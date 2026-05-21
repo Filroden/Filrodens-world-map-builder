@@ -1,0 +1,23 @@
+{
+  "id": "MODULE-FOUNDRY-ID",
+  "title": "Mona Lisa",
+  "description": "My greatest work",
+  "version": "0.0.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13"
+  },
+  "authors": [
+    {
+      "name": "Ken Dearman"
+    }
+  ],
+  "esmodules": [
+    "main.js"
+  ],
+  "styles": [
+  ],
+  "manifestPlusVersion": 1,
+  "manifest": "https://github.com/Filroden/fvtt/releases/download/MODULE-FOUNDRY-ID-latest/module.json",
+  "download": " https://github.com/Filroden/fvtt/releases/download/MODULE-FOUNDRY-ID-latest/MODULE-FOUNDRY-ID.zip"
+}

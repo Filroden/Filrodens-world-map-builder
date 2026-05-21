@@ -1,0 +1,62 @@
+name: Foundry VTT Auto-Publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc
+        run: sudo apt-get install -y pandoc
+
+      - name: Prepare Description and Version
+        id: prepare
+        run: |
+          # 1. Strip the 'v' from the tag
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          CLEAN_VERSION=${TAG_NAME#v}
+          echo "version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+
+          # 2. Clean README and fix Image Paths to point to MAIN
+          MAIN_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/"
+          
+          sed -E '/\!\[.*\]\(https:\/\/img\.shields\.io\/.*\)/d' README.md | \
+          sed -E "s|src=\"images/|src=\"$MAIN_URL/images/|g; s|href=\"images/|href=\"$MAIN_URL/images/|g; s|(\!\[.*\])\(images/|\1($MAIN_URL/images/|g" > clean_readme.md
+          
+          # 3. Convert to HTML
+          pandoc clean_readme.md -f gfm -t html -o description.html
+          
+          # 4. Escape for JSON
+          DESC_JSON=$(jq -Rs . < description.html)
+          echo "description=$DESC_JSON" >> $GITHUB_OUTPUT
+
+      - name: Extract Metadata from module.json
+        id: metadata
+        run: |
+          echo "id=$(jq -r '.id' module.json)" >> $GITHUB_OUTPUT
+          echo "min=$(jq -r '.compatibility.minimum' module.json)" >> $GITHUB_OUTPUT
+          echo "verified=$(jq -r '.compatibility.verified' module.json)" >> $GITHUB_OUTPUT
+
+      - name: Send Release to Foundry API
+        run: |
+          curl -X POST "https://foundryvtt.com/_api/packages/release_version/" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: ${{ secrets.FOUNDRY_API_TOKEN }}" \
+            -d "{
+              \"id\": \"${{ steps.metadata.outputs.id }}\",
+              \"description\": ${{ steps.prepare.outputs.description }},
+              \"release\": {
+                \"version\": \"${{ steps.prepare.outputs.version }}\",
+                \"manifest\": \"https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/module.json\",
+                \"notes\": \"${{ github.event.release.html_url }}\",
+                \"compatibility\": {
+                  \"minimum\": \"${{ steps.metadata.outputs.min }}\",
+                  \"verified\": \"${{ steps.metadata.outputs.verified }}\"
+                }
+              }
+            }"

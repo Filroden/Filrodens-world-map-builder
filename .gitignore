@@ -1,0 +1,7 @@
+/node_modules
+/packs
+/dist
+/unpacked
+
+*.iml
+GEMINI.md
