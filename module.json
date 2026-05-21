@@ -1,23 +1,24 @@
 {
-  "id": "MODULE-FOUNDRY-ID",
-  "title": "Mona Lisa",
-  "description": "My greatest work",
-  "version": "0.0.0",
-  "compatibility": {
-    "minimum": "13",
-    "verified": "13"
-  },
-  "authors": [
-    {
-      "name": "Ken Dearman"
-    }
-  ],
-  "esmodules": [
-    "main.js"
-  ],
-  "styles": [
-  ],
-  "manifestPlusVersion": 1,
-  "manifest": "https://github.com/Filroden/fvtt/releases/download/MODULE-FOUNDRY-ID-latest/module.json",
-  "download": " https://github.com/Filroden/fvtt/releases/download/MODULE-FOUNDRY-ID-latest/MODULE-FOUNDRY-ID.zip"
+    "id": "filrodens-hex-crafter",
+    "title": "Filroden's Hex Crafter",
+    "description": "My greatest work",
+    "version": "1.0.0-beta1",
+    "compatibility": {
+        "minimum": "14",
+        "verified": "14.362",
+        "maximum": "14"
+    },
+    "authors": [{ "name": "Ken Dearman" }],
+    "esmodules": ["main.js"],
+    "styles": ["styles/filroden-theme.css", "styles/filrodens-hex-crafter.css"],
+    "languages": [
+        { "lang": "en", "name": "English", "path": "languages/en.json" },
+        { "lang": "en-GB", "name": "English (UK)", "path": "languages/en-gb.json" }
+    ],
+    "url": "https://github.com/Filroden/filrodens-hex-crafter",
+    "manifest": "https://github.com/Filroden/filrodens-hex-crafter/releases/latest/download/module.json",
+    "download": "https://github.com/Filroden/filrodens-hex-crafter/releases/download/v1.0.0-beta1/filrodens-hex-crafter.zip",
+    "bugs": "https://github.com/Filroden/filrodens-hex-crafter/issues",
+    "readme": "https://github.com/Filroden/filrodens-hex-crafter/blob/main/README.md",
+    "license": "https://mit-license.org/"
 }

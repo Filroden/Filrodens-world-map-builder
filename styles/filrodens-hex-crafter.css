@@ -3,7 +3,7 @@
 =================================================================== */
 
 /* --- MATERIAL DESIGN ICONS --- */
-.module-name-icon {
+.filrodens-hex-crafter-icon {
     display: inline-block;
     width: var(--filroden-font-size-l); 
     height: var(--filroden-font-size-l);
@@ -21,42 +21,42 @@
     margin: 0;
 }
 
-.module-name-icon.example     { -webkit-mask-image: url('../icons/example.svg'); mask-image: url('../icons/example.svg'); }
+.filrodens-hex-crafter-icon.example     { -webkit-mask-image: url('../assets/icons/example.svg'); mask-image: url('../assets/icons/example.svg'); }
 
 
 /* --- APPLICATION SCROLLBARS --- */
-.module-name-window * {
+.filrodens-hex-crafter * {
     scrollbar-width: auto !important;
     scrollbar-color: auto !important;
 }
 
-.module-name-window .module-name-window-scrollable::-webkit-scrollbar {
+.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar {
     width: 8px !important;
     height: 8px !important;
 }
 
-.module-name-window .module-name-window-scrollable::-webkit-scrollbar-track {
+.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar-track {
     background: var(--filroden-color-bg-hover-solid) !important;
     border-radius: var(--filroden-radius-large) !important;
 }
 
-.module-name-window .module-name-window-scrollable::-webkit-scrollbar-thumb {
+.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar-thumb {
     background-color: var(--filroden-color-text-accent) !important;
     border-radius: var(--filroden-radius-large) !important;
     border: 1px solid rgba(0, 0, 0, 0.6) !important;
 }
 
-.module-name-window .module-name-window-scrollable::-webkit-scrollbar-thumb:hover {
+.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar-thumb:hover {
     background-color: var(--filroden-color-text-accent-hover) !important;
 }
 
-.module-name-window .module-name-window-scrollable::-webkit-scrollbar-button {
+.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar-button {
     display: none;
 }
 
 
 /* --- TOOLTIPS --- */
-#tooltip.module-name-tooltip {
+#tooltip.filrodens-hex-crafter-tooltip {
     max-width: 300px !important;
     border: 1px solid var(--filroden-color-text-accent);
     border-radius: var(--filroden-radius-small);
@@ -75,7 +75,7 @@
 
 /* --- BUTTONS --- */
 /* Standard button styles for all buttons */
-.module-name-window button {
+.filrodens-hex-crafter button {
     background: var(--filroden-color-bg-light-solid);
     border: 1px solid var(--filroden-color-border);
     color: var(--filroden-color-text-main-solid);
@@ -85,21 +85,21 @@
     transition: all 0.1s ease;
 }
 
-.module-name-window button:hover {
+.filrodens-hex-crafter button:hover {
     background: var(--filroden-color-bg-hover-solid);
     border-color: var(--filroden-color-text-accent);
     color: var(--filroden-color-text-main-solid);
     box-shadow: none;
 }
 
-.module-name-window *:focus-visible,
-.module-name-window button:focus {
+.filrodens-hex-crafter *:focus-visible,
+.filrodens-hex-crafter button:focus {
     outline: 2px solid var(--filroden-color-text-accent);
     border-radius: var(--filroden-radius-small);
 }
 
 /* Variant styles for primary and danger buttons */
-.module-name-window .module-name-btn {
+.filrodens-hex-crafter .filrodens-hex-crafter-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -110,36 +110,36 @@
     padding: var(--filroden-space-s) var(--filroden-space-m);
 }
 
-.module-name-window .module-name-btn:hover {
+.filrodens-hex-crafter .filrodens-hex-crafter-btn:hover {
     background: var(--filroden-color-bg-hover-solid);
     border-color: var(--filroden-color-text-accent);
     color: var(--filroden-color-text-main-solid);
 }
 
-.module-name-window .module-name-btn.danger {
+.filrodens-hex-crafter .filrodens-hex-crafter-btn.danger {
     color: var(--filroden-color-danger);
     width: 100%;
 }
 
-.module-name-window .module-name-btn.danger:hover {
+.filrodens-hex-crafter .filrodens-hex-crafter-btn.danger:hover {
     color: var(--filroden-color-danger);
 }
 
-.module-name-window .module-name-btn.primary {
+.filrodens-hex-crafter .filrodens-hex-crafter-btn.primary {
     color: var(--filroden-color-text-accent);
 }
 
-.module-name-window .module-name-btn.primary:hover {
+.filrodens-hex-crafter .filrodens-hex-crafter-btn.primary:hover {
     color: var(--filroden-color-text-accent);
 }
 
 
 /* --- INPUTS AND SELECTS --- */
-.module-name input[type="text"],
-.module-name input[type="number"],
-.module-name input[type="time"],
-.module-name select,
-.module-name textarea {
+.filrodens-hex-crafter input[type="text"],
+.filrodens-hex-crafter input[type="number"],
+.filrodens-hex-crafter input[type="time"],
+.filrodens-hex-crafter select,
+.filrodens-hex-crafter textarea {
     background: var(--filroden-color-bg-medium-solid);
     border: 1px solid var(--filroden-color-border);
     color: var(--filroden-color-text-main-solid);
@@ -149,27 +149,27 @@
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.module-name input[type="text"]:focus,
-.module-name input[type="number"]:focus,
-.module-name input[type="time"],
-.module-name select:focus,
-.module-name textarea:focus {
+.filrodens-hex-crafter input[type="text"]:focus,
+.filrodens-hex-crafter input[type="number"]:focus,
+.filrodens-hex-crafter input[type="time"],
+.filrodens-hex-crafter select:focus,
+.filrodens-hex-crafter textarea:focus {
     border-color: var(--filroden-color-text-accent);
     box-shadow: var(--filroden-shadow-focus);
 }
 
-.module-name input::placeholder,
-.module-name textarea::placeholder {
+.filrodens-hex-crafter input::placeholder,
+.filrodens-hex-crafter textarea::placeholder {
     color: var(--filroden-color-text-placeholder-solid);
     opacity: 1;
     font-style: italic;
 }
 
-.module-name input[type="time"]::-webkit-calendar-picker-indicator {
+.filrodens-hex-crafter input[type="time"]::-webkit-calendar-picker-indicator {
     display: none;
 }
 
-.module-name textarea {
+.filrodens-hex-crafter textarea {
     resize: vertical;
     font-family: monospace;
     line-height: var(--filroden-line-height-body);
@@ -177,8 +177,8 @@
 
 
 /* --- CHECKBOXES AND RADIO BUTTONS --- */
-.module-name-checkbox,
-.module-name-radio {
+.filrodens-hex-crafter-checkbox,
+.filrodens-hex-crafter-radio {
     appearance: auto;
     accent-color: var(--filroden-color-text-accent);
     color-scheme: dark;
@@ -191,28 +191,22 @@
     text-align: center;
 }
 
-.module-name-checkbox::before,
-.module-name-checkbox::after,
-.module-name-radio::before,
-.module-name-radio::after {
+.filrodens-hex-crafter-checkbox::before,
+.filrodens-hex-crafter-checkbox::after,
+.filrodens-hex-crafter-radio::before,
+.filrodens-hex-crafter-radio::after {
     content: none;
 }
 
 
 /* --- ACCESSIBILITY INTERACTIONS --- */
-.module-name *:focus-visible,
-.module-name button:focus {
-    outline: 2px solid var(--filroden-color-text-accent);
-    border-radius: var(--filroden-radius-small);
-}
-
-.module-name a:hover {
+.filrodens-hex-crafter a:hover {
     text-shadow: none;
 }
 
-.module-name button.active,
-.module-name [class*="module-name-"][class*="-btn"].active,
-.module-name .module-name-pill.active {
+.filrodens-hex-crafter button.active,
+.filrodens-hex-crafter [class*="filrodens-hex-crafter-"][class*="-btn"].active,
+.filrodens-hex-crafter .filrodens-hex-crafter-pill.active {
     outline: none;
     box-shadow: none;
 }
@@ -220,7 +214,7 @@
 
 /* --- APPLICATION LAYOUTS --- */
 /* Standard two-column wrapper */
-.module-name .module-name-layout {
+.filrodens-hex-crafter .filrodens-hex-crafter-layout {
     display: flex;
     height: 100%;
     width: 100%;
@@ -228,7 +222,7 @@
 }
 
 /* Standard Sidebar */
-.module-name .module-name-sidebar {
+.filrodens-hex-crafter .filrodens-hex-crafter-sidebar {
     flex: 0 0 15rem; /* Default width, easily overridden */
     display: flex;
     flex-direction: column;
@@ -240,7 +234,7 @@
 }
 
 /* Standard Main Content Area */
-.module-name .module-name-main {
+.filrodens-hex-crafter .filrodens-hex-crafter-main {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -251,16 +245,16 @@
 
 
 /* --- TABBED NAVIGATION --- */
-.module-name nav.tabs,
-.module-name .module-name-tabs {
+.filrodens-hex-crafter nav.tabs,
+.filrodens-hex-crafter .filrodens-hex-crafter-tabs {
     display: flex;
     flex: 0 0 auto;
     background: var(--filroden-color-bg-medium-solid);
     border-block-end: 1px solid var(--filroden-color-border);
 }
 
-.module-name nav.tabs .item,
-.module-name .module-name-tabs .item {
+.filrodens-hex-crafter nav.tabs .item,
+.filrodens-hex-crafter .filrodens-hex-crafter-tabs .item {
     flex: 1;
     text-align: center;
     padding: var(--filroden-space-s);
@@ -272,14 +266,14 @@
     transition: background-color 0.2s, color 0.2s;
 }
 
-.module-name nav.tabs .item:hover,
-.module-name .module-name-tabs .item:hover {
+.filrodens-hex-crafter nav.tabs .item:hover,
+.filrodens-hex-crafter .filrodens-hex-crafter-tabs .item:hover {
     color: var(--filroden-color-text-main-solid);
     background: var(--filroden-color-bg-hover-solid);
 }
 
-.module-name nav.tabs .item.active,
-.module-name .module-name-tabs .item.active {
+.filrodens-hex-crafter nav.tabs .item.active,
+.filrodens-hex-crafter .filrodens-hex-crafter-tabs .item.active {
     color: var(--filroden-color-text-accent);
     border-bottom-color: var(--filroden-color-text-accent);
     background: var(--filroden-color-bg-darkest);
@@ -287,7 +281,7 @@
 
 
 /* --- STRUCTURED FORMS --- */
-.module-name fieldset.module-name-fieldset {
+.filrodens-hex-crafter fieldset.filrodens-hex-crafter-fieldset {
     border: var(--filroden-border-main);
     border-radius: var(--filroden-radius-medium);
     padding: var(--filroden-space-m);
@@ -297,14 +291,14 @@
     flex-direction: column;
 }
 
-.module-name fieldset.module-name-fieldset legend {
+.filrodens-hex-crafter fieldset.filrodens-hex-crafter-fieldset legend {
     font-weight: bold;
     color: var(--filroden-color-text-accent);
     padding-inline: var(--filroden-space-xs);
     font-size: var(--filroden-font-size-s);
 }
 
-.module-name .form-group {
+.filrodens-hex-crafter .form-group {
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
@@ -312,7 +306,7 @@
     margin-block-end: var(--filroden-space-s);
 }
 
-.module-name .form-group label {
+.filrodens-hex-crafter .form-group label {
     margin: 0;
     color: var(--filroden-color-text-main-solid);
     white-space: nowrap;
@@ -321,8 +315,8 @@
 
 /* --- SEMANTIC TEXT & STATES --- */
 /* Helper text below inputs or headers */
-.module-name .hint,
-.module-name .module-name-notes {
+.filrodens-hex-crafter .hint,
+.filrodens-hex-crafter .filrodens-hex-crafter-notes {
     font-size: var(--filroden-font-size-xs);
     color: var(--filroden-color-text-muted-solid);
     margin-block-start: var(--filroden-space-xxs);
@@ -330,7 +324,7 @@
 }
 
 /* Empty or missing data states */
-.module-name .module-name-empty {
+.filrodens-hex-crafter .filrodens-hex-crafter-empty {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -345,7 +339,7 @@
 }
 
 /* Thematic Divider */
-.module-name .module-name-divider {
+.filrodens-hex-crafter .filrodens-hex-crafter-divider {
     border: none;
     height: 1px;
     width: 100%;
@@ -355,7 +349,7 @@
 
 
 /* --- BADGES & PILLS --- */
-.module-name .module-name-badge {
+.filrodens-hex-crafter .filrodens-hex-crafter-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -371,7 +365,7 @@
     white-space: nowrap;
 }
 
-.module-name .module-name-badge.primary {
+.filrodens-hex-crafter .filrodens-hex-crafter-badge.primary {
     background-color: var(--filroden-color-text-accent);
     color: var(--filroden-color-text-on-accent);
     border-color: var(--filroden-color-text-accent);
@@ -382,7 +376,7 @@
    --- MAIN UI ---
 =================================================================== */
 
-.module-name {
+.filrodens-hex-crafter {
     font-family: var(--filroden-font-family) !important;
     font-size: var(--filroden-font-size-s);
     background: var(--filroden-color-bg-darkest) !important;
@@ -390,21 +384,21 @@
 }
 
 /* UI direction handling for RTL languages */
-.module-name.rtl,
-.module-name[dir="rtl"] {
+.filrodens-hex-crafter.rtl,
+.filrodens-hex-crafter[dir="rtl"] {
     --filroden-dir-flip: -1;
 }
 
-:root:lang(ar) #tooltip.module-name-tooltip,
-:root:lang(he) #tooltip.module-name-tooltip,
-:root:lang(fa) #tooltip.module-name-tooltip,
-:root:lang(ur) #tooltip.module-name-tooltip {
+:root:lang(ar) #tooltip.filrodens-hex-crafter-tooltip,
+:root:lang(he) #tooltip.filrodens-hex-crafter-tooltip,
+:root:lang(fa) #tooltip.filrodens-hex-crafter-tooltip,
+:root:lang(ur) #tooltip.filrodens-hex-crafter-tooltip {
     direction: rtl;
     text-align: right;
 }
 
 /* Main window header styles */
-.module-name .window-header {
+.filrodens-hex-crafter .window-header {
     background: var(--filroden-color-bg-darkest) !important;
     border: none !important;
     color: var(--filroden-color-text-main-solid);
@@ -416,7 +410,7 @@
     align-items: center;
 }
 
-.module-name .window-header .window-title {
+.filrodens-hex-crafter .window-header .window-title {
     font-size: var(--filroden-font-size-s);
     line-height: var(--filroden-line-height-heading);
     text-align: start; 
@@ -425,13 +419,13 @@
     flex: 1;
 }
 
-.module-name .window-header .window-icon {
+.filrodens-hex-crafter .window-header .window-icon {
     margin-inline-start: var(--filroden-space-xxs);
     margin-inline-end: 0;
 }
 
 /* Main window content styles */
-.module-name .window-content {
+.filrodens-hex-crafter .window-content {
     background: var(--filroden-color-bg-darkest) !important;
     color: var(--filroden-color-text-main-solid);
     padding: 0;
