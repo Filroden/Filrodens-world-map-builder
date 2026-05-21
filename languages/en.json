@@ -1,1 +1,17 @@
-{}
+{
+    "FILRODENSHEX.UI.ControlTitle": "Hex Crafter",
+    "FILRODENSHEX.UI.ToggleEditor": "Toggle Hex Crafter UI",
+    "FILRODENSHEX.UI.ToolbarTitle": "Terrain Generation",
+
+    "FILRODENSHEX.UI.Stage1Legend": "1. Elevation Model",
+    "FILRODENSHEX.UI.Stage1Hint": "Generate the foundational heightmap. This calculates the mathematical noise used to define continental shapes, oceans, and mountain peaks.",
+    "FILRODENSHEX.Actions.GenerateNoise": "Generate Elevation Data",
+
+    "FILRODENSHEX.UI.PaintLegend": "2. Manual Overrides",
+    "FILRODENSHEX.UI.SelectModePrompt": "Procedural generation must be executed before manual painting tools become available.",
+
+    "FILRODENSHEX.Settings.ExportPath.Name": "Map Export Directory",
+    "FILRODENSHEX.Settings.ExportPath.Hint": "The server directory where baked WebP maps will be automatically saved when exiting the editor.",
+
+    "FILRODENSHEX.Warnings.InvalidGridType": "Hex Crafter requires a Hexagonal grid. Please update your Scene Configuration."
+}
