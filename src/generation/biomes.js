@@ -7,14 +7,18 @@ export function determineBiome(elevation, moisture, temperature, seaLevel) {
 
     // 2. Water
     if (elevation <= seaLevel) {
-        return seaLevel - elevation > 0.15 ? "ocean" : "coast";
+        // Calculate the absolute bottom of the coastal shelf, preventing negative values
+        const coastalShelfBottom = Math.max(0, seaLevel - 0.05);
+
+        if (elevation < coastalShelfBottom) return "ocean";
+        return "coast";
     }
 
     // 3. Extreme Elevation Overrides
     if (elevation >= 0.8) return "peak";
     if (elevation >= 0.65) return "mountain";
 
-    // 4. The Whittaker Climate Matrix (Restored bands)
+    // 4. The Whittaker Climate Matrix
     if (temperature > 0.65) {
         if (moisture > 0.55) return "jungle";
         if (moisture > 0.45) return "savanna";

@@ -1,8 +1,8 @@
 {
     "FILRODENSHEX.UI.ControlTitle": "Hex Crafter",
-    "FILRODENSHEX.UI.ToggleEditor": "Toggle Hex Crafter UI",
+    "FILRODENSHEX.UI.ToggleEditor": "Terrain Generation",
     "FILRODENSHEX.UI.ToolbarTitle": "Terrain Generation",
-    "FILRODENSHEX.UI.Stage1Legend": "1. Terrain Model",
+    "FILRODENSHEX.UI.Stage1Legend": "Terrain Model",
     "FILRODENSHEX.UI.Stage1Hint": "Generate the foundational heightmap. This calculates the mathematical noise used to define continental shapes, oceans, and mountain peaks.",
     "FILRODENSHEX.UI.SeedLabel": "World Seed",
     "FILRODENSHEX.UI.SeaLevel": "Sea Level",
@@ -10,10 +10,13 @@
     "FILRODENSHEX.UI.Latitude": "Latitude Boundaries",
     "FILRODENSHEX.UI.LatTop": "Top Edge Latitude (-90 to 90)",
     "FILRODENSHEX.UI.LatBottom": "Bottom Edge Latitude (-90 to 90)",
-    "FILRODENSHEX.UI.PaintLegend": "2. Manual Overrides",
-    "FILRODENSHEX.UI.SelectModePrompt": "Procedural generation must be executed before manual painting tools become available.",
+    "FILRODENSHEX.UI.AdvancedOptions": "Advanced Options",
+    "FILRODENSHEX.UI.ElevScale": "Elevation Scale",
+    "FILRODENSHEX.UI.ElevStretch": "Elevation Stretch",
+    "FILRODENSHEX.UI.MapManager": "Map Manager",
 
     "FILRODENSHEX.Legend.Title": "Biomes",
+
     "FILRODENSHEX.Biomes.ocean": "Ocean",
     "FILRODENSHEX.Biomes.coast": "Coast",
     "FILRODENSHEX.Biomes.peak": "Peak",
@@ -32,7 +35,7 @@
     "FILRODENSHEX.Actions.Randomize": "Randomize Seed",
 
     "FILRODENSHEX.Settings.ExportPath.Name": "Map Export Directory",
-    "FILRODENSHEX.Settings.ExportPath.Hint": "The server directory where baked WebP maps will be automatically saved when exiting the editor.",
+    "FILRODENSHEX.Settings.ExportPath.Hint": "The server directory where WEBP versions of the maps will be automatically saved when exiting the editor.",
 
     "FILRODENSHEX.Warnings.InvalidGridType": "Hex Crafter requires a Hexagonal grid. Please update your Scene Configuration."
 }

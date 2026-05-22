@@ -7,8 +7,15 @@ export class HexCrafterLayer extends foundry.canvas.layers.InteractionLayer {
     async _draw() {
         await super._draw();
 
+        // Safely create the graphics object and add it to the layer
         this.terrainGraphics = new PIXI.Graphics();
         this.addChild(this.terrainGraphics);
+
+        // Native First: Check if the Scene already has a generated continent saved in its flags
+        const savedData = canvas.scene.getFlag(FILRODENSHEX.ID, FILRODENSHEX.FLAGS.HEX_DATA);
+        if (savedData) {
+            this.renderTerrain(savedData);
+        }
 
         return this;
     }

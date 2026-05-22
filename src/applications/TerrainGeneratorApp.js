@@ -4,12 +4,12 @@ import { FILRODENSHEX } from "../config.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
-export class HexCrafterUI extends HandlebarsApplicationMixin(ApplicationV2) {
+export class TerrainGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static DEFAULT_OPTIONS = {
-        id: "fhc-toolbar",
+        id: "fhc-terrain-generator",
         classes: ["fhc", "fhc-docked-toolbar"],
         position: {
-            width: 480,
+            width: 320,
             height: "auto",
         },
         window: {
@@ -17,29 +17,25 @@ export class HexCrafterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             resizable: false,
         },
         actions: {
-            generateElevation: HexCrafterUI.#onGenerateElevation,
-            randomizeSeed: HexCrafterUI.#onRandomizeSeed,
+            generateElevation: TerrainGeneratorApp.#onGenerateElevation,
+            randomizeSeed: TerrainGeneratorApp.#onRandomizeSeed,
         },
     };
 
     static PARTS = {
         toolbar: {
-            template: "modules/filrodens-hex-crafter/templates/toolbar.hbs",
+            // Updated to the new file name
+            template: "modules/filrodens-hex-crafter/templates/terrain-generator.hbs",
         },
     };
 
-    /**
-     * Generates a random 6-character string, updates the input, and triggers a render.
-     */
     static async #onRandomizeSeed(event, target) {
-        // Safely query the DOM within the modern AppV2 window content
         const appElement = target.closest(".window-content");
         const seedInput = appElement.querySelector("#fhc-seed");
 
         if (seedInput) {
             seedInput.value = Math.random().toString(36).substring(2, 8).toUpperCase();
-            // Automatically trigger the generation so the GM doesn't have to click twice
-            HexCrafterUI.#onGenerateElevation(event, target);
+            TerrainGeneratorApp.#onGenerateElevation(event, target);
         }
     }
 
@@ -62,6 +58,15 @@ export class HexCrafterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         const globalTemp = readInput("#fhc-global-temp", FILRODENSHEX.DEFAULTS.GLOBAL_TEMP);
         const latTop = readInput("#fhc-lat-top", FILRODENSHEX.DEFAULTS.LAT_TOP);
         const latBottom = readInput("#fhc-lat-bottom", FILRODENSHEX.DEFAULTS.LAT_BOTTOM);
+
+        // Read Advanced Options, falling back to the config.js defaults if untouched
+        const elScale = readInput("#fhc-el-scale", FILRODENSHEX.NOISE.ELEVATION.SCALE);
+        const elStretch = readInput("#fhc-el-stretch", FILRODENSHEX.NOISE.ELEVATION.STRETCH);
+
+        // Dynamically build the configuration objects for the noise engine
+        const configElevation = { ...FILRODENSHEX.NOISE.ELEVATION, SCALE: elScale, STRETCH: elStretch };
+        const configMoisture = FILRODENSHEX.NOISE.MOISTURE;
+        const configTemperature = FILRODENSHEX.NOISE.TEMPERATURE;
 
         let hash = 0;
         for (let i = 0; i < seedString.length; i++) {
@@ -88,17 +93,15 @@ export class HexCrafterUI extends HandlebarsApplicationMixin(ApplicationV2) {
                 const hexCenterY = vertices.reduce((sum, v) => sum + v.y, 0) / vertices.length;
 
                 if (sceneRect.contains(hexCenterX, hexCenterY)) {
-                    // Native First: Calculate latitude based on absolute pixel Y, ignoring grid row orientation
                     const yFraction = (hexCenterY - sceneRect.top) / sceneRect.height;
                     const currentLat = latTop + yFraction * (latBottom - latTop);
                     const latTempModifier = Math.cos(currentLat * (Math.PI / 180));
 
-                    const elevation = calculateNoise(col, row, FILRODENSHEX.NOISE.ELEVATION, elOffsetX, elOffsetY);
-                    const moisture = calculateNoise(col, row, FILRODENSHEX.NOISE.MOISTURE, moOffsetX, moOffsetY);
-                    const rawTemp = calculateNoise(col, row, FILRODENSHEX.NOISE.TEMPERATURE, tempOffsetX, tempOffsetY);
+                    // Inject the dynamically built configurations
+                    const elevation = calculateNoise(col, row, configElevation, elOffsetX, elOffsetY);
+                    const moisture = calculateNoise(col, row, configMoisture, moOffsetX, moOffsetY);
+                    const rawTemp = calculateNoise(col, row, configTemperature, tempOffsetX, tempOffsetY);
 
-                    // Combine the slider, latitude, and local noise
-                    // The noise supplies a 0.5 variance to the base climate calculation
                     const temperature = latTempModifier * globalTemp + rawTemp * 0.5;
                     const biomeId = determineBiome(elevation, moisture, temperature, seaLevel);
 
@@ -107,6 +110,8 @@ export class HexCrafterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        canvas.hexCrafter.renderTerrain(terrainData);
+        await canvas.scene.setFlag(FILRODENSHEX.ID, FILRODENSHEX.FLAGS.HEX_DATA, terrainData);
+        const savedData = canvas.scene.getFlag(FILRODENSHEX.ID, FILRODENSHEX.FLAGS.HEX_DATA);
+        canvas.hexCrafter.renderTerrain(savedData);
     }
 }
