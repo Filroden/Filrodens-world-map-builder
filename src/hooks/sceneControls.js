@@ -21,8 +21,8 @@ export function registerSceneControls() {
                 toggleEditor: {
                     name: "toggleEditor",
                     title: "FILRODENSHEX.UI.ToggleEditor",
-                    icon: "fhc-scene-icon layers",
-                    toggle: false,
+                    icon: "fhc-scene-icon elevation",
+                    toggle: true,
                     active: false,
                     onChange: (event, active) => {
                         const uiInstance = game.filrodenshex.terrainGenerator;
@@ -37,14 +37,14 @@ export function registerSceneControls() {
                     name: "mapManager",
                     title: "FILRODENSHEX.UI.MapManager",
                     icon: "fhc-scene-icon travel_explore",
-                    toggle: false,
+                    toggle: true,
                     active: false,
                     onChange: (event, active) => {
-                        // Stub for the upcoming Map Manager App
+                        const uiInstance = game.filrodenshex.mapManager;
                         if (active) {
-                            console.log("Hex Crafter | Map Manager opened.");
+                            uiInstance.render({ force: true });
                         } else {
-                            console.log("Hex Crafter | Map Manager closed.");
+                            uiInstance.close();
                         }
                     },
                 },

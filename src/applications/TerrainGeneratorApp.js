@@ -29,6 +29,24 @@ export class TerrainGeneratorApp extends HandlebarsApplicationMixin(ApplicationV
         },
     };
 
+    /**
+     * Native AppV2 Hook: Prepares dynamic data for the Handlebars template.
+     */
+    async _prepareContext(options) {
+        // Fetch the saved parameters from the scene, or default to an empty object
+        const savedParams = canvas?.scene?.getFlag(FILRODENSHEX.ID, FILRODENSHEX.FLAGS.PARAMS) || {};
+
+        return {
+            seed: savedParams.seed || "TERRAHEX",
+            seaLevel: savedParams.seaLevel ?? FILRODENSHEX.DEFAULTS.SEA_LEVEL,
+            globalTemp: savedParams.globalTemp ?? FILRODENSHEX.DEFAULTS.GLOBAL_TEMP,
+            latTop: savedParams.latTop ?? FILRODENSHEX.DEFAULTS.LAT_TOP,
+            latBottom: savedParams.latBottom ?? FILRODENSHEX.DEFAULTS.LAT_BOTTOM,
+            elScale: savedParams.elScale ?? FILRODENSHEX.NOISE.ELEVATION.SCALE,
+            elStretch: savedParams.elStretch ?? FILRODENSHEX.NOISE.ELEVATION.STRETCH,
+        };
+    }
+
     static async #onRandomizeSeed(event, target) {
         const appElement = target.closest(".window-content");
         const seedInput = appElement.querySelector("#fhc-seed");
@@ -62,6 +80,17 @@ export class TerrainGeneratorApp extends HandlebarsApplicationMixin(ApplicationV
         // Read Advanced Options, falling back to the config.js defaults if untouched
         const elScale = readInput("#fhc-el-scale", FILRODENSHEX.NOISE.ELEVATION.SCALE);
         const elStretch = readInput("#fhc-el-stretch", FILRODENSHEX.NOISE.ELEVATION.STRETCH);
+
+        // 1. Capture the exact parameters used for this generation
+        const generationParams = {
+            seed: seedString,
+            seaLevel,
+            globalTemp,
+            latTop,
+            latBottom,
+            elScale,
+            elStretch,
+        };
 
         // Dynamically build the configuration objects for the noise engine
         const configElevation = { ...FILRODENSHEX.NOISE.ELEVATION, SCALE: elScale, STRETCH: elStretch };
@@ -110,8 +139,29 @@ export class TerrainGeneratorApp extends HandlebarsApplicationMixin(ApplicationV
             }
         }
 
+        // 2. The Batched Database Mutation (Now saving BOTH the data and the parameters)
+        await canvas.scene.setFlag(FILRODENSHEX.ID, FILRODENSHEX.FLAGS.PARAMS, generationParams);
         await canvas.scene.setFlag(FILRODENSHEX.ID, FILRODENSHEX.FLAGS.HEX_DATA, terrainData);
+
         const savedData = canvas.scene.getFlag(FILRODENSHEX.ID, FILRODENSHEX.FLAGS.HEX_DATA);
         canvas.hexCrafter.renderTerrain(savedData);
+    }
+
+    /**
+     * Fires immediately before the window is destroyed.
+     * Syncs the Scene Controls toggle state to prevent a visual mismatch.
+     */
+    _onClose(options) {
+        // Safely traverse the V14 Record structure to locate our specific tool
+        const hcControl = ui.controls.controls?.hexCrafter;
+
+        if (hcControl?.tools?.toggleEditor?.active) {
+            // Flip the state and force the left-hand toolbar to visually update
+            hcControl.tools.toggleEditor.active = false;
+            ui.controls.render();
+        }
+
+        // Execute the actual destruction of the window
+        super._onClose(options);
     }
 }

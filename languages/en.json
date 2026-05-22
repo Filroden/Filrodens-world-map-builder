@@ -14,6 +14,11 @@
     "FILRODENSHEX.UI.ElevScale": "Elevation Scale",
     "FILRODENSHEX.UI.ElevStretch": "Elevation Stretch",
     "FILRODENSHEX.UI.MapManager": "Map Manager",
+    "FILRODENSHEX.UI.MapName": "Map Name",
+    "FILRODENSHEX.UI.SaveMap": "Save Map",
+    "FILRODENSHEX.UI.SaveMapHint": "Saves the current map data to a compendium entry. This includes all hex data, biome assignments, and configuration settings. The map can be reloaded later for further editing or export.",
+    "FILRODENSHEX.UI.LoadMap": "Load Map",
+    "FILRODENSHEX.UI.NoMapsSaved": "No saved maps found in the compendium.",
 
     "FILRODENSHEX.Legend.Title": "Biomes",
 
@@ -33,9 +38,17 @@
 
     "FILRODENSHEX.Actions.GenerateNoise": "Generate Terrain Data",
     "FILRODENSHEX.Actions.Randomize": "Randomize Seed",
+    "FILRODENSHEX.Actions.Save": "Save Map Data",
+    "FILRODENSHEX.Actions.Load": "Load Map Data",
+    "FILRODENSHEX.Actions.Delete": "Delete Map Data",
 
     "FILRODENSHEX.Settings.ExportPath.Name": "Map Export Directory",
     "FILRODENSHEX.Settings.ExportPath.Hint": "The server directory where WEBP versions of the maps will be automatically saved when exiting the editor.",
 
-    "FILRODENSHEX.Warnings.InvalidGridType": "Hex Crafter requires a Hexagonal grid. Please update your Scene Configuration."
+    "FILRODENSHEX.Notifications.MapSaved": "Map data saved to compendium.",
+    "FILRODENSHEX.Notifications.MapLoaded": "Map data loaded from compendium.",
+
+    "FILRODENSHEX.Warnings.InvalidGridType": "Hex Crafter requires a Hexagonal grid. Please update your Scene Configuration.",
+
+    "FILRODENSHEX.Notifications.LoadFailed": "Failed to load map data from compendium."
 }
