@@ -26,6 +26,9 @@
 .fhc-icon.elevation { -webkit-mask-image: url('../assets/icons/elevation.svg'); mask-image: url('../assets/icons/elevation.svg'); }
 .fhc-icon.shuffle { -webkit-mask-image: url('../assets/icons/shuffle.svg'); mask-image: url('../assets/icons/shuffle.svg'); }
 .fhc-icon.travel_explore { -webkit-mask-image: url('../assets/icons/travel_explore.svg'); mask-image: url('../assets/icons/travel_explore.svg'); }
+.fhc-icon.file_open     { -webkit-mask-image: url('../assets/icons/file_open.svg'); mask-image: url('../assets/icons/file_open.svg'); }
+.fhc-icon.file_save     { -webkit-mask-image: url('../assets/icons/file_save.svg'); mask-image: url('../assets/icons/file_save.svg'); }
+.fhc-icon.delete    { -webkit-mask-image: url('../assets/icons/delete.svg'); mask-image: url('../assets/icons/delete.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fhc * {
@@ -416,9 +419,9 @@
     mask: url('../assets/icons/hive.svg') no-repeat center;
 }
 
-.fhc-scene-icon.layers::before {
-    -webkit-mask: url('../assets/icons/layers.svg') no-repeat center;
-    mask: url('../assets/icons/layers.svg') no-repeat center;
+.fhc-scene-icon.elevation::before {
+    -webkit-mask: url('../assets/icons/elevation.svg') no-repeat center;
+    mask: url('../assets/icons/elevation.svg') no-repeat center;
 }
 
 .fhc-scene-icon.travel_explore::before {
@@ -582,4 +585,46 @@
     height: var(--filroden-space-l);
     border: 1px solid var(--filroden-color-border);
     border-radius: var(--filroden-radius-small);
+}
+
+/* ===================================================================
+   --- MAP MANAGER ---
+=================================================================== */
+
+.fhc .fhc-map-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--filroden-space-s);
+    max-height: 300px;
+    overflow-y: auto;
+    padding-inline-end: var(--filroden-space-xs); /* Scrollbar buffer */
+}
+
+.fhc .fhc-map-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--filroden-color-bg-medium-solid);
+    border: 1px solid var(--filroden-color-border);
+    border-radius: var(--filroden-radius-small);
+    padding: var(--filroden-space-xs) var(--filroden-space-s);
+}
+
+.fhc .fhc-map-name {
+    font-weight: bold;
+    color: var(--filroden-color-text-main-solid);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+
+.fhc .fhc-map-actions {
+    display: flex;
+    gap: var(--filroden-space-xs);
+    flex: 0 0 auto;
+}
+
+.fhc .fhc-map-actions button {
+    padding: var(--filroden-space-xxs) var(--filroden-space-xs);
 }

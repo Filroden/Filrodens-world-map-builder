@@ -3,6 +3,7 @@ export const FILRODENSHEX = {
     FLAGS: {
         IS_ACTIVE: "isActiveCanvas",
         HEX_DATA: "hexData",
+        PARAMS: "generationParams",
     },
     TEMPLATES: {
         TOOLBAR: "modules/filrodens-hex-crafter/templates/toolbar.hbs",
@@ -35,5 +36,9 @@ export const FILRODENSHEX = {
         taiga: { color: 0x476356 },
         tundra: { color: 0x93a39a },
         ice: { color: 0xddeaf0 },
+    },
+    COMPENDIUM: {
+        NAME: "fhc-maps",
+        LABEL: "Hex Crafter Maps",
     },
 };
