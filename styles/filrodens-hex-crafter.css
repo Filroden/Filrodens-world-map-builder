@@ -3,7 +3,7 @@
 =================================================================== */
 
 /* --- MATERIAL DESIGN ICONS --- */
-.filrodens-hex-crafter-icon {
+.fhc-icon {
     display: inline-block;
     width: var(--filroden-font-size-l); 
     height: var(--filroden-font-size-l);
@@ -21,42 +21,45 @@
     margin: 0;
 }
 
-.filrodens-hex-crafter-icon.example     { -webkit-mask-image: url('../assets/icons/example.svg'); mask-image: url('../assets/icons/example.svg'); }
-
+.fhc-icon.hex     { -webkit-mask-image: url('../assets/icons/hive.svg'); mask-image: url('../assets/icons/hive.svg'); }
+.fhc-icon.layers  { -webkit-mask-image: url('../assets/icons/layers.svg'); mask-image: url('../assets/icons/layers.svg'); }
+.fhc-icon.elevation { -webkit-mask-image: url('../assets/icons/elevation.svg'); mask-image: url('../assets/icons/elevation.svg'); }
+.fhc-icon.shuffle { -webkit-mask-image: url('../assets/icons/shuffle.svg'); mask-image: url('../assets/icons/shuffle.svg'); }
+.fhc-icon.travel_explore { -webkit-mask-image: url('../assets/icons/travel_explore.svg'); mask-image: url('../assets/icons/travel_explore.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
-.filrodens-hex-crafter * {
+.fhc * {
     scrollbar-width: auto !important;
     scrollbar-color: auto !important;
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar {
+.fhc .fhc-scrollable::-webkit-scrollbar {
     width: 8px !important;
     height: 8px !important;
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar-track {
+.fhc .fhc-scrollable::-webkit-scrollbar-track {
     background: var(--filroden-color-bg-hover-solid) !important;
     border-radius: var(--filroden-radius-large) !important;
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar-thumb {
+.fhc .fhc-scrollable::-webkit-scrollbar-thumb {
     background-color: var(--filroden-color-text-accent) !important;
     border-radius: var(--filroden-radius-large) !important;
     border: 1px solid rgba(0, 0, 0, 0.6) !important;
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar-thumb:hover {
+.fhc .fhc-scrollable::-webkit-scrollbar-thumb:hover {
     background-color: var(--filroden-color-text-accent-hover) !important;
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-scrollable::-webkit-scrollbar-button {
+.fhc .fhc-scrollable::-webkit-scrollbar-button {
     display: none;
 }
 
 
 /* --- TOOLTIPS --- */
-#tooltip.filrodens-hex-crafter-tooltip {
+#tooltip.fhc-tooltip {
     max-width: 300px !important;
     border: 1px solid var(--filroden-color-text-accent);
     border-radius: var(--filroden-radius-small);
@@ -75,7 +78,7 @@
 
 /* --- BUTTONS --- */
 /* Standard button styles for all buttons */
-.filrodens-hex-crafter button {
+.fhc button {
     background: var(--filroden-color-bg-light-solid);
     border: 1px solid var(--filroden-color-border);
     color: var(--filroden-color-text-main-solid);
@@ -85,21 +88,21 @@
     transition: all 0.1s ease;
 }
 
-.filrodens-hex-crafter button:hover {
+.fhc button:hover {
     background: var(--filroden-color-bg-hover-solid);
     border-color: var(--filroden-color-text-accent);
     color: var(--filroden-color-text-main-solid);
     box-shadow: none;
 }
 
-.filrodens-hex-crafter *:focus-visible,
-.filrodens-hex-crafter button:focus {
+.fhc *:focus-visible,
+.fhc button:focus {
     outline: 2px solid var(--filroden-color-text-accent);
     border-radius: var(--filroden-radius-small);
 }
 
 /* Variant styles for primary and danger buttons */
-.filrodens-hex-crafter .filrodens-hex-crafter-btn {
+.fhc .fhc-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -110,36 +113,36 @@
     padding: var(--filroden-space-s) var(--filroden-space-m);
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-btn:hover {
+.fhc .fhc-btn:hover {
     background: var(--filroden-color-bg-hover-solid);
     border-color: var(--filroden-color-text-accent);
     color: var(--filroden-color-text-main-solid);
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-btn.danger {
+.fhc .fhc-btn.danger {
     color: var(--filroden-color-danger);
     width: 100%;
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-btn.danger:hover {
+.fhc .fhc-btn.danger:hover {
     color: var(--filroden-color-danger);
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-btn.primary {
+.fhc .fhc-btn.primary {
     color: var(--filroden-color-text-accent);
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-btn.primary:hover {
+.fhc .fhc-btn.primary:hover {
     color: var(--filroden-color-text-accent);
 }
 
 
 /* --- INPUTS AND SELECTS --- */
-.filrodens-hex-crafter input[type="text"],
-.filrodens-hex-crafter input[type="number"],
-.filrodens-hex-crafter input[type="time"],
-.filrodens-hex-crafter select,
-.filrodens-hex-crafter textarea {
+.fhc input[type="text"],
+.fhc input[type="number"],
+.fhc input[type="time"],
+.fhc select,
+.fhc textarea {
     background: var(--filroden-color-bg-medium-solid);
     border: 1px solid var(--filroden-color-border);
     color: var(--filroden-color-text-main-solid);
@@ -149,27 +152,27 @@
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.filrodens-hex-crafter input[type="text"]:focus,
-.filrodens-hex-crafter input[type="number"]:focus,
-.filrodens-hex-crafter input[type="time"],
-.filrodens-hex-crafter select:focus,
-.filrodens-hex-crafter textarea:focus {
+.fhc input[type="text"]:focus,
+.fhc input[type="number"]:focus,
+.fhc input[type="time"],
+.fhc select:focus,
+.fhc textarea:focus {
     border-color: var(--filroden-color-text-accent);
     box-shadow: var(--filroden-shadow-focus);
 }
 
-.filrodens-hex-crafter input::placeholder,
-.filrodens-hex-crafter textarea::placeholder {
+.fhc input::placeholder,
+.fhc textarea::placeholder {
     color: var(--filroden-color-text-placeholder-solid);
     opacity: 1;
     font-style: italic;
 }
 
-.filrodens-hex-crafter input[type="time"]::-webkit-calendar-picker-indicator {
+.fhc input[type="time"]::-webkit-calendar-picker-indicator {
     display: none;
 }
 
-.filrodens-hex-crafter textarea {
+.fhc textarea {
     resize: vertical;
     font-family: monospace;
     line-height: var(--filroden-line-height-body);
@@ -177,8 +180,8 @@
 
 
 /* --- CHECKBOXES AND RADIO BUTTONS --- */
-.filrodens-hex-crafter-checkbox,
-.filrodens-hex-crafter-radio {
+.fhc-checkbox,
+.fhc-radio {
     appearance: auto;
     accent-color: var(--filroden-color-text-accent);
     color-scheme: dark;
@@ -191,22 +194,22 @@
     text-align: center;
 }
 
-.filrodens-hex-crafter-checkbox::before,
-.filrodens-hex-crafter-checkbox::after,
-.filrodens-hex-crafter-radio::before,
-.filrodens-hex-crafter-radio::after {
+.fhc-checkbox::before,
+.fhc-checkbox::after,
+.fhc-radio::before,
+.fhc-radio::after {
     content: none;
 }
 
 
 /* --- ACCESSIBILITY INTERACTIONS --- */
-.filrodens-hex-crafter a:hover {
+.fhc a:hover {
     text-shadow: none;
 }
 
-.filrodens-hex-crafter button.active,
-.filrodens-hex-crafter [class*="filrodens-hex-crafter-"][class*="-btn"].active,
-.filrodens-hex-crafter .filrodens-hex-crafter-pill.active {
+.fhc button.active,
+.fhc [class*="fhc-"][class*="-btn"].active,
+.fhc .fhc-pill.active {
     outline: none;
     box-shadow: none;
 }
@@ -214,7 +217,7 @@
 
 /* --- APPLICATION LAYOUTS --- */
 /* Standard two-column wrapper */
-.filrodens-hex-crafter .filrodens-hex-crafter-layout {
+.fhc .fhc-layout {
     display: flex;
     height: 100%;
     width: 100%;
@@ -222,8 +225,8 @@
 }
 
 /* Standard Sidebar */
-.filrodens-hex-crafter .filrodens-hex-crafter-sidebar {
-    flex: 0 0 15rem; /* Default width, easily overridden */
+.fhc .fhc-sidebar {
+    flex: 0 0 18rem; /* Default width, easily overridden */
     display: flex;
     flex-direction: column;
     padding: var(--filroden-space-m);
@@ -234,7 +237,7 @@
 }
 
 /* Standard Main Content Area */
-.filrodens-hex-crafter .filrodens-hex-crafter-main {
+.fhc .fhc-main {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -245,16 +248,16 @@
 
 
 /* --- TABBED NAVIGATION --- */
-.filrodens-hex-crafter nav.tabs,
-.filrodens-hex-crafter .filrodens-hex-crafter-tabs {
+.fhc nav.tabs,
+.fhc .fhc-tabs {
     display: flex;
     flex: 0 0 auto;
     background: var(--filroden-color-bg-medium-solid);
     border-block-end: 1px solid var(--filroden-color-border);
 }
 
-.filrodens-hex-crafter nav.tabs .item,
-.filrodens-hex-crafter .filrodens-hex-crafter-tabs .item {
+.fhc nav.tabs .item,
+.fhc .fhc-tabs .item {
     flex: 1;
     text-align: center;
     padding: var(--filroden-space-s);
@@ -266,14 +269,14 @@
     transition: background-color 0.2s, color 0.2s;
 }
 
-.filrodens-hex-crafter nav.tabs .item:hover,
-.filrodens-hex-crafter .filrodens-hex-crafter-tabs .item:hover {
+.fhc nav.tabs .item:hover,
+.fhc .fhc-tabs .item:hover {
     color: var(--filroden-color-text-main-solid);
     background: var(--filroden-color-bg-hover-solid);
 }
 
-.filrodens-hex-crafter nav.tabs .item.active,
-.filrodens-hex-crafter .filrodens-hex-crafter-tabs .item.active {
+.fhc nav.tabs .item.active,
+.fhc .fhc-tabs .item.active {
     color: var(--filroden-color-text-accent);
     border-bottom-color: var(--filroden-color-text-accent);
     background: var(--filroden-color-bg-darkest);
@@ -281,24 +284,24 @@
 
 
 /* --- STRUCTURED FORMS --- */
-.filrodens-hex-crafter fieldset.filrodens-hex-crafter-fieldset {
+.fhc fieldset.fhc-fieldset {
     border: var(--filroden-border-main);
     border-radius: var(--filroden-radius-medium);
     padding: var(--filroden-space-m);
-    margin-block-start: var(--filroden-space-m);
+    margin: var(--filroden-space-m);
     gap: var(--filroden-space-s);
     display: flex;
     flex-direction: column;
 }
 
-.filrodens-hex-crafter fieldset.filrodens-hex-crafter-fieldset legend {
+.fhc fieldset.fhc-fieldset legend {
     font-weight: bold;
     color: var(--filroden-color-text-accent);
     padding-inline: var(--filroden-space-xs);
     font-size: var(--filroden-font-size-s);
 }
 
-.filrodens-hex-crafter .form-group {
+.fhc .form-group {
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
@@ -306,7 +309,7 @@
     margin-block-end: var(--filroden-space-s);
 }
 
-.filrodens-hex-crafter .form-group label {
+.fhc .form-group label {
     margin: 0;
     color: var(--filroden-color-text-main-solid);
     white-space: nowrap;
@@ -315,8 +318,8 @@
 
 /* --- SEMANTIC TEXT & STATES --- */
 /* Helper text below inputs or headers */
-.filrodens-hex-crafter .hint,
-.filrodens-hex-crafter .filrodens-hex-crafter-notes {
+.fhc .hint,
+.fhc .fhc-notes {
     font-size: var(--filroden-font-size-xs);
     color: var(--filroden-color-text-muted-solid);
     margin-block-start: var(--filroden-space-xxs);
@@ -324,7 +327,7 @@
 }
 
 /* Empty or missing data states */
-.filrodens-hex-crafter .filrodens-hex-crafter-empty {
+.fhc .fhc-empty {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -339,7 +342,7 @@
 }
 
 /* Thematic Divider */
-.filrodens-hex-crafter .filrodens-hex-crafter-divider {
+.fhc .fhc-divider {
     border: none;
     height: 1px;
     width: 100%;
@@ -349,7 +352,7 @@
 
 
 /* --- BADGES & PILLS --- */
-.filrodens-hex-crafter .filrodens-hex-crafter-badge {
+.fhc .fhc-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -365,18 +368,69 @@
     white-space: nowrap;
 }
 
-.filrodens-hex-crafter .filrodens-hex-crafter-badge.primary {
+.fhc .fhc-badge.primary {
     background-color: var(--filroden-color-text-accent);
     color: var(--filroden-color-text-on-accent);
     border-color: var(--filroden-color-text-accent);
 }
 
+/* ===================================================================
+   --- UTILITY CLASSES ---
+=================================================================== */
+
+.fhc .fhc-flex-row {
+    display: flex;
+    gap: var(--filroden-space-s);
+    width: 100%;
+}
+
+.fhc .fhc-flex-1 {
+    flex: 1;
+    min-width: 0; /* Prevents flexbox text inputs from breaking container bounds */
+}
+
+/* ===================================================================
+   --- SCENE CONTROLS ---
+=================================================================== */
+
+.fhc-scene-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.fhc-scene-icon::before {
+    content: "";
+    display: block;
+    width: var(--filroden-font-size-xl);
+    height: var(--filroden-font-size-xl);
+    margin: 0 auto;
+    background-color: currentColor;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+}
+
+.fhc-scene-icon.hex::before {
+    -webkit-mask: url('../assets/icons/hive.svg') no-repeat center;
+    mask: url('../assets/icons/hive.svg') no-repeat center;
+}
+
+.fhc-scene-icon.layers::before {
+    -webkit-mask: url('../assets/icons/layers.svg') no-repeat center;
+    mask: url('../assets/icons/layers.svg') no-repeat center;
+}
+
+.fhc-scene-icon.travel_explore::before {
+    -webkit-mask: url('../assets/icons/travel_explore.svg') no-repeat center;
+    mask: url('../assets/icons/travel_explore.svg') no-repeat center;
+}
 
 /* ===================================================================
    --- MAIN UI ---
 =================================================================== */
 
-.filrodens-hex-crafter {
+.fhc {
     font-family: var(--filroden-font-family) !important;
     font-size: var(--filroden-font-size-s);
     background: var(--filroden-color-bg-darkest) !important;
@@ -384,21 +438,21 @@
 }
 
 /* UI direction handling for RTL languages */
-.filrodens-hex-crafter.rtl,
-.filrodens-hex-crafter[dir="rtl"] {
+.fhc.rtl,
+.fhc[dir="rtl"] {
     --filroden-dir-flip: -1;
 }
 
-:root:lang(ar) #tooltip.filrodens-hex-crafter-tooltip,
-:root:lang(he) #tooltip.filrodens-hex-crafter-tooltip,
-:root:lang(fa) #tooltip.filrodens-hex-crafter-tooltip,
-:root:lang(ur) #tooltip.filrodens-hex-crafter-tooltip {
+:root:lang(ar) #tooltip.fhc-tooltip,
+:root:lang(he) #tooltip.fhc-tooltip,
+:root:lang(fa) #tooltip.fhc-tooltip,
+:root:lang(ur) #tooltip.fhc-tooltip {
     direction: rtl;
     text-align: right;
 }
 
 /* Main window header styles */
-.filrodens-hex-crafter .window-header {
+.fhc .window-header {
     background: var(--filroden-color-bg-darkest) !important;
     border: none !important;
     color: var(--filroden-color-text-main-solid);
@@ -410,7 +464,7 @@
     align-items: center;
 }
 
-.filrodens-hex-crafter .window-header .window-title {
+.fhc .window-header .window-title {
     font-size: var(--filroden-font-size-s);
     line-height: var(--filroden-line-height-heading);
     text-align: start; 
@@ -419,15 +473,113 @@
     flex: 1;
 }
 
-.filrodens-hex-crafter .window-header .window-icon {
+.fhc .window-header .window-icon {
     margin-inline-start: var(--filroden-space-xxs);
     margin-inline-end: 0;
 }
 
 /* Main window content styles */
-.filrodens-hex-crafter .window-content {
+.fhc .window-content {
     background: var(--filroden-color-bg-darkest) !important;
     color: var(--filroden-color-text-main-solid);
     padding: 0;
     overflow: hidden;
+}
+
+/* ===================================================================
+   --- DETAILS & ACCORDIONS ---
+=================================================================== */
+
+.fhc details.fhc-details {
+    border: 1px solid var(--filroden-color-border);
+    border-radius: var(--filroden-radius-medium);
+    padding: var(--filroden-space-s) var(--filroden-space-m);
+    margin-block-end: var(--filroden-space-m);
+    background: var(--filroden-color-bg-medium-solid);
+}
+
+.fhc details.fhc-details summary {
+    font-weight: bold;
+    color: var(--filroden-color-text-main-solid);
+    cursor: pointer;
+    padding-block: var(--filroden-space-xs);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.fhc details.fhc-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.fhc details.fhc-details summary::after {
+    content: "▼";
+    font-size: var(--filroden-font-size-xs);
+    color: var(--filroden-color-text-muted-solid);
+    transition: transform 0.2s ease;
+}
+
+.fhc details.fhc-details[open] summary::after {
+    transform: rotate(180deg);
+}
+
+.fhc .fhc-details-body {
+    padding-block-start: var(--filroden-space-m);
+    border-block-start: 1px solid var(--filroden-color-border);
+    margin-block-start: var(--filroden-space-s);
+    display: flex;
+    flex-direction: column;
+    gap: var(--filroden-space-s);
+}
+
+/* ===================================================================
+   --- LEGEND OVERLAY ---
+=================================================================== */
+
+.fhc-legend-container {
+    position: absolute;
+    width: 14rem;
+    top: 15px;
+    margin-right: 15px;
+    background-color: var(--filroden-color-bg-darkest);
+    color: var(--filroden-color-text-main-solid);
+    border: var(--filroden-border-main);
+    border-radius: var(--filroden-radius-medium);
+    padding: var(--filroden-space-m) var(--filroden-space-l);
+    box-shadow: var(--filroden-shadow-popout);
+    z-index: 100;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.fhc-legend-header {
+    margin: 0 0 var(--filroden-space-m) 0;
+    border-bottom: var(--filroden-border-main);
+    padding-bottom: var(--filroden-space-s);
+    font-size: var(--filroden-font-size-m);
+    color: var(--filroden-color-text-accent);
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+.fhc-legend-biomes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--filroden-space-s);
+}
+
+.fhc-legend-row {
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-m);
+    font-size: var(--filroden-font-size-s);
+    text-transform: capitalize;
+}
+
+.fhc-legend-swatch {
+    width: var(--filroden-space-l); 
+    height: var(--filroden-space-l);
+    border: 1px solid var(--filroden-color-border);
+    border-radius: var(--filroden-radius-small);
 }

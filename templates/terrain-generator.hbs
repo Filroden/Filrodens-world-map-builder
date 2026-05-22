@@ -1,0 +1,56 @@
+<fieldset class="fhc-fieldset">
+    <legend>{{localize "FILRODENSHEX.UI.Stage1Legend"}}</legend>
+    <p class="hint">{{localize "FILRODENSHEX.UI.Stage1Hint"}}</p>
+
+    <div class="form-group">
+        <label for="fhc-seed">{{localize "FILRODENSHEX.UI.SeedLabel"}}</label>
+        <div class="fhc-flex-row">
+            <input type="text" id="fhc-seed" class="fhc-flex-1" value="TERRAHEX" />
+            <button type="button" class="fhc-btn" data-action="randomizeSeed" title="{{localize 'FILRODENSHEX.Actions.Randomize'}}">
+                <i class="fhc-icon shuffle"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSHEX.UI.Latitude"}}</label>
+        <div class="fhc-flex-row">
+            <input type="number" id="fhc-lat-top" class="fhc-flex-1" min="-90" max="90" value="90" title="{{localize 'FILRODENSHEX.UI.LatTop'}}" />
+            <input type="number" id="fhc-lat-bottom" class="fhc-flex-1" min="-90" max="90" value="-90" title="{{localize 'FILRODENSHEX.UI.LatBottom'}}" />
+        </div>
+    </div>
+
+    <details class="fhc-details">
+        <summary>{{localize "FILRODENSHEX.UI.AdvancedOptions"}}</summary>
+        <div class="fhc-details-body">
+
+            <div class="form-group">
+                <label for="fhc-sea-level">{{localize "FILRODENSHEX.UI.SeaLevel"}}</label>
+                <input type="range" id="fhc-sea-level" min="0" max="1" step="0.01" value="0.35" />
+            </div>
+
+            <div class="form-group">
+                <label for="fhc-global-temp">{{localize "FILRODENSHEX.UI.GlobalTemp"}}</label>
+                <input type="range" id="fhc-global-temp" min="0" max="1" step="0.01" value="0.5" />
+            </div>
+
+            <div class="form-group">
+                <label for="fhc-el-scale">{{localize "FILRODENSHEX.UI.ElevScale"}}</label>
+                <input type="range" id="fhc-el-scale" min="0.01" max="0.10" step="0.01" value="0.04" />
+            </div>
+
+            <div class="form-group">
+                <label for="fhc-el-stretch">{{localize "FILRODENSHEX.UI.ElevStretch"}}</label>
+                <input type="range" id="fhc-el-stretch" min="1.0" max="2.0" step="0.1" value="1.3" />
+            </div>
+
+        </div>
+    </details>
+
+    <div class="form-group">
+        <button type="button" class="fhc-btn primary" data-action="generateElevation">
+            <i class="fhc-icon elevation"></i>
+            {{localize "FILRODENSHEX.Actions.GenerateNoise"}}
+        </button>
+    </div>
+</fieldset>
