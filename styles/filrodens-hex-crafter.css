@@ -23,7 +23,7 @@
 
 .fhc-icon.hex     { -webkit-mask-image: url('../assets/icons/hive.svg'); mask-image: url('../assets/icons/hive.svg'); }
 .fhc-icon.elevation { -webkit-mask-image: url('../assets/icons/elevation.svg'); mask-image: url('../assets/icons/elevation.svg'); }
-
+.fhc-icon.shuffle { -webkit-mask-image: url('../assets/icons/shuffle.svg'); mask-image: url('../assets/icons/shuffle.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fhc * {
@@ -373,6 +373,21 @@
 }
 
 /* ===================================================================
+   --- UTILITY CLASSES ---
+=================================================================== */
+
+.fhc .fhc-flex-row {
+    display: flex;
+    gap: var(--filroden-space-s);
+    width: 100%;
+}
+
+.fhc .fhc-flex-1 {
+    flex: 1;
+    min-width: 0; /* Prevents flexbox text inputs from breaking container bounds */
+}
+
+/* ===================================================================
    --- SCENE CONTROLS ---
 =================================================================== */
 
@@ -462,4 +477,55 @@
     color: var(--filroden-color-text-main-solid);
     padding: 0;
     overflow: hidden;
+}
+
+/* ===================================================================
+   --- LEGEND OVERLAY ---
+=================================================================== */
+
+.fhc-legend-container {
+    position: absolute;
+    width: 14rem;
+    top: 15px;
+    margin-right: 15px;
+    background-color: var(--filroden-color-bg-darkest);
+    color: var(--filroden-color-text-main-solid);
+    border: var(--filroden-border-main);
+    border-radius: var(--filroden-radius-medium);
+    padding: var(--filroden-space-m) var(--filroden-space-l);
+    box-shadow: var(--filroden-shadow-popout);
+    z-index: 100;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.fhc-legend-header {
+    margin: 0 0 var(--filroden-space-m) 0;
+    border-bottom: var(--filroden-border-main);
+    padding-bottom: var(--filroden-space-s);
+    font-size: var(--filroden-font-size-m);
+    color: var(--filroden-color-text-accent);
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+.fhc-legend-biomes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--filroden-space-s);
+}
+
+.fhc-legend-row {
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-m);
+    font-size: var(--filroden-font-size-s);
+    text-transform: capitalize;
+}
+
+.fhc-legend-swatch {
+    width: var(--filroden-space-l); 
+    height: var(--filroden-space-l);
+    border: 1px solid var(--filroden-color-border);
+    border-radius: var(--filroden-radius-small);
 }

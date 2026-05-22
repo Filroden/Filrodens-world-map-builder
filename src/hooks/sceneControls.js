@@ -1,16 +1,16 @@
+import { drawLegend, clearLegend } from "../applications/legend.js";
+
 export function registerSceneControls() {
+    // 1. Hook into the initial creation of the buttons
     Hooks.on("getSceneControlButtons", (controls) => {
         const scene = canvas?.scene;
 
-        // 1. Guard: Ensure the canvas is initialized with a scene
         if (!scene) return;
 
-        // 2. Guard: Ensure the scene is a valid hex grid layout
         const isHexGrid = [CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ, CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(scene.grid.type);
 
         if (!isHexGrid) return;
 
-        // 3. State Mutation: Assign our custom control layer as an object property
         controls.hexCrafter = {
             name: "hexCrafter",
             title: "FILRODENSHEX.UI.ControlTitle",
@@ -23,9 +23,9 @@ export function registerSceneControls() {
                     icon: "fhc-scene-icon layers",
                     toggle: true,
                     active: false,
-                    onChange: (toggled) => {
+                    onChange: (event, active) => {
                         const uiInstance = game.filrodenshex.ui;
-                        if (toggled) {
+                        if (active) {
                             uiInstance.render({ force: true });
                         } else {
                             uiInstance.close();
@@ -34,5 +34,14 @@ export function registerSceneControls() {
                 },
             },
         };
+    });
+
+    // 2. The Legend Controller: Hook directly into the UI render cycle
+    Hooks.on("renderSceneControls", (controlsUI) => {
+        if (controlsUI.control?.name === "hexCrafter") {
+            drawLegend();
+        } else {
+            clearLegend();
+        }
     });
 }

@@ -7,13 +7,33 @@ export const FILRODENSHEX = {
     TEMPLATES: {
         TOOLBAR: "modules/filrodens-hex-crafter/templates/toolbar.hbs",
     },
-    THRESHOLDS: {
-        ELEVATION_MIN: 0,
-        ELEVATION_MAX: 1,
+    DISPLAY: {
+        ALPHA: 0.8,
     },
-    // Added for the Stage 1 TV Static test
-    TESTING: {
-        GRID_SIZE: 20, // Limit the test to a 20x20 grid to prevent loop lockups
-        ALPHA: 0.6, // Slight transparency so the underlying native grid remains visible
+    DEFAULTS: {
+        SEA_LEVEL: 0.35,
+        LAT_TOP: 90,
+        LAT_BOTTOM: -90,
+        GLOBAL_TEMP: 0.5,
+    },
+    NOISE: {
+        ELEVATION: { SCALE: 0.04, OCTAVES: 5, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1.2, STRETCH: 1.3 },
+        MOISTURE: { SCALE: 0.08, OCTAVES: 3, PERSISTENCE: 0.6, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1.2 },
+        TEMPERATURE: { SCALE: 0.04, OCTAVES: 2, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1 },
+    },
+    BIOMES: {
+        ocean: { color: 0x1a4b84 },
+        coast: { color: 0x2a72a4 },
+        peak: { color: 0xffffff },
+        mountain: { color: 0x7a7a7a },
+        jungle: { color: 0x1e592f },
+        savanna: { color: 0x8da848 },
+        desert: { color: 0xd4b872 },
+        swamp: { color: 0x3d523a },
+        forest: { color: 0x337a3e },
+        plains: { color: 0x75a152 },
+        taiga: { color: 0x476356 },
+        tundra: { color: 0x93a39a },
+        ice: { color: 0xddeaf0 },
     },
 };
