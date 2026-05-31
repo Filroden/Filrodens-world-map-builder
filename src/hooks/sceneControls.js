@@ -2,22 +2,30 @@ import { drawLegend, clearLegend } from "../applications/legend.js";
 import { FILRODENSHEX } from "../config.js";
 
 export function registerSceneControls() {
-    // 1. Hook into the initial creation of the buttons
     Hooks.on("getSceneControlButtons", (controls) => {
         const scene = canvas?.scene;
-
         if (!scene) return;
 
         const isHexGrid = [CONST.GRID_TYPES.HEXODDQ, CONST.GRID_TYPES.HEXEVENQ, CONST.GRID_TYPES.HEXODDR, CONST.GRID_TYPES.HEXEVENR].includes(scene.grid.type);
-
         if (!isHexGrid) return;
 
+        // V14 Strict: Assign directly to the Object property
         controls.hexCrafter = {
             name: "hexCrafter",
             title: "FILRODENSHEX.UI.ControlTitle",
             icon: "fhc-scene-icon hex",
             layer: "hexCrafter",
+
+            // THE FIX: Satisfy the engine's routing requirement natively
+            activeTool: "hiddenPainter",
+
             tools: {
+                hiddenPainter: {
+                    name: "hiddenPainter",
+                    title: "Paint",
+                    icon: "fas fa-brush",
+                    visible: false, // This hides it from the UI, keeping your design perfect
+                },
                 toggleEditor: {
                     name: "toggleEditor",
                     title: "FILRODENSHEX.UI.ToggleEditor",
@@ -26,11 +34,20 @@ export function registerSceneControls() {
                     active: false,
                     onChange: (event, active) => {
                         const uiInstance = game.filrodenshex.terrainGenerator;
-                        if (active) {
-                            uiInstance.render({ force: true });
-                        } else {
-                            uiInstance.close();
-                        }
+                        if (active) uiInstance.render({ force: true });
+                        else uiInstance.close();
+                    },
+                },
+                manualEditor: {
+                    name: "manualEditor",
+                    title: "FILRODENSHEX.UI.ManualEditor",
+                    icon: "fhc-scene-icon brush",
+                    toggle: true,
+                    active: false,
+                    onChange: (event, active) => {
+                        const uiInstance = game.filrodenshex.manualEditor;
+                        if (active) uiInstance.render({ force: true });
+                        else uiInstance.close();
                     },
                 },
                 mapManager: {
@@ -41,18 +58,14 @@ export function registerSceneControls() {
                     active: false,
                     onChange: (event, active) => {
                         const uiInstance = game.filrodenshex.mapManager;
-                        if (active) {
-                            uiInstance.render({ force: true });
-                        } else {
-                            uiInstance.close();
-                        }
+                        if (active) uiInstance.render({ force: true });
+                        else uiInstance.close();
                     },
                 },
             },
         };
     });
 
-    // 2. The Legend Controller: Hook directly into the UI render cycle
     Hooks.on("renderSceneControls", (controlsUI) => {
         if (controlsUI.control?.name === "hexCrafter") {
             drawLegend();
@@ -61,15 +74,11 @@ export function registerSceneControls() {
         }
     });
 
-    // 3. The Network Sync: Listen for remote database updates
     Hooks.on("updateScene", (scene, data, options, userId) => {
-        // Guard: Only react if the updated scene is the one currently being viewed on the canvas
         if (scene.id !== canvas.scene?.id) return;
 
-        // Guard: Only react if the database update specifically contains our Hex Data flag payload
         const flagPath = `flags.${FILRODENSHEX.ID}.${FILRODENSHEX.FLAGS.HEX_DATA}`;
         if (foundry.utils.hasProperty(data, flagPath)) {
-            // Retrieve the newly synced data and instruct the canvas to render it instantly
             const hexData = scene.getFlag(FILRODENSHEX.ID, FILRODENSHEX.FLAGS.HEX_DATA);
             canvas.hexCrafter?.renderTerrain(hexData);
         }

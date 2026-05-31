@@ -4,31 +4,55 @@
 
 /* --- MATERIAL DESIGN ICONS --- */
 .fhc-icon {
-    display: inline-block;
     width: var(--filroden-font-size-l); 
     height: var(--filroden-font-size-l);
     min-width: var(--filroden-font-size-l);
-    background-color: currentColor;
     background-image: none !important;
     content: "";
     transform: scaleX(var(--filroden-dir-flip));
     -webkit-mask-size: 100% 100%;
     mask-size: 100% 100%;
+    margin: 0;
+}
+
+.fhc-scene-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.fhc-scene-icon::before {
+    content: "";
+    width: var(--filroden-font-size-xl);
+    height: var(--filroden-font-size-xl);
+    margin: 0 auto;
+}
+
+.fhc-icon, 
+.fhc-scene-icon::before {
+    display: inline-block;
+    background-color: currentColor;
     -webkit-mask-repeat: no-repeat;
     mask-repeat: no-repeat;
     -webkit-mask-position: center;
     mask-position: center;
-    margin: 0;
+    -webkit-mask-image: var(--fhc-mask);
+    mask-image: var(--fhc-mask);
+    -webkit-mask-size: contain;
+    mask-size: contain;
 }
 
-.fhc-icon.hex     { -webkit-mask-image: url('../assets/icons/hive.svg'); mask-image: url('../assets/icons/hive.svg'); }
-.fhc-icon.layers  { -webkit-mask-image: url('../assets/icons/layers.svg'); mask-image: url('../assets/icons/layers.svg'); }
-.fhc-icon.elevation { -webkit-mask-image: url('../assets/icons/elevation.svg'); mask-image: url('../assets/icons/elevation.svg'); }
-.fhc-icon.shuffle { -webkit-mask-image: url('../assets/icons/shuffle.svg'); mask-image: url('../assets/icons/shuffle.svg'); }
-.fhc-icon.travel_explore { -webkit-mask-image: url('../assets/icons/travel_explore.svg'); mask-image: url('../assets/icons/travel_explore.svg'); }
-.fhc-icon.file_open     { -webkit-mask-image: url('../assets/icons/file_open.svg'); mask-image: url('../assets/icons/file_open.svg'); }
-.fhc-icon.file_save     { -webkit-mask-image: url('../assets/icons/file_save.svg'); mask-image: url('../assets/icons/file_save.svg'); }
-.fhc-icon.delete    { -webkit-mask-image: url('../assets/icons/delete.svg'); mask-image: url('../assets/icons/delete.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).hex            { --fhc-mask: url('../assets/icons/hive.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).layers         { --fhc-mask: url('../assets/icons/layers.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).elevation      { --fhc-mask: url('../assets/icons/elevation.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).shuffle        { --fhc-mask: url('../assets/icons/shuffle.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).travel_explore { --fhc-mask: url('../assets/icons/travel_explore.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).file_open      { --fhc-mask: url('../assets/icons/file_open.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).file_save      { --fhc-mask: url('../assets/icons/file_save.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).delete         { --fhc-mask: url('../assets/icons/delete.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).brush          { --fhc-mask: url('../assets/icons/brush.svg'); }
+:is(.fhc-icon, .fhc-scene-icon).select          { --fhc-mask: url('../assets/icons/select.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fhc * {
@@ -393,43 +417,6 @@
 }
 
 /* ===================================================================
-   --- SCENE CONTROLS ---
-=================================================================== */
-
-.fhc-scene-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-}
-
-.fhc-scene-icon::before {
-    content: "";
-    display: block;
-    width: var(--filroden-font-size-xl);
-    height: var(--filroden-font-size-xl);
-    margin: 0 auto;
-    background-color: currentColor;
-    -webkit-mask-size: contain;
-    mask-size: contain;
-}
-
-.fhc-scene-icon.hex::before {
-    -webkit-mask: url('../assets/icons/hive.svg') no-repeat center;
-    mask: url('../assets/icons/hive.svg') no-repeat center;
-}
-
-.fhc-scene-icon.elevation::before {
-    -webkit-mask: url('../assets/icons/elevation.svg') no-repeat center;
-    mask: url('../assets/icons/elevation.svg') no-repeat center;
-}
-
-.fhc-scene-icon.travel_explore::before {
-    -webkit-mask: url('../assets/icons/travel_explore.svg') no-repeat center;
-    mask: url('../assets/icons/travel_explore.svg') no-repeat center;
-}
-
-/* ===================================================================
    --- MAIN UI ---
 =================================================================== */
 
@@ -627,4 +614,66 @@
 
 .fhc .fhc-map-actions button {
     padding: var(--filroden-space-xxs) var(--filroden-space-xs);
+}
+
+/* ===================================================================
+   --- MANUAL EDITOR PALETTE ---
+=================================================================== */
+
+.fhc .fhc-swatch-grid {
+    display: grid;
+    /* Automatically fit as many 4.5rem cards as possible, filling the row */
+    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    gap: var(--filroden-space-s);
+}
+
+.fhc .fhc-swatch-btn {
+    background: var(--filroden-color-bg-medium-solid);
+    border: 1px solid var(--filroden-color-border);
+    border-radius: var(--filroden-radius-small);
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    align-items: center;
+    padding: var(--filroden-space-xs);
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.fhc .fhc-swatch-btn:hover {
+    background: var(--filroden-color-bg-light-solid);
+    border-color: var(--filroden-color-text-muted-solid);
+}
+
+/* The visual color block inside the card */
+.fhc .fhc-swatch-color {
+    width: 100%;
+    height: 2rem;
+    border-radius: var(--filroden-radius-small);
+    margin-block-end: var(--filroden-space-xs);
+    border: 1px solid rgba(0, 0, 0, 0.4);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.fhc .fhc-swatch-label {
+    font-size: var(--filroden-font-size-xs);
+    color: var(--filroden-color-text-main-solid);
+    text-transform: capitalize;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    text-align: center;
+}
+
+/* The active state managed by our #onSelectBiome action */
+.fhc .fhc-swatch-btn.active {
+    border-color: var(--filroden-color-text-accent);
+    box-shadow: 0 0 0 1px var(--filroden-color-text-accent);
+    background: var(--filroden-color-bg-light-solid);
+}
+
+.fhc .fhc-swatch-btn.active .fhc-swatch-label {
+    color: var(--filroden-color-text-accent);
+    font-weight: bold;
 }

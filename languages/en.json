@@ -19,6 +19,7 @@
     "FILRODENSHEX.UI.SaveMapHint": "Saves the current map data to a compendium entry. This includes all hex data, biome assignments, and configuration settings. The map can be reloaded later for further editing or export.",
     "FILRODENSHEX.UI.LoadMap": "Load Map",
     "FILRODENSHEX.UI.NoMapsSaved": "No saved maps found in the compendium.",
+    "FILRODENSHEX.UI.ManualEditor": "Map Editor",
 
     "FILRODENSHEX.Legend.Title": "Biomes",
 
