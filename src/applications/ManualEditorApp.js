@@ -4,8 +4,8 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 export class ManualEditorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static DEFAULT_OPTIONS = {
-        id: "fhc-manual-editor",
-        classes: ["fhc", "fhc-docked-toolbar"],
+        id: "fwmb-manual-editor",
+        classes: ["fwmb", "fwmb-docked-toolbar"],
         position: { width: 280, height: "auto" },
         window: { title: "FILRODENSHEX.UI.ManualEditor", resizable: false },
         actions: {

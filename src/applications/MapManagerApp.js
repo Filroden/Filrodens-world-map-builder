@@ -5,8 +5,8 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 export class MapManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static DEFAULT_OPTIONS = {
-        id: "fhc-map-manager",
-        classes: ["fhc", "fhc-docked-toolbar"],
+        id: "fwmb-map-manager",
+        classes: ["fwmb", "fwmb-docked-toolbar"],
         position: {
             width: 320,
             height: "auto",
@@ -38,7 +38,7 @@ export class MapManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static async #onSaveMap(event, target) {
         const appElement = target.closest(".window-content");
-        const nameInput = appElement.querySelector("#fhc-save-name");
+        const nameInput = appElement.querySelector("#fwmb-save-name");
         const mapName = nameInput?.value || "New Map";
 
         await saveCurrentMap(mapName);

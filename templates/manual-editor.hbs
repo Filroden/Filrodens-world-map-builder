@@ -1,13 +1,13 @@
-<div class="fhc-manual-editor-content">
+<div class="fwmb-manual-editor-content">
 
-    <fieldset class="fhc-fieldset">
+    <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSHEX.Legend.Title"}}</legend>
 
-        <div class="fhc-swatch-grid">
+        <div class="fwmb-swatch-grid">
             {{#each biomes}}
-                <button type="button" class="fhc-swatch-btn" data-action="selectBiome" data-biome="{{this.id}}" title="{{this.label}}">
-                    <div class="fhc-swatch-color" style="background-color: {{this.hexColor}};"></div>
-                    <span class="fhc-swatch-label">{{this.label}}</span>
+                <button type="button" class="fwmb-swatch-btn" data-action="selectBiome" data-biome="{{this.id}}" title="{{this.label}}">
+                    <div class="fwmb-swatch-color" style="background-color: {{this.hexColor}};"></div>
+                    <span class="fwmb-swatch-label">{{this.label}}</span>
                 </button>
             {{/each}}
         </div>

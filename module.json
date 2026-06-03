@@ -1,24 +1,24 @@
 {
-    "id": "filrodens-hex-crafter",
-    "title": "Filroden's Hex Crafter",
+    "id": "filrodens-world-map-builder",
+    "title": "Filroden's World Map Builder",
     "description": "My greatest work",
-    "version": "1.0.0-beta1",
+    "version": "1.0.0-beta2",
     "compatibility": {
         "minimum": "14",
-        "verified": "14.362",
+        "verified": "14",
         "maximum": "14"
     },
     "authors": [{ "name": "Ken Dearman" }],
     "esmodules": ["main.js"],
-    "styles": ["styles/filroden-theme.css", "styles/filrodens-hex-crafter.css"],
+    "styles": ["styles/filroden-theme.css", "styles/filrodens-world-map-builder.css"],
     "languages": [
         { "lang": "en", "name": "English", "path": "languages/en.json" },
         { "lang": "en-GB", "name": "English (UK)", "path": "languages/en-gb.json" }
     ],
-    "url": "https://github.com/Filroden/filrodens-hex-crafter",
-    "manifest": "https://github.com/Filroden/filrodens-hex-crafter/releases/latest/download/module.json",
-    "download": "https://github.com/Filroden/filrodens-hex-crafter/releases/download/v1.0.0-beta1/filrodens-hex-crafter.zip",
-    "bugs": "https://github.com/Filroden/filrodens-hex-crafter/issues",
-    "readme": "https://github.com/Filroden/filrodens-hex-crafter/blob/main/README.md",
+    "url": "https://github.com/Filroden/filrodens-world-map-builder",
+    "manifest": "https://github.com/Filroden/filrodens-world-map-builder/releases/latest/download/module.json",
+    "download": "https://github.com/Filroden/filrodens-world-map-builder/releases/download/v1.0.0-beta2/filrodens-world-map-builder.zip",
+    "bugs": "https://github.com/Filroden/filrodens-world-map-builder/issues",
+    "readme": "https://github.com/Filroden/filrodens-world-map-builder/blob/main/README.md",
     "license": "https://mit-license.org/"
 }

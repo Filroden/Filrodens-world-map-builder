@@ -38,7 +38,7 @@ export const FILRODENSHEX = {
         ice: { color: 0xddeaf0 },
     },
     COMPENDIUM: {
-        NAME: "fhc-maps",
-        LABEL: "Hex Crafter Maps",
+        NAME: "fwmb-maps",
+        LABEL: "Filroden's World Map Builder",
     },
 };
