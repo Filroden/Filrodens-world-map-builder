@@ -4,55 +4,50 @@
 
 /* --- MATERIAL DESIGN ICONS --- */
 .fwmb-icon {
+    display: inline-block;
     width: var(--filroden-font-size-l); 
     height: var(--filroden-font-size-l);
     min-width: var(--filroden-font-size-l);
+    background-color: currentColor;
     background-image: none !important;
     content: "";
     transform: scaleX(var(--filroden-dir-flip));
-    -webkit-mask-size: 100% 100%;
-    mask-size: 100% 100%;
-    margin: 0;
-}
-
-.fwmb-scene-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-}
-
-.fwmb-scene-icon::before {
-    content: "";
-    width: var(--filroden-font-size-xl);
-    height: var(--filroden-font-size-xl);
-    margin: 0 auto;
-}
-
-.fwmb-icon, 
-.fwmb-scene-icon::before {
-    display: inline-block;
-    background-color: currentColor;
     -webkit-mask-repeat: no-repeat;
     mask-repeat: no-repeat;
     -webkit-mask-position: center;
     mask-position: center;
     -webkit-mask-image: var(--fwmb-mask);
     mask-image: var(--fwmb-mask);
-    -webkit-mask-size: contain;
-    mask-size: contain;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    margin: 0;
 }
 
-:is(.fwmb-icon, .fwmb-scene-icon).hex            { --fwmb-mask: url('../assets/icons/hive.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).layers         { --fwmb-mask: url('../assets/icons/layers.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).elevation      { --fwmb-mask: url('../assets/icons/elevation.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).shuffle        { --fwmb-mask: url('../assets/icons/shuffle.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).travel_explore { --fwmb-mask: url('../assets/icons/travel_explore.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).file_open      { --fwmb-mask: url('../assets/icons/file_open.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).file_save      { --fwmb-mask: url('../assets/icons/file_save.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).delete         { --fwmb-mask: url('../assets/icons/delete.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).brush          { --fwmb-mask: url('../assets/icons/brush.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).select          { --fwmb-mask: url('../assets/icons/select.svg'); }
+.fwmb-icon.map                  { --fwmb-mask: url('../assets/icons/map.svg'); }
+.fwmb-icon.hex                  { --fwmb-mask: url('../assets/icons/hive.svg'); }
+.fwmb-icon.layers               { --fwmb-mask: url('../assets/icons/layers.svg'); }
+.fwmb-icon.elevation            { --fwmb-mask: url('../assets/icons/elevation.svg'); }
+.fwmb-icon.shuffle              { --fwmb-mask: url('../assets/icons/shuffle.svg'); }
+.fwmb-icon.travel_explore       { --fwmb-mask: url('../assets/icons/travel_explore.svg'); }
+.fwmb-icon.file_open            { --fwmb-mask: url('../assets/icons/file_open.svg'); }
+.fwmb-icon.file_save            { --fwmb-mask: url('../assets/icons/file_save.svg'); }
+.fwmb-icon.delete               { --fwmb-mask: url('../assets/icons/delete.svg'); }
+.fwmb-icon.brush                { --fwmb-mask: url('../assets/icons/brush.svg'); }
+.fwmb-icon.select               { --fwmb-mask: url('../assets/icons/select.svg'); }
+.fwmb-icon.grid-on              { --fwmb-mask: url('../assets/icons/grid_3x3.svg'); }
+.fwmb-icon.grid-off             { --fwmb-mask: url('../assets/icons/grid_3x3_off.svg'); }
+.fwmb-icon.zoom-in              { --fwmb-mask: url('../assets/icons/zoom_in.svg'); }
+.fwmb-icon.zoom-out             { --fwmb-mask: url('../assets/icons/zoom_out.svg'); }
+.fwmb-icon.center-focus         { --fwmb-mask: url('../assets/icons/center_focus_strong.svg'); }
+.fwmb-icon.tune                 { --fwmb-mask: url('../assets/icons/tune.svg'); }
+.fwmb-icon.landscape            { --fwmb-mask: url('../assets/icons/landscape.svg'); }
+.fwmb-icon.water_drop           { --fwmb-mask: url('../assets/icons/water_drop.svg'); }
+.fwmb-icon.forest               { --fwmb-mask: url('../assets/icons/forest.svg'); }
+.fwmb-icon.location_city        { --fwmb-mask: url('../assets/icons/location_city.svg'); }
+.fwmb-icon.folder_open          { --fwmb-mask: url('../assets/icons/folder_open.svg'); }
+.fwmb-icon.edit_arrow_down      { --fwmb-mask: url('../assets/icons/edit_arrow_down.svg'); }
+.fwmb-icon.edit_arrow_up        { --fwmb-mask: url('../assets/icons/edit_arrow_up.svg'); }
+.fwmb-icon.undo                 { --fwmb-mask: url('../assets/icons/undo.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
@@ -99,7 +94,7 @@
     line-height: var(--filroden-line-height-body);
     text-align: start;
     z-index: var(--z-index-tooltip, 9999);
-    margin-top: var(--filroden-space-m);
+    margin-block-start: var(--filroden-space-m);
 }
 
 
@@ -179,9 +174,18 @@
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+.fwmb input[type="number"],
+.fwmb input[type="time"] {
+    text-align: center; 
+}
+
+.fwmb input[type="number"] {
+    width: 8ch;
+}
+
 .fwmb input[type="text"]:focus,
 .fwmb input[type="number"]:focus,
-.fwmb input[type="time"],
+.fwmb input[type="time"]:focus,
 .fwmb select:focus,
 .fwmb textarea:focus {
     border-color: var(--filroden-color-text-accent);
@@ -292,7 +296,7 @@
     font-weight: bold;
     text-transform: uppercase;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
+    border-block-end: 2px solid transparent;
     transition: background-color 0.2s, color 0.2s;
 }
 
@@ -305,7 +309,7 @@
 .fwmb nav.tabs .item.active,
 .fwmb .fwmb-tabs .item.active {
     color: var(--filroden-color-text-accent);
-    border-bottom-color: var(--filroden-color-text-accent);
+    border-block-end-color: var(--filroden-color-text-accent);
     background: var(--filroden-color-bg-darkest);
 }
 
@@ -330,7 +334,7 @@
 
 .fwmb .form-group {
     display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) max-content;
     align-items: center;
     gap: var(--filroden-space-l);
     margin-block-end: var(--filroden-space-s);
@@ -416,6 +420,31 @@
     min-width: 0; /* Prevents flexbox text inputs from breaking container bounds */
 }
 
+/* --- CONTEXT PANEL CONTENT --- */
+.fwmb-tool-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: var(--filroden-space-m);
+    gap: var(--filroden-space-xs);
+    overflow-y: auto; /* Required to trigger fwmb-scrollable mechanics */
+}
+
+
+/* ===================================================================
+   --- SCENE SIDEBAR BUTTON ---
+=================================================================== */
+
+/* Make custom button a standard square */
+.fwmb-sidebar-btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    margin: 0;
+}
+
+
 /* ===================================================================
    --- MAIN UI ---
 =================================================================== */
@@ -428,8 +457,8 @@
 }
 
 /* UI direction handling for RTL languages */
-.fhc.rtl,
-.fhc[dir="rtl"] {
+.fwmb.rtl,
+.fwmb[dir="rtl"] {
     --filroden-dir-flip: -1;
 }
 
@@ -469,211 +498,227 @@
 }
 
 /* Main window content styles */
-.fwmb .window-content {
-    background: var(--filroden-color-bg-darkest) !important;
-    color: var(--filroden-color-text-main-solid);
+.fwmb.fwmb-layout .window-content {
     padding: 0;
+    display: flex;
+    flex-direction: row; /* Align the AppV2 Parts horizontally */
     overflow: hidden;
+    height: 100%;
 }
 
-/* ===================================================================
-   --- DETAILS & ACCORDIONS ---
-=================================================================== */
-
-.fwmb details.fwmb-details {
-    border: 1px solid var(--filroden-color-border);
-    border-radius: var(--filroden-radius-medium);
-    padding: var(--filroden-space-s) var(--filroden-space-m);
-    margin-block-end: var(--filroden-space-m);
-    background: var(--filroden-color-bg-medium-solid);
+/* 1. The Toolbar Part */
+.fwmb .fwmb-toolbar {
+    flex: 0 0 50px; 
+    background: var(--filroden-color-bg-darkest);
+    border-inline-end: 1px solid var(--filroden-color-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-block: var(--filroden-space-s);
+    gap: var(--filroden-space-s);
 }
 
-.fwmb details.fwmb-details summary {
-    font-weight: bold;
-    color: var(--filroden-color-text-main-solid);
-    cursor: pointer;
-    padding-block: var(--filroden-space-xs);
-    list-style: none;
+.fwmb-toolbar button {
+    width: 36px;
+    height: 36px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-}
-
-.fwmb details.fwmb-details summary::-webkit-details-marker {
-    display: none;
-}
-
-.fwmb details.fwmb-details summary::after {
-    content: "▼";
-    font-size: var(--filroden-font-size-xs);
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--filroden-radius-small);
     color: var(--filroden-color-text-muted-solid);
-    transition: transform 0.2s ease;
 }
 
-.fwmb details.fwmb-details[open] summary::after {
-    transform: rotate(180deg);
-}
-
-.fwmb .fwmb-details-body {
-    padding-block-start: var(--filroden-space-m);
-    border-block-start: 1px solid var(--filroden-color-border);
-    margin-block-start: var(--filroden-space-s);
-    display: flex;
-    flex-direction: column;
-    gap: var(--filroden-space-s);
-}
-
-/* ===================================================================
-   --- LEGEND OVERLAY ---
-=================================================================== */
-
-.fwmb-legend-container {
-    position: absolute;
-    width: 14rem;
-    top: 15px;
-    margin-right: 15px;
-    background-color: var(--filroden-color-bg-darkest);
+.fwmb-toolbar button:hover {
     color: var(--filroden-color-text-main-solid);
-    border: var(--filroden-border-main);
-    border-radius: var(--filroden-radius-medium);
-    padding: var(--filroden-space-m) var(--filroden-space-l);
-    box-shadow: var(--filroden-shadow-popout);
-    z-index: 100;
-    pointer-events: none;
-    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.05);
 }
 
-.fwmb-legend-header {
-    margin: 0 0 var(--filroden-space-m) 0;
-    border-bottom: var(--filroden-border-main);
-    padding-bottom: var(--filroden-space-s);
-    font-size: var(--filroden-font-size-m);
+.fwmb-toolbar button.active {
     color: var(--filroden-color-text-accent);
-    text-align: center;
-    letter-spacing: 1px;
+    background: var(--filroden-color-bg-hover-solid);
+    border-color: var(--filroden-color-text-accent);
 }
 
-.fwmb-legend-biomes {
-    display: flex;
-    flex-direction: column;
-    gap: var(--filroden-space-s);
-}
-
-.fwmb-legend-row {
-    display: flex;
-    align-items: center;
-    gap: var(--filroden-space-m);
-    font-size: var(--filroden-font-size-s);
-    text-transform: capitalize;
-}
-
-.fwmb-legend-swatch {
-    width: var(--filroden-space-l); 
-    height: var(--filroden-space-l);
-    border: 1px solid var(--filroden-color-border);
-    border-radius: var(--filroden-radius-small);
-}
-
-/* ===================================================================
-   --- MAP MANAGER ---
-=================================================================== */
-
-.fwmb .fwmb-map-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--filroden-space-s);
-    max-height: 300px;
-    overflow-y: auto;
-    padding-inline-end: var(--filroden-space-xs); /* Scrollbar buffer */
-}
-
-.fwmb .fwmb-map-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+/* 2. The Context Panel Part */
+.fwmb .fwmb-context-panel {
+    flex: 0 0 280px; 
     background: var(--filroden-color-bg-medium-solid);
-    border: 1px solid var(--filroden-color-border);
-    border-radius: var(--filroden-radius-small);
-    padding: var(--filroden-space-xs) var(--filroden-space-s);
+    border-inline-end: 1px solid var(--filroden-color-border);
+    display: flex;
+    flex-direction: column;
 }
 
-.fwmb .fwmb-map-name {
-    font-weight: bold;
-    color: var(--filroden-color-text-main-solid);
+/* 3. The Map Part */
+.fwmb .fwmb-map {
+    flex: 1; 
+    position: relative;
+    min-width: 0;
+    height: 100%;
+}
+
+.fwmb-map-preview {
+    position: absolute;
+    inset: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
 }
 
-.fwmb .fwmb-map-actions {
+.fwmb-map-preview canvas {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.fwmb-divider-vertical {
+    border: none;
+    height: 100%;
+    width: 1px;
+    background-color: var(--filroden-color-border);
+    margin-inline: var(--filroden-space-m);
+}
+
+.fwmb-zoom-controls {
+    position: absolute;
+    inset-block-end: var(--filroden-space-m);
+    inset-inline-end: var(--filroden-space-m);
     display: flex;
     gap: var(--filroden-space-xs);
-    flex: 0 0 auto;
+    background: rgba(0, 0, 0, 0.5);
+    padding: var(--filroden-space-xs);
+    border-radius: var(--filroden-radius-small);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 20;
+    opacity: 0; /* Hidden by default, shown on hover */
+    transition: opacity 0.2s ease;
 }
 
-.fwmb .fwmb-map-actions button {
-    padding: var(--filroden-space-xxs) var(--filroden-space-xs);
+.fwmb-map-hint {
+    position: absolute;
+    inset-block-end: var(--filroden-space-m);
+    inset-inline-start: var(--filroden-space-m);
+    color: var(--filroden-color-text-muted);
+    font-size: var(--filroden-font-size-xs);
+    background: rgba(0, 0, 0, 0.3);
+    padding: var(--filroden-space-xxs) var(--filroden-space-s);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s ease;
 }
 
-/* ===================================================================
-   --- MANUAL EDITOR PALETTE ---
-=================================================================== */
+.fwmb-map:hover .fwmb-zoom-controls,
+.fwmb-map:hover .fwmb-map-hint {
+    opacity: 1;
+}
 
-.fwmb .fwmb-swatch-grid {
-    display: grid;
-    /* Automatically fit as many 4.5rem cards as possible, filling the row */
-    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+.fwmb-zoom-controls button {
+    width: var(--filroden-font-size-xxl);
+    height: var(--filroden-font-size-xxl);
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--filroden-color-text-main-solid);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fwmb-zoom-controls button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--filroden-color-text-accent);
+}
+
+/* --- RANGE SLIDERS --- */
+.fwmb .fwmb-slider-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
     gap: var(--filroden-space-s);
 }
 
-.fwmb .fwmb-swatch-btn {
-    background: var(--filroden-color-bg-medium-solid);
-    border: 1px solid var(--filroden-color-border);
-    border-radius: var(--filroden-radius-small);
+.fwmb .fwmb-slider-group input[type="range"] {
+    flex: 1;
+    accent-color: var(--filroden-color-text-accent);
+    cursor: pointer;
+}
+
+.fwmb .fwmb-slider-group output {
+    width: 5ch;
+    text-align: right;
+    font-family: monospace;
+    font-size: var(--filroden-font-size-xs);
+    color: var(--filroden-color-text-accent);
+}
+
+/* --- STACKED FORM GROUPS --- */
+.fwmb .form-group.stacked {
     display: flex;
     flex-direction: column;
-    height: auto;
-    align-items: center;
-    padding: var(--filroden-space-xs);
-    cursor: pointer;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    align-items: stretch;
+    gap: var(--filroden-space-xs);
 }
 
-.fwmb .fwmb-swatch-btn:hover {
-    background: var(--filroden-color-bg-light-solid);
-    border-color: var(--filroden-color-text-muted-solid);
-}
-
-/* The visual color block inside the card */
-.fwmb .fwmb-swatch-color {
+.fwmb .form-group.stacked input[type="range"] {
     width: 100%;
-    height: 2rem;
-    border-radius: var(--filroden-radius-small);
-    margin-block-end: var(--filroden-space-xs);
-    border: 1px solid rgba(0, 0, 0, 0.4);
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    margin: 0;
 }
 
-.fwmb .fwmb-swatch-label {
-    font-size: var(--filroden-font-size-xs);
-    color: var(--filroden-color-text-main-solid);
-    text-transform: capitalize;
-    white-space: nowrap;
+/* --- MAP LAYOUT & EDIT TOOLBAR --- */
+.fwmb .fwmb-map-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    position: relative;
+}
+
+.fwmb .fwmb-map-preview {
+    flex: 1;
+    position: relative;
     overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%;
-    text-align: center;
 }
 
-/* The active state managed by our #onSelectBiome action */
-.fwmb .fwmb-swatch-btn.active {
-    border-color: var(--filroden-color-text-accent);
-    box-shadow: 0 0 0 1px var(--filroden-color-text-accent);
-    background: var(--filroden-color-bg-light-solid);
+.fwmb .fwmb-hidden {
+    display: none !important;
 }
 
-.fwmb .fwmb-swatch-btn.active .fwmb-swatch-label {
-    color: var(--filroden-color-text-accent);
-    font-weight: bold;
+.fwmb .fwmb-edit-toolbar {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: var(--filroden-space-s) var(--filroden-space-m);
+    background: var(--filroden-color-bg-darkest);
+    border-bottom: 1px solid var(--filroden-color-border);
+    gap: var(--filroden-space-m);
+}
+
+.fwmb .fwmb-brush-settings,
+.fwmb .fwmb-brush-setting,
+.fwmb .fwmb-brush-tools,
+.fwmb .fwmb-brush-history {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--filroden-space-m);
+}
+
+.fwmb .fwmb-brush-settings label {
+    font-size: var(--filroden-font-size-xs);
+    color: var(--filroden-color-text-muted-solid);
+    margin-right: var(--filroden-space-xs);
+    white-space: nowrap;
+}
+
+.fwmb .fwmb-brush-setting .fwmb-slider-group input[type="range"] {
+    width: 80px; 
+}
+
+.fwmb .fwmb-brush-setting .fwmb-slider-group output {
+    width: 4ch;
+    margin-left: 0;
 }

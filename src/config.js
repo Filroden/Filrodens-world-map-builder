@@ -1,12 +1,12 @@
-export const FILRODENSHEX = {
-    ID: "filrodens-hex-crafter",
+export const FILRODENSWMB = {
+    ID: "filrodens-world-map-builder",
     FLAGS: {
         IS_ACTIVE: "isActiveCanvas",
         HEX_DATA: "hexData",
         PARAMS: "generationParams",
     },
     TEMPLATES: {
-        TOOLBAR: "modules/filrodens-hex-crafter/templates/toolbar.hbs",
+        TOOLBAR: "modules/filrodens-world-map-builder/templates/toolbar.hbs",
     },
     DISPLAY: {
         ALPHA: 0.8,
@@ -16,11 +16,13 @@ export const FILRODENSHEX = {
         LAT_TOP: 90,
         LAT_BOTTOM: -90,
         GLOBAL_TEMP: 0.5,
+        MAP_WIDTH: 1000,
+        MAP_HEIGHT: 1000,
     },
     NOISE: {
-        ELEVATION: { SCALE: 0.04, OCTAVES: 5, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1.2, STRETCH: 1.3 },
-        MOISTURE: { SCALE: 0.08, OCTAVES: 3, PERSISTENCE: 0.6, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1.2 },
-        TEMPERATURE: { SCALE: 0.04, OCTAVES: 2, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1 },
+        ELEVATION: { SCALE: 250, OCTAVES: 5, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1.2, STRETCH: 1.3 },
+        MOISTURE: { SCALE: 12, OCTAVES: 3, PERSISTENCE: 0.6, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1.2 },
+        TEMPERATURE: { SCALE: 25, OCTAVES: 2, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1 },
     },
     BIOMES: {
         ocean: { color: 0x1a4b84 },
