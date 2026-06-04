@@ -13,7 +13,7 @@ export function registerSceneControls() {
         controls.hexCrafter = {
             name: "hexCrafter",
             title: "FILRODENSHEX.UI.ControlTitle",
-            icon: "fhc-scene-icon hex",
+            icon: "fwmb-scene-icon hex",
             layer: "hexCrafter",
 
             // THE FIX: Satisfy the engine's routing requirement natively
@@ -29,7 +29,7 @@ export function registerSceneControls() {
                 toggleEditor: {
                     name: "toggleEditor",
                     title: "FILRODENSHEX.UI.ToggleEditor",
-                    icon: "fhc-scene-icon elevation",
+                    icon: "fwmb-scene-icon elevation",
                     toggle: true,
                     active: false,
                     onChange: (event, active) => {
@@ -41,7 +41,7 @@ export function registerSceneControls() {
                 manualEditor: {
                     name: "manualEditor",
                     title: "FILRODENSHEX.UI.ManualEditor",
-                    icon: "fhc-scene-icon brush",
+                    icon: "fwmb-scene-icon brush",
                     toggle: true,
                     active: false,
                     onChange: (event, active) => {
@@ -53,7 +53,7 @@ export function registerSceneControls() {
                 mapManager: {
                     name: "mapManager",
                     title: "FILRODENSHEX.UI.MapManager",
-                    icon: "fhc-scene-icon travel_explore",
+                    icon: "fwmb-scene-icon travel_explore",
                     toggle: true,
                     active: false,
                     onChange: (event, active) => {

@@ -6,8 +6,8 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 export class TerrainGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static DEFAULT_OPTIONS = {
-        id: "fhc-terrain-generator",
-        classes: ["fhc", "fhc-docked-toolbar"],
+        id: "fwmb-terrain-generator",
+        classes: ["fwmb", "fwmb-docked-toolbar"],
         position: {
             width: 320,
             height: "auto",
@@ -49,7 +49,7 @@ export class TerrainGeneratorApp extends HandlebarsApplicationMixin(ApplicationV
 
     static async #onRandomizeSeed(event, target) {
         const appElement = target.closest(".window-content");
-        const seedInput = appElement.querySelector("#fhc-seed");
+        const seedInput = appElement.querySelector("#fwmb-seed");
 
         if (seedInput) {
             seedInput.value = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -63,7 +63,7 @@ export class TerrainGeneratorApp extends HandlebarsApplicationMixin(ApplicationV
         if (!canvas?.ready || !canvas.hexCrafter) return;
 
         const appElement = target.closest(".window-content");
-        const seedString = appElement?.querySelector("#fhc-seed")?.value || "DEFAULT";
+        const seedString = appElement?.querySelector("#fwmb-seed")?.value || "DEFAULT";
 
         const readInput = (selector, fallback) => {
             const el = appElement?.querySelector(selector);
@@ -72,14 +72,14 @@ export class TerrainGeneratorApp extends HandlebarsApplicationMixin(ApplicationV
             return Number.isNaN(val) ? fallback : val;
         };
 
-        const seaLevel = readInput("#fhc-sea-level", FILRODENSHEX.DEFAULTS.SEA_LEVEL);
-        const globalTemp = readInput("#fhc-global-temp", FILRODENSHEX.DEFAULTS.GLOBAL_TEMP);
-        const latTop = readInput("#fhc-lat-top", FILRODENSHEX.DEFAULTS.LAT_TOP);
-        const latBottom = readInput("#fhc-lat-bottom", FILRODENSHEX.DEFAULTS.LAT_BOTTOM);
+        const seaLevel = readInput("#fwmb-sea-level", FILRODENSHEX.DEFAULTS.SEA_LEVEL);
+        const globalTemp = readInput("#fwmb-global-temp", FILRODENSHEX.DEFAULTS.GLOBAL_TEMP);
+        const latTop = readInput("#fwmb-lat-top", FILRODENSHEX.DEFAULTS.LAT_TOP);
+        const latBottom = readInput("#fwmb-lat-bottom", FILRODENSHEX.DEFAULTS.LAT_BOTTOM);
 
         // Read Advanced Options, falling back to the config.js defaults if untouched
-        const elScale = readInput("#fhc-el-scale", FILRODENSHEX.NOISE.ELEVATION.SCALE);
-        const elStretch = readInput("#fhc-el-stretch", FILRODENSHEX.NOISE.ELEVATION.STRETCH);
+        const elScale = readInput("#fwmb-el-scale", FILRODENSHEX.NOISE.ELEVATION.SCALE);
+        const elStretch = readInput("#fwmb-el-stretch", FILRODENSHEX.NOISE.ELEVATION.STRETCH);
 
         // 1. Capture the exact parameters used for this generation
         const generationParams = {
