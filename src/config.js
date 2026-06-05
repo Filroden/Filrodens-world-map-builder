@@ -25,19 +25,41 @@ export const FILRODENSWMB = {
         TEMPERATURE: { SCALE: 25, OCTAVES: 2, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1 },
     },
     BIOMES: {
-        ocean: { color: 0x1a4b84 },
-        coast: { color: 0x2a72a4 },
-        peak: { color: 0xffffff },
-        mountain: { color: 0x7a7a7a },
-        jungle: { color: 0x1e592f },
-        savanna: { color: 0x8da848 },
-        desert: { color: 0xd4b872 },
-        swamp: { color: 0x3d523a },
-        forest: { color: 0x337a3e },
-        plains: { color: 0x75a152 },
-        taiga: { color: 0x476356 },
-        tundra: { color: 0x93a39a },
-        ice: { color: 0xddeaf0 },
+        // Oceans
+        DEEP_OCEAN: [26, 75, 132],
+        SHALLOW_OCEAN: [46, 117, 182],
+        PACK_ICE: [225, 235, 240],
+
+        // Cold
+        SNOW: [240, 240, 240],
+        TUNDRA: [149, 163, 164],
+        TAIGA: [77, 107, 83],
+
+        // Temperate
+        GRASSLAND: [141, 163, 104],
+        DECIDUOUS_FOREST: [58, 122, 70],
+        TEMPERATE_RAINFOREST: [41, 92, 53],
+        TEMPERATE_DESERT: [194, 178, 128],
+
+        // Tropical
+        TROPICAL_RAINFOREST: [23, 66, 32],
+        SAVANNA: [196, 186, 114],
+        SUBTROPICAL_DESERT: [214, 198, 137],
+    },
+    BIOME_IDS: {
+        DEEP_OCEAN: 1,
+        SHALLOW_OCEAN: 2,
+        SNOW: 3,
+        TUNDRA: 4,
+        TAIGA: 5,
+        GRASSLAND: 6,
+        DECIDUOUS_FOREST: 7,
+        TEMPERATE_RAINFOREST: 8,
+        TEMPERATE_DESERT: 9,
+        TROPICAL_RAINFOREST: 10,
+        SAVANNA: 11,
+        SUBTROPICAL_DESERT: 12,
+        PACK_ICE: 13,
     },
     COMPENDIUM: {
         NAME: "fwmb-maps",

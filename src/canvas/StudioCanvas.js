@@ -6,7 +6,7 @@ export class StudioCanvas {
 
         this.app = new PIXI.Application({
             resizeTo: this.container,
-            backgroundColor: FILRODENSWMB.BIOMES.ocean.color,
+            backgroundColor: 0x1a4b84,
             antialias: true,
             resolution: window.devicePixelRatio || 1,
         });
@@ -16,6 +16,17 @@ export class StudioCanvas {
 
         this.stage = new PIXI.Container();
         this.app.stage.addChild(this.stage);
+
+        // Initialise a strict z-index hierarchy of layers
+        this.layers = {
+            base: new PIXI.Container(),
+            topography: new PIXI.Container(),
+            biomes: new PIXI.Container(),
+            features: new PIXI.Container(),
+        };
+
+        // Add them to the stage in ascending order (base is bottom, features are top)
+        this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.features);
 
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };
@@ -37,6 +48,15 @@ export class StudioCanvas {
             }
         });
         this.resizeObserver.observe(this.container);
+
+        // Callbacks for brush tools
+        this.onBrushStart = null;
+        this.onBrushMove = null;
+        this.onBrushEnd = null;
+
+        // Mode flag
+        this.isEditMode = false;
+        this.lastBrushTime = 0;
     }
 
     #setupInteractions(canvasElement) {
@@ -76,13 +96,25 @@ export class StudioCanvas {
         });
 
         globalThis.addEventListener("pointermove", (e) => {
-            if (!this.isDragging) return;
+            if (this.isDragging) {
+                const dx = e.clientX - this.dragStart.x;
+                const dy = e.clientY - this.dragStart.y;
+                this.stage.position.x = this.stageStart.x + dx;
+                this.stage.position.y = this.stageStart.y + dy;
+                return;
+            }
 
-            const dx = e.clientX - this.dragStart.x;
-            const dy = e.clientY - this.dragStart.y;
+            // Continuous painting while dragging
+            if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
+                const now = performance.now();
 
-            this.stage.position.x = this.stageStart.x + dx;
-            this.stage.position.y = this.stageStart.y + dy;
+                // Throttle the application to fire max once every 100ms
+                if (now - this.lastBrushTime > 100) {
+                    const coords = this.#getMapCoordinates(e, canvasElement);
+                    this.onBrushMove(coords.x, coords.y);
+                    this.lastBrushTime = now;
+                }
+            }
         });
 
         globalThis.addEventListener("pointerup", (e) => {
@@ -93,6 +125,61 @@ export class StudioCanvas {
 
         // Prevent browser context menus from ruining the right-click drag
         canvasElement.addEventListener("contextmenu", (e) => e.preventDefault());
+
+        // HOVER READOUT
+        canvasElement.addEventListener("pointermove", (e) => {
+            if (this.onCanvasHover && !this.isDragging) {
+                const coords = this.#getMapCoordinates(e, canvasElement);
+                this.onCanvasHover(coords.x, coords.y);
+            }
+        });
+
+        canvasElement.addEventListener("pointerleave", (e) => {
+            if (this.onCanvasHover) this.onCanvasHover(null, null);
+        });
+
+        // PIXI listeners
+        canvasElement.addEventListener("pointerdown", (e) => {
+            // Right/Middle click for panning
+            if (e.button === 2 || e.button === 1) {
+                this.isDragging = true;
+                this.dragStart = { x: e.clientX, y: e.clientY };
+                this.stageStart = { x: this.stage.position.x, y: this.stage.position.y };
+                canvasElement.style.cursor = "grabbing";
+                return;
+            }
+
+            // Left click for painting
+            if (e.button === 0 && this.isEditMode && this.onBrushStart) {
+                const coords = this.#getMapCoordinates(e, canvasElement);
+                this.onBrushStart(coords.x, coords.y);
+            }
+        });
+
+        globalThis.addEventListener("pointermove", (e) => {
+            if (this.isDragging) {
+                // ... existing panning logic ...
+                return;
+            }
+
+            // Continuous painting while dragging
+            if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
+                const coords = this.#getMapCoordinates(e, canvasElement);
+                this.onBrushMove(coords.x, coords.y);
+            }
+        });
+
+        globalThis.addEventListener("pointerup", (e) => {
+            if (e.button === 2 || e.button === 1) {
+                this.isDragging = false;
+                canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
+                return;
+            }
+
+            if (e.button === 0 && this.isEditMode && this.onBrushEnd) {
+                this.onBrushEnd();
+            }
+        });
     }
 
     // --- Public API for the UI Buttons ---
@@ -133,14 +220,18 @@ export class StudioCanvas {
     }
 
     /**
-     * Takes a raw RGBA pixel buffer and paints it directly to the WebGL canvas.
+     * Takes a raw RGBA pixel buffer and paints it directly to a specific layer in the stack.
      */
-    renderPixelBuffer(pixelBuffer, width, height) {
+    renderPixelBuffer(layerId, pixelBuffer, width, height) {
+        const targetLayer = this.layers[layerId];
+        if (!targetLayer) return;
+
         this.mapWidth = width;
         this.mapHeight = height;
 
-        for (const child of this.stage.children) {
-            if (child.isMapTexture) child.destroy(true);
+        // Clean only the specific layer being updated
+        for (const child of targetLayer.children) {
+            child.destroy(true);
         }
 
         const buffer = new PIXI.BufferResource(pixelBuffer, { width, height });
@@ -148,15 +239,45 @@ export class StudioCanvas {
         const texture = new PIXI.Texture(baseTexture);
 
         const sprite = new PIXI.Sprite(texture);
-        sprite.isMapTexture = true;
+        targetLayer.addChild(sprite);
 
-        this.stage.addChildAt(sprite, 0);
-
-        // If this is the first terrain generation, auto-frame the map.
-        // Otherwise, leave the camera exactly where the GM was looking.
         if (!this.hasGeneratedMap) {
             this.resetCamera();
             this.hasGeneratedMap = true;
         }
+    }
+
+    /**
+     * Toggles the visibility of a specific layer in the WebGL scene graph.
+     */
+    toggleLayer(layerId, isVisible) {
+        const targetLayer = this.layers[layerId];
+        if (targetLayer) {
+            targetLayer.visible = isVisible;
+        }
+    }
+
+    /**
+     * Extracts precise X/Y integer array coordinates from a screen click.
+     */
+    #getMapCoordinates(event, canvasElement) {
+        const rect = canvasElement.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        // Reverse the WebGL scale and translation offsets
+        const localX = (mouseX - this.stage.x) / this.stage.scale.x;
+        const localY = (mouseY - this.stage.y) / this.stage.scale.y;
+
+        return {
+            x: Math.floor(localX),
+            y: Math.floor(localY),
+        };
+    }
+
+    setEditMode(isActive) {
+        this.isEditMode = isActive;
+        const canvasElement = this.app.canvas ?? this.app.view;
+        canvasElement.style.cursor = isActive ? "crosshair" : "default";
     }
 }

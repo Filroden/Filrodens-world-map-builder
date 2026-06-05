@@ -1,0 +1,65 @@
+<div class="fwmb-edit-toolbar fwmb-hidden">
+    <div class="fwmb-brush-settings">
+        <div class="fwmb-brush-setting">
+            <label>{{localize "FILRODENSWMB.UI.BrushSize"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="brushSize" value="20" min="5" max="100" step="1" oninput="this.nextElementSibling.value = this.value" />
+                <output>20</output>
+            </div>
+        </div>
+
+        <div class="fwmb-brush-setting" data-tool-group="terrain">
+            <label>{{localize "FILRODENSWMB.UI.BrushStrength"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="brushStrength" value="0.02" min="0.01" max="0.05" step="0.01" oninput="this.nextElementSibling.value = this.value" />
+                <output>0.02</output>
+            </div>
+        </div>
+
+        <div class="fwmb-brush-setting" data-tool-group="terrain">
+            <label>{{localize "FILRODENSWMB.UI.BrushFeather"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="brushFeather" value="0.4" min="0" max="0.8" step="0.1" oninput="this.nextElementSibling.value = this.value" />
+                <output>0.4</output>
+            </div>
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="biomes">
+            <label>{{localize "FILRODENSWMB.UI.BrushBiome"}}</label>
+            <select name="brushBiome">
+                {{#each biomeList}}
+                    <option value="{{this.id}}">{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+
+    <div class="fwmb-divider-vertical"></div>
+
+    <div class="fwmb-brush-tools">
+        <button type="button" data-tool-group="terrain" data-action="setBrushTool" data-tool="raise" class="active" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRaise'}}">
+            <i class="fwmb-icon edit_arrow_up"></i>
+        </button>
+        <button type="button" data-tool-group="terrain" data-action="setBrushTool" data-tool="lower" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolLower'}}">
+            <i class="fwmb-icon edit_arrow_down"></i>
+        </button>
+        <button type="button" data-tool-group="terrain" data-action="setBrushTool" data-tool="smooth" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSmooth'}}">
+            <i class="fwmb-icon landscape"></i>
+        </button>
+
+        <button type="button" data-tool-group="biomes" data-action="setBrushTool" data-tool="paint" class="active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolPaint'}}">
+            <i class="fwmb-icon format_paint"></i>
+        </button>
+    </div>
+
+    <div class="fwmb-divider-vertical"></div>
+
+    <div class="fwmb-brush-history">
+        <button type="button" data-action="undoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}">
+            <i class="fwmb-icon undo"></i>
+        </button>
+        <button type="button" data-action="redoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Redo'}}">
+            <i class="fwmb-icon redo"></i>
+        </button>
+    </div>
+</div>

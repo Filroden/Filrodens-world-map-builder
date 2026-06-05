@@ -7,12 +7,12 @@
         <i class="fwmb-icon landscape"></i>
     </button>
 
-    <button type="button" data-action="changeTool" data-tool="features" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolFeatures'}}" class="{{#if (eq activeTool 'features')}}active{{/if}}">
-        <i class="fwmb-icon water_drop"></i>
-    </button>
-
     <button type="button" data-action="changeTool" data-tool="biomes" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolBiomes'}}" class="{{#if (eq activeTool 'biomes')}}active{{/if}}">
         <i class="fwmb-icon forest"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="features" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolFeatures'}}" class="{{#if (eq activeTool 'features')}}active{{/if}}">
+        <i class="fwmb-icon water_drop"></i>
     </button>
 
     <button type="button" data-action="changeTool" data-tool="infrastructure" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolInfrastructure'}}" class="{{#if (eq activeTool 'infrastructure')}}active{{/if}}">
@@ -24,6 +24,10 @@
     </button>
 
     <div class="fwmb-flex-1"></div>
+
+    <button type="button" data-action="saveMap" data-tooltip="{{localize 'FILRODENSWMB.UI.SaveMap'}}">
+        <i class="fwmb-icon file_save"></i>
+    </button>
 
     <button type="button" data-action="changeTool" data-tool="maps" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolMaps'}}" class="{{#if (eq activeTool 'maps')}}active{{/if}}">
         <i class="fwmb-icon folder_open"></i>

@@ -42,12 +42,15 @@
 .fwmb-icon.tune                 { --fwmb-mask: url('../assets/icons/tune.svg'); }
 .fwmb-icon.landscape            { --fwmb-mask: url('../assets/icons/landscape.svg'); }
 .fwmb-icon.water_drop           { --fwmb-mask: url('../assets/icons/water_drop.svg'); }
+.fwmb-icon.temperature          { --fwmb-mask: url('../assets/icons/device_thermostat.svg'); }
 .fwmb-icon.forest               { --fwmb-mask: url('../assets/icons/forest.svg'); }
 .fwmb-icon.location_city        { --fwmb-mask: url('../assets/icons/location_city.svg'); }
 .fwmb-icon.folder_open          { --fwmb-mask: url('../assets/icons/folder_open.svg'); }
 .fwmb-icon.edit_arrow_down      { --fwmb-mask: url('../assets/icons/edit_arrow_down.svg'); }
 .fwmb-icon.edit_arrow_up        { --fwmb-mask: url('../assets/icons/edit_arrow_up.svg'); }
 .fwmb-icon.undo                 { --fwmb-mask: url('../assets/icons/undo.svg'); }
+.fwmb-icon.redo                 { --fwmb-mask: url('../assets/icons/redo.svg'); }
+.fwmb-icon.format_paint         { --fwmb-mask: url('../assets/icons/format_paint.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
@@ -209,6 +212,32 @@
     line-height: var(--filroden-line-height-body);
 }
 
+/* --- SELECT AND OPTIONS --- */
+
+.fwmb select,
+.fwmb select::picker(select) {
+    appearance: base-select;
+}
+
+.fwmb select::picker(select) {
+    position-area: top;
+    margin-block-end: var(--filroden-space-xs);
+    border: 1px solid var(--filroden-color-text-accent);
+}
+
+.fwmb option {
+    background: var(--filroden-color-bg-medium-solid);
+    color: var(--filroden-color-text-main-solid);
+}
+
+.fwmb option:hover {
+    background: var(--filroden-color-text-accent);
+    color: var(--filroden-color-text-on-accent);
+}
+
+.fwmb option:focus {
+    outline: none;
+}
 
 /* --- CHECKBOXES AND RADIO BUTTONS --- */
 .fwmb-checkbox,
@@ -334,10 +363,9 @@
 
 .fwmb .form-group {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) max-content;
+    grid-template-columns: auto minmax(0, max-content);
     align-items: center;
     gap: var(--filroden-space-l);
-    margin-block-end: var(--filroden-space-s);
 }
 
 .fwmb .form-group label {
@@ -377,7 +405,7 @@
     border: none;
     height: 1px;
     width: 100%;
-    background-color: var(--filroden-color-border);
+    background-color: var(--filroden-color-text-accent);
     margin-block: var(--filroden-space-m);
 }
 
@@ -508,7 +536,7 @@
 
 /* 1. The Toolbar Part */
 .fwmb .fwmb-toolbar {
-    flex: 0 0 50px; 
+    flex: 0 0 3rem; 
     background: var(--filroden-color-bg-darkest);
     border-inline-end: 1px solid var(--filroden-color-border);
     display: flex;
@@ -518,7 +546,7 @@
     gap: var(--filroden-space-s);
 }
 
-.fwmb-toolbar button {
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools) button {
     width: 36px;
     height: 36px;
     display: flex;
@@ -530,12 +558,12 @@
     color: var(--filroden-color-text-muted-solid);
 }
 
-.fwmb-toolbar button:hover {
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools) button:hover {
     color: var(--filroden-color-text-main-solid);
     background: rgba(255, 255, 255, 0.05);
 }
 
-.fwmb-toolbar button.active {
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools) button.active {
     color: var(--filroden-color-text-accent);
     background: var(--filroden-color-bg-hover-solid);
     border-color: var(--filroden-color-text-accent);
@@ -543,7 +571,7 @@
 
 /* 2. The Context Panel Part */
 .fwmb .fwmb-context-panel {
-    flex: 0 0 280px; 
+    flex: 0 0 18rem; 
     background: var(--filroden-color-bg-medium-solid);
     border-inline-end: 1px solid var(--filroden-color-border);
     display: flex;
@@ -576,11 +604,11 @@
     border: none;
     height: 100%;
     width: 1px;
-    background-color: var(--filroden-color-border);
+    background-color: var(--filroden-color-text-accent);
     margin-inline: var(--filroden-space-m);
 }
 
-.fwmb-zoom-controls {
+.fwmb-map-controls {
     position: absolute;
     inset-block-end: var(--filroden-space-m);
     inset-inline-end: var(--filroden-space-m);
@@ -610,12 +638,12 @@
     transition: opacity 0.2s ease;
 }
 
-.fwmb-map:hover .fwmb-zoom-controls,
+.fwmb-map:hover .fwmb-map-controls,
 .fwmb-map:hover .fwmb-map-hint {
     opacity: 1;
 }
 
-.fwmb-zoom-controls button {
+.fwmb-map-controls button {
     width: var(--filroden-font-size-xxl);
     height: var(--filroden-font-size-xxl);
     background: transparent;
@@ -627,7 +655,7 @@
     justify-content: center;
 }
 
-.fwmb-zoom-controls button:hover {
+.fwmb-map-controls button:hover {
     background: rgba(255, 255, 255, 0.1);
     border-color: var(--filroden-color-text-accent);
 }
@@ -721,4 +749,81 @@
 .fwmb .fwmb-brush-setting .fwmb-slider-group output {
     width: 4ch;
     margin-left: 0;
+}
+
+/* --- CONTEXT PANEL LOCK STATE --- */
+.fwmb .fwmb-context-panel.fwmb-locked fieldset {
+    opacity: 0.4;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.fwmb .fwmb-context-panel.fwmb-locked fieldset legend {
+    color: var(--filroden-color-text-muted);
+}
+
+/* --- CANVAS HOVER READOUT --- */
+.fwmb-canvas-readout {
+    position: absolute;
+    inset-block-start: var(--filroden-space-m);
+    inset-inline-start: var(--filroden-space-m);
+    background: rgba(0, 0, 0, 0.7);
+    padding: var(--filroden-space-xs) var(--filroden-space-s);
+    border-radius: var(--filroden-radius-small);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--filroden-color-text-main-solid);
+    font-size: var(--filroden-font-size-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-m);
+    z-index: 20;
+    pointer-events: none; /* Crucial: Prevents the readout from blocking brush clicks! */
+}
+
+.fwmb-canvas-readout .fwmb-divider-vertical {
+    height: var(--filroden-font-size-m);
+    margin: 0;
+}
+
+.fwmb-readout-item {
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-xxs);
+    font-family: monospace;
+}
+
+.fwmb-readout-item i {
+    width: var(--filroden-font-size-m);
+    height: var(--filroden-font-size-m);
+    min-width: var(--filroden-font-size-m);
+    color: var(--filroden-color-text-muted-solid);
+}
+
+.fwmb-readout-biome {
+    font-weight: bold;
+    color: var(--filroden-color-text-accent);
+}
+
+/* --- BIOME LEGEND --- */
+.fwmb-biome-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--filroden-space-s);
+    font-size: var(--filroden-font-size-xs);
+}
+
+.fwmb-biome-item {
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-m);
+    color: var(--filroden-color-text-main-solid);
+}
+
+.fwmb-biome-swatch {
+    width: var(--filroden-font-size-l);
+    height: var(--filroden-font-size-l);
+    flex-shrink: 0;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 2px rgba(0,0,0,0.5);
 }

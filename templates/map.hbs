@@ -1,0 +1,42 @@
+<div class="fwmb-map-container">
+
+    {{> "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs" }}
+
+    <div class="fwmb-map-preview">
+        <div class="fwmb-canvas-readout fwmb-hidden">
+            <div class="fwmb-readout-item"><i class="fwmb-icon elevation"></i> <span id="fwmb-readout-elev">--</span></div>
+            <div class="fwmb-readout-item"><i class="fwmb-icon water_drop"></i> <span id="fwmb-readout-mois">--</span></div>
+            <div class="fwmb-readout-item"><i class="fwmb-icon temperature"></i> <span id="fwmb-readout-temp">--</span></div>
+            <div class="fwmb-divider-vertical"></div>
+            <div class="fwmb-readout-biome" id="fwmb-readout-biome">--</div>
+        </div>
+    </div>
+
+    <div class="fwmb-map-hint">{{localize "FILRODENSWMB.UI.CanvasHint"}}</div>
+
+    <div class="fwmb-map-controls">
+        <button type="button" class="active" data-action="toggleLayer" data-layer="base" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerBase'}}">
+            <i class="fwmb-icon map"></i>
+        </button>
+        <button type="button" class="active" data-action="toggleLayer" data-layer="topography" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerTopography'}}">
+            <i class="fwmb-icon elevation"></i>
+        </button>
+        <button type="button" class="" data-action="toggleLayer" data-layer="biomes" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerBiomes'}}">
+            <i class="fwmb-icon forest"></i>
+        </button>
+        <div class="fwmb-divider-vertical"></div>
+        <button type="button" data-action="toggleGrid" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleGrid'}}">
+            <i class="fwmb-icon grid-on"></i>
+        </button>
+        <div class="fwmb-divider-vertical"></div>
+        <button type="button" data-action="zoomOut" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}">
+            <i class="fwmb-icon zoom-out"></i>
+        </button>
+        <button type="button" data-action="resetZoom" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetView'}}">
+            <i class="fwmb-icon center-focus"></i>
+        </button>
+        <button type="button" data-action="zoomIn" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}">
+            <i class="fwmb-icon zoom-in"></i>
+        </button>
+    </div>
+</div>

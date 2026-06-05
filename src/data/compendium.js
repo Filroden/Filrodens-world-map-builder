@@ -38,22 +38,22 @@ export async function getSavedMaps() {
 }
 
 /**
- * Saves the current scene's entire hex state to a new JournalEntry in the compendium.
+ * Saves the Map Studio's generation parameters and brush history to a new JournalEntry.
  */
-export async function saveCurrentMap(mapName) {
-    // 1. Strict Fix: deepClone the flags to strip any DataModel proxies before saving
-    const allModuleFlags = foundry.utils.deepClone(canvas.scene.flags[FILRODENSWMB.ID]);
-
-    if (!allModuleFlags?.[FILRODENSWMB.FLAGS.HEX_DATA]) return null;
+export async function saveMapData(mapName, mapDataPayload) {
+    if (!mapDataPayload) return null;
 
     const packName = `world.${FILRODENSWMB.COMPENDIUM.NAME}`;
     const pack = game.packs.get(packName);
     if (!pack) return null;
 
+    // DeepClone the payload to strip any memory references before database insertion
+    const cleanPayload = foundry.utils.deepClone(mapDataPayload);
+
     const documentData = {
         name: mapName || "Untitled Map",
         flags: {
-            [FILRODENSWMB.ID]: allModuleFlags,
+            [FILRODENSWMB.ID]: cleanPayload,
         },
     };
 
@@ -61,7 +61,7 @@ export async function saveCurrentMap(mapName) {
 }
 
 /**
- * Retrieves a specific map's data object from the compendium.
+ * Retrieves a specific map's data payload from the compendium.
  */
 export async function loadMapData(documentId) {
     const packName = `world.${FILRODENSWMB.COMPENDIUM.NAME}`;
@@ -70,6 +70,6 @@ export async function loadMapData(documentId) {
 
     const document = await pack.getDocument(documentId);
 
-    // 2. Strict Fix: Bypass getFlag() and read the raw scope object directly
+    // Strict Fix: Bypass getFlag() and read the raw scope object directly
     return document?.flags?.[FILRODENSWMB.ID] || null;
 }
