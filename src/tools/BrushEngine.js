@@ -74,19 +74,20 @@ export class BrushEngine {
     }
 
     #processPixel(x, y, cx, cy, elevationData, biomeOverrideData, seaLevel) {
-        const { layer, tool, size, strength, feather, value } = this.activeStroke;
+        const { layer, tool, size, strength, feather, value, points } = this.activeStroke;
         const distance = Math.hypot(x - cx, y - cy);
 
         if (distance > size) return;
 
         const index = y * this.width + x;
 
+        // 1. Calculate the spatial influence (Feathering taper)
+        const safeFeather = Math.min(feather, 0.99);
+        const coreSize = size * safeFeather;
+        const influence = distance > coreSize ? 1 - (distance - coreSize) / (size - coreSize) : 1;
+
         // --- TERRAIN LAYER ---
         if (layer === "terrain") {
-            const safeFeather = Math.min(feather, 0.99);
-            const coreSize = size * safeFeather;
-            let influence = distance > coreSize ? 1 - (distance - coreSize) / (size - coreSize) : 1;
-
             const currentElevation = elevationData[index];
             const modification = strength * influence;
 
@@ -98,20 +99,24 @@ export class BrushEngine {
             }
         }
 
-        // --- BIOME LAYER (DISCRETE PAINTING) ---
+        // --- BIOME LAYER (ORGANIC SCATTER BRUSH) ---
         else if (layer === "biome" && tool === "paint" && biomeOverrideData) {
-            // Hard brush for discrete integer values
-            const isLand = elevationData[index] >= seaLevel;
-            const isWaterBiome = value === 1 || value === 2; // Deep Ocean, Shallow Ocean
+            // Map the 0.01-0.05 strength slider into a 15% to 75% per-tick probability limit
+            const probability = strength * 15 * influence;
 
-            // SMART MASKING: Prevent land biomes on water, and water biomes on land.
-            // (Pack Ice (13) is allowed anywhere).
-            if (value === 13) {
-                biomeOverrideData[index] = value;
-            } else if (isLand && !isWaterBiome) {
-                biomeOverrideData[index] = value;
-            } else if (!isLand && isWaterBiome) {
-                biomeOverrideData[index] = value;
+            // Deterministic Pseudo-Random Generator
+            // Uses the X/Y coordinates and the current length of the stroke queue as an absolute mathematical seed
+            const pseudoRandom = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + points.length) * 43758.5453) % 1;
+
+            // Only paint the pixel if it survives the probability check
+            if (pseudoRandom < probability) {
+                const isLand = elevationData[index] >= seaLevel;
+                const isWaterBiome = value === 1 || value === 2; // Deep/Shallow Ocean
+
+                // SMART MASKING
+                if (value === 13 || isLand !== isWaterBiome) {
+                    biomeOverrideData[index] = value;
+                }
             }
         }
     }

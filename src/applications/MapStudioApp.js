@@ -69,6 +69,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             mapSeed: null,
             seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
             globalTemp: FILRODENSWMB.DEFAULTS.GLOBAL_TEMP,
+            seasonOffset: 0,
             latTop: FILRODENSWMB.DEFAULTS.LAT_TOP,
             latBottom: FILRODENSWMB.DEFAULTS.LAT_BOTTOM,
             globalMoisture: 0.5,
@@ -114,6 +115,32 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     _onRender(context, options) {
         super._onRender(context, options);
 
+        // --- Universal Double-Click to Reset Sliders ---
+        if (!this.element.dataset.hasDblClickListener) {
+            this.element.addEventListener("dblclick", (event) => {
+                const target = event.target;
+
+                // Only intercept double-clicks on range sliders
+                if (target.tagName === "INPUT" && target.type === "range") {
+                    // Read the original value stamped in the HBS file
+                    const defaultVal = target.defaultValue;
+
+                    if (defaultVal !== undefined && target.value !== defaultVal) {
+                        target.value = defaultVal;
+
+                        // Update the sibling <output> text if one exists
+                        if (target.nextElementSibling?.tagName === "OUTPUT") {
+                            target.nextElementSibling.value = defaultVal;
+                        }
+
+                        // Dispatch a fake input event so the debouncers and cache instantly react
+                        target.dispatchEvent(new Event("input", { bubbles: true }));
+                    }
+                }
+            });
+            this.element.dataset.hasDblClickListener = "true";
+        }
+
         const container = this.element.querySelector(".fwmb-map-preview");
         if (container && !this.canvasEngine) {
             this.canvasEngine = new StudioCanvas(container);
@@ -130,7 +157,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.debouncedGenerateTerrain();
                 }
                 // If they touch climate controls, skip topography and instantly rebuild biomes
-                else if (event.target.matches('input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"]')) {
+                else if (
+                    event.target.matches(
+                        'input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"]',
+                    )
+                ) {
                     this.debouncedGenerateClimate();
                 }
             });
@@ -227,6 +258,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const params = {
             seaLevel: this.uiState["seaLevel"],
             globalTemp: this.uiState["globalTemp"],
+            seasonOffset: this.uiState["seasonOffset"],
             latTop: this.uiState["latTop"],
             latBottom: this.uiState["latBottom"],
             globalMoisture: this.uiState["globalMoisture"],

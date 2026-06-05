@@ -104,6 +104,7 @@ export class ProceduralEngine {
         const tScale = params.noise.temperature.scale || 1 / 250;
         const tOctaves = params.noise.temperature.octaves || 3;
         const globalTemp = params.globalTemp;
+        const seasonOffset = params.seasonOffset || 0;
 
         const latTop = params.latTop;
         const latBottom = params.latBottom;
@@ -115,6 +116,7 @@ export class ProceduralEngine {
         for (let y = 0; y < height; y++) {
             const currentLat = latTop - (y / height) * latRange;
             const latGradient = 1 - Math.abs(currentLat) / 90;
+            const seasonImpact = (currentLat / 90) * seasonOffset * 0.35;
 
             for (let x = 0; x < width; x++) {
                 const index = y * width + x;
@@ -123,17 +125,14 @@ export class ProceduralEngine {
 
                 // MOISTURE
                 const moistureNoise = this.#fbm(worldX + moistureOffset, worldY + moistureOffset, mOctaves, mScale);
-                // Shift moisture based on the global slider
                 moistureData[index] = Math.max(0, Math.min(1, moistureNoise + (globalMoisture - 0.5)));
 
                 // TEMPERATURE
                 const tempNoise = this.#fbm(worldX + tempOffset, worldY + tempOffset, tOctaves, tScale);
 
-                // Shift the mathematical weight to 75% Latitude and 25% Noise
                 let temperature = latGradient * 0.75 + tempNoise * 0.25;
-
-                // (The rest remains exactly the same)
                 temperature += globalTemp - 0.3;
+                temperature += seasonImpact;
 
                 const elevation = elevationData[index];
                 if (elevation > params.seaLevel) {

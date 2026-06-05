@@ -60,6 +60,7 @@
     "FILRODENSWMB.UI.BrushBiome": "Select Biome",
     "FILRODENSWMB.UI.ToolPaint": "Paint Biome",
     "FILRODENSWMB.UI.EditBiome": "Toggle Edit Biome",
+    "FILRODENSWMB.UI.SeasonOffset": "Season",
 
     "FILRODENSWMB.BIOMES.DEEP_OCEAN": "Deep Ocean",
     "FILRODENSWMB.BIOMES.SHALLOW_OCEAN": "Shallow Ocean",
