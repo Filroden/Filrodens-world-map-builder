@@ -62,6 +62,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.currentBiomeOverrides = null;
         this.currentMoistureData = null;
         this.currentTemperatureData = null;
+        this.currentRiverData = null;
         this.brushEngine = null;
 
         // Persistent cache to protect slider values when tabs unmount
@@ -80,10 +81,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             "noise.elevation.stretch": FILRODENSWMB.NOISE.ELEVATION.STRETCH,
             "noise.moisture.scale": 500,
             "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
+            riverDensity: 40,
         };
 
         this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), 400);
         this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), 200);
+        this.debouncedGenerateFeatures = foundry.utils.debounce(this.generateFeatures.bind(this), 200);
     }
 
     /**
@@ -163,6 +166,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     )
                 ) {
                     this.debouncedGenerateClimate();
+                }
+                // If they touch feature controls, only rebuild the vector data
+                else if (event.target.matches('input[name="riverDensity"]')) {
+                    this.debouncedGenerateFeatures();
                 }
             });
             contextPanel.dataset.hasNoiseListeners = "true";
@@ -247,10 +254,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 1. Sync visible DOM inputs into the persistent UI state cache
         for (const key of Object.keys(this.uiState)) {
             const input = this.element.querySelector(`input[name="${key}"]`);
-            if (input) {
-                // Safely update the cache, handling text (seeds) and numbers
+            if (!input) continue;
+
+            if (key === "mapSeed") {
+                this.uiState[key] = input.value;
+            } else {
                 const parsed = Number.parseFloat(input.value);
-                this.uiState[key] = key === "mapSeed" ? input.value : Number.isNaN(parsed) ? this.uiState[key] : parsed;
+                if (!Number.isNaN(parsed)) {
+                    this.uiState[key] = parsed;
+                }
             }
         }
 
@@ -262,6 +274,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             latTop: this.uiState["latTop"],
             latBottom: this.uiState["latBottom"],
             globalMoisture: this.uiState["globalMoisture"],
+            riverDensity: this.uiState["riverDensity"],
             noise: {
                 offsetX: this.uiState["noise.offsetX"],
                 offsetY: this.uiState["noise.offsetY"],
@@ -304,6 +317,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (topoBtn && !topoBtn.classList.contains("active")) {
                 topoBtn.classList.add("active");
                 this.canvasEngine?.toggleLayer("topography", true);
+            }
+        } else if (newTool === "features") {
+            const featuresBtn = this.element.querySelector('[data-layer="features"]');
+            if (featuresBtn && !featuresBtn.classList.contains("active")) {
+                featuresBtn.classList.add("active");
+                this.canvasEngine?.toggleLayer("features", true);
             }
         }
 
@@ -384,29 +403,41 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const seaLevel = Number.parseFloat(this.element.querySelector('input[name="seaLevel"]')?.value) || FILRODENSWMB.DEFAULTS.SEA_LEVEL;
         const engine = new ProceduralEngine();
 
-        // 1. Generate and paint the flat Base Map
-        const baseBuffer = engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel);
-        this.canvasEngine.renderPixelBuffer("base", baseBuffer, this.mapWidth, this.mapHeight);
+        // 1. EXTRACT THE NEW DATA STRUCTURE
+        // Safely pull apart the vectors and the mask. If they haven't generated yet, default to null.
+        const waterMask = this.currentRiverData ? this.currentRiverData.waterMask : null;
+        const riverVectors = this.currentRiverData ? this.currentRiverData.vectors : null;
 
         // 2. Generate and paint the shaded Topography
-        const topBuffer = engine.colorize(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel);
+        const topBuffer = engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask);
         this.canvasEngine.renderPixelBuffer("topography", topBuffer, this.mapWidth, this.mapHeight);
 
-        // 3. Generate and paint the Whittaker Biomes
+        // 3. Generate and paint the shaded Topography
+        // Pass the waterMask in so the lakes receive dynamic depth shading!
+        this.canvasEngine.renderPixelBuffer("topography", topBuffer, this.mapWidth, this.mapHeight);
+
+        // 4. Generate and paint the Whittaker Biomes
         if (this.currentMoistureData && this.currentTemperatureData) {
             const biomeBuffer = engine.createBiomesMap(
                 this.currentElevationData,
                 this.currentMoistureData,
                 this.currentTemperatureData,
-                this.currentBiomeOverrides,
+                this.currentBiomeOverrides, // <-- THE FIX: Restore the missing parameter
                 this.mapWidth,
                 this.mapHeight,
                 seaLevel,
+                waterMask,
             );
             this.canvasEngine.renderPixelBuffer("biomes", biomeBuffer, this.mapWidth, this.mapHeight);
 
             const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
             this.canvasEngine.toggleLayer("biomes", biomesBtn?.classList.contains("active"));
+        }
+
+        // 5. Draw Vector Graphics (Rivers)
+        if (riverVectors) {
+            // Only pass the specific vector array to PIXI, not the whole object
+            this.canvasEngine.renderRiverVectors(riverVectors);
         }
     }
 
@@ -494,6 +525,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const t1 = performance.now();
 
         console.log(`World Map Builder | Climate calculated in ${Math.round(t1 - t0)}ms`);
+
+        // Chain the final features generation automatically
+        this.generateFeatures();
+    }
+
+    /**
+     * Final step in the procedural chain. Calculates water flow and spawns vectors.
+     */
+    async generateFeatures() {
+        if (!this.currentElevationData || !this.currentMoistureData || !this.currentTemperatureData) return;
+
+        const { currentSeed, params } = this.#getMapParameters();
+        const engine = new ProceduralEngine(currentSeed);
+
+        const t0 = performance.now();
+        this.currentRiverData = engine.generateRivers(this.currentElevationData, this.currentMoistureData, this.currentTemperatureData, this.mapWidth, this.mapHeight, params);
+        const t1 = performance.now();
+
+        console.log(`World Map Builder | Rivers calculated in ${Math.round(t1 - t0)}ms`);
 
         if (this.canvasEngine) {
             this.#repaintCanvas();

@@ -39,6 +39,7 @@
     "FILRODENSWMB.UI.LatTop": "Top",
     "FILRODENSWMB.UI.LatBottom": "Bottom",
     "FILRODENSWMB.UI.EditTerrain": "Toggle Edit Terrain",
+
     "FILRODENSWMB.UI.BrushSize": "Brush Size",
     "FILRODENSWMB.UI.BrushStrength": "Brush Strength",
     "FILRODENSWMB.UI.BrushFeather": "Brush Feather",
@@ -46,12 +47,13 @@
     "FILRODENSWMB.UI.ToolLower": "Lower Terrain",
     "FILRODENSWMB.UI.ToolSmooth": "Smooth Terrain",
     "FILRODENSWMB.UI.Undo": "Undo",
-    "FILRODENSWMB.UI.SaveMap": "Quick Save Map",
-    "FILRODENSWMB.UI.SaveSuccess": "Successfully saved {name} to the Compendium.",
-    "FILRODENSWMB.UI.SaveError": "Failed to save the map. Please ensure the compendium is unlocked.",
+    "FILRODENSWMB.UI.Redo": "Redo",
+
     "FILRODENSWMB.UI.LayerBase": "Toggle Base Map",
     "FILRODENSWMB.UI.LayerTopography": "Toggle Topography",
     "FILRODENSWMB.UI.LayerBiomes": "Toggle Biomes",
+    "FILRODENSWMB.UI.LayerFeatures": "Toggle Features",
+
     "FILRODENSWMB.UI.ClimateSettings": "Climate Settings",
     "FILRODENSWMB.UI.MoistureSettings": "Moisture Settings",
     "FILRODENSWMB.UI.GlobalMoisture": "Global Moisture",
@@ -61,6 +63,9 @@
     "FILRODENSWMB.UI.ToolPaint": "Paint Biome",
     "FILRODENSWMB.UI.EditBiome": "Toggle Edit Biome",
     "FILRODENSWMB.UI.SeasonOffset": "Season",
+
+    "FILRODENSWMB.UI.Hydrology": "Hydrology",
+    "FILRODENSWMB.UI.RiverDensity": "River Density",
 
     "FILRODENSWMB.BIOMES.DEEP_OCEAN": "Deep Ocean",
     "FILRODENSWMB.BIOMES.SHALLOW_OCEAN": "Shallow Ocean",
@@ -75,6 +80,10 @@
     "FILRODENSWMB.BIOMES.TROPICAL_RAINFOREST": "Tropical Rainforest",
     "FILRODENSWMB.BIOMES.SAVANNA": "Savanna",
     "FILRODENSWMB.BIOMES.SUBTROPICAL_DESERT": "Subtropical Desert",
+
+    "FILRODENSWMB.UI.SaveMap": "Quick Save Map",
+    "FILRODENSWMB.UI.SaveSuccess": "Successfully saved {name} to the Compendium.",
+    "FILRODENSWMB.UI.SaveError": "Failed to save the map. Please ensure the compendium is unlocked.",
 
     "FILRODENSWMB.UI.Warning": "Warning",
     "FILRODENSWMB.UI.SeedWarningContent": "Generating a new terrain seed will permanently erase all manual brush edits you have applied to this map. Do you want to continue?"

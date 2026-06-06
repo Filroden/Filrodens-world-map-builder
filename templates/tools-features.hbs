@@ -1,3 +1,15 @@
-<div>
+<div class="fwmb-tool-content fwmb-scrollable">
+
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.Hydrology"}}</legend>
+
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.RiverDensity"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="riverDensity" value="40" min="0" max="150" step="5" oninput="this.nextElementSibling.value = this.value" />
+                <output>40</output>
+            </div>
+        </div>
+    </fieldset>
 
 </div>

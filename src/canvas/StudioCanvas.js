@@ -25,6 +25,13 @@ export class StudioCanvas {
             features: new PIXI.Container(),
         };
 
+        // Add them to the stage in ascending order
+        this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.features);
+
+        // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
+        this.vectorGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.vectorGraphics);
+
         // Add them to the stage in ascending order (base is bottom, features are top)
         this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.features);
 
@@ -244,6 +251,54 @@ export class StudioCanvas {
         if (!this.hasGeneratedMap) {
             this.resetCamera();
             this.hasGeneratedMap = true;
+        }
+    }
+
+    /**
+     * Renders an array of vector paths using highly performant native WebGL lines.
+     */
+    renderRiverVectors(rivers) {
+        this.vectorGraphics.clear();
+        if (!rivers || rivers.length === 0) return;
+
+        const waterColor = 0x78aad2; // Freshwater Teal
+        const frozenColor = 0xe1ebf0; // Pack Ice
+
+        for (const river of rivers) {
+            if (!river.path || river.path.length < 2) continue;
+
+            let isFlowing = false;
+            let currentIsFrozen = null;
+
+            for (const point of river.path) {
+                if (point.isLake) {
+                    // A clean break at the lip of the crater. No more scribbling.
+                    isFlowing = false;
+                    continue;
+                }
+
+                if (!isFlowing) {
+                    // Start a new line at a spring or a spillover lip
+                    currentIsFrozen = point.isFrozen;
+                    this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+                    this.vectorGraphics.moveTo(point.x, point.y);
+                    isFlowing = true;
+                } else if (point.isFrozen === currentIsFrozen) {
+                    // Standard flow
+                    this.vectorGraphics.lineTo(point.x, point.y);
+                } else {
+                    // THE FIX: The river crossed a temperature biome boundary!
+                    // Connect the previous colour to this boundary pixel...
+                    this.vectorGraphics.lineTo(point.x, point.y);
+
+                    // ...swap the paint colour...
+                    currentIsFrozen = point.isFrozen;
+                    this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+
+                    // ...and anchor the new paint to the exact same boundary pixel to continue seamlessly.
+                    this.vectorGraphics.moveTo(point.x, point.y);
+                }
+            }
         }
     }
 
