@@ -1,4 +1,5 @@
 import { SimplexNoise } from "../../vendor/simplex-noise.js";
+import { FILRODENSWMB } from "../config.js";
 
 export class ProceduralEngine {
     constructor(seed = null) {
@@ -77,24 +78,21 @@ export class ProceduralEngine {
     /**
      * Samples the map to find high-altitude, high-moisture starting points.
      */
-    #findSprings(elevationData, moistureData, width, height, seaLevel, targetCount) {
+    #findSprings(elevationData, moistureData, width, height, seaLevel, targetCount, params) {
         const springs = [];
-        const maxAttempts = targetCount * 50; // Prevent infinite loops on dry/flat maps
+        const maxAttempts = targetCount * 50;
         let attempts = 0;
+
+        const altOffset = params?.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
+        const moistMin = params?.hydrology?.springMoistMin ?? FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN;
 
         while (springs.length < targetCount && attempts < maxAttempts) {
             attempts++;
-
-            // Deterministically pick a coordinate
             const x = Math.floor(this.prng() * width);
             const y = Math.floor(this.prng() * height);
-
             const index = y * width + x;
-            const elevation = elevationData[index];
-            const moisture = moistureData[index];
 
-            // A valid spring requires high altitude and heavy moisture
-            if (elevation > seaLevel + 0.25 && moisture > 0.45) {
+            if (elevationData[index] > seaLevel + altOffset && moistureData[index] > moistMin) {
                 springs.push({ x, y });
             }
         }
@@ -104,15 +102,13 @@ export class ProceduralEngine {
     /**
      * Scans the 8 surrounding pixels to locate the steepest downward slope.
      */
-    #getLowestNeighbor(cx, cy, elevationData, width, height, visitedLocal) {
+    #getLowestNeighbor(cx, cy, elevationData, width, height, visitedLocal, params) {
         let minElev = Infinity;
         let bestTarget = null;
-
-        // Break the cardinal loop bias by starting at a random offset
         const startIdx = Math.floor(this.prng() * 8);
+        const meanderJitter = params?.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER;
 
         for (let i = 0; i < 8; i++) {
-            // Wrap around the array using modulo
             const dir = ProceduralEngine.ADJACENT_OFFSETS[(startIdx + i) % 8];
             const nx = cx + dir.dx;
             const ny = cy + dir.dy;
@@ -121,10 +117,7 @@ export class ProceduralEngine {
             if (visitedLocal.has(`${nx},${ny}`)) continue;
 
             const actualElev = elevationData[ny * width + nx];
-
-            // Slightly stronger jitter to induce organic meandering on uniform slopes
-            const jitter = this.prng() * 0.005;
-            const perceivedElev = actualElev + jitter;
+            const perceivedElev = actualElev + this.prng() * meanderJitter;
 
             if (perceivedElev < minElev) {
                 minElev = perceivedElev;
@@ -137,81 +130,78 @@ export class ProceduralEngine {
     /**
      * Simulates water pooling in a local minimum until it overflows the basin.
      */
-    #fillBasin(startX, startY, elevationData, width, height, riverMap, visitedLocal) {
-        const visited = new Set();
-        visited.add(`${startX},${startY}`);
-
+    #fillBasin(startX, startY, elevationData, width, height, riverMap, visitedLocal, params) {
+        const visited = new Set([`${startX},${startY}`]);
         const boundary = [{ x: startX, y: startY, elev: elevationData[startY * width + startX] }];
         const lakePixels = [];
-        let spillover = null;
 
-        // Track the final resting elevation of the water's surface
         let surfaceElev = boundary[0].elev;
+        const maxLakeSize = params?.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
 
-        const MAX_LAKE_SIZE = 8000;
-
-        while (boundary.length > 0 && lakePixels.length < MAX_LAKE_SIZE) {
+        while (boundary.length > 0 && lakePixels.length < maxLakeSize) {
             boundary.sort((a, b) => a.elev - b.elev);
             const current = boundary.shift();
 
             lakePixels.push({ x: current.x, y: current.y, isLake: true });
             riverMap[current.y * width + current.x] = true;
-
-            // As the basin fills, the surface rises
             surfaceElev = Math.max(surfaceElev, current.elev);
 
-            for (const dir of ProceduralEngine.ADJACENT_OFFSETS) {
-                const nx = current.x + dir.dx;
-                const ny = current.y + dir.dy;
+            const spillover = this.#scanBasinNeighbors(current, elevationData, width, height, visited, visitedLocal, boundary);
 
-                if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
-
-                const key = `${nx},${ny}`;
-                if (visited.has(key)) continue;
-                visited.add(key);
-
-                const nElev = elevationData[ny * width + nx];
-
-                if (nElev < current.elev) {
-                    if (visitedLocal.has(`${nx},${ny}`)) continue;
-
-                    spillover = { x: nx, y: ny, elevation: nElev };
-                    surfaceElev = current.elev; // The water is exactly level with the lip
-                    break;
-                }
-
-                boundary.push({ x: nx, y: ny, elev: nElev });
+            if (spillover) {
+                return { spillover, lakePixels, surfaceElev: current.elev };
             }
-
-            if (spillover) break;
         }
 
-        return { spillover, lakePixels, surfaceElev }; // Include surfaceElev in return
+        return { spillover: null, lakePixels, surfaceElev };
+    }
+
+    #scanBasinNeighbors(current, elevationData, width, height, visited, visitedLocal, boundary) {
+        for (const dir of ProceduralEngine.ADJACENT_OFFSETS) {
+            const nx = current.x + dir.dx;
+            const ny = current.y + dir.dy;
+
+            if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+
+            const key = `${nx},${ny}`;
+            if (visited.has(key)) continue;
+            visited.add(key);
+
+            const nElev = elevationData[ny * width + nx];
+
+            // If we found a pixel strictly lower than the one we are evaluating, it is the spillover lip.
+            if (nElev < current.elev) {
+                if (visitedLocal.has(`${nx},${ny}`)) continue;
+                return { x: nx, y: ny, elevation: nElev };
+            }
+
+            boundary.push({ x: nx, y: ny, elev: nElev });
+        }
+        return null;
     }
 
     /**
      * Executes the Greedy Downhill algorithm to plot a vector path to the ocean.
      */
-    #traceRiver(startX, startY, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask) {
+    #traceRiver(startX, startY, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params) {
         const path = [];
         const visitedLocal = new Set();
+        const freezeLimit = params?.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
 
         let cx = startX;
         let cy = startY;
         let currentElev = elevationData[cy * width + cx];
-
         const maxLength = width * 1.5;
 
         while (path.length < maxLength) {
             const temp = temperatureData[cy * width + cx];
-            const isFrozen = temp < 0.2;
+            const isFrozen = temp < freezeLimit;
 
             visitedLocal.add(`${cx},${cy}`);
-
             path.push({ x: cx, y: cy, isFrozen: isFrozen });
             riverMap[cy * width + cx] = true;
 
-            const lowestNeighbor = this.#getLowestNeighbor(cx, cy, elevationData, width, height, visitedLocal);
+            const lowestNeighbor = this.#getLowestNeighbor(cx, cy, elevationData, width, height, visitedLocal, params);
 
             if (!lowestNeighbor) break;
 
@@ -226,11 +216,10 @@ export class ProceduralEngine {
             }
 
             if (lowestNeighbor.elevation >= currentElev) {
-                const basin = this.#fillBasin(cx, cy, elevationData, width, height, riverMap, visitedLocal);
+                const basin = this.#fillBasin(cx, cy, elevationData, width, height, riverMap, visitedLocal, params);
 
                 if (basin.lakePixels.length > 0) {
                     path.push({ x: cx, y: cy, isLake: true, isFrozen: isFrozen });
-
                     for (const lp of basin.lakePixels) {
                         visitedLocal.add(`${lp.x},${lp.y}`);
                         waterMask[lp.y * width + lp.x] = basin.surfaceElev;
@@ -330,7 +319,8 @@ export class ProceduralEngine {
                 const elevation = elevationData[index];
                 if (elevation > params.seaLevel) {
                     const altitude = (elevation - params.seaLevel) / (1 - params.seaLevel);
-                    temperature -= altitude * 0.4;
+                    const altCooling = params.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING;
+                    temperature -= altitude * altCooling;
                 }
 
                 temperatureData[index] = Math.max(0, Math.min(1, temperature));
@@ -339,7 +329,7 @@ export class ProceduralEngine {
         return { moistureData, temperatureData };
     }
 
-    colorize(elevationData, temperatureData, width, height, seaLevel, waterMask) {
+    colorize(elevationData, temperatureData, width, height, seaLevel, waterMask, params) {
         const totalPixels = width * height;
         const pixelBuffer = new Uint8Array(totalPixels * 4);
 
@@ -348,37 +338,49 @@ export class ProceduralEngine {
             const bufferIndex = i * 4;
 
             if (elevation < seaLevel) {
-                const depth = seaLevel > 0 ? (seaLevel - elevation) / seaLevel : 0;
-                pixelBuffer[bufferIndex] = Math.max(20, 100 - 80 * depth);
-                pixelBuffer[bufferIndex + 1] = Math.max(30, 150 - 120 * depth);
-                pixelBuffer[bufferIndex + 2] = Math.max(80, 200 - 120 * depth);
+                this.#paintOceanPixel(pixelBuffer, bufferIndex, elevation, seaLevel);
             } else if (waterMask && waterMask[i] > 0) {
-                const surfaceElev = waterMask[i];
-                const depth = surfaceElev > 0 ? (surfaceElev - elevation) / surfaceElev : 0;
                 const temp = temperatureData ? temperatureData[i] : 1;
-
-                if (temp < 0.2) {
-                    pixelBuffer[bufferIndex] = Math.max(200, 255 - 50 * depth);
-                    pixelBuffer[bufferIndex + 1] = Math.max(220, 255 - 30 * depth);
-                    pixelBuffer[bufferIndex + 2] = 255;
-                } else {
-                    pixelBuffer[bufferIndex] = Math.max(40, 120 - 80 * depth);
-                    pixelBuffer[bufferIndex + 1] = Math.max(80, 170 - 120 * depth);
-                    pixelBuffer[bufferIndex + 2] = Math.max(120, 210 - 120 * depth);
-                }
+                this.#paintLakePixel(pixelBuffer, bufferIndex, elevation, waterMask[i], temp, params);
             } else {
-                const heightParam = seaLevel < 1 ? (elevation - seaLevel) / (1 - seaLevel) : 1;
-                const grayValue = Math.max(60, 200 - 140 * heightParam);
-
-                pixelBuffer[bufferIndex] = grayValue;
-                pixelBuffer[bufferIndex + 1] = grayValue;
-                pixelBuffer[bufferIndex + 2] = grayValue;
+                this.#paintLandPixel(pixelBuffer, bufferIndex, elevation, seaLevel);
             }
-
-            pixelBuffer[bufferIndex + 3] = 255;
         }
-
         return pixelBuffer;
+    }
+
+    #paintOceanPixel(pixelBuffer, bufferIndex, elevation, seaLevel) {
+        const depth = seaLevel > 0 ? (seaLevel - elevation) / seaLevel : 0;
+        pixelBuffer[bufferIndex] = Math.max(20, 100 - 80 * depth);
+        pixelBuffer[bufferIndex + 1] = Math.max(30, 150 - 120 * depth);
+        pixelBuffer[bufferIndex + 2] = Math.max(80, 200 - 120 * depth);
+        pixelBuffer[bufferIndex + 3] = 255;
+    }
+
+    #paintLakePixel(pixelBuffer, bufferIndex, elevation, surfaceElev, temp, params) {
+        const depth = surfaceElev > 0 ? (surfaceElev - elevation) / surfaceElev : 0;
+        const freezeLimit = params?.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
+
+        if (temp < freezeLimit) {
+            pixelBuffer[bufferIndex] = Math.max(200, 255 - 50 * depth);
+            pixelBuffer[bufferIndex + 1] = Math.max(220, 255 - 30 * depth);
+            pixelBuffer[bufferIndex + 2] = 255;
+        } else {
+            pixelBuffer[bufferIndex] = Math.max(40, 120 - 80 * depth);
+            pixelBuffer[bufferIndex + 1] = Math.max(80, 170 - 120 * depth);
+            pixelBuffer[bufferIndex + 2] = Math.max(120, 210 - 120 * depth);
+        }
+        pixelBuffer[bufferIndex + 3] = 255;
+    }
+
+    #paintLandPixel(pixelBuffer, bufferIndex, elevation, seaLevel) {
+        const heightParam = seaLevel < 1 ? (elevation - seaLevel) / (1 - seaLevel) : 1;
+        const grayValue = Math.max(60, 200 - 140 * heightParam);
+
+        pixelBuffer[bufferIndex] = grayValue;
+        pixelBuffer[bufferIndex + 1] = grayValue;
+        pixelBuffer[bufferIndex + 2] = grayValue;
+        pixelBuffer[bufferIndex + 3] = 255;
     }
 
     #fbm(x, y, octaves, scale) {
@@ -432,41 +434,57 @@ export class ProceduralEngine {
      * SINGLE SOURCE OF TRUTH: Evaluates elevation and climate to determine the precise Biome key.
      */
     static getBiomeKey(elevation, moisture, temp, seaLevel) {
-        if (elevation < seaLevel) {
-            if (temp < 0.3) return "PACK_ICE";
+        const tempLimits = FILRODENSWMB.CLIMATE.THRESHOLDS.TEMPERATURE;
 
-            const depth = seaLevel > 0 ? (seaLevel - elevation) / seaLevel : 0;
-            return depth > 0.5 ? "DEEP_OCEAN" : "SHALLOW_OCEAN";
-        }
+        if (elevation < seaLevel) return ProceduralEngine.#getOceanBiome(elevation, temp, seaLevel);
+        if (temp < tempLimits.ARCTIC) return ProceduralEngine.#getArcticBiome(moisture);
+        if (temp < tempLimits.SUBARCTIC) return ProceduralEngine.#getSubArcticBiome(moisture);
+        if (temp < tempLimits.TEMPERATE) return ProceduralEngine.#getTemperateBiome(moisture);
 
-        // Rebalanced thresholds to vastly expand the Temperate band and Grassland occurrence
-        if (temp < 0.2) {
-            return moisture > 0.5 ? "SNOW" : "TUNDRA";
-        } else if (temp < 0.4) {
-            if (moisture < 0.3) return "TUNDRA";
-            if (moisture < 0.6) return "TAIGA";
-            return "SNOW";
-        } else if (temp < 0.8) {
-            // Expanded Temperate band from 40% to 80%
-            if (moisture < 0.25) return "TEMPERATE_DESERT";
-            if (moisture < 0.6) return "GRASSLAND"; // Expanded Grassland moisture threshold
-            if (moisture < 0.85) return "DECIDUOUS_FOREST";
-            return "TEMPERATE_RAINFOREST";
-        } else {
-            if (moisture < 0.2) return "SUBTROPICAL_DESERT";
-            if (moisture < 0.4) return "SAVANNA";
-            if (moisture < 0.7) return "DECIDUOUS_FOREST";
-            return "TROPICAL_RAINFOREST";
-        }
+        return ProceduralEngine.#getTropicalBiome(moisture);
+    }
+
+    static #getOceanBiome(elevation, temp, seaLevel) {
+        if (temp < FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD) return "PACK_ICE";
+        const depth = seaLevel > 0 ? (seaLevel - elevation) / seaLevel : 0;
+        return depth > 0.5 ? "DEEP_OCEAN" : "SHALLOW_OCEAN";
+    }
+
+    static #getArcticBiome(moisture) {
+        const limit = FILRODENSWMB.CLIMATE.THRESHOLDS.MOISTURE.ARCTIC;
+        return moisture > limit.SNOW ? "SNOW" : "TUNDRA";
+    }
+
+    static #getSubArcticBiome(moisture) {
+        const limit = FILRODENSWMB.CLIMATE.THRESHOLDS.MOISTURE.SUBARCTIC;
+        if (moisture < limit.TUNDRA) return "TUNDRA";
+        if (moisture < limit.TAIGA) return "TAIGA";
+        return "SNOW";
+    }
+
+    static #getTemperateBiome(moisture) {
+        const limit = FILRODENSWMB.CLIMATE.THRESHOLDS.MOISTURE.TEMPERATE;
+        if (moisture < limit.DESERT) return "TEMPERATE_DESERT";
+        if (moisture < limit.GRASSLAND) return "GRASSLAND";
+        if (moisture < limit.DECIDUOUS) return "DECIDUOUS_FOREST";
+        return "TEMPERATE_RAINFOREST";
+    }
+
+    static #getTropicalBiome(moisture) {
+        const limit = FILRODENSWMB.CLIMATE.THRESHOLDS.MOISTURE.TROPICAL;
+        if (moisture < limit.DESERT) return "SUBTROPICAL_DESERT";
+        if (moisture < limit.SAVANNA) return "SAVANNA";
+        if (moisture < limit.DECIDUOUS) return "DECIDUOUS_FOREST";
+        return "TROPICAL_RAINFOREST";
     }
 
     /**
      * VISUAL PASS: Evaluates Temp and Moisture to paint a climate biome map.
      */
-    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask) {
+    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params) {
         const totalPixels = width * height;
         const pixelBuffer = new Uint8Array(totalPixels * 4);
-        const { BIOMES } = globalThis.game.filrodenswmb.config;
+        const BIOMES = FILRODENSWMB.BIOMES;
 
         for (let i = 0; i < totalPixels; i++) {
             const bufferIndex = i * 4;
@@ -494,8 +512,8 @@ export class ProceduralEngine {
                 continue;
             }
 
-            // Render Solid Land/Ice
-            const color = BIOMES[biomeKey] || BIOMES.GRASSLAND;
+            // Render Solid Land/Ice using custom UI overrides if they exist
+            const color = params?.customColors?.[biomeKey] || BIOMES[biomeKey] || BIOMES.GRASSLAND;
             pixelBuffer[bufferIndex] = color[0];
             pixelBuffer[bufferIndex + 1] = color[1];
             pixelBuffer[bufferIndex + 2] = color[2];
@@ -505,11 +523,7 @@ export class ProceduralEngine {
         return pixelBuffer;
     }
 
-    /**
-     * Evaluates geography and climate to calculate procedural water features.
-     * Returns an array of vector paths, not a pixel buffer.
-     */
-    generateRivers(elevationData, moistureData, temperatureData, width, height, params) {
+    generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params) {
         const riverDensity = params.riverDensity || 40;
         const seaLevel = params.seaLevel || 0.3;
 
@@ -517,17 +531,52 @@ export class ProceduralEngine {
         const riverMap = new Uint8Array(width * height);
         const waterMask = new Float32Array(width * height);
 
-        const springs = this.#findSprings(elevationData, moistureData, width, height, seaLevel, riverDensity);
+        // 1. Setup springs
+        const { finalSprings, overrideSet, blockedSet } = this.#parseSpringPins(mapPins);
+        const proceduralSprings = this.#findSprings(elevationData, moistureData, width, height, seaLevel, riverDensity, params);
 
-        for (const spring of springs) {
+        this.#mergeProceduralSprings(finalSprings, proceduralSprings, overrideSet, blockedSet);
+
+        // 2. Trace
+        for (const spring of finalSprings) {
             const index = spring.y * width + spring.x;
             if (riverMap[index]) continue;
 
-            const path = this.#traceRiver(spring.x, spring.y, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask);
-
+            const path = this.#traceRiver(spring.x, spring.y, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params);
             if (path) rivers.push({ id: `river_${rivers.length}`, path: path });
         }
 
         return { vectors: rivers, waterMask: waterMask };
+    }
+
+    #parseSpringPins(mapPins) {
+        const finalSprings = [];
+        const overrideSet = new Set();
+        const blockedSet = new Set();
+
+        if (!mapPins) return { finalSprings, overrideSet, blockedSet };
+
+        for (const pin of mapPins) {
+            if (pin.type === "spring") {
+                finalSprings.push({ x: pin.x, y: pin.y });
+                overrideSet.add(`${pin.x},${pin.y}`);
+            } else if (pin.type === "block_spring") {
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        blockedSet.add(`${pin.x + dx},${pin.y + dy}`);
+                    }
+                }
+            }
+        }
+        return { finalSprings, overrideSet, blockedSet };
+    }
+
+    #mergeProceduralSprings(finalSprings, proceduralSprings, overrideSet, blockedSet) {
+        for (const spring of proceduralSprings) {
+            if (blockedSet.has(`${spring.x},${spring.y}`)) continue;
+            if (!overrideSet.has(`${spring.x},${spring.y}`)) {
+                finalSprings.push(spring);
+            }
+        }
     }
 }

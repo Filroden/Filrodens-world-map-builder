@@ -25,8 +25,7 @@ export class StudioCanvas {
             features: new PIXI.Container(),
         };
 
-        // Add them to the stage in ascending order
-        this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.features);
+        this.layers.biomes.alpha = 0.65;
 
         // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
         this.vectorGraphics = new PIXI.Graphics();
@@ -255,49 +254,94 @@ export class StudioCanvas {
     }
 
     /**
-     * Renders an array of vector paths using highly performant native WebGL lines.
+     * Renders an array of vector paths and POI pins.
+     * Acts as a clean orchestrator, delegating complex rendering to private helpers.
      */
-    renderRiverVectors(rivers) {
+    renderRiverVectors(rivers, mapPins, isFeatureEdit) {
         this.vectorGraphics.clear();
-        if (!rivers || rivers.length === 0) return;
 
+        if (rivers && rivers.length > 0) {
+            this.#drawRivers(rivers);
+        }
+
+        if (mapPins && mapPins.length > 0) {
+            this.#drawMapPins(mapPins, isFeatureEdit);
+        }
+    }
+
+    /**
+     * Iterates over valid river arrays and delegates their path drawing.
+     */
+    #drawRivers(rivers) {
         const waterColor = 0x78aad2; // Freshwater Teal
         const frozenColor = 0xe1ebf0; // Pack Ice
 
         for (const river of rivers) {
             if (!river.path || river.path.length < 2) continue;
+            this.#drawSingleRiver(river.path, waterColor, frozenColor);
+        }
+    }
 
-            let isFlowing = false;
-            let currentIsFrozen = null;
+    /**
+     * Handles the complex state machine of drawing a single continuous vector line,
+     * including breaking for lakes and dynamically swapping colors when freezing.
+     */
+    #drawSingleRiver(path, waterColor, frozenColor) {
+        let isFlowing = false;
+        let currentIsFrozen = null;
 
-            for (const point of river.path) {
-                if (point.isLake) {
-                    // A clean break at the lip of the crater. No more scribbling.
-                    isFlowing = false;
-                    continue;
-                }
+        for (const point of path) {
+            if (point.isLake) {
+                // A clean break at the lip of the crater. No more scribbling.
+                isFlowing = false;
+                continue;
+            }
 
-                if (!isFlowing) {
-                    // Start a new line at a spring or a spillover lip
-                    currentIsFrozen = point.isFrozen;
-                    this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-                    this.vectorGraphics.moveTo(point.x, point.y);
-                    isFlowing = true;
-                } else if (point.isFrozen === currentIsFrozen) {
-                    // Standard flow
-                    this.vectorGraphics.lineTo(point.x, point.y);
-                } else {
-                    // THE FIX: The river crossed a temperature biome boundary!
-                    // Connect the previous colour to this boundary pixel...
-                    this.vectorGraphics.lineTo(point.x, point.y);
+            if (!isFlowing) {
+                // Start a new path from a source or lake lip
+                currentIsFrozen = point.isFrozen;
+                this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+                this.vectorGraphics.moveTo(point.x, point.y);
+                isFlowing = true;
+            } else if (point.isFrozen === currentIsFrozen) {
+                // Continue established path
+                this.vectorGraphics.lineTo(point.x, point.y);
+            } else {
+                // Boundary crossed: anchor the old line, swap paint, and restart the line
+                this.vectorGraphics.lineTo(point.x, point.y);
+                currentIsFrozen = point.isFrozen;
+                this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+                this.vectorGraphics.moveTo(point.x, point.y);
+            }
+        }
+    }
 
-                    // ...swap the paint colour...
-                    currentIsFrozen = point.isFrozen;
-                    this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+    /**
+     * Renders Vector Pins directly from the POI array using a flattened color map.
+     */
+    #drawMapPins(mapPins, isFeatureEdit) {
+        this.vectorGraphics.lineStyle(0);
 
-                    // ...and anchor the new paint to the exact same boundary pixel to continue seamlessly.
-                    this.vectorGraphics.moveTo(point.x, point.y);
-                }
+        // Dictionary to completely eliminate if/else cognitive complexity
+        const pinColors = {
+            spring: 0xff0000, // Semi-transparent Red
+            block_spring: 0x000000, // Semi-transparent Black
+        };
+
+        for (const pin of mapPins) {
+            // Rule: Springs and Blockers only render when editing Hydrology
+            if (!isFeatureEdit && (pin.type === "spring" || pin.type === "block_spring")) {
+                continue;
+            }
+
+            const hexColor = pinColors[pin.type];
+
+            // Future-proofing: Cities might not have a color in this specific dictionary,
+            // so we only draw the circle if it maps to a known vector pin type.
+            if (hexColor !== undefined) {
+                this.vectorGraphics.beginFill(hexColor, 0.4);
+                this.vectorGraphics.drawCircle(pin.x, pin.y, 6);
+                this.vectorGraphics.endFill();
             }
         }
     }
@@ -334,5 +378,14 @@ export class StudioCanvas {
         this.isEditMode = isActive;
         const canvasElement = this.app.canvas ?? this.app.view;
         canvasElement.style.cursor = isActive ? "crosshair" : "default";
+    }
+
+    /**
+     * Dynamically adjusts the alpha transparency of the Biome layer.
+     */
+    setBiomeOpacity(alphaValue) {
+        if (this.layers.biomes) {
+            this.layers.biomes.alpha = alphaValue;
+        }
     }
 }

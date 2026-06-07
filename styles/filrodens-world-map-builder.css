@@ -42,6 +42,7 @@
 .fwmb-icon.tune                 { --fwmb-mask: url('../assets/icons/tune.svg'); }
 .fwmb-icon.landscape            { --fwmb-mask: url('../assets/icons/landscape.svg'); }
 .fwmb-icon.water_drop           { --fwmb-mask: url('../assets/icons/water_drop.svg'); }
+.fwmb-icon.format_color_reset   { --fwmb-mask: url('../assets/icons/format_color_reset.svg'); }
 .fwmb-icon.temperature          { --fwmb-mask: url('../assets/icons/device_thermostat.svg'); }
 .fwmb-icon.forest               { --fwmb-mask: url('../assets/icons/forest.svg'); }
 .fwmb-icon.location_city        { --fwmb-mask: url('../assets/icons/location_city.svg'); }
@@ -51,6 +52,7 @@
 .fwmb-icon.undo                 { --fwmb-mask: url('../assets/icons/undo.svg'); }
 .fwmb-icon.redo                 { --fwmb-mask: url('../assets/icons/redo.svg'); }
 .fwmb-icon.format_paint         { --fwmb-mask: url('../assets/icons/format_paint.svg'); }
+.fwmb-icon.ink_eraser           { --fwmb-mask: url('../assets/icons/ink_eraser.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
@@ -660,6 +662,12 @@
     border-color: var(--filroden-color-text-accent);
 }
 
+.fwmb-map-controls button.active {
+    color: var(--filroden-color-text-accent);
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--filroden-color-text-accent);
+}
+
 /* --- RANGE SLIDERS --- */
 .fwmb .fwmb-slider-group {
     display: flex;
@@ -820,10 +828,32 @@
 }
 
 .fwmb-biome-swatch {
+    appearance: none;
+    -webkit-appearance: none;
     width: var(--filroden-font-size-l);
     height: var(--filroden-font-size-l);
+    padding: 0;
     flex-shrink: 0;
     border-radius: 3px;
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 0 2px rgba(0,0,0,0.5);
+    cursor: default;
+}
+
+input.fwmb-biome-swatch {
+    cursor: pointer;
+}
+
+.fwmb-biome-swatch::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.fwmb-biome-swatch::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px; 
+}
+
+.fwmb-biome-swatch::-moz-color-swatch {
+    border: none;
+    border-radius: 2px;
 }

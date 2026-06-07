@@ -1,12 +1,29 @@
 <div class="fwmb-tool-content fwmb-scrollable">
 
     <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.CanvasSettings"}}</legend>
+
+        <div class="form-group stacked">
+            <label>{{localize "FILRODENSWMB.UI.MapResolution"}}</label>
+            <div class="fwmb-flex-row">
+                <input type="number" name="mapWidth" class="fwmb-flex-1" value="{{uiState.mapWidth}}" min="500" max="4000" step="100" />
+                <span style="align-self: center;">x</span>
+                <input type="number" name="mapHeight" class="fwmb-flex-1" value="{{uiState.mapHeight}}" min="500" max="4000" step="100" />
+            </div>
+            <button type="button" class="fwmb-btn danger" data-action="applyResolution">
+                {{localize "FILRODENSWMB.UI.ApplyResolution"}}
+            </button>
+            <div class="hint">{{localize "FILRODENSWMB.UI.ResolutionHint"}}</div>
+        </div>
+    </fieldset>
+
+    <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.GlobalSettings"}}</legend>
 
         <div class="form-group stacked">
             <label>{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
             <div class="fwmb-flex-row">
-                <input type="text" name="mapSeed" class="fwmb-flex-1" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" />
+                <input type="text" name="mapSeed" class="fwmb-flex-1" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" />
                 <button type="button" class="fwmb-btn" data-action="randomizeSeed" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
                     <i class="fwmb-icon shuffle"></i>
                 </button>

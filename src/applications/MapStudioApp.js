@@ -30,6 +30,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             redoBrush: MapStudioApp.#onRedoBrush,
             saveMap: MapStudioApp.#onSaveMap,
             toggleLayer: MapStudioApp.#onToggleLayer,
+            applyResolution: MapStudioApp.#onApplyResolution,
         },
     };
 
@@ -63,11 +64,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.currentMoistureData = null;
         this.currentTemperatureData = null;
         this.currentRiverData = null;
+        this.mapPins = [];
+        this.pinHistory = [];
+        this.pinRedoStack = [];
         this.brushEngine = null;
 
         // Persistent cache to protect slider values when tabs unmount
-        this.uiState = {
-            mapSeed: null,
+        this.defaultUiState = {
+            mapSeed: FILRODENSWMB.DEFAULTS.SEED,
             seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
             globalTemp: FILRODENSWMB.DEFAULTS.GLOBAL_TEMP,
             seasonOffset: 0,
@@ -82,7 +86,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             "noise.moisture.scale": 500,
             "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
             riverDensity: 40,
+
+            // Settings UI Cache
+            biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,
+            biomeAlphaInactive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE,
+            maxLakeSize: FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE,
+            springAltOffset: FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET,
+            springMoistMin: FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN,
+            meanderJitter: FILRODENSWMB.HYDROLOGY.MEANDER_JITTER,
+            altCooling: FILRODENSWMB.CLIMATE.ALTITUDE_COOLING,
+            freezingThreshold: FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD,
+
+            // New Map Resolution Variables
+            mapWidth: FILRODENSWMB.DEFAULTS.MAP_WIDTH,
+            mapHeight: FILRODENSWMB.DEFAULTS.MAP_HEIGHT,
         };
+
+        // The dynamic cache inherits from defaults on launch
+        this.uiState = foundry.utils.deepClone(this.defaultUiState);
+        this.customBiomeColors = {};
 
         this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), 400);
         this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), 200);
@@ -97,20 +119,27 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context.config = FILRODENSWMB;
         context.activeTool = this.activeTool;
 
-        context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS).map(([key, id]) => ({
-            id: id,
-            label: `FILRODENSWMB.BIOMES.${key}`,
-        }));
+        // Helper to convert [R, G, B] array to a strict #RRGGBB hex string
+        const rgbToHex = (rgb) => "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
+
+        // Unify IDs, Labels, and dynamically updating Hex Colours into a single array
+        context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS).map(([key, id]) => {
+            const defaultRgb = FILRODENSWMB.BIOMES[key] || [0, 0, 0];
+            const currentRgb = this.customBiomeColors[key] || defaultRgb;
+
+            return {
+                id: id,
+                key: key,
+                label: `FILRODENSWMB.BIOMES.${key}`,
+                hex: rgbToHex(currentRgb),
+            };
+        });
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
-
-            // Build the dynamic UI legend from the core color config
-            context.biomeLegend = Object.entries(FILRODENSWMB.BIOMES).map(([key, rgb]) => ({
-                label: `FILRODENSWMB.BIOMES.${key}`,
-                color: `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`,
-            }));
         }
+
+        context.uiState = this.uiState;
 
         return context;
     }
@@ -123,20 +152,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.element.addEventListener("dblclick", (event) => {
                 const target = event.target;
 
-                // Only intercept double-clicks on range sliders
                 if (target.tagName === "INPUT" && target.type === "range") {
-                    // Read the original value stamped in the HBS file
-                    const defaultVal = target.defaultValue;
+                    const defaultVal = this.defaultUiState[target.name];
 
-                    if (defaultVal !== undefined && target.value !== defaultVal) {
+                    if (defaultVal !== undefined && target.value !== String(defaultVal)) {
                         target.value = defaultVal;
 
-                        // Update the sibling <output> text if one exists
                         if (target.nextElementSibling?.tagName === "OUTPUT") {
                             target.nextElementSibling.value = defaultVal;
                         }
 
-                        // Dispatch a fake input event so the debouncers and cache instantly react
                         target.dispatchEvent(new Event("input", { bubbles: true }));
                     }
                 }
@@ -155,20 +180,32 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const contextPanel = this.element.querySelector(".fwmb-context-panel");
         if (contextPanel && !contextPanel.dataset.hasNoiseListeners) {
             contextPanel.addEventListener("input", (event) => {
-                // If they touch elevation or panning, rebuild the topography
+                // Color Picker Intercept (Hex to RGB)
+                if (event.target.matches('input[type="color"]')) {
+                    const biomeKey = event.target.dataset.biome;
+                    const hex = event.target.value;
+                    const rgb = [Number.parseInt(hex.slice(1, 3), 16), Number.parseInt(hex.slice(3, 5), 16), Number.parseInt(hex.slice(5, 7), 16)];
+                    this.customBiomeColors[biomeKey] = rgb;
+                    this.#repaintCanvas();
+                    return;
+                }
+
+                // Opacity changes (Instant Visual Update)
+                if (event.target.matches('input[name="biomeAlphaActive"], input[name="biomeAlphaInactive"]')) {
+                    this.#getMapParameters(); // Sync DOM to cache
+                    this.#updateBiomeOpacity();
+                    return;
+                }
+
                 if (event.target.matches('input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"], input[name="mapSeed"]')) {
                     this.debouncedGenerateTerrain();
-                }
-                // If they touch climate controls, skip topography and instantly rebuild biomes
-                else if (
+                } else if (
                     event.target.matches(
-                        'input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"]',
+                        'input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"], input[name="altCooling"], input[name="freezingThreshold"]',
                     )
                 ) {
                     this.debouncedGenerateClimate();
-                }
-                // If they touch feature controls, only rebuild the vector data
-                else if (event.target.matches('input[name="riverDensity"]')) {
+                } else if (event.target.matches('input[name="riverDensity"], input[name="maxLakeSize"], input[name="springAltOffset"], input[name="springMoistMin"], input[name="meanderJitter"]')) {
                     this.debouncedGenerateFeatures();
                 }
             });
@@ -204,6 +241,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             };
         }
 
+        // Ensure all layer toggle buttons visually match the 'visible' canvas state on launch
+        const layerBtns = this.element.querySelectorAll('[data-action="toggleLayer"]');
+        for (const btn of layerBtns) {
+            btn.classList.add("active");
+        }
+
         // Automatically generate the initial map if the canvas is empty.
         if (!this.currentElevationData) {
             setTimeout(() => this.generateTerrain(), 50);
@@ -222,17 +265,41 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const getNum = (name) => Number.parseFloat(this.element.querySelector(`input[name="${name}"]`)?.value) || 0;
 
         this.canvasEngine.onBrushStart = (x, y) => {
-            let layer = this.activeTool === "biomes" ? "biome" : "terrain";
-            let tool = "paint";
-            let paintValue = null;
+            let layer = "terrain";
+            if (this.activeTool === "biomes") layer = "biome";
+            if (this.activeTool === "features") layer = "features";
 
-            if (layer === "terrain") {
-                tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group="terrain"]`)?.dataset.tool || "raise";
-            } else if (layer === "biome") {
-                const select = this.element.querySelector('select[name="brushBiome"]');
-                paintValue = Number.parseInt(select?.value) || 6; // Default to Grassland
+            let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
+
+            // Intercept POI tools completely bypassing the pixel brush engine
+            if (layer === "features" && ["addSpring", "blockSpring", "erasePin"].includes(tool)) {
+                // Find if we clicked on an existing pin (within 8 pixels)
+                const existingIndex = this.mapPins.findIndex((p) => Math.hypot(p.x - x, p.y - y) < 8);
+
+                // Snapshot the current state for the Undo button
+                this.pinHistory.push(foundry.utils.deepClone(this.mapPins));
+                this.pinRedoStack = [];
+
+                if (tool === "erasePin") {
+                    if (existingIndex > -1) this.mapPins.splice(existingIndex, 1);
+                } else {
+                    const pinType = tool === "addSpring" ? "spring" : "block_spring";
+                    if (existingIndex > -1) {
+                        // Overwrite existing pin if clicked directly
+                        this.mapPins[existingIndex].type = pinType;
+                    } else {
+                        // Create a brand new pin
+                        this.mapPins.push({ id: foundry.utils.randomID(), x, y, type: pinType });
+                    }
+                }
+
+                this.#repaintCanvas();
+                this.debouncedGenerateClimate();
+                return; // Abort here so the pixel brush doesn't fire
             }
 
+            // Standard Pixel Painting (Terrain/Biomes)
+            let paintValue = layer === "biome" ? Number.parseInt(this.element.querySelector('select[name="brushBiome"]')?.value) || 6 : null;
             this.brushEngine.startStroke(layer, tool, getNum("brushSize"), getNum("brushStrength"), getNum("brushFeather"), paintValue);
             this.#applyBrushStroke(x, y);
         };
@@ -292,6 +359,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     octaves: FILRODENSWMB.NOISE.TEMPERATURE.OCTAVES,
                 },
             },
+            hydrology: {
+                maxLakeSize: this.uiState["maxLakeSize"],
+                springAltOffset: this.uiState["springAltOffset"],
+                springMoistMin: this.uiState["springMoistMin"],
+                meanderJitter: this.uiState["meanderJitter"],
+            },
+            climate: {
+                altCooling: this.uiState["altCooling"],
+                freezingThreshold: this.uiState["freezingThreshold"],
+            },
+            customColors: this.customBiomeColors,
+            display: {
+                biomeAlphaActive: this.uiState["biomeAlphaActive"],
+                biomeAlphaInactive: this.uiState["biomeAlphaInactive"],
+            },
         };
 
         return { currentSeed: this.uiState["mapSeed"], params };
@@ -299,38 +381,49 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // --- Action Handlers ---
 
+    #updateBiomeOpacity() {
+        if (!this.canvasEngine) return;
+        const isActive = this.activeTool === "biomes";
+        const alpha = isActive ? this.uiState.biomeAlphaActive : this.uiState.biomeAlphaInactive;
+        this.canvasEngine.setBiomeOpacity(alpha);
+    }
+
     static #onChangeTool(event, target) {
         const newTool = target.dataset.tool;
         if (!newTool || this.activeTool === newTool) return;
 
         this.activeTool = newTool;
 
-        // Auto-activate the required layer for the selected tool
+        // Auto-activate the required layer for the selected tool and dynamically adjust opacity
         if (newTool === "biomes") {
             const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
             if (biomesBtn && !biomesBtn.classList.contains("active")) {
                 biomesBtn.classList.add("active");
                 this.canvasEngine?.toggleLayer("biomes", true);
             }
+            this.#updateBiomeOpacity();
         } else if (newTool === "terrain") {
             const topoBtn = this.element.querySelector('[data-layer="topography"]');
             if (topoBtn && !topoBtn.classList.contains("active")) {
                 topoBtn.classList.add("active");
                 this.canvasEngine?.toggleLayer("topography", true);
             }
+            this.#updateBiomeOpacity();
         } else if (newTool === "features") {
             const featuresBtn = this.element.querySelector('[data-layer="features"]');
             if (featuresBtn && !featuresBtn.classList.contains("active")) {
                 featuresBtn.classList.add("active");
                 this.canvasEngine?.toggleLayer("features", true);
             }
+            this.#updateBiomeOpacity();
         }
 
         // Toggle visibility of specific tool clusters in the floating edit bar
         const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
         if (editToolbar) {
             editToolbar.querySelectorAll("[data-tool-group]").forEach((el) => {
-                el.classList.toggle("fwmb-hidden", el.dataset.toolGroup !== newTool);
+                const allowedTools = el.dataset.toolGroup.split(" ");
+                el.classList.toggle("fwmb-hidden", !allowedTools.includes(newTool));
             });
         }
 
@@ -400,44 +493,54 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #repaintCanvas() {
-        const seaLevel = Number.parseFloat(this.element.querySelector('input[name="seaLevel"]')?.value) || FILRODENSWMB.DEFAULTS.SEA_LEVEL;
+        const seaLevel = this.uiState["seaLevel"];
         const engine = new ProceduralEngine();
+        const { params } = this.#getMapParameters();
 
-        // 1. EXTRACT THE NEW DATA STRUCTURE
-        // Safely pull apart the vectors and the mask. If they haven't generated yet, default to null.
+        // Safely extract the features
         const waterMask = this.currentRiverData ? this.currentRiverData.waterMask : null;
         const riverVectors = this.currentRiverData ? this.currentRiverData.vectors : null;
 
+        // 1. Generate and paint the flat Base Map (The underlying foundation)
+        const baseBuffer = engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel);
+        this.canvasEngine.renderPixelBuffer("base", baseBuffer, this.mapWidth, this.mapHeight);
+
+        const baseBtn = this.element.querySelector('[data-layer="base"]');
+        this.canvasEngine.toggleLayer("base", baseBtn ? baseBtn.classList.contains("active") : true);
+
         // 2. Generate and paint the shaded Topography
-        const topBuffer = engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask);
+        const topBuffer = engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params);
         this.canvasEngine.renderPixelBuffer("topography", topBuffer, this.mapWidth, this.mapHeight);
 
-        // 3. Generate and paint the shaded Topography
-        // Pass the waterMask in so the lakes receive dynamic depth shading!
-        this.canvasEngine.renderPixelBuffer("topography", topBuffer, this.mapWidth, this.mapHeight);
+        const topoBtn = this.element.querySelector('[data-layer="topography"]');
+        this.canvasEngine.toggleLayer("topography", topoBtn ? topoBtn.classList.contains("active") : true);
 
-        // 4. Generate and paint the Whittaker Biomes
+        // 3. Generate and paint the Whittaker Biomes
         if (this.currentMoistureData && this.currentTemperatureData) {
             const biomeBuffer = engine.createBiomesMap(
                 this.currentElevationData,
                 this.currentMoistureData,
                 this.currentTemperatureData,
-                this.currentBiomeOverrides, // <-- THE FIX: Restore the missing parameter
+                this.currentBiomeOverrides,
                 this.mapWidth,
                 this.mapHeight,
                 seaLevel,
                 waterMask,
+                params,
             );
             this.canvasEngine.renderPixelBuffer("biomes", biomeBuffer, this.mapWidth, this.mapHeight);
 
             const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
-            this.canvasEngine.toggleLayer("biomes", biomesBtn?.classList.contains("active"));
+            this.canvasEngine.toggleLayer("biomes", biomesBtn ? biomesBtn.classList.contains("active") : true);
         }
 
-        // 5. Draw Vector Graphics (Rivers)
+        // 4. Draw Vector Graphics (Rivers and POI Pins)
         if (riverVectors) {
-            // Only pass the specific vector array to PIXI, not the whole object
-            this.canvasEngine.renderRiverVectors(riverVectors);
+            const showPins = this.activeTool === "features";
+            this.canvasEngine.renderRiverVectors(riverVectors, this.mapPins, showPins);
+
+            const featuresBtn = this.element.querySelector('[data-layer="features"]');
+            this.canvasEngine.toggleLayer("features", featuresBtn ? featuresBtn.classList.contains("active") : true);
         }
     }
 
@@ -457,10 +560,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #applyBrushStroke(x, y) {
         if (!this.currentElevationData) return;
-
         const seaLevel = this.uiState["seaLevel"];
-        if (this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, seaLevel)) {
+
+        // Pass all three override arrays to the unified brush engine
+        if (this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel)) {
             this.#repaintCanvas();
+            this.debouncedGenerateClimate();
         }
     }
 
@@ -470,25 +575,93 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #rebuildFromHistory() {
         this.currentElevationData = new Float32Array(this.baseElevationData);
         this.currentBiomeOverrides = new Uint8Array(this.mapWidth * this.mapHeight);
-
         this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, this.uiState["seaLevel"]);
+
         this.#repaintCanvas();
+        this.debouncedGenerateClimate();
     }
 
     static #onUndoBrush(event, target) {
-        if (!this.baseElevationData || !this.brushEngine) return;
+        if (this.activeTool === "features") {
+            // Route to Vector History
+            if (this.pinHistory.length === 0) return;
+            this.pinRedoStack.push(foundry.utils.deepClone(this.mapPins));
+            this.mapPins = this.pinHistory.pop();
 
-        if (this.brushEngine.undo()) {
-            this.#rebuildFromHistory();
+            this.#repaintCanvas();
+            this.debouncedGenerateClimate();
+        } else {
+            // Route to Raster History
+            if (!this.baseElevationData || !this.brushEngine) return;
+            if (this.brushEngine.undo()) {
+                this.#rebuildFromHistory();
+            }
         }
     }
 
     static #onRedoBrush(event, target) {
-        if (!this.baseElevationData || !this.brushEngine) return;
+        if (this.activeTool === "features") {
+            if (this.pinRedoStack.length === 0) return;
+            this.pinHistory.push(foundry.utils.deepClone(this.mapPins));
+            this.mapPins = this.pinRedoStack.pop();
 
-        if (this.brushEngine.redo()) {
-            this.#rebuildFromHistory();
+            this.#repaintCanvas();
+            this.debouncedGenerateClimate();
+        } else {
+            if (!this.baseElevationData || !this.brushEngine) return;
+            if (this.brushEngine.redo()) {
+                this.#rebuildFromHistory();
+            }
         }
+    }
+
+    /**
+     * Highly destructive action: Rebuilds the underlying webgl canvas and spatial arrays.
+     */
+    static async #onApplyResolution(event, target) {
+        const widthInput = this.element.querySelector('input[name="mapWidth"]');
+        const heightInput = this.element.querySelector('input[name="mapHeight"]');
+
+        const newWidth = Number.parseInt(widthInput?.value) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
+        const newHeight = Number.parseInt(heightInput?.value) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
+
+        // Abort if no changes were actually made
+        if (newWidth === this.mapWidth && newHeight === this.mapHeight) return;
+
+        // Warn the GM if there is ANY custom data (brush strokes or pins) that will be annihilated
+        const hasBrushEdits = this.brushEngine && this.brushEngine.history.length > 0;
+        const hasPinEdits = this.mapPins && this.mapPins.length > 0;
+
+        if (hasBrushEdits || hasPinEdits) {
+            const confirmed = await foundry.applications.api.DialogV2.confirm({
+                window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
+                content: `<p>${game.i18n.localize("FILRODENSWMB.UI.ResolutionWarningContent")}</p>`,
+                rejectClose: false,
+                modal: true,
+            });
+
+            if (!confirmed) {
+                // User backed out: revert the HTML inputs visually to match current reality
+                if (widthInput) widthInput.value = this.mapWidth;
+                if (heightInput) heightInput.value = this.mapHeight;
+                return;
+            }
+        }
+
+        // Apply new limits
+        this.mapWidth = newWidth;
+        this.mapHeight = newHeight;
+        this.uiState.mapWidth = newWidth;
+        this.uiState.mapHeight = newHeight;
+
+        // Wipe brush and pin history as spatial grid coordinates are now completely invalid
+        this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        this.mapPins = [];
+        this.pinHistory = [];
+        this.pinRedoStack = [];
+
+        // Triggers a complete top-to-bottom recalculation
+        this.generateTerrain();
     }
 
     /**
@@ -503,6 +676,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.baseElevationData = engine.generateTopography(this.mapWidth, this.mapHeight, params);
         this.currentElevationData = new Float32Array(this.baseElevationData);
         this.currentBiomeOverrides = new Uint8Array(this.mapWidth * this.mapHeight);
+        this.currentSpringOverrides = new Uint8Array(this.mapWidth * this.mapHeight);
         const t1 = performance.now();
 
         console.log(`World Map Builder | Topography calculated in ${Math.round(t1 - t0)}ms`);
@@ -540,7 +714,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const engine = new ProceduralEngine(currentSeed);
 
         const t0 = performance.now();
-        this.currentRiverData = engine.generateRivers(this.currentElevationData, this.currentMoistureData, this.currentTemperatureData, this.mapWidth, this.mapHeight, params);
+        this.currentRiverData = engine.generateRivers(this.currentElevationData, this.currentMoistureData, this.currentTemperatureData, this.mapPins, this.mapWidth, this.mapHeight, params);
         const t1 = performance.now();
 
         console.log(`World Map Builder | Rivers calculated in ${Math.round(t1 - t0)}ms`);
@@ -590,6 +764,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             seed: currentSeed,
             params: params,
             history: this.brushEngine?.history || [],
+            mapPins: this.mapPins,
         };
 
         // Auto-generate a fallback name using the seed string or a random hash

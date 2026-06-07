@@ -8,16 +8,59 @@ export const FILRODENSWMB = {
     TEMPLATES: {
         TOOLBAR: "modules/filrodens-world-map-builder/templates/toolbar.hbs",
     },
-    DISPLAY: {
-        ALPHA: 0.8,
-    },
     DEFAULTS: {
+        SEED: "FILRODEN",
         SEA_LEVEL: 0.35,
         LAT_TOP: 90,
         LAT_BOTTOM: -90,
         GLOBAL_TEMP: 0.5,
         MAP_WIDTH: 1000,
         MAP_HEIGHT: 1000,
+    },
+    DISPLAY: {
+        ALPHA: 0.8,
+        BIOME_ALPHA_ACTIVE: 0.85,
+        BIOME_ALPHA_INACTIVE: 0.65,
+        RIVER_WIDTH: 2,
+        RIVER_ALPHA: 0.9,
+        PIN_RADIUS: 6,
+        PIN_ALPHA: 0.4,
+    },
+    HYDROLOGY: {
+        MAX_LAKE_SIZE: 8000,
+        SPRING_ALTITUDE_OFFSET: 0.25,
+        SPRING_MOISTURE_MIN: 0.45,
+        MEANDER_JITTER: 0.005,
+    },
+    CLIMATE: {
+        ALTITUDE_COOLING: 0.4,
+        FREEZING_THRESHOLD: 0.2,
+        THRESHOLDS: {
+            TEMPERATURE: {
+                ARCTIC: 0.2,
+                SUBARCTIC: 0.4,
+                TEMPERATE: 0.8,
+            },
+            MOISTURE: {
+                ARCTIC: {
+                    SNOW: 0.5,
+                },
+                SUBARCTIC: {
+                    TUNDRA: 0.3,
+                    TAIGA: 0.6,
+                },
+                TEMPERATE: {
+                    DESERT: 0.25,
+                    GRASSLAND: 0.6,
+                    DECIDUOUS: 0.85,
+                },
+                TROPICAL: {
+                    DESERT: 0.2,
+                    SAVANNA: 0.4,
+                    DECIDUOUS: 0.7,
+                },
+            },
+        },
     },
     NOISE: {
         ELEVATION: { SCALE: 250, OCTAVES: 5, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1.2, STRETCH: 1.3 },

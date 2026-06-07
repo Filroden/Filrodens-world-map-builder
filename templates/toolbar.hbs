@@ -1,7 +1,4 @@
 <div>
-    <button type="button" data-action="changeTool" data-tool="settings" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSettings'}}" class="{{#if (eq activeTool 'settings')}}active{{/if}}">
-        <i class="fwmb-icon tune"></i>
-    </button>
 
     <button type="button" data-action="changeTool" data-tool="terrain" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolTerrain'}}" class="{{#if (eq activeTool 'terrain')}}active{{/if}}">
         <i class="fwmb-icon landscape"></i>
@@ -21,6 +18,10 @@
 
     <button type="button" data-action="changeTool" data-tool="regions" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegions'}}" class="{{#if (eq activeTool 'regions')}}active{{/if}}">
         <i class="fwmb-icon layers"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="settings" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSettings'}}" class="{{#if (eq activeTool 'settings')}}active{{/if}}">
+        <i class="fwmb-icon tune"></i>
     </button>
 
     <div class="fwmb-flex-1"></div>

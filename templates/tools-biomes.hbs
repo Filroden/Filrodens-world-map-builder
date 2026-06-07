@@ -47,9 +47,9 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.BiomeLegend"}}</legend>
         <div class="fwmb-biome-legend">
-            {{#each biomeLegend}}
+            {{#each biomeList}}
                 <div class="fwmb-biome-item">
-                    <span class="fwmb-biome-swatch" style="background-color: {{this.color}};"></span>
+                    <div class="fwmb-biome-swatch" style="background-color: {{this.hex}};"></div>
                     <span>{{localize this.label}}</span>
                 </div>
             {{/each}}
