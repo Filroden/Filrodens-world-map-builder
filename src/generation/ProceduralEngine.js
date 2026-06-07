@@ -245,7 +245,7 @@ export class ProceduralEngine {
     }
 
     /**
-     * Calculates pure geographical altitude.
+     * Calculates pure geographical altitude, applying exponents strictly to landmasses.
      */
     generateTopography(width, height, params) {
         const totalPixels = width * height;
@@ -257,12 +257,28 @@ export class ProceduralEngine {
         const panX = params.noise.offsetX || 0;
         const panY = params.noise.offsetY || 0;
 
+        // THE FIX: Pull seaLevel to use as the mathematical pivot point
+        const seaLevel = params.seaLevel || 0.35;
+
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const worldX = x + panX;
                 const worldY = y + panY;
                 let elevation = this.#fbm(worldX, worldY, eOctaves, eScale);
-                elevationData[y * width + x] = Math.pow(Math.max(0, elevation), eStretch);
+
+                if (elevation > seaLevel) {
+                    // 1. Isolate just the land and normalise it to a 0.0 - 1.0 scale
+                    const landHeight = (elevation - seaLevel) / (1 - seaLevel);
+
+                    // 2. Apply the exponent stretch (creates flat plains and sharp peaks)
+                    const stretchedLand = Math.pow(landHeight, eStretch);
+
+                    // 3. Map the stretched land back into the real geographical altitude range
+                    elevationData[y * width + x] = seaLevel + stretchedLand * (1 - seaLevel);
+                } else {
+                    // Leave the ocean floor entirely unaffected by the land stretch
+                    elevationData[y * width + x] = Math.max(0, elevation);
+                }
             }
         }
         return elevationData;

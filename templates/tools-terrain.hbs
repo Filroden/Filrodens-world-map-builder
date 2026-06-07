@@ -33,7 +33,10 @@
 
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.SeaLevel"}}</label>
-            <input type="range" name="seaLevel" data-action="updateSeaLevel" value="{{config.DEFAULTS.SEA_LEVEL}}" min="0" max="1" step="0.01" />
+            <div class="fwmb-slider-group">
+                <input type="range" name="seaLevel" value="{{uiState.seaLevel}}" min="0" max="1" step="0.01" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{uiState.seaLevel}}</output>
+            </div>
         </div>
 
     </fieldset>
@@ -41,17 +44,37 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.ElevationNoise"}}</legend>
 
-        <div class="form-group">
-            <label data-tooltip="{{localize 'FILRODENSWMB.UI.ScaleTooltip'}}">{{localize "FILRODENSWMB.UI.LandmassScale"}}</label>
-            <input type="range" name="noise.elevation.scale" value="{{config.NOISE.ELEVATION.SCALE}}" min="100" max="1000" step="10" />
-        </div>
+        <input type="hidden" name="noise.elevation.scale" value="{{config.NOISE.ELEVATION.SCALE}}" />
+        <input type="hidden" name="noise.offsetX" value="0" />
+        <input type="hidden" name="noise.offsetY" value="0" />
 
         <div class="form-group stacked">
-            <label>{{localize "FILRODENSWMB.UI.PanNoise"}}</label>
-            <div class="fwmb-flex-row">
-                <input type="range" name="noise.offsetX" class="fwmb-flex-1" value="0" min="-5000" max="5000" step="50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanX'}}" />
-                <input type="range" name="noise.offsetY" class="fwmb-flex-1" value="0" min="-5000" max="5000" step="50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanY'}}" />
+            <label>{{localize "FILRODENSWMB.UI.MapTransform"}}</label>
+            <div class="fwmb-transform-controls">
+
+                <div class="fwmb-transform-zoom">
+                    <button type="button" data-action="adjustNoiseScale" data-dir="1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomIn'}}"><i class="fwmb-icon zoom-in"></i></button>
+                    <button type="button" data-action="resetNoiseScale" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseReset'}}"><i class="fwmb-icon center-focus"></i></button>
+                    <button type="button" data-action="adjustNoiseScale" data-dir="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomOut'}}"><i class="fwmb-icon zoom-out"></i></button>
+                </div>
+
+                <div class="fwmb-transform-dpad">
+                    <button type="button" class="dpad-up" data-action="nudgeNoise" data-dx="0" data-dy="-50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
+                            class="fwmb-icon edit_arrow_up"
+                        ></i></button>
+                    <button type="button" class="dpad-left" data-action="nudgeNoise" data-dx="-50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
+                            class="fwmb-icon edit_arrow_down fwmb-rotate-90"
+                        ></i></button>
+                    <button type="button" class="dpad-center" data-action="resetNoisePan" data-tooltip="{{localize 'FILRODENSWMB.UI.PanReset'}}"><i class="fwmb-icon center-focus"></i></button>
+                    <button type="button" class="dpad-right" data-action="nudgeNoise" data-dx="50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
+                            class="fwmb-icon edit_arrow_up fwmb-rotate-90"
+                        ></i></button>
+                    <button type="button" class="dpad-down" data-action="nudgeNoise" data-dx="0" data-dy="50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
+                            class="fwmb-icon edit_arrow_down"
+                        ></i></button>
+                </div>
             </div>
+            <div class="hint">{{localize "FILRODENSWMB.UI.MapTransformHint"}}</div>
         </div>
 
         <div class="form-group">

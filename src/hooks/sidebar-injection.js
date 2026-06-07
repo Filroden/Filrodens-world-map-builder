@@ -1,4 +1,3 @@
-// We will build this class next
 import { MapStudioApp } from "../applications/MapStudioApp.js";
 
 export function registerSidebarInjection() {
@@ -47,6 +46,6 @@ function createMapBuilderButton() {
 function handleMapBuilderButtonClick(event) {
     event.preventDefault();
     // Instantiate our new standalone Map Studio Application
-    const app = new MapStudioApp();
+    const app = new MapStudioApp({});
     app.render({ force: true });
 }

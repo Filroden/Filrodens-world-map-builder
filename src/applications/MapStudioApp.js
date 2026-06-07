@@ -22,7 +22,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             zoomIn: MapStudioApp.#onZoomIn,
             zoomOut: MapStudioApp.#onZoomOut,
             resetZoom: MapStudioApp.#onResetZoom,
-            updateSeaLevel: MapStudioApp.#onUpdateSeaLevel,
             randomizeSeed: MapStudioApp.#onRandomizeSeed,
             toggleEditMode: MapStudioApp.#onToggleEditMode,
             setBrushTool: MapStudioApp.#onSetBrushTool,
@@ -31,6 +30,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             saveMap: MapStudioApp.#onSaveMap,
             toggleLayer: MapStudioApp.#onToggleLayer,
             applyResolution: MapStudioApp.#onApplyResolution,
+            adjustNoiseScale: MapStudioApp.#onAdjustNoiseScale,
+            resetNoiseScale: MapStudioApp.#onResetNoiseScale,
+            nudgeNoise: MapStudioApp.#onNudgeNoise,
+            resetNoisePan: MapStudioApp.#onResetNoisePan,
         },
     };
 
@@ -51,7 +54,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     };
 
     constructor(options) {
+        options.position = foundry.utils.mergeObject(options.position || {}, {
+            width: window.innerWidth * 0.9,
+            height: window.innerHeight * 0.9,
+        });
+
         super(options);
+
         this.canvasEngine = null;
         this.activeTool = "terrain";
 
@@ -201,7 +210,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.debouncedGenerateTerrain();
                 } else if (
                     event.target.matches(
-                        'input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"], input[name="altCooling"], input[name="freezingThreshold"]',
+                        'input[name="seaLevel"], input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"], input[name="altCooling"], input[name="freezingThreshold"]',
                     )
                 ) {
                     this.debouncedGenerateClimate();
@@ -725,14 +734,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Native AppV2 Real-Time Listener: Fires whenever the Sea Level slider is dragged.
-     */
-    static async #onUpdateSeaLevel(event, target) {
-        if (!this.currentElevationData || !this.canvasEngine) return;
-        this.#repaintCanvas();
-    }
-
-    /**
      * Handles swapping between the Raise, Lower, and Smooth brush tools.
      */
     static #onSetBrushTool(event, target) {
@@ -780,5 +781,51 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         target.disabled = false;
+    }
+
+    static #onAdjustNoiseScale(event, target) {
+        const dir = Number(target.dataset.dir);
+        const input = this.element.querySelector('input[name="noise.elevation.scale"]');
+        if (!input) return;
+
+        let scale = Number(input.value);
+        scale += dir * 50;
+        scale = Math.max(100, Math.min(scale, 1000)); // Constrain to original slider limits
+
+        input.value = scale;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    static #onResetNoiseScale(event, target) {
+        const input = this.element.querySelector('input[name="noise.elevation.scale"]');
+        if (input) {
+            input.value = this.defaultUiState["noise.elevation.scale"];
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+    }
+
+    static #onNudgeNoise(event, target) {
+        const dx = Number(target.dataset.dx);
+        const dy = Number(target.dataset.dy);
+
+        const inputX = this.element.querySelector('input[name="noise.offsetX"]');
+        const inputY = this.element.querySelector('input[name="noise.offsetY"]');
+        if (!inputX || !inputY) return;
+
+        inputX.value = Number(inputX.value) + dx;
+        inputY.value = Number(inputY.value) + dy;
+
+        // Dispatching a single event triggers the unified engine rebuild
+        inputX.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    static #onResetNoisePan(event, target) {
+        const inputX = this.element.querySelector('input[name="noise.offsetX"]');
+        const inputY = this.element.querySelector('input[name="noise.offsetY"]');
+        if (inputX && inputY) {
+            inputX.value = this.defaultUiState["noise.offsetX"];
+            inputY.value = this.defaultUiState["noise.offsetY"];
+            inputX.dispatchEvent(new Event("input", { bubbles: true }));
+        }
     }
 }

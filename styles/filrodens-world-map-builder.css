@@ -38,6 +38,8 @@
 .fwmb-icon.grid-off             { --fwmb-mask: url('../assets/icons/grid_3x3_off.svg'); }
 .fwmb-icon.zoom-in              { --fwmb-mask: url('../assets/icons/zoom_in.svg'); }
 .fwmb-icon.zoom-out             { --fwmb-mask: url('../assets/icons/zoom_out.svg'); }
+.fwmb-icon.zoom-in-map          { --fwmb-mask: url('../assets/icons/zoom_in_map.svg'); }
+.fwmb-icon.zoom-out-map         { --fwmb-mask: url('../assets/icons/zoom_out_map.svg'); }
 .fwmb-icon.center-focus         { --fwmb-mask: url('../assets/icons/center_focus_strong.svg'); }
 .fwmb-icon.tune                 { --fwmb-mask: url('../assets/icons/tune.svg'); }
 .fwmb-icon.landscape            { --fwmb-mask: url('../assets/icons/landscape.svg'); }
@@ -857,3 +859,43 @@ input.fwmb-biome-swatch {
     border: none;
     border-radius: 2px;
 }
+
+/* --- TRANSFORMATION CONTROLS (D-PAD & ZOOM) --- */
+.fwmb-transform-controls {
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    padding: var(--filroden-space-m);
+    border-radius: var(--filroden-radius-medium);
+    border: 1px inset rgba(255, 255, 255, 0.05);
+}
+
+.fwmb-transform-zoom {
+    display: flex;
+    flex-direction: column;
+    gap: var(--filroden-space-xs);
+}
+
+.fwmb-transform-dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 36px);
+    grid-template-rows: repeat(3, 36px);
+    gap: 4px;
+}
+
+.fwmb-transform-dpad button {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+.fwmb-transform-dpad .dpad-up { grid-column: 2; grid-row: 1; }
+.fwmb-transform-dpad .dpad-left { grid-column: 1; grid-row: 2; }
+.fwmb-transform-dpad .dpad-center { grid-column: 2; grid-row: 2; }
+.fwmb-transform-dpad .dpad-right { grid-column: 3; grid-row: 2; }
+.fwmb-transform-dpad .dpad-down { grid-column: 2; grid-row: 3; }
+
+/* CSS Rotations for universal arrow directions */
+.fwmb-rotate-90 { transform: rotate(90deg) scaleX(var(--filroden-dir-flip)); }
+.fwmb-rotate-270 { transform: rotate(270deg) scaleX(var(--filroden-dir-flip)); }
