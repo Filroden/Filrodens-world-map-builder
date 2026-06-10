@@ -6,8 +6,8 @@
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.RiverDensity"}}</label>
             <div class="fwmb-slider-group">
-                <input type="range" name="riverDensity" value="40" min="0" max="150" step="5" oninput="this.nextElementSibling.value = this.value" />
-                <output>40</output>
+                <input type="range" name="riverDensity" value="{{lookup uiState 'riverDensity'}}" min="10" max="100" step="5" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "riverDensity"}}</output>
             </div>
         </div>
     </fieldset>

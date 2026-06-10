@@ -609,7 +609,7 @@
     height: 100%;
     width: 1px;
     background-color: var(--filroden-color-text-accent);
-    margin-inline: var(--filroden-space-m);
+    margin-inline: var(--filroden-space-xs);
 }
 
 .fwmb-map-controls {
@@ -899,3 +899,46 @@ input.fwmb-biome-swatch {
 /* CSS Rotations for universal arrow directions */
 .fwmb-rotate-90 { transform: rotate(90deg) scaleX(var(--filroden-dir-flip)); }
 .fwmb-rotate-270 { transform: rotate(270deg) scaleX(var(--filroden-dir-flip)); }
+
+/* Map Studio Log Presentation Table Layers */
+.fwmb-journal-summary {
+    padding: var(--space-m);
+}
+
+.fwmb-summary-title {
+    margin-top: 1.5rem;
+    border-bottom: 1px solid var(--color-border-dark);
+    padding-bottom: 4px;
+    color: var(--color-text-light-heading);
+}
+
+.fwmb-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+}
+
+.fwmb-summary-table th {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-bottom: 2px solid var(--color-border-dark);
+    padding: 8px;
+    text-align: left;
+}
+
+.fwmb-summary-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.fwmb-summary-table tr:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.fwmb-mono {
+    font-family: var(--font-mono, monospace);
+    color: var(--color-shadow-highlight, #ffaa00);
+}
+
+.fwmb-capitalize {
+    text-transform: capitalize;
+}

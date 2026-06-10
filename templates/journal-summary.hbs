@@ -1,0 +1,165 @@
+<div class="fwmb-journal-summary">
+    <h2>World Map Parameter Log</h2>
+    <p>This document contains the comprehensive generation profile and mathematical vectors utilised during world initialisation. This allows complete structural inspection of the layout model without
+        requiring application layer ingestion.</p>
+
+    <h3 class="fwmb-summary-title">Canvas &amp; Core Matrix</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>Configuration Property</th>
+                <th>Assigned Vector Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Initialisation Seed</strong></td>
+                <td class="fwmb-mono">{{seed}}</td>
+            </tr>
+            <tr>
+                <td><strong>Canvas Spatial Dimensions</strong></td>
+                <td>{{mapWidth}} &times; {{mapHeight}} pixels</td>
+            </tr>
+            <tr>
+                <td><strong>Grid Overlay Projection</strong></td>
+                <td class="fwmb-capitalize">{{gridType}} ({{gridSize}}px)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">Topography &amp; Elevation Noise Model</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>Configuration Property</th>
+                <th>Assigned Vector Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Sea Level Margin</strong></td>
+                <td>{{params.seaLevel}}</td>
+            </tr>
+            <tr>
+                <td><strong>Noise Anchor Offsets (X, Y)</strong></td>
+                <td>{{params.noise.offsetX}}px, {{params.noise.offsetY}}px</td>
+            </tr>
+            <tr>
+                <td><strong>Elevation Scale Factor (Inverted)</strong></td>
+                <td>{{params.noise.elevation.scale}}</td>
+            </tr>
+            <tr>
+                <td><strong>Topographical Complexity (Octaves)</strong></td>
+                <td>{{params.noise.elevation.octaves}}</td>
+            </tr>
+            <tr>
+                <td><strong>Landmass Structural Stretch</strong></td>
+                <td>{{params.noise.elevation.stretch}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">Climatology &amp; Atmospheric Bands</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>Configuration Property</th>
+                <th>Assigned Vector Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Global Climate Temperature</strong></td>
+                <td>{{params.globalTemp}}</td>
+            </tr>
+            <tr>
+                <td><strong>Global Climate Moisture</strong></td>
+                <td>{{params.globalMoisture}}</td>
+            </tr>
+            <tr>
+                <td><strong>Seasonal Axial Latitude Offset</strong></td>
+                <td>{{params.seasonOffset}}</td>
+            </tr>
+            <tr>
+                <td><strong>Hemispheric Latitude Coverage</strong></td>
+                <td>Top Bound: {{params.latTop}}&deg; / Bottom Bound: {{params.latBottom}}&deg;</td>
+            </tr>
+            <tr>
+                <td><strong>Moisture Scale Factor (Inverted)</strong></td>
+                <td>{{params.noise.moisture.scale}}</td>
+            </tr>
+            <tr>
+                <td><strong>Moisture Complexity (Octaves)</strong></td>
+                <td>{{params.noise.moisture.octaves}}</td>
+            </tr>
+            <tr>
+                <td><strong>Temperature Scale Factor (Inverted)</strong></td>
+                <td>{{params.noise.temperature.scale}}</td>
+            </tr>
+            <tr>
+                <td><strong>Temperature Complexity (Octaves)</strong></td>
+                <td>{{params.noise.temperature.octaves}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">Hydrological Dynamics &amp; Micro-Climate Rules</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>Configuration Property</th>
+                <th>Assigned Vector Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Hydrological River Density</strong></td>
+                <td>{{params.riverDensity}}%</td>
+            </tr>
+            <tr>
+                <td><strong>Volumetric Maximum Lake Size</strong></td>
+                <td>{{params.hydrology.maxLakeSize}} pixels</td>
+            </tr>
+            <tr>
+                <td><strong>Spring Generation Altitude Offset</strong></td>
+                <td>{{params.hydrology.springAltOffset}}</td>
+            </tr>
+            <tr>
+                <td><strong>Spring Generation Moisture Minimum</strong></td>
+                <td>{{params.hydrology.springMoistMin}}</td>
+            </tr>
+            <tr>
+                <td><strong>Meander Vector Pathing Jitter</strong></td>
+                <td>{{params.hydrology.meanderJitter}}</td>
+            </tr>
+            <tr>
+                <td><strong>Altitude Thermal Cooling Coefficient</strong></td>
+                <td>{{params.climate.altCooling}}</td>
+            </tr>
+            <tr>
+                <td><strong>Glacial Freezing Threshold</strong></td>
+                <td>{{params.climate.freezingThreshold}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">Interface View Options</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>Configuration Property</th>
+                <th>Assigned Vector Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Active Focus Layer Alpha Opacity</strong></td>
+                <td>{{params.display.biomeAlphaActive}}</td>
+            </tr>
+            <tr>
+                <td><strong>Inactive Context Layer Alpha Opacity</strong></td>
+                <td>{{params.display.biomeAlphaInactive}}</td>
+            </tr>
+        </tbody>
+    </table>
+</div>

@@ -420,7 +420,7 @@ export class StudioCanvas {
         this.gridLayer.mask = this.gridMask;
 
         // 3. Configure the drawing line styles
-        this.gridLayer.lineStyle(2, 0xffffff, 0.25);
+        this.gridLayer.lineStyle(1, 0xffffff, 0.25);
 
         const width = this.mapWidth;
         const height = this.mapHeight;

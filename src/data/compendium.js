@@ -39,6 +39,7 @@ export async function getSavedMaps() {
 
 /**
  * Saves the Map Studio's generation parameters and brush history to a new JournalEntry.
+ * Generates an embedded human-readable settings page within the text layer.
  */
 export async function saveMapData(mapName, mapDataPayload) {
     if (!mapDataPayload) return null;
@@ -47,11 +48,23 @@ export async function saveMapData(mapName, mapDataPayload) {
     const pack = game.packs.get(packName);
     if (!pack) return null;
 
-    // DeepClone the payload to strip any memory references before database insertion
     const cleanPayload = foundry.utils.deepClone(mapDataPayload);
+
+    // Compile the template into flat text via native engine utilities
+    const narrativeHtml = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/journal-summary.hbs", cleanPayload);
 
     const documentData = {
         name: mapName || "Untitled Map",
+        pages: [
+            {
+                name: "Generation Settings Log",
+                type: "text",
+                text: {
+                    content: narrativeHtml,
+                    format: CONST.JOURNAL_ENTRY_PAGE_FORMATS.HTML,
+                },
+            },
+        ],
         flags: {
             [FILRODENSWMB.ID]: cleanPayload,
         },

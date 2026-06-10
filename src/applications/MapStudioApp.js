@@ -414,6 +414,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const newTool = target.dataset.tool;
         if (!newTool || this.activeTool === newTool) return;
 
+        this.#getMapParameters();
         this.activeTool = newTool;
 
         // Auto-activate the required layer for the selected tool and dynamically adjust opacity
