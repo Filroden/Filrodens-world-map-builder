@@ -286,6 +286,7 @@ export class ProceduralEngine {
 
     /**
      * Calculates moisture and temperature based on the final topography.
+     * Applies globally deterministic Orographic Lift via Western Horizon sampling.
      */
     generateClimateData(elevationData, width, height, params) {
         const totalPixels = width * height;
@@ -311,6 +312,11 @@ export class ProceduralEngine {
         const moistureOffset = 10000;
         const tempOffset = 20000;
 
+        // Fetch elevation parameters to calculate geographical slope
+        const eScale = params.noise.elevation.scale;
+        const eOctaves = params.noise.elevation.octaves;
+        const eStretch = params.noise.elevation.stretch || 1;
+
         for (let y = 0; y < height; y++) {
             const currentLat = latTop - (y / height) * latRange;
             const latGradient = 1 - Math.abs(currentLat) / 90;
@@ -321,19 +327,52 @@ export class ProceduralEngine {
                 const worldX = x + panX;
                 const worldY = y + panY;
 
-                // MOISTURE
+                // --- MOISTURE ---
                 const moistureNoise = this.#fbm(worldX + moistureOffset, worldY + moistureOffset, mOctaves, mScale);
-                moistureData[index] = Math.max(0, Math.min(1, moistureNoise + (globalMoisture - 0.5)));
+                let baseMoisture = moistureNoise + (globalMoisture - 0.5);
 
-                // TEMPERATURE
+                const elevation = elevationData[index];
+                const isLand = elevation > params.seaLevel;
+
+                if (isLand) {
+                    // GLOBALLY DETERMINISTIC OROGRAPHIC LIFT (SMOOTH CORIOLIS)
+                    // A continuous wave simulating the Hadley, Ferrel, and Polar circulation cells.
+                    // This smoothly transitions from 1 (Easterlies) to -1 (Westerlies) to 1 (Polar Easterlies).
+                    // The 0-crossings naturally simulate the windless Horse Latitudes and Doldrums.
+                    const absLat = Math.abs(currentLat);
+                    const windCellBlend = Math.cos(absLat * (Math.PI / 45));
+
+                    // The sampling distance now smoothly scales, rather than instantly snapping
+                    const windDirectionX = 40 * windCellBlend;
+
+                    // 1. Calculate the raw noise upwind
+                    const upwindNoise = this.#fbm(worldX + windDirectionX, worldY, eOctaves, eScale);
+
+                    // 2. Apply the exact same stretch math the topography uses
+                    let upwindElev = Math.max(0, upwindNoise);
+                    if (upwindNoise > params.seaLevel) {
+                        const landHeight = (upwindNoise - params.seaLevel) / (1 - params.seaLevel);
+                        upwindElev = params.seaLevel + Math.pow(landHeight, eStretch) * (1 - params.seaLevel);
+                    }
+
+                    // 3. Calculate true geographical slope and apply to moisture
+                    // Upward slope = Rain dump. Downward slope = Rain shadow desert.
+                    // Because windDirectionX shrinks to 0 at the cell boundaries, the slope
+                    // inherently approaches 0, creating a perfectly smooth transition!
+                    const slope = elevation - upwindElev;
+                    baseMoisture += slope * 3;
+                }
+
+                moistureData[index] = Math.max(0, Math.min(1, baseMoisture));
+
+                // --- TEMPERATURE ---
                 const tempNoise = this.#fbm(worldX + tempOffset, worldY + tempOffset, tOctaves, tScale);
 
                 let temperature = latGradient * 0.75 + tempNoise * 0.25;
                 temperature += globalTemp - 0.3;
                 temperature += seasonImpact;
 
-                const elevation = elevationData[index];
-                if (elevation > params.seaLevel) {
+                if (isLand) {
                     const altitude = (elevation - params.seaLevel) / (1 - params.seaLevel);
                     const altCooling = params.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING;
                     temperature -= altitude * altCooling;

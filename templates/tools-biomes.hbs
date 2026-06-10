@@ -5,13 +5,17 @@
 
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.GlobalTemp"}}</label>
-            <input type="range" name="globalTemp" value="{{config.DEFAULTS.GLOBAL_TEMP}}" min="0" max="1" step="0.01" />
+            <div class="fwmb-slider-group">
+                <input type="range" name="globalTemp" value="{{lookup uiState 'globalTemp'}}" min="0" max="1" step="0.01" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "globalTemp"}}</output>
+            </div>
         </div>
 
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.SeasonOffset"}}</label>
             <div class="fwmb-slider-group">
-                <input type="range" name="seasonOffset" value="0" min="-1" max="1" step="0.05" />
+                <input type="range" name="seasonOffset" value="{{lookup uiState 'seasonOffset'}}" min="-1" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "seasonOffset"}}</output>
             </div>
         </div>
 
@@ -20,11 +24,11 @@
             <div class="fwmb-flex-row">
                 <div class="fwmb-flex-1 form-group">
                     <label class="hint">{{localize "FILRODENSWMB.UI.LatTop"}}</label>
-                    <input type="number" name="latTop" value="{{config.DEFAULTS.LAT_TOP}}" min="-90" max="90" />
+                    <input type="number" name="latTop" value="{{lookup uiState 'latTop'}}" min="-90" max="90" />
                 </div>
                 <div class="fwmb-flex-1 form-group">
                     <label class="hint">{{localize "FILRODENSWMB.UI.LatBottom"}}</label>
-                    <input type="number" name="latBottom" value="{{config.DEFAULTS.LAT_BOTTOM}}" min="-90" max="90" />
+                    <input type="number" name="latBottom" value="{{lookup uiState 'latBottom'}}" min="-90" max="90" />
                 </div>
             </div>
         </div>
@@ -35,12 +39,18 @@
 
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.GlobalMoisture"}}</label>
-            <input type="range" name="globalMoisture" value="0.5" min="0" max="1" step="0.01" />
+            <div class="fwmb-slider-group">
+                <input type="range" name="globalMoisture" value="{{lookup uiState 'globalMoisture'}}" min="0" max="1" step="0.01" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "globalMoisture"}}</output>
+            </div>
         </div>
 
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.MoistureScale"}}</label>
-            <input type="range" name="noise.moisture.scale" value="500" min="100" max="2000" step="50" />
+            <div class="fwmb-slider-group">
+                <input type="range" name="noise.moisture.scale" value="{{lookup uiState 'noise.moisture.scale'}}" min="100" max="2000" step="50" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "noise.moisture.scale"}}</output>
+            </div>
         </div>
     </fieldset>
 

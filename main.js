@@ -12,6 +12,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/toolbar.hbs",
         "modules/filrodens-world-map-builder/templates/context.hbs",
         "modules/filrodens-world-map-builder/templates/map.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-scene.hbs",
         "modules/filrodens-world-map-builder/templates/tools-terrain.hbs",
         "modules/filrodens-world-map-builder/templates/tools-features.hbs",
         "modules/filrodens-world-map-builder/templates/tools-biomes.hbs",

@@ -2,7 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { StudioCanvas } from "../canvas/StudioCanvas.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
-import { saveMapData } from "../data/compendium.js";
+import { getSavedMaps, loadMapData, saveMapData } from "../data/compendium.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -28,6 +28,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             undoBrush: MapStudioApp.#onUndoBrush,
             redoBrush: MapStudioApp.#onRedoBrush,
             saveMap: MapStudioApp.#onSaveMap,
+            loadMap: MapStudioApp.#onLoadMapDialog,
             toggleLayer: MapStudioApp.#onToggleLayer,
             applyResolution: MapStudioApp.#onApplyResolution,
             adjustNoiseScale: MapStudioApp.#onAdjustNoiseScale,
@@ -55,14 +56,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     constructor(options) {
         options.position = foundry.utils.mergeObject(options.position || {}, {
-            width: window.innerWidth * 0.9,
+            width: window.innerWidth * 0.7,
             height: window.innerHeight * 0.9,
         });
 
         super(options);
 
         this.canvasEngine = null;
-        this.activeTool = "terrain";
+        this.activeTool = "scene";
 
         this.mapWidth = FILRODENSWMB.DEFAULTS.MAP_WIDTH;
         this.mapHeight = FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
@@ -80,6 +81,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Persistent cache to protect slider values when tabs unmount
         this.defaultUiState = {
+            // Scene Variables
+            mapWidth: FILRODENSWMB.DEFAULTS.MAP_WIDTH,
+            mapHeight: FILRODENSWMB.DEFAULTS.MAP_HEIGHT,
+            gridType: "square",
+            gridSize: 100,
+            gridVisible: false,
+
+            // Model Variables
             mapSeed: FILRODENSWMB.DEFAULTS.SEED,
             seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
             globalTemp: FILRODENSWMB.DEFAULTS.GLOBAL_TEMP,
@@ -105,10 +114,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             meanderJitter: FILRODENSWMB.HYDROLOGY.MEANDER_JITTER,
             altCooling: FILRODENSWMB.CLIMATE.ALTITUDE_COOLING,
             freezingThreshold: FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD,
-
-            // New Map Resolution Variables
-            mapWidth: FILRODENSWMB.DEFAULTS.MAP_WIDTH,
-            mapHeight: FILRODENSWMB.DEFAULTS.MAP_HEIGHT,
         };
 
         // The dynamic cache inherits from defaults on launch
@@ -189,6 +194,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const contextPanel = this.element.querySelector(".fwmb-context-panel");
         if (contextPanel && !contextPanel.dataset.hasNoiseListeners) {
             contextPanel.addEventListener("input", (event) => {
+                // Grid Configuration Intercept
+                if (event.target.matches('[name="gridType"], input[name="gridSize"]')) {
+                    this.#getMapParameters(); // Sync DOM to cache
+                    this.#updateGrid();
+                    return;
+                }
+
                 // Color Picker Intercept (Hex to RGB)
                 if (event.target.matches('input[type="color"]')) {
                     const biomeKey = event.target.dataset.biome;
@@ -251,13 +263,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         // Ensure all layer toggle buttons visually match the 'visible' canvas state on launch
-        const layerBtns = this.element.querySelectorAll('[data-action="toggleLayer"]');
-        for (const btn of layerBtns) {
-            btn.classList.add("active");
-        }
-
-        // Automatically generate the initial map if the canvas is empty.
+        // Nested inside the initialisation block so it never fires on tab switches
         if (!this.currentElevationData) {
+            const layerBtns = this.element.querySelectorAll('[data-action="toggleLayer"]');
+            for (const btn of layerBtns) {
+                btn.classList.add("active");
+            }
+
+            // Automatically generate the initial map
             setTimeout(() => this.generateTerrain(), 50);
         }
     }
@@ -329,10 +342,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #getMapParameters() {
         // 1. Sync visible DOM inputs into the persistent UI state cache
         for (const key of Object.keys(this.uiState)) {
-            const input = this.element.querySelector(`input[name="${key}"]`);
+            const input = this.element.querySelector(`[name="${key}"]`);
             if (!input) continue;
 
-            if (key === "mapSeed") {
+            if (key === "mapSeed" || key === "gridType") {
                 this.uiState[key] = input.value;
             } else {
                 const parsed = Number.parseFloat(input.value);
@@ -440,7 +453,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     static #onToggleGrid(event, target) {
-        console.log("World Map Builder | Grid toggle placeholder");
+        this.uiState.gridVisible = !this.uiState.gridVisible;
+        target.classList.toggle("active", this.uiState.gridVisible);
+        this.#updateGrid();
+    }
+
+    #updateGrid() {
+        if (!this.canvasEngine) return;
+        this.canvasEngine.drawGrid(this.uiState.gridType, this.uiState.gridSize, this.uiState.gridVisible);
     }
 
     static #onZoomIn(event, target) {
@@ -671,6 +691,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Triggers a complete top-to-bottom recalculation
         this.generateTerrain();
+        this.#updateGrid();
     }
 
     /**
@@ -691,7 +712,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         console.log(`World Map Builder | Topography calculated in ${Math.round(t1 - t0)}ms`);
 
         // Chain the climate generation automatically after topography finishes
-        this.generateClimate();
+        await this.generateClimate();
     }
 
     async generateClimate() {
@@ -710,7 +731,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         console.log(`World Map Builder | Climate calculated in ${Math.round(t1 - t0)}ms`);
 
         // Chain the final features generation automatically
-        this.generateFeatures();
+        await this.generateFeatures();
     }
 
     /**
@@ -763,6 +784,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const payload = {
             seed: currentSeed,
+            mapWidth: this.mapWidth,
+            mapHeight: this.mapHeight,
+            gridType: this.uiState.gridType,
+            gridSize: this.uiState.gridSize,
             params: params,
             history: this.brushEngine?.history || [],
             mapPins: this.mapPins,
@@ -770,7 +795,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Auto-generate a fallback name using the seed string or a random hash
         const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
-        const mapName = `Terrain Map (${hash})`;
+
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const hours = String(now.getHours()).padStart(2, "0");
+        const mins = String(now.getMinutes()).padStart(2, "0");
+        const timestamp = `${year}${month}${day} ${hours}:${mins}`;
+
+        const mapName = `Terrain Map (${hash}) ${timestamp}`;
 
         const journal = await saveMapData(mapName, payload);
 
@@ -781,6 +815,137 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         target.disabled = false;
+    }
+
+    static async #onLoadMapDialog(event, target) {
+        // Warn the GM if they are about to overwrite unsaved canvas data
+        const hasBrushEdits = this.brushEngine && this.brushEngine.history.length > 0;
+        const hasPinEdits = this.mapPins && this.mapPins.length > 0;
+
+        if (hasBrushEdits || hasPinEdits) {
+            const confirmed = await foundry.applications.api.DialogV2.confirm({
+                window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
+                content: `<p>${game.i18n.localize("FILRODENSWMB.UI.LoadWarningContent")}</p>`,
+                rejectClose: false,
+                modal: true,
+            });
+            if (!confirmed) return;
+        }
+
+        const maps = await getSavedMaps();
+        if (maps.length === 0) {
+            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.NoSavedMaps"));
+            return;
+        }
+
+        const optionsHtml = maps.map((m) => `<option value="${m.id}">${m.name}</option>`).join("");
+        const content = `
+            <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.SelectMap")}</label>
+                <select id="fwmb-map-select" style="width: 100%; padding: 4px;">${optionsHtml}</select>
+            </div>
+        `;
+
+        const selectedId = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.LoadMap") },
+            content: content,
+            ok: {
+                label: game.i18n.localize("FILRODENSWMB.UI.Load"),
+                callback: (event, button, dialog) => document.getElementById("fwmb-map-select").value,
+            },
+        });
+
+        if (selectedId) {
+            const payload = await loadMapData(selectedId);
+            if (payload) {
+                await this.#ingestMapPayload(payload);
+                ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
+            }
+        }
+    }
+
+    async #ingestMapPayload(payload) {
+        // 1. Unpack the seed
+        this.uiState.mapSeed = payload.seed;
+
+        this.mapWidth = payload.mapWidth;
+        this.mapHeight = payload.mapHeight;
+        this.uiState.mapWidth = this.mapWidth;
+        this.uiState.mapHeight = this.mapHeight;
+        this.uiState.gridType = payload.gridType || "square";
+        this.uiState.gridSize = payload.gridSize || 100;
+
+        // Rebuild the brush engine to match the newly loaded spatial coordinates
+        this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+
+        // 2. Unpack the core parameters
+        const p = payload.params;
+        this.uiState.seaLevel = p.seaLevel;
+        this.uiState.globalTemp = p.globalTemp;
+        this.uiState.seasonOffset = p.seasonOffset;
+        this.uiState.latTop = p.latTop;
+        this.uiState.latBottom = p.latBottom;
+        this.uiState.globalMoisture = p.globalMoisture;
+        this.uiState.riverDensity = p.riverDensity;
+
+        // 3. Unpack and cleanly invert the noise scales
+        this.uiState["noise.offsetX"] = p.noise.offsetX;
+        this.uiState["noise.offsetY"] = p.noise.offsetY;
+        this.uiState["noise.elevation.scale"] = Math.round(1 / p.noise.elevation.scale);
+        this.uiState["noise.elevation.octaves"] = p.noise.elevation.octaves;
+        this.uiState["noise.elevation.stretch"] = p.noise.elevation.stretch;
+        this.uiState["noise.moisture.scale"] = Math.round(1 / p.noise.moisture.scale);
+        this.uiState["noise.moisture.octaves"] = p.noise.moisture.octaves;
+
+        // 4. Unpack Settings UI Cache (with safe defaults for legacy saves)
+        this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
+        this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
+        this.uiState.springMoistMin = p.hydrology?.springMoistMin ?? FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN;
+        this.uiState.meanderJitter = p.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER;
+        this.uiState.altCooling = p.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING;
+        this.uiState.freezingThreshold = p.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
+        this.uiState.biomeAlphaActive = p.display?.biomeAlphaActive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE;
+        this.uiState.biomeAlphaInactive = p.display?.biomeAlphaInactive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
+
+        // 5. Restore Spatial Arrays and Custom Styling
+        this.customBiomeColors = p.customColors || {};
+        this.mapPins = payload.mapPins || [];
+
+        this.brushEngine.history = payload.history || [];
+        this.brushEngine.redoStack = [];
+        this.pinHistory = [];
+        this.pinRedoStack = [];
+
+        // 6. Visually synchronise the HTML sliders
+        this.#syncDOMToState();
+        this.#updateGrid();
+
+        // 7. Await the full mathematical rebuild, then repaint history over the top
+        await this.generateTerrain();
+
+        if (this.brushEngine.history.length > 0) {
+            this.#rebuildFromHistory();
+        }
+    }
+
+    #syncDOMToState() {
+        for (const [key, value] of Object.entries(this.uiState)) {
+            const input = this.element.querySelector(`[name="${key}"]`);
+            if (!input) continue;
+
+            input.value = value;
+            if (input.nextElementSibling?.tagName === "OUTPUT") {
+                input.nextElementSibling.value = value;
+            }
+        }
+
+        // Specifically rebuild Hex strings for the colour pickers
+        for (const [key, rgb] of Object.entries(this.customBiomeColors)) {
+            const input = this.element.querySelector(`input[data-biome="${key}"]`);
+            if (!input) continue;
+
+            input.value = "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
+        }
     }
 
     static #onAdjustNoiseScale(event, target) {

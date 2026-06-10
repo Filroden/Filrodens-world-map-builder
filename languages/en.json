@@ -118,6 +118,22 @@
     "FILRODENSWMB.UI.SaveSuccess": "Successfully saved {name} to the Compendium.",
     "FILRODENSWMB.UI.SaveError": "Failed to save the map. Please ensure the compendium is unlocked.",
 
+    "FILRODENSWMB.UI.LoadMap": "Load Map",
+    "FILRODENSWMB.UI.SelectMap": "Select a saved map from the compendium:",
+    "FILRODENSWMB.UI.Load": "Load",
+    "FILRODENSWMB.UI.NoSavedMaps": "No saved maps found in the compendium.",
+    "FILRODENSWMB.UI.LoadSuccess": "Map loaded successfully.",
+    "FILRODENSWMB.UI.LoadWarningContent": "Loading a map will overwrite your current canvas. Any unsaved brush strokes or pins will be lost. Are you sure you wish to proceed?",
+
+    "FILRODENSWMB.UI.SceneTool": "Scene Configuration",
+    "FILRODENSWMB.UI.GridSettings": "Grid Overlay",
+    "FILRODENSWMB.UI.GridType": "Grid Pattern",
+    "FILRODENSWMB.UI.GridSize": "Grid Size (px)",
+    "FILRODENSWMB.UI.GridNone": "Gridless",
+    "FILRODENSWMB.UI.GridSquare": "Square",
+    "FILRODENSWMB.UI.GridHexRows": "Hexagonal (Rows)",
+    "FILRODENSWMB.UI.GridHexCols": "Hexagonal (Columns)",
+
     "FILRODENSWMB.UI.Warning": "Warning",
     "FILRODENSWMB.UI.SeedWarningContent": "Generating a new terrain seed will permanently erase all manual brush edits you have applied to this map. Do you want to continue?"
 }

@@ -1,5 +1,9 @@
 <div>
 
+    <button type="button" data-action="changeTool" data-tool="scene" data-tooltip="{{localize 'FILRODENSWMB.UI.SceneTool'}}" class="{{#if (eq activeTool 'terrain')}}active{{/if}}">
+        <i class="fwmb-icon grid-on"></i>
+    </button>
+
     <button type="button" data-action="changeTool" data-tool="terrain" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolTerrain'}}" class="{{#if (eq activeTool 'terrain')}}active{{/if}}">
         <i class="fwmb-icon landscape"></i>
     </button>
@@ -30,7 +34,11 @@
         <i class="fwmb-icon file_save"></i>
     </button>
 
-    <button type="button" data-action="changeTool" data-tool="maps" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolMaps'}}" class="{{#if (eq activeTool 'maps')}}active{{/if}}">
+    <button type="button" data-action="loadMap" data-tooltip="{{localize 'FILRODENSWMB.UI.LoadMap'}}">
+        <i class="fwmb-icon file_open"></i>
+    </button>
+
+        <button type="button" data-action="changeTool" data-tool="maps" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolMaps'}}" class="{{#if (eq activeTool 'maps')}}active{{/if}}">
         <i class="fwmb-icon folder_open"></i>
     </button>
 </div>

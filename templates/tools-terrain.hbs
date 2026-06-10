@@ -1,23 +1,6 @@
 <div class="fwmb-tool-content fwmb-scrollable">
 
     <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.CanvasSettings"}}</legend>
-
-        <div class="form-group stacked">
-            <label>{{localize "FILRODENSWMB.UI.MapResolution"}}</label>
-            <div class="fwmb-flex-row">
-                <input type="number" name="mapWidth" class="fwmb-flex-1" value="{{uiState.mapWidth}}" min="500" max="4000" step="100" />
-                <span style="align-self: center;">x</span>
-                <input type="number" name="mapHeight" class="fwmb-flex-1" value="{{uiState.mapHeight}}" min="500" max="4000" step="100" />
-            </div>
-            <button type="button" class="fwmb-btn danger" data-action="applyResolution">
-                {{localize "FILRODENSWMB.UI.ApplyResolution"}}
-            </button>
-            <div class="hint">{{localize "FILRODENSWMB.UI.ResolutionHint"}}</div>
-        </div>
-    </fieldset>
-
-    <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.GlobalSettings"}}</legend>
 
         <div class="form-group stacked">
@@ -44,9 +27,9 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.ElevationNoise"}}</legend>
 
-        <input type="hidden" name="noise.elevation.scale" value="{{config.NOISE.ELEVATION.SCALE}}" />
-        <input type="hidden" name="noise.offsetX" value="0" />
-        <input type="hidden" name="noise.offsetY" value="0" />
+        <input type="hidden" name="noise.elevation.scale" value="{{lookup uiState 'noise.elevation.scale'}}" />
+        <input type="hidden" name="noise.offsetX" value="{{lookup uiState 'noise.offsetX'}}" />
+        <input type="hidden" name="noise.offsetY" value="{{lookup uiState 'noise.offsetY'}}" />
 
         <div class="form-group stacked">
             <label>{{localize "FILRODENSWMB.UI.MapTransform"}}</label>
@@ -63,7 +46,7 @@
                             class="fwmb-icon edit_arrow_up"
                         ></i></button>
                     <button type="button" class="dpad-left" data-action="nudgeNoise" data-dx="-50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
-                            class="fwmb-icon edit_arrow_down fwmb-rotate-90"
+                            class="fwmb-icon edit_arrow_up fwmb-rotate-270"
                         ></i></button>
                     <button type="button" class="dpad-center" data-action="resetNoisePan" data-tooltip="{{localize 'FILRODENSWMB.UI.PanReset'}}"><i class="fwmb-icon center-focus"></i></button>
                     <button type="button" class="dpad-right" data-action="nudgeNoise" data-dx="50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
@@ -79,12 +62,34 @@
 
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.TopographicalDetail"}}</label>
-            <input type="range" name="noise.elevation.octaves" value="{{config.NOISE.ELEVATION.OCTAVES}}" min="1" max="10" step="1" />
+            <div class="fwmb-slider-group">
+                <input
+                    type="range"
+                    name="noise.elevation.octaves"
+                    value="{{lookup uiState 'noise.elevation.octaves'}}"
+                    min="1"
+                    max="10"
+                    step="1"
+                    oninput="this.nextElementSibling.value = this.value"
+                />
+                <output>{{lookup uiState "noise.elevation.octaves"}}</output>
+            </div>
         </div>
 
         <div class="form-group">
             <label data-tooltip="{{localize 'FILRODENSWMB.UI.StretchTooltip'}}">{{localize "FILRODENSWMB.UI.LandmassStretch"}}</label>
-            <input type="range" name="noise.elevation.stretch" value="{{config.NOISE.ELEVATION.STRETCH}}" min="0.5" max="3.0" step="0.1" />
+            <div class="fwmb-slider-group">
+                <input
+                    type="range"
+                    name="noise.elevation.stretch"
+                    value="{{lookup uiState 'noise.elevation.stretch'}}"
+                    min="0.5"
+                    max="3.0"
+                    step="0.1"
+                    oninput="this.nextElementSibling.value = this.value"
+                />
+                <output>{{lookup uiState "noise.elevation.stretch"}}</output>
+            </div>
         </div>
     </fieldset>
 

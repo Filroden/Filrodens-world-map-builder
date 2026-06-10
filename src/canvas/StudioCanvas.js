@@ -31,8 +31,11 @@ export class StudioCanvas {
         this.vectorGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.vectorGraphics);
 
-        // Add them to the stage in ascending order (base is bottom, features are top)
-        this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.features);
+        // Instantiate the grid layer
+        this.gridLayer = new PIXI.Graphics();
+
+        // Add them to the zooming stage in ascending order (grid is absolute top)
+        this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.features, this.gridLayer);
 
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };
@@ -386,6 +389,84 @@ export class StudioCanvas {
     setBiomeOpacity(alphaValue) {
         if (this.layers.biomes) {
             this.layers.biomes.alpha = alphaValue;
+        }
+    }
+
+    /**
+     * Draws a crisp, low-opacity PIXI overlay of standard VTT grid patterns.
+     * Utilises a geometric boundary mask to allow edge-hex completion without bleed.
+     */
+    drawGrid(type, size, isVisible) {
+        this.gridLayer.clear();
+
+        // Clean up the mask layout if the grid is hidden or disabled
+        if (this.gridMask) {
+            this.gridMask.clear();
+            this.gridLayer.mask = null;
+        }
+
+        if (!isVisible || type === "none") return;
+
+        // 1. Initialise the masking container if it does not exist
+        if (!this.gridMask) {
+            this.gridMask = new PIXI.Graphics();
+            this.stage.addChild(this.gridMask);
+        }
+
+        // 2. Build the bounding-box clipping mask to capture edge overflows
+        this.gridMask.beginFill(0xffffff);
+        this.gridMask.drawRect(0, 0, this.mapWidth, this.mapHeight);
+        this.gridMask.endFill();
+        this.gridLayer.mask = this.gridMask;
+
+        // 3. Configure the drawing line styles
+        this.gridLayer.lineStyle(2, 0xffffff, 0.25);
+
+        const width = this.mapWidth;
+        const height = this.mapHeight;
+        const s = Math.max(10, Number(size));
+
+        if (type === "square") {
+            for (let x = 0; x <= width; x += s) {
+                this.gridLayer.moveTo(x, 0).lineTo(x, height);
+            }
+            for (let y = 0; y <= height; y += s) {
+                this.gridLayer.moveTo(0, y).lineTo(width, y);
+            }
+        } else if (type === "hexR" || type === "hexC") {
+            const isRow = type === "hexR";
+            const r = s / Math.sqrt(3);
+            const widthDist = isRow ? s : r * 1.5;
+            const heightDist = isRow ? r * 1.5 : s;
+
+            // Intentionally sampling from column -1 to guarantee edge completion
+            for (let col = -1; col * widthDist < width + s; col++) {
+                for (let row = -1; row * heightDist < height + s; row++) {
+                    let cx, cy;
+
+                    if (isRow) {
+                        const offset = row % 2 === 0 ? 0 : s / 2;
+                        cx = col * widthDist + offset;
+                        cy = row * heightDist;
+                    } else {
+                        const offset = col % 2 === 0 ? 0 : s / 2;
+                        cx = col * widthDist;
+                        cy = row * heightDist + offset;
+                    }
+
+                    // Draw the 6 structural vertices of the Hexagon
+                    for (let i = 0; i < 6; i++) {
+                        const angle_deg = 60 * i - (isRow ? 30 : 0);
+                        const angle_rad = (Math.PI / 180) * angle_deg;
+                        const px = cx + r * Math.cos(angle_rad);
+                        const py = cy + r * Math.sin(angle_rad);
+
+                        if (i === 0) this.gridLayer.moveTo(px, py);
+                        else this.gridLayer.lineTo(px, py);
+                    }
+                    this.gridLayer.closePath();
+                }
+            }
         }
     }
 }
