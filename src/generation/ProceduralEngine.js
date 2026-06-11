@@ -1,4 +1,4 @@
-import { SimplexNoise } from "../../vendor/simplex-noise.js";
+import { SimplexNoise } from "../../vendor/simplex-noise/simplex-noise.js";
 import { FILRODENSWMB } from "../config.js";
 
 export class ProceduralEngine {

@@ -3,6 +3,7 @@ import { StudioCanvas } from "../canvas/StudioCanvas.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { getSavedMaps, loadMapData, saveMapData } from "../data/compendium.js";
+import { Scene3D } from "../canvas/Scene3D.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -29,6 +30,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             redoBrush: MapStudioApp.#onRedoBrush,
             saveMap: MapStudioApp.#onSaveMap,
             loadMap: MapStudioApp.#onLoadMapDialog,
+            threeDView: MapStudioApp.#onThreeDView,
             toggleLayer: MapStudioApp.#onToggleLayer,
             applyResolution: MapStudioApp.#onApplyResolution,
             adjustNoiseScale: MapStudioApp.#onAdjustNoiseScale,
@@ -277,6 +279,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async close(options) {
         if (this.canvasEngine) this.canvasEngine.destroy();
+        if (this.scene3D) this.scene3D.destroy();
         return super.close(options);
     }
 
@@ -567,11 +570,72 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 4. Draw Vector Graphics (Rivers and POI Pins)
         if (riverVectors) {
             const showPins = this.activeTool === "features";
-            this.canvasEngine.renderRiverVectors(riverVectors, this.mapPins, showPins);
+            this.canvasEngine.renderRiverVectors(riverVectors, this.mapPins, showPins, waterMask);
 
             const featuresBtn = this.element.querySelector('[data-layer="features"]');
             this.canvasEngine.toggleLayer("features", featuresBtn ? featuresBtn.classList.contains("active") : true);
         }
+    }
+
+    /**
+     * Toggles the interactive 3D topography visualisation.
+     */
+    static async #onThreeDView(event, target) {
+        const overlay = this.element.querySelector("#fwmb-3d-overlay");
+        const mapControls = this.element.querySelector(".fwmb-map-controls");
+        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+
+        if (!overlay || !this.currentElevationData) return;
+
+        // Toggle Off: Destroy context and restore 2D UI
+        if (this.scene3D) {
+            this.scene3D.destroy();
+            this.scene3D = null;
+            overlay.classList.add("fwmb-hidden");
+            target.classList.remove("active");
+
+            if (mapControls) mapControls.classList.remove("fwmb-hidden");
+
+            // Only restore the edit toolbar if the Edit Mode button is actually active
+            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
+            if (editToolbar && editBtn?.classList.contains("active")) {
+                editToolbar.classList.remove("fwmb-hidden");
+            }
+            return;
+        }
+
+        // Toggle On: Show 3D and hide 2D UI
+        overlay.classList.remove("fwmb-hidden");
+        target.classList.add("active");
+
+        if (mapControls) mapControls.classList.add("fwmb-hidden");
+        if (editToolbar) editToolbar.classList.add("fwmb-hidden");
+
+        const { params } = this.#getMapParameters();
+        const engine = new ProceduralEngine();
+        const seaLevel = this.uiState["seaLevel"];
+        const waterMask = this.currentRiverData ? this.currentRiverData.waterMask : null;
+
+        // Generate a pristine Biome buffer specifically for the 3D drape.
+        const biomeBuffer = engine.createBiomesMap(
+            this.currentElevationData,
+            this.currentMoistureData,
+            this.currentTemperatureData,
+            this.currentBiomeOverrides,
+            this.mapWidth,
+            this.mapHeight,
+            seaLevel,
+            waterMask,
+            params,
+        );
+
+        // Instantiate and boot the orchestrator
+        this.scene3D = new Scene3D(overlay);
+
+        // Extract the river vectors if they exist
+        const riverVectors = this.currentRiverData ? this.currentRiverData.vectors : null;
+
+        this.scene3D.render3DMap(this.currentElevationData, biomeBuffer, this.mapWidth, this.mapHeight, seaLevel, riverVectors, waterMask);
     }
 
     /**

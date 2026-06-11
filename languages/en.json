@@ -134,6 +134,8 @@
     "FILRODENSWMB.UI.GridHexRows": "Hexagonal (Rows)",
     "FILRODENSWMB.UI.GridHexCols": "Hexagonal (Columns)",
 
+    "FILRODENSWMB.UI.ThreeDView": "3D View",
+
     "FILRODENSWMB.UI.Warning": "Warning",
     "FILRODENSWMB.UI.SeedWarningContent": "Generating a new terrain seed will permanently erase all manual brush edits you have applied to this map. Do you want to continue?",
 

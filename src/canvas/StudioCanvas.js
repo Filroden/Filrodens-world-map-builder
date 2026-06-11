@@ -258,13 +258,12 @@ export class StudioCanvas {
 
     /**
      * Renders an array of vector paths and POI pins.
-     * Acts as a clean orchestrator, delegating complex rendering to private helpers.
      */
-    renderRiverVectors(rivers, mapPins, isFeatureEdit) {
+    renderRiverVectors(rivers, mapPins, isFeatureEdit, waterMask) {
         this.vectorGraphics.clear();
 
         if (rivers && rivers.length > 0) {
-            this.#drawRivers(rivers);
+            this.#drawRivers(rivers, waterMask);
         }
 
         if (mapPins && mapPins.length > 0) {
@@ -272,45 +271,40 @@ export class StudioCanvas {
         }
     }
 
-    /**
-     * Iterates over valid river arrays and delegates their path drawing.
-     */
-    #drawRivers(rivers) {
-        const waterColor = 0x78aad2; // Freshwater Teal
-        const frozenColor = 0xe1ebf0; // Pack Ice
+    #drawRivers(rivers, waterMask) {
+        const waterColor = 0x78aad2;
+        const frozenColor = 0xe1ebf0;
 
         for (const river of rivers) {
             if (!river.path || river.path.length < 2) continue;
-            this.#drawSingleRiver(river.path, waterColor, frozenColor);
+            this.#drawSingleRiver(river.path, waterColor, frozenColor, waterMask);
         }
     }
 
-    /**
-     * Handles the complex state machine of drawing a single continuous vector line,
-     * including breaking for lakes and dynamically swapping colors when freezing.
-     */
-    #drawSingleRiver(path, waterColor, frozenColor) {
+    #drawSingleRiver(path, waterColor, frozenColor, waterMask) {
         let isFlowing = false;
         let currentIsFrozen = null;
 
         for (const point of path) {
-            if (point.isLake) {
-                // A clean break at the lip of the crater. No more scribbling.
+            // THE FIX: Intercept coordinates and evaluate against the submerged mask
+            const safeX = Math.max(0, Math.min(Math.round(point.x), this.mapWidth - 1));
+            const safeY = Math.max(0, Math.min(Math.round(point.y), this.mapHeight - 1));
+            const index = safeY * this.mapWidth + safeX;
+            const isWater = waterMask && waterMask[index] > 0;
+
+            if (point.isLake || isWater) {
                 isFlowing = false;
                 continue;
             }
 
             if (!isFlowing) {
-                // Start a new path from a source or lake lip
                 currentIsFrozen = point.isFrozen;
                 this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
                 this.vectorGraphics.moveTo(point.x, point.y);
                 isFlowing = true;
             } else if (point.isFrozen === currentIsFrozen) {
-                // Continue established path
                 this.vectorGraphics.lineTo(point.x, point.y);
             } else {
-                // Boundary crossed: anchor the old line, swap paint, and restart the line
                 this.vectorGraphics.lineTo(point.x, point.y);
                 currentIsFrozen = point.isFrozen;
                 this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);

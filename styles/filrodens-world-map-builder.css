@@ -55,6 +55,7 @@
 .fwmb-icon.redo                 { --fwmb-mask: url('../assets/icons/redo.svg'); }
 .fwmb-icon.format_paint         { --fwmb-mask: url('../assets/icons/format_paint.svg'); }
 .fwmb-icon.ink_eraser           { --fwmb-mask: url('../assets/icons/ink_eraser.svg'); }
+.fwmb-icon.three-d              { --fwmb-mask: url('../assets/icons/3d.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
@@ -941,4 +942,15 @@ input.fwmb-biome-swatch {
 
 .fwmb-capitalize {
     text-transform: capitalize;
+}
+
+/* 3D Visualisation Container */
+.fwmb-3d-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10; /* Ensures it covers PIXI but remains under UI panels (z-index: 100+) */
+    background-color: #1a4b84; /* Matches the ocean backdrop */
 }
