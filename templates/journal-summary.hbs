@@ -152,6 +152,10 @@
         </thead>
         <tbody>
             <tr>
+                <td><strong>{{localize "FILRODENSWMB.UI.ContourInterval"}}</strong></td>
+                <td>{{params.display.contourInterval}}</td>
+            </tr>
+            <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.AlphaActive"}}</strong></td>
                 <td>{{params.display.biomeAlphaActive}}</td>
             </tr>
@@ -159,6 +163,31 @@
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.AlphaInactive"}}</strong></td>
                 <td>{{params.display.biomeAlphaInactive}}</td>
             </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.SectionBiomePalette"}}</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>{{localize "FILRODENSWMB.JOURNAL.BiomeClassification"}}</th>
+                <th>{{localize "FILRODENSWMB.JOURNAL.HexValue"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each journalColors}}
+                <tr>
+                    <td><strong>{{localize this.label}}</strong></td>
+                    <td class="fwmb-mono" style="display: flex; align-items: center; gap: 8px;">
+                        <span style="display: inline-block; width: 16px; height: 16px; background-color: {{this.hex}}; border: 1px solid var(--color-border-dark);"></span>
+                        {{this.hex}}
+                    </td>
+                </tr>
+            {{else}}
+                <tr>
+                    <td colspan="2" style="font-style: italic;">{{localize "FILRODENSWMB.JOURNAL.StandardPalette"}}</td>
+                </tr>
+            {{/each}}
         </tbody>
     </table>
 </div>

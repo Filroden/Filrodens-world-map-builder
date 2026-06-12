@@ -634,4 +634,39 @@ export class ProceduralEngine {
             }
         }
     }
+
+    /**
+     * Generates a flat RGBA buffer containing topographical contour lines.
+     * Uses a high-performance neighbor-thresholding edge detection algorithm.
+     */
+    createContourMap(elevationData, width, height, interval, seaLevel) {
+        const buffer = new Uint8Array(width * height * 4);
+        if (!interval || interval <= 0) return buffer;
+
+        for (let y = 0; y < height - 1; y++) {
+            for (let x = 0; x < width - 1; x++) {
+                const index = y * width + x;
+                const elev = elevationData[index];
+
+                // Determine the mathematical "contour step" for this pixel
+                const currentStep = Math.floor(elev / interval);
+
+                // Sample the Right and Bottom neighbors
+                const rightStep = Math.floor(elevationData[index + 1] / interval);
+                const bottomStep = Math.floor(elevationData[index + width] / interval);
+
+                // If a boundary is crossed, color the pixel
+                if (currentStep !== rightStep || currentStep !== bottomStep) {
+                    const isLand = elev >= seaLevel;
+
+                    // Cartographic styling: Dark lines on land, bright lines underwater
+                    buffer[index * 4] = isLand ? 0 : 255; // R
+                    buffer[index * 4 + 1] = isLand ? 0 : 255; // G
+                    buffer[index * 4 + 2] = isLand ? 0 : 255; // B
+                    buffer[index * 4 + 3] = isLand ? 60 : 40; // A (Alpha)
+                }
+            }
+        }
+        return buffer;
+    }
 }

@@ -108,6 +108,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             riverDensity: 40,
 
             // Settings UI Cache
+            contourInterval: 0.1,
             biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,
             biomeAlphaInactive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE,
             maxLakeSize: FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE,
@@ -139,17 +140,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const rgbToHex = (rgb) => "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
 
         // Unify IDs, Labels, and dynamically updating Hex Colours into a single array
-        context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS).map(([key, id]) => {
-            const defaultRgb = FILRODENSWMB.BIOMES[key] || [0, 0, 0];
-            const currentRgb = this.customBiomeColors[key] || defaultRgb;
+        context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS)
+            // Exclude Deep Ocean (1) and Shallow Ocean (2) from all UI lists
+            .filter(([key, id]) => id !== 1 && id !== 2)
+            .map(([key, id]) => {
+                const defaultRgb = FILRODENSWMB.BIOMES[key] || [0, 0, 0];
+                const currentRgb = this.customBiomeColors[key] || defaultRgb;
 
-            return {
-                id: id,
-                key: key,
-                label: `FILRODENSWMB.BIOMES.${key}`,
-                hex: rgbToHex(currentRgb),
-            };
-        });
+                return {
+                    id: id,
+                    key: key,
+                    label: `FILRODENSWMB.BIOMES.${key}`,
+                    hex: rgbToHex(currentRgb),
+                };
+            });
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
@@ -213,10 +217,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     return;
                 }
 
-                // Opacity changes (Instant Visual Update)
+                // Opacity & Overlay changes (Instant Visual Update)
                 if (event.target.matches('input[name="biomeAlphaActive"], input[name="biomeAlphaInactive"]')) {
-                    this.#getMapParameters(); // Sync DOM to cache
+                    this.#getMapParameters();
                     this.#updateBiomeOpacity();
+                    return;
+                }
+
+                if (event.target.matches('input[name="contourInterval"]')) {
+                    this.#getMapParameters();
+                    this.#repaintCanvas();
                     return;
                 }
 
@@ -396,6 +406,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             },
             customColors: this.customBiomeColors,
             display: {
+                contourInterval: this.uiState["contourInterval"],
                 biomeAlphaActive: this.uiState["biomeAlphaActive"],
                 biomeAlphaInactive: this.uiState["biomeAlphaInactive"],
             },
@@ -567,7 +578,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.toggleLayer("biomes", biomesBtn ? biomesBtn.classList.contains("active") : true);
         }
 
-        // 4. Draw Vector Graphics (Rivers and POI Pins)
+        // 4 Generate and paint Cartographic Contours
+        const contourInterval = this.uiState["contourInterval"];
+        if (contourInterval > 0) {
+            const contourBuffer = engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel);
+            this.canvasEngine.renderPixelBuffer("contours", contourBuffer, this.mapWidth, this.mapHeight);
+
+            const contourBtn = this.element.querySelector('[data-layer="contours"]');
+            this.canvasEngine.toggleLayer("contours", contourBtn ? contourBtn.classList.contains("active") : true);
+        }
+
+        // 5. Draw Vector Graphics (Rivers and POI Pins)
         if (riverVectors) {
             const showPins = this.activeTool === "features";
             this.canvasEngine.renderRiverVectors(riverVectors, this.mapPins, showPins, waterMask);
@@ -969,6 +990,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.meanderJitter = p.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER;
         this.uiState.altCooling = p.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING;
         this.uiState.freezingThreshold = p.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
+        this.uiState.contourInterval = p.display?.contourInterval ?? 0.1;
         this.uiState.biomeAlphaActive = p.display?.biomeAlphaActive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE;
         this.uiState.biomeAlphaInactive = p.display?.biomeAlphaInactive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
 

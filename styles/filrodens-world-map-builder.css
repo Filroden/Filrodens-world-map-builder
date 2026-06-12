@@ -28,9 +28,9 @@
 .fwmb-icon.layers               { --fwmb-mask: url('../assets/icons/layers.svg'); }
 .fwmb-icon.elevation            { --fwmb-mask: url('../assets/icons/elevation.svg'); }
 .fwmb-icon.shuffle              { --fwmb-mask: url('../assets/icons/shuffle.svg'); }
-.fwmb-icon.travel_explore       { --fwmb-mask: url('../assets/icons/travel_explore.svg'); }
-.fwmb-icon.file_open            { --fwmb-mask: url('../assets/icons/file_open.svg'); }
-.fwmb-icon.file_save            { --fwmb-mask: url('../assets/icons/file_save.svg'); }
+.fwmb-icon.travel-explore       { --fwmb-mask: url('../assets/icons/travel_explore.svg'); }
+.fwmb-icon.file-open            { --fwmb-mask: url('../assets/icons/file_open.svg'); }
+.fwmb-icon.file-save            { --fwmb-mask: url('../assets/icons/file_save.svg'); }
 .fwmb-icon.delete               { --fwmb-mask: url('../assets/icons/delete.svg'); }
 .fwmb-icon.brush                { --fwmb-mask: url('../assets/icons/brush.svg'); }
 .fwmb-icon.select               { --fwmb-mask: url('../assets/icons/select.svg'); }
@@ -43,19 +43,20 @@
 .fwmb-icon.center-focus         { --fwmb-mask: url('../assets/icons/center_focus_strong.svg'); }
 .fwmb-icon.tune                 { --fwmb-mask: url('../assets/icons/tune.svg'); }
 .fwmb-icon.landscape            { --fwmb-mask: url('../assets/icons/landscape.svg'); }
-.fwmb-icon.water_drop           { --fwmb-mask: url('../assets/icons/water_drop.svg'); }
-.fwmb-icon.format_color_reset   { --fwmb-mask: url('../assets/icons/format_color_reset.svg'); }
+.fwmb-icon.water-drop           { --fwmb-mask: url('../assets/icons/water_drop.svg'); }
+.fwmb-icon.format-color-reset   { --fwmb-mask: url('../assets/icons/format_color_reset.svg'); }
 .fwmb-icon.temperature          { --fwmb-mask: url('../assets/icons/device_thermostat.svg'); }
 .fwmb-icon.forest               { --fwmb-mask: url('../assets/icons/forest.svg'); }
-.fwmb-icon.location_city        { --fwmb-mask: url('../assets/icons/location_city.svg'); }
-.fwmb-icon.folder_open          { --fwmb-mask: url('../assets/icons/folder_open.svg'); }
-.fwmb-icon.edit_arrow_down      { --fwmb-mask: url('../assets/icons/edit_arrow_down.svg'); }
-.fwmb-icon.edit_arrow_up        { --fwmb-mask: url('../assets/icons/edit_arrow_up.svg'); }
+.fwmb-icon.location-city        { --fwmb-mask: url('../assets/icons/location_city.svg'); }
+.fwmb-icon.folder-open          { --fwmb-mask: url('../assets/icons/folder_open.svg'); }
+.fwmb-icon.edit-arrow-down      { --fwmb-mask: url('../assets/icons/edit_arrow_down.svg'); }
+.fwmb-icon.edit-arrow-up        { --fwmb-mask: url('../assets/icons/edit_arrow_up.svg'); }
 .fwmb-icon.undo                 { --fwmb-mask: url('../assets/icons/undo.svg'); }
 .fwmb-icon.redo                 { --fwmb-mask: url('../assets/icons/redo.svg'); }
-.fwmb-icon.format_paint         { --fwmb-mask: url('../assets/icons/format_paint.svg'); }
-.fwmb-icon.ink_eraser           { --fwmb-mask: url('../assets/icons/ink_eraser.svg'); }
+.fwmb-icon.format-paint         { --fwmb-mask: url('../assets/icons/format_paint.svg'); }
+.fwmb-icon.ink-eraser           { --fwmb-mask: url('../assets/icons/ink_eraser.svg'); }
 .fwmb-icon.three-d              { --fwmb-mask: url('../assets/icons/3d.svg'); }
+.fwmb-icon.scatter-plot         { --fwmb-mask: url('../assets/icons/scatter_plot.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {

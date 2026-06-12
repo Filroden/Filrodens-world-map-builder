@@ -107,6 +107,8 @@
     "FILRODENSWMB.UI.AltitudeCooling": "Altitude Cooling Mod",
     "FILRODENSWMB.UI.FreezingThreshold": "Freezing Threshold",
     "FILRODENSWMB.UI.SettingsBiomeColors": "Biome Colors",
+    "FILRODENSWMB.UI.LayerContours": "Toggle Contour Lines",
+    "FILRODENSWMB.UI.ContourInterval": "Contour Interval",
 
     "FILRODENSWMB.UI.CanvasSettings": "Canvas Setup",
     "FILRODENSWMB.UI.MapResolution": "Grid Resolution (Pixels)",
@@ -146,6 +148,7 @@
     "FILRODENSWMB.JOURNAL.SectionClimate": "Climatology & Atmospheric Bands",
     "FILRODENSWMB.JOURNAL.SectionHydrology": "Hydrological Dynamics & Micro-Climate Rules",
     "FILRODENSWMB.JOURNAL.SectionDisplay": "Interface View Options",
+    "FILRODENSWMB.JOURNAL.SectionBiomePalette": "Custom Biome Palette Overrides",
     "FILRODENSWMB.JOURNAL.Property": "Configuration Property",
     "FILRODENSWMB.JOURNAL.Value": "Assigned Vector Value",
     "FILRODENSWMB.JOURNAL.Seed": "Initialisation Seed",
@@ -172,5 +175,8 @@
     "FILRODENSWMB.JOURNAL.AltCooling": "Altitude Thermal Cooling Coefficient",
     "FILRODENSWMB.JOURNAL.FreezingThreshold": "Glacial Freezing Threshold",
     "FILRODENSWMB.JOURNAL.AlphaActive": "Active Focus Layer Alpha Opacity",
-    "FILRODENSWMB.JOURNAL.AlphaInactive": "Inactive Context Layer Alpha Opacity"
+    "FILRODENSWMB.JOURNAL.AlphaInactive": "Inactive Context Layer Alpha Opacity",
+    "FILRODENSWMB.JOURNAL.BiomeClassification": "Biome Classification",
+    "FILRODENSWMB.JOURNAL.HexValue": "Assigned Hexadecimal Value",
+    "FILRODENSWMB.JOURNAL.StandardPalette": "No custom biome colours applied. Standard palette active."
 }

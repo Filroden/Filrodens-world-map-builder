@@ -22,6 +22,7 @@ export class StudioCanvas {
             base: new PIXI.Container(),
             topography: new PIXI.Container(),
             biomes: new PIXI.Container(),
+            contours: new PIXI.Container(),
             features: new PIXI.Container(),
         };
 
@@ -34,8 +35,8 @@ export class StudioCanvas {
         // Instantiate the grid layer
         this.gridLayer = new PIXI.Graphics();
 
-        // Add them to the zooming stage in ascending order (grid is absolute top)
-        this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.features, this.gridLayer);
+        // Add them to the zooming stage in ascending order
+        this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.contours, this.layers.features, this.gridLayer);
 
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };

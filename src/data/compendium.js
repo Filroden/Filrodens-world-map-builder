@@ -50,6 +50,12 @@ export async function saveMapData(mapName, mapDataPayload) {
 
     const cleanPayload = foundry.utils.deepClone(mapDataPayload);
 
+    // Format custom colours for the Handlebars journal template
+    cleanPayload.journalColors = Object.entries(cleanPayload.params.customColors || {}).map(([key, rgb]) => {
+        const hex = "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
+        return { label: `FILRODENSWMB.BIOMES.${key}`, hex: hex };
+    });
+
     // Compile the template into flat text via native engine utilities
     const narrativeHtml = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/journal-summary.hbs", cleanPayload);
 

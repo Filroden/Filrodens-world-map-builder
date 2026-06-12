@@ -5,7 +5,7 @@
     <div class="fwmb-map-preview">
         <div class="fwmb-canvas-readout fwmb-hidden">
             <div class="fwmb-readout-item"><i class="fwmb-icon elevation"></i> <span id="fwmb-readout-elev">--</span></div>
-            <div class="fwmb-readout-item"><i class="fwmb-icon water_drop"></i> <span id="fwmb-readout-mois">--</span></div>
+            <div class="fwmb-readout-item"><i class="fwmb-icon water-drop"></i> <span id="fwmb-readout-mois">--</span></div>
             <div class="fwmb-readout-item"><i class="fwmb-icon temperature"></i> <span id="fwmb-readout-temp">--</span></div>
             <div class="fwmb-divider-vertical"></div>
             <div class="fwmb-readout-biome" id="fwmb-readout-biome">--</div>
@@ -27,9 +27,12 @@
             <i class="fwmb-icon forest"></i>
         </button>
         <button type="button" class="active" data-action="toggleLayer" data-layer="features" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerFeatures'}}">
-            <i class="fwmb-icon water_drop"></i>
+            <i class="fwmb-icon water-drop"></i>
         </button>
         <div class="fwmb-divider-vertical"></div>
+        <button type="button" class="active" data-action="toggleLayer" data-layer="contours" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerContours'}}">
+            <i class="fwmb-icon scatter-plot"></i>
+        </button>
         <button type="button" data-action="toggleGrid" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleGrid'}}">
             <i class="fwmb-icon grid-on"></i>
         </button>
