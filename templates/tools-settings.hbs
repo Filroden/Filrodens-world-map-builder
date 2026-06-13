@@ -1,0 +1,90 @@
+<div class="fwmb-tool-content fwmb-scrollable">
+
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.SettingsVisuals"}}</legend>
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.ContourInterval"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="contourInterval" value="{{lookup uiState 'contourInterval'}}" min="0.02" max="0.3" step="0.02" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "contourInterval"}}</output>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.ActiveBiomeOpacity"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="biomeAlphaActive" value="{{lookup uiState 'biomeAlphaActive'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "biomeAlphaActive"}}</output>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.InactiveBiomeOpacity"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="biomeAlphaInactive" value="{{lookup uiState 'biomeAlphaInactive'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "biomeAlphaInactive"}}</output>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.SettingsHydrology"}}</legend>
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.MaxLakeSize"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="maxLakeSize" value="{{lookup uiState 'maxLakeSize'}}" min="1000" max="20000" step="500" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "maxLakeSize"}}</output>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.SpringAltMin"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="springAltOffset" value="{{lookup uiState 'springAltOffset'}}" min="0" max="0.8" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "springAltOffset"}}</output>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.SpringMoistMin"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="springMoistMin" value="{{lookup uiState 'springMoistMin'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "springMoistMin"}}</output>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.MeanderJitter"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="meanderJitter" value="{{lookup uiState 'meanderJitter'}}" min="0" max="0.02" step="0.001" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "meanderJitter"}}</output>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.SettingsClimate"}}</legend>
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.AltitudeCooling"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="altCooling" value="{{lookup uiState 'altCooling'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "altCooling"}}</output>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.FreezingThreshold"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="freezingThreshold" value="{{lookup uiState 'freezingThreshold'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "freezingThreshold"}}</output>
+            </div>
+        </div>
+    </fieldset>
+
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.SettingsBiomeColors"}}</legend>
+        <div class="fwmb-biome-legend">
+            {{#each biomeList}}
+                <div class="fwmb-biome-item" style="gap: var(--filroden-space-s);">
+                    <input type="color" class="fwmb-biome-swatch" name="color_{{this.key}}" value="{{this.hex}}" data-biome="{{this.key}}" />
+                    <label style="font-size: var(--filroden-font-size-xs);">{{localize this.label}}</label>
+                </div>
+            {{/each}}
+        </div>
+    </fieldset>
+
+</div>

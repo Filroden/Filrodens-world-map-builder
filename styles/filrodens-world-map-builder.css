@@ -4,55 +4,64 @@
 
 /* --- MATERIAL DESIGN ICONS --- */
 .fwmb-icon {
+    display: inline-block;
     width: var(--filroden-font-size-l); 
     height: var(--filroden-font-size-l);
     min-width: var(--filroden-font-size-l);
+    background-color: currentColor;
     background-image: none !important;
     content: "";
     transform: scaleX(var(--filroden-dir-flip));
-    -webkit-mask-size: 100% 100%;
-    mask-size: 100% 100%;
-    margin: 0;
-}
-
-.fwmb-scene-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-}
-
-.fwmb-scene-icon::before {
-    content: "";
-    width: var(--filroden-font-size-xl);
-    height: var(--filroden-font-size-xl);
-    margin: 0 auto;
-}
-
-.fwmb-icon, 
-.fwmb-scene-icon::before {
-    display: inline-block;
-    background-color: currentColor;
     -webkit-mask-repeat: no-repeat;
     mask-repeat: no-repeat;
     -webkit-mask-position: center;
     mask-position: center;
     -webkit-mask-image: var(--fwmb-mask);
     mask-image: var(--fwmb-mask);
-    -webkit-mask-size: contain;
-    mask-size: contain;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    margin: 0;
 }
 
-:is(.fwmb-icon, .fwmb-scene-icon).hex            { --fwmb-mask: url('../assets/icons/hive.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).layers         { --fwmb-mask: url('../assets/icons/layers.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).elevation      { --fwmb-mask: url('../assets/icons/elevation.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).shuffle        { --fwmb-mask: url('../assets/icons/shuffle.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).travel_explore { --fwmb-mask: url('../assets/icons/travel_explore.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).file_open      { --fwmb-mask: url('../assets/icons/file_open.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).file_save      { --fwmb-mask: url('../assets/icons/file_save.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).delete         { --fwmb-mask: url('../assets/icons/delete.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).brush          { --fwmb-mask: url('../assets/icons/brush.svg'); }
-:is(.fwmb-icon, .fwmb-scene-icon).select          { --fwmb-mask: url('../assets/icons/select.svg'); }
+.fwmb-icon.map                  { --fwmb-mask: url('../assets/icons/map.svg'); }
+.fwmb-icon.hex                  { --fwmb-mask: url('../assets/icons/hive.svg'); }
+.fwmb-icon.layers               { --fwmb-mask: url('../assets/icons/layers.svg'); }
+.fwmb-icon.elevation            { --fwmb-mask: url('../assets/icons/elevation.svg'); }
+.fwmb-icon.shuffle              { --fwmb-mask: url('../assets/icons/shuffle.svg'); }
+.fwmb-icon.travel-explore       { --fwmb-mask: url('../assets/icons/travel_explore.svg'); }
+.fwmb-icon.file-open            { --fwmb-mask: url('../assets/icons/file_open.svg'); }
+.fwmb-icon.save                 { --fwmb-mask: url('../assets/icons/save.svg'); }
+.fwmb-icon.delete               { --fwmb-mask: url('../assets/icons/delete.svg'); }
+.fwmb-icon.brush                { --fwmb-mask: url('../assets/icons/brush.svg'); }
+.fwmb-icon.select               { --fwmb-mask: url('../assets/icons/select.svg'); }
+.fwmb-icon.grid-on              { --fwmb-mask: url('../assets/icons/grid_3x3.svg'); }
+.fwmb-icon.grid-off             { --fwmb-mask: url('../assets/icons/grid_3x3_off.svg'); }
+.fwmb-icon.zoom-in              { --fwmb-mask: url('../assets/icons/zoom_in.svg'); }
+.fwmb-icon.zoom-out             { --fwmb-mask: url('../assets/icons/zoom_out.svg'); }
+.fwmb-icon.zoom-in-map          { --fwmb-mask: url('../assets/icons/zoom_in_map.svg'); }
+.fwmb-icon.zoom-out-map         { --fwmb-mask: url('../assets/icons/zoom_out_map.svg'); }
+.fwmb-icon.center-focus         { --fwmb-mask: url('../assets/icons/center_focus_strong.svg'); }
+.fwmb-icon.tune                 { --fwmb-mask: url('../assets/icons/tune.svg'); }
+.fwmb-icon.landscape            { --fwmb-mask: url('../assets/icons/landscape.svg'); }
+.fwmb-icon.water-drop           { --fwmb-mask: url('../assets/icons/water_drop.svg'); }
+.fwmb-icon.format-color-reset   { --fwmb-mask: url('../assets/icons/format_color_reset.svg'); }
+.fwmb-icon.temperature          { --fwmb-mask: url('../assets/icons/device_thermostat.svg'); }
+.fwmb-icon.forest               { --fwmb-mask: url('../assets/icons/forest.svg'); }
+.fwmb-icon.location-city        { --fwmb-mask: url('../assets/icons/location_city.svg'); }
+.fwmb-icon.folder-open          { --fwmb-mask: url('../assets/icons/folder_open.svg'); }
+.fwmb-icon.edit-arrow-down      { --fwmb-mask: url('../assets/icons/edit_arrow_down.svg'); }
+.fwmb-icon.edit-arrow-up        { --fwmb-mask: url('../assets/icons/edit_arrow_up.svg'); }
+.fwmb-icon.undo                 { --fwmb-mask: url('../assets/icons/undo.svg'); }
+.fwmb-icon.redo                 { --fwmb-mask: url('../assets/icons/redo.svg'); }
+.fwmb-icon.format-paint         { --fwmb-mask: url('../assets/icons/format_paint.svg'); }
+.fwmb-icon.ink-eraser           { --fwmb-mask: url('../assets/icons/ink_eraser.svg'); }
+.fwmb-icon.three-d              { --fwmb-mask: url('../assets/icons/3d.svg'); }
+.fwmb-icon.scatter-plot         { --fwmb-mask: url('../assets/icons/scatter_plot.svg'); }
+.fwmb-icon.content-copy         { --fwmb-mask: url('../assets/icons/content_copy.svg'); }
+.fwmb-icon.edit                 { --fwmb-mask: url('../assets/icons/edit.svg'); }
+.fwmb-icon.file-export          { --fwmb-mask: url('../assets/icons/file_export.svg'); }
+.fwmb-icon.upload-file          { --fwmb-mask: url('../assets/icons/upload_file.svg'); }
+.fwmb-icon.more-vert            { --fwmb-mask: url('../assets/icons/more_vert.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
@@ -99,7 +108,7 @@
     line-height: var(--filroden-line-height-body);
     text-align: start;
     z-index: var(--z-index-tooltip, 9999);
-    margin-top: var(--filroden-space-m);
+    margin-block-start: var(--filroden-space-m);
 }
 
 
@@ -179,9 +188,18 @@
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
+.fwmb input[type="number"],
+.fwmb input[type="time"] {
+    text-align: center; 
+}
+
+.fwmb input[type="number"] {
+    width: 8ch;
+}
+
 .fwmb input[type="text"]:focus,
 .fwmb input[type="number"]:focus,
-.fwmb input[type="time"],
+.fwmb input[type="time"]:focus,
 .fwmb select:focus,
 .fwmb textarea:focus {
     border-color: var(--filroden-color-text-accent);
@@ -205,6 +223,32 @@
     line-height: var(--filroden-line-height-body);
 }
 
+/* --- SELECT AND OPTIONS --- */
+
+.fwmb select,
+.fwmb select::picker(select) {
+    appearance: base-select;
+}
+
+.fwmb select::picker(select) {
+    position-area: top;
+    margin-block-end: var(--filroden-space-xs);
+    border: 1px solid var(--filroden-color-text-accent);
+}
+
+.fwmb option {
+    background: var(--filroden-color-bg-medium-solid);
+    color: var(--filroden-color-text-main-solid);
+}
+
+.fwmb option:hover {
+    background: var(--filroden-color-text-accent);
+    color: var(--filroden-color-text-on-accent);
+}
+
+.fwmb option:focus {
+    outline: none;
+}
 
 /* --- CHECKBOXES AND RADIO BUTTONS --- */
 .fwmb-checkbox,
@@ -292,7 +336,7 @@
     font-weight: bold;
     text-transform: uppercase;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
+    border-block-end: 2px solid transparent;
     transition: background-color 0.2s, color 0.2s;
 }
 
@@ -305,7 +349,7 @@
 .fwmb nav.tabs .item.active,
 .fwmb .fwmb-tabs .item.active {
     color: var(--filroden-color-text-accent);
-    border-bottom-color: var(--filroden-color-text-accent);
+    border-block-end-color: var(--filroden-color-text-accent);
     background: var(--filroden-color-bg-darkest);
 }
 
@@ -330,10 +374,9 @@
 
 .fwmb .form-group {
     display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, max-content);
     align-items: center;
     gap: var(--filroden-space-l);
-    margin-block-end: var(--filroden-space-s);
 }
 
 .fwmb .form-group label {
@@ -373,7 +416,7 @@
     border: none;
     height: 1px;
     width: 100%;
-    background-color: var(--filroden-color-border);
+    background-color: var(--filroden-color-text-accent);
     margin-block: var(--filroden-space-m);
 }
 
@@ -416,6 +459,31 @@
     min-width: 0; /* Prevents flexbox text inputs from breaking container bounds */
 }
 
+/* --- CONTEXT PANEL CONTENT --- */
+.fwmb-tool-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: var(--filroden-space-m);
+    gap: var(--filroden-space-xs);
+    overflow-y: auto; /* Required to trigger fwmb-scrollable mechanics */
+}
+
+
+/* ===================================================================
+   --- SCENE SIDEBAR BUTTON ---
+=================================================================== */
+
+/* Make custom button a standard square */
+.fwmb-sidebar-btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0;
+    margin: 0;
+}
+
+
 /* ===================================================================
    --- MAIN UI ---
 =================================================================== */
@@ -428,8 +496,8 @@
 }
 
 /* UI direction handling for RTL languages */
-.fhc.rtl,
-.fhc[dir="rtl"] {
+.fwmb.rtl,
+.fwmb[dir="rtl"] {
     --filroden-dir-flip: -1;
 }
 
@@ -469,211 +537,540 @@
 }
 
 /* Main window content styles */
-.fwmb .window-content {
-    background: var(--filroden-color-bg-darkest) !important;
-    color: var(--filroden-color-text-main-solid);
+.fwmb.fwmb-layout .window-content {
     padding: 0;
+    display: flex;
+    flex-direction: row; /* Align the AppV2 Parts horizontally */
+    overflow: hidden;
+    height: 100%;
+}
+
+/* 1. The Toolbar Part */
+.fwmb .fwmb-toolbar {
+    flex: 0 0 3rem; 
+    background: var(--filroden-color-bg-darkest);
+    border-inline-end: 1px solid var(--filroden-color-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-block: var(--filroden-space-s);
+    gap: var(--filroden-space-s);
+}
+
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools) button {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--filroden-radius-small);
+    color: var(--filroden-color-text-muted-solid);
+}
+
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools) button:hover {
+    color: var(--filroden-color-text-main-solid);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools) button.active {
+    color: var(--filroden-color-text-accent);
+    background: var(--filroden-color-bg-hover-solid);
+    border-color: var(--filroden-color-text-accent);
+}
+
+/* 2. The Context Panel Part */
+.fwmb .fwmb-context-panel {
+    flex: 0 0 18rem; 
+    background: var(--filroden-color-bg-medium-solid);
+    border-inline-end: 1px solid var(--filroden-color-border);
+    display: flex;
+    flex-direction: column;
+}
+
+/* 3. The Map Part */
+.fwmb .fwmb-map {
+    flex: 1; 
+    position: relative;
+    min-width: 0;
+    height: 100%;
+}
+
+.fwmb-map-preview {
+    position: absolute;
+    inset: 0;
     overflow: hidden;
 }
 
-/* ===================================================================
-   --- DETAILS & ACCORDIONS ---
-=================================================================== */
-
-.fwmb details.fwmb-details {
-    border: 1px solid var(--filroden-color-border);
-    border-radius: var(--filroden-radius-medium);
-    padding: var(--filroden-space-s) var(--filroden-space-m);
-    margin-block-end: var(--filroden-space-m);
-    background: var(--filroden-color-bg-medium-solid);
+.fwmb-map-preview canvas {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
 }
 
-.fwmb details.fwmb-details summary {
-    font-weight: bold;
+.fwmb-divider-vertical {
+    border: none;
+    height: 100%;
+    width: 1px;
+    background-color: var(--filroden-color-text-accent);
+    margin-inline: var(--filroden-space-xs);
+}
+
+.fwmb-map-controls {
+    position: absolute;
+    inset-block-end: var(--filroden-space-m);
+    inset-inline-end: var(--filroden-space-m);
+    display: flex;
+    gap: var(--filroden-space-xs);
+    background: rgba(0, 0, 0, 0.5);
+    padding: var(--filroden-space-xs);
+    border-radius: var(--filroden-radius-small);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 20;
+    opacity: 0; /* Hidden by default, shown on hover */
+    transition: opacity 0.2s ease;
+}
+
+.fwmb-map-hint {
+    position: absolute;
+    inset-block-end: var(--filroden-space-m);
+    inset-inline-start: var(--filroden-space-m);
+    color: var(--filroden-color-text-muted);
+    font-size: var(--filroden-font-size-xs);
+    background: rgba(0, 0, 0, 0.3);
+    padding: var(--filroden-space-xxs) var(--filroden-space-s);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.fwmb-map:hover .fwmb-map-controls,
+.fwmb-map:hover .fwmb-map-hint {
+    opacity: 1;
+}
+
+.fwmb-map-controls button {
+    width: var(--filroden-font-size-xxl);
+    height: var(--filroden-font-size-xxl);
+    background: transparent;
+    border: 1px solid transparent;
     color: var(--filroden-color-text-main-solid);
-    cursor: pointer;
-    padding-block: var(--filroden-space-xs);
-    list-style: none;
+    padding: 0;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
 }
 
-.fwmb details.fwmb-details summary::-webkit-details-marker {
-    display: none;
+.fwmb-map-controls button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--filroden-color-text-accent);
 }
 
-.fwmb details.fwmb-details summary::after {
-    content: "▼";
-    font-size: var(--filroden-font-size-xs);
-    color: var(--filroden-color-text-muted-solid);
-    transition: transform 0.2s ease;
+.fwmb-map-controls button.active {
+    color: var(--filroden-color-text-accent);
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--filroden-color-text-accent);
 }
 
-.fwmb details.fwmb-details[open] summary::after {
-    transform: rotate(180deg);
-}
-
-.fwmb .fwmb-details-body {
-    padding-block-start: var(--filroden-space-m);
-    border-block-start: 1px solid var(--filroden-color-border);
-    margin-block-start: var(--filroden-space-s);
+/* --- RANGE SLIDERS --- */
+.fwmb .fwmb-slider-group {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: center;
     gap: var(--filroden-space-s);
 }
 
-/* ===================================================================
-   --- LEGEND OVERLAY ---
-=================================================================== */
+.fwmb .fwmb-slider-group input[type="range"] {
+    flex: 1;
+    accent-color: var(--filroden-color-text-accent);
+    cursor: pointer;
+}
 
-.fwmb-legend-container {
-    position: absolute;
-    width: 14rem;
-    top: 15px;
-    margin-right: 15px;
-    background-color: var(--filroden-color-bg-darkest);
-    color: var(--filroden-color-text-main-solid);
-    border: var(--filroden-border-main);
-    border-radius: var(--filroden-radius-medium);
-    padding: var(--filroden-space-m) var(--filroden-space-l);
-    box-shadow: var(--filroden-shadow-popout);
-    z-index: 100;
-    pointer-events: none;
+.fwmb .fwmb-slider-group output {
+    width: 5ch;
+    text-align: right;
+    font-family: monospace;
+    font-size: var(--filroden-font-size-xs);
+    color: var(--filroden-color-text-accent);
+}
+
+/* --- STACKED FORM GROUPS --- */
+.fwmb .form-group.stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--filroden-space-xs);
+}
+
+.fwmb .form-group.stacked input[type="range"] {
+    width: 100%;
+    margin: 0;
+}
+
+/* --- MAP LAYOUT & EDIT TOOLBAR --- */
+.fwmb .fwmb-map-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    position: relative;
+}
+
+.fwmb .fwmb-map-preview {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+.fwmb .fwmb-hidden {
+    display: none !important;
+}
+
+.fwmb .fwmb-edit-toolbar {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: var(--filroden-space-s) var(--filroden-space-m);
+    background: var(--filroden-color-bg-darkest);
+    border-bottom: 1px solid var(--filroden-color-border);
+    gap: var(--filroden-space-m);
+}
+
+.fwmb .fwmb-brush-settings,
+.fwmb .fwmb-brush-setting,
+.fwmb .fwmb-brush-tools,
+.fwmb .fwmb-brush-history {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--filroden-space-m);
+}
+
+.fwmb .fwmb-brush-settings label {
+    font-size: var(--filroden-font-size-xs);
+    color: var(--filroden-color-text-muted-solid);
+    margin-right: var(--filroden-space-xs);
     white-space: nowrap;
 }
 
-.fwmb-legend-header {
-    margin: 0 0 var(--filroden-space-m) 0;
-    border-bottom: var(--filroden-border-main);
-    padding-bottom: var(--filroden-space-s);
-    font-size: var(--filroden-font-size-m);
-    color: var(--filroden-color-text-accent);
-    text-align: center;
-    letter-spacing: 1px;
+.fwmb .fwmb-brush-setting .fwmb-slider-group input[type="range"] {
+    width: 80px; 
 }
 
-.fwmb-legend-biomes {
-    display: flex;
-    flex-direction: column;
-    gap: var(--filroden-space-s);
+.fwmb .fwmb-brush-setting .fwmb-slider-group output {
+    width: 4ch;
+    margin-left: 0;
 }
 
-.fwmb-legend-row {
+/* --- CONTEXT PANEL LOCK STATE --- */
+.fwmb .fwmb-context-panel.fwmb-locked fieldset {
+    opacity: 0.4;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.fwmb .fwmb-context-panel.fwmb-locked fieldset legend {
+    color: var(--filroden-color-text-muted);
+}
+
+/* --- CANVAS HOVER READOUT --- */
+.fwmb-canvas-readout {
+    position: absolute;
+    inset-block-start: var(--filroden-space-m);
+    inset-inline-start: var(--filroden-space-m);
+    background: rgba(0, 0, 0, 0.7);
+    padding: var(--filroden-space-xs) var(--filroden-space-s);
+    border-radius: var(--filroden-radius-small);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--filroden-color-text-main-solid);
+    font-size: var(--filroden-font-size-xs);
     display: flex;
     align-items: center;
     gap: var(--filroden-space-m);
-    font-size: var(--filroden-font-size-s);
+    z-index: 20;
+    pointer-events: none; /* Crucial: Prevents the readout from blocking brush clicks! */
+}
+
+.fwmb-canvas-readout .fwmb-divider-vertical {
+    height: var(--filroden-font-size-m);
+    margin: 0;
+}
+
+.fwmb-readout-item {
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-xxs);
+    font-family: monospace;
+}
+
+.fwmb-readout-item i {
+    width: var(--filroden-font-size-m);
+    height: var(--filroden-font-size-m);
+    min-width: var(--filroden-font-size-m);
+    color: var(--filroden-color-text-muted-solid);
+}
+
+.fwmb-readout-biome {
+    font-weight: bold;
+    color: var(--filroden-color-text-accent);
+}
+
+/* --- BIOME LEGEND --- */
+.fwmb-biome-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--filroden-space-s);
+    font-size: var(--filroden-font-size-xs);
+}
+
+.fwmb-biome-item {
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-m);
+    color: var(--filroden-color-text-main-solid);
+}
+
+.fwmb-biome-swatch {
+    appearance: none;
+    -webkit-appearance: none;
+    width: var(--filroden-font-size-l);
+    height: var(--filroden-font-size-l);
+    padding: 0;
+    flex-shrink: 0;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 0 2px rgba(0,0,0,0.5);
+    cursor: default;
+}
+
+input.fwmb-biome-swatch {
+    cursor: pointer;
+}
+
+.fwmb-biome-swatch::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.fwmb-biome-swatch::-webkit-color-swatch {
+    border: none;
+    border-radius: 2px; 
+}
+
+.fwmb-biome-swatch::-moz-color-swatch {
+    border: none;
+    border-radius: 2px;
+}
+
+/* --- TRANSFORMATION CONTROLS (D-PAD & ZOOM) --- */
+.fwmb-transform-controls {
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    padding: var(--filroden-space-m);
+    border-radius: var(--filroden-radius-medium);
+    border: 1px inset rgba(255, 255, 255, 0.05);
+}
+
+.fwmb-transform-zoom {
+    display: flex;
+    flex-direction: column;
+    gap: var(--filroden-space-xs);
+}
+
+.fwmb-transform-dpad {
+    display: grid;
+    grid-template-columns: repeat(3, 36px);
+    grid-template-rows: repeat(3, 36px);
+    gap: 4px;
+}
+
+.fwmb-transform-dpad button {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+.fwmb-transform-dpad .dpad-up { grid-column: 2; grid-row: 1; }
+.fwmb-transform-dpad .dpad-left { grid-column: 1; grid-row: 2; }
+.fwmb-transform-dpad .dpad-center { grid-column: 2; grid-row: 2; }
+.fwmb-transform-dpad .dpad-right { grid-column: 3; grid-row: 2; }
+.fwmb-transform-dpad .dpad-down { grid-column: 2; grid-row: 3; }
+
+/* CSS Rotations for universal arrow directions */
+.fwmb-rotate-90 { transform: rotate(90deg) scaleX(var(--filroden-dir-flip)); }
+.fwmb-rotate-270 { transform: rotate(270deg) scaleX(var(--filroden-dir-flip)); }
+
+/* Map Studio Log Presentation Table Layers */
+.fwmb-journal-summary {
+    padding: var(--space-m);
+}
+
+.fwmb-summary-title {
+    margin-top: 1.5rem;
+    border-bottom: 1px solid var(--color-border-dark);
+    padding-bottom: 4px;
+    color: var(--color-text-light-heading);
+}
+
+.fwmb-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+}
+
+.fwmb-summary-table th {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-bottom: 2px solid var(--color-border-dark);
+    padding: 8px;
+    text-align: left;
+}
+
+.fwmb-summary-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.fwmb-summary-table tr:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.fwmb-mono {
+    font-family: var(--font-mono, monospace);
+    color: var(--color-shadow-highlight, #ffaa00);
+}
+
+.fwmb-capitalize {
     text-transform: capitalize;
 }
 
-.fwmb-legend-swatch {
-    width: var(--filroden-space-l); 
-    height: var(--filroden-space-l);
-    border: 1px solid var(--filroden-color-border);
-    border-radius: var(--filroden-radius-small);
-}
-
-/* ===================================================================
-   --- MAP MANAGER ---
-=================================================================== */
-
-.fwmb .fwmb-map-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--filroden-space-s);
-    max-height: 300px;
-    overflow-y: auto;
-    padding-inline-end: var(--filroden-space-xs); /* Scrollbar buffer */
-}
-
-.fwmb .fwmb-map-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--filroden-color-bg-medium-solid);
-    border: 1px solid var(--filroden-color-border);
-    border-radius: var(--filroden-radius-small);
-    padding: var(--filroden-space-xs) var(--filroden-space-s);
-}
-
-.fwmb .fwmb-map-name {
-    font-weight: bold;
-    color: var(--filroden-color-text-main-solid);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-}
-
-.fwmb .fwmb-map-actions {
-    display: flex;
-    gap: var(--filroden-space-xs);
-    flex: 0 0 auto;
-}
-
-.fwmb .fwmb-map-actions button {
-    padding: var(--filroden-space-xxs) var(--filroden-space-xs);
-}
-
-/* ===================================================================
-   --- MANUAL EDITOR PALETTE ---
-=================================================================== */
-
-.fwmb .fwmb-swatch-grid {
-    display: grid;
-    /* Automatically fit as many 4.5rem cards as possible, filling the row */
-    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
-    gap: var(--filroden-space-s);
-}
-
-.fwmb .fwmb-swatch-btn {
-    background: var(--filroden-color-bg-medium-solid);
-    border: 1px solid var(--filroden-color-border);
-    border-radius: var(--filroden-radius-small);
-    display: flex;
-    flex-direction: column;
-    height: auto;
-    align-items: center;
-    padding: var(--filroden-space-xs);
-    cursor: pointer;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-}
-
-.fwmb .fwmb-swatch-btn:hover {
-    background: var(--filroden-color-bg-light-solid);
-    border-color: var(--filroden-color-text-muted-solid);
-}
-
-/* The visual color block inside the card */
-.fwmb .fwmb-swatch-color {
+/* 3D Visualisation Container */
+.fwmb-3d-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
-    height: 2rem;
-    border-radius: var(--filroden-radius-small);
-    margin-block-end: var(--filroden-space-xs);
-    border: 1px solid rgba(0, 0, 0, 0.4);
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+    height: 100%;
+    z-index: 10; /* Ensures it covers PIXI but remains under UI panels (z-index: 100+) */
+    background-color: #689cd1;
 }
 
-.fwmb .fwmb-swatch-label {
+/* Manage Maps Card UI */
+.fwmb-panel-header h3 {
+    font-weight: bold;
+    color: var(--filroden-color-text-accent);
+    font-size: var(--filroden-font-size-s);
+    margin: var(--filroden-space-l) var(--filroden-space-m);
+}
+
+.fwmb-map-list {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: var(--filroden-space-s);
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+.fwmb-map-card {
+    background: var(--filroden-color-bg-light-solid);
+    border: 1px solid var(--filroden-color-text-accent);
+    border-radius: var(--filroden-radius-medium);
+    padding: var(--filroden-space-m);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--filroden-shadow-card);
+}
+
+.fwmb-map-card-info {
     font-size: var(--filroden-font-size-xs);
     color: var(--filroden-color-text-main-solid);
-    text-transform: capitalize;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: 100%;
-    text-align: center;
-}
-
-/* The active state managed by our #onSelectBiome action */
-.fwmb .fwmb-swatch-btn.active {
-    border-color: var(--filroden-color-text-accent);
-    box-shadow: 0 0 0 1px var(--filroden-color-text-accent);
-    background: var(--filroden-color-bg-light-solid);
-}
-
-.fwmb .fwmb-swatch-btn.active .fwmb-swatch-label {
-    color: var(--filroden-color-text-accent);
     font-weight: bold;
+}
+
+.fwmb-map-card-actions {
+    display: flex;
+    gap: var(--filroden-space-s);
+}
+
+/* Base button styling for Load and Kebab */
+.fwmb-map-card-actions > button,
+.fwmb-dropdown > button {
+    width: var(--filroden-space-xxl);
+    height: var(--filroden-space-xxl);
+    padding: 0;
+    display: flex;
+    justify-content: inline-start;
+    align-items: center;
+    border: 1px solid var(--filroden-color-border-dark);
+    border-radius: var(--filroden-radius-medium);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.fwmb-map-card-actions > button:hover,
+.fwmb-dropdown > button:hover {
+    background: var(--filroden-color-bg-hover);
+}
+
+/* ==========================================
+   Pure CSS Context Menu (No JS Required) 
+========================================== */
+.fwmb-dropdown {
+    position: relative;
+    outline: none; /* Prevents blue focus ring when clicking kebab */
+}
+
+.fwmb-dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: var(--filroden-space-s);
+    background: var(--filroden-color-bg-darkest);
+    border: 1px solid var(--filroden-color-border-light);
+    border-radius: 4px;
+    box-shadow: var(--filroden-shadow-popout);
+    flex-direction: column;
+    min-width: 160px;
+    z-index: 100;
+}
+
+/* Automatically reveals menu when the user clicks the kebab button */
+.fwmb-dropdown:focus-within .fwmb-dropdown-menu {
+    display: flex;
+}
+
+.fwmb-dropdown-menu button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--filroden-space-s);
+    padding: var(--filroden-space-m) var(--filroden-space-l);
+    background: transparent;
+    border: none;
+    color: var(--filroden-color-text-main-solid);
+    border-radius: 0;
+    cursor: pointer;
+    font-size: var(--filroden-font-size-m);
+}
+
+.fwmb-dropdown-menu button:hover {
+    background: var(--filroden-color-bg-hover);
+}
+
+.fwmb-dropdown-menu button.fwmb-danger {
+    color: var(--filroden-color-danger);
+}
+
+.fwmb-dropdown-menu button.fwmb-danger:hover {
+    background: rgba(255, 0, 0, 0.15);
 }

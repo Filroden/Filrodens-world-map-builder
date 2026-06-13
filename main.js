@@ -1,29 +1,33 @@
-import { FILRODENSHEX } from "./src/config.js";
-import { registerSceneControls } from "./src/hooks/sceneControls.js";
-import { TerrainGeneratorApp } from "./src/applications/TerrainGeneratorApp.js";
-import { HexCrafterLayer } from "./src/canvas/CanvasLayer.js";
+import { FILRODENSWMB } from "./src/config.js";
+import { registerSidebarInjection } from "./src/hooks/sidebar-injection.js";
 import { initializeCompendium } from "./src/data/compendium.js";
-import { MapManagerApp } from "./src/applications/MapManagerApp.js";
-import { ManualEditorApp } from "./src/applications/ManualEditorApp.js";
 
-Hooks.once("init", () => {
-    game.filrodenshex = {
-        config: FILRODENSHEX,
-        terrainGenerator: new TerrainGeneratorApp(),
-        mapManager: new MapManagerApp(),
-        manualEditor: new ManualEditorApp(),
+Hooks.once("init", async () => {
+    game.filrodenswmb = {
+        config: FILRODENSWMB,
     };
 
-    // Register the custom PIXI layer
-    CONFIG.Canvas.layers.hexCrafter = {
-        group: "interface",
-        layerClass: HexCrafterLayer,
-    };
+    // Pre-load Handlebars partials so the UI can construct itself dynamically
+    await foundry.applications.handlebars.loadTemplates([
+        "modules/filrodens-world-map-builder/templates/toolbar.hbs",
+        "modules/filrodens-world-map-builder/templates/context.hbs",
+        "modules/filrodens-world-map-builder/templates/map.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-scene.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-terrain.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-features.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-biomes.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-infrastructure.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-regions.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-maps.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-settings.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-manage.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
+        "modules/filrodens-world-map-builder/templates/journal-summary.hbs",
+    ]);
 
-    registerSceneControls();
+    registerSidebarInjection();
 });
 
 Hooks.once("ready", async () => {
-    // Ensure the compendium exists on world load
     await initializeCompendium();
 });

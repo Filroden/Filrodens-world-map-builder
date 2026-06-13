@@ -1,0 +1,193 @@
+<div class="fwmb-journal-summary">
+    <h2>{{localize "FILRODENSWMB.JOURNAL.Title"}}</h2>
+    <p>{{localize "FILRODENSWMB.JOURNAL.Description"}}</p>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.SectionCanvas"}}</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Property"}}</th>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Value"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.Seed"}}</strong></td>
+                <td class="fwmb-mono">{{seed}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.Resolution"}}</strong></td>
+                <td>{{mapWidth}} &times; {{mapHeight}} pixels</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.Grid"}}</strong></td>
+                <td class="fwmb-capitalize">{{gridType}} ({{gridSize}}px)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.SectionTopography"}}</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Property"}}</th>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Value"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.SeaLevel"}}</strong></td>
+                <td>{{params.seaLevel}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.NoiseOffset"}}</strong></td>
+                <td>{{params.noise.offsetX}}px, {{params.noise.offsetY}}px</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevScale"}}</strong></td>
+                <td>{{params.noise.elevation.scale}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevOctaves"}}</strong></td>
+                <td>{{params.noise.elevation.octaves}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevStretch"}}</strong></td>
+                <td>{{params.noise.elevation.stretch}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.SectionClimate"}}</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Property"}}</th>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Value"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.TempBase"}}</strong></td>
+                <td>{{params.globalTemp}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.MoistBase"}}</strong></td>
+                <td>{{params.globalMoisture}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.SeasonOffset"}}</strong></td>
+                <td>{{params.seasonOffset}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.Latitudes"}}</strong></td>
+                <td>Top: {{params.latTop}}&deg; / Bottom: {{params.latBottom}}&deg;</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.MoistScale"}}</strong></td>
+                <td>{{params.noise.moisture.scale}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.MoistOctaves"}}</strong></td>
+                <td>{{params.noise.moisture.octaves}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.TempScale"}}</strong></td>
+                <td>{{params.noise.temperature.scale}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.TempOctaves"}}</strong></td>
+                <td>{{params.noise.temperature.octaves}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.SectionHydrology"}}</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Property"}}</th>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Value"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.RiverDensity"}}</strong></td>
+                <td>{{params.riverDensity}}%</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.MaxLakeSize"}}</strong></td>
+                <td>{{params.hydrology.maxLakeSize}} pixels</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.SpringAltOffset"}}</strong></td>
+                <td>{{params.hydrology.springAltOffset}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.SpringMoistMin"}}</strong></td>
+                <td>{{params.hydrology.springMoistMin}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.MeanderJitter"}}</strong></td>
+                <td>{{params.hydrology.meanderJitter}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.AltCooling"}}</strong></td>
+                <td>{{params.climate.altCooling}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FreezingThreshold"}}</strong></td>
+                <td>{{params.climate.freezingThreshold}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.SectionDisplay"}}</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Property"}}</th>
+                <th>{{localize "FILRODENSWMB.JOURNAL.Value"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.UI.ContourInterval"}}</strong></td>
+                <td>{{params.display.contourInterval}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.AlphaActive"}}</strong></td>
+                <td>{{params.display.biomeAlphaActive}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.AlphaInactive"}}</strong></td>
+                <td>{{params.display.biomeAlphaInactive}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.SectionBiomePalette"}}</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>{{localize "FILRODENSWMB.JOURNAL.BiomeClassification"}}</th>
+                <th>{{localize "FILRODENSWMB.JOURNAL.HexValue"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each journalColors}}
+                <tr>
+                    <td><strong>{{localize this.label}}</strong></td>
+                    <td class="fwmb-mono" style="display: flex; align-items: center; gap: 8px;">
+                        <span style="display: inline-block; width: 16px; height: 16px; background-color: {{this.hex}}; border: 1px solid var(--color-border-dark);"></span>
+                        {{this.hex}}
+                    </td>
+                </tr>
+            {{else}}
+                <tr>
+                    <td colspan="2" style="font-style: italic;">{{localize "FILRODENSWMB.JOURNAL.StandardPalette"}}</td>
+                </tr>
+            {{/each}}
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,59 @@
+<div class="fwmb-tool-content">
+    <div class="fwmb-panel-header">
+        <h3>{{localize "FILRODENSWMB.UI.SavedMaps"}}</h3>
+    </div>
+
+    <div class="fwmb-map-list">
+        {{#each savedMaps}}
+            <div class="fwmb-map-card" data-id="{{this.id}}">
+                <div class="fwmb-map-card-info">
+                    {{this.name}}
+                </div>
+
+                <div class="fwmb-map-card-actions">
+                    <button type="button" data-action="manageMap" data-action-type="load" data-tooltip="{{localize 'FILRODENSWMB.UI.Load'}}">
+                        <i class="fwmb-icon file-open"></i>
+                    </button>
+
+                    <div class="fwmb-dropdown" tabindex="0">
+                        <button type="button" data-tooltip="Options">
+                            <i class="fwmb-icon more-vert"></i>
+                        </button>
+
+                        <div class="fwmb-dropdown-menu">
+                            <button type="button" data-action="manageMap" data-action-type="rename">
+                                <i class="fwmb-icon edit"></i>
+                                {{localize "FILRODENSWMB.UI.Rename"}}
+                            </button>
+                            <button type="button" data-action="manageMap" data-action-type="duplicate">
+                                <i class="fwmb-icon content-copy"></i>
+                                {{localize "FILRODENSWMB.UI.Duplicate"}}
+                            </button>
+                            <button type="button" data-action="manageMap" data-action-type="export">
+                                <i class="fwmb-icon file-export"></i>
+                                {{localize "FILRODENSWMB.UI.Export"}}
+                            </button>
+                            <div class="fwmb-divider"></div>
+                            <button type="button" data-action="manageMap" data-action-type="delete" class="fwmb-danger">
+                                <i class="fwmb-icon delete"></i>
+                                {{localize "FILRODENSWMB.UI.Delete"}}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        {{else}}
+            <div class="fwmb-empty-state">
+                <p>{{localize "FILRODENSWMB.UI.NoSavedMaps"}}</p>
+            </div>
+        {{/each}}
+    </div>
+
+    <div class="fwmb-divider"></div>
+
+    <button type="button" data-action="importMapJson" style="width: auto; padding: 0 8px;">
+        <i class="fwmb-icon upload-file"></i>
+        {{localize "FILRODENSWMB.UI.ImportJSON"}}
+    </button>
+</div>

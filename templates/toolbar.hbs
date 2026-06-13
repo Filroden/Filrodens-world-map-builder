@@ -1,0 +1,47 @@
+<div>
+
+    <button type="button" data-action="changeTool" data-tool="scene" data-tooltip="{{localize 'FILRODENSWMB.UI.SceneTool'}}" class="{{#if (eq activeTool 'scene')}}active{{/if}}">
+        <i class="fwmb-icon grid-on"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="terrain" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolTerrain'}}" class="{{#if (eq activeTool 'terrain')}}active{{/if}}">
+        <i class="fwmb-icon landscape"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="biomes" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolBiomes'}}" class="{{#if (eq activeTool 'biomes')}}active{{/if}}">
+        <i class="fwmb-icon forest"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="features" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolFeatures'}}" class="{{#if (eq activeTool 'features')}}active{{/if}}">
+        <i class="fwmb-icon water-drop"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="infrastructure" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolInfrastructure'}}" class="{{#if (eq activeTool 'infrastructure')}}active{{/if}}">
+        <i class="fwmb-icon location-city"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="regions" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegions'}}" class="{{#if (eq activeTool 'regions')}}active{{/if}}">
+        <i class="fwmb-icon layers"></i>
+    </button>
+
+    <div class="fwmb-flex-1"></div>
+    <div class="fwmb-divider"></div>
+
+    <button type="button" data-action="threeDView" data-tooltip="{{localize 'FILRODENSWMB.UI.ThreeDView'}}">
+        <i class="fwmb-icon three-d"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="settings" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSettings'}}" class="{{#if (eq activeTool 'settings')}}active{{/if}}">
+        <i class="fwmb-icon tune"></i>
+    </button>
+
+    <div class="fwmb-divider"></div>
+
+    <button type="button" data-action="saveMap" data-tooltip="{{localize 'FILRODENSWMB.UI.SaveMap'}}">
+        <i class="fwmb-icon save"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="manage" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolManage'}}" class="{{#if (eq activeTool 'manage')}}active{{/if}}">
+        <i class="fwmb-icon folder-open"></i>
+    </button>
+</div>

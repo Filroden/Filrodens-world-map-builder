@@ -1,0 +1,198 @@
+export class BrushEngine {
+    constructor(mapWidth, mapHeight) {
+        this.mapWidth = mapWidth;
+        this.mapHeight = mapHeight;
+
+        this.history = [];
+        this.redoStack = [];
+
+        this.currentStroke = null;
+        this.lastX = null;
+        this.lastY = null;
+    }
+
+    startStroke(layer, tool, size, strength, feather, paintValue = null) {
+        this.currentStroke = {
+            layer,
+            tool,
+            size,
+            strength,
+            feather,
+            paintValue,
+            points: [],
+        };
+
+        this.lastX = null;
+        this.lastY = null;
+        this.redoStack = [];
+    }
+
+    applyBrush(x, y, elevationData, biomeOverrideData, springOverrides, seaLevel) {
+        if (!this.currentStroke) return false;
+        this.#lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, true);
+        return true;
+    }
+
+    endStroke() {
+        if (!this.currentStroke || this.currentStroke.points.length === 0) {
+            this.currentStroke = null;
+            return;
+        }
+
+        this.history.push(this.currentStroke);
+        this.currentStroke = null;
+        this.lastX = null;
+        this.lastY = null;
+    }
+
+    undo() {
+        if (this.history.length === 0) return false;
+        this.redoStack.push(this.history.pop());
+        return true;
+    }
+
+    redo() {
+        if (this.redoStack.length === 0) return false;
+        this.history.push(this.redoStack.pop());
+        return true;
+    }
+
+    replayHistory(elevationData, biomeOverrideData, seaLevel) {
+        for (const stroke of this.history) {
+            this.currentStroke = stroke;
+            this.lastX = null;
+            this.lastY = null;
+
+            for (const pt of stroke.points) {
+                this.#lerpAndStamp(pt.x, pt.y, elevationData, biomeOverrideData, seaLevel, false);
+            }
+        }
+
+        this.currentStroke = null;
+        this.lastX = null;
+        this.lastY = null;
+    }
+
+    // --- Private Interpolation Engine ---
+
+    #lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, shouldRecord) {
+        if (this.lastX === null || this.lastY === null) {
+            if (shouldRecord) this.#recordControlPoint(x, y);
+            this.#stampBrush(x, y, elevationData, biomeOverrideData, seaLevel);
+            this.lastX = x;
+            this.lastY = y;
+            return;
+        }
+
+        const dx = x - this.lastX;
+        const dy = y - this.lastY;
+        const distance = Math.hypot(dx, dy);
+
+        const radius = this.currentStroke.size;
+        const stepSpacing = Math.max(1, radius * 0.25);
+
+        // Accumulator: Required so slow mouse movements eventually trigger a stamp
+        if (distance < stepSpacing) {
+            return;
+        }
+
+        const steps = Math.floor(distance / stepSpacing);
+
+        for (let i = 1; i <= steps; i++) {
+            const lerpFactor = (i * stepSpacing) / distance;
+            const interpX = this.lastX + dx * lerpFactor;
+            const interpY = this.lastY + dy * lerpFactor;
+
+            this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel);
+        }
+
+        if (shouldRecord) {
+            this.#recordControlPoint(x, y);
+        }
+
+        // Leave fractional distance in the accumulator for the next frame
+        const finalLerp = (steps * stepSpacing) / distance;
+        this.lastX = this.lastX + dx * finalLerp;
+        this.lastY = this.lastY + dy * finalLerp;
+    }
+
+    #recordControlPoint(x, y) {
+        const pts = this.currentStroke.points;
+
+        // Aggressive Memory Optimisation: Only save coordinates that jump at least 5 pixels
+        if (pts.length > 0) {
+            const lastPt = pts[pts.length - 1];
+            const dist = Math.hypot(x - lastPt.x, y - lastPt.y);
+            if (dist < 5) return;
+        }
+
+        pts.push({ x: Math.round(x), y: Math.round(y) });
+    }
+
+    // --- Private Rasterisation & Math ---
+
+    #stampBrush(cx, cy, elevationData, biomeOverrideData, seaLevel) {
+        const { layer, size } = this.currentStroke;
+
+        const minX = Math.max(0, Math.floor(cx - size));
+        const maxX = Math.min(this.mapWidth - 1, Math.ceil(cx + size));
+        const minY = Math.max(0, Math.floor(cy - size));
+        const maxY = Math.min(this.mapHeight - 1, Math.ceil(cy + size));
+
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+                const distance = Math.hypot(x - cx, y - cy);
+                if (distance > size) continue;
+
+                const index = y * this.mapWidth + x;
+                const influence = this.#calculateInfluence(distance, size, this.currentStroke.feather);
+
+                if (layer === "terrain") {
+                    this.#applyTerrainMath(index, cx, cy, influence, elevationData);
+                } else if (layer === "biome" && this.currentStroke.tool === "paint" && biomeOverrideData) {
+                    this.#applyBiomeMath(index, x, y, influence, elevationData, biomeOverrideData, seaLevel);
+                }
+            }
+        }
+    }
+
+    #calculateInfluence(distance, size, feather) {
+        const safeFeather = Math.min(feather, 0.99);
+        const coreSize = size * safeFeather;
+        return distance > coreSize ? 1 - (distance - coreSize) / (size - coreSize) : 1;
+    }
+
+    #applyTerrainMath(index, cx, cy, influence, elevationData) {
+        const { tool, strength } = this.currentStroke;
+        const currentElevation = elevationData[index];
+        const modification = strength * influence;
+
+        if (tool === "raise") {
+            elevationData[index] = Math.min(1, currentElevation + modification);
+        } else if (tool === "lower") {
+            elevationData[index] = Math.max(0, currentElevation - modification);
+        } else if (tool === "smooth") {
+            const targetX = Math.max(0, Math.min(this.mapWidth - 1, Math.round(cx)));
+            const targetY = Math.max(0, Math.min(this.mapHeight - 1, Math.round(cy)));
+            const targetElevation = elevationData[targetY * this.mapWidth + targetX];
+
+            elevationData[index] += (targetElevation - currentElevation) * (modification * 0.5);
+        }
+    }
+
+    #applyBiomeMath(index, x, y, influence, elevationData, biomeOverrideData, seaLevel) {
+        const { strength, paintValue, points } = this.currentStroke;
+
+        const probability = strength * 15 * influence;
+        const pseudoRandom = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + points.length) * 43758.5453) % 1;
+
+        if (pseudoRandom < probability) {
+            const isLand = elevationData[index] >= seaLevel;
+            const isWaterBiome = paintValue === 1 || paintValue === 2;
+
+            if (paintValue === 13 || isLand !== isWaterBiome) {
+                biomeOverrideData[index] = paintValue;
+            }
+        }
+    }
+}
