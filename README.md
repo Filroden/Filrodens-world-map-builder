@@ -1,26 +1,35 @@
-# This will be my greatest work
+# Filroden's World Map Builder
 
-## Change
-* Pushing to fvtt? Add PUBLIC_REPO_TOKEN to this new REPO.
-* Edit module.json fields: _id_, _title_, _description_, _styles_, _manifest_ and _download_
-  **ATTENTION** the _id_ needs to be coordinated with changes to both _manifest_ and _download_. 
-* Edit github `.github/workflows/auto-release.yaml` 
-  
-  ```
-    # Replace MODULE-FOUNDRY-ID with the name of module id used in module.json
-    jobs:
-      release:
-        runs-on: ubuntu-latest
-    env:
-        PUBLIC_REPO: Filroden/fvtt
-        PUBLIC_LATEST_RELEASE_TAG: MODULE-FOUNDRY-ID-latest
-        PUBLIC_RELEASE_MSG: Whatever description you want
-        MODULE_ZIP_NAME: MODULE-FOUNDRY-ID.zip
-  ```
-* Edit `.github/workflows/auto-release.yaml` and replace `change-me-to-main` to `main`
-    ```
-    on:
-      push:
-        branches:
-          - change-me-to-main
-    ```
+![Latest Version](https://img.shields.io/badge/Version-1.0.0-alpha1-blue)
+![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
+![RTL Support](https://img.shields.io/badge/RTL-Supported-green)
+![Download Count](https://img.shields.io/github/downloads/Filroden/filrodens-world-map-builder/filrodens-world-map-builder.zip)
+![Download Count](https://img.shields.io/github/downloads/Filroden/filrodens-world-map-builder/latest/filrodens-world-map-builder.zip)
+![Last Commit](https://img.shields.io/github/last-commit/Filroden/filrodens-world-map-builder)
+![Issues](https://img.shields.io/github/issues/Filroden/filrodens-world-map-builder)
+
+## Welcome to Filroden's World Map Builder
+
+> **WARNING** This is a Alpha preview release. As the module develops there is a high chance that the data structure for map saves will evolve. This could mean any maps saved will be lost. Please treat this release as a way to test the concept and provide your feedback on what you would like to see.
+
+> **UNIMPLEMENTED FEATURES** Not all release features are implemented yet. This includes all map features relating to infrastructure, points of interest or social, political or economic regions which will be added in later builds before beta and full release.
+
+### Filroden's World Map Builder - Alpha 1 Preview
+
+Filroden's World Map Builder is a system-agnostic cartography tool. It lets GMs generate, edit, and visualise worlds directly within their campaigns.
+
+Built on a robust, high-performance web architecture, the module blends deterministic mathematical generation with non-destructive, freehand editing.
+
+### Core Features
+
+- **Advanced Procedural Generation**: The underlying engine calculates authentic topography using layered noise and geological stretch parameters. It dynamically simulates climate by mapping global temperature gradients and tracking geographical orographic lift (rain shadows) to accurately determine Whittaker biomes.
+- **Dynamic Hydrology Systems**: Rivers are carved procedurally using greedy downhill algorithms, naturally pooling into lakes until they overflow their basins, and freezing intelligently based on altitude and regional climate thresholds.
+- **Non-Destructive Vector Brush Engine**: Edit the terrain (raising, lowering, smoothing, or painting custom biomes) with a responsive freehand brush tool. Under the hood, edits are saved as a spatial vector history rather than static pixels, preserving your exact strokes for future map scaling and regional zooming.
+- **Interactive 3D Visualisation**: View your 2D cartography in an interactive 3D web view. The biome map is draped over your custom topography, complete with topographical river vectors, ocean planes, and dynamic lighting. This feature is purely visual. It will not update to any changes made until it is toggled again.
+- **Compendium Integration**: Your maps are saved directly to a dedicated compendium. Each save automatically generates a readable journal showing your parameters. The application UI contains map management tools which allow you to easily duplicate, rename, or export your worlds as shareable JSON files.
+
+## Roadmap
+
+I have designed the module so that users will eventually be able to create a world map, then zoom into an area of interest and use it as the new boundaries for a larger-scale, higher detail map containing all the same information. This will allow users to create more detailed maps of continents, countries, regions, etc.

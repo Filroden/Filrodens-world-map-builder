@@ -108,7 +108,7 @@ export class Scene3D {
 
         // 3. Displace Vertices
         const pos = geometry.attributes.position;
-        const altitudeMultiplier = 45;
+        const altitudeMultiplier = 40;
 
         for (let i = 0; i < pos.count; i++) {
             const vx = pos.getX(i);
@@ -141,7 +141,7 @@ export class Scene3D {
             opacity: 0.35,
             depthWrite: false,
             roughness: 0.1,
-            metalness: 0.6,
+            metalness: 0.2,
         });
 
         this.water = new THREE.Mesh(waterGeo, waterMat);
@@ -187,7 +187,7 @@ export class Scene3D {
                     const vz = point.y - height / 2;
 
                     const displayElev = (elevationData[elevIndex] - seaLevel) * altitudeMultiplier;
-                    const vec3 = new THREE.Vector3(vx, displayElev + 1.5, vz);
+                    const vec3 = new THREE.Vector3(vx, displayElev + 0.25, vz);
 
                     if (currentPoints.length === 0) {
                         currentIsFrozen = point.isFrozen;

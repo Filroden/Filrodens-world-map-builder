@@ -2,7 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { StudioCanvas } from "../canvas/StudioCanvas.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
-import { getSavedMaps, loadMapData, saveMapData } from "../data/compendium.js";
+import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
 import { Scene3D } from "../canvas/Scene3D.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -29,6 +29,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             undoBrush: MapStudioApp.#onUndoBrush,
             redoBrush: MapStudioApp.#onRedoBrush,
             saveMap: MapStudioApp.#onSaveMap,
+            manageMap: MapStudioApp.#onManageMapAction,
+            importMapJson: MapStudioApp.#onImportMapJson,
             loadMap: MapStudioApp.#onLoadMapDialog,
             threeDView: MapStudioApp.#onThreeDView,
             toggleLayer: MapStudioApp.#onToggleLayer,
@@ -80,6 +82,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.pinHistory = [];
         this.pinRedoStack = [];
         this.brushEngine = null;
+        this.currentSaveId = null;
+        this.currentSaveName = null;
 
         // Persistent cache to protect slider values when tabs unmount
         this.defaultUiState = {
@@ -157,6 +161,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
+
+            // Inject the compendium list dynamically when navigating to the Manage tab
+            if (this.activeTool === "manage") {
+                context.savedMaps = await getSavedMaps();
+            }
         }
 
         context.uiState = this.uiState;
@@ -793,6 +802,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.currentElevationData = new Float32Array(this.baseElevationData);
         this.currentBiomeOverrides = new Uint8Array(this.mapWidth * this.mapHeight);
         this.currentSpringOverrides = new Uint8Array(this.mapWidth * this.mapHeight);
+
+        // Apply loaded or existing brush strokes immediately so climate and rivers react to them
+        if (this.brushEngine && this.brushEngine.history.length > 0) {
+            this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, this.uiState["seaLevel"]);
+        }
+
         const t1 = performance.now();
 
         console.log(`World Map Builder | Topography calculated in ${Math.round(t1 - t0)}ms`);
@@ -860,14 +875,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Packages the current mathematical state and brush history, and saves it to the compendium.
+     * Context-aware Quick Save.
+     * Creates a new journal if none exists, otherwise overwrites the current ID.
      */
     static async #onSaveMap(event, target) {
-        // Prevent spam-clicking while the database operation resolves
         target.disabled = true;
 
         const { currentSeed, params } = this.#getMapParameters();
-
         const payload = {
             seed: currentSeed,
             mapWidth: this.mapWidth,
@@ -879,28 +893,147 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             mapPins: this.mapPins,
         };
 
-        // Auto-generate a fallback name using the seed string or a random hash
-        const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
+        // If no ID exists, trigger the "Save As" flow
+        if (!this.currentSaveId) {
+            const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
+            const defaultName = `Terrain Map (${hash})`;
 
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const day = String(now.getDate()).padStart(2, "0");
-        const hours = String(now.getHours()).padStart(2, "0");
-        const mins = String(now.getMinutes()).padStart(2, "0");
-        const timestamp = `${year}${month}${day} ${hours}:${mins}`;
+            const mapName = await foundry.applications.api.DialogV2.prompt({
+                window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") },
+                content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${defaultName}">`,
+                ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
+            });
 
-        const mapName = `Terrain Map (${hash}) ${timestamp}`;
+            if (!mapName) {
+                target.disabled = false;
+                return; // User cancelled
+            }
+            this.currentSaveName = mapName;
+        }
 
-        const journal = await saveMapData(mapName, payload);
+        // Save or Overwrite
+        const journal = await saveMapData(this.currentSaveName, payload, this.currentSaveId);
 
         if (journal) {
+            this.currentSaveId = journal.id;
             ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
         } else {
             ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
         }
 
         target.disabled = false;
+    }
+
+    /**
+     * Unified router for the inline CRUD buttons on the Manage Maps cards.
+     */
+    static async #onManageMapAction(event, target) {
+        const action = target.dataset.actionType;
+        const card = target.closest(".fwmb-map-card");
+        if (!action || !card) return;
+
+        const mapId = card.dataset.id;
+
+        switch (action) {
+            case "load": {
+                const payload = await loadMapData(mapId);
+                if (payload) {
+                    this.currentSaveId = mapId;
+                    this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+                    await this.#ingestMapPayload(payload);
+                    ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
+                }
+                break;
+            }
+
+            case "delete": {
+                const confirmed = await foundry.applications.api.DialogV2.confirm({
+                    window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
+                    content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
+                    rejectClose: false,
+                    modal: true,
+                });
+                if (!confirmed) return;
+
+                await deleteSavedMap(mapId);
+                if (this.currentSaveId === mapId) this.currentSaveId = null;
+                this.render({ parts: ["context"] });
+                break;
+            }
+
+            case "rename": {
+                const currentName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+                const newName = await foundry.applications.api.DialogV2.prompt({
+                    window: { title: game.i18n.localize("FILRODENSWMB.UI.Rename") },
+                    content: `<input type="text" id="fwmb-rename" value="${currentName}">`,
+                    ok: { callback: (event, button, dialog) => button.form.elements["fwmb-rename"].value },
+                });
+
+                if (newName && newName !== currentName) {
+                    await renameSavedMap(mapId, newName);
+                    if (this.currentSaveId === mapId) this.currentSaveName = newName;
+                    this.render({ parts: ["context"] });
+                }
+                break;
+            }
+
+            case "duplicate": {
+                await duplicateSavedMap(mapId);
+                this.render({ parts: ["context"] });
+                break;
+            }
+
+            case "export": {
+                const exportData = await loadMapData(mapId);
+                if (!exportData) return;
+
+                const rawName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+                const mapName = rawName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `fwmb_${mapName}.json`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                break;
+            }
+        }
+    }
+
+    /**
+     * Opens a system file dialogue, validates the JSON payload, and imports it to the database.
+     */
+    static async #onImportMapJson(event, target) {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const parsedData = JSON.parse(text);
+
+                // Ultra-light schema validation
+                if (!parsedData.seed || !parsedData.params) {
+                    throw new Error("Invalid FWMB Data Schema");
+                }
+
+                const cleanName = file.name.replace(".json", "").replace("fwmb_", "");
+                await saveMapData(`${cleanName} (Imported)`, parsedData);
+
+                ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ImportSuccess"));
+                this.render({ parts: ["context"] });
+            } catch (err) {
+                console.error("FWMB | Import Failed:", err);
+                ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.ImportError"));
+            }
+        };
+
+        input.click();
     }
 
     static async #onLoadMapDialog(event, target) {
@@ -1007,12 +1140,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#syncDOMToState();
         this.#updateGrid();
 
-        // 7. Await the full mathematical rebuild, then repaint history over the top
+        // 7. Await the full mathematical rebuild. History is now automatically applied inside generateTerrain.
         await this.generateTerrain();
-
-        if (this.brushEngine.history.length > 0) {
-            this.#rebuildFromHistory();
-        }
     }
 
     #syncDOMToState() {

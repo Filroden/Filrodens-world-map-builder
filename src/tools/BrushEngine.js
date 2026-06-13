@@ -11,9 +11,6 @@ export class BrushEngine {
         this.lastY = null;
     }
 
-    /**
-     * Initialises a new continuous brush stroke.
-     */
     startStroke(layer, tool, size, strength, feather, paintValue = null) {
         this.currentStroke = {
             layer,
@@ -27,23 +24,15 @@ export class BrushEngine {
 
         this.lastX = null;
         this.lastY = null;
-        this.redoStack = []; // A new action permanently destroys the redo future
+        this.redoStack = [];
     }
 
-    /**
-     * Evaluates a mouse movement and interpolates intermediate points.
-     */
     applyBrush(x, y, elevationData, biomeOverrideData, springOverrides, seaLevel) {
         if (!this.currentStroke) return false;
-
-        // Perform the interpolation and commit the control point
         this.#lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, true);
         return true;
     }
 
-    /**
-     * Finalises the stroke and commits it to the database history log.
-     */
     endStroke() {
         if (!this.currentStroke || this.currentStroke.points.length === 0) {
             this.currentStroke = null;
@@ -55,8 +44,6 @@ export class BrushEngine {
         this.lastX = null;
         this.lastY = null;
     }
-
-    // --- History Management ---
 
     undo() {
         if (this.history.length === 0) return false;
@@ -70,9 +57,6 @@ export class BrushEngine {
         return true;
     }
 
-    /**
-     * Rebuilds the mathematical arrays from the exact sequence of saved control points.
-     */
     replayHistory(elevationData, biomeOverrideData, seaLevel) {
         for (const stroke of this.history) {
             this.currentStroke = stroke;
@@ -80,7 +64,6 @@ export class BrushEngine {
             this.lastY = null;
 
             for (const pt of stroke.points) {
-                // Replay the interpolation between control points but do NOT record them again
                 this.#lerpAndStamp(pt.x, pt.y, elevationData, biomeOverrideData, seaLevel, false);
             }
         }
@@ -92,9 +75,6 @@ export class BrushEngine {
 
     // --- Private Interpolation Engine ---
 
-    /**
-     * Calculates intermediate coordinates to ensure a solid, unbroken stroke.
-     */
     #lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, shouldRecord) {
         if (this.lastX === null || this.lastY === null) {
             if (shouldRecord) this.#recordControlPoint(x, y);
@@ -108,30 +88,38 @@ export class BrushEngine {
         const dy = y - this.lastY;
         const distance = Math.hypot(dx, dy);
 
-        // Step at 25% of the brush radius to ensure perfectly dense overlap
-        const radius = this.currentStroke.size / 2;
+        const radius = this.currentStroke.size;
         const stepSpacing = Math.max(1, radius * 0.25);
-        const steps = Math.floor(distance / stepSpacing);
 
-        if (steps > 0) {
-            for (let i = 1; i <= steps; i++) {
-                const lerpFactor = i / steps;
-                const interpX = this.lastX + dx * lerpFactor;
-                const interpY = this.lastY + dy * lerpFactor;
-
-                this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel);
-            }
+        // Accumulator: Required so slow mouse movements eventually trigger a stamp
+        if (distance < stepSpacing) {
+            return;
         }
 
-        if (shouldRecord) this.#recordControlPoint(x, y);
-        this.lastX = x;
-        this.lastY = y;
+        const steps = Math.floor(distance / stepSpacing);
+
+        for (let i = 1; i <= steps; i++) {
+            const lerpFactor = (i * stepSpacing) / distance;
+            const interpX = this.lastX + dx * lerpFactor;
+            const interpY = this.lastY + dy * lerpFactor;
+
+            this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel);
+        }
+
+        if (shouldRecord) {
+            this.#recordControlPoint(x, y);
+        }
+
+        // Leave fractional distance in the accumulator for the next frame
+        const finalLerp = (steps * stepSpacing) / distance;
+        this.lastX = this.lastX + dx * finalLerp;
+        this.lastY = this.lastY + dy * finalLerp;
     }
 
     #recordControlPoint(x, y) {
         const pts = this.currentStroke.points;
 
-        // Optimise memory: Only save the control point if it has moved at least 5 pixels
+        // Aggressive Memory Optimisation: Only save coordinates that jump at least 5 pixels
         if (pts.length > 0) {
             const lastPt = pts[pts.length - 1];
             const dist = Math.hypot(x - lastPt.x, y - lastPt.y);
@@ -143,9 +131,6 @@ export class BrushEngine {
 
     // --- Private Rasterisation & Math ---
 
-    /**
-     * Extracts a bounding box and delegates pixels to their respective layer mathematics.
-     */
     #stampBrush(cx, cy, elevationData, biomeOverrideData, seaLevel) {
         const { layer, size } = this.currentStroke;
 
@@ -187,7 +172,6 @@ export class BrushEngine {
         } else if (tool === "lower") {
             elevationData[index] = Math.max(0, currentElevation - modification);
         } else if (tool === "smooth") {
-            // Target the absolute center of the brush to pull surrounding pixels towards it
             const targetX = Math.max(0, Math.min(this.mapWidth - 1, Math.round(cx)));
             const targetY = Math.max(0, Math.min(this.mapHeight - 1, Math.round(cy)));
             const targetElevation = elevationData[targetY * this.mapWidth + targetX];
@@ -199,10 +183,7 @@ export class BrushEngine {
     #applyBiomeMath(index, x, y, influence, elevationData, biomeOverrideData, seaLevel) {
         const { strength, paintValue, points } = this.currentStroke;
 
-        // Map the 0.01-0.05 strength slider into a 15% to 75% per-tick probability limit
         const probability = strength * 15 * influence;
-
-        // Deterministic Pseudo-Random Generator based on the exact saved state
         const pseudoRandom = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + points.length) * 43758.5453) % 1;
 
         if (pseudoRandom < probability) {

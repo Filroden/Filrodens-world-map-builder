@@ -30,7 +30,7 @@
 .fwmb-icon.shuffle              { --fwmb-mask: url('../assets/icons/shuffle.svg'); }
 .fwmb-icon.travel-explore       { --fwmb-mask: url('../assets/icons/travel_explore.svg'); }
 .fwmb-icon.file-open            { --fwmb-mask: url('../assets/icons/file_open.svg'); }
-.fwmb-icon.file-save            { --fwmb-mask: url('../assets/icons/file_save.svg'); }
+.fwmb-icon.save                 { --fwmb-mask: url('../assets/icons/save.svg'); }
 .fwmb-icon.delete               { --fwmb-mask: url('../assets/icons/delete.svg'); }
 .fwmb-icon.brush                { --fwmb-mask: url('../assets/icons/brush.svg'); }
 .fwmb-icon.select               { --fwmb-mask: url('../assets/icons/select.svg'); }
@@ -57,6 +57,11 @@
 .fwmb-icon.ink-eraser           { --fwmb-mask: url('../assets/icons/ink_eraser.svg'); }
 .fwmb-icon.three-d              { --fwmb-mask: url('../assets/icons/3d.svg'); }
 .fwmb-icon.scatter-plot         { --fwmb-mask: url('../assets/icons/scatter_plot.svg'); }
+.fwmb-icon.content-copy         { --fwmb-mask: url('../assets/icons/content_copy.svg'); }
+.fwmb-icon.edit                 { --fwmb-mask: url('../assets/icons/edit.svg'); }
+.fwmb-icon.file-export          { --fwmb-mask: url('../assets/icons/file_export.svg'); }
+.fwmb-icon.upload-file          { --fwmb-mask: url('../assets/icons/upload_file.svg'); }
+.fwmb-icon.more-vert            { --fwmb-mask: url('../assets/icons/more_vert.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
@@ -953,5 +958,119 @@ input.fwmb-biome-swatch {
     width: 100%;
     height: 100%;
     z-index: 10; /* Ensures it covers PIXI but remains under UI panels (z-index: 100+) */
-    background-color: #1a4b84; /* Matches the ocean backdrop */
+    background-color: #689cd1;
+}
+
+/* Manage Maps Card UI */
+.fwmb-panel-header h3 {
+    font-weight: bold;
+    color: var(--filroden-color-text-accent);
+    font-size: var(--filroden-font-size-s);
+    margin: var(--filroden-space-l) var(--filroden-space-m);
+}
+
+.fwmb-map-list {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: var(--filroden-space-s);
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+.fwmb-map-card {
+    background: var(--filroden-color-bg-light-solid);
+    border: 1px solid var(--filroden-color-text-accent);
+    border-radius: var(--filroden-radius-medium);
+    padding: var(--filroden-space-m);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--filroden-shadow-card);
+}
+
+.fwmb-map-card-info {
+    font-size: var(--filroden-font-size-xs);
+    color: var(--filroden-color-text-main-solid);
+    font-weight: bold;
+}
+
+.fwmb-map-card-actions {
+    display: flex;
+    gap: var(--filroden-space-s);
+}
+
+/* Base button styling for Load and Kebab */
+.fwmb-map-card-actions > button,
+.fwmb-dropdown > button {
+    width: var(--filroden-space-xxl);
+    height: var(--filroden-space-xxl);
+    padding: 0;
+    display: flex;
+    justify-content: inline-start;
+    align-items: center;
+    border: 1px solid var(--filroden-color-border-dark);
+    border-radius: var(--filroden-radius-medium);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.fwmb-map-card-actions > button:hover,
+.fwmb-dropdown > button:hover {
+    background: var(--filroden-color-bg-hover);
+}
+
+/* ==========================================
+   Pure CSS Context Menu (No JS Required) 
+========================================== */
+.fwmb-dropdown {
+    position: relative;
+    outline: none; /* Prevents blue focus ring when clicking kebab */
+}
+
+.fwmb-dropdown-menu {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: var(--filroden-space-s);
+    background: var(--filroden-color-bg-darkest);
+    border: 1px solid var(--filroden-color-border-light);
+    border-radius: 4px;
+    box-shadow: var(--filroden-shadow-popout);
+    flex-direction: column;
+    min-width: 160px;
+    z-index: 100;
+}
+
+/* Automatically reveals menu when the user clicks the kebab button */
+.fwmb-dropdown:focus-within .fwmb-dropdown-menu {
+    display: flex;
+}
+
+.fwmb-dropdown-menu button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: var(--filroden-space-s);
+    padding: var(--filroden-space-m) var(--filroden-space-l);
+    background: transparent;
+    border: none;
+    color: var(--filroden-color-text-main-solid);
+    border-radius: 0;
+    cursor: pointer;
+    font-size: var(--filroden-font-size-m);
+}
+
+.fwmb-dropdown-menu button:hover {
+    background: var(--filroden-color-bg-hover);
+}
+
+.fwmb-dropdown-menu button.fwmb-danger {
+    color: var(--filroden-color-danger);
+}
+
+.fwmb-dropdown-menu button.fwmb-danger:hover {
+    background: rgba(255, 0, 0, 0.15);
 }

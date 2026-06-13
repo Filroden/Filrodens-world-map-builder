@@ -41,7 +41,10 @@ export async function getSavedMaps() {
  * Saves the Map Studio's generation parameters and brush history to a new JournalEntry.
  * Generates an embedded human-readable settings page within the text layer.
  */
-export async function saveMapData(mapName, mapDataPayload) {
+/**
+ * Upgraded Save function. If existingId is provided, it overwrites the payload natively.
+ */
+export async function saveMapData(mapName, mapDataPayload, existingId = null) {
     if (!mapDataPayload) return null;
 
     const packName = `world.${FILRODENSWMB.COMPENDIUM.NAME}`;
@@ -50,33 +53,73 @@ export async function saveMapData(mapName, mapDataPayload) {
 
     const cleanPayload = foundry.utils.deepClone(mapDataPayload);
 
-    // Format custom colours for the Handlebars journal template
     cleanPayload.journalColors = Object.entries(cleanPayload.params.customColors || {}).map(([key, rgb]) => {
         const hex = "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
         return { label: `FILRODENSWMB.BIOMES.${key}`, hex: hex };
     });
 
-    // Compile the template into flat text via native engine utilities
     const narrativeHtml = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/journal-summary.hbs", cleanPayload);
 
-    const documentData = {
-        name: mapName || "Untitled Map",
-        pages: [
-            {
-                name: "Generation Settings Log",
-                type: "text",
-                text: {
-                    content: narrativeHtml,
-                    format: CONST.JOURNAL_ENTRY_PAGE_FORMATS.HTML,
-                },
-            },
-        ],
-        flags: {
-            [FILRODENSWMB.ID]: cleanPayload,
+    const pages = [
+        {
+            name: "Cartographic Data",
+            type: "text",
+            text: { content: narrativeHtml, format: 1 },
         },
-    };
+    ];
 
-    return await JournalEntry.create(documentData, { pack: packName });
+    if (existingId) {
+        const doc = await pack.getDocument(existingId);
+        if (doc) {
+            // Strictly overwrite the internal flags and the page content
+            await doc.update({
+                name: mapName,
+                "flags.filrodens-world-map-builder.mapData": mapDataPayload,
+                pages: pages,
+            });
+            return doc;
+        }
+    }
+
+    return await JournalEntry.create(
+        {
+            name: mapName,
+            pages: pages,
+            "flags.filrodens-world-map-builder.mapData": mapDataPayload,
+        },
+        { pack: pack.collection },
+    );
+}
+
+export async function deleteSavedMap(id) {
+    const pack = game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
+    if (!pack) return false;
+    const doc = await pack.getDocument(id);
+    if (!doc) return false;
+    await doc.delete();
+    return true;
+}
+
+export async function renameSavedMap(id, newName) {
+    const pack = game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
+    if (!pack) return false;
+    const doc = await pack.getDocument(id);
+    if (!doc) return false;
+    await doc.update({ name: newName });
+    return true;
+}
+
+export async function duplicateSavedMap(id) {
+    const pack = game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
+    if (!pack) return null;
+    const doc = await pack.getDocument(id);
+    if (!doc) return null;
+
+    const clonedData = doc.toObject();
+    clonedData.name = `${clonedData.name} (Copy)`;
+    delete clonedData._id;
+
+    return await JournalEntry.create(clonedData, { pack: pack.collection });
 }
 
 /**
@@ -89,6 +132,5 @@ export async function loadMapData(documentId) {
 
     const document = await pack.getDocument(documentId);
 
-    // Strict Fix: Bypass getFlag() and read the raw scope object directly
-    return document?.flags?.[FILRODENSWMB.ID] || null;
+    return document?.flags?.[FILRODENSWMB.ID]?.mapData || null;
 }
