@@ -35,6 +35,9 @@ export class StudioCanvas {
         // Instantiate the grid layer
         this.gridLayer = new PIXI.Graphics();
 
+        // Cache for persistent GPU textures to prevent memory churn
+        this.layerSprites = {};
+
         // Add them to the zooming stage in ascending order
         this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.contours, this.layers.features, this.gridLayer);
 
@@ -231,6 +234,7 @@ export class StudioCanvas {
 
     /**
      * Takes a raw RGBA pixel buffer and paints it directly to a specific layer in the stack.
+     * Utilises persistent sprite caching to eliminate VRAM reallocation spikes during live editing.
      */
     renderPixelBuffer(layerId, pixelBuffer, width, height) {
         const targetLayer = this.layers[layerId];
@@ -239,17 +243,28 @@ export class StudioCanvas {
         this.mapWidth = width;
         this.mapHeight = height;
 
-        // Clean only the specific layer being updated
-        for (const child of targetLayer.children) {
-            child.destroy(true);
+        let sprite = this.layerSprites[layerId];
+
+        // Setup the persistent sprite if it does not exist or resolution has changed
+        if (!sprite || sprite.width !== width || sprite.height !== height) {
+            if (sprite) sprite.destroy(true);
+
+            // Create a brand new typed array to decouple from the engine's reference
+            const buffer = new PIXI.BufferResource(new Uint8Array(pixelBuffer), { width, height });
+            const baseTexture = new PIXI.BaseTexture(buffer);
+            const texture = new PIXI.Texture(baseTexture);
+
+            sprite = new PIXI.Sprite(texture);
+            this.layerSprites[layerId] = sprite;
+
+            targetLayer.removeChildren();
+            targetLayer.addChild(sprite);
+        } else {
+            // Strictly mutate the underlying buffer and notify the GPU
+            const resource = sprite.texture.baseTexture.resource;
+            resource.data.set(pixelBuffer);
+            sprite.texture.baseTexture.update();
         }
-
-        const buffer = new PIXI.BufferResource(pixelBuffer, { width, height });
-        const baseTexture = new PIXI.BaseTexture(buffer);
-        const texture = new PIXI.Texture(baseTexture);
-
-        const sprite = new PIXI.Sprite(texture);
-        targetLayer.addChild(sprite);
 
         if (!this.hasGeneratedMap) {
             this.resetCamera();

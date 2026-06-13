@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-1.0.0-alpha1-blue)
+![Latest Version](https://img.shields.io/badge/Version-1.0.0-alpha2-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -15,8 +15,6 @@
 > **WARNING** This is a Alpha preview release. As the module develops there is a high chance that the data structure for map saves will evolve. This could mean any maps saved will be lost. Please treat this release as a way to test the concept and provide your feedback on what you would like to see.
 
 > **UNIMPLEMENTED FEATURES** Not all release features are implemented yet. This includes all map features relating to infrastructure, points of interest or social, political or economic regions which will be added in later builds before beta and full release.
-
-### Filroden's World Map Builder - Alpha 1 Preview
 
 Filroden's World Map Builder is a system-agnostic cartography tool. It generates terrain, moisture and temperatures using a procedural, deterministic model so using the same "seed" will generate the same model. It then calculates appropriate biomes taking into account the latitude and underlying models including wind patterns. You can scale and offset the result to frame a map that is close to your idea so that you can apply the final edits to the world using non-destructive brushes.
 
