@@ -1,7 +1,7 @@
 {
     "id": "filrodens-world-map-builder",
     "title": "Filroden's World Map Builder",
-    "description": "My greatest work",
+    "description": "Filroden's World Map Builder is a system-agnostic cartography tool. It generates terrain, moisture and temperatures using a procedural, deterministic model so using the same `seed` will generate the same model. It then calculates appropriate biomes taking into account the latitude and underlying models including wind patterns. You can scale and offset the result to frame a map that is close to your idea so that you can apply the final edits to the world using non-destructive brushes.",
     "version": "1.0.0-alpha2",
     "compatibility": {
         "minimum": "14",
