@@ -28,6 +28,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             setBrushTool: MapStudioApp.#onSetBrushTool,
             undoBrush: MapStudioApp.#onUndoBrush,
             redoBrush: MapStudioApp.#onRedoBrush,
+            exportPng: MapStudioApp.#onExportPng,
             saveMap: MapStudioApp.#onSaveMap,
             manageMap: MapStudioApp.#onManageMapAction,
             importMapJson: MapStudioApp.#onImportMapJson,
@@ -441,6 +442,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const newTool = target.dataset.tool;
         if (!newTool || this.activeTool === newTool) return;
 
+        // --- Gracefully exit edit mode if active ---
+        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+        if (editToolbar && !editToolbar.classList.contains("fwmb-hidden")) {
+            // Hide the toolbar and end any active strokes
+            editToolbar.classList.add("fwmb-hidden");
+            this.brushEngine?.endStroke();
+
+            // Un-toggle the main edit button
+            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
+            if (editBtn) editBtn.classList.remove("active");
+
+            // Tell the canvas to drop the brush cursor
+            if (this.canvasEngine) this.canvasEngine.setEditMode(false);
+
+            // Unlock the procedural generation inputs
+            const panel = this.element.querySelector(".fwmb-context-panel");
+            if (panel) {
+                const controls = panel.querySelectorAll("fieldset input, fieldset button");
+                for (const control of controls) {
+                    control.disabled = false;
+                }
+                panel.classList.remove("fwmb-locked");
+            }
+        }
+
         this.#getMapParameters();
         this.activeTool = newTool;
 
@@ -469,7 +495,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         // Toggle visibility of specific tool clusters in the floating edit bar
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
         if (editToolbar) {
             editToolbar.querySelectorAll("[data-tool-group]").forEach((el) => {
                 const allowedTools = el.dataset.toolGroup.split(" ");
@@ -614,6 +639,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const overlay = this.element.querySelector("#fwmb-3d-overlay");
         const mapControls = this.element.querySelector(".fwmb-map-controls");
         const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+        const contextPanel = this.element.querySelector(".fwmb-context-panel");
 
         if (!overlay || !this.currentElevationData) return;
 
@@ -625,6 +651,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             target.classList.remove("active");
 
             if (mapControls) mapControls.classList.remove("fwmb-hidden");
+            if (contextPanel) contextPanel.style.display = "";
 
             // Only restore the edit toolbar if the Edit Mode button is actually active
             const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
@@ -640,6 +667,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (mapControls) mapControls.classList.add("fwmb-hidden");
         if (editToolbar) editToolbar.classList.add("fwmb-hidden");
+        if (contextPanel) contextPanel.style.display = "none";
 
         const { params } = this.#getMapParameters();
         const engine = new ProceduralEngine();
@@ -884,6 +912,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // target.closest("button") ensures this works even if the user clicks directly on the <i> icon inside the button.
         const activeBtn = target.closest("button");
         if (activeBtn) activeBtn.classList.add("active");
+    }
+
+    /**
+     * Extracts the currently active canvas state to a PNG.
+     */
+    static async #onExportPng(event, target) {
+        if (!this.canvasEngine || !this.currentElevationData) {
+            ui.notifications.warn("No map is currently generated to export.");
+            return;
+        }
+
+        // Use the saved name if it exists, otherwise default to "Unsaved Map"
+        const mapName = this.currentSaveName || "Unsaved Map";
+
+        ui.notifications.info(game.i18n.format("Exporting {name} to PNG...", { name: mapName }));
+        this.canvasEngine.exportToPNG(mapName);
     }
 
     /**

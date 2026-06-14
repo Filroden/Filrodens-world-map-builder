@@ -143,6 +143,7 @@
     "FILRODENSWMB.UI.Rename": "Rename",
     "FILRODENSWMB.UI.Duplicate": "Duplicate",
     "FILRODENSWMB.UI.Export": "Export JSON",
+    "FILRODENSWMB.UI.ExportPNG": "Export to PNG",
     "FILRODENSWMB.UI.Delete": "Delete",
     "FILRODENSWMB.UI.NoSavedMaps": "No saved maps found in the compendium.",
     "FILRODENSWMB.UI.DeleteConfirm": "Are you sure you want to delete this map?",

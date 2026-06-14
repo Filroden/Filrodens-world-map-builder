@@ -62,6 +62,7 @@
 .fwmb-icon.file-export          { --fwmb-mask: url('../assets/icons/file_export.svg'); }
 .fwmb-icon.upload-file          { --fwmb-mask: url('../assets/icons/upload_file.svg'); }
 .fwmb-icon.more-vert            { --fwmb-mask: url('../assets/icons/more_vert.svg'); }
+.fwmb-icon.image                { --fwmb-mask: url('../assets/icons/image.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {

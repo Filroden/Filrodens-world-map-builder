@@ -479,4 +479,37 @@ export class StudioCanvas {
             }
         }
     }
+
+    /**
+     * Extracts the current PIXI stage and converts it synchronously to a binary Blob.
+     * Triggers a detached link click to bypass Electron's DOM navigation interceptors.
+     */
+    exportToPNG(filename = "world-map") {
+        try {
+            const canvas = this.app.renderer.extract.canvas(this.stage);
+            const dataUrl = canvas.toDataURL("image/png");
+            const byteString = atob(dataUrl.split(",")[1]);
+            const arrayBuffer = new ArrayBuffer(byteString.length);
+            const uintArray = new Uint8Array(arrayBuffer);
+
+            for (let i = 0; i < byteString.length; i++) {
+                uintArray[i] = byteString.codePointAt(i);
+            }
+
+            const blob = new Blob([arrayBuffer], { type: "image/png" });
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = blobUrl;
+
+            const safeName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+            a.download = `fwmb_${safeName}.png`;
+
+            a.click();
+
+            URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            console.error("FWMB | Failed to export PNG:", err);
+            ui.notifications.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
+        }
+    }
 }
