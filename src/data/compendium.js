@@ -71,6 +71,12 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null) {
     if (existingId) {
         const doc = await pack.getDocument(existingId);
         if (doc) {
+            // Target the specific embedded page to ensure Foundry overwrites it
+            const existingPage = doc.pages.contents[0];
+            if (existingPage) {
+                pages[0]._id = existingPage.id;
+            }
+
             // Strictly overwrite the internal flags and the page content
             await doc.update({
                 name: mapName,

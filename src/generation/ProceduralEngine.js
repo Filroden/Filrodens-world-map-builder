@@ -247,9 +247,9 @@ export class ProceduralEngine {
     /**
      * Calculates pure geographical altitude, applying exponents strictly to landmasses.
      */
-    generateTopography(width, height, params) {
+    generateTopography(width, height, params, outBuffer) {
         const totalPixels = width * height;
-        const elevationData = new Float32Array(totalPixels);
+        const elevationData = outBuffer;
 
         const eScale = params.noise.elevation.scale;
         const eOctaves = params.noise.elevation.octaves;
@@ -257,7 +257,7 @@ export class ProceduralEngine {
         const panX = params.noise.offsetX || 0;
         const panY = params.noise.offsetY || 0;
 
-        // THE FIX: Pull seaLevel to use as the mathematical pivot point
+        // Pull seaLevel to use as the mathematical pivot point
         const seaLevel = params.seaLevel || 0.35;
 
         for (let y = 0; y < height; y++) {
@@ -288,10 +288,10 @@ export class ProceduralEngine {
      * Calculates moisture and temperature based on the final topography.
      * Applies globally deterministic Orographic Lift via Western Horizon sampling.
      */
-    generateClimateData(elevationData, width, height, params) {
+    generateClimateData(elevationData, width, height, params, outMoisture, outTemperature) {
         const totalPixels = width * height;
-        const moistureData = new Float32Array(totalPixels);
-        const temperatureData = new Float32Array(totalPixels);
+        const moistureData = outMoisture;
+        const temperatureData = outTemperature;
 
         const panX = params.noise.offsetX || 0;
         const panY = params.noise.offsetY || 0;
@@ -384,9 +384,9 @@ export class ProceduralEngine {
         return { moistureData, temperatureData };
     }
 
-    colorize(elevationData, temperatureData, width, height, seaLevel, waterMask, params) {
+    colorize(elevationData, temperatureData, width, height, seaLevel, waterMask, params, outBuffer) {
         const totalPixels = width * height;
-        const pixelBuffer = new Uint8Array(totalPixels * 4);
+        const pixelBuffer = outBuffer;
 
         for (let i = 0; i < totalPixels; i++) {
             const elevation = elevationData[i];
@@ -459,9 +459,9 @@ export class ProceduralEngine {
     /**
      * VISUAL PASS: Converts mathematical elevation into a pure, flat, binary land/sea map.
      */
-    createBaseMap(elevationData, width, height, seaLevel) {
+    createBaseMap(elevationData, width, height, seaLevel, outBuffer) {
         const totalPixels = width * height;
-        const pixelBuffer = new Uint8Array(totalPixels * 4);
+        const pixelBuffer = outBuffer;
 
         for (let i = 0; i < totalPixels; i++) {
             const isLand = elevationData[i] >= seaLevel;
@@ -486,7 +486,7 @@ export class ProceduralEngine {
     }
 
     /**
-     * SINGLE SOURCE OF TRUTH: Evaluates elevation and climate to determine the precise Biome key.
+     * Evaluates elevation and climate to determine the precise Biome key.
      */
     static getBiomeKey(elevation, moisture, temp, seaLevel) {
         const tempLimits = FILRODENSWMB.CLIMATE.THRESHOLDS.TEMPERATURE;
@@ -536,9 +536,9 @@ export class ProceduralEngine {
     /**
      * VISUAL PASS: Evaluates Temp and Moisture to paint a climate biome map.
      */
-    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params) {
+    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer) {
         const totalPixels = width * height;
-        const pixelBuffer = new Uint8Array(totalPixels * 4);
+        const pixelBuffer = outBuffer;
         const BIOMES = FILRODENSWMB.BIOMES;
 
         for (let i = 0; i < totalPixels; i++) {
@@ -578,13 +578,16 @@ export class ProceduralEngine {
         return pixelBuffer;
     }
 
-    generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params) {
+    generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params, outRiverMap, outWaterMask) {
         const riverDensity = params.riverDensity || 40;
         const seaLevel = params.seaLevel || 0.3;
 
         const rivers = [];
-        const riverMap = new Uint8Array(width * height);
-        const waterMask = new Float32Array(width * height);
+        const riverMap = outRiverMap;
+        const waterMask = outWaterMask;
+
+        riverMap.fill(0);
+        waterMask.fill(0);
 
         // 1. Setup springs
         const { finalSprings, overrideSet, blockedSet } = this.#parseSpringPins(mapPins);
@@ -636,12 +639,12 @@ export class ProceduralEngine {
     }
 
     /**
-     * Generates a flat RGBA buffer containing topographical contour lines.
+     * Extracts topographical contour lines.
      * Uses a high-performance neighbor-thresholding edge detection algorithm.
      */
-    createContourMap(elevationData, width, height, interval, seaLevel) {
-        const buffer = new Uint8Array(width * height * 4);
-        if (!interval || interval <= 0) return buffer;
+    createContourMap(elevationData, width, height, interval, seaLevel, outBuffer) {
+        outBuffer.fill(0); // Wipe the previous contour frame
+        if (!interval || interval <= 0) return outBuffer;
 
         for (let y = 0; y < height - 1; y++) {
             for (let x = 0; x < width - 1; x++) {
@@ -660,13 +663,14 @@ export class ProceduralEngine {
                     const isLand = elev >= seaLevel;
 
                     // Cartographic styling: Dark lines on land, bright lines underwater
-                    buffer[index * 4] = isLand ? 0 : 255; // R
-                    buffer[index * 4 + 1] = isLand ? 0 : 255; // G
-                    buffer[index * 4 + 2] = isLand ? 0 : 255; // B
-                    buffer[index * 4 + 3] = isLand ? 60 : 40; // A (Alpha)
+                    outBuffer[index * 4] = isLand ? 0 : 255; // R
+                    outBuffer[index * 4 + 1] = isLand ? 0 : 255; // G
+                    outBuffer[index * 4 + 2] = isLand ? 0 : 255; // B
+                    outBuffer[index * 4 + 3] = isLand ? 60 : 40; // A (Alpha transparency)
                 }
             }
         }
-        return buffer;
+
+        return outBuffer;
     }
 }

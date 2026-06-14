@@ -28,6 +28,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             setBrushTool: MapStudioApp.#onSetBrushTool,
             undoBrush: MapStudioApp.#onUndoBrush,
             redoBrush: MapStudioApp.#onRedoBrush,
+            exportPng: MapStudioApp.#onExportPng,
             saveMap: MapStudioApp.#onSaveMap,
             manageMap: MapStudioApp.#onManageMapAction,
             importMapJson: MapStudioApp.#onImportMapJson,
@@ -84,6 +85,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.brushEngine = null;
         this.currentSaveId = null;
         this.currentSaveName = null;
+
+        this.#allocateBuffers();
+        this.hasBooted = false;
 
         // Persistent cache to protect slider values when tabs unmount
         this.defaultUiState = {
@@ -285,7 +289,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Ensure all layer toggle buttons visually match the 'visible' canvas state on launch
         // Nested inside the initialisation block so it never fires on tab switches
-        if (!this.currentElevationData) {
+        if (!this.hasBooted) {
+            this.hasBooted = true;
             const layerBtns = this.element.querySelectorAll('[data-action="toggleLayer"]');
             for (const btn of layerBtns) {
                 btn.classList.add("active");
@@ -437,6 +442,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const newTool = target.dataset.tool;
         if (!newTool || this.activeTool === newTool) return;
 
+        // --- Gracefully exit edit mode if active ---
+        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+        if (editToolbar && !editToolbar.classList.contains("fwmb-hidden")) {
+            // Hide the toolbar and end any active strokes
+            editToolbar.classList.add("fwmb-hidden");
+            this.brushEngine?.endStroke();
+
+            // Un-toggle the main edit button
+            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
+            if (editBtn) editBtn.classList.remove("active");
+
+            // Tell the canvas to drop the brush cursor
+            if (this.canvasEngine) this.canvasEngine.setEditMode(false);
+
+            // Unlock the procedural generation inputs
+            const panel = this.element.querySelector(".fwmb-context-panel");
+            if (panel) {
+                const controls = panel.querySelectorAll("fieldset input, fieldset button");
+                for (const control of controls) {
+                    control.disabled = false;
+                }
+                panel.classList.remove("fwmb-locked");
+            }
+        }
+
         this.#getMapParameters();
         this.activeTool = newTool;
 
@@ -465,7 +495,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         // Toggle visibility of specific tool clusters in the floating edit bar
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
         if (editToolbar) {
             editToolbar.querySelectorAll("[data-tool-group]").forEach((el) => {
                 const allowedTools = el.dataset.toolGroup.split(" ");
@@ -545,32 +574,32 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    #repaintCanvas() {
+    async #repaintCanvas() {
+        if (!this.currentElevationData) return;
+
         const seaLevel = this.uiState["seaLevel"];
         const engine = new ProceduralEngine();
         const { params } = this.#getMapParameters();
-
-        // Safely extract the features
-        const waterMask = this.currentRiverData ? this.currentRiverData.waterMask : null;
+        const waterMask = this.bufferWaterMask;
         const riverVectors = this.currentRiverData ? this.currentRiverData.vectors : null;
 
         // 1. Generate and paint the flat Base Map (The underlying foundation)
-        const baseBuffer = engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel);
-        this.canvasEngine.renderPixelBuffer("base", baseBuffer, this.mapWidth, this.mapHeight);
+        engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, this.bufferBase);
+        this.canvasEngine.renderPixelBuffer("base", this.bufferBase, this.mapWidth, this.mapHeight);
 
         const baseBtn = this.element.querySelector('[data-layer="base"]');
         this.canvasEngine.toggleLayer("base", baseBtn ? baseBtn.classList.contains("active") : true);
 
         // 2. Generate and paint the shaded Topography
-        const topBuffer = engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params);
-        this.canvasEngine.renderPixelBuffer("topography", topBuffer, this.mapWidth, this.mapHeight);
+        engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography);
+        this.canvasEngine.renderPixelBuffer("topography", this.bufferTopography, this.mapWidth, this.mapHeight);
 
         const topoBtn = this.element.querySelector('[data-layer="topography"]');
         this.canvasEngine.toggleLayer("topography", topoBtn ? topoBtn.classList.contains("active") : true);
 
         // 3. Generate and paint the Whittaker Biomes
         if (this.currentMoistureData && this.currentTemperatureData) {
-            const biomeBuffer = engine.createBiomesMap(
+            engine.createBiomesMap(
                 this.currentElevationData,
                 this.currentMoistureData,
                 this.currentTemperatureData,
@@ -580,8 +609,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 seaLevel,
                 waterMask,
                 params,
+                this.bufferBiomes,
             );
-            this.canvasEngine.renderPixelBuffer("biomes", biomeBuffer, this.mapWidth, this.mapHeight);
+            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
 
             const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
             this.canvasEngine.toggleLayer("biomes", biomesBtn ? biomesBtn.classList.contains("active") : true);
@@ -589,13 +619,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // 4 Generate and paint Cartographic Contours
         const contourInterval = this.uiState["contourInterval"];
-        if (contourInterval > 0) {
-            const contourBuffer = engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel);
-            this.canvasEngine.renderPixelBuffer("contours", contourBuffer, this.mapWidth, this.mapHeight);
-
-            const contourBtn = this.element.querySelector('[data-layer="contours"]');
-            this.canvasEngine.toggleLayer("contours", contourBtn ? contourBtn.classList.contains("active") : true);
-        }
+        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours);
+        this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight);
 
         // 5. Draw Vector Graphics (Rivers and POI Pins)
         if (riverVectors) {
@@ -614,6 +639,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const overlay = this.element.querySelector("#fwmb-3d-overlay");
         const mapControls = this.element.querySelector(".fwmb-map-controls");
         const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+        const contextPanel = this.element.querySelector(".fwmb-context-panel");
 
         if (!overlay || !this.currentElevationData) return;
 
@@ -625,6 +651,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             target.classList.remove("active");
 
             if (mapControls) mapControls.classList.remove("fwmb-hidden");
+            if (contextPanel) contextPanel.style.display = "";
 
             // Only restore the edit toolbar if the Edit Mode button is actually active
             const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
@@ -640,6 +667,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (mapControls) mapControls.classList.add("fwmb-hidden");
         if (editToolbar) editToolbar.classList.add("fwmb-hidden");
+        if (contextPanel) contextPanel.style.display = "none";
 
         const { params } = this.#getMapParameters();
         const engine = new ProceduralEngine();
@@ -647,7 +675,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const waterMask = this.currentRiverData ? this.currentRiverData.waterMask : null;
 
         // Generate a pristine Biome buffer specifically for the 3D drape.
-        const biomeBuffer = engine.createBiomesMap(
+        const biomeBuffer = new Uint8Array(this.mapWidth * this.mapHeight * 4);
+        engine.createBiomesMap(
             this.currentElevationData,
             this.currentMoistureData,
             this.currentTemperatureData,
@@ -657,6 +686,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             seaLevel,
             waterMask,
             params,
+            biomeBuffer,
         );
 
         // Instantiate and boot the orchestrator
@@ -696,10 +726,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Highly performant pipeline to rebuild the canvas strictly from the event history.
      */
-    #rebuildFromHistory() {
-        this.currentElevationData = new Float32Array(this.baseElevationData);
-        this.currentBiomeOverrides = new Uint8Array(this.mapWidth * this.mapHeight);
-        this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, this.uiState["seaLevel"]);
+    async #rebuildFromHistory() {
+        const { params } = this.#getMapParameters();
+
+        this.currentElevationData.set(this.baseElevationData);
+        this.currentBiomeOverrides.fill(0);
+        this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel);
 
         this.#repaintCanvas();
         this.debouncedGenerateClimate();
@@ -775,6 +807,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Apply new limits
         this.mapWidth = newWidth;
         this.mapHeight = newHeight;
+        this.#allocateBuffers();
+
         this.uiState.mapWidth = newWidth;
         this.uiState.mapHeight = newHeight;
 
@@ -785,8 +819,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.pinRedoStack = [];
 
         // Triggers a complete top-to-bottom recalculation
-        this.generateTerrain();
+        await this.generateTerrain();
         this.#updateGrid();
+        this.canvasEngine.resetCamera();
     }
 
     /**
@@ -794,44 +829,40 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Called automatically via debounced input events on the sliders.
      */
     async generateTerrain() {
-        const { currentSeed, params } = this.#getMapParameters();
-        const engine = new ProceduralEngine(currentSeed);
+        const { params } = this.#getMapParameters();
+        const engine = new ProceduralEngine();
 
+        console.log("World Map Builder | Generating Topography...");
         const t0 = performance.now();
-        this.baseElevationData = engine.generateTopography(this.mapWidth, this.mapHeight, params);
-        this.currentElevationData = new Float32Array(this.baseElevationData);
-        this.currentBiomeOverrides = new Uint8Array(this.mapWidth * this.mapHeight);
-        this.currentSpringOverrides = new Uint8Array(this.mapWidth * this.mapHeight);
 
-        // Apply loaded or existing brush strokes immediately so climate and rivers react to them
-        if (this.brushEngine && this.brushEngine.history.length > 0) {
-            this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, this.uiState["seaLevel"]);
-        }
+        // 1. Generate base mathematical topography
+        engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData);
+
+        // 2. Clone the base array and stamp all brush edits onto it
+        await this.#rebuildFromHistory();
+
+        this.currentSpringOverrides.fill(0);
 
         const t1 = performance.now();
+        console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
 
-        console.log(`World Map Builder | Topography calculated in ${Math.round(t1 - t0)}ms`);
-
-        // Chain the climate generation automatically after topography finishes
+        // 3. Proceed to climate calculation using the newly edited topography
         await this.generateClimate();
     }
 
     async generateClimate() {
         if (!this.currentElevationData) return;
+        const { params } = this.#getMapParameters();
+        const engine = new ProceduralEngine();
 
-        const { currentSeed, params } = this.#getMapParameters();
-        const engine = new ProceduralEngine(currentSeed);
-
+        console.log("World Map Builder | Generating Climate Data...");
         const t0 = performance.now();
-        const climateData = engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params);
 
-        this.currentMoistureData = climateData.moistureData;
-        this.currentTemperatureData = climateData.temperatureData;
+        engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params, this.currentMoistureData, this.currentTemperatureData);
+
         const t1 = performance.now();
+        console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
 
-        console.log(`World Map Builder | Climate calculated in ${Math.round(t1 - t0)}ms`);
-
-        // Chain the final features generation automatically
         await this.generateFeatures();
     }
 
@@ -839,20 +870,29 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Final step in the procedural chain. Calculates water flow and spawns vectors.
      */
     async generateFeatures() {
-        if (!this.currentElevationData || !this.currentMoistureData || !this.currentTemperatureData) return;
+        if (!this.currentElevationData) return;
+        const { params } = this.#getMapParameters();
+        const engine = new ProceduralEngine();
 
-        const { currentSeed, params } = this.#getMapParameters();
-        const engine = new ProceduralEngine(currentSeed);
-
+        console.log("World Map Builder | Generating Features...");
         const t0 = performance.now();
-        this.currentRiverData = engine.generateRivers(this.currentElevationData, this.currentMoistureData, this.currentTemperatureData, this.mapPins, this.mapWidth, this.mapHeight, params);
+
+        this.currentRiverData = engine.generateRivers(
+            this.currentElevationData,
+            this.currentMoistureData,
+            this.currentTemperatureData,
+            this.mapPins,
+            this.mapWidth,
+            this.mapHeight,
+            params,
+            this.bufferRiverMap,
+            this.bufferWaterMask,
+        );
+
         const t1 = performance.now();
+        console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
 
-        console.log(`World Map Builder | Rivers calculated in ${Math.round(t1 - t0)}ms`);
-
-        if (this.canvasEngine) {
-            this.#repaintCanvas();
-        }
+        await this.#repaintCanvas();
     }
 
     /**
@@ -872,6 +912,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // target.closest("button") ensures this works even if the user clicks directly on the <i> icon inside the button.
         const activeBtn = target.closest("button");
         if (activeBtn) activeBtn.classList.add("active");
+    }
+
+    /**
+     * Extracts the currently active canvas state to a PNG.
+     */
+    static async #onExportPng(event, target) {
+        if (!this.canvasEngine || !this.currentElevationData) {
+            ui.notifications.warn("No map is currently generated to export.");
+            return;
+        }
+
+        // Use the saved name if it exists, otherwise default to "Unsaved Map"
+        const mapName = this.currentSaveName || "Unsaved Map";
+
+        ui.notifications.info(game.i18n.format("Exporting {name} to PNG...", { name: mapName }));
+        this.canvasEngine.exportToPNG(mapName);
     }
 
     /**
@@ -1094,6 +1150,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.gridType = payload.gridType || "square";
         this.uiState.gridSize = payload.gridSize || 100;
 
+        this.#allocateBuffers();
+
         // Rebuild the brush engine to match the newly loaded spatial coordinates
         this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
 
@@ -1142,6 +1200,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // 7. Await the full mathematical rebuild. History is now automatically applied inside generateTerrain.
         await this.generateTerrain();
+        this.canvasEngine.resetCamera();
     }
 
     #syncDOMToState() {
@@ -1208,5 +1267,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             inputY.value = this.defaultUiState["noise.offsetY"];
             inputX.dispatchEvent(new Event("input", { bubbles: true }));
         }
+    }
+
+    #allocateBuffers() {
+        const totalPixels = this.mapWidth * this.mapHeight;
+
+        // 1D Mathematical Arrays
+        this.baseElevationData = new Float32Array(totalPixels);
+        this.currentElevationData = new Float32Array(totalPixels);
+        this.currentMoistureData = new Float32Array(totalPixels);
+        this.currentTemperatureData = new Float32Array(totalPixels);
+        this.currentBiomeOverrides = new Uint8Array(totalPixels);
+        this.currentSpringOverrides = new Uint8Array(totalPixels);
+        this.bufferRiverMap = new Uint8Array(totalPixels);
+        this.bufferWaterMask = new Float32Array(totalPixels);
+
+        // RGBA Visual Rendering Buffers (4 bytes per pixel)
+        this.bufferBase = new Uint8Array(totalPixels * 4);
+        this.bufferTopography = new Uint8Array(totalPixels * 4);
+        this.bufferBiomes = new Uint8Array(totalPixels * 4);
+        this.bufferContours = new Uint8Array(totalPixels * 4);
     }
 }
