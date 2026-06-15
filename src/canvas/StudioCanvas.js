@@ -24,6 +24,9 @@ export class StudioCanvas {
             biomes: new PIXI.Container(),
             contours: new PIXI.Container(),
             features: new PIXI.Container(),
+            infrastructure: new PIXI.Container(),
+            regions: new PIXI.Container(),
+            labels: new PIXI.Container(),
         };
 
         this.layers.biomes.alpha = 0.65;
@@ -32,6 +35,12 @@ export class StudioCanvas {
         this.vectorGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.vectorGraphics);
 
+        // Infrastructure specific containers to enforce strict z-index (lines below pins)
+        this.routeGraphics = new PIXI.Graphics();
+        this.pinContainer = new PIXI.Container();
+        this.layers.infrastructure.addChild(this.routeGraphics);
+        this.layers.infrastructure.addChild(this.pinContainer);
+
         // Instantiate the grid layer
         this.gridLayer = new PIXI.Graphics();
 
@@ -39,7 +48,17 @@ export class StudioCanvas {
         this.layerSprites = {};
 
         // Add them to the zooming stage in ascending order
-        this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.contours, this.layers.features, this.gridLayer);
+        this.stage.addChild(
+            this.layers.base,
+            this.layers.topography,
+            this.layers.biomes,
+            this.layers.contours,
+            this.layers.features,
+            this.layers.regions,
+            this.layers.infrastructure,
+            this.layers.labels,
+            this.gridLayer,
+        );
 
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };
@@ -511,5 +530,133 @@ export class StudioCanvas {
             console.error("FWMB | Failed to export PNG:", err);
             ui.notifications.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
         }
+    }
+
+    /**
+     * Generates a smooth array of coordinates through the provided points using a Catmull-Rom spline.
+     */
+    #getSplinePoints(points, resolution = 20) {
+        if (!points || points.length < 2) return points;
+        if (points.length === 2) return points;
+
+        const curve = [];
+
+        // To make the spline pass exactly through the first and last points without snapping,
+        // we duplicate the start and end nodes to act as invisible control anchors.
+        const p = [points[0], ...points, points[points.length - 1]];
+
+        for (let i = 1; i < p.length - 2; i++) {
+            const p0 = p[i - 1];
+            const p1 = p[i];
+            const p2 = p[i + 1];
+            const p3 = p[i + 2];
+
+            for (let t = 0; t <= 1; t += 1 / resolution) {
+                const t2 = t * t;
+                const t3 = t2 * t;
+
+                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+
+                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+
+                // Prevent pushing microscopic overlapping coordinates
+                if (curve.length > 0) {
+                    const last = curve.at(-1);
+                    if (Math.abs(last.x - x) < 0.1 && Math.abs(last.y - y) < 0.1) continue;
+                }
+
+                curve.push({ x, y });
+            }
+        }
+        return curve;
+    }
+
+    /**
+     * Renders vector routes and POI pins to the infrastructure layer.
+     */
+    renderInfrastructure(pins = [], routes = []) {
+        this.routeGraphics.clear();
+
+        // Safely destroy and clear all existing pin sprites from memory
+        this.pinContainer.removeChildren().forEach((c) => c.destroy());
+
+        // 1. Render Routes (Bottom Layer)
+        routes.forEach((route) => {
+            if (route.hidden || !route.points || route.points.length < 2) return;
+
+            const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
+            const splinePoints = this.#getSplinePoints(route.points);
+
+            // Set the PIXI stroke properties
+            this.routeGraphics.lineStyle(route.thickness, colorHex, 1);
+
+            if (route.style === "solid") {
+                this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
+                for (let i = 1; i < splinePoints.length; i++) {
+                    this.routeGraphics.lineTo(splinePoints[i].x, splinePoints[i].y);
+                }
+            } else {
+                // Dash and Dot Algorithm
+                // Dynamically scales the spacing based on the thickness of the line
+                const dashPattern = route.style === "dashed" ? [route.thickness * 4, route.thickness * 3] : [route.thickness, route.thickness * 2];
+
+                let dashIndex = 0;
+                let dashLength = 0;
+                let isDrawing = true;
+
+                this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
+
+                for (let i = 1; i < splinePoints.length; i++) {
+                    const p1 = splinePoints[i - 1];
+                    const p2 = splinePoints[i];
+                    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+                    let remainingDist = dist;
+                    let currentX = p1.x;
+                    let currentY = p1.y;
+
+                    while (remainingDist > 0) {
+                        const step = Math.min(remainingDist, dashPattern[dashIndex] - dashLength);
+                        const ratio = step / remainingDist;
+
+                        currentX += (p2.x - currentX) * ratio;
+                        currentY += (p2.y - currentY) * ratio;
+
+                        if (isDrawing) {
+                            this.routeGraphics.lineTo(currentX, currentY);
+                        } else {
+                            this.routeGraphics.moveTo(currentX, currentY);
+                        }
+
+                        dashLength += step;
+                        remainingDist -= step;
+
+                        // Switch from drawing to skipping when the dash limit is reached
+                        if (dashLength >= dashPattern[dashIndex]) {
+                            dashLength = 0;
+                            dashIndex = (dashIndex + 1) % dashPattern.length;
+                            isDrawing = !isDrawing;
+                        }
+                    }
+                }
+            }
+        });
+
+        // 2. Render Pins (Top Layer)
+        pins.forEach((pin) => {
+            if (pin.hidden) return;
+
+            const texturePath = `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg`;
+            const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
+
+            // Standardise icon sizing and anchor it dead centre so clicking is perfectly accurate
+            sprite.anchor.set(0.5);
+            sprite.width = 32;
+            sprite.height = 32;
+            sprite.x = pin.x;
+            sprite.y = pin.y;
+
+            this.pinContainer.addChild(sprite);
+        });
     }
 }

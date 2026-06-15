@@ -63,6 +63,10 @@
 .fwmb-icon.upload-file          { --fwmb-mask: url('../assets/icons/upload_file.svg'); }
 .fwmb-icon.more-vert            { --fwmb-mask: url('../assets/icons/more_vert.svg'); }
 .fwmb-icon.image                { --fwmb-mask: url('../assets/icons/image.svg'); }
+.fwmb-icon.insert-text          { --fwmb-mask: url('../assets/icons/insert_text.svg'); }
+.fwmb-icon.filter-center-focus  { --fwmb-mask: url('../assets/icons/filter_center_focus.svg'); }
+.fwmb-icon.visibility           { --fwmb-mask: url('../assets/icons/visibility.svg'); }
+.fwmb-icon.visibility-off       { --fwmb-mask: url('../assets/icons/visibility_off.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
@@ -380,10 +384,16 @@
     gap: var(--filroden-space-l);
 }
 
-.fwmb .form-group label {
+.fwmb label {
     margin: 0;
     color: var(--filroden-color-text-main-solid);
     white-space: nowrap;
+}
+
+.fwmb .fwmb-title {
+    font-weight: bold;
+    margin-block-start: var(--filroden-space-m);
+    margin-block-end: var(--filroden-space-m);
 }
 
 
@@ -468,6 +478,10 @@
     padding: var(--filroden-space-m);
     gap: var(--filroden-space-xs);
     overflow-y: auto; /* Required to trigger fwmb-scrollable mechanics */
+}
+
+.fwmb .fwmb-wide {
+    width: 4rem;
 }
 
 
@@ -837,7 +851,7 @@
     color: var(--filroden-color-text-main-solid);
 }
 
-.fwmb-biome-swatch {
+.fwmb-swatch {
     appearance: none;
     -webkit-appearance: none;
     width: var(--filroden-font-size-l);
@@ -850,20 +864,20 @@
     cursor: default;
 }
 
-input.fwmb-biome-swatch {
+input.fwmb-swatch {
     cursor: pointer;
 }
 
-.fwmb-biome-swatch::-webkit-color-swatch-wrapper {
+.fwmb-swatch::-webkit-color-swatch-wrapper {
     padding: 0;
 }
 
-.fwmb-biome-swatch::-webkit-color-swatch {
+.fwmb-swatch::-webkit-color-swatch {
     border: none;
     border-radius: 2px; 
 }
 
-.fwmb-biome-swatch::-moz-color-swatch {
+.fwmb-swatch::-moz-color-swatch {
     border: none;
     border-radius: 2px;
 }
@@ -1074,4 +1088,78 @@ input.fwmb-biome-swatch {
 
 .fwmb-dropdown-menu button.fwmb-danger:hover {
     background: rgba(255, 0, 0, 0.15);
+}
+
+/* ==========================================
+   Infrastructure UI Elements
+========================================== */
+
+.fwmb-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+    gap: var(--filroden-space-s);
+    max-height: 200px;
+    overflow-y: auto;
+    padding: var(--filroden-space-s);
+    background: var(--filroden-color-bg-darkest);
+    border: 1px solid var(--filroden-color-border-light);
+    border-radius: 4px;
+}
+
+.fwmb-icon-grid .fwmb-icon-btn {
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.fwmb-icon-grid .fwmb-icon-btn:hover {
+    background: var(--filroden-color-bg-hover);
+}
+
+.fwmb-icon-grid .fwmb-icon-btn.active {
+    background: var(--filroden-color-bg-hover-solid);
+    border-color: var(--filroden-color-border-focus);
+}
+
+.fwmb-icon-grid img, 
+.fwmb-list-icon {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: invert(1); /* Assuming the CC0 SVGs are black by default */
+}
+
+.fwmb-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.fwmb-list-item {
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-m);
+    padding: var(--filroden-space-s);
+    background: var(--filroden-color-bg-medium);
+    border: 1px solid var(--filroden-color-border-light);
+    border-radius: 4px;
+}
+
+.fwmb-list-item .fwmb-list-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.fwmb-route-swatch {
+    width: 24px;
+    border-top-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
 }

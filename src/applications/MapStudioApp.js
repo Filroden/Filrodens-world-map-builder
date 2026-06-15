@@ -40,6 +40,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             resetNoiseScale: MapStudioApp.#onResetNoiseScale,
             nudgeNoise: MapStudioApp.#onNudgeNoise,
             resetNoisePan: MapStudioApp.#onResetNoisePan,
+            setInfrastructureIcon: MapStudioApp.#onSetInfrastructureIcon,
+            toggleSnapping: MapStudioApp.#onToggleSnapping,
+            setRouteStyle: MapStudioApp.#onSetRouteStyle,
+            togglePinVisibility: MapStudioApp.#onTogglePinVisibility,
+            deletePin: MapStudioApp.#onDeletePin,
+            toggleRouteVisibility: MapStudioApp.#onToggleRouteVisibility,
+            deleteRoute: MapStudioApp.#onDeleteRoute,
         },
     };
 
@@ -80,6 +87,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.currentTemperatureData = null;
         this.currentRiverData = null;
         this.mapPins = [];
+        this.mapRoutes = [];
+        this.activeRouteId = null;
         this.pinHistory = [];
         this.pinRedoStack = [];
         this.brushEngine = null;
@@ -125,6 +134,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             meanderJitter: FILRODENSWMB.HYDROLOGY.MEANDER_JITTER,
             altCooling: FILRODENSWMB.CLIMATE.ALTITUDE_COOLING,
             freezingThreshold: FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD,
+
+            // Infrastructure Variables
+            activeIcon: "map_pin",
+            activeInfraMode: "pin",
+            snapToPoints: true,
+            routeColor: "#ffffff",
+            routeThickness: 3,
+            routeStyle: "solid",
         };
 
         // The dynamic cache inherits from defaults on launch
@@ -173,6 +190,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         context.uiState = this.uiState;
+
+        if (partId === "context" && this.activeTool === "infrastructure") {
+            context.infrastructureIcons = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS).map(([id, label]) => ({
+                id: id,
+                label: label,
+            }));
+
+            context.mapPins = this.mapPins || [];
+            context.mapRoutes = this.mapRoutes || [];
+        }
 
         return context;
     }
@@ -240,6 +267,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 if (event.target.matches('input[name="contourInterval"]')) {
                     this.#getMapParameters();
                     this.#repaintCanvas();
+                    return;
+                }
+
+                // Custom Route Settings Intercept
+                if (event.target.matches('input[name="routeColor"], input[name="routeThickness"], select[name="routeStyle"]')) {
+                    this.uiState.activeInfraMode = "route";
+                    this.#getMapParameters();
+
+                    if (this.activeRouteId) {
+                        const activeRoute = this.mapRoutes.find((r) => r.id === this.activeRouteId);
+                        if (activeRoute) {
+                            activeRoute.color = this.uiState.routeColor;
+                            activeRoute.thickness = this.uiState.routeThickness;
+                            activeRoute.style = this.uiState.routeStyle;
+                            this.#repaintCanvas();
+                        }
+                    }
                     return;
                 }
 
@@ -317,6 +361,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             let layer = "terrain";
             if (this.activeTool === "biomes") layer = "biome";
             if (this.activeTool === "features") layer = "features";
+            if (this.activeTool === "infrastructure") layer = "infrastructure";
 
             let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
 
@@ -326,7 +371,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const existingIndex = this.mapPins.findIndex((p) => Math.hypot(p.x - x, p.y - y) < 8);
 
                 // Snapshot the current state for the Undo button
-                this.pinHistory.push(foundry.utils.deepClone(this.mapPins));
+                this.pinHistory.push({ pins: foundry.utils.deepClone(this.mapPins), routes: foundry.utils.deepClone(this.mapRoutes), activeRouteId: this.activeRouteId });
                 this.pinRedoStack = [];
 
                 if (tool === "erasePin") {
@@ -345,6 +390,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.#repaintCanvas();
                 this.debouncedGenerateClimate();
                 return; // Abort here so the pixel brush doesn't fire
+            }
+
+            // Intercept Infrastructure tools completely
+            if (layer === "infrastructure") {
+                this.#handleInfrastructureClick(x, y);
+                return;
             }
 
             // Standard Pixel Painting (Terrain/Biomes)
@@ -562,15 +613,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.setEditMode(isActivating);
         }
 
-        // Lock or unlock the procedural generation inputs
-        const panel = this.element.querySelector(".fwmb-context-panel");
-        if (panel) {
-            const controls = panel.querySelectorAll("fieldset input, fieldset button");
-            for (const control of controls) {
-                control.disabled = isActivating;
+        // Lock or unlock the procedural generation inputs (EXCEPT for vector tools)
+        if (this.activeTool !== "infrastructure" && this.activeTool !== "labels") {
+            const panel = this.element.querySelector(".fwmb-context-panel");
+            if (panel) {
+                const controls = panel.querySelectorAll("fieldset input, fieldset button");
+                for (const control of controls) {
+                    control.disabled = isActivating;
+                }
+                panel.classList.toggle("fwmb-locked", isActivating);
             }
-            // Apply a visual dimming class to the fieldsets
-            panel.classList.toggle("fwmb-locked", isActivating);
         }
     }
 
@@ -630,6 +682,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const featuresBtn = this.element.querySelector('[data-layer="features"]');
             this.canvasEngine.toggleLayer("features", featuresBtn ? featuresBtn.classList.contains("active") : true);
         }
+
+        // 6. Draw Infrastructure Layer
+        this.canvasEngine.renderInfrastructure(this.mapPins, this.mapRoutes);
     }
 
     /**
@@ -738,16 +793,26 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     static #onUndoBrush(event, target) {
-        if (this.activeTool === "features") {
-            // Route to Vector History
+        if (this.activeTool === "features" || this.activeTool === "infrastructure") {
             if (this.pinHistory.length === 0) return;
-            this.pinRedoStack.push(foundry.utils.deepClone(this.mapPins));
-            this.mapPins = this.pinHistory.pop();
+
+            // Push current state to redo stack
+            this.pinRedoStack.push({
+                pins: foundry.utils.deepClone(this.mapPins),
+                routes: foundry.utils.deepClone(this.mapRoutes),
+                activeRouteId: this.activeRouteId,
+            });
+
+            // Pop previous state
+            const state = this.pinHistory.pop();
+            this.mapPins = state.pins || state; // Fallback for old simple arrays
+            this.mapRoutes = state.routes || this.mapRoutes;
+            this.activeRouteId = state.activeRouteId || null;
 
             this.#repaintCanvas();
-            this.debouncedGenerateClimate();
+            if (this.activeTool === "features") this.debouncedGenerateClimate();
         } else {
-            // Route to Raster History
+            // Raster History
             if (!this.baseElevationData || !this.brushEngine) return;
             if (this.brushEngine.undo()) {
                 this.#rebuildFromHistory();
@@ -756,14 +821,26 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     static #onRedoBrush(event, target) {
-        if (this.activeTool === "features") {
+        if (this.activeTool === "features" || this.activeTool === "infrastructure") {
             if (this.pinRedoStack.length === 0) return;
-            this.pinHistory.push(foundry.utils.deepClone(this.mapPins));
-            this.mapPins = this.pinRedoStack.pop();
+
+            // Push current state to undo stack
+            this.pinHistory.push({
+                pins: foundry.utils.deepClone(this.mapPins),
+                routes: foundry.utils.deepClone(this.mapRoutes),
+                activeRouteId: this.activeRouteId,
+            });
+
+            // Pop next state
+            const state = this.pinRedoStack.pop();
+            this.mapPins = state.pins;
+            this.mapRoutes = state.routes;
+            this.activeRouteId = state.activeRouteId;
 
             this.#repaintCanvas();
-            this.debouncedGenerateClimate();
+            if (this.activeTool === "features") this.debouncedGenerateClimate();
         } else {
+            // Raster History
             if (!this.baseElevationData || !this.brushEngine) return;
             if (this.brushEngine.redo()) {
                 this.#rebuildFromHistory();
@@ -947,6 +1024,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             params: params,
             history: this.brushEngine?.history || [],
             mapPins: this.mapPins,
+            mapRoutes: this.mapRoutes,
         };
 
         // If no ID exists, trigger the "Save As" flow
@@ -1188,6 +1266,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 5. Restore Spatial Arrays and Custom Styling
         this.customBiomeColors = p.customColors || {};
         this.mapPins = payload.mapPins || [];
+        this.mapRoutes = payload.mapRoutes || [];
 
         this.brushEngine.history = payload.history || [];
         this.brushEngine.redoStack = [];
@@ -1287,5 +1366,151 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.bufferTopography = new Uint8Array(totalPixels * 4);
         this.bufferBiomes = new Uint8Array(totalPixels * 4);
         this.bufferContours = new Uint8Array(totalPixels * 4);
+    }
+
+    /**
+     * Finds the nearest visible pin within a 20-pixel radius for route snapping.
+     */
+    #getSnappedCoordinates(x, y, threshold = 20) {
+        let closest = { x, y, dist: Infinity };
+
+        for (const pin of this.mapPins) {
+            if (pin.hidden) continue;
+            const dist = Math.hypot(pin.x - x, pin.y - y);
+            if (dist < closest.dist && dist <= threshold) {
+                closest = { x: pin.x, y: pin.y, dist };
+            }
+        }
+
+        return closest.dist === Infinity ? { x, y } : { x: closest.x, y: closest.y };
+    }
+
+    /**
+     * Routes clicks to either the Pin placement or Spline extension logic.
+     */
+    #handleInfrastructureClick(x, y) {
+        this.pinHistory.push({
+            pins: foundry.utils.deepClone(this.mapPins),
+            routes: foundry.utils.deepClone(this.mapRoutes),
+            activeRouteId: this.activeRouteId,
+        });
+        this.pinRedoStack = [];
+
+        const finalPos = this.uiState.snapToPoints ? this.#getSnappedCoordinates(x, y) : { x, y };
+
+        if (this.uiState.activeInfraMode === "pin") {
+            const newPin = {
+                id: foundry.utils.randomID(),
+                name: game.i18n.localize(FILRODENSWMB.INFRASTRUCTURE_ICONS[this.uiState.activeIcon] || "Pin"),
+                icon: this.uiState.activeIcon,
+                x: finalPos.x,
+                y: finalPos.y,
+                hidden: false,
+            };
+            this.mapPins.push(newPin);
+        } else if (this.uiState.activeInfraMode === "route") {
+            if (this.activeRouteId) {
+                // Extend the existing active route
+                const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
+                if (route) {
+                    const lastPt = route.points[route.points.length - 1];
+                    // Double-click detection (clicking within 5 pixels of the last node ends the route)
+                    if (Math.hypot(lastPt.x - finalPos.x, lastPt.y - finalPos.y) < 5) {
+                        this.activeRouteId = null;
+                    } else {
+                        route.points.push(finalPos);
+                    }
+                }
+            } else {
+                // Initiate a new route
+                this.activeRouteId = foundry.utils.randomID();
+                const newRoute = {
+                    id: this.activeRouteId,
+                    name: `Route ${this.mapRoutes.length + 1}`,
+                    points: [finalPos],
+                    color: this.uiState.routeColor,
+                    thickness: this.uiState.routeThickness,
+                    style: this.uiState.routeStyle,
+                    hidden: false,
+                };
+                this.mapRoutes.push(newRoute);
+            }
+        }
+
+        this.#repaintCanvas();
+        this.render({ parts: ["context"] }); // Re-render sidebar to show the new list item
+    }
+
+    static #onSetInfrastructureIcon(event, target) {
+        this.uiState.activeIcon = target.dataset.icon;
+        this.uiState.activeInfraMode = "pin";
+        this.activeRouteId = null;
+        this.render({ parts: ["context"] });
+    }
+
+    static #onToggleSnapping(event, target) {
+        this.uiState.snapToPoints = !this.uiState.snapToPoints;
+        target.classList.toggle("active", this.uiState.snapToPoints);
+    }
+
+    static #onSetRouteStyle(event, target) {
+        const style = target.dataset.style;
+        this.uiState.activeInfraMode = "route";
+        this.activeRouteId = null; // Drop any active line to start a fresh one
+
+        if (style === "major") {
+            this.uiState.routeColor = "#ffb300"; // Amber
+            this.uiState.routeThickness = 6;
+            this.uiState.routeStyle = "solid";
+        } else if (style === "minor") {
+            this.uiState.routeColor = "#e0e0e0"; // Light Grey
+            this.uiState.routeThickness = 3;
+            this.uiState.routeStyle = "solid";
+        } else if (style === "trail") {
+            this.uiState.routeColor = "#8d6e63"; // Brown
+            this.uiState.routeThickness = 2;
+            this.uiState.routeStyle = "dashed";
+        } else if (style === "sea") {
+            this.uiState.routeColor = "#4dd0e1"; // Cyan
+            this.uiState.routeThickness = 4;
+            this.uiState.routeStyle = "dotted";
+        }
+
+        this.render({ parts: ["context"] });
+    }
+
+    static #onTogglePinVisibility(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const pin = this.mapPins.find((p) => p.id === id);
+        if (pin) {
+            pin.hidden = !pin.hidden;
+            this.#repaintCanvas();
+            this.render({ parts: ["context"] });
+        }
+    }
+
+    static #onDeletePin(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        this.mapPins = this.mapPins.filter((p) => p.id !== id);
+        this.#repaintCanvas();
+        this.render({ parts: ["context"] });
+    }
+
+    static #onToggleRouteVisibility(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const route = this.mapRoutes.find((r) => r.id === id);
+        if (route) {
+            route.hidden = !route.hidden;
+            this.#repaintCanvas();
+            this.render({ parts: ["context"] });
+        }
+    }
+
+    static #onDeleteRoute(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        this.mapRoutes = this.mapRoutes.filter((r) => r.id !== id);
+        if (this.activeRouteId === id) this.activeRouteId = null;
+        this.#repaintCanvas();
+        this.render({ parts: ["context"] });
     }
 }

@@ -1,3 +1,106 @@
-<div>
+<div class="fwmb-tool-content fwmb-scrollable">
+
+    <div class="fwmb-flex-row">
+        <button type="button" class="fwmb-btn {{#if uiState.snapToPoints}}active{{/if}}" data-action="toggleSnapping">
+            <i class="fwmb-icon filter-center-focus"></i>
+            {{localize "FILRODENSWMB.UI.SnapToPoints"}}
+        </button>
+    </div>
+
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.PointsOfInterest"}}</legend>
+        
+        <div class="form-group stacked">
+            <label class="fwmb-title">{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
+            <div class="fwmb-icon-grid fwmb-scrollable">
+                {{#each infrastructureIcons}}
+                <button type="button" class="fwmb-icon-btn {{#if (eq ../uiState.activeIcon this.id)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.id}}" data-tooltip="{{localize this.label}}">
+                    <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{this.id}}.svg" alt="{{localize this.label}}" />
+                </button>
+                {{/each}}
+            </div>
+        </div>
+        
+        <div class="fwmb-list-container" style="margin-top: var(--filroden-space-m);">
+            {{#each mapPins}}
+            <div class="fwmb-list-item" data-id="{{this.id}}">
+                <button type="button" class="fwmb-icon-btn small" data-action="togglePinVisibility">
+                    <i class="fwmb-icon {{#if this.hidden}}visibility-off{{else}}visibility{{/if}}"></i>
+                </button>
+                <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{this.icon}}.svg" class="fwmb-list-icon" />
+                <span class="fwmb-flex-1">{{this.name}}</span>
+                <button type="button" class="fwmb-icon-btn small fwmb-danger" data-action="deletePin">
+                    <i class="fwmb-icon delete"></i>
+                </button>
+            </div>
+            {{else}}
+            <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoPoints"}}</div>
+            {{/each}}
+        </div>
+    </fieldset>
+
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.Routes"}}</legend>
+
+        <div class="form-group stacked">
+            <label class="fwmb-title">{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
+            <div class="fwmb-flex-row" style="gap: var(--filroden-space-s); flex-wrap: wrap;">
+                <button type="button" class="fwmb-btn outline" data-action="setRouteStyle" data-style="major">{{localize "FILRODENSWMB.UI.RoadMajor"}}</button>
+                <button type="button" class="fwmb-btn outline" data-action="setRouteStyle" data-style="minor">{{localize "FILRODENSWMB.UI.RoadMinor"}}</button>
+                <button type="button" class="fwmb-btn outline" data-action="setRouteStyle" data-style="trail">{{localize "FILRODENSWMB.UI.Trail"}}</button>
+                <button type="button" class="fwmb-btn outline" data-action="setRouteStyle" data-style="sea">{{localize "FILRODENSWMB.UI.SeaRoute"}}</button>
+            </div>
+        </div>
+
+        <div class="form-group stacked">
+            <label class="fwmb-title">{{localize "FILRODENSWMB.UI.CustomStyles"}}</label>
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
+                <input type="color" class="fwmb-swatch fwmb-wide" name="routeColor" value="{{lookup uiState 'routeColor'}}" />
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="routeThickness" value="{{lookup uiState 'routeThickness'}}" min="1" max="10" step="1" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "routeThickness"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.LineStyle"}}</label>
+                <select name="routeStyle">
+                    <option value="solid" {{#if (eq uiState.routeStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+                    <option value="dashed" {{#if (eq uiState.routeStyle "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
+                    <option value="dotted" {{#if (eq uiState.routeStyle "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="fwmb-list-container" style="margin-top: var(--filroden-space-m);">
+            {{#each mapRoutes}}
+            <div class="fwmb-list-item" data-id="{{this.id}}">
+                <button type="button" class="fwmb-icon-btn small" data-action="toggleRouteVisibility">
+                    <i class="fwmb-icon {{#if this.hidden}}visibility-off{{else}}visibility{{/if}}"></i>
+                </button>
+                <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: {{this.thickness}}px; border-style: {{this.style}};"></div>
+                <span class="fwmb-flex-1">{{this.name}}</span>
+                <button type="button" class="fwmb-icon-btn small fwmb-danger" data-action="deleteRoute">
+                    <i class="fwmb-icon delete"></i>
+                </button>
+            </div>
+            {{else}}
+            <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoRoutes"}}</div>
+            {{/each}}
+        </div>
+    </fieldset>
+
+    <div class="fwmb-flex-1"></div>
+    <div class="fwmb-divider"></div>
+
+    <button type="button" class="fwmb-btn primary" data-action="toggleEditMode">
+        <i class="fwmb-icon brush"></i>
+        {{localize "FILRODENSWMB.UI.EditInfrastructure"}}
+    </button>
 
 </div>
