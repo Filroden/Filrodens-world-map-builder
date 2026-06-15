@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-1.0.0-beta1-blue)
+![Latest Version](https://img.shields.io/badge/Version-1.0.0-alpha3-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -12,7 +12,7 @@
 
 ## Welcome to Filroden's World Map Builder
 
-> **WARNING** This is a Beta release. As the module develops there is a small chance that the data structure for map saves will evolve. This could mean any maps saved will be lost. Please treat this release as a way to test the module and provide your feedback on what you would like to see.
+> **WARNING** This is an Alpha release. As the module develops there is a chance that the data structure for map saves will evolve. This could mean any maps saved will be lost. Please treat this release as a way to test the module and provide your feedback on what you would like to see.
 
 Filroden's World Map Builder is a system-agnostic cartography tool. It generates terrain, moisture and temperatures using a procedural, deterministic model so using the same "seed" will generate the same model. It then calculates appropriate biomes taking into account the latitude and underlying models including wind patterns. You can scale and offset the result to frame a map that is close to your idea so that you can apply the final edits to the world using non-destructive brushes.
 
@@ -56,13 +56,20 @@ The procedural plus non-destructive brush approach means the resulting saved jou
 - **Export JSON:** Export the map data into a JSON file. This allows you to share maps with others.
 - **Delete:** Delete the map. This can also be done inside the normal Foundry compendium.
 
+## Important Note on Performance
+
+Filroden's World Map Builder can be computationally heavy when generating new or loading existing terrain, moisture and temperature models, particularly as you increase the size of the map. Maps of 1,000 x 1,000 pixels should be created or loaded very quickly. Maps of 4,000 x 4,000 look beautiful but even on powerful PCs they might take a few seconds to calculate.
+
+Once calculated, the application will be much more responsive.
+
+I will continue to look for ways to improve performance as the module develops.
+
 ## Roadmap
 
 I have designed the module so that users will eventually be able to create a world map, then zoom into an area of interest and use it as the new boundaries for a larger-scale, higher detail map containing all the same information. This will allow users to create more detailed maps of continents, countries, regions, etc.
 
 - Improve performance
-- Add infrastructure (roads, sea routes, settlements, points of interest)
 - Add social, political or economic regions as individual, toggled display layers
 - Add labels
 - Link vector features to journals to add descriptions
-- Add "export to scene" tools
+- Add "export to scene" tools to supplement or replace the current "export to PNG" tool.

@@ -35,11 +35,18 @@ export class StudioCanvas {
         this.vectorGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.vectorGraphics);
 
-        // Infrastructure specific containers to enforce strict z-index (lines below pins)
+        // Setup Infrastructure Sub-containers
         this.routeGraphics = new PIXI.Graphics();
+        this.nodeContainer = new PIXI.Container();
         this.pinContainer = new PIXI.Container();
+
         this.layers.infrastructure.addChild(this.routeGraphics);
-        this.layers.infrastructure.addChild(this.pinContainer);
+        this.layers.infrastructure.addChild(this.nodeContainer); // Render nodes above lines
+        this.layers.infrastructure.addChild(this.pinContainer); // Render pins above nodes
+
+        // --- Global Drag Handling ---
+        this.activeDrag = null;
+        this.interactiveTargets = [];
 
         // Instantiate the grid layer
         this.gridLayer = new PIXI.Graphics();
@@ -91,6 +98,23 @@ export class StudioCanvas {
         this.lastBrushTime = 0;
     }
 
+    /**
+     * Mathematically checks if the mouse coordinates are hovering over a draggable node or pin.
+     */
+    #getGrabbedInfrastructure(x, y) {
+        let closest = null;
+        let minDist = Infinity;
+
+        for (const item of this.interactiveTargets) {
+            const dist = Math.hypot(item.x - x, item.y - y);
+            if (dist <= item.radius && dist < minDist) {
+                minDist = dist;
+                closest = item.target;
+            }
+        }
+        return closest;
+    }
+
     #setupInteractions(canvasElement) {
         // SCROLL TO ZOOM
         canvasElement.addEventListener("wheel", (e) => {
@@ -108,71 +132,20 @@ export class StudioCanvas {
             this.stage.scale.x *= scaleDirection;
             this.stage.scale.y *= scaleDirection;
 
-            // Constrain zoom levels (0.1x to 5x)
             this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x, 5));
             this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y, 5));
 
-            // Adjust position so it zooms towards the cursor
             this.stage.position.x = mouseX - localX * this.stage.scale.x;
             this.stage.position.y = mouseY - localY * this.stage.scale.y;
         });
 
-        // RIGHT CLICK OR MIDDLE CLICK TO PAN
-        canvasElement.addEventListener("pointerdown", (e) => {
-            if (e.button !== 2 && e.button !== 1) return; // Leave left click (0) for the paintbrush
-
-            this.isDragging = true;
-            this.dragStart = { x: e.clientX, y: e.clientY };
-            this.stageStart = { x: this.stage.position.x, y: this.stage.position.y };
-            canvasElement.style.cursor = "grabbing";
-        });
-
-        globalThis.addEventListener("pointermove", (e) => {
-            if (this.isDragging) {
-                const dx = e.clientX - this.dragStart.x;
-                const dy = e.clientY - this.dragStart.y;
-                this.stage.position.x = this.stageStart.x + dx;
-                this.stage.position.y = this.stageStart.y + dy;
-                return;
-            }
-
-            // Continuous painting while dragging
-            if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
-                const now = performance.now();
-
-                // Throttle the application to fire max once every 100ms
-                if (now - this.lastBrushTime > 100) {
-                    const coords = this.#getMapCoordinates(e, canvasElement);
-                    this.onBrushMove(coords.x, coords.y);
-                    this.lastBrushTime = now;
-                }
-            }
-        });
-
-        globalThis.addEventListener("pointerup", (e) => {
-            if (e.button !== 2 && e.button !== 1) return;
-            this.isDragging = false;
-            canvasElement.style.cursor = "default";
-        });
-
-        // Prevent browser context menus from ruining the right-click drag
+        // PREVENT NATIVE CONTEXT MENU
         canvasElement.addEventListener("contextmenu", (e) => e.preventDefault());
 
-        // HOVER READOUT
-        canvasElement.addEventListener("pointermove", (e) => {
-            if (this.onCanvasHover && !this.isDragging) {
-                const coords = this.#getMapCoordinates(e, canvasElement);
-                this.onCanvasHover(coords.x, coords.y);
-            }
-        });
-
-        canvasElement.addEventListener("pointerleave", (e) => {
-            if (this.onCanvasHover) this.onCanvasHover(null, null);
-        });
-
-        // PIXI listeners
+        // MOUSE DOWN (Start Pan, Drag, or Paint/Place)
         canvasElement.addEventListener("pointerdown", (e) => {
-            // Right/Middle click for panning
+            canvasElement.setPointerCapture(e.pointerId);
+
             if (e.button === 2 || e.button === 1) {
                 this.isDragging = true;
                 this.dragStart = { x: e.clientX, y: e.clientY };
@@ -181,35 +154,122 @@ export class StudioCanvas {
                 return;
             }
 
-            // Left click for painting
-            if (e.button === 0 && this.isEditMode && this.onBrushStart) {
+            if (e.button === 0 && this.isEditMode) {
                 const coords = this.#getMapCoordinates(e, canvasElement);
-                this.onBrushStart(coords.x, coords.y);
+
+                // --- Shift-Click Node Insertion Intercept ---
+                if (e.shiftKey && this.onInfraInsertNode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    this.activeDrag = null;
+                    this.onInfraInsertNode(coords.x, coords.y);
+                    return;
+                }
+
+                // 1. Try to grab an existing infrastructure node or pin
+                const grabbedTarget = this.#getGrabbedInfrastructure(coords.x, coords.y);
+
+                // --- Ctrl-Click / Cmd-Click Node Deletion Intercept ---
+                if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    this.activeDrag = null;
+                    this.onInfraDeleteNode(grabbedTarget);
+                    return;
+                }
+
+                if (grabbedTarget) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    this.activeDrag = { target: grabbedTarget };
+                    canvasElement.style.cursor = "grabbing";
+                    if (this.onInfraDragStart) this.onInfraDragStart();
+                    return;
+                }
+
+                // 2. Otherwise, pass to brush engine
+                if (this.onBrushStart) {
+                    this.onBrushStart(coords.x, coords.y);
+                }
             }
         });
 
-        globalThis.addEventListener("pointermove", (e) => {
+        // MOUSE MOVE (Pan, Drag Item, or Continuous Paint)
+        canvasElement.addEventListener("pointermove", (e) => {
+            const coords = this.#getMapCoordinates(e, canvasElement);
+
             if (this.isDragging) {
-                // ... existing panning logic ...
+                const dx = e.clientX - this.dragStart.x;
+                const dy = e.clientY - this.dragStart.y;
+                this.stage.position.x = this.stageStart.x + dx;
+                this.stage.position.y = this.stageStart.y + dy;
                 return;
             }
 
-            // Continuous painting while dragging
+            // Dragging an Infrastructure Item
+            if (this.activeDrag) {
+                // Clamp coordinates to prevent dragging items off the map boundaries
+                this.activeDrag.target.x = Math.max(0, Math.min(coords.x, this.mapWidth));
+                this.activeDrag.target.y = Math.max(0, Math.min(coords.y, this.mapHeight));
+
+                if (this.onInfraDrag) this.onInfraDrag();
+                return;
+            }
+
+            // Continuous Painting
             if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
-                const coords = this.#getMapCoordinates(e, canvasElement);
-                this.onBrushMove(coords.x, coords.y);
+                const now = performance.now();
+                if (now - this.lastBrushTime > 100) {
+                    this.onBrushMove(coords.x, coords.y);
+                    this.lastBrushTime = now;
+                }
+                return;
+            }
+
+            // --- HOVER STATES ---
+            if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+
+            if (this.isEditMode && !this.isDragging && !this.activeDrag) {
+                const hoverTarget = this.#getGrabbedInfrastructure(coords.x, coords.y);
+                canvasElement.style.cursor = hoverTarget ? "grab" : "crosshair";
             }
         });
 
-        globalThis.addEventListener("pointerup", (e) => {
+        // RELEASE MOUSE (End Pan, Drag, or Brush)
+        const endPointer = (e) => {
+            if (canvasElement.hasPointerCapture(e.pointerId)) {
+                canvasElement.releasePointerCapture(e.pointerId);
+            }
+
             if (e.button === 2 || e.button === 1) {
                 this.isDragging = false;
                 canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
                 return;
             }
 
-            if (e.button === 0 && this.isEditMode && this.onBrushEnd) {
-                this.onBrushEnd();
+            if (e.button === 0) {
+                if (this.activeDrag) {
+                    this.activeDrag = null;
+                    canvasElement.style.cursor = "crosshair";
+                    if (this.onInfraDragEnd) this.onInfraDragEnd();
+                    return; // CRITICAL: Abort so we don't trigger brush end
+                }
+
+                if (this.isEditMode && this.onBrushEnd) {
+                    this.onBrushEnd();
+                }
+            }
+        };
+
+        canvasElement.addEventListener("pointerup", endPointer);
+        canvasElement.addEventListener("pointercancel", endPointer);
+
+        canvasElement.addEventListener("pointerleave", (e) => {
+            if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
+                this.onCanvasHover(null, null);
             }
         });
     }
@@ -574,11 +634,13 @@ export class StudioCanvas {
     /**
      * Renders vector routes and POI pins to the infrastructure layer.
      */
-    renderInfrastructure(pins = [], routes = []) {
+    renderInfrastructure(pins = [], routes = [], isEditMode = false) {
         this.routeGraphics.clear();
-
-        // Safely destroy and clear all existing pin sprites from memory
         this.pinContainer.removeChildren().forEach((c) => c.destroy());
+        this.nodeContainer.removeChildren().forEach((c) => c.destroy());
+
+        // Clear the mathematical spatial cache before rendering
+        this.interactiveTargets = [];
 
         // 1. Render Routes (Bottom Layer)
         routes.forEach((route) => {
@@ -587,7 +649,6 @@ export class StudioCanvas {
             const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
             const splinePoints = this.#getSplinePoints(route.points);
 
-            // Set the PIXI stroke properties
             this.routeGraphics.lineStyle(route.thickness, colorHex, 1);
 
             if (route.style === "solid") {
@@ -596,10 +657,7 @@ export class StudioCanvas {
                     this.routeGraphics.lineTo(splinePoints[i].x, splinePoints[i].y);
                 }
             } else {
-                // Dash and Dot Algorithm
-                // Dynamically scales the spacing based on the thickness of the line
                 const dashPattern = route.style === "dashed" ? [route.thickness * 4, route.thickness * 3] : [route.thickness, route.thickness * 2];
-
                 let dashIndex = 0;
                 let dashLength = 0;
                 let isDrawing = true;
@@ -631,7 +689,6 @@ export class StudioCanvas {
                         dashLength += step;
                         remainingDist -= step;
 
-                        // Switch from drawing to skipping when the dash limit is reached
                         if (dashLength >= dashPattern[dashIndex]) {
                             dashLength = 0;
                             dashIndex = (dashIndex + 1) % dashPattern.length;
@@ -639,6 +696,22 @@ export class StudioCanvas {
                         }
                     }
                 }
+            }
+
+            if (isEditMode) {
+                route.points.forEach((pt) => {
+                    const node = new PIXI.Graphics();
+                    node.beginFill(0xffffff, 0.6);
+                    node.lineStyle(2, 0x000000, 0.6);
+                    node.drawCircle(0, 0, 5);
+                    node.endFill();
+                    node.x = pt.x;
+                    node.y = pt.y;
+
+                    // Push to mathematical cache instead of binding PIXI events
+                    this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
+                    this.nodeContainer.addChild(node);
+                });
             }
         });
 
@@ -655,8 +728,11 @@ export class StudioCanvas {
             sprite.x = pin.x;
             sprite.y = pin.y;
 
-            // Interactive Tooltip Logic ---
-            if (pin.name || pin.description) {
+            if (isEditMode) {
+                // Push to mathematical cache
+                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: 16 });
+            } else if (pin.name || pin.description) {
+                // Keep PIXI hover events for tooltips ONLY when not in edit mode
                 sprite.eventMode = "static";
                 sprite.interactive = true;
                 sprite.cursor = "help";
@@ -665,7 +741,6 @@ export class StudioCanvas {
                     const tooltip = document.getElementById("fwmb-infra-tooltip");
                     if (!tooltip) return;
 
-                    // Build the HTML content, replacing newlines with <br> for descriptions
                     let html = ``;
                     if (pin.name) html += `<strong>${pin.name}</strong>`;
                     if (pin.description) html += `<span>${pin.description.replaceAll("\n", "<br>")}</span>`;
@@ -678,10 +753,9 @@ export class StudioCanvas {
                     const tooltip = document.getElementById("fwmb-infra-tooltip");
                     if (!tooltip) return;
 
-                    // Position tooltip relative to the mouse using the native window event
                     const evt = e.data.originalEvent;
                     tooltip.style.left = `${evt.clientX}px`;
-                    tooltip.style.top = `${evt.clientY - 15}px`; // Offset slightly above cursor
+                    tooltip.style.top = `${evt.clientY - 15}px`;
                 });
 
                 sprite.on("pointerout", () => {

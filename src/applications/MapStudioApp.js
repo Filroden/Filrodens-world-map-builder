@@ -363,6 +363,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             // Automatically generate the initial map
             setTimeout(() => this.generateTerrain(), 50);
         }
+
+        // Restore Edit Button visual state if the UI was dynamically re-rendered while editing
+        if (this.canvasEngine?.isEditMode) {
+            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
+            if (editBtn) editBtn.classList.add("active");
+        }
     }
 
     async close(options) {
@@ -430,6 +436,99 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.canvasEngine.onBrushEnd = () => {
             this.brushEngine.endStroke();
+        };
+
+        this.canvasEngine.onInfraDragStart = () => {
+            // Snapshot the state before the drag begins
+            this.pinHistory.push({
+                pins: foundry.utils.deepClone(this.mapPins),
+                routes: foundry.utils.deepClone(this.mapRoutes),
+                activeRouteId: this.activeRouteId,
+            });
+            this.pinRedoStack = [];
+        };
+
+        this.canvasEngine.onInfraDrag = () => {
+            const infraPins = this.mapPins.filter((p) => !!p.icon);
+            this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, this.canvasEngine.isEditMode);
+        };
+
+        this.canvasEngine.onInfraDragEnd = () => {
+            this.render({ parts: ["context"] });
+        };
+
+        // --- Shift-Click Node Insertion ---
+        this.canvasEngine.onInfraInsertNode = (x, y) => {
+            if (this.activeTool !== "infrastructure") return;
+
+            // Safety: Ignore clicks outside the map boundaries
+            if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+
+            // 1. Prevent Node Stacking: Ignore clicks directly on existing nodes or pins
+            for (const route of this.mapRoutes) {
+                for (const pt of route.points) {
+                    if (Math.hypot(pt.x - x, pt.y - y) < 15) return;
+                }
+            }
+            for (const pin of this.mapPins) {
+                if (!pin.hidden && pin.icon && Math.hypot(pin.x - x, pin.y - y) < 15) return;
+            }
+
+            // 2. Insert Node: Find the closest line segment
+            const segment = this.#getClosestRouteSegment(x, y);
+            if (segment) {
+                // Snapshot clean state before insertion
+                this.pinHistory.push({
+                    pins: foundry.utils.deepClone(this.mapPins),
+                    routes: foundry.utils.deepClone(this.mapRoutes),
+                    activeRouteId: this.activeRouteId,
+                });
+                this.pinRedoStack = [];
+
+                segment.route.points.splice(segment.insertIndex, 0, { x: segment.projX, y: segment.projY });
+
+                this.#repaintCanvas();
+                this.render({ parts: ["context"] });
+            }
+        };
+
+        // --- Ctrl-Click Node Deletion ---
+        this.canvasEngine.onInfraDeleteNode = (target) => {
+            if (this.activeTool !== "infrastructure") return;
+
+            // Safety Check: The user specifically requested NOT to delete pins via canvas clicks.
+            // Since pins have an 'icon' property and route points only have 'x' and 'y', we can cleanly abort.
+            if (target.icon) return;
+
+            // Find which route contains this exact mathematical node reference
+            for (let i = 0; i < this.mapRoutes.length; i++) {
+                const route = this.mapRoutes[i];
+                const nodeIndex = route.points.indexOf(target);
+
+                if (nodeIndex > -1) {
+                    // Snapshot clean state before deletion
+                    this.pinHistory.push({
+                        pins: foundry.utils.deepClone(this.mapPins),
+                        routes: foundry.utils.deepClone(this.mapRoutes),
+                        activeRouteId: this.activeRouteId,
+                    });
+                    this.pinRedoStack = [];
+
+                    // Splice the node out of the route
+                    route.points.splice(nodeIndex, 1);
+
+                    // Structural Cleanup: A vector line requires at least 2 points to exist.
+                    // If we just deleted the second-to-last node, garbage collect the dead route.
+                    if (route.points.length < 2) {
+                        this.mapRoutes.splice(i, 1);
+                        if (this.activeRouteId === route.id) this.activeRouteId = null;
+                    }
+
+                    this.#repaintCanvas();
+                    this.render({ parts: ["context"] });
+                    return; // Exit the loop once found and deleted
+                }
+            }
         };
     }
 
@@ -654,8 +753,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        // Force a repaint if we are on the features tool to instantly show/hide the red/black river edit pins
-        if (this.activeTool === "features") {
+        // Force a repaint if we are on features or infrastructure so edit pins/nodes instantly appear or disappear
+        if (this.activeTool === "features" || this.activeTool === "infrastructure") {
             this.#repaintCanvas();
         }
     }
@@ -721,9 +820,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         // 6. Draw Infrastructure Layer
-        // Strictly filter out river springs so the SVG renderer doesn't choke on undefined paths
+        const isEditModeActive = this.canvasEngine?.isEditMode || false;
         const infraPins = this.mapPins.filter((p) => !!p.icon);
-        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes);
+        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isEditModeActive);
     }
 
     /**
@@ -1727,5 +1826,34 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static #onTogglePinDropdown(event, target) {
         const dropdown = target.closest(".fwmb-custom-select").querySelector(".fwmb-select-options");
         if (dropdown) dropdown.classList.toggle("fwmb-hidden");
+    }
+
+    /**
+     * Calculates the perpendicular distance from a point to all line segments
+     * to find the closest route insertion point.
+     */
+    #getClosestRouteSegment(x, y, threshold = 15) {
+        let closest = { route: null, insertIndex: -1, dist: Infinity };
+
+        for (const route of this.mapRoutes) {
+            if (route.hidden || !route.points || route.points.length < 2) continue;
+
+            for (let i = 0; i < route.points.length - 1; i++) {
+                const p1 = route.points[i];
+                const p2 = route.points[i + 1];
+
+                const lengthSquared = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2);
+                let t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / lengthSquared));
+
+                const projX = p1.x + t * (p2.x - p1.x);
+                const projY = p1.y + t * (p2.y - p1.y);
+                const dist = Math.hypot(x - projX, y - projY);
+
+                if (dist < closest.dist && dist <= threshold) {
+                    closest = { route, insertIndex: i + 1, dist, projX, projY };
+                }
+            }
+        }
+        return closest.route ? closest : null;
     }
 }
