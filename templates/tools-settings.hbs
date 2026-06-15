@@ -80,7 +80,7 @@
         <div class="fwmb-biome-legend">
             {{#each biomeList}}
                 <div class="fwmb-biome-item" style="gap: var(--filroden-space-s);">
-                    <input type="color" class="fwmb-biome-swatch" name="color_{{this.key}}" value="{{this.hex}}" data-biome="{{this.key}}" />
+                    <input type="color" class="fwmb-swatch" name="color_{{this.key}}" value="{{this.hex}}" data-biome="{{this.key}}" />
                     <label style="font-size: var(--filroden-font-size-xs);">{{localize this.label}}</label>
                 </div>
             {{/each}}

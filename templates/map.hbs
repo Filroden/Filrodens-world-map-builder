@@ -11,6 +11,8 @@
             <div class="fwmb-readout-biome" id="fwmb-readout-biome">--</div>
         </div>
     </div>
+
+    <div id="fwmb-infra-tooltip" class="fwmb-hidden"></div>
         
     <div id="fwmb-3d-overlay" class="fwmb-3d-overlay fwmb-hidden"></div>
 
@@ -28,6 +30,15 @@
         </button>
         <button type="button" class="active" data-action="toggleLayer" data-layer="features" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerFeatures'}}">
             <i class="fwmb-icon water-drop"></i>
+        </button>
+        <button type="button" class="active" data-action="toggleLayer" data-layer="infrastructure" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerInfrastructure'}}">
+            <i class="fwmb-icon location-city"></i>
+        </button>
+        <button type="button" class="active" data-action="toggleLayer" data-layer="regions" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerRegions'}}">
+            <i class="fwmb-icon layers"></i>
+        </button>
+        <button type="button" class="active" data-action="toggleLayer" data-layer="labels" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerLabels'}}">
+            <i class="fwmb-icon insert-text"></i>
         </button>
         <div class="fwmb-divider-vertical"></div>
         <button type="button" class="active" data-action="toggleLayer" data-layer="contours" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerContours'}}">

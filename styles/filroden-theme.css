@@ -89,6 +89,9 @@
     /** A standard 1px solid border. */
     --filroden-border-main: 1px solid var(--filroden-color-border);
     
+    /** A 1px solid border in accent colour. */
+    --filroden-border-accent: 1px solid var(--filroden-color-text-accent);
+
     /** A standard 1px dashed border, for sub-sections or fieldsets. */
     --filroden-border-dashed: 1px dashed var(--filroden-color-border);
 

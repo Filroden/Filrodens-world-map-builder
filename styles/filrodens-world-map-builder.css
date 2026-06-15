@@ -23,6 +23,10 @@
     margin: 0;
 }
 
+.fwmb-icon.invert {
+    filter: invert(1);
+}
+
 .fwmb-icon.map                  { --fwmb-mask: url('../assets/icons/map.svg'); }
 .fwmb-icon.hex                  { --fwmb-mask: url('../assets/icons/hive.svg'); }
 .fwmb-icon.layers               { --fwmb-mask: url('../assets/icons/layers.svg'); }
@@ -63,11 +67,23 @@
 .fwmb-icon.upload-file          { --fwmb-mask: url('../assets/icons/upload_file.svg'); }
 .fwmb-icon.more-vert            { --fwmb-mask: url('../assets/icons/more_vert.svg'); }
 .fwmb-icon.image                { --fwmb-mask: url('../assets/icons/image.svg'); }
+.fwmb-icon.insert-text          { --fwmb-mask: url('../assets/icons/insert_text.svg'); }
+.fwmb-icon.filter-center-focus  { --fwmb-mask: url('../assets/icons/filter_center_focus.svg'); }
+.fwmb-icon.visibility           { --fwmb-mask: url('../assets/icons/visibility.svg'); }
+.fwmb-icon.visibility-off       { --fwmb-mask: url('../assets/icons/visibility_off.svg'); }
+.fwmb-icon.place                { --fwmb-mask: url('../assets/icons/add_location.svg'); }
+.fwmb-icon.timeline             { --fwmb-mask: url('../assets/icons/timeline.svg'); }
+.fwmb-icon.arrow-drop-down      { --fwmb-mask: url('../assets/icons/arrow_drop_down.svg'); }
+
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
     scrollbar-width: auto !important;
     scrollbar-color: auto !important;
+}
+
+.fwmb .fwmb-scrollable.stable {
+    scrollbar-gutter: stable;
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar {
@@ -150,6 +166,10 @@
     padding: var(--filroden-space-s) var(--filroden-space-m);
 }
 
+.fwmb .fwmb-btn.wide {
+    width: auto;
+}
+
 .fwmb .fwmb-btn:hover {
     background: var(--filroden-color-bg-hover-solid);
     border-color: var(--filroden-color-text-accent);
@@ -171,6 +191,12 @@
 
 .fwmb .fwmb-btn.primary:hover {
     color: var(--filroden-color-text-accent);
+}
+
+.fwmb .fwmb-btn.outline.active {
+    background: var(--filroden-color-bg-hover-solid);
+    border-color: var(--filroden-color-border-focus);
+    color: var(--filroden-color-text-main-solid);
 }
 
 
@@ -235,19 +261,21 @@
     position-area: top;
     margin-block-end: var(--filroden-space-xs);
     border: 1px solid var(--filroden-color-text-accent);
+
+    scrollbar-width: thin;
+    scrollbar-color: var(--filroden-color-text-accent) var(--filroden-color-bg-darkest);
 }
 
 .fwmb option {
     background: var(--filroden-color-bg-medium-solid);
     color: var(--filroden-color-text-main-solid);
+    padding: var(--filroden-space-xs) var(--filroden-space-s);
 }
 
-.fwmb option:hover {
+.fwmb option:hover,
+.fwmb option:focus {
     background: var(--filroden-color-text-accent);
     color: var(--filroden-color-text-on-accent);
-}
-
-.fwmb option:focus {
     outline: none;
 }
 
@@ -380,10 +408,16 @@
     gap: var(--filroden-space-l);
 }
 
-.fwmb .form-group label {
+.fwmb label {
     margin: 0;
     color: var(--filroden-color-text-main-solid);
     white-space: nowrap;
+}
+
+.fwmb .fwmb-title {
+    font-weight: bold;
+    margin-block-start: var(--filroden-space-m);
+    margin-block-end: var(--filroden-space-m);
 }
 
 
@@ -470,6 +504,10 @@
     overflow-y: auto; /* Required to trigger fwmb-scrollable mechanics */
 }
 
+.fwmb .fwmb-wide {
+    width: 4rem;
+}
+
 
 /* ===================================================================
    --- SCENE SIDEBAR BUTTON ---
@@ -489,7 +527,8 @@
    --- MAIN UI ---
 =================================================================== */
 
-.fwmb {
+.fwmb,
+.fwmb .window-content {
     font-family: var(--filroden-font-family) !important;
     font-size: var(--filroden-font-size-s);
     background: var(--filroden-color-bg-darkest) !important;
@@ -541,7 +580,7 @@
 .fwmb.fwmb-layout .window-content {
     padding: 0;
     display: flex;
-    flex-direction: row; /* Align the AppV2 Parts horizontally */
+    flex-direction: row;
     overflow: hidden;
     height: 100%;
 }
@@ -565,8 +604,6 @@
     align-items: center;
     justify-content: center;
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--filroden-radius-small);
     color: var(--filroden-color-text-muted-solid);
 }
 
@@ -837,7 +874,7 @@
     color: var(--filroden-color-text-main-solid);
 }
 
-.fwmb-biome-swatch {
+.fwmb-swatch {
     appearance: none;
     -webkit-appearance: none;
     width: var(--filroden-font-size-l);
@@ -850,20 +887,20 @@
     cursor: default;
 }
 
-input.fwmb-biome-swatch {
+input.fwmb-swatch {
     cursor: pointer;
 }
 
-.fwmb-biome-swatch::-webkit-color-swatch-wrapper {
+.fwmb-swatch::-webkit-color-swatch-wrapper {
     padding: 0;
 }
 
-.fwmb-biome-swatch::-webkit-color-swatch {
+.fwmb-swatch::-webkit-color-swatch {
     border: none;
     border-radius: 2px; 
 }
 
-.fwmb-biome-swatch::-moz-color-swatch {
+.fwmb-swatch::-moz-color-swatch {
     border: none;
     border-radius: 2px;
 }
@@ -976,7 +1013,6 @@ input.fwmb-biome-swatch {
     flex: 1;
     gap: var(--filroden-space-s);
     overflow-y: auto;
-    scrollbar-gutter: stable;
 }
 
 .fwmb-map-card {
@@ -1074,4 +1110,162 @@ input.fwmb-biome-swatch {
 
 .fwmb-dropdown-menu button.fwmb-danger:hover {
     background: rgba(255, 0, 0, 0.15);
+}
+
+/* ==========================================
+   Infrastructure UI Elements
+========================================== */
+
+.fwmb-icon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--filroden-font-size-xxl), 1fr));
+    gap: var(--filroden-space-s);
+    max-height: 200px;
+    overflow-y: auto;
+    padding: var(--filroden-space-s);
+    background: var(--filroden-color-bg-darkest);
+    border: 1px solid var(--filroden-color-border-light);
+    border-radius: var(--filroden-radius-medium);
+}
+
+.fwmb-icon-grid .fwmb-icon-btn {
+    width: var(--filroden-font-size-xxl);
+    height: var(--filroden-font-size-xxl);
+    padding: var(--filroden-space-xs);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--filroden-radius-medium);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.fwmb-icon-grid .fwmb-icon-btn:hover {
+    background: var(--filroden-color-bg-hover);
+}
+
+.fwmb-icon-grid .fwmb-icon-btn.active {
+    background: var(--filroden-color-bg-hover-solid);
+    border-color: var(--filroden-color-border-focus);
+}
+
+.fwmb-icon-grid img, 
+.fwmb-list-icon {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: invert(1);
+}
+
+.fwmb-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--filroden-space-xs);
+    padding-right: var(--filroden-space-xs);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.fwmb-list-item {
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-m);
+    padding: var(--filroden-space-s);
+    background: var(--filroden-color-bg-medium);
+    border: var(--filroden-border-accent);
+    border-radius: var(--filroden-radius-medium);
+}
+
+.fwmb-list-item .fwmb-list-icon {
+    width: var(--filroden-font-size-m);
+    height: var(--filroden-font-size-m);
+}
+
+.fwmb-route-swatch {
+    width: var(--filroden-font-size-xxl);
+    border-top-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+}
+
+#fwmb-infra-tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--filroden-color-bg-darkest);
+    color: var(--filroden-color-text-main-solid);
+    padding: var(--filroden-space-s) var(--filroden-space-m);
+    border-radius: var(--filroden-radius-medium);
+    border: var(--filroden-border-accent);
+    font-size: var(--filroden-font-size-xs);
+    line-height: 1.4;
+    z-index: 9999;
+    max-width: 16rem;
+    transform: translate(-50%, -100%);
+    box-shadow: var(--filroden-shadow-card);
+}
+
+#fwmb-infra-tooltip strong {
+    display: block;
+    color: var(--filroden-color-text-main-solid);
+    font-size: var(--filroden-font-size-s);
+    font-weight: bold;
+    margin-block-end: var(--filroden-space-xs);
+    border-block-end: var(--filroden-border-accent);
+    padding-block-end: var(--filroden-space-xxs);
+}
+
+.fwmb .fwmb-name {
+    font-size: var(--filroden-font-size-xs);
+    color: var(--filroden-color-text-main-solid);
+    min-width: 0; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis;
+}
+
+.fwmb-empty-state {
+    color: var(--filroden-color-text-muted-solid);
+}
+
+/* ==========================================
+   Custom Dropdown Select
+========================================== */
+.fwmb-custom-select {
+    position: relative;
+}
+
+.fwmb-select-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--filroden-space-xs) var(--filroden-space-s);
+    background: var(--filroden-color-bg-darkest);
+    border: 1px solid var(--filroden-color-border-light);
+    border-radius: 4px;
+    cursor: pointer;
+    min-width: 60px;
+    height: 32px;
+}
+
+.fwmb-select-trigger:hover {
+    background: var(--filroden-color-bg-hover);
+}
+
+.fwmb-select-trigger img {
+    width: 24px;
+    height: 24px;
+    filter: invert(1);
+}
+
+.fwmb-custom-select .fwmb-select-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 100;
+    margin-top: 4px;
+    background: var(--filroden-color-bg-darkest);
+    border: 1px solid var(--filroden-color-border-focus);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    width: 260px; /* Expands to hold the grid nicely */
+    padding: var(--filroden-space-s);
 }

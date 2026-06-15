@@ -24,6 +24,9 @@ export class StudioCanvas {
             biomes: new PIXI.Container(),
             contours: new PIXI.Container(),
             features: new PIXI.Container(),
+            infrastructure: new PIXI.Container(),
+            regions: new PIXI.Container(),
+            labels: new PIXI.Container(),
         };
 
         this.layers.biomes.alpha = 0.65;
@@ -32,6 +35,19 @@ export class StudioCanvas {
         this.vectorGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.vectorGraphics);
 
+        // Setup Infrastructure Sub-containers
+        this.routeGraphics = new PIXI.Graphics();
+        this.nodeContainer = new PIXI.Container();
+        this.pinContainer = new PIXI.Container();
+
+        this.layers.infrastructure.addChild(this.routeGraphics);
+        this.layers.infrastructure.addChild(this.nodeContainer); // Render nodes above lines
+        this.layers.infrastructure.addChild(this.pinContainer); // Render pins above nodes
+
+        // --- Global Drag Handling ---
+        this.activeDrag = null;
+        this.interactiveTargets = [];
+
         // Instantiate the grid layer
         this.gridLayer = new PIXI.Graphics();
 
@@ -39,7 +55,17 @@ export class StudioCanvas {
         this.layerSprites = {};
 
         // Add them to the zooming stage in ascending order
-        this.stage.addChild(this.layers.base, this.layers.topography, this.layers.biomes, this.layers.contours, this.layers.features, this.gridLayer);
+        this.stage.addChild(
+            this.layers.base,
+            this.layers.topography,
+            this.layers.biomes,
+            this.layers.contours,
+            this.layers.features,
+            this.layers.regions,
+            this.layers.infrastructure,
+            this.layers.labels,
+            this.gridLayer,
+        );
 
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };
@@ -72,6 +98,23 @@ export class StudioCanvas {
         this.lastBrushTime = 0;
     }
 
+    /**
+     * Mathematically checks if the mouse coordinates are hovering over a draggable node or pin.
+     */
+    #getGrabbedInfrastructure(x, y) {
+        let closest = null;
+        let minDist = Infinity;
+
+        for (const item of this.interactiveTargets) {
+            const dist = Math.hypot(item.x - x, item.y - y);
+            if (dist <= item.radius && dist < minDist) {
+                minDist = dist;
+                closest = item.target;
+            }
+        }
+        return closest;
+    }
+
     #setupInteractions(canvasElement) {
         // SCROLL TO ZOOM
         canvasElement.addEventListener("wheel", (e) => {
@@ -89,71 +132,20 @@ export class StudioCanvas {
             this.stage.scale.x *= scaleDirection;
             this.stage.scale.y *= scaleDirection;
 
-            // Constrain zoom levels (0.1x to 5x)
             this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x, 5));
             this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y, 5));
 
-            // Adjust position so it zooms towards the cursor
             this.stage.position.x = mouseX - localX * this.stage.scale.x;
             this.stage.position.y = mouseY - localY * this.stage.scale.y;
         });
 
-        // RIGHT CLICK OR MIDDLE CLICK TO PAN
-        canvasElement.addEventListener("pointerdown", (e) => {
-            if (e.button !== 2 && e.button !== 1) return; // Leave left click (0) for the paintbrush
-
-            this.isDragging = true;
-            this.dragStart = { x: e.clientX, y: e.clientY };
-            this.stageStart = { x: this.stage.position.x, y: this.stage.position.y };
-            canvasElement.style.cursor = "grabbing";
-        });
-
-        globalThis.addEventListener("pointermove", (e) => {
-            if (this.isDragging) {
-                const dx = e.clientX - this.dragStart.x;
-                const dy = e.clientY - this.dragStart.y;
-                this.stage.position.x = this.stageStart.x + dx;
-                this.stage.position.y = this.stageStart.y + dy;
-                return;
-            }
-
-            // Continuous painting while dragging
-            if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
-                const now = performance.now();
-
-                // Throttle the application to fire max once every 100ms
-                if (now - this.lastBrushTime > 100) {
-                    const coords = this.#getMapCoordinates(e, canvasElement);
-                    this.onBrushMove(coords.x, coords.y);
-                    this.lastBrushTime = now;
-                }
-            }
-        });
-
-        globalThis.addEventListener("pointerup", (e) => {
-            if (e.button !== 2 && e.button !== 1) return;
-            this.isDragging = false;
-            canvasElement.style.cursor = "default";
-        });
-
-        // Prevent browser context menus from ruining the right-click drag
+        // PREVENT NATIVE CONTEXT MENU
         canvasElement.addEventListener("contextmenu", (e) => e.preventDefault());
 
-        // HOVER READOUT
-        canvasElement.addEventListener("pointermove", (e) => {
-            if (this.onCanvasHover && !this.isDragging) {
-                const coords = this.#getMapCoordinates(e, canvasElement);
-                this.onCanvasHover(coords.x, coords.y);
-            }
-        });
-
-        canvasElement.addEventListener("pointerleave", (e) => {
-            if (this.onCanvasHover) this.onCanvasHover(null, null);
-        });
-
-        // PIXI listeners
+        // MOUSE DOWN (Start Pan, Drag, or Paint/Place)
         canvasElement.addEventListener("pointerdown", (e) => {
-            // Right/Middle click for panning
+            canvasElement.setPointerCapture(e.pointerId);
+
             if (e.button === 2 || e.button === 1) {
                 this.isDragging = true;
                 this.dragStart = { x: e.clientX, y: e.clientY };
@@ -162,35 +154,122 @@ export class StudioCanvas {
                 return;
             }
 
-            // Left click for painting
-            if (e.button === 0 && this.isEditMode && this.onBrushStart) {
+            if (e.button === 0 && this.isEditMode) {
                 const coords = this.#getMapCoordinates(e, canvasElement);
-                this.onBrushStart(coords.x, coords.y);
+
+                // --- Shift-Click Node Insertion Intercept ---
+                if (e.shiftKey && this.onInfraInsertNode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    this.activeDrag = null;
+                    this.onInfraInsertNode(coords.x, coords.y);
+                    return;
+                }
+
+                // 1. Try to grab an existing infrastructure node or pin
+                const grabbedTarget = this.#getGrabbedInfrastructure(coords.x, coords.y);
+
+                // --- Ctrl-Click / Cmd-Click Node Deletion Intercept ---
+                if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    this.activeDrag = null;
+                    this.onInfraDeleteNode(grabbedTarget);
+                    return;
+                }
+
+                if (grabbedTarget) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    this.activeDrag = { target: grabbedTarget };
+                    canvasElement.style.cursor = "grabbing";
+                    if (this.onInfraDragStart) this.onInfraDragStart();
+                    return;
+                }
+
+                // 2. Otherwise, pass to brush engine
+                if (this.onBrushStart) {
+                    this.onBrushStart(coords.x, coords.y);
+                }
             }
         });
 
-        globalThis.addEventListener("pointermove", (e) => {
+        // MOUSE MOVE (Pan, Drag Item, or Continuous Paint)
+        canvasElement.addEventListener("pointermove", (e) => {
+            const coords = this.#getMapCoordinates(e, canvasElement);
+
             if (this.isDragging) {
-                // ... existing panning logic ...
+                const dx = e.clientX - this.dragStart.x;
+                const dy = e.clientY - this.dragStart.y;
+                this.stage.position.x = this.stageStart.x + dx;
+                this.stage.position.y = this.stageStart.y + dy;
                 return;
             }
 
-            // Continuous painting while dragging
+            // Dragging an Infrastructure Item
+            if (this.activeDrag) {
+                // Clamp coordinates to prevent dragging items off the map boundaries
+                this.activeDrag.target.x = Math.max(0, Math.min(coords.x, this.mapWidth));
+                this.activeDrag.target.y = Math.max(0, Math.min(coords.y, this.mapHeight));
+
+                if (this.onInfraDrag) this.onInfraDrag();
+                return;
+            }
+
+            // Continuous Painting
             if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
-                const coords = this.#getMapCoordinates(e, canvasElement);
-                this.onBrushMove(coords.x, coords.y);
+                const now = performance.now();
+                if (now - this.lastBrushTime > 100) {
+                    this.onBrushMove(coords.x, coords.y);
+                    this.lastBrushTime = now;
+                }
+                return;
+            }
+
+            // --- HOVER STATES ---
+            if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+
+            if (this.isEditMode && !this.isDragging && !this.activeDrag) {
+                const hoverTarget = this.#getGrabbedInfrastructure(coords.x, coords.y);
+                canvasElement.style.cursor = hoverTarget ? "grab" : "crosshair";
             }
         });
 
-        globalThis.addEventListener("pointerup", (e) => {
+        // RELEASE MOUSE (End Pan, Drag, or Brush)
+        const endPointer = (e) => {
+            if (canvasElement.hasPointerCapture(e.pointerId)) {
+                canvasElement.releasePointerCapture(e.pointerId);
+            }
+
             if (e.button === 2 || e.button === 1) {
                 this.isDragging = false;
                 canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
                 return;
             }
 
-            if (e.button === 0 && this.isEditMode && this.onBrushEnd) {
-                this.onBrushEnd();
+            if (e.button === 0) {
+                if (this.activeDrag) {
+                    this.activeDrag = null;
+                    canvasElement.style.cursor = "crosshair";
+                    if (this.onInfraDragEnd) this.onInfraDragEnd();
+                    return; // CRITICAL: Abort so we don't trigger brush end
+                }
+
+                if (this.isEditMode && this.onBrushEnd) {
+                    this.onBrushEnd();
+                }
+            }
+        };
+
+        canvasElement.addEventListener("pointerup", endPointer);
+        canvasElement.addEventListener("pointercancel", endPointer);
+
+        canvasElement.addEventListener("pointerleave", (e) => {
+            if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
+                this.onCanvasHover(null, null);
             }
         });
     }
@@ -511,5 +590,221 @@ export class StudioCanvas {
             console.error("FWMB | Failed to export PNG:", err);
             ui.notifications.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
         }
+    }
+
+    /**
+     * Generates a smooth array of coordinates through the provided points using a Catmull-Rom spline.
+     */
+    #getSplinePoints(points, resolution = 20) {
+        if (!points || points.length < 2) return points;
+        if (points.length === 2) return points;
+
+        const curve = [];
+
+        // To make the spline pass exactly through the first and last points without snapping,
+        // we duplicate the start and end nodes to act as invisible control anchors.
+        const p = [points[0], ...points, points[points.length - 1]];
+
+        for (let i = 1; i < p.length - 2; i++) {
+            const p0 = p[i - 1];
+            const p1 = p[i];
+            const p2 = p[i + 1];
+            const p3 = p[i + 2];
+
+            for (let t = 0; t <= 1; t += 1 / resolution) {
+                const t2 = t * t;
+                const t3 = t2 * t;
+
+                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+
+                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+
+                // Prevent pushing microscopic overlapping coordinates
+                if (curve.length > 0) {
+                    const last = curve.at(-1);
+                    if (Math.abs(last.x - x) < 0.1 && Math.abs(last.y - y) < 0.1) continue;
+                }
+
+                curve.push({ x, y });
+            }
+        }
+        return curve;
+    }
+
+    /**
+     * Renders vector routes and POI pins to the infrastructure layer.
+     */
+    renderInfrastructure(pins = [], routes = [], isEditMode = false) {
+        this.routeGraphics.clear();
+        this.pinContainer.removeChildren().forEach((c) => c.destroy());
+        this.nodeContainer.removeChildren().forEach((c) => c.destroy());
+
+        // Clear the mathematical spatial cache before rendering
+        this.interactiveTargets = [];
+
+        // 1. Render Routes (Bottom Layer)
+        routes.forEach((route) => {
+            if (route.hidden || !route.points || route.points.length < 2) return;
+
+            const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
+            const splinePoints = this.#getSplinePoints(route.points);
+
+            this.routeGraphics.lineStyle(route.thickness, colorHex, 1);
+
+            if (route.style === "solid") {
+                this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
+                for (let i = 1; i < splinePoints.length; i++) {
+                    this.routeGraphics.lineTo(splinePoints[i].x, splinePoints[i].y);
+                }
+            } else {
+                const dashPattern = route.style === "dashed" ? [route.thickness * 4, route.thickness * 3] : [route.thickness, route.thickness * 2];
+                let dashIndex = 0;
+                let dashLength = 0;
+                let isDrawing = true;
+
+                this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
+
+                for (let i = 1; i < splinePoints.length; i++) {
+                    const p1 = splinePoints[i - 1];
+                    const p2 = splinePoints[i];
+                    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+                    let remainingDist = dist;
+                    let currentX = p1.x;
+                    let currentY = p1.y;
+
+                    while (remainingDist > 0) {
+                        const step = Math.min(remainingDist, dashPattern[dashIndex] - dashLength);
+                        const ratio = step / remainingDist;
+
+                        currentX += (p2.x - currentX) * ratio;
+                        currentY += (p2.y - currentY) * ratio;
+
+                        if (isDrawing) {
+                            this.routeGraphics.lineTo(currentX, currentY);
+                        } else {
+                            this.routeGraphics.moveTo(currentX, currentY);
+                        }
+
+                        dashLength += step;
+                        remainingDist -= step;
+
+                        if (dashLength >= dashPattern[dashIndex]) {
+                            dashLength = 0;
+                            dashIndex = (dashIndex + 1) % dashPattern.length;
+                            isDrawing = !isDrawing;
+                        }
+                    }
+                }
+            }
+
+            if (isEditMode) {
+                route.points.forEach((pt) => {
+                    const node = new PIXI.Graphics();
+                    node.beginFill(0xffffff, 0.6);
+                    node.lineStyle(2, 0x000000, 0.6);
+                    node.drawCircle(0, 0, 5);
+                    node.endFill();
+                    node.x = pt.x;
+                    node.y = pt.y;
+
+                    // Push to mathematical cache instead of binding PIXI events
+                    this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
+                    this.nodeContainer.addChild(node);
+                });
+            }
+        });
+
+        // 2. Render Pins (Top Layer)
+        pins.forEach((pin) => {
+            if (pin.hidden) return;
+
+            const texturePath = `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg`;
+            const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
+
+            sprite.anchor.set(0.5);
+            sprite.width = 32;
+            sprite.height = 32;
+            sprite.x = pin.x;
+            sprite.y = pin.y;
+
+            if (isEditMode) {
+                // Push to mathematical cache
+                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: 16 });
+            } else if (pin.name || pin.description) {
+                // Keep PIXI hover events for tooltips ONLY when not in edit mode
+                sprite.eventMode = "static";
+                sprite.interactive = true;
+                sprite.cursor = "help";
+
+                sprite.on("pointerover", () => {
+                    const tooltip = document.getElementById("fwmb-infra-tooltip");
+                    if (!tooltip) return;
+
+                    let html = ``;
+                    if (pin.name) html += `<strong>${pin.name}</strong>`;
+                    if (pin.description) html += `<span>${pin.description.replaceAll("\n", "<br>")}</span>`;
+
+                    tooltip.innerHTML = html;
+                    tooltip.classList.remove("fwmb-hidden");
+                });
+
+                sprite.on("pointermove", (e) => {
+                    const tooltip = document.getElementById("fwmb-infra-tooltip");
+                    if (!tooltip) return;
+
+                    const evt = e.data.originalEvent;
+                    tooltip.style.left = `${evt.clientX}px`;
+                    tooltip.style.top = `${evt.clientY - 15}px`;
+                });
+
+                sprite.on("pointerout", () => {
+                    const tooltip = document.getElementById("fwmb-infra-tooltip");
+                    if (tooltip) tooltip.classList.add("fwmb-hidden");
+                });
+            }
+
+            this.pinContainer.addChild(sprite);
+        });
+    }
+
+    /**
+     * Frames the viewport to encompass a specific array of coordinates.
+     */
+    zoomToFeature(points) {
+        if (!points || points.length === 0 || !this.stage) return;
+
+        const MIN_BOUNDS_SIZE = 400;
+        const PADDING_FACTOR = 1.2;
+        const MAX_ZOOM_SCALE = 2;
+
+        let minX = points[0].x;
+        let maxX = points[0].x;
+        let minY = points[0].y;
+        let maxY = points[0].y;
+
+        // Flatten the boundaries
+        for (let i = 1; i < points.length; i++) {
+            if (points[i].x < minX) minX = points[i].x;
+            if (points[i].x > maxX) maxX = points[i].x;
+            if (points[i].y < minY) minY = points[i].y;
+            if (points[i].y > maxY) maxY = points[i].y;
+        }
+
+        const width = Math.max(maxX - minX, MIN_BOUNDS_SIZE);
+        const height = Math.max(maxY - minY, MIN_BOUNDS_SIZE);
+
+        const centerX = minX + width / 2;
+        const centerY = minY + height / 2;
+
+        // Calculate scale to fit with padding, constrained by maximum zoom limits
+        const scaleX = this.app.screen.width / (width * PADDING_FACTOR);
+        const scaleY = this.app.screen.height / (height * PADDING_FACTOR);
+        const targetScale = Math.min(scaleX, scaleY, MAX_ZOOM_SCALE);
+
+        // Apply transforms directly to the PIXI stage
+        this.stage.scale.set(targetScale);
+        this.stage.position.x = this.app.screen.width / 2 - centerX * targetScale;
+        this.stage.position.y = this.app.screen.height / 2 - centerY * targetScale;
     }
 }
