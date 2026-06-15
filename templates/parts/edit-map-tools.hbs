@@ -32,9 +32,23 @@
                 {{/each}}
             </select>
         </div>
+
+        <button type="button" data-tool-group="infrastructure" data-action="setInfraMode" data-mode="pin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ModePin'}}">
+            <i class="fwmb-icon place"></i>
+        </button>
+
+        <button type="button" data-tool-group="infrastructure" data-action="setInfraMode" data-mode="route" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ModeRoute'}}">
+            <i class="fwmb-icon timeline"></i>
+        </button>
+
+        <button type="button" data-tool-group="infrastructure" data-action="toggleSnapping" class="fwmb-btn wide {{#if uiState.snapToPoints}}active {{else}}fwmb-hidden {{/if}}">
+            <i class="fwmb-icon filter-center-focus"></i>
+            {{localize "FILRODENSWMB.UI.SnapToPoints"}}
+        </button>
+
     </div>
 
-    <div class="fwmb-divider-vertical" data-tool-group="terrain biomes"></div>
+    <div class="fwmb-divider-vertical" data-tool-group="terrain biomes infrastructure"></div>
 
     <div class="fwmb-brush-tools">
 
@@ -55,12 +69,67 @@
         <button type="button" data-tool-group="features" data-action="setBrushTool" data-tool="addSpring" class="active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolAddSpring'}}">
             <i class="fwmb-icon water-drop"></i>
         </button>
+
         <button type="button" data-tool-group="features" data-action="setBrushTool" data-tool="blockSpring" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolBlockSpring'}}">
             <i class="fwmb-icon format-color-reset"></i>
         </button>
+
         <button type="button" data-tool-group="features" data-action="setBrushTool" data-tool="erasePin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolErasePin'}}">
             <i class="fwmb-icon ink-eraser"></i>
         </button>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-pin">
+            <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
+            <div class="fwmb-custom-select" id="fwmb-pin-select">
+                <div class="fwmb-select-trigger" data-action="togglePinDropdown">
+                    <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{uiState.activeIcon}}.svg" class="fwmb-active-icon-img" />
+                    <i class="fwmb-icon arrow-drop-down invert"></i>
+                </div>
+                <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
+                    {{#each infrastructureIcons}}
+                    <button type="button" class="fwmb-icon-btn {{#if (eq ../uiState.activeIcon this.id)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.id}}" data-tooltip="{{localize this.label}}">
+                        <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{this.id}}.svg" alt="{{localize this.label}}" />
+                    </button>
+                    {{/each}}
+                </div>
+            </div>
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-route">
+            <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
+            <div class="fwmb-flex-row" style="gap: 4px;">
+                {{#each routeStyles}}
+                <button type="button" class="fwmb-btn outline small wide {{#if (eq ../uiState.activeRouteQuickStyle this.id)}}active{{/if}}" data-action="setRouteStyle" data-style="{{this.id}}">
+                    {{localize this.label}}
+                </button>
+                {{/each}}
+            </div>
+        </div>
+
+        <div class="fwmb-divider-vertical" data-tool-group="infrastructure"></div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-route">
+            <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
+            <input type="color" class="fwmb-swatch fwmb-wide" name="routeColor" value="{{lookup uiState 'routeColor'}}" style="height: 24px; padding: 0;" />
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-route">
+            <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="routeThickness" value="{{lookup uiState 'routeThickness'}}" min="1" max="10" step="1" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "routeThickness"}}</output>
+            </div>
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-route">
+            <label>{{localize "FILRODENSWMB.UI.LineStyle"}}</label>
+            <select name="routeStyle">
+                <option value="solid" {{#if (eq uiState.routeStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+                <option value="dashed" {{#if (eq uiState.routeStyle "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
+                <option value="dotted" {{#if (eq uiState.routeStyle "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
+            </select>
+        </div>
+
     </div>
 
     <div class="fwmb-divider-vertical"></div>

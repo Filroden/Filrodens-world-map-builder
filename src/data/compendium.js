@@ -109,10 +109,12 @@ export async function deleteSavedMap(id) {
 export async function renameSavedMap(id, newName) {
     const pack = game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
     if (!pack) return false;
+
     const doc = await pack.getDocument(id);
     if (!doc) return false;
-    await doc.update({ name: newName });
-    return true;
+
+    // Return the updated document instead of a boolean
+    return await doc.update({ name: newName });
 }
 
 export async function duplicateSavedMap(id) {

@@ -32,7 +32,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             saveMap: MapStudioApp.#onSaveMap,
             manageMap: MapStudioApp.#onManageMapAction,
             importMapJson: MapStudioApp.#onImportMapJson,
-            loadMap: MapStudioApp.#onLoadMapDialog,
             threeDView: MapStudioApp.#onThreeDView,
             toggleLayer: MapStudioApp.#onToggleLayer,
             applyResolution: MapStudioApp.#onApplyResolution,
@@ -41,6 +40,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             nudgeNoise: MapStudioApp.#onNudgeNoise,
             resetNoisePan: MapStudioApp.#onResetNoisePan,
             setInfrastructureIcon: MapStudioApp.#onSetInfrastructureIcon,
+            setInfraMode: MapStudioApp.#onSetInfraMode,
             toggleSnapping: MapStudioApp.#onToggleSnapping,
             setRouteStyle: MapStudioApp.#onSetRouteStyle,
             togglePinVisibility: MapStudioApp.#onTogglePinVisibility,
@@ -51,6 +51,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             editPin: MapStudioApp.#onEditPin,
             zoomToRoute: MapStudioApp.#onZoomToRoute,
             editRoute: MapStudioApp.#onEditRoute,
+            togglePinDropdown: MapStudioApp.#onTogglePinDropdown,
         },
     };
 
@@ -146,6 +147,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             routeColor: "#ffffff",
             routeThickness: 3,
             routeStyle: "solid",
+            activeRouteQuickStyle: "custom",
         };
 
         // The dynamic cache inherits from defaults on launch
@@ -195,13 +197,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         context.uiState = this.uiState;
 
-        if (partId === "context" && this.activeTool === "infrastructure") {
-            context.infrastructureIcons = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS).map(([id, label]) => ({
+        context.infrastructureIcons = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS)
+            .map(([id, label]) => ({
                 id: id,
                 label: label,
-            }));
+                _localized: game.i18n.localize(label),
+            }))
+            .sort((a, b) => a._localized.localeCompare(b._localized));
 
-            context.mapPins = this.mapPins || [];
+        // Inject the Route Styles for dynamic button generation
+        context.routeStyles = Object.entries(FILRODENSWMB.ROUTE_STYLES).map(([id, data]) => ({
+            id: id,
+            label: data.label,
+        }));
+
+        if (partId === "context") {
+            context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
+
+            // Strictly filter out river springs so they don't appear in the sidebar list
+            context.mapPins = (this.mapPins || []).filter((p) => !!p.icon);
             context.mapRoutes = this.mapRoutes || [];
         }
 
@@ -277,6 +291,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 // Custom Route Settings Intercept
                 if (event.target.matches('input[name="routeColor"], input[name="routeThickness"], select[name="routeStyle"]')) {
                     this.uiState.activeInfraMode = "route";
+                    this.uiState.activeRouteQuickStyle = "custom";
+                    this.#syncInfraModeButtons();
                     this.#getMapParameters();
 
                     if (this.activeRouteId) {
@@ -553,9 +569,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (editToolbar) {
             editToolbar.querySelectorAll("[data-tool-group]").forEach((el) => {
                 const allowedTools = el.dataset.toolGroup.split(" ");
-                el.classList.toggle("fwmb-hidden", !allowedTools.includes(newTool));
+                let isVisible = allowedTools.includes(newTool);
+
+                // Special handling to display the correct styling tools based on active sub-mode
+                if (newTool === "infrastructure" && allowedTools.some((t) => t.startsWith("infrastructure-"))) {
+                    isVisible = allowedTools.includes(`infrastructure-${this.uiState.activeInfraMode}`);
+                }
+
+                el.classList.toggle("fwmb-hidden", !isVisible);
             });
         }
+
+        this.#syncInfraModeButtons();
 
         this.render({ parts: ["toolbar", "context"] });
     }
@@ -628,6 +653,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 panel.classList.toggle("fwmb-locked", isActivating);
             }
         }
+
+        // Force a repaint if we are on the features tool to instantly show/hide the red/black river edit pins
+        if (this.activeTool === "features") {
+            this.#repaintCanvas();
+        }
     }
 
     async #repaintCanvas() {
@@ -680,7 +710,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // 5. Draw Vector Graphics (Rivers and POI Pins)
         if (riverVectors) {
-            const showPins = this.activeTool === "features";
+            // Only show edit pins if the tool is active AND edit mode is toggled on
+            const isEditModeActive = this.element.querySelector('[data-action="toggleEditMode"]')?.classList.contains("active");
+            const showPins = this.activeTool === "features" && isEditModeActive;
+
             this.canvasEngine.renderRiverVectors(riverVectors, this.mapPins, showPins, waterMask);
 
             const featuresBtn = this.element.querySelector('[data-layer="features"]');
@@ -688,7 +721,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         // 6. Draw Infrastructure Layer
-        this.canvasEngine.renderInfrastructure(this.mapPins, this.mapRoutes);
+        // Strictly filter out river springs so the SVG renderer doesn't choke on undefined paths
+        const infraPins = this.mapPins.filter((p) => !!p.icon);
+        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes);
     }
 
     /**
@@ -1108,8 +1143,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 });
 
                 if (newName && newName !== currentName) {
-                    await renameSavedMap(mapId, newName);
-                    if (this.currentSaveId === mapId) this.currentSaveName = newName;
+                    const updatedDoc = await renameSavedMap(mapId, newName);
+
+                    // Force sync the application memory if the renamed map is the currently active one
+                    if (this.currentSaveId === mapId) {
+                        this.currentSaveName = newName;
+                        // If the database generated a new ID during the rename, catch it
+                        if (updatedDoc && updatedDoc.id && updatedDoc.id !== this.currentSaveId) {
+                            this.currentSaveId = updatedDoc.id;
+                        }
+                    }
                     this.render({ parts: ["context"] });
                 }
                 break;
@@ -1172,53 +1215,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         };
 
         input.click();
-    }
-
-    static async #onLoadMapDialog(event, target) {
-        // Warn the GM if they are about to overwrite unsaved canvas data
-        const hasBrushEdits = this.brushEngine && this.brushEngine.history.length > 0;
-        const hasPinEdits = this.mapPins && this.mapPins.length > 0;
-
-        if (hasBrushEdits || hasPinEdits) {
-            const confirmed = await foundry.applications.api.DialogV2.confirm({
-                window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
-                content: `<p>${game.i18n.localize("FILRODENSWMB.UI.LoadWarningContent")}</p>`,
-                rejectClose: false,
-                modal: true,
-            });
-            if (!confirmed) return;
-        }
-
-        const maps = await getSavedMaps();
-        if (maps.length === 0) {
-            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.NoSavedMaps"));
-            return;
-        }
-
-        const optionsHtml = maps.map((m) => `<option value="${m.id}">${m.name}</option>`).join("");
-        const content = `
-            <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
-                <label>${game.i18n.localize("FILRODENSWMB.UI.SelectMap")}</label>
-                <select id="fwmb-map-select" style="width: 100%; padding: 4px;">${optionsHtml}</select>
-            </div>
-        `;
-
-        const selectedId = await foundry.applications.api.DialogV2.prompt({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.LoadMap") },
-            content: content,
-            ok: {
-                label: game.i18n.localize("FILRODENSWMB.UI.Load"),
-                callback: (event, button, dialog) => document.getElementById("fwmb-map-select").value,
-            },
-        });
-
-        if (selectedId) {
-            const payload = await loadMapData(selectedId);
-            if (payload) {
-                await this.#ingestMapPayload(payload);
-                ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
-            }
-        }
     }
 
     async #ingestMapPayload(payload) {
@@ -1379,7 +1375,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         let closest = { x, y, dist: Infinity };
 
         for (const pin of this.mapPins) {
-            if (pin.hidden) continue;
+            // Skip hidden POIs and river springs
+            if (pin.hidden || !pin.icon) continue;
+
             const dist = Math.hypot(pin.x - x, pin.y - y);
             if (dist < closest.dist && dist <= threshold) {
                 closest = { x: pin.x, y: pin.y, dist };
@@ -1393,6 +1391,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Routes clicks to either the Pin placement or Spline extension logic.
      */
     #handleInfrastructureClick(x, y) {
+        // Prevent placing infrastructure outside the canvas boundaries
+        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+
         this.pinHistory.push({
             pins: foundry.utils.deepClone(this.mapPins),
             routes: foundry.utils.deepClone(this.mapRoutes),
@@ -1445,40 +1446,28 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.render({ parts: ["context"] }); // Re-render sidebar to show the new list item
     }
 
-    static #onSetInfrastructureIcon(event, target) {
-        this.uiState.activeIcon = target.dataset.icon;
-        this.uiState.activeInfraMode = "pin";
-        this.activeRouteId = null;
-        this.render({ parts: ["context"] });
-    }
-
     static #onToggleSnapping(event, target) {
         this.uiState.snapToPoints = !this.uiState.snapToPoints;
         target.classList.toggle("active", this.uiState.snapToPoints);
     }
 
     static #onSetRouteStyle(event, target) {
-        const style = target.dataset.style;
-        this.uiState.activeInfraMode = "route";
-        this.activeRouteId = null; // Drop any active line to start a fresh one
+        const styleId = target.dataset.style;
+        const styleData = FILRODENSWMB.ROUTE_STYLES[styleId];
 
-        if (style === "major") {
-            this.uiState.routeColor = "#ffb300"; // Amber
-            this.uiState.routeThickness = 6;
-            this.uiState.routeStyle = "solid";
-        } else if (style === "minor") {
-            this.uiState.routeColor = "#e0e0e0"; // Light Grey
-            this.uiState.routeThickness = 3;
-            this.uiState.routeStyle = "solid";
-        } else if (style === "trail") {
-            this.uiState.routeColor = "#8d6e63"; // Brown
-            this.uiState.routeThickness = 2;
-            this.uiState.routeStyle = "dashed";
-        } else if (style === "sea") {
-            this.uiState.routeColor = "#4dd0e1"; // Cyan
-            this.uiState.routeThickness = 4;
-            this.uiState.routeStyle = "dotted";
-        }
+        if (!styleData) return;
+
+        this.uiState.activeInfraMode = "route";
+        this.uiState.activeRouteQuickStyle = styleId;
+        this.activeRouteId = null;
+
+        // Apply data-driven parameters
+        this.uiState.routeColor = styleData.color;
+        this.uiState.routeThickness = styleData.thickness;
+        this.uiState.routeStyle = styleData.style;
+
+        this.#syncDOMToState();
+        this.#syncInfraModeButtons();
 
         this.render({ parts: ["context"] });
     }
@@ -1529,7 +1518,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static #onZoomToRoute(event, target) {
         const id = target.closest(".fwmb-list-item").dataset.id;
         const route = this.mapRoutes.find((r) => r.id === id);
-        if (route && route.points && this.canvasEngine) {
+        if (route?.points && this.canvasEngine) {
             this.canvasEngine.zoomToFeature(route.points);
         }
     }
@@ -1539,11 +1528,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const pin = this.mapPins.find((p) => p.id === id);
         if (!pin) return;
 
-        // Reconstruct the Icon Dictionary into a dropdown list
+        // Reconstruct the Icon Dictionary into an alphabetically sorted dropdown list
         const iconOptions = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS)
-            .map(([key, label]) => {
+            .map(([key, label]) => ({
+                key: key,
+                localized: game.i18n.localize(label),
+            }))
+            .sort((a, b) => a.localized.localeCompare(b.localized))
+            .map(({ key, localized }) => {
                 const isSelected = key === pin.icon ? "selected" : "";
-                return `<option value="${key}" ${isSelected}>${game.i18n.localize(label)}</option>`;
+                return `<option value="${key}" ${isSelected}>${localized}</option>`;
             })
             .join("");
 
@@ -1554,7 +1548,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             </div>
             <div class="form-group stacked">
                 <label>${game.i18n.localize("FILRODENSWMB.UI.Description")}</label>
-                <textarea name="pinDesc" rows="4">${pin.description || ""}</textarea>
+                <textarea class="fwmb-scrollable stable" name="pinDesc" rows="4">${pin.description || ""}</textarea>
             </div>
             <div class="form-group">
                 <label>${game.i18n.localize("FILRODENSWMB.UI.SelectIcon")}</label>
@@ -1563,6 +1557,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         `;
 
         const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
             window: { title: game.i18n.localize("FILRODENSWMB.UI.EditPin") },
             content: content,
             ok: {
@@ -1618,7 +1613,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             </div>
             <div class="form-group stacked">
                 <label>${game.i18n.localize("FILRODENSWMB.UI.Description")}</label>
-                <textarea name="routeDesc" rows="4">${route.description || ""}</textarea>
+                <textarea class="fwmb-scrollable stable" name="routeDesc" rows="4">${route.description || ""}</textarea>
             </div>
             <div class="form-group">
                 <label>${game.i18n.localize("FILRODENSWMB.UI.LineColor")}</label>
@@ -1635,6 +1630,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         `;
 
         const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
             window: { title: game.i18n.localize("FILRODENSWMB.UI.EditRoute") },
             content: content,
             ok: {
@@ -1667,5 +1663,65 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.#repaintCanvas();
             this.render({ parts: ["context"] });
         }
+    }
+
+    /**
+     * Updates the active classes on the edit toolbar infrastructure buttons.
+     */
+    #syncInfraModeButtons() {
+        const mode = this.uiState.activeInfraMode;
+
+        // 1. Toggle the explicit Mode Buttons (Pin vs Route)
+        const modeBtns = this.element.querySelectorAll('.fwmb-edit-toolbar [data-action="setInfraMode"]');
+        for (const btn of modeBtns) {
+            btn.classList.toggle("active", btn.dataset.mode === mode);
+        }
+
+        // 2. Toggle the Quick Style Buttons
+        const styleBtns = this.element.querySelectorAll('.fwmb-edit-toolbar [data-action="setRouteStyle"]');
+        for (const btn of styleBtns) {
+            btn.classList.toggle("active", btn.dataset.style === this.uiState.activeRouteQuickStyle);
+        }
+
+        // 3. Toggle the specific creation tools based on the active mode
+        if (this.activeTool === "infrastructure") {
+            const toolGroups = this.element.querySelectorAll(".fwmb-edit-toolbar [data-tool-group]");
+            for (const group of toolGroups) {
+                const allowed = group.dataset.toolGroup.split(" ");
+                if (allowed.some((a) => a.startsWith("infrastructure-"))) {
+                    group.classList.toggle("fwmb-hidden", !allowed.includes(`infrastructure-${mode}`));
+                }
+            }
+        }
+    }
+
+    static #onSetInfrastructureIcon(event, target) {
+        this.uiState.activeIcon = target.dataset.icon;
+        this.uiState.activeInfraMode = "pin";
+        this.activeRouteId = null;
+
+        // Visually update the custom dropdown trigger to show the new selection
+        const triggerImg = this.element.querySelector(".fwmb-active-icon-img");
+        if (triggerImg) triggerImg.src = `modules/filrodens-world-map-builder/assets/pinhead-icons/${this.uiState.activeIcon}.svg`;
+
+        // Automatically hide the grid dropdown once clicked
+        const dropdown = this.element.querySelector("#fwmb-pin-select .fwmb-select-options");
+        if (dropdown) dropdown.classList.add("fwmb-hidden");
+
+        this.#syncInfraModeButtons();
+    }
+
+    /**
+     * Handles manual switching between Point and Route modes via the edit toolbar.
+     */
+    static #onSetInfraMode(event, target) {
+        this.uiState.activeInfraMode = target.dataset.mode;
+        this.activeRouteId = null; // Drop any active line when swapping modes
+        this.#syncInfraModeButtons();
+    }
+
+    static #onTogglePinDropdown(event, target) {
+        const dropdown = target.closest(".fwmb-custom-select").querySelector(".fwmb-select-options");
+        if (dropdown) dropdown.classList.toggle("fwmb-hidden");
     }
 }
