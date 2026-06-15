@@ -649,14 +649,88 @@ export class StudioCanvas {
             const texturePath = `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg`;
             const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
 
-            // Standardise icon sizing and anchor it dead centre so clicking is perfectly accurate
             sprite.anchor.set(0.5);
             sprite.width = 32;
             sprite.height = 32;
             sprite.x = pin.x;
             sprite.y = pin.y;
 
+            // Interactive Tooltip Logic ---
+            if (pin.name || pin.description) {
+                sprite.eventMode = "static";
+                sprite.interactive = true;
+                sprite.cursor = "help";
+
+                sprite.on("pointerover", () => {
+                    const tooltip = document.getElementById("fwmb-infra-tooltip");
+                    if (!tooltip) return;
+
+                    // Build the HTML content, replacing newlines with <br> for descriptions
+                    let html = ``;
+                    if (pin.name) html += `<strong>${pin.name}</strong>`;
+                    if (pin.description) html += `<span>${pin.description.replaceAll("\n", "<br>")}</span>`;
+
+                    tooltip.innerHTML = html;
+                    tooltip.classList.remove("fwmb-hidden");
+                });
+
+                sprite.on("pointermove", (e) => {
+                    const tooltip = document.getElementById("fwmb-infra-tooltip");
+                    if (!tooltip) return;
+
+                    // Position tooltip relative to the mouse using the native window event
+                    const evt = e.data.originalEvent;
+                    tooltip.style.left = `${evt.clientX}px`;
+                    tooltip.style.top = `${evt.clientY - 15}px`; // Offset slightly above cursor
+                });
+
+                sprite.on("pointerout", () => {
+                    const tooltip = document.getElementById("fwmb-infra-tooltip");
+                    if (tooltip) tooltip.classList.add("fwmb-hidden");
+                });
+            }
+
             this.pinContainer.addChild(sprite);
         });
+    }
+
+    /**
+     * Frames the viewport to encompass a specific array of coordinates.
+     */
+    zoomToFeature(points) {
+        if (!points || points.length === 0 || !this.stage) return;
+
+        const MIN_BOUNDS_SIZE = 400;
+        const PADDING_FACTOR = 1.2;
+        const MAX_ZOOM_SCALE = 2;
+
+        let minX = points[0].x;
+        let maxX = points[0].x;
+        let minY = points[0].y;
+        let maxY = points[0].y;
+
+        // Flatten the boundaries
+        for (let i = 1; i < points.length; i++) {
+            if (points[i].x < minX) minX = points[i].x;
+            if (points[i].x > maxX) maxX = points[i].x;
+            if (points[i].y < minY) minY = points[i].y;
+            if (points[i].y > maxY) maxY = points[i].y;
+        }
+
+        const width = Math.max(maxX - minX, MIN_BOUNDS_SIZE);
+        const height = Math.max(maxY - minY, MIN_BOUNDS_SIZE);
+
+        const centerX = minX + width / 2;
+        const centerY = minY + height / 2;
+
+        // Calculate scale to fit with padding, constrained by maximum zoom limits
+        const scaleX = this.app.screen.width / (width * PADDING_FACTOR);
+        const scaleY = this.app.screen.height / (height * PADDING_FACTOR);
+        const targetScale = Math.min(scaleX, scaleY, MAX_ZOOM_SCALE);
+
+        // Apply transforms directly to the PIXI stage
+        this.stage.scale.set(targetScale);
+        this.stage.position.x = this.app.screen.width / 2 - centerX * targetScale;
+        this.stage.position.y = this.app.screen.height / 2 - centerY * targetScale;
     }
 }

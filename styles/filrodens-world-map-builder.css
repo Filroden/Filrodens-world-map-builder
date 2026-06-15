@@ -74,6 +74,10 @@
     scrollbar-color: auto !important;
 }
 
+.fwmb .fwmb-scrollable.stable {
+    scrollbar-gutter: stable;
+}
+
 .fwmb .fwmb-scrollable::-webkit-scrollbar {
     width: 8px !important;
     height: 8px !important;
@@ -990,7 +994,6 @@ input.fwmb-swatch {
     flex: 1;
     gap: var(--filroden-space-s);
     overflow-y: auto;
-    scrollbar-gutter: stable;
 }
 
 .fwmb-map-card {
@@ -1096,23 +1099,23 @@ input.fwmb-swatch {
 
 .fwmb-icon-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--filroden-font-size-xxl), 1fr));
     gap: var(--filroden-space-s);
     max-height: 200px;
     overflow-y: auto;
     padding: var(--filroden-space-s);
     background: var(--filroden-color-bg-darkest);
     border: 1px solid var(--filroden-color-border-light);
-    border-radius: 4px;
+    border-radius: var(--filroden-radius-medium);
 }
 
 .fwmb-icon-grid .fwmb-icon-btn {
-    width: 32px;
-    height: 32px;
-    padding: 4px;
+    width: var(--filroden-font-size-xxl);
+    height: var(--filroden-font-size-xxl);
+    padding: var(--filroden-space-xs);
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: var(--filroden-radius-medium);
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -1131,13 +1134,14 @@ input.fwmb-swatch {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    filter: invert(1); /* Assuming the CC0 SVGs are black by default */
+    filter: invert(1);
 }
 
 .fwmb-list-container {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--filroden-space-xs);
+    padding-right: var(--filroden-space-xs);
     max-height: 200px;
     overflow-y: auto;
 }
@@ -1148,18 +1152,53 @@ input.fwmb-swatch {
     gap: var(--filroden-space-m);
     padding: var(--filroden-space-s);
     background: var(--filroden-color-bg-medium);
-    border: 1px solid var(--filroden-color-border-light);
-    border-radius: 4px;
+    border: var(--filroden-border-accent);
+    border-radius: var(--filroden-radius-medium);
 }
 
 .fwmb-list-item .fwmb-list-icon {
-    width: 16px;
-    height: 16px;
+    width: var(--filroden-font-size-m);
+    height: var(--filroden-font-size-m);
 }
 
 .fwmb-route-swatch {
-    width: 24px;
+    width: var(--filroden-font-size-xxl);
     border-top-width: 0;
     border-bottom-width: 0;
     border-left-width: 0;
+}
+
+#fwmb-infra-tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--filroden-color-bg-darkest);
+    color: var(--filroden-color-text-main-solid);
+    padding: var(--filroden-space-s) var(--filroden-space-m);
+    border-radius: var(--filroden-radius-medium);
+    border: var(--filroden-border-accent);
+    font-size: var(--filroden-font-size-xs);
+    line-height: 1.4;
+    z-index: 9999;
+    max-width: 16rem;
+    transform: translate(-50%, -100%);
+    box-shadow: var(--filroden-shadow-card);
+}
+
+#fwmb-infra-tooltip strong {
+    display: block;
+    color: var(--filroden-color-text-main-solid);
+    font-size: var(--filroden-font-size-s);
+    font-weight: bold;
+    margin-block-end: var(--filroden-space-xs);
+    border-block-end: var(--filroden-border-accent);
+    padding-block-end: var(--filroden-space-xxs);
+}
+
+.fwmb .fwmb-name {
+    font-size: var(--filroden-font-size-xs);
+    color: var(--filroden-color-text-main-solid);
+    min-width: 0; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis;
 }

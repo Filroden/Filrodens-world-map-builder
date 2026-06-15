@@ -47,6 +47,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deletePin: MapStudioApp.#onDeletePin,
             toggleRouteVisibility: MapStudioApp.#onToggleRouteVisibility,
             deleteRoute: MapStudioApp.#onDeleteRoute,
+            zoomToPin: MapStudioApp.#onZoomToPin,
+            editPin: MapStudioApp.#onEditPin,
+            zoomToRoute: MapStudioApp.#onZoomToRoute,
+            editRoute: MapStudioApp.#onEditRoute,
         },
     };
 
@@ -1512,5 +1516,156 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.activeRouteId === id) this.activeRouteId = null;
         this.#repaintCanvas();
         this.render({ parts: ["context"] });
+    }
+
+    static #onZoomToPin(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const pin = this.mapPins.find((p) => p.id === id);
+        if (pin && this.canvasEngine) {
+            this.canvasEngine.zoomToFeature([pin]);
+        }
+    }
+
+    static #onZoomToRoute(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const route = this.mapRoutes.find((r) => r.id === id);
+        if (route && route.points && this.canvasEngine) {
+            this.canvasEngine.zoomToFeature(route.points);
+        }
+    }
+
+    static async #onEditPin(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const pin = this.mapPins.find((p) => p.id === id);
+        if (!pin) return;
+
+        // Reconstruct the Icon Dictionary into a dropdown list
+        const iconOptions = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS)
+            .map(([key, label]) => {
+                const isSelected = key === pin.icon ? "selected" : "";
+                return `<option value="${key}" ${isSelected}>${game.i18n.localize(label)}</option>`;
+            })
+            .join("");
+
+        const content = `
+            <div class="form-group stacked">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
+                <input type="text" name="pinName" value="${pin.name || ""}" />
+            </div>
+            <div class="form-group stacked">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.Description")}</label>
+                <textarea name="pinDesc" rows="4">${pin.description || ""}</textarea>
+            </div>
+            <div class="form-group">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.SelectIcon")}</label>
+                <select name="pinIcon">${iconOptions}</select>
+            </div>
+        `;
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditPin") },
+            content: content,
+            ok: {
+                callback: (event, button, dialog) => {
+                    return {
+                        name: button.form.elements["pinName"].value,
+                        description: button.form.elements["pinDesc"].value,
+                        icon: button.form.elements["pinIcon"].value,
+                    };
+                },
+            },
+        });
+
+        if (result) {
+            this.pinHistory.push({
+                pins: foundry.utils.deepClone(this.mapPins),
+                routes: foundry.utils.deepClone(this.mapRoutes),
+                activeRouteId: this.activeRouteId,
+            });
+            this.pinRedoStack = [];
+
+            pin.name = result.name;
+            pin.description = result.description;
+            pin.icon = result.icon;
+
+            this.#repaintCanvas();
+            this.render({ parts: ["context"] });
+        }
+    }
+
+    static async #onEditRoute(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const route = this.mapRoutes.find((r) => r.id === id);
+        if (!route) return;
+
+        const styles = [
+            { value: "solid", label: "FILRODENSWMB.UI.StyleSolid" },
+            { value: "dashed", label: "FILRODENSWMB.UI.StyleDashed" },
+            { value: "dotted", label: "FILRODENSWMB.UI.StyleDotted" },
+        ];
+
+        const styleOptions = styles
+            .map((s) => {
+                const isSelected = s.value === route.style ? "selected" : "";
+                return `<option value="${s.value}" ${isSelected}>${game.i18n.localize(s.label)}</option>`;
+            })
+            .join("");
+
+        const content = `
+            <div class="form-group stacked">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
+                <input type="text" name="routeName" value="${route.name || ""}" />
+            </div>
+            <div class="form-group stacked">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.Description")}</label>
+                <textarea name="routeDesc" rows="4">${route.description || ""}</textarea>
+            </div>
+            <div class="form-group">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.LineColor")}</label>
+                <input type="color" name="routeColor" value="${route.color}" />
+            </div>
+            <div class="form-group">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.LineThickness")}</label>
+                <input type="number" name="routeThickness" value="${route.thickness}" min="1" max="10" />
+            </div>
+            <div class="form-group">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.LineStyle")}</label>
+                <select name="routeStyle">${styleOptions}</select>
+            </div>
+        `;
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditRoute") },
+            content: content,
+            ok: {
+                callback: (event, button, dialog) => {
+                    return {
+                        name: button.form.elements["routeName"].value,
+                        description: button.form.elements["routeDesc"].value,
+                        color: button.form.elements["routeColor"].value,
+                        thickness: Number(button.form.elements["routeThickness"].value),
+                        style: button.form.elements["routeStyle"].value,
+                    };
+                },
+            },
+        });
+
+        if (result) {
+            this.pinHistory.push({
+                pins: foundry.utils.deepClone(this.mapPins),
+                routes: foundry.utils.deepClone(this.mapRoutes),
+                activeRouteId: this.activeRouteId,
+            });
+            this.pinRedoStack = [];
+
+            route.name = result.name;
+            route.description = result.description;
+            route.color = result.color;
+            route.thickness = result.thickness;
+            route.style = result.style;
+
+            this.#repaintCanvas();
+            this.render({ parts: ["context"] });
+        }
     }
 }

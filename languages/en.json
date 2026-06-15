@@ -171,6 +171,12 @@
     "FILRODENSWMB.UI.StyleDashed": "Dashed",
     "FILRODENSWMB.UI.StyleDotted": "Dotted",
     "FILRODENSWMB.UI.NoRoutes": "No routes drawn.",
+    "FILRODENSWMB.UI.ZoomTo": "Focus View",
+    "FILRODENSWMB.UI.Edit": "Edit Details",
+    "FILRODENSWMB.UI.EditPin": "Edit Point of Interest",
+    "FILRODENSWMB.UI.EditRoute": "Edit Route",
+    "FILRODENSWMB.UI.Name": "Name",
+    "FILRODENSWMB.UI.Description": "Description",
 
     "FILRODENSWMB.UI.Warning": "Warning",
     "FILRODENSWMB.UI.SeedWarningContent": "Generating a new terrain seed will permanently erase all manual brush edits you have applied to this map. Do you want to continue?",
