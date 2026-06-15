@@ -844,11 +844,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             // Pop previous state
             const state = this.pinHistory.pop();
-            this.mapPins = state.pins || state; // Fallback for old simple arrays
+            this.mapPins = state.pins || state;
             this.mapRoutes = state.routes || this.mapRoutes;
             this.activeRouteId = state.activeRouteId || null;
 
             this.#repaintCanvas();
+            this.render({ parts: ["context"] });
+
             if (this.activeTool === "features") this.debouncedGenerateClimate();
         } else {
             // Raster History
@@ -877,6 +879,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.activeRouteId = state.activeRouteId;
 
             this.#repaintCanvas();
+            this.render({ parts: ["context"] });
+
             if (this.activeTool === "features") this.debouncedGenerateClimate();
         } else {
             // Raster History
