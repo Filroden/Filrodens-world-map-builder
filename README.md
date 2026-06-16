@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-1.0.0-alpha3-blue)
+![Latest Version](https://img.shields.io/badge/Version-1.0.0-alpha4-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -56,6 +56,17 @@ The procedural plus non-destructive brush approach means the resulting saved jou
 - **Export JSON:** Export the map data into a JSON file. This allows you to share maps with others.
 - **Delete:** Delete the map. This can also be done inside the normal Foundry compendium.
 
+#### Reference Images
+
+You can load a reference image to act as a guide when creating your map. Please make sure you have permission to use any map used as a reference.
+
+1. Use the *Reference Image* tool.
+2. Select the file using the file picker.
+3. Use the mouse `left click` while the reference tool is enabled to quickly move the image and use `SHIFT + Scroll Wheel` to scale it.
+4. Use the zoom and D-Pad buttons to fine tune its scale and position.
+
+Reference images will be automatically excluded from any export.
+
 ## Important Note on Performance
 
 Filroden's World Map Builder can be computationally heavy when generating new or loading existing terrain, moisture and temperature models, particularly as you increase the size of the map. Maps of 1,000 x 1,000 pixels should be created or loaded very quickly. Maps of 4,000 x 4,000 look beautiful but even on powerful PCs they might take a few seconds to calculate.
@@ -70,6 +81,6 @@ I have designed the module so that users will eventually be able to create a wor
 
 - Improve performance
 - Add social, political or economic regions as individual, toggled display layers
-- Add labels
-- Link vector features to journals to add descriptions
-- Add "export to scene" tools to supplement or replace the current "export to PNG" tool.
+- Add labels with predefined styles and custom styles
+- Add cartography tools: scale, cartouche, compass roses, etc
+- Add "export to scene" tools to supplement or replace the current "export to PNG" tool. Link vector features and their meta data to journals.

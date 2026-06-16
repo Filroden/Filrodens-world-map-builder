@@ -17,6 +17,8 @@
     "FILRODENSWMB.UI.ToolInfrastructure": "Infrastructure",
     "FILRODENSWMB.UI.ToolRegions": "Regions",
     "FILRODENSWMB.UI.ToolLabels": "Labels",
+    "FILRODENSWMB.UI.ToolCartography": "Cartography",
+    "FILRODENSWMB.UI.ToolReference": "Reference Image",
     "FILRODENSWMB.UI.ToolMaps": "Manage Maps",
 
     "FILRODENSWMB.UI.GlobalSettings": "Global Settings",
@@ -67,6 +69,7 @@
     "FILRODENSWMB.UI.LayerInfrastructure": "Toggle Infrastructure",
     "FILRODENSWMB.UI.LayerRegions": "Toggle Regions",
     "FILRODENSWMB.UI.LayerLabels": "Toggle Labels",
+    "FILRODENSWMB.UI.LayerReference": "Toggle Reference Image",
 
     "FILRODENSWMB.UI.ClimateSettings": "Climate Settings",
     "FILRODENSWMB.UI.MoistureSettings": "Moisture Settings",
@@ -176,6 +179,11 @@
     "FILRODENSWMB.UI.Description": "Description",
     "FILRODENSWMB.UI.ModePin": "Place Point of Interest",
     "FILRODENSWMB.UI.ModeRoute": "Draw Route",
+
+    "FILRODENSWMB.UI.ReferenceImage": "Reference Image",
+    "FILRODENSWMB.UI.ImageSource": "Image Source",
+    "FILRODENSWMB.UI.RemoveImage": "Remove Image",
+    "FILRODENSWMB.UI.Opacity": "Opacity",
 
     "FILRODENSWMB.UI.StyleSolid": "Solid",
     "FILRODENSWMB.UI.StyleDashed": "Dashed",

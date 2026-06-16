@@ -74,6 +74,8 @@
 .fwmb-icon.place                { --fwmb-mask: url('../assets/icons/add_location.svg'); }
 .fwmb-icon.timeline             { --fwmb-mask: url('../assets/icons/timeline.svg'); }
 .fwmb-icon.arrow-drop-down      { --fwmb-mask: url('../assets/icons/arrow_drop_down.svg'); }
+.fwmb-icon.explore              { --fwmb-mask: url('../assets/icons/explore.svg'); }
+.fwmb-icon.png                  { --fwmb-mask: url('../assets/icons/file_png.svg'); }
 
 
 /* --- APPLICATION SCROLLBARS --- */

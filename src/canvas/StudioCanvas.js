@@ -27,6 +27,7 @@ export class StudioCanvas {
             infrastructure: new PIXI.Container(),
             regions: new PIXI.Container(),
             labels: new PIXI.Container(),
+            reference: new PIXI.Container(),
         };
 
         this.layers.biomes.alpha = 0.65;
@@ -43,6 +44,11 @@ export class StudioCanvas {
         this.layers.infrastructure.addChild(this.routeGraphics);
         this.layers.infrastructure.addChild(this.nodeContainer); // Render nodes above lines
         this.layers.infrastructure.addChild(this.pinContainer); // Render pins above nodes
+
+        // Reference Image Sprite Setup
+        this.referenceSprite = new PIXI.Sprite();
+        this.referenceSprite.anchor.set(0.5); // Centered anchor ensures scaling expands outward equally
+        this.layers.reference.addChild(this.referenceSprite);
 
         // --- Global Drag Handling ---
         this.activeDrag = null;
@@ -63,6 +69,7 @@ export class StudioCanvas {
             this.layers.features,
             this.layers.regions,
             this.layers.infrastructure,
+            this.layers.reference,
             this.layers.labels,
             this.gridLayer,
         );
@@ -70,6 +77,9 @@ export class StudioCanvas {
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };
         this.stageStart = { x: 0, y: 0 };
+
+        this.isReferenceMode = false;
+        this.isDraggingReference = false;
 
         // Frame State
         this.isInitialized = false;
@@ -116,8 +126,15 @@ export class StudioCanvas {
     }
 
     #setupInteractions(canvasElement) {
-        // SCROLL TO ZOOM
+        // SCROLL TO ZOOM / SCALE
         canvasElement.addEventListener("wheel", (e) => {
+            // --- Reference Image Scaling Intercept ---
+            if (this.isReferenceMode && e.shiftKey) {
+                const scaleDirection = e.deltaY < 0 ? 1.05 : 0.95;
+                if (this.onReferenceScale) this.onReferenceScale(scaleDirection);
+                return; // Abort standard camera zoom
+            }
+
             e.preventDefault();
             const zoomFactor = 1.1;
             const scaleDirection = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
@@ -154,11 +171,19 @@ export class StudioCanvas {
                 return;
             }
 
-            if (e.button === 0 && this.isEditMode) {
+            if (e.button === 0) {
                 const coords = this.#getMapCoordinates(e, canvasElement);
 
+                // --- Reference Image Drag Intercept ---
+                if (this.isReferenceMode) {
+                    this.isDraggingReference = true;
+                    this.dragStart = { x: coords.x, y: coords.y };
+                    canvasElement.style.cursor = "grabbing";
+                    return; // Abort all other edit tools
+                }
+
                 // --- Shift-Click Node Insertion Intercept ---
-                if (e.shiftKey && this.onInfraInsertNode) {
+                if (this.isEditMode && e.shiftKey && this.onInfraInsertNode) {
                     e.preventDefault();
                     e.stopPropagation();
 
@@ -200,6 +225,18 @@ export class StudioCanvas {
         // MOUSE MOVE (Pan, Drag Item, or Continuous Paint)
         canvasElement.addEventListener("pointermove", (e) => {
             const coords = this.#getMapCoordinates(e, canvasElement);
+
+            if (this.isDraggingReference) {
+                const coords = this.#getMapCoordinates(e, canvasElement);
+                const dx = coords.x - this.dragStart.x;
+                const dy = coords.y - this.dragStart.y;
+
+                // Reset start point for continuous relative movement
+                this.dragStart = { x: coords.x, y: coords.y };
+
+                if (this.onReferencePan) this.onReferencePan(dx, dy);
+                return;
+            }
 
             if (this.isDragging) {
                 const dx = e.clientX - this.dragStart.x;
@@ -251,6 +288,12 @@ export class StudioCanvas {
             }
 
             if (e.button === 0) {
+                if (this.isDraggingReference) {
+                    this.isDraggingReference = false;
+                    canvasElement.style.cursor = "crosshair";
+                    return;
+                }
+
                 if (this.activeDrag) {
                     this.activeDrag = null;
                     canvasElement.style.cursor = "crosshair";
@@ -265,6 +308,24 @@ export class StudioCanvas {
         };
 
         canvasElement.addEventListener("pointerup", endPointer);
+        canvasElement.addEventListener("pointercancel", endPointer);
+
+        canvasElement.addEventListener("pointerleave", (e) => {
+            if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
+                this.onCanvasHover(null, null);
+            }
+        });
+
+        canvasElement.addEventListener("pointerup", (e) => {
+            if (e.button === 0) {
+                if (this.isDraggingReference) {
+                    this.isDraggingReference = false;
+                    canvasElement.style.cursor = "crosshair";
+                    return;
+                }
+            }
+        });
+
         canvasElement.addEventListener("pointercancel", endPointer);
 
         canvasElement.addEventListener("pointerleave", (e) => {
@@ -565,7 +626,10 @@ export class StudioCanvas {
      */
     exportToPNG(filename = "world-map") {
         try {
+            this.layers.reference.visible = false;
             const canvas = this.app.renderer.extract.canvas(this.stage);
+            this.layers.reference.visible = true;
+
             const dataUrl = canvas.toDataURL("image/png");
             const byteString = atob(dataUrl.split(",")[1]);
             const arrayBuffer = new ArrayBuffer(byteString.length);
@@ -635,6 +699,9 @@ export class StudioCanvas {
      * Renders vector routes and POI pins to the infrastructure layer.
      */
     renderInfrastructure(pins = [], routes = [], isEditMode = false) {
+        // Clone and sort the routes by thickness so major highways always draw on top
+        const sortedRoutes = [...routes].sort((a, b) => a.thickness - b.thickness);
+
         this.routeGraphics.clear();
         this.pinContainer.removeChildren().forEach((c) => c.destroy());
         this.nodeContainer.removeChildren().forEach((c) => c.destroy());
@@ -643,13 +710,20 @@ export class StudioCanvas {
         this.interactiveTargets = [];
 
         // 1. Render Routes (Bottom Layer)
-        routes.forEach((route) => {
+        sortedRoutes.forEach((route) => {
             if (route.hidden || !route.points || route.points.length < 2) return;
 
             const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
             const splinePoints = this.#getSplinePoints(route.points);
 
-            this.routeGraphics.lineStyle(route.thickness, colorHex, 1);
+            // Apply rounded caps and joins to blend intersections seamlessly
+            this.routeGraphics.lineStyle({
+                width: route.thickness,
+                color: colorHex,
+                alpha: 1,
+                cap: PIXI.LINE_CAP.ROUND,
+                join: PIXI.LINE_JOIN.ROUND,
+            });
 
             if (route.style === "solid") {
                 this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
@@ -806,5 +880,32 @@ export class StudioCanvas {
         this.stage.scale.set(targetScale);
         this.stage.position.x = this.app.screen.width / 2 - centerX * targetScale;
         this.stage.position.y = this.app.screen.height / 2 - centerY * targetScale;
+    }
+
+    async updateReferenceImage(url, x, y, scale, alpha) {
+        if (!url) {
+            this.referenceSprite.texture = PIXI.Texture.EMPTY;
+            return;
+        }
+
+        try {
+            if (!this.referenceSprite.texture.textureCacheIds.includes(url)) {
+                const texture = await PIXI.Assets.load(url);
+                this.referenceSprite.texture = texture;
+            }
+        } catch (err) {
+            console.error("FWMB | Failed to load reference image:", err);
+        }
+
+        this.referenceSprite.x = x;
+        this.referenceSprite.y = y;
+        this.referenceSprite.scale.set(scale);
+        this.referenceSprite.alpha = alpha;
+    }
+
+    setReferenceMode(isActive) {
+        this.isReferenceMode = isActive;
+        const canvasElement = this.app.canvas ?? this.app.view;
+        if (isActive) canvasElement.style.cursor = "crosshair";
     }
 }

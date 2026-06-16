@@ -52,6 +52,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             zoomToRoute: MapStudioApp.#onZoomToRoute,
             editRoute: MapStudioApp.#onEditRoute,
             togglePinDropdown: MapStudioApp.#onTogglePinDropdown,
+            nudgeReference: MapStudioApp.#onNudgeReference,
+            resetReferencePan: MapStudioApp.#onResetReferencePan,
+            removeReferenceImage: MapStudioApp.#onRemoveReferenceImage,
+            adjustReferenceScale: MapStudioApp.#onAdjustReferenceScale,
+            resetReferenceScale: MapStudioApp.#onResetReferenceScale,
         },
     };
 
@@ -148,6 +153,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             routeThickness: 3,
             routeStyle: "solid",
             activeRouteQuickStyle: "custom",
+
+            // Reference Variables
+            referenceImage: "",
+            referenceAlpha: 0.5,
+            referenceScale: 1,
+            referenceX: FILRODENSWMB.DEFAULTS.MAP_WIDTH / 2,
+            referenceY: FILRODENSWMB.DEFAULTS.MAP_HEIGHT / 2,
         };
 
         // The dynamic cache inherits from defaults on launch
@@ -254,10 +266,26 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.#wireBrushCallbacks();
         }
 
-        // Delegate 'input' events to the context panel.
         const contextPanel = this.element.querySelector(".fwmb-context-panel");
+
         if (contextPanel && !contextPanel.dataset.hasNoiseListeners) {
+            // Reference Settings File-Picker Intercept
+            contextPanel.addEventListener("change", (event) => {
+                if (event.target.matches('file-picker[name="referenceImage"]')) {
+                    this.uiState.referenceImage = event.target.value;
+                    this.#updateReferenceLayer();
+                }
+            });
+
+            // Delegate 'input' events to the context panel.
             contextPanel.addEventListener("input", (event) => {
+                // Reference Opacity Intercept
+                if (event.target.matches('input[name="referenceAlpha"]')) {
+                    this.uiState.referenceAlpha = Number(event.target.value);
+                    this.#updateReferenceLayer();
+                    return;
+                }
+
                 // Grid Configuration Intercept
                 if (event.target.matches('[name="gridType"], input[name="gridSize"]')) {
                     this.#getMapParameters(); // Sync DOM to cache
@@ -430,6 +458,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.#applyBrushStroke(x, y);
         };
 
+        // --- Reference Layer Interactions ---
+        this.canvasEngine.onReferencePan = (dx, dy) => {
+            this.uiState.referenceX += dx;
+            this.uiState.referenceY += dy;
+            this.#updateReferenceLayer();
+        };
+
+        this.canvasEngine.onReferenceScale = (factor) => {
+            this.uiState.referenceScale *= factor;
+
+            // Constrain limits and sync the slider DOM
+            this.uiState.referenceScale = Math.max(0.1, Math.min(this.uiState.referenceScale, 10));
+            this.#syncDOMToState();
+            this.#updateReferenceLayer();
+        };
+
+        // --- Brush Move ---
         this.canvasEngine.onBrushMove = (x, y) => {
             this.#applyBrushStroke(x, y);
         };
@@ -438,6 +483,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.brushEngine.endStroke();
         };
 
+        // ---Infrastructure Drag ---
         this.canvasEngine.onInfraDragStart = () => {
             // Snapshot the state before the drag begins
             this.pinHistory.push({
@@ -662,6 +708,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.canvasEngine?.toggleLayer("features", true);
             }
             this.#updateBiomeOpacity();
+        }
+
+        // Tell the canvas to engage reference mode mouse listeners
+        if (this.canvasEngine) {
+            this.canvasEngine.setReferenceMode(newTool === "reference");
         }
 
         // Toggle visibility of specific tool clusters in the floating edit bar
@@ -1252,7 +1303,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     if (this.currentSaveId === mapId) {
                         this.currentSaveName = newName;
                         // If the database generated a new ID during the rename, catch it
-                        if (updatedDoc && updatedDoc.id && updatedDoc.id !== this.currentSaveId) {
+                        if (updatedDoc?.id && updatedDoc.id !== this.currentSaveId) {
                             this.currentSaveId = updatedDoc.id;
                         }
                     }
@@ -1855,5 +1906,52 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
         return closest.route ? closest : null;
+    }
+
+    #updateReferenceLayer() {
+        if (this.canvasEngine) {
+            this.canvasEngine.updateReferenceImage(this.uiState.referenceImage, this.uiState.referenceX, this.uiState.referenceY, this.uiState.referenceScale, this.uiState.referenceAlpha);
+        }
+    }
+
+    static #onNudgeReference(event, target) {
+        const dx = Number(target.dataset.dx);
+        const dy = Number(target.dataset.dy);
+
+        this.uiState.referenceX += dx;
+        this.uiState.referenceY += dy;
+        this.#updateReferenceLayer();
+    }
+
+    static #onResetReferencePan(event, target) {
+        this.uiState.referenceX = this.mapWidth / 2;
+        this.uiState.referenceY = this.mapHeight / 2;
+        this.#updateReferenceLayer();
+    }
+
+    static #onRemoveReferenceImage(event, target) {
+        this.uiState.referenceImage = "";
+
+        // Reset the v14 file-picker UI element visually
+        const filePicker = this.element.querySelector('file-picker[name="referenceImage"]');
+        if (filePicker) filePicker.value = "";
+
+        this.#updateReferenceLayer();
+    }
+
+    static #onAdjustReferenceScale(event, target) {
+        const dir = Number(target.dataset.dir);
+        // Apply a fine 1% scale adjustment per click
+        const factor = dir > 0 ? 1.01 : 0.99;
+
+        this.uiState.referenceScale *= factor;
+        this.uiState.referenceScale = Math.max(0.1, Math.min(this.uiState.referenceScale, 10));
+
+        this.#updateReferenceLayer();
+    }
+
+    static #onResetReferenceScale(event, target) {
+        this.uiState.referenceScale = 1.0;
+        this.#updateReferenceLayer();
     }
 }

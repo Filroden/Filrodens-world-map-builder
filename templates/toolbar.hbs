@@ -28,11 +28,19 @@
         <i class="fwmb-icon insert-text"></i>
     </button>
 
+    <button type="button" data-action="changeTool" data-tool="cartography" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolCartography'}}" class="{{#if (eq activeTool 'cartography')}}active{{/if}}">
+        <i class="fwmb-icon explore"></i>
+    </button>
+
     <div class="fwmb-flex-1"></div>
     <div class="fwmb-divider"></div>
 
     <button type="button" data-action="threeDView" data-tooltip="{{localize 'FILRODENSWMB.UI.ThreeDView'}}">
         <i class="fwmb-icon three-d"></i>
+    </button>
+
+    <button type="button" data-action="changeTool" data-tool="reference" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolReference'}}" class="{{#if (eq activeTool 'settings')}}active{{/if}}">
+        <i class="fwmb-icon image"></i>
     </button>
 
     <button type="button" data-action="changeTool" data-tool="settings" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSettings'}}" class="{{#if (eq activeTool 'settings')}}active{{/if}}">
@@ -42,7 +50,7 @@
     <div class="fwmb-divider"></div>
 
     <button type="button" data-action="exportPng" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportPNG'}}">
-        <i class="fwmb-icon image"></i>
+        <i class="fwmb-icon png"></i>
     </button>
 
     <button type="button" data-action="saveMap" data-tooltip="{{localize 'FILRODENSWMB.UI.SaveMap'}}">
