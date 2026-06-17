@@ -119,14 +119,7 @@ export class BrushEngine {
     #recordControlPoint(x, y) {
         const pts = this.currentStroke.points;
 
-        // Aggressive Memory Optimisation: Only save coordinates that jump at least 5 pixels
-        if (pts.length > 0) {
-            const lastPt = pts[pts.length - 1];
-            const dist = Math.hypot(x - lastPt.x, y - lastPt.y);
-            if (dist < 5) return;
-        }
-
-        pts.push({ x: Math.round(x), y: Math.round(y) });
+        pts.push({ x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) });
     }
 
     // --- Private Rasterisation & Math ---

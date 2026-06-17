@@ -1165,7 +1165,7 @@ input.fwmb-swatch {
     flex-direction: column;
     gap: var(--filroden-space-xs);
     padding-right: var(--filroden-space-xs);
-    max-height: 200px;
+    max-height: 40%;
     overflow-y: auto;
 }
 

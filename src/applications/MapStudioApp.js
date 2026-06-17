@@ -209,6 +209,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             });
 
         context.uiState = this.uiState;
+        context.currentSaveName = this.currentSaveName;
 
         context.infrastructureIcons = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS)
             .map(([id, label]) => ({
@@ -1656,6 +1657,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
                     await this.#ingestMapPayload(payload);
                     ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
+                    this.render({ parts: ["toolbar"] });
                 }
                 break;
             }
@@ -1882,6 +1884,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (journal) {
             this.currentSaveId = journal.id;
             ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
+            this.render({ parts: ["toolbar"] });
         } else {
             ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
         }
