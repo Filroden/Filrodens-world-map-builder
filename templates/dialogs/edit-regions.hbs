@@ -1,0 +1,59 @@
+<div class="fwmb-dialog-content">
+
+    <div class="form-group stacked">
+        <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <input type="text" name="regionName" value="{{region.name}}" />
+    </div>
+    <div class="form-group stacked">
+        <label>{{localize "FILRODENSWMB.UI.Description"}}</label>
+        <textarea class="fwmb-scrollable stable" name="regionDesc" rows="4">{{region.description}}</textarea>
+    </div>
+    
+    <div class="fwmb-divider"></div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.Smoothing"}}</label>
+        <select name="regionSmoothing">
+            <option value="false" {{#unless region.smoothing}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.StyleStraight"}}</option>
+            <option value="true" {{#if region.smoothing}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSmooth"}}</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.FillColor"}}</label>
+        <div class="fwmb-setting-row">
+            <label style="font-size: 0.8em; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                <input type="checkbox" class="fwmb-checkbox" name="regionFillTransparent" {{#if (eq region.fillColor "transparent")}}checked{{/if}} />
+                {{localize "FILRODENSWMB.UI.NoFill"}}
+            </label>
+            <input type="color" class="fwmb-swatch fwmb-wide" name="regionFillColor" value="{{#if (eq region.fillColor 'transparent')}}#000000{{else}}{{region.fillColor}}{{/if}}" list="fwmb-region-colors" />
+        </div>
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.FillStyle"}}</label>
+        <select name="regionFillStyle">
+            <option value="solid" {{#if (eq region.fillStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+            <option value="diagonal" {{#if (eq region.fillStyle "diagonal")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDiagonalHatch"}}</option>
+            <option value="crosshatch" {{#if (eq region.fillStyle "crosshatch")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleCrossHatch"}}</option>
+        </select>
+    </div>
+
+    <div class="fwmb-divider"></div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
+        <input type="color" class="fwmb-swatch fwmb-wide" name="regionLineColor" value="{{region.lineColor}}" list="fwmb-region-colors" />
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
+        <input type="number" name="regionLineThickness" value="{{region.lineThickness}}" min="0" max="10" />
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.LineStyle"}}</label>
+        <select name="regionLineStyle">
+            <option value="solid" {{#if (eq region.lineStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+            <option value="dashed" {{#if (eq region.lineStyle "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
+            <option value="dotted" {{#if (eq region.lineStyle "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
+            <option value="dashdot" {{#if (eq region.lineStyle "dashdot")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashDot"}}</option>
+        </select>
+    </div>
+</div>

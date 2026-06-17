@@ -696,6 +696,84 @@ export class StudioCanvas {
     }
 
     /**
+     * Programmatically generates seamless diagonal and crosshatch textures for polygon fills.
+     */
+    #getHatchTexture(colorHex, style) {
+        const key = `${colorHex}_${style}`;
+        if (this.layerSprites[key]) return this.layerSprites[key];
+
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext("2d");
+
+        // Convert strict hex integer back to #RRGGBB string for the canvas context
+        ctx.strokeStyle = "#" + colorHex.toString(16).padStart(6, "0");
+        ctx.lineWidth = 2;
+
+        if (style === "diagonal" || style === "crosshatch") {
+            ctx.beginPath();
+            ctx.moveTo(-4, 12);
+            ctx.lineTo(12, -4);
+            ctx.moveTo(4, 20);
+            ctx.lineTo(20, 4);
+            ctx.stroke();
+        }
+        if (style === "crosshatch") {
+            ctx.beginPath();
+            ctx.moveTo(20, 12);
+            ctx.lineTo(4, -4);
+            ctx.moveTo(12, 20);
+            ctx.lineTo(-4, 4);
+            ctx.stroke();
+        }
+
+        const texture = PIXI.Texture.from(canvas);
+        this.layerSprites[key] = texture;
+        return texture;
+    }
+
+    /**
+     * A variation of the spline generator that wraps the array to create a perfectly closed, seamless loop.
+     */
+    #getClosedSplinePoints(points, resolution = 20) {
+        if (!points || points.length < 3) return points;
+        const curve = [];
+
+        // Wrap the array: [Last, First, Second, ..., Last, First, Second]
+        const p = [points[points.length - 1], ...points, points[0], points[1]];
+
+        for (let i = 1; i < p.length - 2; i++) {
+            const p0 = p[i - 1];
+            const p1 = p[i];
+            const p2 = p[i + 1];
+            const p3 = p[i + 2];
+
+            for (let t = 0; t <= 1; t += 1 / resolution) {
+                const t2 = t * t;
+                const t3 = t2 * t;
+
+                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+
+                if (curve.length > 0) {
+                    const last = curve.at(-1);
+                    if (Math.abs(last.x - x) < 0.1 && Math.abs(last.y - y) < 0.1) continue;
+                }
+                curve.push({ x, y });
+            }
+        }
+        return curve;
+    }
+
+    /**
+     * Safety router to clear the spatial node cache before a render pass.
+     */
+    clearInteractiveTargets() {
+        this.interactiveTargets = [];
+    }
+
+    /**
      * Renders vector routes and POI pins to the infrastructure layer.
      */
     renderInfrastructure(pins = [], routes = [], isEditMode = false) {
@@ -705,9 +783,6 @@ export class StudioCanvas {
         this.routeGraphics.clear();
         this.pinContainer.removeChildren().forEach((c) => c.destroy());
         this.nodeContainer.removeChildren().forEach((c) => c.destroy());
-
-        // Clear the mathematical spatial cache before rendering
-        this.interactiveTargets = [];
 
         // 1. Render Routes (Bottom Layer)
         sortedRoutes.forEach((route) => {
@@ -839,6 +914,126 @@ export class StudioCanvas {
             }
 
             this.pinContainer.addChild(sprite);
+        });
+    }
+
+    renderRegions(regionLayers = [], isEditMode = false, activeRegionId = null) {
+        this.layers.regions.removeChildren().forEach((c) => c.destroy());
+
+        regionLayers.forEach((layer) => {
+            if (layer.hidden) return;
+
+            const layerContainer = new PIXI.Container();
+            layerContainer.alpha = layer.opacity === undefined ? 0.5 : layer.opacity;
+            this.layers.regions.addChild(layerContainer);
+
+            layer.regions.forEach((region) => {
+                if (region.hidden || !region.points || region.points.length === 0) return;
+
+                const g = new PIXI.Graphics();
+                layerContainer.addChild(g);
+
+                const fillColorHex = region.fillColor === "transparent" ? null : Number.parseInt(region.fillColor.replace("#", ""), 16);
+                const lineColorHex = Number.parseInt(region.lineColor.replace("#", ""), 16);
+
+                // A polygon is "closed" if it has 3+ points and the user isn't actively currently drawing it
+                const isClosed = region.points.length >= 3 && region.id !== activeRegionId;
+                const pts = region.smoothing && isClosed ? this.#getClosedSplinePoints(region.points) : region.points;
+
+                // 1. Draw Fill
+                if (fillColorHex !== null) {
+                    if (region.fillStyle === "solid") {
+                        g.beginFill(fillColorHex, 1);
+                    } else {
+                        const tex = this.#getHatchTexture(fillColorHex, region.fillStyle);
+
+                        // Shift the texture origin to the region's first node.
+                        // This creates a clean, deterministic phase offset between different regions.
+                        const matrix = new PIXI.Matrix();
+                        matrix.translate(pts[0].x, pts[0].y);
+
+                        g.beginTextureFill({ texture: tex, matrix: matrix });
+                    }
+
+                    g.lineStyle(0); // Fills don't have lines
+                    g.moveTo(pts[0].x, pts[0].y);
+                    for (let i = 1; i < pts.length; i++) {
+                        g.lineTo(pts[i].x, pts[i].y);
+                    }
+                    if (isClosed) g.closePath();
+                    g.endFill();
+                }
+
+                // 2. Draw Border (Separated to allow dashed/dotted borders around solid fills)
+                if (region.lineThickness > 0) {
+                    g.lineStyle({ width: region.lineThickness, color: lineColorHex, alpha: 1, cap: PIXI.LINE_CAP.ROUND, join: PIXI.LINE_JOIN.ROUND });
+
+                    if (region.lineStyle === "solid") {
+                        g.moveTo(pts[0].x, pts[0].y);
+                        for (let i = 1; i < pts.length; i++) {
+                            g.lineTo(pts[i].x, pts[i].y);
+                        }
+                        if (isClosed) g.closePath();
+                    } else {
+                        // Dash drawing logic
+                        let pattern = [region.lineThickness * 4, region.lineThickness * 3]; // dashed
+                        if (region.lineStyle === "dotted") pattern = [region.lineThickness, region.lineThickness * 2];
+                        if (region.lineStyle === "dashdot") pattern = [region.lineThickness * 4, region.lineThickness * 2, region.lineThickness, region.lineThickness * 2];
+
+                        let dashIdx = 0;
+                        let dashLen = 0;
+                        let isDrawing = true;
+                        g.moveTo(pts[0].x, pts[0].y);
+
+                        const limit = isClosed ? pts.length + 1 : pts.length;
+                        for (let i = 1; i < limit; i++) {
+                            const p1 = pts[(i - 1) % pts.length];
+                            const p2 = pts[i % pts.length];
+                            const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+                            let remainingDist = dist;
+                            let currentX = p1.x;
+                            let currentY = p1.y;
+
+                            while (remainingDist > 0) {
+                                const step = Math.min(remainingDist, pattern[dashIdx] - dashLen);
+                                const ratio = step / remainingDist;
+
+                                currentX += (p2.x - currentX) * ratio;
+                                currentY += (p2.y - currentY) * ratio;
+
+                                if (isDrawing) g.lineTo(currentX, currentY);
+                                else g.moveTo(currentX, currentY);
+
+                                dashLen += step;
+                                remainingDist -= step;
+
+                                if (dashLen >= pattern[dashIdx]) {
+                                    dashLen = 0;
+                                    dashIdx = (dashIdx + 1) % pattern.length;
+                                    isDrawing = !isDrawing;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Draw Edit Nodes
+                if (isEditMode) {
+                    region.points.forEach((pt) => {
+                        const node = new PIXI.Graphics();
+                        node.beginFill(0xffffff, 0.6);
+                        node.lineStyle(2, 0x000000, 0.6);
+                        node.drawCircle(0, 0, 5);
+                        node.endFill();
+                        node.x = pt.x;
+                        node.y = pt.y;
+
+                        this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
+                        layerContainer.addChild(node);
+                    });
+                }
+            });
         });
     }
 

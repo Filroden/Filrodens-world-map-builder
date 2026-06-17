@@ -14,6 +14,7 @@ export const FILRODENSWMB = {
         LAT_TOP: 90,
         LAT_BOTTOM: -90,
         GLOBAL_TEMP: 0.5,
+        GLOBAL_MOISTURE: 0.5,
         MAP_WIDTH: 1000,
         MAP_HEIGHT: 1000,
     },
@@ -25,8 +26,10 @@ export const FILRODENSWMB = {
         RIVER_ALPHA: 0.9,
         PIN_RADIUS: 6,
         PIN_ALPHA: 0.4,
+        CONTOUR_INTERVAL: 0.1,
     },
     HYDROLOGY: {
+        RIVER_DENSITY: 40,
         MAX_LAKE_SIZE: 8000,
         SPRING_ALTITUDE_OFFSET: 0.25,
         SPRING_MOISTURE_MIN: 0.45,
@@ -64,7 +67,7 @@ export const FILRODENSWMB = {
     },
     NOISE: {
         ELEVATION: { SCALE: 250, OCTAVES: 5, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1.2, STRETCH: 1.75 },
-        MOISTURE: { SCALE: 12, OCTAVES: 3, PERSISTENCE: 0.6, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1.2 },
+        MOISTURE: { SCALE: 500, OCTAVES: 3, PERSISTENCE: 0.6, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1.2 },
         TEMPERATURE: { SCALE: 25, OCTAVES: 2, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1 },
     },
     BIOMES: {
@@ -142,5 +145,8 @@ export const FILRODENSWMB = {
         minor: { label: "FILRODENSWMB.UI.StyleMinor", color: "#e0e0e0", thickness: 3, style: "solid" },
         trail: { label: "FILRODENSWMB.UI.StyleTrail", color: "#8d6e63", thickness: 2, style: "dashed" },
         sea: { label: "FILRODENSWMB.UI.StyleSea", color: "#4dd0e1", thickness: 4, style: "dotted" },
+    },
+    REGIONS: {
+        PRESETS: ["#c6af53", "#397cac", "#e06c75", "#d19a66", "#98c379", "#56b6c2", "#c678dd", "#ffffff", "#000000", "#7f848e", "#e5c07b", "#61afef", "#be5046", "#82b366", "#d19a66"],
     },
 };

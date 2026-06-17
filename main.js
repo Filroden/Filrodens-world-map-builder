@@ -24,8 +24,11 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/tools-maps.hbs",
         "modules/filrodens-world-map-builder/templates/tools-settings.hbs",
         "modules/filrodens-world-map-builder/templates/tools-manage.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
         "modules/filrodens-world-map-builder/templates/journal-summary.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs",
     ]);
 
     registerSidebarInjection();

@@ -64,6 +64,7 @@ You can load a reference image to act as a guide when creating your map. Please 
 2. Select the file using the file picker.
 3. Use the mouse `left click` while the reference tool is enabled to quickly move the image and use `SHIFT + Scroll Wheel` to scale it.
 4. Use the zoom and D-Pad buttons to fine tune its scale and position.
+5. The reference image can be toggled on and off using the tools in the bottom right of the map canvas.
 
 Reference images will be automatically excluded from any export.
 
