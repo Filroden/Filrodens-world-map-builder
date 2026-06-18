@@ -1,0 +1,26 @@
+<div class="fwmb-dialog-content">
+    <div class="form-group stacked">
+        <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <input type="text" name="routeName" value="{{route.name}}" />
+    </div>
+    <div class="form-group stacked">
+        <label>{{localize "FILRODENSWMB.UI.Description"}}</label>
+        <textarea class="fwmb-scrollable stable" name="routeDesc" rows="4">{{route.description}}</textarea>
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
+        <input type="color" name="routeColor" value="{{route.color}}" />
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
+        <input type="number" name="routeThickness" value="{{route.thickness}}" min="1" max="10" />
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.LineStyle"}}</label>
+        <select name="routeStyle">
+            <option value="solid" {{#if (eq route.style "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+            <option value="dashed" {{#if (eq route.style "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
+            <option value="dotted" {{#if (eq route.style "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
+        </select>
+    </div>
+</div>

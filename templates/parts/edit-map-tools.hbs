@@ -1,4 +1,10 @@
 <div class="fwmb-edit-toolbar fwmb-hidden">
+    <datalist id="fwmb-region-colors">
+        {{#each uiState.regionPresets}}
+            <option value="{{this}}"></option>
+        {{/each}}
+    </datalist>
+
     <div class="fwmb-brush-settings">
         <div class="fwmb-brush-setting" data-tool-group="terrain biomes">
             <label>{{localize "FILRODENSWMB.UI.BrushSize"}}</label>
@@ -130,6 +136,63 @@
             </select>
         </div>
 
+    </div>
+
+    <button type="button" data-tool-group="regions" data-action="setRegionMode" data-mode="draw" class="active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.DrawRegion'}}">
+        <i class="fwmb-icon edit"></i>
+    </button>
+
+    <div class="fwmb-divider-vertical" data-tool-group="regions"></div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="regions">
+        <label>{{localize "FILRODENSWMB.UI.FillColor"}}</label>
+        <div class="fwmb-setting-row">
+            <button type="button" class="fwmb-swatch fwmb-transparent" data-action="setRegionPreset" data-color="transparent" data-target="fill" title="{{localize 'FILRODENSWMB.UI.NoFill'}}"></button>
+            <input type="color" class="fwmb-swatch fwmb-swatch-lg fwmb-wide" name="regionFillColor" value="{{#if (eq (lookup uiState 'regionFillColor') 'transparent')}}#000000{{else}}{{lookup uiState 'regionFillColor'}}{{/if}}" list="fwmb-region-colors" />
+        </div>
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="regions">
+        <label>{{localize "FILRODENSWMB.UI.FillStyle"}}</label>
+        <select name="regionFillStyle">
+            <option value="solid" {{#if (eq uiState.regionFillStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+            <option value="diagonal" {{#if (eq uiState.regionFillStyle "diagonal")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDiagonalHatch"}}</option>
+            <option value="crosshatch" {{#if (eq uiState.regionFillStyle "crosshatch")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleCrossHatch"}}</option>
+        </select>
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="regions">
+        <label>{{localize "FILRODENSWMB.UI.Border"}}</label>
+        <div class="fwmb-setting-row">
+            <input type="color" class="fwmb-swatch fwmb-swatch-lg  fwmb-wide" name="regionLineColor" value="{{lookup uiState 'regionLineColor'}}" list="fwmb-region-colors" />
+            <input type="number" class="fwmb-input-short" name="regionLineThickness" value="{{lookup uiState 'regionLineThickness'}}" min="0" max="10" title="{{localize 'FILRODENSWMB.UI.LineThickness'}}" />
+        </div>
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="regions">
+        <label>{{localize "FILRODENSWMB.UI.LineStyle"}}</label>
+        <select name="regionLineStyle">
+            <option value="solid" {{#if (eq uiState.regionLineStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+            <option value="dashed" {{#if (eq uiState.regionLineStyle "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
+            <option value="dotted" {{#if (eq uiState.regionLineStyle "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
+            <option value="dashdot" {{#if (eq uiState.regionLineStyle "dashdot")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashDot"}}</option>
+        </select>
+    </div>
+
+    <div class="fwmb-divider-vertical" data-tool-group="regions"></div>
+
+    <div class="fwmb-brush-setting fwmb-hidden fwmb-centered" data-tool-group="regions">
+        <button type="button" data-action="toggleRegionSmoothing" class="fwmb-btn wide {{#if uiState.regionSmoothing}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleSmoothing'}}">
+            <i class="fwmb-icon {{#if uiState.regionSmoothing}}gesture{{else}}timeline{{/if}}"></i>
+        </button>
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="regions">
+        <label>{{localize "FILRODENSWMB.UI.Opacity"}}</label>
+        <div class="fwmb-slider-group">
+            <input type="range" name="regionOpacity" value="{{lookup uiState 'regionOpacity'}}" min="0.1" max="1" step="0.1" oninput="this.nextElementSibling.value = this.value" />
+            <output>{{lookup uiState "regionOpacity"}}</output>
+        </div>
     </div>
 
     <div class="fwmb-divider-vertical"></div>

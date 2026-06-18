@@ -27,6 +27,7 @@ export class StudioCanvas {
             infrastructure: new PIXI.Container(),
             regions: new PIXI.Container(),
             labels: new PIXI.Container(),
+            reference: new PIXI.Container(),
         };
 
         this.layers.biomes.alpha = 0.65;
@@ -43,6 +44,11 @@ export class StudioCanvas {
         this.layers.infrastructure.addChild(this.routeGraphics);
         this.layers.infrastructure.addChild(this.nodeContainer); // Render nodes above lines
         this.layers.infrastructure.addChild(this.pinContainer); // Render pins above nodes
+
+        // Reference Image Sprite Setup
+        this.referenceSprite = new PIXI.Sprite();
+        this.referenceSprite.anchor.set(0.5); // Centered anchor ensures scaling expands outward equally
+        this.layers.reference.addChild(this.referenceSprite);
 
         // --- Global Drag Handling ---
         this.activeDrag = null;
@@ -63,6 +69,7 @@ export class StudioCanvas {
             this.layers.features,
             this.layers.regions,
             this.layers.infrastructure,
+            this.layers.reference,
             this.layers.labels,
             this.gridLayer,
         );
@@ -70,6 +77,9 @@ export class StudioCanvas {
         this.isDragging = false;
         this.dragStart = { x: 0, y: 0 };
         this.stageStart = { x: 0, y: 0 };
+
+        this.isReferenceMode = false;
+        this.isDraggingReference = false;
 
         // Frame State
         this.isInitialized = false;
@@ -116,8 +126,15 @@ export class StudioCanvas {
     }
 
     #setupInteractions(canvasElement) {
-        // SCROLL TO ZOOM
+        // SCROLL TO ZOOM / SCALE
         canvasElement.addEventListener("wheel", (e) => {
+            // --- Reference Image Scaling Intercept ---
+            if (this.isReferenceMode && e.shiftKey) {
+                const scaleDirection = e.deltaY < 0 ? 1.05 : 0.95;
+                if (this.onReferenceScale) this.onReferenceScale(scaleDirection);
+                return; // Abort standard camera zoom
+            }
+
             e.preventDefault();
             const zoomFactor = 1.1;
             const scaleDirection = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
@@ -154,11 +171,19 @@ export class StudioCanvas {
                 return;
             }
 
-            if (e.button === 0 && this.isEditMode) {
+            if (e.button === 0) {
                 const coords = this.#getMapCoordinates(e, canvasElement);
 
+                // --- Reference Image Drag Intercept ---
+                if (this.isReferenceMode) {
+                    this.isDraggingReference = true;
+                    this.dragStart = { x: coords.x, y: coords.y };
+                    canvasElement.style.cursor = "grabbing";
+                    return; // Abort all other edit tools
+                }
+
                 // --- Shift-Click Node Insertion Intercept ---
-                if (e.shiftKey && this.onInfraInsertNode) {
+                if (this.isEditMode && e.shiftKey && this.onInfraInsertNode) {
                     e.preventDefault();
                     e.stopPropagation();
 
@@ -200,6 +225,18 @@ export class StudioCanvas {
         // MOUSE MOVE (Pan, Drag Item, or Continuous Paint)
         canvasElement.addEventListener("pointermove", (e) => {
             const coords = this.#getMapCoordinates(e, canvasElement);
+
+            if (this.isDraggingReference) {
+                const coords = this.#getMapCoordinates(e, canvasElement);
+                const dx = coords.x - this.dragStart.x;
+                const dy = coords.y - this.dragStart.y;
+
+                // Reset start point for continuous relative movement
+                this.dragStart = { x: coords.x, y: coords.y };
+
+                if (this.onReferencePan) this.onReferencePan(dx, dy);
+                return;
+            }
 
             if (this.isDragging) {
                 const dx = e.clientX - this.dragStart.x;
@@ -251,6 +288,12 @@ export class StudioCanvas {
             }
 
             if (e.button === 0) {
+                if (this.isDraggingReference) {
+                    this.isDraggingReference = false;
+                    canvasElement.style.cursor = "crosshair";
+                    return;
+                }
+
                 if (this.activeDrag) {
                     this.activeDrag = null;
                     canvasElement.style.cursor = "crosshair";
@@ -265,6 +308,24 @@ export class StudioCanvas {
         };
 
         canvasElement.addEventListener("pointerup", endPointer);
+        canvasElement.addEventListener("pointercancel", endPointer);
+
+        canvasElement.addEventListener("pointerleave", (e) => {
+            if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
+                this.onCanvasHover(null, null);
+            }
+        });
+
+        canvasElement.addEventListener("pointerup", (e) => {
+            if (e.button === 0) {
+                if (this.isDraggingReference) {
+                    this.isDraggingReference = false;
+                    canvasElement.style.cursor = "crosshair";
+                    return;
+                }
+            }
+        });
+
         canvasElement.addEventListener("pointercancel", endPointer);
 
         canvasElement.addEventListener("pointerleave", (e) => {
@@ -565,7 +626,10 @@ export class StudioCanvas {
      */
     exportToPNG(filename = "world-map") {
         try {
+            this.layers.reference.visible = false;
             const canvas = this.app.renderer.extract.canvas(this.stage);
+            this.layers.reference.visible = true;
+
             const dataUrl = canvas.toDataURL("image/png");
             const byteString = atob(dataUrl.split(",")[1]);
             const arrayBuffer = new ArrayBuffer(byteString.length);
@@ -632,24 +696,109 @@ export class StudioCanvas {
     }
 
     /**
+     * Programmatically generates seamless diagonal and crosshatch textures for polygon fills.
+     */
+    #getHatchTexture(colorHex, style) {
+        const key = `${colorHex}_${style}`;
+        if (this.layerSprites[key]) return this.layerSprites[key];
+
+        const canvas = document.createElement("canvas");
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext("2d");
+
+        // Convert strict hex integer back to #RRGGBB string for the canvas context
+        ctx.strokeStyle = "#" + colorHex.toString(16).padStart(6, "0");
+        ctx.lineWidth = 2;
+
+        if (style === "diagonal" || style === "crosshatch") {
+            ctx.beginPath();
+            ctx.moveTo(-4, 12);
+            ctx.lineTo(12, -4);
+            ctx.moveTo(4, 20);
+            ctx.lineTo(20, 4);
+            ctx.stroke();
+        }
+        if (style === "crosshatch") {
+            ctx.beginPath();
+            ctx.moveTo(20, 12);
+            ctx.lineTo(4, -4);
+            ctx.moveTo(12, 20);
+            ctx.lineTo(-4, 4);
+            ctx.stroke();
+        }
+
+        const texture = PIXI.Texture.from(canvas);
+        this.layerSprites[key] = texture;
+        return texture;
+    }
+
+    /**
+     * A variation of the spline generator that wraps the array to create a perfectly closed, seamless loop.
+     */
+    #getClosedSplinePoints(points, resolution = 20) {
+        if (!points || points.length < 3) return points;
+        const curve = [];
+
+        // Wrap the array: [Last, First, Second, ..., Last, First, Second]
+        const p = [points[points.length - 1], ...points, points[0], points[1]];
+
+        for (let i = 1; i < p.length - 2; i++) {
+            const p0 = p[i - 1];
+            const p1 = p[i];
+            const p2 = p[i + 1];
+            const p3 = p[i + 2];
+
+            for (let t = 0; t <= 1; t += 1 / resolution) {
+                const t2 = t * t;
+                const t3 = t2 * t;
+
+                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+
+                if (curve.length > 0) {
+                    const last = curve.at(-1);
+                    if (Math.abs(last.x - x) < 0.1 && Math.abs(last.y - y) < 0.1) continue;
+                }
+                curve.push({ x, y });
+            }
+        }
+        return curve;
+    }
+
+    /**
+     * Safety router to clear the spatial node cache before a render pass.
+     */
+    clearInteractiveTargets() {
+        this.interactiveTargets = [];
+    }
+
+    /**
      * Renders vector routes and POI pins to the infrastructure layer.
      */
     renderInfrastructure(pins = [], routes = [], isEditMode = false) {
+        // Clone and sort the routes by thickness so major highways always draw on top
+        const sortedRoutes = [...routes].sort((a, b) => a.thickness - b.thickness);
+
         this.routeGraphics.clear();
         this.pinContainer.removeChildren().forEach((c) => c.destroy());
         this.nodeContainer.removeChildren().forEach((c) => c.destroy());
 
-        // Clear the mathematical spatial cache before rendering
-        this.interactiveTargets = [];
-
         // 1. Render Routes (Bottom Layer)
-        routes.forEach((route) => {
+        sortedRoutes.forEach((route) => {
             if (route.hidden || !route.points || route.points.length < 2) return;
 
             const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
             const splinePoints = this.#getSplinePoints(route.points);
 
-            this.routeGraphics.lineStyle(route.thickness, colorHex, 1);
+            // Apply rounded caps and joins to blend intersections seamlessly
+            this.routeGraphics.lineStyle({
+                width: route.thickness,
+                color: colorHex,
+                alpha: 1,
+                cap: PIXI.LINE_CAP.ROUND,
+                join: PIXI.LINE_JOIN.ROUND,
+            });
 
             if (route.style === "solid") {
                 this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
@@ -768,6 +917,126 @@ export class StudioCanvas {
         });
     }
 
+    renderRegions(regionLayers = [], isEditMode = false, activeRegionId = null) {
+        this.layers.regions.removeChildren().forEach((c) => c.destroy());
+
+        regionLayers.forEach((layer) => {
+            if (layer.hidden) return;
+
+            const layerContainer = new PIXI.Container();
+            layerContainer.alpha = layer.opacity === undefined ? 0.5 : layer.opacity;
+            this.layers.regions.addChild(layerContainer);
+
+            layer.regions.forEach((region) => {
+                if (region.hidden || !region.points || region.points.length === 0) return;
+
+                const g = new PIXI.Graphics();
+                layerContainer.addChild(g);
+
+                const fillColorHex = region.fillColor === "transparent" ? null : Number.parseInt(region.fillColor.replace("#", ""), 16);
+                const lineColorHex = Number.parseInt(region.lineColor.replace("#", ""), 16);
+
+                // A polygon is "closed" if it has 3+ points and the user isn't actively currently drawing it
+                const isClosed = region.points.length >= 3 && region.id !== activeRegionId;
+                const pts = region.smoothing && isClosed ? this.#getClosedSplinePoints(region.points) : region.points;
+
+                // 1. Draw Fill
+                if (fillColorHex !== null) {
+                    if (region.fillStyle === "solid") {
+                        g.beginFill(fillColorHex, 1);
+                    } else {
+                        const tex = this.#getHatchTexture(fillColorHex, region.fillStyle);
+
+                        // Shift the texture origin to the region's first node.
+                        // This creates a clean, deterministic phase offset between different regions.
+                        const matrix = new PIXI.Matrix();
+                        matrix.translate(pts[0].x, pts[0].y);
+
+                        g.beginTextureFill({ texture: tex, matrix: matrix });
+                    }
+
+                    g.lineStyle(0); // Fills don't have lines
+                    g.moveTo(pts[0].x, pts[0].y);
+                    for (let i = 1; i < pts.length; i++) {
+                        g.lineTo(pts[i].x, pts[i].y);
+                    }
+                    if (isClosed) g.closePath();
+                    g.endFill();
+                }
+
+                // 2. Draw Border (Separated to allow dashed/dotted borders around solid fills)
+                if (region.lineThickness > 0) {
+                    g.lineStyle({ width: region.lineThickness, color: lineColorHex, alpha: 1, cap: PIXI.LINE_CAP.ROUND, join: PIXI.LINE_JOIN.ROUND });
+
+                    if (region.lineStyle === "solid") {
+                        g.moveTo(pts[0].x, pts[0].y);
+                        for (let i = 1; i < pts.length; i++) {
+                            g.lineTo(pts[i].x, pts[i].y);
+                        }
+                        if (isClosed) g.closePath();
+                    } else {
+                        // Dash drawing logic
+                        let pattern = [region.lineThickness * 4, region.lineThickness * 3]; // dashed
+                        if (region.lineStyle === "dotted") pattern = [region.lineThickness, region.lineThickness * 2];
+                        if (region.lineStyle === "dashdot") pattern = [region.lineThickness * 4, region.lineThickness * 2, region.lineThickness, region.lineThickness * 2];
+
+                        let dashIdx = 0;
+                        let dashLen = 0;
+                        let isDrawing = true;
+                        g.moveTo(pts[0].x, pts[0].y);
+
+                        const limit = isClosed ? pts.length + 1 : pts.length;
+                        for (let i = 1; i < limit; i++) {
+                            const p1 = pts[(i - 1) % pts.length];
+                            const p2 = pts[i % pts.length];
+                            const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+                            let remainingDist = dist;
+                            let currentX = p1.x;
+                            let currentY = p1.y;
+
+                            while (remainingDist > 0) {
+                                const step = Math.min(remainingDist, pattern[dashIdx] - dashLen);
+                                const ratio = step / remainingDist;
+
+                                currentX += (p2.x - currentX) * ratio;
+                                currentY += (p2.y - currentY) * ratio;
+
+                                if (isDrawing) g.lineTo(currentX, currentY);
+                                else g.moveTo(currentX, currentY);
+
+                                dashLen += step;
+                                remainingDist -= step;
+
+                                if (dashLen >= pattern[dashIdx]) {
+                                    dashLen = 0;
+                                    dashIdx = (dashIdx + 1) % pattern.length;
+                                    isDrawing = !isDrawing;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. Draw Edit Nodes
+                if (isEditMode) {
+                    region.points.forEach((pt) => {
+                        const node = new PIXI.Graphics();
+                        node.beginFill(0xffffff, 0.6);
+                        node.lineStyle(2, 0x000000, 0.6);
+                        node.drawCircle(0, 0, 5);
+                        node.endFill();
+                        node.x = pt.x;
+                        node.y = pt.y;
+
+                        this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
+                        layerContainer.addChild(node);
+                    });
+                }
+            });
+        });
+    }
+
     /**
      * Frames the viewport to encompass a specific array of coordinates.
      */
@@ -806,5 +1075,32 @@ export class StudioCanvas {
         this.stage.scale.set(targetScale);
         this.stage.position.x = this.app.screen.width / 2 - centerX * targetScale;
         this.stage.position.y = this.app.screen.height / 2 - centerY * targetScale;
+    }
+
+    async updateReferenceImage(url, x, y, scale, alpha) {
+        if (!url) {
+            this.referenceSprite.texture = PIXI.Texture.EMPTY;
+            return;
+        }
+
+        try {
+            if (!this.referenceSprite.texture.textureCacheIds.includes(url)) {
+                const texture = await PIXI.Assets.load(url);
+                this.referenceSprite.texture = texture;
+            }
+        } catch (err) {
+            console.error("FWMB | Failed to load reference image:", err);
+        }
+
+        this.referenceSprite.x = x;
+        this.referenceSprite.y = y;
+        this.referenceSprite.scale.set(scale);
+        this.referenceSprite.alpha = alpha;
+    }
+
+    setReferenceMode(isActive) {
+        this.isReferenceMode = isActive;
+        const canvasElement = this.app.canvas ?? this.app.view;
+        if (isActive) canvasElement.style.cursor = "crosshair";
     }
 }

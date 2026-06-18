@@ -1,0 +1,53 @@
+<div class="fwmb-tool-content fwmb-scrollable">
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.ReferenceImage"}}</legend>
+
+        <div class="form-group stacked">
+            <label>{{localize "FILRODENSWMB.UI.ImageSource"}}</label>
+            <div class="fwmb-flex-row" style="gap: 8px; align-items: center;">
+                <file-picker name="referenceImage" type="image" value="{{uiState.referenceImage}}" style="flex: 1;"></file-picker>
+                <button type="button" class="fwmb-icon-btn" data-action="removeReferenceImage" data-tooltip="{{localize 'FILRODENSWMB.UI.RemoveImage'}}">
+                    <i class="fwmb-icon delete"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="fwmb-brush-setting">
+            <label>{{localize "FILRODENSWMB.UI.Opacity"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="referenceAlpha" value="{{lookup uiState 'referenceAlpha'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "referenceAlpha"}}</output>
+            </div>
+        </div>
+
+        <div class="form-group stacked" style="margin-top: var(--filroden-space-m);">
+            <label>{{localize "FILRODENSWMB.UI.MapTransform"}}</label>
+            <div class="fwmb-transform-controls">
+
+                <div class="fwmb-transform-zoom">
+                    <button type="button" data-action="adjustReferenceScale" data-dir="1" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}"><i class="fwmb-icon zoom-in"></i></button>
+                    <button type="button" data-action="resetReferenceScale" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetScale'}}"><i class="fwmb-icon center-focus"></i></button>
+                    <button type="button" data-action="adjustReferenceScale" data-dir="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}"><i class="fwmb-icon zoom-out"></i></button>
+                </div>
+
+                <div class="fwmb-transform-dpad">
+                    <button type="button" class="dpad-up" data-action="nudgeReference" data-dx="0" data-dy="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
+                            class="fwmb-icon edit-arrow-up"
+                        ></i></button>
+                    <button type="button" class="dpad-left" data-action="nudgeReference" data-dx="-1" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
+                            class="fwmb-icon edit-arrow-up fwmb-rotate-270"
+                        ></i></button>
+                    <button type="button" class="dpad-center" data-action="resetReferencePan" data-tooltip="{{localize 'FILRODENSWMB.UI.CenterImage'}}"><i class="fwmb-icon center-focus"></i></button>
+                    <button type="button" class="dpad-right" data-action="nudgeReference" data-dx="1" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
+                            class="fwmb-icon edit-arrow-up fwmb-rotate-90"
+                        ></i></button>
+                    <button type="button" class="dpad-down" data-action="nudgeReference" data-dx="0" data-dy="1" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
+                            class="fwmb-icon edit-arrow-down"
+                        ></i></button>
+                </div>
+
+            </div>
+        </div>
+
+    </fieldset>
+</div>

@@ -74,6 +74,10 @@
 .fwmb-icon.place                { --fwmb-mask: url('../assets/icons/add_location.svg'); }
 .fwmb-icon.timeline             { --fwmb-mask: url('../assets/icons/timeline.svg'); }
 .fwmb-icon.arrow-drop-down      { --fwmb-mask: url('../assets/icons/arrow_drop_down.svg'); }
+.fwmb-icon.explore              { --fwmb-mask: url('../assets/icons/explore.svg'); }
+.fwmb-icon.png                  { --fwmb-mask: url('../assets/icons/file_png.svg'); }
+.fwmb-icon.add                  { --fwmb-mask: url('../assets/icons/add.svg'); }
+.fwmb-icon.gesture              { --fwmb-mask: url('../assets/icons/gesture.svg'); }
 
 
 /* --- APPLICATION SCROLLBARS --- */
@@ -1161,7 +1165,7 @@ input.fwmb-swatch {
     flex-direction: column;
     gap: var(--filroden-space-xs);
     padding-right: var(--filroden-space-xs);
-    max-height: 200px;
+    max-height: 40%;
     overflow-y: auto;
 }
 
@@ -1268,4 +1272,101 @@ input.fwmb-swatch {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     width: 260px; /* Expands to hold the grid nicely */
     padding: var(--filroden-space-s);
+}
+
+/* ==========================================
+   Region Panel & Accordion Layouts
+========================================== */
+.fwmb-panel-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-block-end: var(--filroden-space-s);
+}
+
+.fwmb-layer-header {
+    background: rgba(0, 0, 0, 0.2);
+    padding: var(--filroden-space-xs) var(--filroden-space-s);
+}
+
+.fwmb-list-item-content {
+    display: flex;
+    align-items: center;
+    gap: var(--filroden-space-s);
+    flex: 1;
+    min-width: 0; /* Ensures the text truncation child doesn't break the flex boundary */
+}
+
+.fwmb-list-item-actions {
+    display: flex;
+    gap: var(--filroden-space-xs);
+}
+
+.fwmb-layer-title {
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.fwmb-accordion-content {
+    margin-block-start: var(--filroden-space-s);
+    padding-inline-start: var(--filroden-space-l);
+    border-inline-start: 2px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--filroden-space-xs);
+}
+
+.fwmb-hint.small {
+    padding: var(--filroden-space-xs);
+    opacity: 0.7;
+    font-size: 0.9em;
+}
+
+.fwmb-swatch.small {
+    width: 16px;
+    height: 16px;
+}
+
+/* --- REGION & TOOLBAR UTILITIES --- */
+.fwmb-color-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.fwmb-setting-row {
+    display: flex;
+    gap: var(--filroden-space-s);
+    align-items: center;
+}
+
+input[type="color"].fwmb-swatch.fwmb-swatch-lg {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+}
+
+.fwmb-input-short {
+    width: 40px;
+}
+
+.fwmb-centered {
+    justify-content: center;
+}
+
+/* Base style for the transparent preset button */
+.fwmb-transparent {
+    background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), 
+                      linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+                      linear-gradient(45deg, transparent 75%, #ccc 75%), 
+                      linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+    background-color: #fff;
+}
+
+.fwmb-dialog-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--filroden-space-s);
 }

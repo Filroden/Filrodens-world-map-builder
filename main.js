@@ -18,11 +18,17 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/tools-biomes.hbs",
         "modules/filrodens-world-map-builder/templates/tools-infrastructure.hbs",
         "modules/filrodens-world-map-builder/templates/tools-regions.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-cartography.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-labels.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-reference.hbs",
         "modules/filrodens-world-map-builder/templates/tools-maps.hbs",
         "modules/filrodens-world-map-builder/templates/tools-settings.hbs",
         "modules/filrodens-world-map-builder/templates/tools-manage.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
         "modules/filrodens-world-map-builder/templates/journal-summary.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs",
     ]);
 
     registerSidebarInjection();
