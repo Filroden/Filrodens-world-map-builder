@@ -25,6 +25,7 @@ export class BrushEngine {
         this.lastX = null;
         this.lastY = null;
         this.redoStack = [];
+        this.activeSlopeElevation = null;
     }
 
     applyBrush(x, y, elevationData, biomeOverrideData, springOverrides, seaLevel) {
@@ -62,6 +63,7 @@ export class BrushEngine {
             this.currentStroke = stroke;
             this.lastX = null;
             this.lastY = null;
+            this.activeSlopeElevation = null;
 
             for (const pt of stroke.points) {
                 this.#lerpAndStamp(pt.x, pt.y, elevationData, biomeOverrideData, seaLevel, false);
@@ -77,6 +79,13 @@ export class BrushEngine {
 
     #lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, shouldRecord) {
         if (this.lastX === null || this.lastY === null) {
+            // Anchor the slope elevation to the exact pixel where the user first clicked
+            if (this.currentStroke.tool === "slopeUp" || this.currentStroke.tool === "slopeDown") {
+                const tx = Math.max(0, Math.min(this.mapWidth - 1, Math.round(x)));
+                const ty = Math.max(0, Math.min(this.mapHeight - 1, Math.round(y)));
+                this.activeSlopeElevation = elevationData[ty * this.mapWidth + tx];
+            }
+
             if (shouldRecord) this.#recordControlPoint(x, y);
             this.#stampBrush(x, y, elevationData, biomeOverrideData, seaLevel);
             this.lastX = x;
@@ -102,6 +111,17 @@ export class BrushEngine {
             const lerpFactor = (i * stepSpacing) / distance;
             const interpX = this.lastX + dx * lerpFactor;
             const interpY = this.lastY + dy * lerpFactor;
+
+            // Apply Continuous Gradient (Boosted for stronger carving)
+            const gradientBoost = 0.3;
+
+            if (this.currentStroke.tool === "slopeUp") {
+                this.activeSlopeElevation += this.currentStroke.strength * stepSpacing * gradientBoost;
+                this.activeSlopeElevation = Math.min(1, this.activeSlopeElevation);
+            } else if (this.currentStroke.tool === "slopeDown") {
+                this.activeSlopeElevation -= this.currentStroke.strength * stepSpacing * gradientBoost;
+                this.activeSlopeElevation = Math.max(0, this.activeSlopeElevation);
+            }
 
             this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel);
         }
@@ -170,6 +190,11 @@ export class BrushEngine {
             const targetElevation = elevationData[targetY * this.mapWidth + targetX];
 
             elevationData[index] += (targetElevation - currentElevation) * (modification * 0.5);
+        } else if (tool === "slopeUp" || tool === "slopeDown") {
+            // Exponentiate the influence to counter the "hardening" effect of overlapping stamps.
+            // Centerline hits the exact slope, but edges fall off rapidly to preserve the feather.
+            const slopeInfluence = Math.pow(influence, 4);
+            elevationData[index] = currentElevation * (1 - slopeInfluence) + this.activeSlopeElevation * slopeInfluence;
         }
     }
 

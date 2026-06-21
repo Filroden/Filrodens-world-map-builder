@@ -9,7 +9,7 @@
         <div class="fwmb-brush-setting" data-tool-group="terrain biomes">
             <label>{{localize "FILRODENSWMB.UI.BrushSize"}}</label>
             <div class="fwmb-slider-group">
-                <input type="range" name="brushSize" value="20" min="5" max="100" step="1" oninput="this.nextElementSibling.value = this.value" />
+                <input type="range" name="brushSize" value="20" min="2" max="100" step="1" oninput="this.nextElementSibling.value = this.value" />
                 <output>20</output>
             </div>
         </div>
@@ -66,6 +66,12 @@
         </button>
         <button type="button" data-tool-group="terrain" data-action="setBrushTool" data-tool="smooth" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSmooth'}}">
             <i class="fwmb-icon landscape"></i>
+        </button>
+        <button type="button" data-tool-group="terrain" data-action="setBrushTool" data-tool="slopeUp" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSlopeUp'}}">
+            <i class="fwmb-icon slope"></i>
+        </button>
+        <button type="button" data-tool-group="terrain" data-action="setBrushTool" data-tool="slopeDown" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSlopeDown'}}">
+            <i class="fwmb-icon slope reverse"></i>
         </button>
 
         <button type="button" data-tool-group="biomes" data-action="setBrushTool" data-tool="paint" class="active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolPaint'}}">

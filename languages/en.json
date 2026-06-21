@@ -10,6 +10,7 @@
     "FILRODENSWMB.UI.ResetView": "Reset View",
     "FILRODENSWMB.UI.ToggleGrid": "Toggle Grid Overlay",
 
+    "FILRODENSWMB.UI.ToolCreateMap": "Create New Map",
     "FILRODENSWMB.UI.ToolSettings": "Settings",
     "FILRODENSWMB.UI.ToolTerrain": "Terrain Generation",
     "FILRODENSWMB.UI.ToolFeatures": "Terrain Features",
@@ -59,6 +60,8 @@
     "FILRODENSWMB.UI.ToolRaise": "Raise Terrain",
     "FILRODENSWMB.UI.ToolLower": "Lower Terrain",
     "FILRODENSWMB.UI.ToolSmooth": "Smooth Terrain",
+    "FILRODENSWMB.UI.ToolSlopeUp": "Slope Up",
+    "FILRODENSWMB.UI.ToolSlopeDown": "Slope Down",
     "FILRODENSWMB.UI.Undo": "Undo",
     "FILRODENSWMB.UI.Redo": "Redo",
 
@@ -119,9 +122,13 @@
 
     "FILRODENSWMB.UI.CanvasSettings": "Canvas Setup",
     "FILRODENSWMB.UI.MapResolution": "Grid Resolution (Pixels)",
-    "FILRODENSWMB.UI.ApplyResolution": "Rebuild Canvas",
+    "FILRODENSWMB.UI.ApplyResolution": "Create New Map",
     "FILRODENSWMB.UI.ResolutionHint": "Warning: Changing the resolution will completely regenerate the map and destroy any custom brush strokes.",
     "FILRODENSWMB.UI.ResolutionWarningContent": "Changing the map resolution alters the underlying pixel grid. This will wipe all custom terrain painting, biome painting, and hand-placed springs. Are you sure you wish to proceed?",
+
+    "FILRODENSWMB.UI.Save": "Save",
+    "FILRODENSWMB.UI.Discard": "Discard",
+    "FILRODENSWMB.UI.Cancel": "Cancel",
 
     "FILRODENSWMB.UI.SaveMap": "Quick Save Map",
     "FILRODENSWMB.UI.SaveAs": "Save As...",
@@ -133,7 +140,6 @@
     "FILRODENSWMB.UI.LoadSuccess": "Map loaded successfully.",
     "FILRODENSWMB.UI.LoadWarningContent": "Loading a map will overwrite your current canvas. Any unsaved brush strokes or pins will be lost. Are you sure you wish to proceed?",
 
-    "FILRODENSWMB.UI.SceneTool": "Scene Configuration",
     "FILRODENSWMB.UI.GridSettings": "Grid Overlay",
     "FILRODENSWMB.UI.GridType": "Grid Pattern",
     "FILRODENSWMB.UI.GridSize": "Grid Size (px)",
@@ -217,6 +223,7 @@
     "FILRODENSWMB.UI.Warning": "Warning",
     "FILRODENSWMB.UI.SeedWarningContent": "Generating a new terrain seed will permanently erase all manual brush edits you have applied to this map. Do you want to continue?",
     "FILRODENSWMB.UI.WarnNoRegionLayer": "No region layer selected.",
+    "FILRODENSWMB.UI.UnsavedChangesWarning": "You have unsaved changes. Do you want to save your map before closing?",
 
     "FILRODENSWMB.JOURNAL.Title": "World Map Parameter Log",
     "FILRODENSWMB.JOURNAL.Description": "This journal contains the full generation profile and mathematical vectors used during world creation. This allows you to see the complete settings for the model without having to load it.",

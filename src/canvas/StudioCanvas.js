@@ -60,6 +60,10 @@ export class StudioCanvas {
         // Cache for persistent GPU textures to prevent memory churn
         this.layerSprites = {};
 
+        // Setup the Brush Cursor overlay
+        this.brushCursor = new PIXI.Graphics();
+        this.brushCursor.visible = false;
+
         // Add them to the zooming stage in ascending order
         this.stage.addChild(
             this.layers.base,
@@ -72,6 +76,7 @@ export class StudioCanvas {
             this.layers.reference,
             this.layers.labels,
             this.gridLayer,
+            this.brushCursor,
         );
 
         this.isDragging = false;
@@ -1102,5 +1107,25 @@ export class StudioCanvas {
         this.isReferenceMode = isActive;
         const canvasElement = this.app.canvas ?? this.app.view;
         if (isActive) canvasElement.style.cursor = "crosshair";
+    }
+
+    updateBrushCursor(x, y, radius, isVisible) {
+        if (!isVisible || x === null || y === null) {
+            this.brushCursor.visible = false;
+            return;
+        }
+
+        this.brushCursor.visible = true;
+        this.brushCursor.clear();
+
+        // Ensure the line stays exactly 1 screen-pixel thick regardless of map zoom
+        const thickness = 1 / this.stage.scale.x;
+
+        // Draw a white circle with a slight drop-shadow effect for visibility on light terrain
+        this.brushCursor.lineStyle({ width: thickness * 3, color: 0x000000, alpha: 0.3 });
+        this.brushCursor.drawCircle(x, y, radius);
+
+        this.brushCursor.lineStyle({ width: thickness, color: 0xffffff, alpha: 0.9 });
+        this.brushCursor.drawCircle(x, y, radius);
     }
 }

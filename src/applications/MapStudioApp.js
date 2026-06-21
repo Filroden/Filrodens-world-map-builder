@@ -116,8 +116,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.pinHistory = [];
         this.pinRedoStack = [];
         this.brushEngine = null;
+
         this.currentSaveId = null;
         this.currentSaveName = null;
+        this.isDirty = false;
+        this.isSaving = false;
 
         this.#allocateBuffers();
         this.hasBooted = false;
@@ -128,6 +131,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             gridType: "square",
             gridSize: 50,
             gridVisible: false,
+            brushSize: 20,
+            brushStrength: 0.02,
+            brushFeather: 0.4,
+            brushBiome: 6,
 
             mapSeed: FILRODENSWMB.DEFAULTS.SEED,
             seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
@@ -185,6 +192,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), 400);
         this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), 200);
         this.debouncedGenerateFeatures = foundry.utils.debounce(this.generateFeatures.bind(this), 200);
+    }
+
+    markDirty() {
+        this.isDirty = true;
     }
 
     async _preparePartContext(partId, context, options) {
@@ -420,6 +431,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (this.canvasEngine) {
             this.canvasEngine.onCanvasHover = (x, y) => {
+                // --- Update Brush Cursor ---
+                const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
+                const showCursor = this.canvasEngine.isEditMode && isBrushActive && !this.canvasEngine.isDragging;
+                this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, showCursor);
+
+                // --- Update Canvas Readout ---
                 const readout = this.element.querySelector(".fwmb-canvas-readout");
                 if (!readout) return;
 
@@ -462,6 +479,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async close(options) {
+        if (this.isDirty) {
+            const choice = await foundry.applications.api.DialogV2.wait({
+                window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
+                content: `<p>${game.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
+                buttons: [
+                    { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
+                    { action: "discard", label: game.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
+                    { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+                ],
+                close: () => "cancel",
+            });
+
+            if (choice === "cancel") return; // Abort application closure entirely
+            if (choice === "save") {
+                const saved = await this.saveCurrentMap();
+                if (!saved) return; // If save failed or was cancelled, abort closure
+            }
+        }
+
         if (this.canvasEngine) this.canvasEngine.destroy();
         if (this.scene3D) this.scene3D.destroy();
         return super.close(options);
@@ -539,10 +575,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.canvasEngine.onBrushMove = (x, y) => {
             this.#applyBrushStroke(x, y);
+
+            // Track the mouse while actively painting
+            const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
+            if (this.canvasEngine.isEditMode && isBrushActive) {
+                this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, true);
+            }
         };
 
         this.canvasEngine.onBrushEnd = () => {
             this.brushEngine.endStroke();
+            this.markDirty();
         };
 
         this.canvasEngine.onInfraDragStart = () => {
@@ -565,6 +608,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.canvasEngine.onInfraDragEnd = () => {
             this.render({ parts: ["context"] });
+            this.markDirty();
         };
 
         this.canvasEngine.onInfraInsertNode = (x, y) => {
@@ -612,6 +656,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.#repaintCanvas();
                 this.render({ parts: ["context"] });
             }
+
+            this.markDirty();
         };
 
         this.canvasEngine.onInfraDeleteNode = (target) => {
@@ -672,6 +718,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     }
                 }
             }
+
+            this.markDirty();
         };
     }
 
@@ -1065,6 +1113,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.#repaintCanvas();
         this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     #syncInfraModeButtons() {
@@ -1205,6 +1254,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.#repaintCanvas();
         this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     // --- Action Handlers ---
@@ -1276,14 +1326,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.mapWidth = newWidth;
         this.uiState.mapHeight = newHeight;
 
+        // 1. Reset all history and spatial arrays
+        this.markDirty();
         this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
         this.mapPins = [];
+        this.mapRoutes = [];
+        this.regionLayers = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
+
+        // 2. Drop all active drawing states
+        this.activeRouteId = null;
+        this.activeRegionLayerId = null;
+        this.activeRegionId = null;
+
+        // 3. Wipe the save memory so the next save forces a "Save As" prompt
+        this.currentSaveId = null;
+        this.currentSaveName = null;
 
         await this.generateTerrain();
         this.#updateGrid();
         this.canvasEngine.resetCamera();
+
+        // 4. Force UI to update (clears old layers from the sidebar and map name from the save tooltip)
+        this.render({ parts: ["toolbar", "context"] });
     }
 
     static #onChangeTool(event, target) {
@@ -1363,6 +1429,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapPins = this.mapPins.filter((p) => p.id !== id);
         this.#repaintCanvas();
         this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     static async #onDeleteRegion(event, target) {
@@ -1395,6 +1462,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.#repaintCanvas();
         this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     static async #onDeleteRegionLayer(event, target) {
@@ -1410,6 +1478,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (this.activeRegionLayerId === id) this.activeRegionLayerId = null;
             this.#repaintCanvas();
             this.render({ parts: ["context"] });
+            this.markDirty();
         }
     }
 
@@ -1419,6 +1488,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.activeRouteId === id) this.activeRouteId = null;
         this.#repaintCanvas();
         this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     static async #onEditPin(event, target) {
@@ -1467,6 +1537,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             this.#repaintCanvas();
             this.render({ parts: ["context"] });
+            this.markDirty();
         }
     }
 
@@ -1526,6 +1597,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.#repaintCanvas();
         this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     static async #onEditRegionLayer(event, target) {
@@ -1542,6 +1614,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (newName) {
             layer.name = newName;
             this.render({ parts: ["context"] });
+            this.markDirty();
         }
     }
 
@@ -1587,6 +1660,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             this.#repaintCanvas();
             this.render({ parts: ["context"] });
+            this.markDirty();
         }
     }
 
@@ -1658,6 +1732,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     await this.#ingestMapPayload(payload);
                     ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
                     this.render({ parts: ["toolbar"] });
+                    this.isDirty = false;
                 }
                 break;
             }
@@ -1797,6 +1872,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.#rebuildFromHistory();
             }
         }
+
+        this.markDirty();
     }
 
     static #onRemoveReferenceImage(event, target) {
@@ -1845,51 +1922,70 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Context-aware Quick Save.
      * Creates a new journal if none exists, otherwise overwrites the current ID.
      */
-    static async #onSaveMap(event, target) {
-        target.disabled = true;
+    async saveCurrentMap() {
+        if (this.isSaving) return false;
+        this.isSaving = true;
 
-        const { currentSeed, params } = this.#getMapParameters();
-        const payload = {
-            seed: currentSeed,
-            mapWidth: this.mapWidth,
-            mapHeight: this.mapHeight,
-            gridType: this.uiState.gridType,
-            gridSize: this.uiState.gridSize,
-            params: params,
-            history: this.brushEngine?.history || [],
-            mapPins: this.mapPins,
-            mapRoutes: this.mapRoutes,
-            regionLayers: this.regionLayers,
-        };
+        // Visually lock the application to prevent array mutation during serialisation
+        this.element.style.pointerEvents = "none";
+        this.element.style.filter = "brightness(0.7)";
+        this.element.style.cursor = "wait";
 
-        if (!this.currentSaveId) {
-            const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
-            const defaultName = `Terrain Map (${hash})`;
+        let success = false;
+        try {
+            const { currentSeed, params } = this.#getMapParameters();
+            const payload = {
+                seed: currentSeed,
+                mapWidth: this.mapWidth,
+                mapHeight: this.mapHeight,
+                gridType: this.uiState.gridType,
+                gridSize: this.uiState.gridSize,
+                params: params,
+                history: this.brushEngine?.history || [],
+                mapPins: this.mapPins,
+                mapRoutes: this.mapRoutes,
+                regionLayers: this.regionLayers,
+            };
 
-            const mapName = await foundry.applications.api.DialogV2.prompt({
-                window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") },
-                content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${defaultName}">`,
-                ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
-            });
+            if (!this.currentSaveId) {
+                const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
+                const defaultName = `Terrain Map (${hash})`;
 
-            if (!mapName) {
-                target.disabled = false;
-                return;
+                const mapName = await foundry.applications.api.DialogV2.prompt({
+                    window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save As" },
+                    content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${defaultName}">`,
+                    ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
+                });
+
+                if (!mapName) return false; // User cancelled the save prompt
+                this.currentSaveName = mapName;
             }
-            this.currentSaveName = mapName;
+
+            const journal = await saveMapData(this.currentSaveName, payload, this.currentSaveId);
+
+            if (journal) {
+                this.currentSaveId = journal.id;
+                this.isDirty = false; // Successfully saved, map is no longer dirty
+                success = true;
+                ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
+                this.render({ parts: ["toolbar"] });
+            } else {
+                ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
+            }
+        } finally {
+            // Guarantee the UI unlocks even if an unexpected error occurs
+            this.isSaving = false;
+            this.element.style.pointerEvents = "auto";
+            this.element.style.filter = "none";
+            this.element.style.cursor = "default";
         }
+        return success;
+    }
 
-        const journal = await saveMapData(this.currentSaveName, payload, this.currentSaveId);
-
-        if (journal) {
-            this.currentSaveId = journal.id;
-            ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
-            this.render({ parts: ["toolbar"] });
-        } else {
-            ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
-        }
-
-        target.disabled = false;
+    static async #onSaveMap(event, target) {
+        if (target) target.disabled = true;
+        await this.saveCurrentMap();
+        if (target) target.disabled = false;
     }
 
     static #onSelectRegionLayer(event, target) {
@@ -2231,6 +2327,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.#rebuildFromHistory();
             }
         }
+
+        this.markDirty();
     }
 
     static #onZoomIn(event, target) {

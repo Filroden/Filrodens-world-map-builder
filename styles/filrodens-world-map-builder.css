@@ -27,6 +27,10 @@
     filter: invert(1);
 }
 
+.fwmb-icon.reverse {
+    transform: scaleX(calc(-1 * var(--filroden-dir-flip)));
+}
+
 .fwmb-icon.map                  { --fwmb-mask: url('../assets/icons/map.svg'); }
 .fwmb-icon.hex                  { --fwmb-mask: url('../assets/icons/hive.svg'); }
 .fwmb-icon.layers               { --fwmb-mask: url('../assets/icons/layers.svg'); }
@@ -36,6 +40,7 @@
 .fwmb-icon.file-open            { --fwmb-mask: url('../assets/icons/file_open.svg'); }
 .fwmb-icon.save                 { --fwmb-mask: url('../assets/icons/save.svg'); }
 .fwmb-icon.delete               { --fwmb-mask: url('../assets/icons/delete.svg'); }
+.fwmb-icon.cancel               { --fwmb-mask: url('../assets/icons/cancel.svg'); }
 .fwmb-icon.brush                { --fwmb-mask: url('../assets/icons/brush.svg'); }
 .fwmb-icon.select               { --fwmb-mask: url('../assets/icons/select.svg'); }
 .fwmb-icon.grid-on              { --fwmb-mask: url('../assets/icons/grid_3x3.svg'); }
@@ -78,6 +83,7 @@
 .fwmb-icon.png                  { --fwmb-mask: url('../assets/icons/file_png.svg'); }
 .fwmb-icon.add                  { --fwmb-mask: url('../assets/icons/add.svg'); }
 .fwmb-icon.gesture              { --fwmb-mask: url('../assets/icons/gesture.svg'); }
+.fwmb-icon.slope                { --fwmb-mask: url('../assets/icons/signal_cellular_null.svg'); }
 
 
 /* --- APPLICATION SCROLLBARS --- */

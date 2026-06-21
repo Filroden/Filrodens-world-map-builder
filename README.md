@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-1.0.0-alpha4-blue)
+![Latest Version](https://img.shields.io/badge/Version-1.0.0-beta1-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -147,8 +147,8 @@ I will continue to look for ways to improve performance as the module develops.
 
 I have designed the module so that users will eventually be able to create a world map, then zoom into an area of interest and use it as the new boundaries for a larger-scale, higher detail map containing all the same information. This will allow users to create more detailed maps of continents, countries, regions, etc.
 
-- Improve performance
-- Add social, political or economic regions as individual, toggled display layers
-- Add labels with predefined styles and custom styles
-- Add cartography tools: scale, cartouche, compass roses, etc
-- Add "export to scene" tools to supplement or replace the current "export to PNG" tool. Link vector features and their meta data to journals.
+- Improve performance.
+- Add labels with predefined styles and custom styles. Pre-generate labels from existing infrastructure and region names.
+- Add cartography tools: scale, cartouche, compass roses, etc.
+- Add "export to scene" tools to supplement or replace the current "export to PNG" tool. Link vector features and their meta data to journal pages.
+- Sandbox mode, import DEM, import greyscale map and calculate elevations, etc.
