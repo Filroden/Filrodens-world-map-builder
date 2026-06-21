@@ -494,12 +494,15 @@ export class StudioCanvas {
 
             const hexColor = pinColors[pin.type];
 
-            // Future-proofing: Cities might not have a color in this specific dictionary,
-            // so we only draw the circle if it maps to a known vector pin type.
             if (hexColor !== undefined) {
+                const radius = pin.radius || 6;
                 this.vectorGraphics.beginFill(hexColor, 0.4);
-                this.vectorGraphics.drawCircle(pin.x, pin.y, 6);
+                this.vectorGraphics.drawCircle(pin.x, pin.y, radius);
                 this.vectorGraphics.endFill();
+
+                if (isFeatureEdit) {
+                    this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: Math.max(radius, 10) });
+                }
             }
         }
     }

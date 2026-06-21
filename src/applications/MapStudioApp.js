@@ -414,7 +414,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     return;
                 }
 
-                if (event.target.matches('input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"], input[name="mapSeed"]')) {
+                if (event.target.matches('input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]')) {
                     this.debouncedGenerateTerrain();
                 } else if (
                     event.target.matches(
@@ -431,8 +431,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (this.canvasEngine) {
             this.canvasEngine.onCanvasHover = (x, y) => {
-                // --- Update Brush Cursor ---
-                const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
+                const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes" || this.activeTool === "features";
                 const showCursor = this.canvasEngine.isEditMode && isBrushActive && !this.canvasEngine.isDragging;
                 this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, showCursor);
 
@@ -518,7 +517,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
 
             if (layer === "features" && ["addSpring", "blockSpring", "erasePin"].includes(tool)) {
-                const existingIndex = this.mapPins.findIndex((p) => Math.hypot(p.x - x, p.y - y) < 8);
+                // Allow clicking massive block zones, but keep a minimum 8px target for tiny pins
+                const clickedIndex = this.mapPins.findIndex((p) => {
+                    const r = p.radius || 6;
+                    return Math.hypot(p.x - x, p.y - y) <= Math.max(r, 8);
+                });
 
                 this.pinHistory.push({
                     pins: foundry.utils.deepClone(this.mapPins),
@@ -530,13 +533,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.pinRedoStack = [];
 
                 if (tool === "erasePin") {
-                    if (existingIndex > -1) this.mapPins.splice(existingIndex, 1);
+                    if (clickedIndex > -1) this.mapPins.splice(clickedIndex, 1);
                 } else {
                     const pinType = tool === "addSpring" ? "spring" : "block_spring";
-                    if (existingIndex > -1) {
-                        this.mapPins[existingIndex].type = pinType;
+                    const radius = tool === "blockSpring" ? getNum("brushSize") : 6;
+
+                    // Don't overwrite if placing a blocker, allow overlapping blockers for coverage
+                    if (clickedIndex > -1 && tool !== "blockSpring") {
+                        this.mapPins[clickedIndex].type = pinType;
+                        this.mapPins[clickedIndex].radius = radius;
                     } else {
-                        this.mapPins.push({ id: foundry.utils.randomID(), x, y, type: pinType });
+                        this.mapPins.push({ id: foundry.utils.randomID(), x, y, type: pinType, radius: radius });
                     }
                 }
 
@@ -577,7 +584,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.#applyBrushStroke(x, y);
 
             // Track the mouse while actively painting
-            const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
+            const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes" || this.activeTool === "features";
             if (this.canvasEngine.isEditMode && isBrushActive) {
                 this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, true);
             }
@@ -603,12 +610,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const isEdit = this.canvasEngine.isEditMode;
             const infraPins = this.mapPins.filter((p) => !!p.icon);
             this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isEdit);
-            this.canvasEngine.renderRegions(this.regionLayers, isEdit, this.activeRegionId); // <-- Required to see dragged regions
+            this.canvasEngine.renderRegions(this.regionLayers, isEdit, this.activeRegionId);
+
+            if (this.activeTool === "features") {
+                this.canvasEngine.renderRiverVectors(this.currentRiverData?.vectors, this.mapPins, isEdit, this.bufferWaterMask);
+            }
         };
 
         this.canvasEngine.onInfraDragEnd = () => {
             this.render({ parts: ["context"] });
             this.markDirty();
+
+            if (this.activeTool === "features") this.debouncedGenerateClimate();
         };
 
         this.canvasEngine.onInfraInsertNode = (x, y) => {
@@ -624,7 +637,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 if (!pin.hidden && pin.icon && Math.hypot(pin.x - x, pin.y - y) < 15) return;
             }
 
-            // Try to insert into a Route
+            // 1. Try to insert into a Route
             const routeSegment = this.#getClosestRouteSegment(x, y);
             if (routeSegment && this.activeTool === "infrastructure") {
                 this.pinHistory.push({
@@ -638,10 +651,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 routeSegment.route.points.splice(routeSegment.insertIndex, 0, { x: routeSegment.projX, y: routeSegment.projY });
                 this.#repaintCanvas();
                 this.render({ parts: ["context"] });
+                this.markDirty();
                 return;
             }
 
-            // Try to insert into a Region
+            // 2. Try to insert into a Region
             const regionSegment = this.#getClosestRegionSegment(x, y);
             if (regionSegment && this.activeTool === "regions") {
                 this.pinHistory.push({
@@ -655,14 +669,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 regionSegment.region.points.splice(regionSegment.insertIndex, 0, { x: regionSegment.projX, y: regionSegment.projY });
                 this.#repaintCanvas();
                 this.render({ parts: ["context"] });
+                this.markDirty();
             }
-
-            this.markDirty();
         };
 
         this.canvasEngine.onInfraDeleteNode = (target) => {
-            if (this.activeTool !== "infrastructure" && this.activeTool !== "regions") return;
-            if (target.icon) return;
+            if (this.activeTool !== "infrastructure" && this.activeTool !== "regions" && this.activeTool !== "features") return;
+            if (target.icon && this.activeTool !== "infrastructure") return;
 
             const pushHistory = () => {
                 this.pinHistory.push({
@@ -690,6 +703,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         }
                         this.#repaintCanvas();
                         this.render({ parts: ["context"] });
+                        this.markDirty();
                         return;
                     }
                 }
@@ -713,9 +727,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                             this.#repaintCanvas();
                             this.render({ parts: ["context"] });
+                            this.markDirty();
                             return;
                         }
                     }
+                }
+            }
+
+            // 3. Check Features
+            if (this.activeTool === "features" && (target.type === "spring" || target.type === "block_spring")) {
+                const nodeIndex = this.mapPins.indexOf(target);
+                if (nodeIndex > -1) {
+                    pushHistory();
+                    this.mapPins.splice(nodeIndex, 1);
+                    this.#repaintCanvas();
+                    this.debouncedGenerateClimate();
+                    this.markDirty();
+                    return;
                 }
             }
 
@@ -800,8 +828,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.currentElevationData) return;
 
         const seaLevel = this.uiState["seaLevel"];
-        const engine = new ProceduralEngine();
-        const { params } = this.#getMapParameters();
+        const { currentSeed, params } = this.#getMapParameters();
+        const engine = new ProceduralEngine(currentSeed);
         const waterMask = this.bufferWaterMask;
         const riverVectors = this.currentRiverData ? this.currentRiverData.vectors : null;
 
@@ -840,8 +868,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours);
         this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight);
 
+        if (this.canvasEngine) {
+            this.canvasEngine.clearInteractiveTargets();
+        }
+
         if (riverVectors) {
-            const isEditModeActive = this.element.querySelector('[data-action="toggleEditMode"]')?.classList.contains("active");
+            const isEditModeActive = this.canvasEngine.isEditMode;
             const showPins = this.activeTool === "features" && isEditModeActive;
 
             this.canvasEngine.renderRiverVectors(riverVectors, this.mapPins, showPins, waterMask);
@@ -851,7 +883,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         if (this.canvasEngine) {
-            this.canvasEngine.clearInteractiveTargets();
             const isEditModeActive = this.canvasEngine.isEditMode;
 
             const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
@@ -885,8 +916,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async generateTerrain() {
-        const { params } = this.#getMapParameters();
-        const engine = new ProceduralEngine();
+        const { currentSeed, params } = this.#getMapParameters();
+        const engine = new ProceduralEngine(currentSeed);
 
         console.log("World Map Builder | Generating Topography...");
         const t0 = performance.now();
@@ -905,8 +936,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async generateClimate() {
         if (!this.currentElevationData) return;
-        const { params } = this.#getMapParameters();
-        const engine = new ProceduralEngine();
+        const { currentSeed, params } = this.#getMapParameters();
+        const engine = new ProceduralEngine(currentSeed);
 
         console.log("World Map Builder | Generating Climate Data...");
         const t0 = performance.now();
@@ -921,8 +952,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async generateFeatures() {
         if (!this.currentElevationData) return;
-        const { params } = this.#getMapParameters();
-        const engine = new ProceduralEngine();
+        const { currentSeed, params } = this.#getMapParameters();
+        const engine = new ProceduralEngine(currentSeed);
 
         console.log("World Map Builder | Generating Features...");
         const t0 = performance.now();
@@ -1295,11 +1326,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static async #onApplyResolution(event, target) {
         const widthInput = this.element.querySelector('input[name="mapWidth"]');
         const heightInput = this.element.querySelector('input[name="mapHeight"]');
+        const seedInput = this.element.querySelector('input[name="mapSeed"]'); // <-- NEW
 
         const newWidth = Number.parseInt(widthInput?.value) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
         const newHeight = Number.parseInt(heightInput?.value) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
+        let newSeed = seedInput?.value?.trim(); // <-- NEW
 
-        if (newWidth === this.mapWidth && newHeight === this.mapHeight) return;
+        // If the user left the seed blank, generate a random one automatically
+        if (!newSeed) {
+            newSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
 
         const hasBrushEdits = this.brushEngine && this.brushEngine.history.length > 0;
         const hasPinEdits = this.mapPins && this.mapPins.length > 0;
@@ -1315,12 +1351,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (!confirmed) {
                 if (widthInput) widthInput.value = this.mapWidth;
                 if (heightInput) heightInput.value = this.mapHeight;
+                if (seedInput) seedInput.value = this.uiState.mapSeed; // Revert visually
                 return;
             }
         }
 
         this.mapWidth = newWidth;
         this.mapHeight = newHeight;
+        this.uiState.mapSeed = newSeed;
+        if (seedInput) seedInput.value = newSeed;
+
         this.#allocateBuffers();
 
         this.uiState.mapWidth = newWidth;
@@ -1822,25 +1862,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     static async #onRandomizeSeed(event, target) {
-        if (this.brushEngine && this.brushEngine.history.length > 0) {
-            const confirmed = await foundry.applications.api.DialogV2.confirm({
-                window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
-                content: `<p>${game.i18n.localize("FILRODENSWMB.UI.SeedWarningContent")}</p>`,
-                rejectClose: false,
-                modal: true,
-            });
-
-            if (!confirmed) return;
-
-            this.brushEngine.history = [];
-            this.brushEngine.redoStack = [];
-        }
-
         const input = this.element.querySelector('input[name="mapSeed"]');
         if (!input) return;
 
         input.value = Math.random().toString(36).substring(2, 8).toUpperCase();
-        input.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
     static #onRedoBrush(event, target) {
@@ -2150,8 +2175,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (editToolbar) editToolbar.classList.add("fwmb-hidden");
         if (contextPanel) contextPanel.style.display = "none";
 
-        const { params } = this.#getMapParameters();
-        const engine = new ProceduralEngine();
+        const { currentSeed, params } = this.#getMapParameters();
+        const engine = new ProceduralEngine(currentSeed);
         const seaLevel = this.uiState["seaLevel"];
         const waterMask = this.currentRiverData ? this.currentRiverData.waterMask : null;
 

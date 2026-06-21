@@ -399,7 +399,7 @@
     border-radius: var(--filroden-radius-medium);
     padding: var(--filroden-space-m);
     margin: var(--filroden-space-m);
-    gap: var(--filroden-space-s);
+    gap: var(--filroden-space-l);
     display: flex;
     flex-direction: column;
 }

@@ -3,17 +3,6 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.GlobalSettings"}}</legend>
 
-        <div class="form-group stacked">
-            <label>{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
-            <div class="fwmb-flex-row">
-                <input type="text" name="mapSeed" class="fwmb-flex-1" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" />
-                <button type="button" class="fwmb-btn" data-action="randomizeSeed" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
-                    <i class="fwmb-icon shuffle"></i>
-                </button>
-            </div>
-            <div class="hint">{{localize "FILRODENSWMB.UI.SeedHint"}}</div>
-        </div>
-
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.SeaLevel"}}</label>
             <div class="fwmb-slider-group">
