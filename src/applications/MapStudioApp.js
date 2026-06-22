@@ -656,8 +656,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.onInfraDrag = () => {
             const isEdit = this.canvasEngine.isEditMode;
             const infraPins = this.mapPins.filter((p) => !!p.icon);
-            this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isEdit);
-            this.canvasEngine.renderRegions(this.regionLayers, isEdit, this.activeRegionId);
+
+            // --- Isolate the edit state to the active tool ---
+            const isInfraEdit = this.activeTool === "infrastructure" && isEdit;
+            this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit);
+
+            const isRegionEdit = this.activeTool === "regions" && isEdit;
+            this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId);
 
             if (this.activeTool === "features") {
                 this.canvasEngine.renderRiverVectors(this.currentRiverData?.vectors, this.mapPins, isEdit, this.bufferWaterMask);
@@ -667,7 +672,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isEdit);
             }
         };
-
         this.canvasEngine.onInfraDragEnd = () => {
             this.render({ parts: ["context"] });
             this.markDirty();
@@ -1494,7 +1498,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         this.#syncInfraModeButtons();
-
+        this.#repaintVectors();
         this.render({ parts: ["toolbar", "context"] });
     }
 
@@ -1615,11 +1619,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditLabel") || "Edit Label" },
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditLabel") },
             content: content,
-            render: (event, dialog) => {
-                const range = dialog.querySelector('input[name="labelFontSize"]');
-                const output = dialog.querySelector("output");
+            render: (event) => {
+                const app = event.target;
+                const html = app.element;
+
+                const range = html.querySelector('input[name="labelFontSize"]');
+                const output = html.querySelector("output");
+
                 if (range && output) {
                     range.addEventListener("input", (e) => (output.value = e.target.value));
                 }

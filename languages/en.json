@@ -223,7 +223,7 @@
     "FILRODENSWMB.UI.AutoLabels": "Auto-Generated Labels",
     "FILRODENSWMB.UI.CustomLabels": "Custom Labels",
     "FILRODENSWMB.UI.AddLabel": "Add New Label",
-    "FILRODENSWMB.UI.LabelHelpText": "Drag labels to reposition them. Use the scroll wheel while dragging to rotate them.",
+    "FILRODENSWMB.UI.LabelHelpText": "Click to add a new label. Drag labels to reposition them. Use the scroll wheel while dragging to rotate them.",
     "FILRODENSWMB.UI.LabelText": "Label Text",
     "FILRODENSWMB.UI.FontFamily": "Font Family",
     "FILRODENSWMB.UI.FontSize": "Font Size (REM)",

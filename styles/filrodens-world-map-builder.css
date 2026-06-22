@@ -501,6 +501,7 @@
 
 .fwmb .fwmb-flex-1 {
     flex: 1;
+    min-height: 0;
     min-width: 0; /* Prevents flexbox text inputs from breaking container bounds */
 }
 
