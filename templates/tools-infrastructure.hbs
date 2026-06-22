@@ -6,12 +6,12 @@
         <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--filroden-space-m);">
             {{#each mapPins}}
             <div class="fwmb-list-item" data-id="{{this.id}}">
-                <button type="button" class="fwmb-icon-btn small" data-action="togglePinVisibility">
+                <button type="button" class="fwmb-icon-btn small" data-action="toggleVisibility" data-target="feature">
                     <i class="fwmb-icon {{#if this.hidden}}visibility-off{{else}}visibility{{/if}}"></i>
                 </button>
                 <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{this.icon}}.svg" class="fwmb-list-icon" />
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
-                <button type="button" class="fwmb-icon-btn small" data-action="zoomToPin" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon center-focus"></i>
                 </button>
                 <button type="button" class="fwmb-icon-btn small" data-action="editPin" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
@@ -38,7 +38,7 @@
                 </button>
                 <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: {{this.thickness}}px; border-style: {{this.style}};"></div>
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
-                <button type="button" class="fwmb-icon-btn small" data-action="zoomToRoute" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon center-focus"></i>
                 </button>
                 <button type="button" class="fwmb-icon-btn small" data-action="editRoute" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">

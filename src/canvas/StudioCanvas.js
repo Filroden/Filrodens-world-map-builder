@@ -133,6 +133,18 @@ export class StudioCanvas {
     #setupInteractions(canvasElement) {
         // SCROLL TO ZOOM / SCALE
         canvasElement.addEventListener("wheel", (e) => {
+            // --- Label Rotation Intercept ---
+            if (this.activeDrag) {
+                const dragWrapper = this.interactiveTargets.find((t) => t.target === this.activeDrag.target);
+                if (dragWrapper?.isLabel) {
+                    e.preventDefault();
+                    const dir = e.deltaY < 0 ? -5 : 5;
+                    this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
+                    if (this.onInfraDrag) this.onInfraDrag(); // Force a live redraw
+                    return;
+                }
+            }
+
             // --- Reference Image Scaling Intercept ---
             if (this.isReferenceMode && e.shiftKey) {
                 const scaleDirection = e.deltaY < 0 ? 1.05 : 0.95;
@@ -1130,5 +1142,115 @@ export class StudioCanvas {
 
         this.brushCursor.lineStyle({ width: thickness, color: 0xffffff, alpha: 0.9 });
         this.brushCursor.drawCircle(x, y, radius);
+    }
+
+    /**
+     * Calculates relative luminance to guarantee text readability against any biome.
+     */
+    #getAdaptiveStrokeColor(hexColor) {
+        const cleanHex = String(hexColor).replace("#", "");
+        if (cleanHex.length !== 6) return "#000000";
+
+        const r = Number.parseInt(cleanHex.substring(0, 2), 16);
+        const g = Number.parseInt(cleanHex.substring(2, 4), 16);
+        const b = Number.parseInt(cleanHex.substring(4, 6), 16);
+
+        // Standard perceived luminance calculation
+        const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+        return luma < 128 ? "#ffffff" : "#000000";
+    }
+
+    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], regionLayers = [], isEditMode = false) {
+        this.layers.labels.removeChildren().forEach((c) => c.destroy());
+
+        // Extract native OS root font size to mimic CSS 'rem' behaviour
+        const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+
+        const ensureLabelData = (obj) => {
+            if (!obj.label) obj.label = {};
+            return obj.label;
+        };
+
+        const drawLabel = (name, labelData, defaultX, defaultY) => {
+            if (labelData?.hidden || !name) return;
+
+            const x = labelData.x ?? defaultX;
+            const y = labelData.y ?? defaultY;
+            const rotation = labelData.rotation ?? 0;
+
+            const font = labelData.fontFamily || "Signika";
+            const size = (labelData.fontSize || 2) * rootFontSize;
+            const fill = labelData.fillColor || "#ffffff";
+            const stroke = this.#getAdaptiveStrokeColor(fill);
+
+            const style = new PIXI.TextStyle({
+                fontFamily: font,
+                fontSize: size,
+                fill: fill,
+                fontWeight: "bold",
+                stroke: stroke,
+                strokeThickness: 3,
+                dropShadow: true,
+                dropShadowColor: stroke,
+                dropShadowBlur: 2,
+                dropShadowDistance: 2,
+            });
+
+            const text = new PIXI.Text(name, style);
+            text.anchor.set(0.5);
+            text.x = x;
+            text.y = y;
+            text.rotation = rotation * (Math.PI / 180); // PIXI uses radians natively
+
+            this.layers.labels.addChild(text);
+
+            if (isEditMode) {
+                // Ensure the initial coordinates are written to the object so they can be dragged
+                labelData.x = x;
+                labelData.y = y;
+
+                const hitRadius = Math.max(text.width, text.height) / 2;
+                this.interactiveTargets.push({ target: labelData, x: x, y: y, radius: hitRadius, isLabel: true });
+            }
+        };
+
+        // 1. Custom Labels
+        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y));
+
+        // 2. Auto-Labels: Pins (Offset Top Right)
+        mapPins.forEach((pin) => {
+            if (!pin.icon) return;
+            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20);
+        });
+
+        // 3. Auto-Labels: Routes (Spline Midpoint)
+        mapRoutes.forEach((route) => {
+            if (route.hidden || !route.points || route.points.length < 2) return;
+            const spline = this.#getSplinePoints(route.points);
+            const mid = spline[Math.floor(spline.length / 2)];
+            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15);
+        });
+
+        // 4. Auto-Labels: Regions (Polygon Centroid)
+        regionLayers.forEach((layer) => {
+            if (layer.hidden) return;
+            layer.regions.forEach((region) => {
+                if (region.hidden || !region.points || region.points.length < 3) return;
+
+                let minX = Infinity,
+                    maxX = -Infinity,
+                    minY = Infinity,
+                    maxY = -Infinity;
+                region.points.forEach((p) => {
+                    if (p.x < minX) minX = p.x;
+                    if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y;
+                    if (p.y > maxY) maxY = p.y;
+                });
+
+                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2);
+            });
+        });
     }
 }

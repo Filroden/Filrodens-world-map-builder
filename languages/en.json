@@ -220,6 +220,17 @@
     "FILRODENSWMB.UI.StyleDiagonalHatch": "Diagonal Hatch",
     "FILRODENSWMB.UI.StyleCrossHatch": "Cross Hatch",
 
+    "FILRODENSWMB.UI.AutoLabels": "Auto-Generated Labels",
+    "FILRODENSWMB.UI.CustomLabels": "Custom Labels",
+    "FILRODENSWMB.UI.AddLabel": "Add New Label",
+    "FILRODENSWMB.UI.LabelHelpText": "Drag labels to reposition them. Use the scroll wheel while dragging to rotate them.",
+    "FILRODENSWMB.UI.LabelText": "Label Text",
+    "FILRODENSWMB.UI.FontFamily": "Font Family",
+    "FILRODENSWMB.UI.FontSize": "Font Size (REM)",
+    "FILRODENSWMB.UI.FontColor": "Font Color",
+    "FILRODENSWMB.UI.EditLabel": "Edit Label",
+    "FILRODENSWMB.UI.NoLabels": "No custom labels have been added yet.",
+
     "FILRODENSWMB.UI.Warning": "Warning",
     "FILRODENSWMB.UI.SeedWarningContent": "Generating a new terrain seed will permanently erase all manual brush edits you have applied to this map. Do you want to continue?",
     "FILRODENSWMB.UI.WarnNoRegionLayer": "No region layer selected.",

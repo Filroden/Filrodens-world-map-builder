@@ -149,4 +149,9 @@ export const FILRODENSWMB = {
     REGIONS: {
         PRESETS: ["#c6af53", "#397cac", "#e06c75", "#d19a66", "#98c379", "#56b6c2", "#c678dd", "#ffffff", "#000000", "#7f848e", "#e5c07b", "#61afef", "#be5046", "#82b366", "#d19a66"],
     },
+    LABELS: {
+        DEFAULT_FONT: "Signika",
+        DEFAULT_SIZE: 2, // Represents REM units for responsive scaling
+        DEFAULT_COLOR: "#DEDCD3",
+    },
 };
