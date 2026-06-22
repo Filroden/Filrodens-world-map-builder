@@ -1615,21 +1615,35 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         const fonts = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-labels.hbs", { label: labelData, fonts });
+        const palette = FILRODENSWMB.LABELS?.PRESETS || [];
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-labels.hbs", { label: labelData, fonts, palette });
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditLabel") },
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditLabel") || "Edit Label" },
             content: content,
             render: (event) => {
                 const app = event.target;
                 const html = app.element;
 
+                // 1. Bind Font Size Slider
                 const range = html.querySelector('input[name="labelFontSize"]');
                 const output = html.querySelector("output");
-
                 if (range && output) {
                     range.addEventListener("input", (e) => (output.value = e.target.value));
+                }
+
+                // 2. Bind Preset Color Swatches
+                const colorInput = html.querySelector('input[name="labelFillColor"]');
+                const swatches = html.querySelectorAll(".fwmb-preset-swatch");
+                if (colorInput && swatches.length) {
+                    swatches.forEach((swatch) => {
+                        swatch.addEventListener("click", (e) => {
+                            // Apply the preset hex to the native color picker
+                            colorInput.value = e.target.dataset.color;
+                        });
+                    });
                 }
             },
             ok: {

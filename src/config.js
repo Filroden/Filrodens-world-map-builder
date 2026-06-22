@@ -147,11 +147,12 @@ export const FILRODENSWMB = {
         sea: { label: "FILRODENSWMB.UI.StyleSea", color: "#4dd0e1", thickness: 4, style: "dotted" },
     },
     REGIONS: {
-        PRESETS: ["#c6af53", "#397cac", "#e06c75", "#d19a66", "#98c379", "#56b6c2", "#c678dd", "#ffffff", "#000000", "#7f848e", "#e5c07b", "#61afef", "#be5046", "#82b366", "#d19a66"],
+        PRESETS: ["#C84B31", "#E28743", "#E8B851", "#4F7942", "#8A9A5B", "#3B8388", "#2D70B3", "#4A4E69", "#7A5C9B", "#B56576", "#A0522D", "#CC7161", "#6C7A89", "#A89F91", "#E08E79"],
     },
     LABELS: {
         DEFAULT_FONT: "Signika",
         DEFAULT_SIZE: 2, // Represents REM units for responsive scaling
         DEFAULT_COLOR: "#DEDCD3",
+        PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
     },
 };

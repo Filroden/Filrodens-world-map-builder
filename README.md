@@ -56,7 +56,7 @@ The procedural plus non-destructive brush approach means the resulting saved jou
 
 #### Regions
 
-The Regions tool allows you to draw custom polygons to show political, economic, or other areas. Regions are organised into customisable layers. Entire layers, or individual regions within those layers, can have their visibility toggled on or off.
+The *Regions* tool allows you to draw custom polygons to show political, economic, or other areas. Regions are organised into customisable layers. Entire layers, or individual regions within those layers, can have their visibility toggled on or off.
 
 1. Add a new *Region Layer* from the main sidebar.
    > Each *Region Layer* can be edited to add a name.
@@ -72,13 +72,26 @@ The Regions tool allows you to draw custom polygons to show political, economic,
 4. Click the canvas to create a node. To close a region, either add a node close to the starting node, click the "Add New Region" button, or exit Edit mode.
 
 5. To edit existing nodes:
-   - Nodes can be dragged using `Left-click`.
+   - Nodes can be dragged holding `Left-click`.
    - New nodes can be added to a border using `SHIFT + left-click`.
    - Existing nodes can be deleted using `CTRL (or CMD) + left-click`.
 
 #### Labels
 
-1. ...
+The *Labels* tool allows you to edit existing labels and add/delete custom labels.
+
+1. Labels are automatically created for any vector item created using other tools, e.g., Points of Interest, routes and regions. These labels can be renamed, their styles edited and have their visibility toggled. They cannot be deleted.
+
+2. To edit a label click its edit button shown after its name in the sidebar. You can change its name and its style.
+   > Changing the name of the label in the *Labels* tool also changes it name when inspected in the tool it belongs to if it was automatically created.
+
+3. Enable Edit mode to move and rotate existing labels and to create new custom labels.
+   - New labels can be created by using `Left-click`.
+   - Existing labels can be dragged holding `Left-click`.
+   - Labels can be rotated by using the `Scroll Wheel` while holding `Left-click`.
+
+4. Individual labels can have their visibility toggled by clicking the visibility button before its name in the sidebar.
+   > Hidden labels will not be exported. Use the visibility toggle to control what information you want to share, e.g., by creating a player map and a GM map.
 
 #### Cartography
 

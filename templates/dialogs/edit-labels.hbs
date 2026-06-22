@@ -23,6 +23,13 @@
 
     <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.FontColor"}}</label>
-        <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{label.fillColor}}" />
+        <div style="display: flex; flex-direction: column; gap: var(--filroden-space-s);">
+            <div class="fwmb-color-row">
+                {{#each palette}}
+                    <button type="button" class="fwmb-swatch fwmb-preset-swatch fwmb-swatch-lg" style="background-color: {{this}};" data-color="{{this}}" title="{{this}}"></button>
+                {{/each}}
+            </div>
+            <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{label.fillColor}}" />
+        </div>
     </div>
 </form>
