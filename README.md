@@ -95,7 +95,15 @@ The *Labels* tool allows you to edit existing labels and add/delete custom label
 
 #### Cartography
 
-1. ...
+The *Cartography* tool allows you to add decorations to the map.
+
+1. **Scale Bar:**
+
+2. **Map Border:**
+
+3. **Other Decorations:**
+
+When in edit mode, the scale bar and decorations can be dragged by holding `Left Click`; decorations can be rotated using the `Scroll Wheel` and resized using the `SHIFT + Scroll Wheel`.
 
 ### Settings
 

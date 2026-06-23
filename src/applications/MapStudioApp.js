@@ -18,16 +18,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             resizable: true,
         },
         actions: {
+            addDecoration: MapStudioApp.#onAddDecoration,
             addRegionLayer: MapStudioApp.#onAddRegionLayer,
             adjustNoiseScale: MapStudioApp.#onAdjustNoiseScale,
             adjustReferenceScale: MapStudioApp.#onAdjustReferenceScale,
             applyResolution: MapStudioApp.#onApplyResolution,
             changeTool: MapStudioApp.#onChangeTool,
+            deleteDecoration: MapStudioApp.#onDeleteDecoration,
             deleteLabel: MapStudioApp.#onDeleteLabel,
             deletePin: MapStudioApp.#onDeletePin,
             deleteRegion: MapStudioApp.#onDeleteRegion,
             deleteRegionLayer: MapStudioApp.#onDeleteRegionLayer,
             deleteRoute: MapStudioApp.#onDeleteRoute,
+            editDecoration: MapStudioApp.#onEditDecoration,
             editLabel: MapStudioApp.#onEditLabel,
             editPin: MapStudioApp.#onEditPin,
             editRegion: MapStudioApp.#onEditRegion,
@@ -111,6 +114,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.activeRegionLayerId = null;
         this.activeRegionId = null;
         this.mapLabels = [];
+        this.mapDecorations = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
         this.brushEngine = null;
@@ -186,6 +190,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             labelFontFamily: FILRODENSWMB.LABELS?.DEFAULT_FONT,
             labelFontSize: FILRODENSWMB.LABELS?.DEFAULT_SIZE,
             labelFillColor: FILRODENSWMB.LABELS?.DEFAULT_COLOR,
+
+            cartographyScaleEnable: false,
+            cartographyScaleUnits: "Miles",
+            cartographyScaleValue: 1,
+            cartographyScaleInterval: 100,
+            cartographyScaleMajorTicks: 4,
+            cartographyScaleMinorTicks: 4,
+            cartographyBorderEnable: false,
+            cartographyBorderStyle: "solid",
+            cartographyBorderColor: "#000000",
+            cartographyScaleX: 50,
+            cartographyScaleY: FILRODENSWMB.DEFAULTS.MAP_HEIGHT - 50,
         };
 
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
@@ -210,6 +226,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             routes: foundry.utils.deepClone(this.mapRoutes),
             regionLayers: foundry.utils.deepClone(this.regionLayers),
             mapLabels: foundry.utils.deepClone(this.mapLabels),
+            mapDecorations: foundry.utils.deepClone(this.mapDecorations),
             activeRouteId: this.activeRouteId,
             activeRegionId: this.activeRegionId,
         });
@@ -272,6 +289,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             context.mapPins = (this.mapPins || []).filter((p) => !!p.icon);
             context.mapRoutes = this.mapRoutes || [];
             context.mapLabels = this.mapLabels || [];
+            context.mapDecorations = this.mapDecorations || [];
 
             // Extract native Foundry fonts for the UI dropdown
             context.fontFamilies = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
@@ -400,6 +418,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             });
 
             contextPanel.addEventListener("input", (event) => {
+                if (event.target.matches('[name^="cartography"]')) {
+                    const t = event.target;
+                    this.uiState[t.name] = t.type === "checkbox" ? t.checked : t.type === "number" ? Number(t.value) : t.value;
+                    this.#repaintVectors();
+                    this.markDirty();
+                    return;
+                }
+
                 if (event.target.matches('input[name="referenceAlpha"]')) {
                     this.uiState.referenceAlpha = Number(event.target.value);
                     this.#updateReferenceLayer();
@@ -515,24 +541,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async close(options) {
-        if (this.isDirty) {
-            const choice = await foundry.applications.api.DialogV2.wait({
-                window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
-                content: `<p>${game.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
-                buttons: [
-                    { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
-                    { action: "discard", label: game.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
-                    { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
-                ],
-                close: () => "cancel",
-            });
-
-            if (choice === "cancel") return; // Abort application closure entirely
-            if (choice === "save") {
-                const saved = await this.saveCurrentMap();
-                if (!saved) return; // If save failed or was cancelled, abort closure
-            }
-        }
+        const canClose = await this.#gateUnsavedChanges();
+        if (!canClose) return; // Abort closure entirely
 
         if (this.canvasEngine) this.canvasEngine.destroy();
         if (this.scene3D) this.scene3D.destroy();
@@ -595,7 +605,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (layer === "labels") {
                 if (!this.canvasEngine.isEditMode) return;
 
-                // Capture the state BEFORE placing the new label
                 this.#pushVectorState();
 
                 this.mapLabels.push({
@@ -613,6 +622,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.#repaintVectors();
                 this.render({ parts: ["context"] });
                 this.markDirty();
+                return;
+            }
+
+            if (layer === "cartography") {
                 return;
             }
 
@@ -654,6 +667,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         };
 
         this.canvasEngine.onInfraDrag = () => {
+            this.canvasEngine.clearInteractiveTargets();
+
             const isEdit = this.canvasEngine.isEditMode;
             const infraPins = this.mapPins.filter((p) => !!p.icon);
 
@@ -670,6 +685,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             if (this.activeTool === "labels") {
                 this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isEdit);
+            }
+
+            if (this.activeTool === "cartography" && this.canvasEngine.renderCartography) {
+                this.canvasEngine.renderCartography(this.mapDecorations, this.uiState, this.mapWidth, this.mapHeight, isEdit);
             }
         };
         this.canvasEngine.onInfraDragEnd = () => {
@@ -850,6 +869,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 biomeAlphaActive: this.uiState["biomeAlphaActive"],
                 biomeAlphaInactive: this.uiState["biomeAlphaInactive"],
             },
+            cartography: {
+                scaleEnable: this.uiState.cartographyScaleEnable,
+                scaleUnits: this.uiState.cartographyScaleUnits,
+                scaleInterval: this.uiState.cartographyScaleInterval,
+                scaleValue: this.uiState.cartographyScaleValue,
+                scaleMajorTicks: this.uiState.cartographyScaleMajorTicks,
+                scaleMinorTicks: this.uiState.cartographyScaleMinorTicks,
+                scaleX: this.uiState.cartographyScaleX,
+                scaleY: this.uiState.cartographyScaleY,
+                borderEnable: this.uiState.cartographyBorderEnable,
+                borderStyle: this.uiState.cartographyBorderStyle,
+                borderColor: this.uiState.cartographyBorderColor,
+            },
         };
 
         return { currentSeed: this.uiState["mapSeed"], params };
@@ -943,6 +975,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 4. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
         this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isLabelEdit);
+
+        // 5. Render Cartography
+        const isCartographyEdit = this.activeTool === "cartography" && isEditModeActive;
+        if (this.canvasEngine.renderCartography) {
+            this.canvasEngine.renderCartography(this.mapDecorations, this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit);
+        }
     }
 
     #applyBrushStroke(x, y) {
@@ -1039,6 +1077,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
 
         const p = payload.params;
+        const c = p.cartography || {};
+
         this.uiState.seaLevel = p.seaLevel;
         this.uiState.globalTemp = p.globalTemp;
         this.uiState.seasonOffset = p.seasonOffset;
@@ -1064,12 +1104,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.contourInterval = p.display?.contourInterval ?? 0.1;
         this.uiState.biomeAlphaActive = p.display?.biomeAlphaActive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE;
         this.uiState.biomeAlphaInactive = p.display?.biomeAlphaInactive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
+        this.uiState.cartographyScaleEnable = c.scaleEnable ?? this.defaultUiState.cartographyScaleEnable;
+        this.uiState.cartographyScaleUnits = c.scaleUnits ?? this.defaultUiState.cartographyScaleUnits;
+        this.uiState.cartographyScaleInterval = c.scaleInterval ?? this.defaultUiState.cartographyScaleInterval;
+        this.uiState.cartographyScaleValue = c.scaleValue ?? this.defaultUiState.cartographyScaleValue;
+        this.uiState.cartographyScaleMajorTicks = c.scaleMajorTicks ?? this.defaultUiState.cartographyScaleMajorTicks;
+        this.uiState.cartographyScaleMinorTicks = c.scaleMinorTicks ?? this.defaultUiState.cartographyScaleMinorTicks;
+        this.uiState.cartographyScaleX = c.scaleX ?? this.defaultUiState.cartographyScaleX;
+        this.uiState.cartographyScaleY = c.scaleY ?? this.defaultUiState.cartographyScaleY;
+        this.uiState.cartographyBorderEnable = c.borderEnable ?? this.defaultUiState.cartographyBorderEnable;
+        this.uiState.cartographyBorderStyle = c.borderStyle ?? this.defaultUiState.cartographyBorderStyle;
+        this.uiState.cartographyBorderColor = c.borderColor ?? this.defaultUiState.cartographyBorderColor;
 
         this.customBiomeColors = p.customColors || {};
         this.mapPins = payload.mapPins || [];
         this.mapRoutes = payload.mapRoutes || [];
         this.regionLayers = payload.regionLayers || [];
         this.mapLabels = payload.mapLabels || [];
+        this.mapDecorations = payload.mapDecorations || [];
 
         this.brushEngine.history = payload.history || [];
         this.brushEngine.redoStack = [];
@@ -1325,7 +1377,153 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.markDirty();
     }
 
+    /**
+     * Intercepts destructive actions if the map state is dirty.
+     * Returns true if the user saved or discarded changes; returns false if they cancelled.
+     */
+    async #gateUnsavedChanges() {
+        if (!this.isDirty) return true;
+
+        const choice = await foundry.applications.api.DialogV2.wait({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
+            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
+            buttons: [
+                { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
+                { action: "discard", label: game.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
+                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+            ],
+            close: () => "cancel",
+        });
+
+        if (choice === "cancel") return false;
+        if (choice === "save") {
+            const saved = await this.saveCurrentMap();
+            if (!saved) return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Context-aware Quick Save.
+     * Creates a new journal if none exists, otherwise overwrites the current ID.
+     */
+    async saveCurrentMap() {
+        if (this.isSaving) return false;
+        this.isSaving = true;
+
+        // Visually lock the application to prevent array mutation during serialisation
+        this.element.style.pointerEvents = "none";
+        this.element.style.filter = "brightness(0.7)";
+        this.element.style.cursor = "wait";
+
+        let success = false;
+        try {
+            const { currentSeed, params } = this.#getMapParameters();
+            const payload = {
+                seed: currentSeed,
+                mapWidth: this.mapWidth,
+                mapHeight: this.mapHeight,
+                gridType: this.uiState.gridType,
+                gridSize: this.uiState.gridSize,
+                params: params,
+                history: this.brushEngine?.history || [],
+                mapPins: this.mapPins,
+                mapRoutes: this.mapRoutes,
+                regionLayers: this.regionLayers,
+                mapLabels: this.mapLabels,
+                mapDecorations: this.mapDecorations,
+            };
+
+            if (!this.currentSaveId) {
+                const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
+                const defaultName = `Terrain Map (${hash})`;
+
+                const mapName = await foundry.applications.api.DialogV2.prompt({
+                    window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save As" },
+                    content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${defaultName}">`,
+                    ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
+                });
+
+                if (!mapName) return false; // User cancelled the save prompt
+                this.currentSaveName = mapName;
+            }
+
+            const journal = await saveMapData(this.currentSaveName, payload, this.currentSaveId);
+
+            if (journal) {
+                this.currentSaveId = journal.id;
+                this.isDirty = false; // Successfully saved, map is no longer dirty
+                success = true;
+                ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
+                this.render({ parts: ["toolbar"] });
+            } else {
+                ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
+            }
+        } finally {
+            // Guarantee the UI unlocks even if an unexpected error occurs
+            this.isSaving = false;
+            this.element.style.pointerEvents = "auto";
+            this.element.style.filter = "none";
+            this.element.style.cursor = "default";
+        }
+        return success;
+    }
+
     // --- Action Handlers ---
+
+    static async #onAddDecoration(event, target) {
+        if (!this.canvasEngine || !this.canvasEngine.isEditMode) return;
+
+        const content = `
+            <div class="form-group fwmb-dialog-content">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
+                <input type="text" id="fwmb-dec-name" value="New Decoration">
+            </div>
+            <div class="form-group fwmb-dialog-content" style="margin-top: var(--filroden-space-m);">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.ImageSource")}</label>
+                <file-picker id="fwmb-dec-src" type="image" value=""></file-picker>
+            </div>
+        `;
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.AddDecoration") },
+            content: content,
+            ok: {
+                callback: (evt, button) => {
+                    return {
+                        name: button.form.querySelector("#fwmb-dec-name").value,
+                        src: button.form.querySelector("#fwmb-dec-src").value,
+                    };
+                },
+            },
+        });
+
+        if (result && result.src) {
+            this.#pushVectorState();
+
+            // Default to spawning in the absolute mathematical center of the map
+            const spawnX = this.mapWidth / 2;
+            const spawnY = this.mapHeight / 2;
+
+            this.mapDecorations.push({
+                id: foundry.utils.randomID(),
+                type: "decoration",
+                name: result.name || "Unnamed Decoration",
+                src: result.src,
+                x: spawnX,
+                y: spawnY,
+                rotation: 0,
+                scale: 1, // Default PIXI Sprite scale
+                hidden: false,
+            });
+
+            this.#repaintVectors();
+            this.render({ parts: ["context"] });
+            this.markDirty();
+        }
+    }
 
     static #onAddRegionLayer(event, target) {
         const id = foundry.utils.randomID();
@@ -1336,15 +1534,68 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static #onAdjustNoiseScale(event, target) {
         const dir = Number(target.dataset.dir);
-        const input = this.element.querySelector('input[name="noise.elevation.scale"]');
-        if (!input) return;
+        const inputScale = this.element.querySelector('input[name="noise.elevation.scale"]');
+        const inputOffsetX = this.element.querySelector('input[name="noise.offsetX"]');
+        const inputOffsetY = this.element.querySelector('input[name="noise.offsetY"]');
 
-        let scale = Number(input.value);
-        scale += dir * 50;
-        scale = Math.max(100, Math.min(scale, 1000));
+        if (!inputScale) return;
 
-        input.value = scale;
-        input.dispatchEvent(new Event("input", { bubbles: true }));
+        const currentScale = Number(inputScale.value);
+
+        // Dynamically calculate the maximum bound based on the current map resolution
+        const maxScale = Math.max(this.mapWidth, this.mapHeight);
+        const targetScale = Math.max(100, Math.min(currentScale + dir * 50, maxScale));
+
+        if (currentScale === targetScale) {
+            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnScaleLimit") || "Noise scale limit reached.");
+            return;
+        }
+
+        // 1. Capture vector history before transforming the points
+        this.#pushVectorState();
+
+        // 2. Calculate the exact mathematical scaling ratio
+        const scaleRatio = targetScale / currentScale;
+        const offsetX = inputOffsetX ? Number(inputOffsetX.value) : 0;
+        const offsetY = inputOffsetY ? Number(inputOffsetY.value) : 0;
+
+        // 3. Apply the scale transformation (accounting for pan offset and nested labels)
+        const scalePoint = (pt) => {
+            if (pt?.x !== undefined) {
+                pt.x = (pt.x + offsetX) * scaleRatio - offsetX;
+                pt.y = (pt.y + offsetY) * scaleRatio - offsetY;
+            }
+        };
+
+        this.mapLabels.forEach(scalePoint);
+        this.mapDecorations.forEach(scalePoint);
+        this.mapPins.forEach((p) => {
+            scalePoint(p);
+            if (p.label) scalePoint(p.label);
+        });
+        this.mapRoutes.forEach((r) => {
+            r.points?.forEach(scalePoint);
+            if (r.label) scalePoint(r.label);
+        });
+        this.regionLayers.forEach((layer) => {
+            layer.regions.forEach((reg) => {
+                reg.points?.forEach(scalePoint);
+                if (reg.label) scalePoint(reg.label);
+            });
+        });
+        if (this.brushEngine) {
+            const scaleStroke = (stroke) => {
+                stroke.points.forEach(scalePoint);
+                stroke.size = stroke.size * scaleRatio;
+            };
+            this.brushEngine.history.forEach(scaleStroke);
+            this.brushEngine.redoStack.forEach(scaleStroke);
+        }
+
+        // 4. Update the DOM and trigger the procedural rebuild
+        inputScale.value = targetScale;
+        inputScale.dispatchEvent(new Event("input", { bubbles: true }));
+        this.markDirty();
     }
 
     static #onAdjustReferenceScale(event, target) {
@@ -1402,6 +1653,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState.mapWidth = newWidth;
         this.uiState.mapHeight = newHeight;
+
+        // Revert Cartography to clean defaults
+        Object.keys(this.defaultUiState).forEach((k) => {
+            if (k.startsWith("cartography")) this.uiState[k] = this.defaultUiState[k];
+        });
 
         // 1. Reset all history and spatial arrays
         this.markDirty();
@@ -1502,6 +1758,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.render({ parts: ["toolbar", "context"] });
     }
 
+    static async #onDeleteDecoration(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
+            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
+            rejectClose: false,
+            modal: true,
+        });
+
+        if (!confirmed) return;
+
+        this.#pushVectorState();
+        this.mapDecorations = this.mapDecorations.filter((d) => d.id !== id);
+        this.#repaintVectors();
+        this.render({ parts: ["context"] });
+        this.markDirty();
+    }
+
     static async #onDeleteLabel(event, target) {
         const id = target.closest(".fwmb-list-item").dataset.id;
         const confirmed = await foundry.applications.api.DialogV2.confirm({
@@ -1580,6 +1854,58 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#repaintVectors();
         this.render({ parts: ["context"] });
         this.markDirty();
+    }
+
+    static async #onEditDecoration(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const dec = this.mapDecorations.find((d) => d.id === id);
+        if (!dec) return;
+
+        const content = `
+            <div class="form-group fwmb-dialog-content">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
+                <input type="text" id="fwmb-dec-name" value="${dec.name}">
+            </div>
+            <div class="form-group fwmb-dialog-content" style="margin-top: var(--filroden-space-m);">
+                <label>${game.i18n.localize("FILRODENSWMB.UI.Opacity")}</label>
+                <div class="fwmb-slider-group">
+                    <input type="range" id="fwmb-dec-alpha" value="${dec.opacity ?? 1}" min="0.1" max="1" step="0.1" oninput="this.nextElementSibling.value = this.value" />
+                    <output>${dec.opacity ?? 1}</output>
+                </div>
+            </div>
+        `;
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Edit") || "Edit Decoration" },
+            content: content,
+            render: (event) => {
+                const app = event.target;
+                const html = app.element;
+                const range = html.querySelector("#fwmb-dec-alpha");
+                const output = html.querySelector("output");
+                if (range && output) {
+                    range.addEventListener("input", (e) => (output.value = e.target.value));
+                }
+            },
+            ok: {
+                callback: (evt, button) => {
+                    return {
+                        name: button.form.querySelector("#fwmb-dec-name").value,
+                        opacity: Number(button.form.querySelector("#fwmb-dec-alpha").value),
+                    };
+                },
+            },
+        });
+
+        if (result) {
+            this.#pushVectorState();
+            dec.name = result.name;
+            dec.opacity = result.opacity;
+            this.#repaintVectors();
+            this.render({ parts: ["context"] });
+            this.markDirty();
+        }
     }
 
     static async #onEditLabel(event, target) {
@@ -1892,6 +2218,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         switch (action) {
             case "load": {
+                const canLoad = await this.#gateUnsavedChanges();
+                if (!canLoad) return;
+
                 const payload = await loadMapData(mapId);
                 if (payload) {
                     this.currentSaveId = mapId;
@@ -1973,10 +2302,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const inputY = this.element.querySelector('input[name="noise.offsetY"]');
         if (!inputX || !inputY) return;
 
+        // 1. Capture vector history before moving the world
+        this.#pushVectorState();
+
+        // 2. Translate all vector nodes and their associated label offsets
+        const translatePoint = (pt) => {
+            if (pt?.x !== undefined) {
+                pt.x -= dx;
+                pt.y -= dy;
+            }
+        };
+
+        this.mapLabels.forEach(translatePoint);
+        this.mapDecorations.forEach(translatePoint);
+        this.mapPins.forEach((p) => {
+            translatePoint(p);
+            if (p.label) translatePoint(p.label);
+        });
+        this.mapRoutes.forEach((r) => {
+            r.points?.forEach(translatePoint);
+            if (r.label) translatePoint(r.label);
+        });
+        this.regionLayers.forEach((layer) => {
+            layer.regions.forEach((reg) => {
+                reg.points?.forEach(translatePoint);
+                if (reg.label) translatePoint(reg.label);
+            });
+        });
+        if (this.brushEngine) {
+            const translateStroke = (stroke) => stroke.points.forEach(translatePoint);
+            this.brushEngine.history.forEach(translateStroke);
+            this.brushEngine.redoStack.forEach(translateStroke);
+        }
+
+        // 3. Shift the procedural window
         inputX.value = Number(inputX.value) + dx;
         inputY.value = Number(inputY.value) + dy;
 
         inputX.dispatchEvent(new Event("input", { bubbles: true }));
+        this.markDirty();
     }
 
     static #onNudgeReference(event, target) {
@@ -2003,7 +2367,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 pins: foundry.utils.deepClone(this.mapPins),
                 routes: foundry.utils.deepClone(this.mapRoutes),
                 regionLayers: foundry.utils.deepClone(this.regionLayers),
-                mapLabels: foundry.utils.deepClone(this.mapLabels), // <-- Track labels
+                mapLabels: foundry.utils.deepClone(this.mapLabels),
+                mapDecorations: foundry.utils.deepClone(this.mapDecorations),
                 activeRouteId: this.activeRouteId,
                 activeRegionId: this.activeRegionId,
             });
@@ -2012,7 +2377,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.mapPins = state.pins;
             this.mapRoutes = state.routes;
             this.regionLayers = state.regionLayers;
-            this.mapLabels = state.mapLabels || this.mapLabels; // <-- Restore labels
+            this.mapLabels = state.mapLabels || this.mapLabels;
+            this.mapDecorations = state.mapDecorations || this.mapDecorations;
             this.activeRouteId = state.activeRouteId;
             this.activeRegionId = state.activeRegionId;
 
@@ -2075,71 +2441,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static #onResetZoom(event, target) {
         this.canvasEngine?.resetCamera();
-    }
-
-    /**
-     * Context-aware Quick Save.
-     * Creates a new journal if none exists, otherwise overwrites the current ID.
-     */
-    async saveCurrentMap() {
-        if (this.isSaving) return false;
-        this.isSaving = true;
-
-        // Visually lock the application to prevent array mutation during serialisation
-        this.element.style.pointerEvents = "none";
-        this.element.style.filter = "brightness(0.7)";
-        this.element.style.cursor = "wait";
-
-        let success = false;
-        try {
-            const { currentSeed, params } = this.#getMapParameters();
-            const payload = {
-                seed: currentSeed,
-                mapWidth: this.mapWidth,
-                mapHeight: this.mapHeight,
-                gridType: this.uiState.gridType,
-                gridSize: this.uiState.gridSize,
-                params: params,
-                history: this.brushEngine?.history || [],
-                mapPins: this.mapPins,
-                mapRoutes: this.mapRoutes,
-                regionLayers: this.regionLayers,
-                mapLabels: this.mapLabels,
-            };
-
-            if (!this.currentSaveId) {
-                const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
-                const defaultName = `Terrain Map (${hash})`;
-
-                const mapName = await foundry.applications.api.DialogV2.prompt({
-                    window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save As" },
-                    content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${defaultName}">`,
-                    ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
-                });
-
-                if (!mapName) return false; // User cancelled the save prompt
-                this.currentSaveName = mapName;
-            }
-
-            const journal = await saveMapData(this.currentSaveName, payload, this.currentSaveId);
-
-            if (journal) {
-                this.currentSaveId = journal.id;
-                this.isDirty = false; // Successfully saved, map is no longer dirty
-                success = true;
-                ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
-                this.render({ parts: ["toolbar"] });
-            } else {
-                ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
-            }
-        } finally {
-            // Guarantee the UI unlocks even if an unexpected error occurs
-            this.isSaving = false;
-            this.element.style.pointerEvents = "auto";
-            this.element.style.filter = "none";
-            this.element.style.cursor = "default";
-        }
-        return success;
     }
 
     static async #onSaveMap(event, target) {
@@ -2358,7 +2659,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        if (["features", "infrastructure", "regions", "labels"].includes(this.activeTool)) {
+        if (["features", "infrastructure", "regions", "labels", "cartography"].includes(this.activeTool)) {
             this.#repaintVectors();
         }
     }
@@ -2424,16 +2725,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 layer.hidden = !layer.hidden;
             }
         }
-        // 2. Handle Individual List Items (Pins, Routes, Regions, Custom Labels)
+        // 2. Handle Individual List Items (Pins, Routes, Regions, Custom Labels, Decorations)
         else {
             const listItem = target.closest(".fwmb-list-item");
             if (!listItem) return;
 
             const id = listItem.dataset.id;
-            const type = listItem.dataset.type; // "pin", "route", "region", "custom"
+            const type = listItem.dataset.type; // "pin", "route", "region", "decoration", "custom"
 
             let obj = null;
             if (type === "custom") obj = this.mapLabels.find((l) => l.id === id);
+            else if (type === "decoration") obj = this.mapDecorations.find((d) => d.id === id);
             else if (type === "pin") obj = this.mapPins.find((p) => p.id === id);
             else if (type === "route") obj = this.mapRoutes.find((r) => r.id === id);
             else if (type === "region") {
@@ -2466,7 +2768,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     static #onUndoBrush(event, target) {
-        // Added 'labels' to the validation check
         if (["features", "infrastructure", "regions", "labels"].includes(this.activeTool)) {
             if (this.pinHistory.length === 0) return;
 
@@ -2474,7 +2775,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 pins: foundry.utils.deepClone(this.mapPins),
                 routes: foundry.utils.deepClone(this.mapRoutes),
                 regionLayers: foundry.utils.deepClone(this.regionLayers),
-                mapLabels: foundry.utils.deepClone(this.mapLabels), // <-- Track labels
+                mapLabels: foundry.utils.deepClone(this.mapLabels),
+                mapDecorations: foundry.utils.deepClone(this.mapDecorations),
                 activeRouteId: this.activeRouteId,
                 activeRegionId: this.activeRegionId,
             });
@@ -2483,7 +2785,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.mapPins = state.pins || state;
             this.mapRoutes = state.routes || this.mapRoutes;
             this.regionLayers = state.regionLayers || this.regionLayers;
-            this.mapLabels = state.mapLabels || this.mapLabels; // <-- Restore labels
+            this.mapLabels = state.mapLabels || this.mapLabels;
+            this.mapDecorations = state.mapDecorations || this.mapDecorations;
             this.activeRouteId = state.activeRouteId || null;
             this.activeRegionId = state.activeRegionId || null;
 
@@ -2524,6 +2827,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (type === "custom") {
             const label = this.mapLabels.find((l) => l.id === id);
             if (label) targetPoints = [label];
+        } else if (type === "decoration") {
+            const dec = this.mapDecorations.find((d) => d.id === id);
+            if (dec) targetPoints = [dec];
         } else if (type === "pin") {
             const pin = this.mapPins.find((p) => p.id === id);
             if (pin) targetPoints = [pin];

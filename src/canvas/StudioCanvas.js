@@ -28,6 +28,7 @@ export class StudioCanvas {
             regions: new PIXI.Container(),
             labels: new PIXI.Container(),
             reference: new PIXI.Container(),
+            cartography: new PIXI.Container(),
         };
 
         this.layers.biomes.alpha = 0.65;
@@ -74,8 +75,9 @@ export class StudioCanvas {
             this.layers.regions,
             this.layers.infrastructure,
             this.layers.reference,
-            this.layers.labels,
             this.gridLayer,
+            this.layers.labels,
+            this.layers.cartography,
             this.brushCursor,
         );
 
@@ -133,14 +135,33 @@ export class StudioCanvas {
     #setupInteractions(canvasElement) {
         // SCROLL TO ZOOM / SCALE
         canvasElement.addEventListener("wheel", (e) => {
-            // --- Label Rotation Intercept ---
+            // --- Label & Decoration Transformation Intercept ---
             if (this.activeDrag) {
                 const dragWrapper = this.interactiveTargets.find((t) => t.target === this.activeDrag.target);
-                if (dragWrapper?.isLabel) {
+
+                if (dragWrapper?.isLabel || dragWrapper?.isDecoration) {
                     e.preventDefault();
-                    const dir = e.deltaY < 0 ? -5 : 5;
-                    this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
-                    if (this.onInfraDrag) this.onInfraDrag(); // Force a live redraw
+
+                    if (dragWrapper.isDecoration) {
+                        // Shift + Scroll to Scale Decorations
+                        if (e.shiftKey) {
+                            const scaleDir = e.deltaY < 0 ? 1.05 : 0.95;
+                            this.activeDrag.target.scale = (this.activeDrag.target.scale || 1) * scaleDir;
+                        }
+                        // Standard Scroll to Rotate Decorations
+                        else {
+                            const dir = e.deltaY < 0 ? -5 : 5;
+                            this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
+                        }
+                    }
+                    // Standard Scroll to Rotate Labels
+                    else if (dragWrapper.isLabel) {
+                        const dir = e.deltaY < 0 ? -5 : 5;
+                        this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
+                    }
+
+                    // Force the immediate-mode redraw!
+                    if (this.onInfraDrag) this.onInfraDrag();
                     return;
                 }
             }
@@ -1251,6 +1272,159 @@ export class StudioCanvas {
 
                 drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2);
             });
+        });
+    }
+
+    renderCartography(decorations = [], uiState, mapWidth, mapHeight, isEditMode = false) {
+        if (!this.layers.cartography) return;
+        this.layers.cartography.removeChildren().forEach((c) => c.destroy());
+
+        const vectorLayer = new PIXI.Graphics();
+        this.layers.cartography.addChild(vectorLayer);
+
+        const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+        const borderColorHex = Number.parseInt((uiState.cartographyBorderColor || "#000000").replace("#", ""), 16);
+
+        // 1. Draw Procedural Map Border
+        if (uiState.cartographyBorderEnable) {
+            const style = uiState.cartographyBorderStyle;
+            const margin = 20;
+
+            if (style === "solid") {
+                vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+            } else if (style === "double") {
+                vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+                vectorLayer.lineStyle(3, borderColorHex, 1, 0);
+                vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
+            } else if (style === "ornate") {
+                vectorLayer.lineStyle(12, borderColorHex, 1, 0);
+                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+                vectorLayer.lineStyle(4, borderColorHex, 1, 0);
+                vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
+
+                const boxSize = 40;
+                vectorLayer.beginFill(borderColorHex);
+                vectorLayer.drawRect(0, 0, boxSize, boxSize);
+                vectorLayer.drawRect(mapWidth - boxSize, 0, boxSize, boxSize);
+                vectorLayer.drawRect(0, mapHeight - boxSize, boxSize, boxSize);
+                vectorLayer.drawRect(mapWidth - boxSize, mapHeight - boxSize, boxSize, boxSize);
+                vectorLayer.endFill();
+            }
+        }
+
+        // 2. Draw Procedural Scale Bar (Inside a Movable Container)
+        if (uiState.cartographyScaleEnable) {
+            const scaleContainer = new PIXI.Container();
+
+            // Set position based on UI State
+            scaleContainer.x = uiState.cartographyScaleX ?? 50;
+            scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
+
+            const interval = uiState.cartographyScaleInterval || 100;
+            const majorTicks = uiState.cartographyScaleMajorTicks || 4;
+            const minorTicks = uiState.cartographyScaleMinorTicks || 4;
+            const scaleValue = uiState.cartographyScaleValue || 1;
+            const units = uiState.cartographyScaleUnits || "Miles";
+
+            const height = 10;
+            const totalWidth = interval * majorTicks;
+
+            const scaleGraphics = new PIXI.Graphics();
+
+            // Base graphics are drawn relative to 0,0 inside the container
+            scaleGraphics.lineStyle(2, 0x000000, 1);
+            scaleGraphics.beginFill(0xffffff, 0.9);
+            scaleGraphics.drawRect(0, 0, totalWidth, height);
+            scaleGraphics.endFill();
+
+            scaleGraphics.beginFill(0x000000, 0.9);
+            for (let i = 0; i < majorTicks; i++) {
+                if (i % 2 !== 0) scaleGraphics.drawRect(i * interval, 0, interval, height);
+            }
+            scaleGraphics.endFill();
+
+            if (minorTicks > 0) {
+                const minorInterval = interval / minorTicks;
+                scaleGraphics.beginFill(0x000000, 0.9);
+                for (let i = 0; i < minorTicks; i++) {
+                    if (i % 2 === 0) {
+                        scaleGraphics.drawRect(i * minorInterval, height / 2, minorInterval, height / 2);
+                    } else {
+                        scaleGraphics.drawRect(i * minorInterval, 0, minorInterval, height / 2);
+                    }
+                }
+                scaleGraphics.endFill();
+            }
+            scaleContainer.addChild(scaleGraphics);
+
+            const textStyle = new PIXI.TextStyle({ fontFamily: "Signika", fontSize: 16, fill: "#000000", stroke: "#ffffff", strokeThickness: 4, fontWeight: "bold" });
+            const text0 = new PIXI.Text("0", textStyle);
+            text0.anchor.set(0.5, 1);
+            text0.x = 0;
+            text0.y = -5;
+            scaleContainer.addChild(text0);
+
+            // Apply the multiplier mathematically
+            const textMax = new PIXI.Text(`${majorTicks * scaleValue} ${units}`, textStyle);
+            textMax.anchor.set(0.5, 1);
+            textMax.x = totalWidth;
+            textMax.y = -5;
+            scaleContainer.addChild(textMax);
+
+            this.layers.cartography.addChild(scaleContainer);
+
+            if (isEditMode) {
+                const scaleDataObj = {
+                    get x() {
+                        return uiState.cartographyScaleX;
+                    },
+                    set x(val) {
+                        uiState.cartographyScaleX = val;
+                    },
+                    get y() {
+                        return uiState.cartographyScaleY;
+                    },
+                    set y(val) {
+                        uiState.cartographyScaleY = val;
+                    },
+                };
+
+                this.interactiveTargets.push({
+                    target: scaleDataObj,
+                    x: scaleContainer.x + totalWidth / 2,
+                    y: scaleContainer.y,
+                    radius: totalWidth / 2,
+                    isDecoration: false,
+                });
+            }
+        }
+
+        // 3. Draw Custom Decorations
+        decorations.forEach((dec) => {
+            if (dec.hidden || !dec.src) return;
+
+            const sprite = new PIXI.Sprite(PIXI.Texture.from(dec.src));
+            sprite.anchor.set(0.5);
+            sprite.x = dec.x;
+            sprite.y = dec.y;
+            sprite.rotation = dec.rotation * (Math.PI / 180);
+            sprite.scale.set(dec.scale || 1);
+            sprite.alpha = dec.opacity ?? 1; // Allow opacity fading
+
+            this.layers.cartography.addChild(sprite);
+
+            if (isEditMode) {
+                const hitRadius = Math.max(sprite.width, sprite.height, 32) / 2;
+                this.interactiveTargets.push({
+                    target: dec,
+                    x: dec.x,
+                    y: dec.y,
+                    radius: hitRadius,
+                    isDecoration: true,
+                });
+            }
         });
     }
 }

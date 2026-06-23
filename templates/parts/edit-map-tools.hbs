@@ -90,6 +90,10 @@
             <i class="fwmb-icon ink-eraser"></i>
         </button>
 
+        <button type="button" data-tool-group="cartography" data-action="addDecoration" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.AddDecoration'}}">
+            <i class="fwmb-icon add"></i>
+        </button>
+
         <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-pin">
             <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
             <div class="fwmb-custom-select" id="fwmb-pin-select">
@@ -205,7 +209,7 @@
         {{localize "FILRODENSWMB.UI.LabelHelpText"}}
     </div>
 
-    <div class="fwmb-divider-vertical" data-tool-group="terrain biomes features infrastructure regions labels"></div>
+    <div class="fwmb-divider-vertical" data-tool-group="terrain biomes features infrastructure regions labels cartography"></div>
 
     <div class="fwmb-brush-history">
         <button type="button" data-action="undoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}">
