@@ -1647,18 +1647,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.mapWidth = newWidth;
         this.mapHeight = newHeight;
-        this.uiState.mapSeed = newSeed;
-        if (seedInput) seedInput.value = newSeed;
 
         this.#allocateBuffers();
 
+        // --- Master State Reset ---
+        this.uiState = foundry.utils.deepClone(this.defaultUiState);
         this.uiState.mapWidth = newWidth;
         this.uiState.mapHeight = newHeight;
+        this.uiState.mapSeed = newSeed;
 
-        // Revert Cartography to clean defaults
-        Object.keys(this.defaultUiState).forEach((k) => {
-            if (k.startsWith("cartography")) this.uiState[k] = this.defaultUiState[k];
+        // Reset biome colors to defaults so the DOM sync catches them
+        this.customBiomeColors = {};
+        Object.entries(FILRODENSWMB.BIOMES).forEach(([key, rgb]) => {
+            this.customBiomeColors[key] = rgb;
         });
+
+        // Force all HTML inputs, sliders, and checkboxes to visually snap back to defaults
+        this.#syncDOMToState();
 
         // 1. Reset all history and spatial arrays
         this.markDirty();
@@ -1667,6 +1672,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapRoutes = [];
         this.regionLayers = [];
         this.mapLabels = [];
+        this.mapDecorations = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
 
