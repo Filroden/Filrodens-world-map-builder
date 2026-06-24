@@ -167,6 +167,7 @@
     "FILRODENSWMB.UI.SnapToPoints": "Snap to Points",
     "FILRODENSWMB.UI.PointsOfInterest": "Points of Interest",
     "FILRODENSWMB.UI.SelectIcon": "Select Marker Icon",
+    "FILRODENSWMB.UI.IconScale": "Icon Scale",
     "FILRODENSWMB.UI.NoPoints": "No points placed.",
     "FILRODENSWMB.UI.Routes": "Routes",
     "FILRODENSWMB.UI.QuickStyles": "Quick Styles",

@@ -906,21 +906,26 @@ export class StudioCanvas {
         });
 
         // 2. Render Pins (Top Layer)
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / 1000;
+
         pins.forEach((pin) => {
             if (pin.hidden) return;
 
             const texturePath = `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg`;
             const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
 
+            // Apply resolution scaling * user override scale
+            const baseSize = 24 * resScale;
+            sprite.width = baseSize * (pin.scale || 1);
+            sprite.height = baseSize * (pin.scale || 1);
+
             sprite.anchor.set(0.5);
-            sprite.width = 32;
-            sprite.height = 32;
             sprite.x = pin.x;
             sprite.y = pin.y;
 
             if (isEditMode) {
-                // Push to mathematical cache
-                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: 16 });
+                // The hit radius must expand to match the new size
+                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2 });
             } else if (pin.name || pin.description) {
                 // Keep PIXI hover events for tooltips ONLY when not in edit mode
                 sprite.eventMode = "static";
@@ -1188,6 +1193,9 @@ export class StudioCanvas {
         // Extract native OS root font size to mimic CSS 'rem' behaviour
         const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 
+        // Dynamically scale vectors based on the canvas dimensions (1000px = baseline 1x)
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / 1000;
+
         const ensureLabelData = (obj) => {
             if (!obj.label) obj.label = {};
             return obj.label;
@@ -1201,7 +1209,7 @@ export class StudioCanvas {
             const rotation = labelData.rotation ?? 0;
 
             const font = labelData.fontFamily || "Signika";
-            const size = (labelData.fontSize || 2) * rootFontSize;
+            const size = (labelData.fontSize || 1) * rootFontSize * resScale;
             const fill = labelData.fillColor || "#ffffff";
             const stroke = this.#getAdaptiveStrokeColor(fill);
 

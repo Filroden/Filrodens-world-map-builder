@@ -1209,6 +1209,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 icon: this.uiState.activeIcon,
                 x: finalPos.x,
                 y: finalPos.y,
+                scale: FILRODENSWMB.PINS?.DEFAULT_SCALE,
                 hidden: false,
             };
             this.mapPins.push(newPin);
@@ -1473,7 +1474,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     // --- Action Handlers ---
 
     static async #onAddDecoration(event, target) {
-        if (!this.canvasEngine || !this.canvasEngine.isEditMode) return;
+        if (!this.canvasEngine?.isEditMode) return;
 
         const content = `
             <div class="form-group fwmb-dialog-content">
@@ -1500,7 +1501,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             },
         });
 
-        if (result && result.src) {
+        if (result?.src) {
             this.#pushVectorState();
 
             // Default to spawning in the absolute mathematical center of the map
@@ -2018,18 +2019,28 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }))
             .sort((a, b) => a.localized.localeCompare(b.localized));
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs", { pin, icons });
+        const safePin = { ...pin, scale: pin.scale ?? 1 };
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs", { pin: safePin, icons });
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
             window: { title: game.i18n.localize("FILRODENSWMB.UI.EditPin") },
             content: content,
+            render: (event) => {
+                const app = event.target;
+                const html = app.element;
+                const range = html.querySelector('input[name="pinScale"]');
+                const output = html.querySelector("output");
+                if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
+            },
             ok: {
                 callback: (event, button, dialog) => {
                     return {
                         name: button.form.elements["pinName"].value,
                         description: button.form.elements["pinDesc"].value,
                         icon: button.form.elements["pinIcon"].value,
+                        scale: Number(button.form.elements["pinScale"].value),
                     };
                 },
             },
@@ -2037,10 +2048,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (result) {
             this.#pushVectorState();
-
             pin.name = result.name;
             pin.description = result.description;
             pin.icon = result.icon;
+            pin.scale = result.scale;
 
             this.#repaintVectors();
             this.render({ parts: ["context"] });

@@ -151,8 +151,11 @@ export const FILRODENSWMB = {
     },
     LABELS: {
         DEFAULT_FONT: "Signika",
-        DEFAULT_SIZE: 2, // Represents REM units for responsive scaling
+        DEFAULT_SIZE: 1,
         DEFAULT_COLOR: "#DEDCD3",
         PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
+    },
+    PINS: {
+        DEFAULT_SCALE: 1,
     },
 };
