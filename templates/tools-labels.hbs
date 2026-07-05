@@ -7,7 +7,7 @@
             {{#each mapPins}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="pin">
                 <button type="button" class="fwmb-icon-btn small" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                    <i class="fwmb-icon {{#if this.label.hidden}}visibility-off{{else}}visibility{{/if}}"></i>
+                    <i class="fwmb-icon {{#if (eq this.label.visibility 'none')}}visibility-off{{else if (eq this.label.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>
                 <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
                 <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
@@ -22,7 +22,7 @@
             {{#each mapRoutes}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="route">
                 <button type="button" class="fwmb-icon-btn small" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                    <i class="fwmb-icon {{#if this.label.hidden}}visibility-off{{else}}visibility{{/if}}"></i>
+                    <i class="fwmb-icon {{#if (eq this.label.visibility 'none')}}visibility-off{{else if (eq this.label.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>
                 <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
                 <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
@@ -38,7 +38,7 @@
                 {{#each this.regions}}
                 <div class="fwmb-list-item" data-id="{{this.id}}" data-layer-id="{{../id}}" data-type="region">
                     <button type="button" class="fwmb-icon-btn small" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                        <i class="fwmb-icon {{#if this.label.hidden}}visibility-off{{else}}visibility{{/if}}"></i>
+                        <i class="fwmb-icon {{#if (eq this.label.visibility 'none')}}visibility-off{{else if (eq this.label.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                     </button>
                     <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
                     <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
@@ -61,7 +61,7 @@
             {{#each mapLabels}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="custom">
                 <button type="button" class="fwmb-icon-btn small" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                    <i class="fwmb-icon {{#if this.hidden}}visibility-off{{else}}visibility{{/if}}"></i>
+                    <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>
                 <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
                 <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">

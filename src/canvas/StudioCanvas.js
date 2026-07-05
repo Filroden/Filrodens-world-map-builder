@@ -112,6 +112,8 @@ export class StudioCanvas {
 
         // Mode flag
         this.isEditMode = false;
+        this.renderPassMode = "normal"; // "normal" | "player" | "gm"
+        this.viewFilters = { all: true, gm: true, none: false };
         this.lastBrushTime = 0;
     }
 
@@ -254,7 +256,7 @@ export class StudioCanvas {
                 }
 
                 // 2. Otherwise, pass to brush engine
-                if (this.onBrushStart) {
+                if (this.isEditMode && this.onBrushStart) {
                     this.onBrushStart(coords.x, coords.y);
                 }
             }
@@ -827,7 +829,7 @@ export class StudioCanvas {
 
         // 1. Render Routes (Bottom Layer)
         sortedRoutes.forEach((route) => {
-            if (route.hidden || !route.points || route.points.length < 2) return;
+            if (!this.#isVisibleInCurrentPass(route.visibility, "all", false) || !route.points || route.points.length < 2) return;
 
             const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
             const splinePoints = this.#getSplinePoints(route.points);
@@ -909,7 +911,7 @@ export class StudioCanvas {
         const resScale = Math.max(this.mapWidth, this.mapHeight) / 1000;
 
         pins.forEach((pin) => {
-            if (pin.hidden) return;
+            if (!this.#isVisibleInCurrentPass(pin.visibility, "all", false)) return;
 
             const texturePath = `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg`;
             const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
@@ -967,14 +969,14 @@ export class StudioCanvas {
         this.layers.regions.removeChildren().forEach((c) => c.destroy());
 
         regionLayers.forEach((layer) => {
-            if (layer.hidden) return;
+            if (!this.#isVisibleInCurrentPass(layer.visibility, "all", true)) return;
 
             const layerContainer = new PIXI.Container();
             layerContainer.alpha = layer.opacity === undefined ? 0.5 : layer.opacity;
             this.layers.regions.addChild(layerContainer);
 
             layer.regions.forEach((region) => {
-                if (region.hidden || !region.points || region.points.length === 0) return;
+                if (!this.#isVisibleInCurrentPass(region.visibility, layer.visibility, false) || !region.points || region.points.length === 0) return;
 
                 const g = new PIXI.Graphics();
                 layerContainer.addChild(g);
@@ -1201,8 +1203,8 @@ export class StudioCanvas {
             return obj.label;
         };
 
-        const drawLabel = (name, labelData, defaultX, defaultY) => {
-            if (labelData?.hidden || !name) return;
+        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all") => {
+            if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name) return;
 
             const x = labelData.x ?? defaultX;
             const y = labelData.y ?? defaultY;
@@ -1230,7 +1232,7 @@ export class StudioCanvas {
             text.anchor.set(0.5);
             text.x = x;
             text.y = y;
-            text.rotation = rotation * (Math.PI / 180); // PIXI uses radians natively
+            text.rotation = rotation * (Math.PI / 180);
 
             this.layers.labels.addChild(text);
 
@@ -1244,28 +1246,36 @@ export class StudioCanvas {
             }
         };
 
-        // 1. Custom Labels
-        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y));
+        // Custom Labels
+        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all"));
 
-        // 2. Auto-Labels: Pins (Offset Top Right)
+        // Auto-Labels: Pins (Offset Top Right)
         mapPins.forEach((pin) => {
             if (!pin.icon) return;
-            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20);
+            // NEW: Pass the pin's visibility to the label
+            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility);
         });
 
-        // 3. Auto-Labels: Routes (Spline Midpoint)
+        // Auto-Labels: Routes (Spline Midpoint)
         mapRoutes.forEach((route) => {
-            if (route.hidden || !route.points || route.points.length < 2) return;
+            if (route.visibility === "none" || !route.points || route.points.length < 2) return;
+            if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) return; // Check container rules
+
             const spline = this.#getSplinePoints(route.points);
             const mid = spline[Math.floor(spline.length / 2)];
-            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15);
+            // NEW: Pass the route's visibility to the label
+            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15, route.visibility);
         });
 
-        // 4. Auto-Labels: Regions (Polygon Centroid)
+        // Auto-Labels: Regions (Polygon Centroid)
         regionLayers.forEach((layer) => {
-            if (layer.hidden) return;
+            if (!this.#isVisibleInCurrentPass(layer.visibility, "all", true)) return;
+
             layer.regions.forEach((region) => {
-                if (region.hidden || !region.points || region.points.length < 3) return;
+                let regionVis = region.visibility || "all";
+                if (regionVis !== "none" && layer.visibility === "gm") regionVis = "gm";
+
+                if (!this.#isVisibleInCurrentPass(regionVis, layer.visibility, true) || !region.points || region.points.length < 3) return;
 
                 let minX = Infinity,
                     maxX = -Infinity,
@@ -1278,19 +1288,19 @@ export class StudioCanvas {
                     if (p.y > maxY) maxY = p.y;
                 });
 
-                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2);
+                // Pass the effective region visibility to the label
+                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, regionVis);
             });
         });
     }
 
-    renderCartography(decorations = [], uiState, mapWidth, mapHeight, isEditMode = false) {
+    renderCartography(uiState, mapWidth, mapHeight, isEditMode = false, decorations = []) {
         if (!this.layers.cartography) return;
         this.layers.cartography.removeChildren().forEach((c) => c.destroy());
 
         const vectorLayer = new PIXI.Graphics();
         this.layers.cartography.addChild(vectorLayer);
 
-        const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
         const borderColorHex = Number.parseInt((uiState.cartographyBorderColor || "#000000").replace("#", ""), 16);
 
         // 1. Draw Procedural Map Border
@@ -1411,7 +1421,7 @@ export class StudioCanvas {
 
         // 3. Draw Custom Decorations
         decorations.forEach((dec) => {
-            if (dec.hidden || !dec.src) return;
+            if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false) || !dec.src) return;
 
             const sprite = new PIXI.Sprite(PIXI.Texture.from(dec.src));
             sprite.anchor.set(0.5);
@@ -1434,5 +1444,100 @@ export class StudioCanvas {
                 });
             }
         });
+    }
+
+    /**
+     * Extracts the canvas to a binary Blob, manipulating heavy background layers based on the pass type.
+     */
+    async extractCanvasBlob(passType = "player") {
+        const originalVisibility = {
+            grid: this.gridLayer.visible,
+            reference: this.layers.reference.visible,
+            cartography: this.layers.cartography.visible,
+        };
+
+        // Inject Invisible Bounding Box
+        // Forces PIXI to extract the full map dimensions even if all background layers are hidden
+        const boundsBox = new PIXI.Graphics();
+        boundsBox.beginFill(0x000000, 0); // 0 Alpha = completely transparent, but counts for bounds
+        boundsBox.drawRect(0, 0, this.mapWidth, this.mapHeight);
+        boundsBox.endFill();
+        this.stage.addChildAt(boundsBox, 0);
+
+        this.layers.reference.visible = false;
+
+        if (passType === "player") {
+            this.gridLayer.visible = false;
+        } else if (passType === "gm") {
+            // Hide all background elements so the GM overlay is purely transparent
+            this.layers.base.visible = false;
+            this.layers.topography.visible = false;
+            this.layers.biomes.visible = false;
+            this.layers.contours.visible = false;
+            this.layers.features.visible = false;
+            this.gridLayer.visible = false;
+            this.layers.cartography.visible = false; // Usually procedural borders shouldn't duplicate
+        }
+
+        // Force an immediate synchronous WebGL render to capture the new visibility states
+        this.app.renderer.render(this.stage);
+        const canvas = this.app.renderer.extract.canvas(this.stage);
+
+        // Cleanup Bounding Box
+        boundsBox.destroy();
+
+        // Restore the original visual state for the user
+        this.gridLayer.visible = originalVisibility.grid;
+        this.layers.reference.visible = originalVisibility.reference;
+        this.layers.cartography.visible = originalVisibility.cartography;
+        this.layers.base.visible = true;
+        this.layers.topography.visible = true;
+        this.layers.biomes.visible = true;
+        this.layers.contours.visible = true;
+        this.layers.features.visible = true;
+        return new Promise((resolve) => {
+            canvas.toBlob((blob) => {
+                resolve(blob);
+            }, "image/png");
+        });
+    }
+
+    setRenderPass(mode) {
+        this.renderPassMode = mode;
+    }
+
+    setViewFilters(filters) {
+        this.viewFilters = { ...this.viewFilters, ...filters };
+    }
+
+    /**
+     * Evaluates whether a JSON element should be drawn during the current pass.
+     * @param {string} visibility - The visibility of the current element ("all", "gm", "none")
+     * @param {string} parentVisibility - The visibility of the parent container ("all", "gm", "none")
+     * @param {boolean} isContainer - Whether this element contains children that need evaluation
+     */
+    #isVisibleInCurrentPass(visibility, parentVisibility = "all", isContainer = false) {
+        let vis = visibility || "all";
+
+        // Hierarchical override: If a parent is strictly GM only, children cannot be Player visible.
+        if (vis !== "none" && parentVisibility === "gm") {
+            vis = "gm";
+        }
+
+        if (vis === "none") return false;
+
+        // Strict Export Overrides
+        if (this.renderPassMode === "player") {
+            return vis === "all";
+        } else if (this.renderPassMode === "gm") {
+            if (isContainer && vis === "all") return true; // Enter generic layers to check for GM secrets
+            return vis === "gm";
+        }
+
+        // Standard Interactive Mode Filters
+        if (isContainer && vis === "all") return true; // Always enter generic layers in interactive mode
+
+        if (vis === "gm") return this.viewFilters.gm;
+        return this.viewFilters.all;
     }
 }

@@ -11,7 +11,7 @@
     "FILRODENSWMB.UI.ToggleGrid": "Toggle Grid Overlay",
 
     "FILRODENSWMB.UI.ToolCreateMap": "Create New Map",
-    "FILRODENSWMB.UI.ToolSettings": "Settings",
+    "FILRODENSWMB.UI.ToolSettings": "Map Configuration",
     "FILRODENSWMB.UI.ToolTerrain": "Terrain Generation",
     "FILRODENSWMB.UI.ToolFeatures": "Terrain Features",
     "FILRODENSWMB.UI.ToolBiomes": "Biomes",
@@ -320,5 +320,23 @@
     "FILRODENSWMB.ICONS.ObeliskPlinth": "Obelisk on Plinth",
     "FILRODENSWMB.ICONS.Temple": "Temple",
     "FILRODENSWMB.ICONS.Shipwreck": "Shipwreck",
-    "FILRODENSWMB.ICONS.Skull": "Skull"
+    "FILRODENSWMB.ICONS.Skull": "Skull",
+
+    "FILRODENSWMB.UI.ExportScene": "Export to Scene",
+    "FILRODENSWMB.UI.SceneName": "Target Scene Name",
+    "FILRODENSWMB.UI.SceneNameHint": "The name of the new Scene that will be created in your world.",
+    "FILRODENSWMB.UI.ExportFolder": "Server Export Directory",
+    "FILRODENSWMB.UI.ExportFolderHint": "The folder inside your world directory where the map images will be saved.",
+    "FILRODENSWMB.UI.GenerateJournals": "Generate Journals & Map Notes",
+    "FILRODENSWMB.UI.GenerateJournalsHint": "Automatically creates a Journal Entry for this map and populates it with your Points of Interest, linking them natively to the Scene.",
+    "FILRODENSWMB.UI.CreateGMOverlay": "Create GM Secret Overlay",
+    "FILRODENSWMB.UI.CreateGMOverlayHint": "Generates a transparent secondary tile containing hidden routes and labels, invisible to players by default.",
+    "FILRODENSWMB.UI.DirectoryCreated": "Created new export directory: {path}",
+
+    "FILRODENSWMB.UI.VisibilityPlayer": "Player Visible Features",
+    "FILRODENSWMB.UI.VisibilityGM": "GM Visible Features",
+    "FILRODENSWMB.UI.VisibilityNone": "Hidden Features",
+
+    "FILRODENSWMB.UI.OverwriteJournals": "Overwrite Existing Journal Pages",
+    "FILRODENSWMB.UI.OverwriteJournalsHint": "If checked, existing map journals will be updated with your current descriptions. Warning: This will destroy any manual lore edits made by the GM."
 }

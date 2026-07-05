@@ -19,6 +19,16 @@
     <div class="fwmb-map-hint">{{localize "FILRODENSWMB.UI.CanvasHint"}}</div>
 
     <div class="fwmb-map-controls">
+        <button type="button" class="active" data-action="toggleViewFilter" data-filter="all" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityPlayer'}}">
+            <i class="fwmb-icon visibility"></i>
+        </button>
+        <button type="button" class="active" data-action="toggleViewFilter" data-filter="gm" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityGM'}}">
+            <i class="fwmb-icon security"></i>
+        </button>
+        <button type="button" data-action="toggleViewFilter" data-filter="none" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityNone'}}">
+            <i class="fwmb-icon visibility-off"></i>
+        </button>
+        <div class="fwmb-divider-vertical"></div>
         <button type="button" class="active" data-action="toggleLayer" data-layer="base" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerBase'}}">
             <i class="fwmb-icon map"></i>
         </button>

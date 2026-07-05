@@ -28,6 +28,8 @@ The procedural plus non-destructive brush approach means the resulting saved jou
 
 ## How to Use
 
+> *Note: This section will be completed and moved to the module wiki before release.*
+
 1. Filroden's World Map Builder can be opened from the *Scenes* sidebar. A new button has been added at the top of the sidebar called *Map Builder*.
 
 ### Map Making Tools
@@ -97,29 +99,89 @@ The *Labels* tool allows you to edit existing labels and add/delete custom label
 
 The *Cartography* tool allows you to add decorations to the map.
 
-1. **Scale Bar:**
+1. **Scale Bar:** Set the map units, the scale interval size (in pixels), the number of map units represented by a major tick, and the number of major/minor intervals to show on the scale bar.
 
-2. **Map Border:**
+2. **Map Border:** At launch, three simple border types can be set, and a single colour applied.
 
-3. **Other Decorations:**
+3. **Other Decorations:** You can add any image file as a decoration, e.g., adding a windrose or compass, or adding a map cartouche you have designed outside Foundry.
 
 When in edit mode, the scale bar and decorations can be dragged by holding `Left Click`; decorations can be rotated using the `Scroll Wheel` and resized using the `SHIFT + Scroll Wheel`.
 
-### Settings
-
-1. ...
-
-### Map Management Tools
+### Module Settings
 
 #### 3D View
 
 1. Use the *3D View* tool to see your 2D cartography in 3D. The biome map is draped over your custom topography, complete with topographical river vectors, ocean planes, and dynamic lighting. This feature is purely visual and included for fun. It will not update to any changes made until it is toggled again.
 
-> While 3D View is enabled, the sidebar and map tools are hidden.
+   > While 3D View is enabled, the sidebar and map tools are hidden.
 
-#### Exporting a Map
+#### Reference Images
+
+You can load a reference image to act as a guide when creating your map. Please make sure you have permission to use any map used as a reference.
+
+1. Use the *Reference Image* tool.
+2. Select the file using the file picker.
+3. Use the mouse `left click` while the reference tool is enabled to quickly move the image and use `SHIFT + Scroll Wheel` to scale it.
+4. Use the zoom and D-Pad buttons to fine tune its scale and position.
+5. The reference image can be toggled on and off using the tools in the bottom right of the map canvas.
+
+Reference images will be automatically excluded from any export.
+
+#### Map Configuration
+
+You can change some of the map configuration settings.
+
+1. **Visuals**
+   - **Contour Interval:** Change the elevation interval between contours.
+   - **Active Biome Opacity:** Set the opacity of the biome layer when it is the active tool.
+   - **Inactive Biome Opacity:** Set the opacity of the biome layer when it is not the active tool. This is useful if you want the terrain to be more visible through the biome colours.
+
+2. **Hydrology**
+   - **Max Lake Size:** Set how large lakes can become. The larger the value, the more likely the lake will continue to grow until it finds a new path to flow down the terrain. Smaller values will result in more inland lakes which have no links to the ocean.
+   - **Spring Altitude (Min):** Set the lowest elevation where river sources can randomly spawn. This prevents rivers trying to form on flat plains.
+   - **Spring Altitude (Max):** Set the highest elevation where river sources can randomly spawn. This prevents rivers trying to form on at the top of a mountain.
+   - **River Meander:** Set how much a river will meander as it flows downhill. A value of 0 will mean it flows in a straight line.
+
+3. **Climate**
+   - **Altitude Cooling Mod:** Sets an altitude above which glaciers form on mountains.
+   - **Freezing Threshold:** Sets the temperature threshold for when rivers and lakes freeze.
+
+4. **Biome Colours**
+   - Click the colour swatch to edit the colour of each biome.
+
+### Map Management Tools
+
+#### Exporting to an external PNG
+
+This tool is to export a flat PNG image of your map which can be saved and shared anywhere.
 
 1. Use the *Export to PNG* tool found near the bottom of the toolbar to export all *visible* layers as a PNG image. The module will automatically hide any reference image. This is a temporary feature until more export tools are added.
+
+#### Exporting to a Scene
+
+This tool exports the map directly into a playable Foundry scene. It will create:
+
+- A base map containing all layers set to "Player" visibility. It will configure the grid, disable token vision, and enable global illumination.
+- An overlay map tile containing any layers set to "GM" visibility.
+- A journal with a page for every visible feature on the map.
+- Map pins for all visible regions and infrastructure features, linked directly to their journal page.
+
+**How to export:**
+
+1. Open the *Export to Scene* tool to launch the dialogue.
+
+   ![Scene Export Dialogue](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/export-to-scene.png)
+
+2. Name the scene (defaults to the current map name).
+3. Use the folder browser to select a directory in your `world` data folder to save the map images.
+4. Select if you want to generate the associated journal and map pins.
+5. If updating an existing scene, choose whether to overwrite the existing journal. *(Warning: Overwriting will delete any edits made manually to the journal made directly through normal Foundry tools).*
+
+   > Note: Re-exporting a map to an existing scene is a non-destructive process for the canvas. It will safely update the background and grid without deleting any walls, lighting, or tokens already placed on the scene. It is only re-exporting the journals that is will overwrite existing content.
+
+6. Select if you want to extract the GM-only overlay tile.
+
+When you confirm, the interface will lock to prevent changes during the extraction process. On completion, the new scene will automatically activate.
 
 #### Saving a Map
 
@@ -144,32 +206,16 @@ When in edit mode, the scale bar and decorations can be dragged by holding `Left
 - **Export JSON:** Export the map data into a JSON file. This allows you to share maps with others.
 - **Delete:** Delete the map. This can also be done inside the normal Foundry compendium.
 
-#### Reference Images
-
-You can load a reference image to act as a guide when creating your map. Please make sure you have permission to use any map used as a reference.
-
-1. Use the *Reference Image* tool.
-2. Select the file using the file picker.
-3. Use the mouse `left click` while the reference tool is enabled to quickly move the image and use `SHIFT + Scroll Wheel` to scale it.
-4. Use the zoom and D-Pad buttons to fine tune its scale and position.
-5. The reference image can be toggled on and off using the tools in the bottom right of the map canvas.
-
-Reference images will be automatically excluded from any export.
-
 ## Important Note on Performance
 
-Filroden's World Map Builder can be computationally heavy when generating new or loading existing terrain, moisture and temperature models, particularly as you increase the size of the map. Maps of 1,000 x 1,000 pixels should be created or loaded very quickly. Maps of 4,000 x 4,000 look beautiful but even on powerful PCs they might take a few seconds to calculate.
-
-Once calculated, the application will be much more responsive.
-
-I will continue to look for ways to improve performance as the module develops.
+The generator can be computationally heavy when calculating new terrain, moisture, and temperature models, particularly at larger resolutions. Maps of 1000x1000 pixels process very quickly. Maps of 4000x4000 pixels look beautiful, but may take a few seconds to calculate even on powerful PCs. Once the initial calculation is complete, the application returns to being highly responsive.
 
 ## Roadmap
 
-I have designed the module so that users will eventually be able to create a world map, then zoom into an area of interest and use it as the new boundaries for a larger-scale, higher detail map containing all the same information. This will allow users to create more detailed maps of continents, countries, regions, etc.
+The long-term vision for this module is to allow users to create a world map, zoom into an area of interest, and use those boundaries to generate a larger-scale, higher-detail regional map containing all the same geographical data.
 
-- Improve performance.
-- Add labels with predefined styles and custom styles. Pre-generate labels from existing infrastructure and region names.
-- Add cartography tools: scale, cartouche, compass roses, etc.
-- Add "export to scene" tools to supplement or replace the current "export to PNG" tool. Link vector features and their meta data to journal pages.
-- Sandbox mode, import DEM, import greyscale map and calculate elevations, etc.
+- Plateau terrain brush to paint flat terrain (still feathering into the surroundings).
+- Custom biome support for the brush tool.
+- Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
+- Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
+- A Sandbox Mode allowing the import of DEM or greyscale heightmaps to bypass the procedural generation entirely.

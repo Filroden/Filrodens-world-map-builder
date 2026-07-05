@@ -68,7 +68,7 @@
             {{#each mapDecorations}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="decoration">
                 <button type="button" class="fwmb-icon-btn small" data-action="toggleVisibility" data-target="feature" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                    <i class="fwmb-icon {{#if this.hidden}}visibility-off{{else}}visibility{{/if}}"></i>
+                    <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>
                 <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
                 <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">

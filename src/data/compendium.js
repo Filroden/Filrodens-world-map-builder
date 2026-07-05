@@ -8,7 +8,7 @@ export async function initializeCompendium() {
     let pack = game.packs.get(packName);
 
     if (!pack) {
-        console.log("World Map Builder | Initialising Map Compendium...");
+        console.log("World Map Builder | Initializing Map Compendium...");
         pack = await foundry.documents.collections.CompendiumCollection.createCompendium({
             type: "JournalEntry",
             label: FILRODENSWMB.COMPENDIUM.LABEL,

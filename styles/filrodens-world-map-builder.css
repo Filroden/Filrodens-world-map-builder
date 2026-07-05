@@ -84,6 +84,7 @@
 .fwmb-icon.add                  { --fwmb-mask: url('../assets/icons/add.svg'); }
 .fwmb-icon.gesture              { --fwmb-mask: url('../assets/icons/gesture.svg'); }
 .fwmb-icon.slope                { --fwmb-mask: url('../assets/icons/signal_cellular_null.svg'); }
+.fwmb-icon.security             { --fwmb-mask: url('../assets/icons/security.svg'); }
 
 
 /* --- APPLICATION SCROLLBARS --- */
@@ -441,6 +442,10 @@
     line-height: var(--filroden-line-height-body);
 }
 
+.fwmb .hint.indent {
+    margin-inline-start: var(--filroden-space-xxl);
+}
+
 /* Empty or missing data states */
 .fwmb .fwmb-empty {
     display: flex;
@@ -631,7 +636,7 @@
 
 /* 2. The Context Panel Part */
 .fwmb .fwmb-context-panel {
-    flex: 0 0 18rem; 
+    flex: 0 0 20rem; 
     background: var(--filroden-color-bg-medium-solid);
     border-inline-end: 1px solid var(--filroden-color-border);
     display: flex;
@@ -662,7 +667,6 @@
 
 .fwmb-divider-vertical {
     border: none;
-    height: 100%;
     width: 1px;
     background-color: var(--filroden-color-text-accent);
     margin-inline: var(--filroden-space-xs);

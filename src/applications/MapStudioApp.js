@@ -4,6 +4,7 @@ import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
 import { Scene3D } from "../canvas/Scene3D.js";
+import { SceneExporter } from "./SceneExporter.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -37,6 +38,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             editRegionLayer: MapStudioApp.#onEditRegionLayer,
             editRoute: MapStudioApp.#onEditRoute,
             exportPng: MapStudioApp.#onExportPng,
+            exportScene: MapStudioApp.#onExportScene,
             importMapJson: MapStudioApp.#onImportMapJson,
             manageMap: MapStudioApp.#onManageMapAction,
             nudgeNoise: MapStudioApp.#onNudgeNoise,
@@ -64,6 +66,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             togglePinDropdown: MapStudioApp.#onTogglePinDropdown,
             toggleRegionSmoothing: MapStudioApp.#onToggleRegionSmoothing,
             toggleSnapping: MapStudioApp.#onToggleSnapping,
+            toggleViewFilter: MapStudioApp.#onToggleViewFilter,
             toggleVisibility: MapStudioApp.#onToggleVisibility,
             undoBrush: MapStudioApp.#onUndoBrush,
             zoomIn: MapStudioApp.#onZoomIn,
@@ -97,6 +100,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.canvasEngine = null;
         this.activeTool = "scene";
+        this.viewFilters = { all: true, gm: true, none: false };
 
         this.mapWidth = FILRODENSWMB.DEFAULTS.MAP_WIDTH;
         this.mapHeight = FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
@@ -420,7 +424,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             contextPanel.addEventListener("input", (event) => {
                 if (event.target.matches('[name^="cartography"]')) {
                     const t = event.target;
-                    this.uiState[t.name] = t.type === "checkbox" ? t.checked : t.type === "number" ? Number(t.value) : t.value;
+                    let value;
+
+                    if (t.type === "checkbox") {
+                        value = t.checked;
+                    } else if (t.type === "number") {
+                        value = Number(t.value);
+                    } else {
+                        value = t.value;
+                    }
+
+                    this.uiState[t.name] = value;
                     this.#repaintVectors();
                     this.markDirty();
                     return;
@@ -553,6 +567,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const getNum = (name) => Number.parseFloat(this.element.querySelector(`input[name="${name}"]`)?.value) || 0;
 
         this.canvasEngine.onBrushStart = (x, y) => {
+            if (!this.canvasEngine.isEditMode) return;
+
             let layer = "terrain";
             if (this.activeTool === "biomes") layer = "biome";
             if (this.activeTool === "features") layer = "features";
@@ -603,8 +619,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
 
             if (layer === "labels") {
-                if (!this.canvasEngine.isEditMode) return;
-
                 this.#pushVectorState();
 
                 this.mapLabels.push({
@@ -616,7 +630,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     fontFamily: this.uiState.labelFontFamily,
                     fontSize: this.uiState.labelFontSize,
                     fillColor: this.uiState.labelFillColor,
-                    hidden: false,
+                    visibility: "all",
                 });
 
                 this.#repaintVectors();
@@ -688,7 +702,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
 
             if (this.activeTool === "cartography" && this.canvasEngine.renderCartography) {
-                this.canvasEngine.renderCartography(this.mapDecorations, this.uiState, this.mapWidth, this.mapHeight, isEdit);
+                this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isEdit, this.mapDecorations);
             }
         };
         this.canvasEngine.onInfraDragEnd = () => {
@@ -708,7 +722,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 }
             }
             for (const pin of this.mapPins) {
-                if (!pin.hidden && pin.icon && Math.hypot(pin.x - x, pin.y - y) < 15) return;
+                if (pin.visibility !== "none" && pin.icon && Math.hypot(pin.x - x, pin.y - y) < 15) return;
             }
 
             // 1. Try to insert into a Route
@@ -979,7 +993,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 5. Render Cartography
         const isCartographyEdit = this.activeTool === "cartography" && isEditModeActive;
         if (this.canvasEngine.renderCartography) {
-            this.canvasEngine.renderCartography(this.mapDecorations, this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit);
+            this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit, this.mapDecorations);
         }
     }
 
@@ -1116,6 +1130,34 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.cartographyBorderStyle = c.borderStyle ?? this.defaultUiState.cartographyBorderStyle;
         this.uiState.cartographyBorderColor = c.borderColor ?? this.defaultUiState.cartographyBorderColor;
 
+        // Legacy Visibility Migration
+        const migrateVisibility = (arr) => {
+            arr.forEach((item) => {
+                if (item.hidden !== undefined) {
+                    item.visibility = item.hidden ? "none" : "all";
+                    delete item.hidden; // Clean up old data
+                }
+                if (item.label?.hidden !== undefined) {
+                    item.label.visibility = item.label.hidden ? "none" : "all";
+                    delete item.label.hidden;
+                }
+            });
+        };
+
+        if (payload.mapPins) migrateVisibility(payload.mapPins);
+        if (payload.mapRoutes) migrateVisibility(payload.mapRoutes);
+        if (payload.mapLabels) migrateVisibility(payload.mapLabels);
+        if (payload.mapDecorations) migrateVisibility(payload.mapDecorations);
+        if (payload.regionLayers) {
+            payload.regionLayers.forEach((layer) => {
+                if (layer.hidden !== undefined) {
+                    layer.visibility = layer.hidden ? "none" : "all";
+                    delete layer.hidden;
+                }
+                if (layer.regions) migrateVisibility(layer.regions);
+            });
+        }
+
         this.customBiomeColors = p.customColors || {};
         this.mapPins = payload.mapPins || [];
         this.mapRoutes = payload.mapRoutes || [];
@@ -1184,7 +1226,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         let closest = { x, y, dist: Infinity };
 
         for (const pin of this.mapPins) {
-            if (pin.hidden || !pin.icon) continue;
+            if (pin.visibility === "none" || !pin.icon) continue;
 
             const dist = Math.hypot(pin.x - x, pin.y - y);
             if (dist < closest.dist && dist <= threshold) {
@@ -1210,7 +1252,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 x: finalPos.x,
                 y: finalPos.y,
                 scale: FILRODENSWMB.PINS?.DEFAULT_SCALE,
-                hidden: false,
+                visibility: "all",
             };
             this.mapPins.push(newPin);
         } else if (this.uiState.activeInfraMode === "route") {
@@ -1233,7 +1275,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     color: this.uiState.routeColor,
                     thickness: this.uiState.routeThickness,
                     style: this.uiState.routeStyle,
-                    hidden: false,
+                    visibility: "all",
                 };
                 this.mapRoutes.push(newRoute);
             }
@@ -1272,7 +1314,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         let closest = { route: null, insertIndex: -1, dist: Infinity };
 
         for (const route of this.mapRoutes) {
-            if (route.hidden || !route.points || route.points.length < 2) continue;
+            if (route.visibility === "none" || !route.points || route.points.length < 2) continue;
 
             for (let i = 0; i < route.points.length - 1; i++) {
                 const p1 = route.points[i];
@@ -1297,10 +1339,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         let closest = { region: null, insertIndex: -1, dist: Infinity };
 
         for (const layer of this.regionLayers) {
-            if (layer.hidden) continue;
+            if (layer.visibility === "none") continue;
 
             for (const region of layer.regions) {
-                if (region.hidden || !region.points || region.points.length < 2) continue;
+                if (region.visibility === "none" || !region.points || region.points.length < 2) continue;
 
                 // Closed polygons check the segment returning to the start node
                 const isClosed = region.points.length >= 3 && region.id !== this.activeRegionId;
@@ -1369,7 +1411,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 lineThickness: this.uiState.regionLineThickness,
                 lineStyle: this.uiState.regionLineStyle,
                 smoothing: this.uiState.regionSmoothing,
-                hidden: false,
+                visibility: "all",
             });
         }
 
@@ -1517,7 +1559,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 y: spawnY,
                 rotation: 0,
                 scale: 1, // Default PIXI Sprite scale
-                hidden: false,
+                visibility: "all",
             });
 
             this.#repaintVectors();
@@ -1528,7 +1570,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static #onAddRegionLayer(event, target) {
         const id = foundry.utils.randomID();
-        this.regionLayers.push({ id: id, name: `Region Layer ${this.regionLayers.length + 1}`, hidden: false, opacity: this.uiState.regionOpacity, regions: [] });
+        this.regionLayers.push({ id: id, name: `Region Layer ${this.regionLayers.length + 1}`, visibility: "all", opacity: this.uiState.regionOpacity, regions: [] });
         this.activeRegionLayerId = id;
         this.render({ parts: ["context"] });
     }
@@ -2190,6 +2232,81 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
+     * Prompts the user with the export configuration dialogue before triggering the async build pipeline.
+     */
+    static async #onExportScene(event, target) {
+        if (!this.canvasEngine || !this.currentElevationData) {
+            ui.notifications.warn("No map is currently generated to export.");
+            return;
+        }
+
+        const defaultName = this.currentSaveName || "New Map Scene";
+        const defaultFolder = "fwmb-exports";
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder });
+
+        const config = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.ExportScene") || "Export to Scene" },
+            content: content,
+            ok: {
+                callback: (event, button, dialog) => {
+                    return {
+                        sceneName: button.form.elements["sceneName"].value.trim() || defaultName,
+                        exportFolder: button.form.elements["exportFolder"].value.trim() || defaultFolder,
+                        generateJournals: button.form.elements["generateJournals"].checked,
+                        overwriteJournals: button.form.elements["overwriteJournals"].checked,
+                        createGmOverlay: button.form.elements["createGmOverlay"].checked,
+                    };
+                },
+            },
+        });
+
+        if (!config) return; // User cancelled
+
+        // The user has confirmed. Hand off to the background processing pipeline.
+        this.#executeSceneExportPipeline(config);
+    }
+
+    /**
+     * The background orchestrator for slicing the canvas and creating the Foundry Documents.
+     */
+    async #executeSceneExportPipeline(config) {
+        this.element.style.pointerEvents = "none";
+        this.element.style.filter = "brightness(0.7)";
+        this.element.style.cursor = "wait";
+
+        try {
+            ui.notifications.info(`FWMB | Extracting Player View...`);
+            this.canvasEngine.setRenderPass("player");
+            this.#repaintVectors(); // Forces canvas to instantly hide GM items
+            const playerBlob = await this.canvasEngine.extractCanvasBlob("player");
+
+            let gmBlob = null;
+            if (config.createGmOverlay) {
+                ui.notifications.info(`FWMB | Extracting GM Overlay...`);
+                this.canvasEngine.setRenderPass("gm");
+                this.#repaintVectors(); // Forces canvas to instantly hide Player items
+                gmBlob = await this.canvasEngine.extractCanvasBlob("gm");
+            }
+
+            // Restore the normal view
+            this.canvasEngine.setRenderPass("normal");
+            this.#repaintVectors();
+
+            // Hand off the physical Blobs to the server-side Exporter utility
+            await SceneExporter.run(this, config, playerBlob, gmBlob);
+        } catch (err) {
+            console.error("FWMB | Pipeline Error:", err);
+            ui.notifications.error("Export pipeline failed. See console for details.");
+        } finally {
+            this.element.style.pointerEvents = "auto";
+            this.element.style.filter = "none";
+            this.element.style.cursor = "default";
+        }
+    }
+
+    /**
      * Opens a system file dialogue, validates the JSON payload, and imports it to the database.
      */
     static async #onImportMapJson(event, target) {
@@ -2549,7 +2666,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             lineThickness: this.uiState.regionLineThickness,
             lineStyle: this.uiState.regionLineStyle,
             smoothing: this.uiState.regionSmoothing,
-            hidden: false,
+            visibility: "all",
         });
 
         this.#repaintVectors();
@@ -2730,8 +2847,27 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         target.classList.toggle("active", this.uiState.snapToPoints);
     }
 
+    /**
+     * Toggles live canvas filters for Player, GM, and Hidden vectors.
+     */
+    static #onToggleViewFilter(event, target) {
+        if (!this.canvasEngine) return;
+
+        const filter = target.dataset.filter; // "all", "gm", or "none"
+        if (!filter) return;
+
+        // Invert the state and visually toggle the button
+        this.viewFilters[filter] = !this.viewFilters[filter];
+        target.classList.toggle("active", this.viewFilters[filter]);
+
+        // Push to canvas and redraw
+        this.canvasEngine.setViewFilters(this.viewFilters);
+        this.#repaintVectors();
+    }
+
     static #onToggleVisibility(event, target) {
         const targetType = target.dataset.target; // "layer", "feature", or "label"
+        const states = ["all", "gm", "none"];
 
         // 1. Handle Region Layers (Accordion Groups)
         if (targetType === "layer") {
@@ -2739,16 +2875,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const layer = this.regionLayers.find((l) => l.id === id);
             if (layer) {
                 this.#pushVectorState();
-                layer.hidden = !layer.hidden;
+                const currentIdx = states.indexOf(layer.visibility || "all");
+                layer.visibility = states[(currentIdx + 1) % states.length];
             }
         }
-        // 2. Handle Individual List Items (Pins, Routes, Regions, Custom Labels, Decorations)
+        // 2. Handle Individual List Items
         else {
             const listItem = target.closest(".fwmb-list-item");
             if (!listItem) return;
 
             const id = listItem.dataset.id;
-            const type = listItem.dataset.type; // "pin", "route", "region", "decoration", "custom"
+            const type = listItem.dataset.type;
 
             let obj = null;
             if (type === "custom") obj = this.mapLabels.find((l) => l.id === id);
@@ -2763,18 +2900,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (obj) {
                 this.#pushVectorState();
 
-                // If the user clicked the hide button on the Labels tab
                 if (targetType === "label") {
                     if (type === "custom") {
-                        obj.hidden = !obj.hidden;
+                        const currentIdx = states.indexOf(obj.visibility || "all");
+                        obj.visibility = states[(currentIdx + 1) % states.length];
                     } else {
-                        if (!obj.label) obj.label = { hidden: false };
-                        obj.label.hidden = !obj.label.hidden;
+                        if (!obj.label) obj.label = { visibility: "all" };
+                        const currentIdx = states.indexOf(obj.label.visibility || "all");
+                        obj.label.visibility = states[(currentIdx + 1) % states.length];
                     }
-                }
-                // If the user clicked the hide button on the Infrastructure or Regions tab
-                else if (targetType === "feature") {
-                    obj.hidden = !obj.hidden;
+                } else if (targetType === "feature") {
+                    const currentIdx = states.indexOf(obj.visibility || "all");
+                    obj.visibility = states[(currentIdx + 1) % states.length];
                 }
             }
         }
@@ -2834,30 +2971,42 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine?.zoomCamera(0.8);
     }
 
-    static #onZoomToFeature(event, target) {
-        const listItem = target.closest(".fwmb-list-item");
+    static #getZoomTargetPoints(listItem) {
         const id = listItem.dataset.id;
         const type = listItem.dataset.type;
 
-        let targetPoints = [];
-
-        if (type === "custom") {
-            const label = this.mapLabels.find((l) => l.id === id);
-            if (label) targetPoints = [label];
-        } else if (type === "decoration") {
-            const dec = this.mapDecorations.find((d) => d.id === id);
-            if (dec) targetPoints = [dec];
-        } else if (type === "pin") {
-            const pin = this.mapPins.find((p) => p.id === id);
-            if (pin) targetPoints = [pin];
-        } else if (type === "route") {
-            const route = this.mapRoutes.find((r) => r.id === id);
-            if (route?.points) targetPoints = route.points;
-        } else if (type === "region") {
-            const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);
-            const region = layer?.regions.find((r) => r.id === id);
-            if (region?.points) targetPoints = region.points;
+        switch (type) {
+            case "custom": {
+                const label = this.mapLabels.find((l) => l.id === id);
+                return label ? [label] : [];
+            }
+            case "decoration": {
+                const dec = this.mapDecorations.find((d) => d.id === id);
+                return dec ? [dec] : [];
+            }
+            case "pin": {
+                const pin = this.mapPins.find((p) => p.id === id);
+                return pin ? [pin] : [];
+            }
+            case "route": {
+                const route = this.mapRoutes.find((r) => r.id === id);
+                return route?.points || [];
+            }
+            case "region": {
+                const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);
+                const region = layer?.regions.find((r) => r.id === id);
+                return region?.points || [];
+            }
+            default:
+                return [];
         }
+    }
+
+    static #onZoomToFeature(event, target) {
+        const listItem = target.closest(".fwmb-list-item");
+        if (!listItem) return;
+
+        const targetPoints = this.#getZoomTargetPoints(listItem);
 
         if (targetPoints.length > 0 && this.canvasEngine) {
             this.canvasEngine.zoomToFeature(targetPoints);
