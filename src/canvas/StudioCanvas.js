@@ -28,6 +28,7 @@ export class StudioCanvas {
             regions: new PIXI.Container(),
             labels: new PIXI.Container(),
             reference: new PIXI.Container(),
+            cartography: new PIXI.Container(),
         };
 
         this.layers.biomes.alpha = 0.65;
@@ -60,6 +61,10 @@ export class StudioCanvas {
         // Cache for persistent GPU textures to prevent memory churn
         this.layerSprites = {};
 
+        // Setup the Brush Cursor overlay
+        this.brushCursor = new PIXI.Graphics();
+        this.brushCursor.visible = false;
+
         // Add them to the zooming stage in ascending order
         this.stage.addChild(
             this.layers.base,
@@ -70,8 +75,10 @@ export class StudioCanvas {
             this.layers.regions,
             this.layers.infrastructure,
             this.layers.reference,
-            this.layers.labels,
             this.gridLayer,
+            this.layers.labels,
+            this.layers.cartography,
+            this.brushCursor,
         );
 
         this.isDragging = false;
@@ -105,6 +112,8 @@ export class StudioCanvas {
 
         // Mode flag
         this.isEditMode = false;
+        this.renderPassMode = "normal"; // "normal" | "player" | "gm"
+        this.viewFilters = { all: true, gm: true, none: false };
         this.lastBrushTime = 0;
     }
 
@@ -128,6 +137,37 @@ export class StudioCanvas {
     #setupInteractions(canvasElement) {
         // SCROLL TO ZOOM / SCALE
         canvasElement.addEventListener("wheel", (e) => {
+            // --- Label & Decoration Transformation Intercept ---
+            if (this.activeDrag) {
+                const dragWrapper = this.interactiveTargets.find((t) => t.target === this.activeDrag.target);
+
+                if (dragWrapper?.isLabel || dragWrapper?.isDecoration) {
+                    e.preventDefault();
+
+                    if (dragWrapper.isDecoration) {
+                        // Shift + Scroll to Scale Decorations
+                        if (e.shiftKey) {
+                            const scaleDir = e.deltaY < 0 ? 1.05 : 0.95;
+                            this.activeDrag.target.scale = (this.activeDrag.target.scale || 1) * scaleDir;
+                        }
+                        // Standard Scroll to Rotate Decorations
+                        else {
+                            const dir = e.deltaY < 0 ? -5 : 5;
+                            this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
+                        }
+                    }
+                    // Standard Scroll to Rotate Labels
+                    else if (dragWrapper.isLabel) {
+                        const dir = e.deltaY < 0 ? -5 : 5;
+                        this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
+                    }
+
+                    // Force the immediate-mode redraw!
+                    if (this.onInfraDrag) this.onInfraDrag();
+                    return;
+                }
+            }
+
             // --- Reference Image Scaling Intercept ---
             if (this.isReferenceMode && e.shiftKey) {
                 const scaleDirection = e.deltaY < 0 ? 1.05 : 0.95;
@@ -216,7 +256,7 @@ export class StudioCanvas {
                 }
 
                 // 2. Otherwise, pass to brush engine
-                if (this.onBrushStart) {
+                if (this.isEditMode && this.onBrushStart) {
                     this.onBrushStart(coords.x, coords.y);
                 }
             }
@@ -489,12 +529,15 @@ export class StudioCanvas {
 
             const hexColor = pinColors[pin.type];
 
-            // Future-proofing: Cities might not have a color in this specific dictionary,
-            // so we only draw the circle if it maps to a known vector pin type.
             if (hexColor !== undefined) {
+                const radius = pin.radius || 6;
                 this.vectorGraphics.beginFill(hexColor, 0.4);
-                this.vectorGraphics.drawCircle(pin.x, pin.y, 6);
+                this.vectorGraphics.drawCircle(pin.x, pin.y, radius);
                 this.vectorGraphics.endFill();
+
+                if (isFeatureEdit) {
+                    this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: Math.max(radius, 10) });
+                }
             }
         }
     }
@@ -786,7 +829,7 @@ export class StudioCanvas {
 
         // 1. Render Routes (Bottom Layer)
         sortedRoutes.forEach((route) => {
-            if (route.hidden || !route.points || route.points.length < 2) return;
+            if (!this.#isVisibleInCurrentPass(route.visibility, "all", false) || !route.points || route.points.length < 2) return;
 
             const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
             const splinePoints = this.#getSplinePoints(route.points);
@@ -865,21 +908,26 @@ export class StudioCanvas {
         });
 
         // 2. Render Pins (Top Layer)
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / 1000;
+
         pins.forEach((pin) => {
-            if (pin.hidden) return;
+            if (!this.#isVisibleInCurrentPass(pin.visibility, "all", false)) return;
 
             const texturePath = `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg`;
             const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
 
+            // Apply resolution scaling * user override scale
+            const baseSize = 24 * resScale;
+            sprite.width = baseSize * (pin.scale || 1);
+            sprite.height = baseSize * (pin.scale || 1);
+
             sprite.anchor.set(0.5);
-            sprite.width = 32;
-            sprite.height = 32;
             sprite.x = pin.x;
             sprite.y = pin.y;
 
             if (isEditMode) {
-                // Push to mathematical cache
-                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: 16 });
+                // The hit radius must expand to match the new size
+                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2 });
             } else if (pin.name || pin.description) {
                 // Keep PIXI hover events for tooltips ONLY when not in edit mode
                 sprite.eventMode = "static";
@@ -921,14 +969,14 @@ export class StudioCanvas {
         this.layers.regions.removeChildren().forEach((c) => c.destroy());
 
         regionLayers.forEach((layer) => {
-            if (layer.hidden) return;
+            if (!this.#isVisibleInCurrentPass(layer.visibility, "all", true)) return;
 
             const layerContainer = new PIXI.Container();
             layerContainer.alpha = layer.opacity === undefined ? 0.5 : layer.opacity;
             this.layers.regions.addChild(layerContainer);
 
             layer.regions.forEach((region) => {
-                if (region.hidden || !region.points || region.points.length === 0) return;
+                if (!this.#isVisibleInCurrentPass(region.visibility, layer.visibility, false) || !region.points || region.points.length === 0) return;
 
                 const g = new PIXI.Graphics();
                 layerContainer.addChild(g);
@@ -1102,5 +1150,394 @@ export class StudioCanvas {
         this.isReferenceMode = isActive;
         const canvasElement = this.app.canvas ?? this.app.view;
         if (isActive) canvasElement.style.cursor = "crosshair";
+    }
+
+    updateBrushCursor(x, y, radius, isVisible) {
+        if (!isVisible || x === null || y === null) {
+            this.brushCursor.visible = false;
+            return;
+        }
+
+        this.brushCursor.visible = true;
+        this.brushCursor.clear();
+
+        // Ensure the line stays exactly 1 screen-pixel thick regardless of map zoom
+        const thickness = 1 / this.stage.scale.x;
+
+        // Draw a white circle with a slight drop-shadow effect for visibility on light terrain
+        this.brushCursor.lineStyle({ width: thickness * 3, color: 0x000000, alpha: 0.3 });
+        this.brushCursor.drawCircle(x, y, radius);
+
+        this.brushCursor.lineStyle({ width: thickness, color: 0xffffff, alpha: 0.9 });
+        this.brushCursor.drawCircle(x, y, radius);
+    }
+
+    /**
+     * Calculates relative luminance to guarantee text readability against any biome.
+     */
+    #getAdaptiveStrokeColor(hexColor) {
+        const cleanHex = String(hexColor).replace("#", "");
+        if (cleanHex.length !== 6) return "#000000";
+
+        const r = Number.parseInt(cleanHex.substring(0, 2), 16);
+        const g = Number.parseInt(cleanHex.substring(2, 4), 16);
+        const b = Number.parseInt(cleanHex.substring(4, 6), 16);
+
+        // Standard perceived luminance calculation
+        const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+        return luma < 128 ? "#ffffff" : "#000000";
+    }
+
+    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], regionLayers = [], isEditMode = false) {
+        this.layers.labels.removeChildren().forEach((c) => c.destroy());
+
+        // Extract native OS root font size to mimic CSS 'rem' behaviour
+        const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+
+        // Dynamically scale vectors based on the canvas dimensions (1000px = baseline 1x)
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / 1000;
+
+        const ensureLabelData = (obj) => {
+            if (!obj.label) obj.label = {};
+            return obj.label;
+        };
+
+        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all") => {
+            if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name) return;
+
+            const x = labelData.x ?? defaultX;
+            const y = labelData.y ?? defaultY;
+            const rotation = labelData.rotation ?? 0;
+
+            const font = labelData.fontFamily || "Signika";
+            const size = (labelData.fontSize || 1) * rootFontSize * resScale;
+            const fill = labelData.fillColor || "#ffffff";
+            const stroke = this.#getAdaptiveStrokeColor(fill);
+
+            const style = new PIXI.TextStyle({
+                fontFamily: font,
+                fontSize: size,
+                fill: fill,
+                fontWeight: "bold",
+                stroke: stroke,
+                strokeThickness: 3,
+                dropShadow: true,
+                dropShadowColor: stroke,
+                dropShadowBlur: 2,
+                dropShadowDistance: 2,
+            });
+
+            const text = new PIXI.Text(name, style);
+            text.anchor.set(0.5);
+            text.x = x;
+            text.y = y;
+            text.rotation = rotation * (Math.PI / 180);
+
+            this.layers.labels.addChild(text);
+
+            if (isEditMode) {
+                // Ensure the initial coordinates are written to the object so they can be dragged
+                labelData.x = x;
+                labelData.y = y;
+
+                const hitRadius = Math.max(text.width, text.height) / 2;
+                this.interactiveTargets.push({ target: labelData, x: x, y: y, radius: hitRadius, isLabel: true });
+            }
+        };
+
+        // Custom Labels
+        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all"));
+
+        // Auto-Labels: Pins (Offset Top Right)
+        mapPins.forEach((pin) => {
+            if (!pin.icon) return;
+            // NEW: Pass the pin's visibility to the label
+            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility);
+        });
+
+        // Auto-Labels: Routes (Spline Midpoint)
+        mapRoutes.forEach((route) => {
+            if (route.visibility === "none" || !route.points || route.points.length < 2) return;
+            if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) return; // Check container rules
+
+            const spline = this.#getSplinePoints(route.points);
+            const mid = spline[Math.floor(spline.length / 2)];
+            // NEW: Pass the route's visibility to the label
+            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15, route.visibility);
+        });
+
+        // Auto-Labels: Regions (Polygon Centroid)
+        regionLayers.forEach((layer) => {
+            if (!this.#isVisibleInCurrentPass(layer.visibility, "all", true)) return;
+
+            layer.regions.forEach((region) => {
+                let regionVis = region.visibility || "all";
+                if (regionVis !== "none" && layer.visibility === "gm") regionVis = "gm";
+
+                if (!this.#isVisibleInCurrentPass(regionVis, layer.visibility, true) || !region.points || region.points.length < 3) return;
+
+                let minX = Infinity,
+                    maxX = -Infinity,
+                    minY = Infinity,
+                    maxY = -Infinity;
+                region.points.forEach((p) => {
+                    if (p.x < minX) minX = p.x;
+                    if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y;
+                    if (p.y > maxY) maxY = p.y;
+                });
+
+                // Pass the effective region visibility to the label
+                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, regionVis);
+            });
+        });
+    }
+
+    renderCartography(uiState, mapWidth, mapHeight, isEditMode = false, decorations = []) {
+        if (!this.layers.cartography) return;
+        this.layers.cartography.removeChildren().forEach((c) => c.destroy());
+
+        const vectorLayer = new PIXI.Graphics();
+        this.layers.cartography.addChild(vectorLayer);
+
+        const borderColorHex = Number.parseInt((uiState.cartographyBorderColor || "#000000").replace("#", ""), 16);
+
+        // 1. Draw Procedural Map Border
+        if (uiState.cartographyBorderEnable) {
+            const style = uiState.cartographyBorderStyle;
+            const margin = 20;
+
+            if (style === "solid") {
+                vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+            } else if (style === "double") {
+                vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+                vectorLayer.lineStyle(3, borderColorHex, 1, 0);
+                vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
+            } else if (style === "ornate") {
+                vectorLayer.lineStyle(12, borderColorHex, 1, 0);
+                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+                vectorLayer.lineStyle(4, borderColorHex, 1, 0);
+                vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
+
+                const boxSize = 40;
+                vectorLayer.beginFill(borderColorHex);
+                vectorLayer.drawRect(0, 0, boxSize, boxSize);
+                vectorLayer.drawRect(mapWidth - boxSize, 0, boxSize, boxSize);
+                vectorLayer.drawRect(0, mapHeight - boxSize, boxSize, boxSize);
+                vectorLayer.drawRect(mapWidth - boxSize, mapHeight - boxSize, boxSize, boxSize);
+                vectorLayer.endFill();
+            }
+        }
+
+        // 2. Draw Procedural Scale Bar (Inside a Movable Container)
+        if (uiState.cartographyScaleEnable) {
+            const scaleContainer = new PIXI.Container();
+
+            // Set position based on UI State
+            scaleContainer.x = uiState.cartographyScaleX ?? 50;
+            scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
+
+            const interval = uiState.cartographyScaleInterval || 100;
+            const majorTicks = uiState.cartographyScaleMajorTicks || 4;
+            const minorTicks = uiState.cartographyScaleMinorTicks || 4;
+            const scaleValue = uiState.cartographyScaleValue || 1;
+            const units = uiState.cartographyScaleUnits || "Miles";
+
+            const height = 10;
+            const totalWidth = interval * majorTicks;
+
+            const scaleGraphics = new PIXI.Graphics();
+
+            // Base graphics are drawn relative to 0,0 inside the container
+            scaleGraphics.lineStyle(2, 0x000000, 1);
+            scaleGraphics.beginFill(0xffffff, 0.9);
+            scaleGraphics.drawRect(0, 0, totalWidth, height);
+            scaleGraphics.endFill();
+
+            scaleGraphics.beginFill(0x000000, 0.9);
+            for (let i = 0; i < majorTicks; i++) {
+                if (i % 2 !== 0) scaleGraphics.drawRect(i * interval, 0, interval, height);
+            }
+            scaleGraphics.endFill();
+
+            if (minorTicks > 0) {
+                const minorInterval = interval / minorTicks;
+                scaleGraphics.beginFill(0x000000, 0.9);
+                for (let i = 0; i < minorTicks; i++) {
+                    if (i % 2 === 0) {
+                        scaleGraphics.drawRect(i * minorInterval, height / 2, minorInterval, height / 2);
+                    } else {
+                        scaleGraphics.drawRect(i * minorInterval, 0, minorInterval, height / 2);
+                    }
+                }
+                scaleGraphics.endFill();
+            }
+            scaleContainer.addChild(scaleGraphics);
+
+            const textStyle = new PIXI.TextStyle({ fontFamily: "Signika", fontSize: 16, fill: "#000000", stroke: "#ffffff", strokeThickness: 4, fontWeight: "bold" });
+            const text0 = new PIXI.Text("0", textStyle);
+            text0.anchor.set(0.5, 1);
+            text0.x = 0;
+            text0.y = -5;
+            scaleContainer.addChild(text0);
+
+            // Apply the multiplier mathematically
+            const textMax = new PIXI.Text(`${majorTicks * scaleValue} ${units}`, textStyle);
+            textMax.anchor.set(0.5, 1);
+            textMax.x = totalWidth;
+            textMax.y = -5;
+            scaleContainer.addChild(textMax);
+
+            this.layers.cartography.addChild(scaleContainer);
+
+            if (isEditMode) {
+                const scaleDataObj = {
+                    get x() {
+                        return uiState.cartographyScaleX;
+                    },
+                    set x(val) {
+                        uiState.cartographyScaleX = val;
+                    },
+                    get y() {
+                        return uiState.cartographyScaleY;
+                    },
+                    set y(val) {
+                        uiState.cartographyScaleY = val;
+                    },
+                };
+
+                this.interactiveTargets.push({
+                    target: scaleDataObj,
+                    x: scaleContainer.x + totalWidth / 2,
+                    y: scaleContainer.y,
+                    radius: totalWidth / 2,
+                    isDecoration: false,
+                });
+            }
+        }
+
+        // 3. Draw Custom Decorations
+        decorations.forEach((dec) => {
+            if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false) || !dec.src) return;
+
+            const sprite = new PIXI.Sprite(PIXI.Texture.from(dec.src));
+            sprite.anchor.set(0.5);
+            sprite.x = dec.x;
+            sprite.y = dec.y;
+            sprite.rotation = dec.rotation * (Math.PI / 180);
+            sprite.scale.set(dec.scale || 1);
+            sprite.alpha = dec.opacity ?? 1; // Allow opacity fading
+
+            this.layers.cartography.addChild(sprite);
+
+            if (isEditMode) {
+                const hitRadius = Math.max(sprite.width, sprite.height, 32) / 2;
+                this.interactiveTargets.push({
+                    target: dec,
+                    x: dec.x,
+                    y: dec.y,
+                    radius: hitRadius,
+                    isDecoration: true,
+                });
+            }
+        });
+    }
+
+    /**
+     * Extracts the canvas to a binary Blob, manipulating heavy background layers based on the pass type.
+     */
+    async extractCanvasBlob(passType = "player") {
+        const originalVisibility = {
+            grid: this.gridLayer.visible,
+            reference: this.layers.reference.visible,
+            cartography: this.layers.cartography.visible,
+        };
+
+        // Inject Invisible Bounding Box
+        // Forces PIXI to extract the full map dimensions even if all background layers are hidden
+        const boundsBox = new PIXI.Graphics();
+        boundsBox.beginFill(0x000000, 0); // 0 Alpha = completely transparent, but counts for bounds
+        boundsBox.drawRect(0, 0, this.mapWidth, this.mapHeight);
+        boundsBox.endFill();
+        this.stage.addChildAt(boundsBox, 0);
+
+        this.layers.reference.visible = false;
+
+        if (passType === "player") {
+            this.gridLayer.visible = false;
+        } else if (passType === "gm") {
+            // Hide all background elements so the GM overlay is purely transparent
+            this.layers.base.visible = false;
+            this.layers.topography.visible = false;
+            this.layers.biomes.visible = false;
+            this.layers.contours.visible = false;
+            this.layers.features.visible = false;
+            this.gridLayer.visible = false;
+            this.layers.cartography.visible = false; // Usually procedural borders shouldn't duplicate
+        }
+
+        // Force an immediate synchronous WebGL render to capture the new visibility states
+        this.app.renderer.render(this.stage);
+        const canvas = this.app.renderer.extract.canvas(this.stage);
+
+        // Cleanup Bounding Box
+        boundsBox.destroy();
+
+        // Restore the original visual state for the user
+        this.gridLayer.visible = originalVisibility.grid;
+        this.layers.reference.visible = originalVisibility.reference;
+        this.layers.cartography.visible = originalVisibility.cartography;
+        this.layers.base.visible = true;
+        this.layers.topography.visible = true;
+        this.layers.biomes.visible = true;
+        this.layers.contours.visible = true;
+        this.layers.features.visible = true;
+        return new Promise((resolve) => {
+            canvas.toBlob((blob) => {
+                resolve(blob);
+            }, "image/png");
+        });
+    }
+
+    setRenderPass(mode) {
+        this.renderPassMode = mode;
+    }
+
+    setViewFilters(filters) {
+        this.viewFilters = { ...this.viewFilters, ...filters };
+    }
+
+    /**
+     * Evaluates whether a JSON element should be drawn during the current pass.
+     * @param {string} visibility - The visibility of the current element ("all", "gm", "none")
+     * @param {string} parentVisibility - The visibility of the parent container ("all", "gm", "none")
+     * @param {boolean} isContainer - Whether this element contains children that need evaluation
+     */
+    #isVisibleInCurrentPass(visibility, parentVisibility = "all", isContainer = false) {
+        let vis = visibility || "all";
+
+        // Hierarchical override: If a parent is strictly GM only, children cannot be Player visible.
+        if (vis !== "none" && parentVisibility === "gm") {
+            vis = "gm";
+        }
+
+        if (vis === "none") return false;
+
+        // Strict Export Overrides
+        if (this.renderPassMode === "player") {
+            return vis === "all";
+        } else if (this.renderPassMode === "gm") {
+            if (isContainer && vis === "all") return true; // Enter generic layers to check for GM secrets
+            return vis === "gm";
+        }
+
+        // Standard Interactive Mode Filters
+        if (isContainer && vis === "all") return true; // Always enter generic layers in interactive mode
+
+        if (vis === "gm") return this.viewFilters.gm;
+        return this.viewFilters.all;
     }
 }

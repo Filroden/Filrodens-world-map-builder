@@ -10,7 +10,8 @@
     "FILRODENSWMB.UI.ResetView": "Reset View",
     "FILRODENSWMB.UI.ToggleGrid": "Toggle Grid Overlay",
 
-    "FILRODENSWMB.UI.ToolSettings": "Settings",
+    "FILRODENSWMB.UI.ToolCreateMap": "Create New Map",
+    "FILRODENSWMB.UI.ToolSettings": "Map Configuration",
     "FILRODENSWMB.UI.ToolTerrain": "Terrain Generation",
     "FILRODENSWMB.UI.ToolFeatures": "Terrain Features",
     "FILRODENSWMB.UI.ToolBiomes": "Biomes",
@@ -59,6 +60,8 @@
     "FILRODENSWMB.UI.ToolRaise": "Raise Terrain",
     "FILRODENSWMB.UI.ToolLower": "Lower Terrain",
     "FILRODENSWMB.UI.ToolSmooth": "Smooth Terrain",
+    "FILRODENSWMB.UI.ToolSlopeUp": "Slope Up",
+    "FILRODENSWMB.UI.ToolSlopeDown": "Slope Down",
     "FILRODENSWMB.UI.Undo": "Undo",
     "FILRODENSWMB.UI.Redo": "Redo",
 
@@ -69,6 +72,7 @@
     "FILRODENSWMB.UI.LayerInfrastructure": "Toggle Infrastructure",
     "FILRODENSWMB.UI.LayerRegions": "Toggle Regions",
     "FILRODENSWMB.UI.LayerLabels": "Toggle Labels",
+    "FILRODENSWMB.UI.LayerCartography": "Toggle Cartography Decorations",
     "FILRODENSWMB.UI.LayerReference": "Toggle Reference Image",
 
     "FILRODENSWMB.UI.ClimateSettings": "Climate Settings",
@@ -118,10 +122,14 @@
     "FILRODENSWMB.UI.ContourInterval": "Contour Interval",
 
     "FILRODENSWMB.UI.CanvasSettings": "Canvas Setup",
-    "FILRODENSWMB.UI.MapResolution": "Grid Resolution (Pixels)",
-    "FILRODENSWMB.UI.ApplyResolution": "Rebuild Canvas",
+    "FILRODENSWMB.UI.MapResolution": "Map Resolution (Pixels)",
+    "FILRODENSWMB.UI.ApplyResolution": "Create New Map",
     "FILRODENSWMB.UI.ResolutionHint": "Warning: Changing the resolution will completely regenerate the map and destroy any custom brush strokes.",
     "FILRODENSWMB.UI.ResolutionWarningContent": "Changing the map resolution alters the underlying pixel grid. This will wipe all custom terrain painting, biome painting, and hand-placed springs. Are you sure you wish to proceed?",
+
+    "FILRODENSWMB.UI.Save": "Save",
+    "FILRODENSWMB.UI.Discard": "Discard",
+    "FILRODENSWMB.UI.Cancel": "Cancel",
 
     "FILRODENSWMB.UI.SaveMap": "Quick Save Map",
     "FILRODENSWMB.UI.SaveAs": "Save As...",
@@ -133,7 +141,6 @@
     "FILRODENSWMB.UI.LoadSuccess": "Map loaded successfully.",
     "FILRODENSWMB.UI.LoadWarningContent": "Loading a map will overwrite your current canvas. Any unsaved brush strokes or pins will be lost. Are you sure you wish to proceed?",
 
-    "FILRODENSWMB.UI.SceneTool": "Scene Configuration",
     "FILRODENSWMB.UI.GridSettings": "Grid Overlay",
     "FILRODENSWMB.UI.GridType": "Grid Pattern",
     "FILRODENSWMB.UI.GridSize": "Grid Size (px)",
@@ -160,6 +167,7 @@
     "FILRODENSWMB.UI.SnapToPoints": "Snap to Points",
     "FILRODENSWMB.UI.PointsOfInterest": "Points of Interest",
     "FILRODENSWMB.UI.SelectIcon": "Select Marker Icon",
+    "FILRODENSWMB.UI.IconScale": "Icon Scale",
     "FILRODENSWMB.UI.NoPoints": "No points placed.",
     "FILRODENSWMB.UI.Routes": "Routes",
     "FILRODENSWMB.UI.QuickStyles": "Quick Styles",
@@ -214,9 +222,38 @@
     "FILRODENSWMB.UI.StyleDiagonalHatch": "Diagonal Hatch",
     "FILRODENSWMB.UI.StyleCrossHatch": "Cross Hatch",
 
+    "FILRODENSWMB.UI.AutoLabels": "Auto-Generated Labels",
+    "FILRODENSWMB.UI.CustomLabels": "Custom Labels",
+    "FILRODENSWMB.UI.AddLabel": "Add New Label",
+    "FILRODENSWMB.UI.LabelHelpText": "Click to add a new label. Drag labels to reposition them. Use the scroll wheel while dragging to rotate them.",
+    "FILRODENSWMB.UI.LabelText": "Label Text",
+    "FILRODENSWMB.UI.FontFamily": "Font Family",
+    "FILRODENSWMB.UI.FontSize": "Font Size (REM)",
+    "FILRODENSWMB.UI.FontColor": "Font Color",
+    "FILRODENSWMB.UI.EditLabel": "Edit Label",
+    "FILRODENSWMB.UI.NoLabels": "No custom labels have been added yet.",
+
+    "FILRODENSWMB.UI.CartographyScale": "Enable Scale Bar",
+    "FILRODENSWMB.UI.ScaleUnits": "Scale Units",
+    "FILRODENSWMB.UI.ScaleInterval": "Scale Interval",
+    "FILRODENSWMB.UI.ScaleValue": "Scale Value",
+    "FILRODENSWMB.UI.ScaleValueHint": "per major tick",
+    "FILRODENSWMB.UI.ScaleTicks": "Major / Minor Ticks",
+    "FILRODENSWMB.UI.CartographyBorder": "Enable Map Border",
+    "FILRODENSWMB.UI.BorderStyle": "Border Style",
+    "FILRODENSWMB.UI.BorderSolid": "Solid",
+    "FILRODENSWMB.UI.BorderDouble": "Double",
+    "FILRODENSWMB.UI.BorderOrnate": "Ornate",
+    "FILRODENSWMB.UI.CartographyDecorations": "Map Decorations",
+    "FILRODENSWMB.UI.AddDecoration": "Add New Decoration",
+    "FILRODENSWMB.UI.NoDecorations": "No map decorations have been placed yet.",
+    "FILRODENSWMB.UI.EditCartography": "Toggle Edit Cartography",
+
     "FILRODENSWMB.UI.Warning": "Warning",
     "FILRODENSWMB.UI.SeedWarningContent": "Generating a new terrain seed will permanently erase all manual brush edits you have applied to this map. Do you want to continue?",
     "FILRODENSWMB.UI.WarnNoRegionLayer": "No region layer selected.",
+    "FILRODENSWMB.UI.UnsavedChangesWarning": "You have unsaved changes. Do you want to save your map before closing?",
+    "FILRODENSWMB.UI.WarnScaleLimit": "Landscape scale limit reached.",
 
     "FILRODENSWMB.JOURNAL.Title": "World Map Parameter Log",
     "FILRODENSWMB.JOURNAL.Description": "This journal contains the full generation profile and mathematical vectors used during world creation. This allows you to see the complete settings for the model without having to load it.",
@@ -283,5 +320,23 @@
     "FILRODENSWMB.ICONS.ObeliskPlinth": "Obelisk on Plinth",
     "FILRODENSWMB.ICONS.Temple": "Temple",
     "FILRODENSWMB.ICONS.Shipwreck": "Shipwreck",
-    "FILRODENSWMB.ICONS.Skull": "Skull"
+    "FILRODENSWMB.ICONS.Skull": "Skull",
+
+    "FILRODENSWMB.UI.ExportScene": "Export to Scene",
+    "FILRODENSWMB.UI.SceneName": "Target Scene Name",
+    "FILRODENSWMB.UI.SceneNameHint": "The name of the new Scene that will be created in your world.",
+    "FILRODENSWMB.UI.ExportFolder": "Server Export Directory",
+    "FILRODENSWMB.UI.ExportFolderHint": "The folder inside your world directory where the map images will be saved.",
+    "FILRODENSWMB.UI.GenerateJournals": "Generate Journals & Map Notes",
+    "FILRODENSWMB.UI.GenerateJournalsHint": "Automatically creates a Journal Entry for this map and populates it with your Points of Interest, linking them natively to the Scene.",
+    "FILRODENSWMB.UI.CreateGMOverlay": "Create GM Secret Overlay",
+    "FILRODENSWMB.UI.CreateGMOverlayHint": "Generates a transparent secondary tile containing hidden routes and labels, invisible to players by default.",
+    "FILRODENSWMB.UI.DirectoryCreated": "Created new export directory: {path}",
+
+    "FILRODENSWMB.UI.VisibilityPlayer": "Player Visible Features",
+    "FILRODENSWMB.UI.VisibilityGM": "GM Visible Features",
+    "FILRODENSWMB.UI.VisibilityNone": "Hidden Features",
+
+    "FILRODENSWMB.UI.OverwriteJournals": "Overwrite Existing Journal Pages",
+    "FILRODENSWMB.UI.OverwriteJournalsHint": "If checked, existing map journals will be updated with your current descriptions. Warning: This will destroy any manual lore edits made by the GM."
 }

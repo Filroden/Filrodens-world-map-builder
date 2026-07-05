@@ -27,6 +27,10 @@
     filter: invert(1);
 }
 
+.fwmb-icon.reverse {
+    transform: scaleX(calc(-1 * var(--filroden-dir-flip)));
+}
+
 .fwmb-icon.map                  { --fwmb-mask: url('../assets/icons/map.svg'); }
 .fwmb-icon.hex                  { --fwmb-mask: url('../assets/icons/hive.svg'); }
 .fwmb-icon.layers               { --fwmb-mask: url('../assets/icons/layers.svg'); }
@@ -36,6 +40,7 @@
 .fwmb-icon.file-open            { --fwmb-mask: url('../assets/icons/file_open.svg'); }
 .fwmb-icon.save                 { --fwmb-mask: url('../assets/icons/save.svg'); }
 .fwmb-icon.delete               { --fwmb-mask: url('../assets/icons/delete.svg'); }
+.fwmb-icon.cancel               { --fwmb-mask: url('../assets/icons/cancel.svg'); }
 .fwmb-icon.brush                { --fwmb-mask: url('../assets/icons/brush.svg'); }
 .fwmb-icon.select               { --fwmb-mask: url('../assets/icons/select.svg'); }
 .fwmb-icon.grid-on              { --fwmb-mask: url('../assets/icons/grid_3x3.svg'); }
@@ -78,6 +83,8 @@
 .fwmb-icon.png                  { --fwmb-mask: url('../assets/icons/file_png.svg'); }
 .fwmb-icon.add                  { --fwmb-mask: url('../assets/icons/add.svg'); }
 .fwmb-icon.gesture              { --fwmb-mask: url('../assets/icons/gesture.svg'); }
+.fwmb-icon.slope                { --fwmb-mask: url('../assets/icons/signal_cellular_null.svg'); }
+.fwmb-icon.security             { --fwmb-mask: url('../assets/icons/security.svg'); }
 
 
 /* --- APPLICATION SCROLLBARS --- */
@@ -393,7 +400,7 @@
     border-radius: var(--filroden-radius-medium);
     padding: var(--filroden-space-m);
     margin: var(--filroden-space-m);
-    gap: var(--filroden-space-s);
+    gap: var(--filroden-space-l);
     display: flex;
     flex-direction: column;
 }
@@ -433,6 +440,10 @@
     color: var(--filroden-color-text-muted-solid);
     margin-block-start: var(--filroden-space-xxs);
     line-height: var(--filroden-line-height-body);
+}
+
+.fwmb .hint.indent {
+    margin-inline-start: var(--filroden-space-xxl);
 }
 
 /* Empty or missing data states */
@@ -495,6 +506,7 @@
 
 .fwmb .fwmb-flex-1 {
     flex: 1;
+    min-height: 0;
     min-width: 0; /* Prevents flexbox text inputs from breaking container bounds */
 }
 
@@ -624,7 +636,7 @@
 
 /* 2. The Context Panel Part */
 .fwmb .fwmb-context-panel {
-    flex: 0 0 18rem; 
+    flex: 0 0 20rem; 
     background: var(--filroden-color-bg-medium-solid);
     border-inline-end: 1px solid var(--filroden-color-border);
     display: flex;
@@ -655,7 +667,6 @@
 
 .fwmb-divider-vertical {
     border: none;
-    height: 100%;
     width: 1px;
     background-color: var(--filroden-color-text-accent);
     margin-inline: var(--filroden-space-xs);
@@ -1165,7 +1176,8 @@ input.fwmb-swatch {
     flex-direction: column;
     gap: var(--filroden-space-xs);
     padding-right: var(--filroden-space-xs);
-    max-height: 40%;
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
 }
 

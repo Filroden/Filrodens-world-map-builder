@@ -619,9 +619,16 @@ export class ProceduralEngine {
                 finalSprings.push({ x: pin.x, y: pin.y });
                 overrideSet.add(`${pin.x},${pin.y}`);
             } else if (pin.type === "block_spring") {
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        blockedSet.add(`${pin.x + dx},${pin.y + dy}`);
+                const r = Math.round(pin.radius || 1);
+                const rSq = r * r; // Pre-calculate squared radius to avoid hypot in tight loops
+                const px = Math.round(pin.x);
+                const py = Math.round(pin.y);
+
+                for (let dy = -r; dy <= r; dy++) {
+                    for (let dx = -r; dx <= r; dx++) {
+                        if (dx * dx + dy * dy <= rSq) {
+                            blockedSet.add(`${px + dx},${py + dy}`);
+                        }
                     }
                 }
             }
