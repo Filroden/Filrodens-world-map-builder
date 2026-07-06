@@ -12,7 +12,7 @@
 
 ## Welcome to Filroden's World Map Builder
 
-> **WARNING** This is an Alpha release. As the module develops there is a chance that the data structure for map saves will evolve. This could mean any maps saved will be lost. Please treat this release as a way to test the module and provide your feedback on what you would like to see.
+> **WARNING** This is a Beta release. As the module develops there is a chance that the data structure for map saves will evolve. This could mean any maps saved will be lost. Please treat this release as a way to test the module and provide your feedback on what you would like to see.
 
 Filroden's World Map Builder is a system-agnostic cartography tool. It generates terrain, moisture and temperatures using a procedural, deterministic model so using the same "seed" will generate the same model. It then calculates appropriate biomes taking into account the latitude and underlying models including wind patterns. You can scale and offset the result to frame a map that is close to your idea so that you can apply the final edits to the world using non-destructive brushes.
 
@@ -28,33 +28,179 @@ The procedural plus non-destructive brush approach means the resulting saved jou
 
 ## How to Use
 
+- [The Map Canvas](#the-map-canvas)
+- [Map Making Tools](#map-making-tools)
+  - [Generating a New Map](#generating-a-new-map)
+  - [Terrain](#terrain)
+  - [Biomes](#biomes-climate)
+  - [Hydrology](#hydrology)
+  - [Infrastructure](#infrastructure)
+  - [Regions](#regions)
+  - [Labels](#labels)
+  - [Cartography](#cartography)
+- [Module Settings](#module-settings)
+  - [3D View](#3d-view)
+  - [Reference Images](#reference-images)
+  - [Map Configuration](#map-configuration)
+- [Map Management Tools](#map-management-tools)
+  - [Exporting to an external PNG](#exporting-to-an-external-png)
+  - [Exporting to a Scene](#exporting-to-a-scene)
+  - [Saving a Map](#saving-a-map)
+  - [Loading an Existing Map](#loading-an-existing-map)
+
 > *Note: This section will be completed and moved to the module wiki before release.*
 
 1. Filroden's World Map Builder can be opened from the *Scenes* sidebar. A new button has been added at the top of the sidebar called *Map Builder*.
 
+### The Map Canvas
+
+The main window in the module shows the current map.
+
+Hold `Left Click` to drag the map, and use the `Scroll Wheel` to zoom in and out.
+
+As you move the mouse pointer over the map, a display of the elevation, moisture, temperature values and biome type will show in the top left corner of the map.
+
+There are map controls in the bottom right corner of the map (only visible when the mouse is inside the map canvas).
+
+![Map Controls](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/map-controls.png)
+
+- The first three icons toggle different views of the map: the player-visible features, GM-visible features and hidden features.
+- The next group of icons toggle different layers on or off: base map, terrain, biomes, hydrology (rivers and lakes), infrastructure, regions, labels and cartography decorations.
+- The next three icons toggle specific information layers: contour lines, the map grid, a map reference image.
+- The final three icons allow you to zoom in and out, and to reset the map so it fills the window.
+
+> **Important:** The toggle states of the layers (including the contours and grid layers) determines what will be exported (either as a PNG or as a scene).
+
 ### Map Making Tools
+
+#### General notes on edit mode
+
+Many of the following tools offer an edit mode. This mode has certain common features:
+
+- If you click the "Toggle Edit [Tool]" button in the sidebar a new toolbar will appear above the map containing edit tools.
+- While in edit mode the tool sidebar is locked to prevent changes while you are editing.
+- All edit toolbars have an "Undo" and "Redo" action.
+- Either click the "Toggle Edit [Tool]" button again to exit edit mode, or switch to a different map tool.
+
+In edit mode, some layers allow features to be added, moved or removed with mouse actions. Only the features relating to the specific tool can be edited. Not every action is available for every tool.
+
+- **Move:** Pins, region nodes, labels and cartographic decorations can be moved by holding the `Left-click` and dragging.
+- **Add:** New region nodes can be added by using `SHIFT + left-click`.
+- **Remove**: Existing pins and region nodes can be removed by using `CTRL (or CMD) + left-click`.
+- **Rotate:** Labels and cartographic decorations can be rotated by using the `Scroll Wheel` while holding `Left-click`.
+- **Re-size:** Cartographic decorations can be re-sized using the `SHIFT + Scroll Wheel` while holding `Left-click`.
 
 #### Generating a New Map
 
-1. ...
+1. To generate a new map either enter a map seed or generate a random seed, set the map resolution and click "Create New Map".
+
+   > Note: If you have an unsaved changes on the existing map you will be prompted to save or discard them.
+
+2. [Optional] Select a grid to display. By default, the grid layer is disabled in the map canvas controls. To see the grid, simply toggle the grid icon in the map controls.
+
+Creating a new map will procedurally generate a terrain, moisture and temperature model for the world, and calculate appropriate biomes.
+
+It is recommended that you work through each map tool in turn to edit the map.
 
 #### Terrain
 
-1. ...
+The terrain is generated automatically. Once generated, the terrain can be edited by the user.
 
-#### Climate
+1. **Global Settings**
+   - **Sea Level:** Set the sea level. This will update the map to show the new coastline.
 
-1. ...
+2. **Elevation Model** The terrain model is infinite in size. These controls determine which part of the model you see.
+   - **Map Transformation:** Use the zoom buttons and the nudge buttons to change your position in the model. Both groups have a reset button between them, to return you to the original positions.
+   - **Detail:** Determine how smooth or detailed the model will be.
+   - **Stretch:** Higher values result in mid-elevations being stretched and high/low elevations being compressed. This allows for larger plains to form.
+
+3. **Edit Terrain** Use the edit tools to adjust your terrain.
+
+   Brush tools work similar to brush tools in graphics packages.
+   - **Brush Size:** The radius of the brush tool.
+   - **Brush Strength:** How quickly the brush is applied.
+   - **Brush Feather:** How much the brush is blended with the surrounding terrain. Feathering increases towards the edges of the brush.
+
+   - **Raise Terrain:** This brush increases the elevation of the terrain beneath it.
+   - **Lower Terrain:** This brush reduces the elevation of the terrain beneath it.
+   - **Smooth Terrain**: This brush "averages" the terrain elevations under it.
+   - **Slope Up**: This brush takes the starting elevation and then increases elevation as you move away from that point.
+   - **Slope Down**: This brush takes the starting elevation and then decreases elevation as you move away from that point.
+
+#### Biomes (Climate)
+
+Biomes are generated automatically depending on the latitude, terrain, temperature profile and moisture profile. It also accounts for prevailing wind patterns tracking geographical orographic lift (rain shadows). Once generated, the biomes can be edited by the user.
+
+1. **Climate Settings**
+   - **Global Temperature:** Determine how warm or cold the overall global climate is. Lower the value to create ice worlds and raise it to create desert worlds.
+   - **Season:** Determine the current season. Set a value of 0 for Spring/Autumn, and a value of -1 or 1 for Summer/Winter (by hemisphere).
+   - **Latitude:** Set the upper and lower latitude values for the world. This determines the overall climate across the map.
+
+2. **Moisture Settings**
+   - **Global Moisture:** Determine how wet or dry the overall climate is.
+   - **Scale:** Determine the "size" of the moisture distribution from large constistent areas to very changeable and details variations within small areas.
+
+3. **Edit Biomes** Use the edit tools to place your own biomes.
+
+   Brush tools work similar to brush tools in graphics packages.
+   - **Brush Size:** The radius of the brush tool.
+   - **Brush Strength:** How quickly the brush is applied.
+   - **Brush Feather:** How much the brush is blended with the surrounding terrain. Feathering increases towards the edges of the brush.
+
+   - **Select Biome**: Select which biome type will be painted by the brush.
 
 #### Hydrology
 
-1. ...
+River sources are automatically generated where the moisture levels are high enough. River sources form between certain elevations which can be changed in the Map Configuration settings. They find their way down the terrain until they reach natural depressions. Water will then pool to form lakes. If the lakes becomes large enough, they may find new paths down the terrain and potentially reach the ocean.
+
+1. **Hydrology**
+   - **River Density:** Determine how many rivers might spawn automatically on the map.
+
+2. **Edit Hydrology**
+
+   Brush tools work similar to brush tools in graphics packages.
+   - **Brush Size:** The radius of the brush tool.
+
+   - **Add New River Source:**: Add a pin which spawns a new river source.
+   - **Block Procedurally Generated River Source:** Add a pin which blocks a river source which was generated by the module.
+   - **Remove Pin:** Use this brush to delete any pin added by the user.
 
 #### Infrastructure
 
-- Points of Interest pins and Route nodes can be dragged using `Left-click`.
-- New nodes can be added by using `SHIFT + left-click`.
-- Existing nodes can be removed by using `CTRL (or CMD) + left-click`.
+You can add two types of infrastructure:
+
+- **Points of Interest**
+- **Routes**
+
+Once created, they are shown in the sidebar as cards. Each card has four buttons:
+
+- **Visibility:** Set whether the feature will be visible to players, the GM or completely hidden.
+- **Focus View:** Clicking this will pan the map and zoom to the feature.
+- **Edit Details:** You can edit the feature's name, add a description and:
+  - For Points of Interest, change the marker icon and its size.
+  - For Routes, change its colour, its thickness and its line style (solid, dashed or dotted).
+- **Delete**
+
+Descriptions for Points of Interest will be shown as tooltips if you hover over its marker. Descriptions can be styled using `<HTML>` elements, including referencing images, etc.
+
+Both Points of Interest and Routes will show a label. The label can be edited seperately using the label tool.
+
+1. **Edit Infrastructure**
+
+   The Edit Infrastructure toolbar offers the following buttons and options:
+
+   - **Place Point of Interest**: Used to drop markers on the map.
+   - **Draw Route**: Used to draw routes (roads, sea routes, etc). Routes are made up of nodes and a smooth line is drawn connected each node.
+
+   The remainder of the toolbar depends on which of the above two options is active:
+
+   - **Points of Interest**
+     - **Select Marker Icon:** Select the icon to be used as the marker. The size of the marker can be changed inside the "Edit Details" from the sidebar (see above).
+
+   - **Routes**
+     - **Snap to Points:** If enabled, route nodes will try to snap to a nearby point of interest.
+     - **Quick Styles:** Four quick styles have been pre-configured which set the colour, thickness and style of line.
+     - **Colour** / **Thickness** / **Style** Or each property can be customised. All three can be changed from inside the "Edit Details" (see above).
 
 #### Regions
 
@@ -73,11 +219,6 @@ The *Regions* tool allows you to draw custom polygons to show political, economi
 
 4. Click the canvas to create a node. To close a region, either add a node close to the starting node, click the "Add New Region" button, or exit Edit mode.
 
-5. To edit existing nodes:
-   - Nodes can be dragged holding `Left-click`.
-   - New nodes can be added to a border using `SHIFT + left-click`.
-   - Existing nodes can be deleted using `CTRL (or CMD) + left-click`.
-
 #### Labels
 
 The *Labels* tool allows you to edit existing labels and add/delete custom labels.
@@ -87,12 +228,7 @@ The *Labels* tool allows you to edit existing labels and add/delete custom label
 2. To edit a label click its edit button shown after its name in the sidebar. You can change its name and its style.
    > Changing the name of the label in the *Labels* tool also changes it name when inspected in the tool it belongs to if it was automatically created.
 
-3. Enable Edit mode to move and rotate existing labels and to create new custom labels.
-   - New labels can be created by using `Left-click`.
-   - Existing labels can be dragged holding `Left-click`.
-   - Labels can be rotated by using the `Scroll Wheel` while holding `Left-click`.
-
-4. Individual labels can have their visibility toggled by clicking the visibility button before its name in the sidebar.
+3. Individual labels can have their visibility toggled by clicking the visibility button before its name in the sidebar.
    > Hidden labels will not be exported. Use the visibility toggle to control what information you want to share, e.g., by creating a player map and a GM map.
 
 #### Cartography
@@ -104,8 +240,6 @@ The *Cartography* tool allows you to add decorations to the map.
 2. **Map Border:** At launch, three simple border types can be set, and a single colour applied.
 
 3. **Other Decorations:** You can add any image file as a decoration, e.g., adding a windrose or compass, or adding a map cartouche you have designed outside Foundry.
-
-When in edit mode, the scale bar and decorations can be dragged by holding `Left Click`; decorations can be rotated using the `Scroll Wheel` and resized using the `SHIFT + Scroll Wheel`.
 
 ### Module Settings
 
@@ -177,11 +311,11 @@ This tool exports the map directly into a playable Foundry scene. It will create
 4. Select if you want to generate the associated journal and map pins.
 5. If updating an existing scene, choose whether to overwrite the existing journal. *(Warning: Overwriting will delete any edits made manually to the journal made directly through normal Foundry tools).*
 
-   > Note: Re-exporting a map to an existing scene is a non-destructive process for the canvas. It will safely update the background and grid without deleting any walls, lighting, or tokens already placed on the scene. It is only re-exporting the journals that is will overwrite existing content.
+   > Note: Re-exporting a map to an existing scene is a non-destructive process for the canvas. It will safely update the background and grid without deleting any walls, lighting, or tokens already placed on the scene. It is only re-exporting the journals that will overwrite existing content.
 
 6. Select if you want to extract the GM-only overlay tile.
 
-When you confirm, the interface will lock to prevent changes during the extraction process. On completion, the new scene will automatically activate.
+When you click "Confirm", the interface will lock to prevent changes during the extraction process. When completed, your canvas will switch to view the new scene.
 
 #### Saving a Map
 
@@ -216,6 +350,7 @@ The long-term vision for this module is to allow users to create a world map, zo
 
 - Plateau terrain brush to paint flat terrain (still feathering into the surroundings).
 - Custom biome support for the brush tool.
+- Configure quick styles for routes, etc.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
 - A Sandbox Mode allowing the import of DEM or greyscale heightmaps to bypass the procedural generation entirely.

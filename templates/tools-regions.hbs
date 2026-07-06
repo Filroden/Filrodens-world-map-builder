@@ -20,8 +20,12 @@
                 </span>
             </div>
             <div class="fwmb-list-item-actions">
-                <button type="button" class="fwmb-icon-btn small" data-action="editRegionLayer"><i class="fwmb-icon edit"></i></button>
-                <button type="button" class="fwmb-icon-btn small" data-action="deleteRegionLayer"><i class="fwmb-icon delete"></i></button>
+                <button type="button" class="fwmb-icon-btn small" data-action="editRegionLayer" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                    <i class="fwmb-icon edit"></i>
+                </button>
+                <button type="button" class="fwmb-icon-btn small" data-action="deleteRegionLayer" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                    <i class="fwmb-icon delete"></i>
+                </button>
             </div>
         </div>
 
@@ -37,9 +41,15 @@
                         <span class="fwmb-name" title="{{this.name}}">{{this.name}}</span>
                     </div>
                     <div class="fwmb-list-item-actions">
-                        <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" title="{{localize 'FILRODENSWMB.UI.ZoomTo'}}"><i class="fwmb-icon center-focus"></i></button>
-                        <button type="button" class="fwmb-icon-btn small" data-action="editRegion"><i class="fwmb-icon edit"></i></button>
-                        <button type="button" class="fwmb-icon-btn small" data-action="deleteRegion"><i class="fwmb-icon delete"></i></button>
+                        <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                            <i class="fwmb-icon center-focus"></i>
+                        </button>
+                        <button type="button" class="fwmb-icon-btn small" data-action="editRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                            <i class="fwmb-icon edit"></i>
+                        </button>
+                        <button type="button" class="fwmb-icon-btn small" data-action="deleteRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                            <i class="fwmb-icon delete"></i>
+                        </button>
                     </div>
                 </div>
                 {{/each}}
