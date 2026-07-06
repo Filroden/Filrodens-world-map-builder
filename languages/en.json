@@ -87,7 +87,7 @@
 
     "FILRODENSWMB.UI.Hydrology": "Hydrology",
     "FILRODENSWMB.UI.RiverDensity": "River Density",
-    "FILRODENSWMB.UI.EditFeatures": "Toggle Edit Features",
+    "FILRODENSWMB.UI.EditFeatures": "Toggle Edit Hydrology",
     "FILRODENSWMB.UI.ToolAddSpring": "Add New River Source",
     "FILRODENSWMB.UI.ToolBlockSpring": "Block Prodcedurally Generated River Source",
     "FILRODENSWMB.UI.ToolErasePin": "Remove Pin",
@@ -124,7 +124,6 @@
     "FILRODENSWMB.UI.CanvasSettings": "Canvas Setup",
     "FILRODENSWMB.UI.MapResolution": "Map Resolution (Pixels)",
     "FILRODENSWMB.UI.ApplyResolution": "Create New Map",
-    "FILRODENSWMB.UI.ResolutionHint": "Warning: Changing the resolution will completely regenerate the map and destroy any custom brush strokes.",
     "FILRODENSWMB.UI.ResolutionWarningContent": "Changing the map resolution alters the underlying pixel grid. This will wipe all custom terrain painting, biome painting, and hand-placed springs. Are you sure you wish to proceed?",
 
     "FILRODENSWMB.UI.Save": "Save",

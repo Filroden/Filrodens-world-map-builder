@@ -668,6 +668,7 @@
 .fwmb-divider-vertical {
     border: none;
     width: 1px;
+    height: 100%;
     background-color: var(--filroden-color-text-accent);
     margin-inline: var(--filroden-space-xs);
 }

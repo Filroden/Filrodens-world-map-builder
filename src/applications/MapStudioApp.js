@@ -2971,7 +2971,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine?.zoomCamera(0.8);
     }
 
-    static #getZoomTargetPoints(listItem) {
+    #getZoomTargetPoints(listItem) {
         const id = listItem.dataset.id;
         const type = listItem.dataset.type;
 
