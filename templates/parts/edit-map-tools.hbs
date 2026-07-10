@@ -117,7 +117,7 @@
             <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
             <div class="fwmb-flex-row" style="gap: 4px;">
                 {{#each routeStyles}}
-                <button type="button" class="fwmb-btn outline small wide {{#if (eq ../uiState.activeRouteQuickStyle this.id)}}active{{/if}}" data-action="setRouteStyle" data-style="{{this.id}}">
+                <button type="button" class="fwmb-btn outline wide {{#if (eq ../uiState.activeRouteQuickStyle this.id)}}active{{/if}}" data-action="setRouteStyle" data-style="{{this.id}}">
                     {{localize this.label}}
                 </button>
                 {{/each}}

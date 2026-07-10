@@ -45,8 +45,8 @@
     --fwmb-teal-accent-dark:   hsl(205, 60%, 40%);
     
     /* Neutrals */
-    --fwmb-neutral-000: hsl(0, 0%, 100%); /* Pure White */
-    --fwmb-neutral-999: hsl(0, 0%, 0%);   /* Pure Black */
+    --fwmb-neutral-000: hsl(0, 0%, 100%);
+    --fwmb-neutral-999: hsl(0, 0%, 0%);
 
     /* Other colours */
     --fwmb-success: hsl(130, 50%, 50%);

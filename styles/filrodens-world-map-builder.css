@@ -144,7 +144,7 @@
 /* Standard button styles for all buttons */
 .fwmb button {
     background: var(--fwmb-accent-main);
-    border: 1px solid var(--fwmb-border-main);
+    border: none;
     color: var(--fwmb-text-inverse);
     border-radius: var(--fwmb-radius-small);
     cursor: pointer;
@@ -183,7 +183,7 @@
 }
 
 .fwmb .fwmb-btn.small {
-    padding: var(--fwmb-space-s) var(--fwmb-space-xs);
+    padding: 0.75rem;
     height: var(--fwmb-font-size-xxs);
     width: var(--fwmb-font-size-xxs);
 }
@@ -512,17 +512,21 @@
     border: 1px solid var(--fwmb-border-main);
 }
 
-/* Thematic Divider */
+.fwmb-danger {
+    color: var(--fwmb-color-danger);
+}
+
+/* Thematic Dividers */
 .fwmb .fwmb-divider {
-    border: none;
-    height: 1px;
+    border-block-end: 2px solid var(--fwmb-border-main);
     width: 100%;
-    background-color: var(--fwmb-accent-main);
     margin-block: var(--fwmb-space-m);
 }
 
-.fwmb-danger {
-    color: var(--fwmb-color-danger);
+.fwmb .fwmb-divider-vertical {
+    border-inline-end: 2px solid var(--fwmb-border-main);
+    height: 100%;
+    margin-inline: var(--fwmb-space-xs);
 }
 
 
@@ -722,14 +726,6 @@
     height: 100%;
 }
 
-.fwmb-divider-vertical {
-    border: none;
-    width: 1px;
-    height: 100%;
-    background-color: var(--fwmb-accent-main);
-    margin-inline: var(--fwmb-space-xs);
-}
-
 .fwmb-map-controls {
     position: absolute;
     inset-block-end: var(--fwmb-space-m);
@@ -770,7 +766,7 @@
     height: var(--fwmb-font-size-xxl);
     background: transparent;
     border: 1px solid transparent;
-    color: var(--fwmb-primary-100);
+    color: var(--fwmb-primary-300);
     padding: 0;
     display: flex;
     align-items: center;
@@ -778,13 +774,14 @@
 }
 
 .fwmb-map-controls button:hover {
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--fwmb-accent-hover);
+    background: rgba(0 , 0, 0, 0.2);
     border-color: var(--fwmb-accent-main);
 }
 
 .fwmb-map-controls button.active {
     color: var(--fwmb-accent-main);
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.4);
     border-color: var(--fwmb-accent-main);
 }
 

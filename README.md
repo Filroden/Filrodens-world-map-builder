@@ -350,7 +350,7 @@ The long-term vision for this module is to allow users to create a world map, zo
 
 - Sort infrastructure, regions, labels and decorations into alphabetical order.
 - Plateau terrain brush to paint flat terrain (still feathering into the surroundings).
-- Configure quick styles for routes, etc.
+- Configure quick styles for routes, etc. Add a reset to return the other settings back to default and disable current quick style button.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
 - A Sandbox Mode allowing the import of DEM or greyscale heightmaps to bypass the procedural generation entirely.

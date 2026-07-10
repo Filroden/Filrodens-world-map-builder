@@ -1880,7 +1880,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const confirmed = await foundry.applications.api.DialogV2.confirm({
             window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
-            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
+            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteBiome")}</p>`,
             modal: true,
         });
 
@@ -1911,13 +1911,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        // 2. Scrub the brush history so Undo/Redo doesn't paint black pixels
+        // 2. Scrub the brush history related to the deleted biome
         if (this.brushEngine) {
             const scrubHistory = (stroke) => {
-                // If a historical stroke painted this deleted biome, convert it to an eraser stroke
-                if (stroke.layer === "biome" && stroke.value === id) {
-                    stroke.value = 0;
-                }
+                if (stroke.layer !== "biome" || stroke.paintValue !== id) return;
+                stroke.paintValue = 0;
             };
             this.brushEngine.history.forEach(scrubHistory);
             this.brushEngine.redoStack.forEach(scrubHistory);
