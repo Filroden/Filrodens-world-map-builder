@@ -79,12 +79,25 @@
         <legend>{{localize "FILRODENSWMB.UI.SettingsBiomeColors"}}</legend>
         <div class="fwmb-biome-legend">
             {{#each biomeList}}
-                <div class="fwmb-biome-item" style="gap: var(--filroden-space-s);">
+                <div class="fwmb-biome-item">
                     <input type="color" class="fwmb-swatch" name="color_{{this.key}}" value="{{this.hex}}" data-biome="{{this.key}}" />
-                    <label style="font-size: var(--filroden-font-size-xs);">{{localize this.label}}</label>
+
+                    {{#if this.isCustom}}
+                        <label class="fwmb-biome-label">{{this.label}}</label>
+                        <button type="button" class="fwmb-btn muted small danger" data-action="deleteCustomBiome" data-id="{{this.id}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}">
+                            <i class="fwmb-icon delete"></i>
+                        </button>
+                    {{else}}
+                        <label class="fwmb-biome-label">{{localize this.label}}</label>
+                    {{/if}}
                 </div>
             {{/each}}
         </div>
+
+        <button type="button" class="fwmb-btn outline wide" data-action="addCustomBiome" style="margin-top: var(--fwmb-space-m);">
+            <i class="fwmb-icon add"></i>
+            {{localize "FILRODENSWMB.UI.AddCustomBiome"}}
+        </button>
     </fieldset>
 
 </div>

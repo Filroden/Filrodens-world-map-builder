@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-1.0.0-beta1-blue)
+![Latest Version](https://img.shields.io/badge/Version-1.0.0-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -348,8 +348,8 @@ The generator can be computationally heavy when calculating new terrain, moistur
 
 The long-term vision for this module is to allow users to create a world map, zoom into an area of interest, and use those boundaries to generate a larger-scale, higher-detail regional map containing all the same geographical data.
 
+- Sort infrastructure, regions, labels and decorations into alphabetical order.
 - Plateau terrain brush to paint flat terrain (still feathering into the surroundings).
-- Custom biome support for the brush tool.
 - Configure quick styles for routes, etc.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.

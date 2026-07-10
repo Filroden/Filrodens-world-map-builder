@@ -337,5 +337,13 @@
     "FILRODENSWMB.UI.VisibilityNone": "Hidden Features",
 
     "FILRODENSWMB.UI.OverwriteJournals": "Overwrite Existing Journal Pages",
-    "FILRODENSWMB.UI.OverwriteJournalsHint": "If checked, existing map journals will be updated with your current descriptions. Warning: This will destroy any manual lore edits made by the GM."
+    "FILRODENSWMB.UI.OverwriteJournalsHint": "If checked, existing map journals will be updated with your current descriptions. Warning: This will destroy any manual lore edits made by the GM.",
+
+    "FILRODENSWMB.Settings.ThemeHue.Name": "Color Theme",
+    "FILRODENSWMB.Settings.ThemeHue.Hint": "Select the primary hue for the interface.",
+    "FILRODENSWMB.Settings.ThemeHue.Gold": "Gold",
+    "FILRODENSWMB.Settings.ThemeHue.Teal": "Teal",
+
+    "FILRODENSWMB.UI.AddCustomBiome": "Add Custom Biome",
+    "FILRODENSWMB.UI.DeleteBiome": "Are you sure you want to delete this custom biome? Any existing areas on the map will return to their original biomes."
 }

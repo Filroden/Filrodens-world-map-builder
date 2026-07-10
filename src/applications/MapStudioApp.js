@@ -19,12 +19,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             resizable: true,
         },
         actions: {
+            addCustomBiome: MapStudioApp.#onAddCustomBiome,
             addDecoration: MapStudioApp.#onAddDecoration,
             addRegionLayer: MapStudioApp.#onAddRegionLayer,
             adjustNoiseScale: MapStudioApp.#onAdjustNoiseScale,
             adjustReferenceScale: MapStudioApp.#onAdjustReferenceScale,
             applyResolution: MapStudioApp.#onApplyResolution,
             changeTool: MapStudioApp.#onChangeTool,
+            deleteCustomBiome: MapStudioApp.#onDeleteCustomBiome,
             deleteDecoration: MapStudioApp.#onDeleteDecoration,
             deleteLabel: MapStudioApp.#onDeleteLabel,
             deletePin: MapStudioApp.#onDeletePin,
@@ -141,6 +143,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             brushStrength: 0.02,
             brushFeather: 0.4,
             brushBiome: 6,
+            customBiomes: [],
 
             mapSeed: FILRODENSWMB.DEFAULTS.SEED,
             seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
@@ -188,7 +191,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             regionLineColor: "#ffffff",
             regionLineThickness: 2,
             regionLineStyle: "solid",
-            regionSmoothing: false,
+            regionSmoothing: true,
             regionOpacity: 0.5,
 
             labelFontFamily: FILRODENSWMB.LABELS?.DEFAULT_FONT,
@@ -269,8 +272,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     key: key,
                     label: `FILRODENSWMB.BIOMES.${key}`,
                     hex: rgbToHex(currentRgb),
+                    isCustom: false, // Ensure native biomes flag as false
                 };
             });
+
+        // Map custom biomes and append them to the UI list
+        const customBiomesMapped = (this.uiState.customBiomes || []).map((cb) => ({
+            id: cb.id,
+            key: `custom_${cb.id}`,
+            label: cb.name,
+            hex: rgbToHex(cb.color),
+            isCustom: true,
+        }));
+
+        context.biomeList = [...context.biomeList, ...customBiomesMapped];
 
         context.uiState = this.uiState;
         context.currentSaveName = this.currentSaveName;
@@ -456,7 +471,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     const biomeKey = event.target.dataset.biome;
                     const hex = event.target.value;
                     const rgb = [Number.parseInt(hex.slice(1, 3), 16), Number.parseInt(hex.slice(3, 5), 16), Number.parseInt(hex.slice(5, 7), 16)];
-                    this.customBiomeColors[biomeKey] = rgb;
+
+                    if (biomeKey.startsWith("custom_")) {
+                        const id = Number.parseInt(biomeKey.split("_")[1]);
+                        const cb = this.uiState.customBiomes.find((c) => c.id === id);
+                        if (cb) cb.color = rgb;
+                    } else {
+                        this.customBiomeColors[biomeKey] = rgb;
+                    }
+
                     this.#repaintCanvas();
                     return;
                 }
@@ -842,6 +865,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
+        // Compile a dual-key dictionary for the render buffers
+        const compiledPalette = {};
+        for (const [key, id] of Object.entries(FILRODENSWMB.BIOME_IDS)) {
+            const rgb = this.customBiomeColors[key] || FILRODENSWMB.BIOMES[key] || [0, 0, 0];
+            compiledPalette[id] = rgb;
+            compiledPalette[key] = rgb;
+        }
+        for (const cb of this.uiState.customBiomes || []) {
+            compiledPalette[cb.id] = cb.color;
+        }
+
         const params = {
             seaLevel: this.uiState["seaLevel"],
             globalTemp: this.uiState["globalTemp"],
@@ -877,6 +911,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 altCooling: this.uiState["altCooling"],
                 freezingThreshold: this.uiState["freezingThreshold"],
             },
+            biomePalette: compiledPalette,
             customColors: this.customBiomeColors,
             display: {
                 contourInterval: this.uiState["contourInterval"],
@@ -1108,6 +1143,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState["noise.elevation.stretch"] = p.noise.elevation.stretch;
         this.uiState["noise.moisture.scale"] = Math.round(1 / p.noise.moisture.scale);
         this.uiState["noise.moisture.octaves"] = p.noise.moisture.octaves;
+
+        this.uiState.customBiomes = payload.customBiomes || [];
 
         this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
@@ -1470,6 +1507,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 gridType: this.uiState.gridType,
                 gridSize: this.uiState.gridSize,
                 params: params,
+                customBiomes: this.uiState.customBiomes,
                 history: this.brushEngine?.history || [],
                 mapPins: this.mapPins,
                 mapRoutes: this.mapRoutes,
@@ -1515,6 +1553,36 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // --- Action Handlers ---
 
+    static async #onAddCustomBiome(event, target) {
+        const name = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.AddCustomBiome") || "Add Custom Biome" },
+            content: `<div class="form-group"><label>Biome Name</label><input type="text" id="fwmb-biome-name" autofocus></div>`,
+            ok: { callback: (e, b) => b.form.querySelector("#fwmb-biome-name").value.trim() },
+        });
+
+        if (!name) return;
+
+        const currentIds = this.uiState.customBiomes.map((c) => c.id);
+        const nextId = currentIds.length > 0 ? Math.max(...currentIds) + 1 : 14;
+
+        this.uiState.customBiomes.push({
+            id: nextId,
+            name: name,
+            color: [128, 128, 128],
+        });
+
+        const select = this.element.querySelector('select[name="brushBiome"]');
+        if (select) {
+            const option = document.createElement("option");
+            option.value = nextId;
+            option.textContent = name;
+            select.appendChild(option);
+        }
+
+        this.render({ parts: ["context"] });
+        this.markDirty();
+    }
+
     static async #onAddDecoration(event, target) {
         if (!this.canvasEngine?.isEditMode) return;
 
@@ -1523,7 +1591,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
                 <input type="text" id="fwmb-dec-name" value="New Decoration">
             </div>
-            <div class="form-group fwmb-dialog-content" style="margin-top: var(--filroden-space-m);">
+            <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
                 <label>${game.i18n.localize("FILRODENSWMB.UI.ImageSource")}</label>
                 <file-picker id="fwmb-dec-src" type="image" value=""></file-picker>
             </div>
@@ -1807,6 +1875,61 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.render({ parts: ["toolbar", "context"] });
     }
 
+    static async #onDeleteCustomBiome(event, target) {
+        const id = Number(target.dataset.id);
+
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
+            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
+            modal: true,
+        });
+
+        if (!confirmed) return;
+
+        this.#pushVectorState();
+        this.uiState.customBiomes = this.uiState.customBiomes.filter((c) => c.id !== id);
+
+        if (Number(this.uiState.brushBiome) === id) {
+            this.uiState.brushBiome = 6;
+            this.#syncDOMToState();
+        }
+
+        const select = this.element.querySelector('select[name="brushBiome"]');
+        if (select) {
+            const option = select.querySelector(`option[value="${id}"]`);
+            if (option) option.remove();
+        }
+
+        // Fallback to Procedural
+        // 1. Wipe the active buffer globally
+        if (this.currentBiomeOverrides) {
+            const len = this.currentBiomeOverrides.length;
+            for (let i = 0; i < len; i++) {
+                if (this.currentBiomeOverrides[i] === id) {
+                    this.currentBiomeOverrides[i] = 0; // 0 = Procedural Engine Fallback
+                }
+            }
+        }
+
+        // 2. Scrub the brush history so Undo/Redo doesn't paint black pixels
+        if (this.brushEngine) {
+            const scrubHistory = (stroke) => {
+                // If a historical stroke painted this deleted biome, convert it to an eraser stroke
+                if (stroke.layer === "biome" && stroke.value === id) {
+                    stroke.value = 0;
+                }
+            };
+            this.brushEngine.history.forEach(scrubHistory);
+            this.brushEngine.redoStack.forEach(scrubHistory);
+        }
+
+        // Redraw the canvas to show the healed procedural biomes
+        this.#repaintCanvas();
+
+        this.render({ parts: ["context"] });
+        this.markDirty();
+    }
+
     static async #onDeleteDecoration(event, target) {
         const id = target.closest(".fwmb-list-item").dataset.id;
         const confirmed = await foundry.applications.api.DialogV2.confirm({
@@ -1915,7 +2038,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
                 <input type="text" id="fwmb-dec-name" value="${dec.name}">
             </div>
-            <div class="form-group fwmb-dialog-content" style="margin-top: var(--filroden-space-m);">
+            <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
                 <label>${game.i18n.localize("FILRODENSWMB.UI.Opacity")}</label>
                 <div class="fwmb-slider-group">
                     <input type="range" id="fwmb-dec-alpha" value="${dec.opacity ?? 1}" min="0.1" max="1" step="0.1" oninput="this.nextElementSibling.value = this.value" />

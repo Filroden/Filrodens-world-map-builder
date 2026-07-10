@@ -16,23 +16,6 @@ export class ProceduralEngine {
         this.simplex = new SimplexNoise(this.prng);
     }
 
-    static BIOME_DICTIONARY = [
-        null, // 0 = Procedural
-        "DEEP_OCEAN",
-        "SHALLOW_OCEAN",
-        "SNOW",
-        "TUNDRA",
-        "TAIGA",
-        "GRASSLAND",
-        "DECIDUOUS_FOREST",
-        "TEMPERATE_RAINFOREST",
-        "TEMPERATE_DESERT",
-        "TROPICAL_RAINFOREST",
-        "SAVANNA",
-        "SUBTROPICAL_DESERT",
-        "PACK_ICE",
-    ];
-
     // Cardinal and ordinal directions for pathfinding to prevent array reallocation in tight loops
     static ADJACENT_OFFSETS = [
         { dx: 0, dy: -1 },
@@ -539,7 +522,6 @@ export class ProceduralEngine {
     createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer) {
         const totalPixels = width * height;
         const pixelBuffer = outBuffer;
-        const BIOMES = FILRODENSWMB.BIOMES;
 
         for (let i = 0; i < totalPixels; i++) {
             const bufferIndex = i * 4;
@@ -547,19 +529,27 @@ export class ProceduralEngine {
 
             // 1. Check for a manual brush override
             const overrideId = biomeOverrideData ? biomeOverrideData[i] : 0;
-            let biomeKey;
+
+            let lookupKey;
+            let isWater = false;
 
             if (overrideId > 0) {
-                biomeKey = ProceduralEngine.BIOME_DICTIONARY[overrideId];
+                lookupKey = overrideId;
+                // IDs 1 and 2 represent the native ocean brushes
+                if (overrideId === 1 || overrideId === 2) isWater = true;
             } else {
                 // 2. Fall back to procedural math if untouched
                 const temp = temperatureData[i];
                 const moisture = moistureData[i];
-                biomeKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
+                lookupKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
+
+                if (lookupKey === "DEEP_OCEAN" || lookupKey === "SHALLOW_OCEAN" || (waterMask && waterMask[i] > 0)) {
+                    isWater = true;
+                }
             }
 
             // Render Transparent Oceans
-            if (biomeKey === "DEEP_OCEAN" || biomeKey === "SHALLOW_OCEAN" || (waterMask && waterMask[i] > 0)) {
+            if (isWater) {
                 pixelBuffer[bufferIndex] = 0;
                 pixelBuffer[bufferIndex + 1] = 0;
                 pixelBuffer[bufferIndex + 2] = 0;
@@ -567,8 +557,9 @@ export class ProceduralEngine {
                 continue;
             }
 
-            // Render Solid Land/Ice using custom UI overrides if they exist
-            const color = params?.customColors?.[biomeKey] || BIOMES[biomeKey] || BIOMES.GRASSLAND;
+            // Render Solid Land/Ice using the unified palette lookup
+            const color = params?.biomePalette?.[lookupKey] || [0, 0, 0];
+
             pixelBuffer[bufferIndex] = color[0];
             pixelBuffer[bufferIndex + 1] = color[1];
             pixelBuffer[bufferIndex + 2] = color[2];
@@ -577,7 +568,6 @@ export class ProceduralEngine {
 
         return pixelBuffer;
     }
-
     generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params, outRiverMap, outWaterMask) {
         const riverDensity = params.riverDensity || 40;
         const seaLevel = params.seaLevel || 0.3;

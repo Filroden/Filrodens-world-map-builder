@@ -58,6 +58,14 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null) {
         return { label: `FILRODENSWMB.BIOMES.${key}`, hex: hex };
     });
 
+    if (cleanPayload.customBiomes) {
+        const customColors = cleanPayload.customBiomes.map((cb) => ({
+            label: cb.name, // Passed as a raw string, bypassing the {{localize}} helper
+            hex: "#" + cb.color.map((x) => x.toString(16).padStart(2, "0")).join(""),
+        }));
+        cleanPayload.journalColors.push(...customColors);
+    }
+
     const narrativeHtml = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/journal-summary.hbs", cleanPayload);
 
     const pages = [

@@ -34,7 +34,13 @@
             <label>{{localize "FILRODENSWMB.UI.BrushBiome"}}</label>
             <select name="brushBiome">
                 {{#each biomeList}}
-                    <option value="{{this.id}}">{{localize this.label}}</option>
+                    <option value="{{this.id}}" {{#if (eq ../uiState.brushBiome this.id)}}selected{{/if}}>
+                        {{#if this.isCustom}}
+                            {{this.label}}
+                        {{else}}
+                            {{localize this.label}}
+                        {{/if}}
+                    </option>
                 {{/each}}
             </select>
         </div>
@@ -99,7 +105,7 @@
                 </div>
                 <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
                     {{#each infrastructureIcons}}
-                    <button type="button" class="fwmb-icon-btn {{#if (eq ../uiState.activeIcon this.id)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.id}}" data-tooltip="{{localize this.label}}">
+                    <button type="button" class="fwmb-btn {{#if (eq ../uiState.activeIcon this.id)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.id}}" data-tooltip="{{localize this.label}}">
                         <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{this.id}}.svg" alt="{{localize this.label}}" />
                     </button>
                     {{/each}}

@@ -5,13 +5,13 @@
 /* --- MATERIAL DESIGN ICONS --- */
 .fwmb-icon {
     display: inline-block;
-    width: var(--filroden-font-size-l); 
-    height: var(--filroden-font-size-l);
-    min-width: var(--filroden-font-size-l);
+    width: var(--fwmb-font-size-l); 
+    height: var(--fwmb-font-size-l);
+    min-width: var(--fwmb-font-size-l);
     background-color: currentColor;
     background-image: none !important;
     content: "";
-    transform: scaleX(var(--filroden-dir-flip));
+    transform: scaleX(var(--fwmb-dir-flip));
     -webkit-mask-repeat: no-repeat;
     mask-repeat: no-repeat;
     -webkit-mask-position: center;
@@ -28,7 +28,7 @@
 }
 
 .fwmb-icon.reverse {
-    transform: scaleX(calc(-1 * var(--filroden-dir-flip)));
+    transform: scaleX(calc(-1 * var(--fwmb-dir-flip)));
 }
 
 .fwmb-icon.map                  { --fwmb-mask: url('../assets/icons/map.svg'); }
@@ -103,18 +103,18 @@
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-track {
-    background: var(--filroden-color-bg-hover-solid) !important;
-    border-radius: var(--filroden-radius-large) !important;
+    background: var(--fwmb-color-bg-hover) !important;
+    border-radius: var(--fwmb-radius-large) !important;
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-thumb {
-    background-color: var(--filroden-color-text-accent) !important;
-    border-radius: var(--filroden-radius-large) !important;
+    background-color: var(--fwmb-accent-main) !important;
+    border-radius: var(--fwmb-radius-large) !important;
     border: 1px solid rgba(0, 0, 0, 0.6) !important;
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-thumb:hover {
-    background-color: var(--filroden-color-text-accent-hover) !important;
+    background-color: var(--fwmb-accent-hover) !important;
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-button {
@@ -125,44 +125,45 @@
 /* --- TOOLTIPS --- */
 #tooltip.fwmb-tooltip {
     max-width: 300px !important;
-    border: 1px solid var(--filroden-color-text-accent);
-    border-radius: var(--filroden-radius-small);
-    padding: var(--filroden-space-s);
-    background: var(--filroden-color-bg-darkest);
-    color: var(--filroden-color-text-main-solid);
-    box-shadow: var(--filroden-shadow-popout);
-    font-family: var(--filroden-font-family);
-    font-size: var(--filroden-font-size-s);
-    line-height: var(--filroden-line-height-body);
+    border: 1px solid var(--fwmb-accent-main);
+    border-radius: var(--fwmb-radius-small);
+    padding: var(--fwmb-space-s);
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-primary);
+    box-shadow: var(--fwmb-shadow-popout);
+    font-family: var(--fwmb-font-family);
+    font-size: var(--fwmb-font-size-s);
+    line-height: var(--fwmb-line-height-body);
     text-align: start;
     z-index: var(--z-index-tooltip, 9999);
-    margin-block-start: var(--filroden-space-m);
+    margin-top: var(--fwmb-space-m);
 }
 
 
 /* --- BUTTONS --- */
 /* Standard button styles for all buttons */
 .fwmb button {
-    background: var(--filroden-color-bg-light-solid);
-    border: 1px solid var(--filroden-color-border);
-    color: var(--filroden-color-text-main-solid);
-    border-radius: var(--filroden-radius-small);
+    background: var(--fwmb-accent-main);
+    border: 1px solid var(--fwmb-border-main);
+    color: var(--fwmb-text-inverse);
+    border-radius: var(--fwmb-radius-small);
     cursor: pointer;
     padding: 0;
     transition: all 0.1s ease;
+    min-height: 0;
 }
 
 .fwmb button:hover {
-    background: var(--filroden-color-bg-hover-solid);
-    border-color: var(--filroden-color-text-accent);
-    color: var(--filroden-color-text-main-solid);
+    background: var(--fwmb-accent-hover);
+    border-color: var(--fwmb-border-focus);
+    color: var(--fwmb-text-inverse);
     box-shadow: none;
 }
 
 .fwmb *:focus-visible,
 .fwmb button:focus {
-    outline: 2px solid var(--filroden-color-text-accent);
-    border-radius: var(--filroden-radius-small);
+    outline: 2px solid var(--fwmb-border-focus);
+    border-radius: var(--fwmb-radius-small);
 }
 
 /* Variant styles for primary and danger buttons */
@@ -171,43 +172,46 @@
     align-items: center;
     justify-content: center;
     font-family: inherit;
-    font-size: var(--filroden-font-size-s);
+    font-size: var(--fwmb-font-size-s);
     font-weight: bold;
-    gap: var(--filroden-space-s);
-    padding: var(--filroden-space-s) var(--filroden-space-m);
+    gap: var(--fwmb-space-s);
+    padding: var(--fwmb-space-s) var(--fwmb-space-m);
 }
 
 .fwmb .fwmb-btn.wide {
     width: auto;
 }
 
-.fwmb .fwmb-btn:hover {
-    background: var(--filroden-color-bg-hover-solid);
-    border-color: var(--filroden-color-text-accent);
-    color: var(--filroden-color-text-main-solid);
+.fwmb .fwmb-btn.small {
+    padding: var(--fwmb-space-s) var(--fwmb-space-xs);
+    height: var(--fwmb-font-size-xxs);
+    width: var(--fwmb-font-size-xxs);
 }
 
 .fwmb .fwmb-btn.danger {
-    color: var(--filroden-color-danger);
-    width: 100%;
+    color: var(--fwmb-color-danger);
 }
 
 .fwmb .fwmb-btn.danger:hover {
-    color: var(--filroden-color-danger);
+    color: var(--fwmb-color-danger);
+}
+
+.fwmb .fwmb-btn.muted {
+    background: inherit;
+    border-color: transparent;
+}
+
+.fwmb .fwmb-btn.muted:hover {
+    background: var(--fwmb-bg-hover);
+    border-color: var(--fwmb-border-subtle);
 }
 
 .fwmb .fwmb-btn.primary {
-    color: var(--filroden-color-text-accent);
+    color: var(--fwmb-text-inverse);
 }
 
 .fwmb .fwmb-btn.primary:hover {
-    color: var(--filroden-color-text-accent);
-}
-
-.fwmb .fwmb-btn.outline.active {
-    background: var(--filroden-color-bg-hover-solid);
-    border-color: var(--filroden-color-border-focus);
-    color: var(--filroden-color-text-main-solid);
+    color: var(--fwmb-text-inverse);
 }
 
 
@@ -217,12 +221,12 @@
 .fwmb input[type="time"],
 .fwmb select,
 .fwmb textarea {
-    background: var(--filroden-color-bg-medium-solid);
-    border: 1px solid var(--filroden-color-border);
-    color: var(--filroden-color-text-main-solid);
-    border-radius: var(--filroden-radius-small);
-    min-height: var(--filroden-font-size-xl);
-    padding-inline: var(--filroden-space-xs);
+    background: var(--fwmb-bg-panel);
+    border: 1px solid var(--fwmb-border-main);
+    color: var(--fwmb-text-primary);
+    border-radius: var(--fwmb-radius-small);
+    min-height: var(--fwmb-font-size-xl);
+    padding-inline: var(--fwmb-space-s);
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -240,13 +244,13 @@
 .fwmb input[type="time"]:focus,
 .fwmb select:focus,
 .fwmb textarea:focus {
-    border-color: var(--filroden-color-text-accent);
-    box-shadow: var(--filroden-shadow-focus);
+    border-color: var(--fwmb-border-focus);
+    box-shadow: var(--fwmb-shadow-focus);
 }
 
 .fwmb input::placeholder,
 .fwmb textarea::placeholder {
-    color: var(--filroden-color-text-placeholder-solid);
+    color: var(--fwmb-name-text-muted);
     opacity: 1;
     font-style: italic;
 }
@@ -258,10 +262,17 @@
 .fwmb textarea {
     resize: vertical;
     font-family: monospace;
-    line-height: var(--filroden-line-height-body);
+    line-height: var(--fwmb-line-height-body);
 }
 
 /* --- SELECT AND OPTIONS --- */
+
+.module-name select,
+.module-name-roll-footer select {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 .fwmb select,
 .fwmb select::picker(select) {
@@ -270,35 +281,52 @@
 
 .fwmb select::picker(select) {
     position-area: top;
-    margin-block-end: var(--filroden-space-xs);
-    border: 1px solid var(--filroden-color-text-accent);
+    margin-block-end: var(--fwmb-space-xs);
+    border: 1px solid var(--fwmb-border-focus);
 
     scrollbar-width: thin;
-    scrollbar-color: var(--filroden-color-text-accent) var(--filroden-color-bg-darkest);
+    scrollbar-color: var(--fwmb-accent-main) var(--fwmb-bg-base);
 }
 
 .fwmb option {
-    background: var(--filroden-color-bg-medium-solid);
-    color: var(--filroden-color-text-main-solid);
-    padding: var(--filroden-space-xs) var(--filroden-space-s);
+    background: var(--fwmb-bg-panel);
+    color: var(--fwmb-text-primary);
+    padding: var(--fwmb-space-xs) var(--fwmb-space-s);
 }
 
 .fwmb option:hover,
 .fwmb option:focus {
-    background: var(--filroden-color-text-accent);
-    color: var(--filroden-color-text-on-accent);
+    background: var(--fwmb-accent-hover);
+    color: var(--fwmb-text-inverse);
     outline: none;
+}
+
+.fwmb optgroup {
+    background-color: var(--fwmb-bg-base);
+    color: var(--fwmb-text-primary);
+    font-weight: bold;
+    font-style: italic;
+    padding-block: 3px 1px;
+}
+
+.fwmb input:disabled,
+.fwmb select:disabled,
+.fwmb textarea:disabled {
+    background: var(--fwmb-bg-panel);
+    border-color: var(--fwmb-border-main);
+    color: var(--fwmb-text-muted);
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* --- CHECKBOXES AND RADIO BUTTONS --- */
 .fwmb-checkbox,
 .fwmb-radio {
     appearance: auto;
-    accent-color: var(--filroden-color-text-accent);
-    color-scheme: dark;
-    width: var(--filroden-font-size-m) !important;
-    height: var(--filroden-font-size-m);
-    margin: var(--filroden-space-xs);
+    accent-color: var(--fwmb-accent-main);
+    width: var(--fwmb-font-size-m) !important;
+    height: var(--fwmb-font-size-m);
+    margin: var(--fwmb-space-xs);
     cursor: pointer;
     display: inline-block;
     align-content: center;
@@ -340,10 +368,10 @@
     flex: 0 0 18rem; /* Default width, easily overridden */
     display: flex;
     flex-direction: column;
-    padding: var(--filroden-space-m);
-    gap: var(--filroden-space-m);
-    background-color: var(--filroden-color-bg-darkest);
-    border-inline-end: 1px solid var(--filroden-color-border);
+    padding: var(--fwmb-space-m);
+    gap: var(--fwmb-space-m);
+    background-color: var(--fwmb-name-bg-panel);
+    border-inline-end: 1px solid var(--fwmb-name-border-main);
     overflow-y: auto;
 }
 
@@ -352,7 +380,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: var(--filroden-space-l);
+    padding: var(--fwmb-space-l);
     overflow-y: auto;
     min-width: 0; /* Prevents flexbox text overflow issues */
 }
@@ -363,72 +391,90 @@
 .fwmb .fwmb-tabs {
     display: flex;
     flex: 0 0 auto;
-    background: var(--filroden-color-bg-medium-solid);
-    border-block-end: 1px solid var(--filroden-color-border);
+    gap: 0;
+    padding-inline-start: var(--fwmb-space-xs);
+    border-block-end: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-panel);
 }
 
 .fwmb nav.tabs .item,
 .fwmb .fwmb-tabs .item {
+    display: flex;
     flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: var(--fwmb-space-m);
     text-align: center;
-    padding: var(--filroden-space-s);
-    color: var(--filroden-color-text-muted-solid);
+    padding: var(--fwmb-space-s);
+    color: var(--fwmb-text-secondary);
     font-weight: bold;
-    text-transform: uppercase;
     cursor: pointer;
-    border-block-end: 2px solid transparent;
+    border-block-end: 4px solid transparent;
     transition: background-color 0.2s, color 0.2s;
 }
 
 .fwmb nav.tabs .item:hover,
 .fwmb .fwmb-tabs .item:hover {
-    color: var(--filroden-color-text-main-solid);
-    background: var(--filroden-color-bg-hover-solid);
+    color: var(--fwmb-text-primary);
+    background: var(--fwmb-bg-hover);
 }
 
 .fwmb nav.tabs .item.active,
 .fwmb .fwmb-tabs .item.active {
-    color: var(--filroden-color-text-accent);
-    border-block-end-color: var(--filroden-color-text-accent);
-    background: var(--filroden-color-bg-darkest);
+    color: var(--fwmb-accent-main);
+    border-block-end-color: var(--fwmb-border-focus);
+    background: var(--fwmb-bg-base);
+    text-shadow: none;
 }
 
 
 /* --- STRUCTURED FORMS --- */
 .fwmb fieldset.fwmb-fieldset {
-    border: var(--filroden-border-main);
-    border-radius: var(--filroden-radius-medium);
-    padding: var(--filroden-space-m);
-    margin: var(--filroden-space-m);
-    gap: var(--filroden-space-l);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-medium);
+    padding: var(--fwmb-space-m);
+    margin: var(--fwmb-space-m);
+    gap: var(--fwmb-space-xs);
     display: flex;
     flex-direction: column;
 }
 
 .fwmb fieldset.fwmb-fieldset legend {
     font-weight: bold;
-    color: var(--filroden-color-text-accent);
-    padding-inline: var(--filroden-space-xs);
-    font-size: var(--filroden-font-size-s);
+    color: var(--fwmb-accent-main);
+    padding-inline: var(--fwmb-space-xs);
+    font-size: var(--fwmb-font-size-s);
 }
 
 .fwmb .form-group {
     display: grid;
     grid-template-columns: auto minmax(0, max-content);
     align-items: center;
-    gap: var(--filroden-space-l);
+    gap: var(--fwmb-space-l);
+    margin-block-end: var(--fwmb-space-s);
 }
 
 .fwmb label {
     margin: 0;
-    color: var(--filroden-color-text-main-solid);
+    color: var(--fwmb-name-text-primary);
     white-space: nowrap;
 }
 
 .fwmb .fwmb-title {
     font-weight: bold;
-    margin-block-start: var(--filroden-space-m);
-    margin-block-end: var(--filroden-space-m);
+    margin-block-start: var(--fwmb-space-m);
+    margin-block-end: var(--fwmb-space-m);
+}
+
+.fwmb .fwmb-stacked-group {
+    border: 1px solid var(--fwmb-border-main);
+    padding: var(--fwmb-space-m);
+    margin-block-start: var(--fwmb-space-m);
+    border-radius: var(--fwmb-radius-small);
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-space-s);
 }
 
 
@@ -436,14 +482,19 @@
 /* Helper text below inputs or headers */
 .fwmb .hint,
 .fwmb .fwmb-notes {
-    font-size: var(--filroden-font-size-xs);
-    color: var(--filroden-color-text-muted-solid);
-    margin-block-start: var(--filroden-space-xxs);
-    line-height: var(--filroden-line-height-body);
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-text-muted);
+    margin-block-start: var(--fwmb-space-xxs);
+    line-height: var(--fwmb-line-height-body);
+}
+
+.fwmb .fwmb-notes.module-long {
+    text-align: start;
+    margin-block-end: var(--fwmb-space-m);
 }
 
 .fwmb .hint.indent {
-    margin-inline-start: var(--filroden-space-xxl);
+    margin-inline-start: var(--fwmb-space-xxl);
 }
 
 /* Empty or missing data states */
@@ -453,12 +504,12 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    color: var(--filroden-color-text-placeholder-solid);
+    color: var(--fwmb-text-muted);
     font-style: italic;
-    padding: var(--filroden-space-xl);
-    background-color: var(--filroden-color-bg-light-solid);
-    border-radius: var(--filroden-radius-medium);
-    border: var(--filroden-border-dashed);
+    padding: var(--fwmb-space-xl);
+    background-color: var(--fwmb-bg-panel);
+    border-radius: var(--fwmb-radius-medium);
+    border: 1px solid var(--fwmb-border-main);
 }
 
 /* Thematic Divider */
@@ -466,8 +517,12 @@
     border: none;
     height: 1px;
     width: 100%;
-    background-color: var(--filroden-color-text-accent);
-    margin-block: var(--filroden-space-m);
+    background-color: var(--fwmb-accent-main);
+    margin-block: var(--fwmb-space-m);
+}
+
+.fwmb-danger {
+    color: var(--fwmb-color-danger);
 }
 
 
@@ -476,22 +531,22 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--filroden-space-xs);
-    background-color: var(--filroden-color-bg-darkest);
-    color: var(--filroden-color-text-muted-solid);
-    border: 1px solid var(--filroden-color-border);
-    border-radius: var(--filroden-radius-large);
-    font-size: var(--filroden-font-size-xs);
+    gap: var(--fwmb-space-xs);
+    background-color: var(--fwmb-bg-base);
+    color: var(--fwmb-text-secondary);
+    border: 1px solid var(--fwmb-border-focus);
+    border-radius: var(--fwmb-radius-large);
+    font-size: var(--fwmb-font-size-xs);
     font-weight: bold;
-    padding: var(--filroden-space-xxs) var(--filroden-space-s);
-    line-height: var(--filroden-line-height-heading);
+    padding: var(--fwmb-space-xxs) var(--fwmb-space-s);
+    line-height: var(--fwmb-line-height-heading);
     white-space: nowrap;
 }
 
 .fwmb .fwmb-badge.primary {
-    background-color: var(--filroden-color-text-accent);
-    color: var(--filroden-color-text-on-accent);
-    border-color: var(--filroden-color-text-accent);
+    background-color: var(--fwmb-accent-main);
+    color: var(--fwmb-text-inverse);
+    border-color: var(--fwmb-accent-main);
 }
 
 /* ===================================================================
@@ -500,7 +555,7 @@
 
 .fwmb .fwmb-flex-row {
     display: flex;
-    gap: var(--filroden-space-s);
+    gap: var(--fwmb-space-s);
     width: 100%;
 }
 
@@ -515,8 +570,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: var(--filroden-space-m);
-    gap: var(--filroden-space-xs);
+    padding: var(--fwmb-space-m);
+    gap: var(--fwmb-space-xs);
     overflow-y: auto; /* Required to trigger fwmb-scrollable mechanics */
 }
 
@@ -545,16 +600,16 @@
 
 .fwmb,
 .fwmb .window-content {
-    font-family: var(--filroden-font-family) !important;
-    font-size: var(--filroden-font-size-s);
-    background: var(--filroden-color-bg-darkest) !important;
-    --filroden-dir-flip: 1;
+    font-family: var(--fwmb-font-family) !important;
+    font-size: var(--fwmb-font-size-s);
+    background: var(--fwmb-bg-base) !important;
+    --fwmb-dir-flip: 1;
 }
 
 /* UI direction handling for RTL languages */
 .fwmb.rtl,
 .fwmb[dir="rtl"] {
-    --filroden-dir-flip: -1;
+    --fwmb-dir-flip: -1;
 }
 
 :root:lang(ar) #tooltip.fwmb-tooltip,
@@ -567,28 +622,24 @@
 
 /* Main window header styles */
 .fwmb .window-header {
-    background: var(--filroden-color-bg-darkest) !important;
-    border: none !important;
-    color: var(--filroden-color-text-main-solid);
-    flex: 0 0 auto !important; 
-    min-height: 34px; 
-    height: auto !important;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
+    background-image: unset;
+    background-color: var(--fwmb-primary-900);
+    border: none;
+    color: var(--fwmb-primary-100);
 }
 
 .fwmb .window-header .window-title {
-    font-size: var(--filroden-font-size-s);
-    line-height: var(--filroden-line-height-heading);
+    color: var(--fwmb-primary-100);
+    font-size: var(--fwmb-font-size-s);
+    line-height: var(--fwmb-line-height-heading);
     text-align: start; 
-    padding-inline-start: var(--filroden-space-s);
+    padding-inline-start: var(--fwmb-space-s);
     padding-inline-end: 0;
     flex: 1;
 }
 
 .fwmb .window-header .window-icon {
-    margin-inline-start: var(--filroden-space-xxs);
+    margin-inline-start: var(--fwmb-space-xxs);
     margin-inline-end: 0;
 }
 
@@ -604,41 +655,47 @@
 /* 1. The Toolbar Part */
 .fwmb .fwmb-toolbar {
     flex: 0 0 3rem; 
-    background: var(--filroden-color-bg-darkest);
-    border-inline-end: 1px solid var(--filroden-color-border);
+    background: var(--fwmb-bg-base);
+    border-inline-end: 1px solid var(--fwmb-border-main);
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-block: var(--filroden-space-s);
-    gap: var(--filroden-space-s);
+    padding-block: var(--fwmb-space-s);
+    gap: var(--fwmb-space-s);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools) button {
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools, .fwmb-brush-history) button {
     width: 36px;
     height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: transparent;
-    color: var(--filroden-color-text-muted-solid);
+    color: var(--fwmb-text-secondary);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools) button:hover {
-    color: var(--filroden-color-text-main-solid);
-    background: rgba(255, 255, 255, 0.05);
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools, .fwmb-brush-history) button:hover {
+    color: var(--fwmb-text-primary);
+    background: var(--fwmb-bg-hover);
+    border-color: var(--fwmb-border-focus);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools) button.active {
-    color: var(--filroden-color-text-accent);
-    background: var(--filroden-color-bg-hover-solid);
-    border-color: var(--filroden-color-text-accent);
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools, .fwmb-brush-history) button.active {
+    color: var(--fwmb-text-inverse);
+    background: var(--fwmb-accent-main);
+    border-color: var(--fwmb-border-main);
+}
+
+.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools, .fwmb-brush-history) button .fwmb-icon {
+    width: var(--fwmb-font-size-xl);
+    height: var(--fwmb-font-size-xl);
 }
 
 /* 2. The Context Panel Part */
 .fwmb .fwmb-context-panel {
     flex: 0 0 20rem; 
-    background: var(--filroden-color-bg-medium-solid);
-    border-inline-end: 1px solid var(--filroden-color-border);
+    background: var(--fwmb-bg-main);
+    border-inline-end: 1px solid var(--fwmb-border-main);
     display: flex;
     flex-direction: column;
 }
@@ -669,19 +726,19 @@
     border: none;
     width: 1px;
     height: 100%;
-    background-color: var(--filroden-color-text-accent);
-    margin-inline: var(--filroden-space-xs);
+    background-color: var(--fwmb-accent-main);
+    margin-inline: var(--fwmb-space-xs);
 }
 
 .fwmb-map-controls {
     position: absolute;
-    inset-block-end: var(--filroden-space-m);
-    inset-inline-end: var(--filroden-space-m);
+    inset-block-end: var(--fwmb-space-m);
+    inset-inline-end: var(--fwmb-space-m);
     display: flex;
-    gap: var(--filroden-space-xs);
+    gap: var(--fwmb-space-xs);
     background: rgba(0, 0, 0, 0.5);
-    padding: var(--filroden-space-xs);
-    border-radius: var(--filroden-radius-small);
+    padding: var(--fwmb-space-xs);
+    border-radius: var(--fwmb-radius-small);
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 20;
     opacity: 0; /* Hidden by default, shown on hover */
@@ -690,12 +747,12 @@
 
 .fwmb-map-hint {
     position: absolute;
-    inset-block-end: var(--filroden-space-m);
-    inset-inline-start: var(--filroden-space-m);
-    color: var(--filroden-color-text-muted);
-    font-size: var(--filroden-font-size-xs);
+    inset-block-end: var(--fwmb-space-m);
+    inset-inline-start: var(--fwmb-space-m);
+    color: var(--fwmb-primary-200);
+    font-size: var(--fwmb-font-size-xs);
     background: rgba(0, 0, 0, 0.3);
-    padding: var(--filroden-space-xxs) var(--filroden-space-s);
+    padding: var(--fwmb-space-xxs) var(--fwmb-space-s);
     border-radius: 4px;
     pointer-events: none;
     z-index: 10;
@@ -709,11 +766,11 @@
 }
 
 .fwmb-map-controls button {
-    width: var(--filroden-font-size-xxl);
-    height: var(--filroden-font-size-xxl);
+    width: var(--fwmb-font-size-xxl);
+    height: var(--fwmb-font-size-xxl);
     background: transparent;
     border: 1px solid transparent;
-    color: var(--filroden-color-text-main-solid);
+    color: var(--fwmb-primary-100);
     padding: 0;
     display: flex;
     align-items: center;
@@ -722,13 +779,54 @@
 
 .fwmb-map-controls button:hover {
     background: rgba(255, 255, 255, 0.1);
-    border-color: var(--filroden-color-text-accent);
+    border-color: var(--fwmb-accent-main);
 }
 
 .fwmb-map-controls button.active {
-    color: var(--filroden-color-text-accent);
+    color: var(--fwmb-accent-main);
     background: rgba(255, 255, 255, 0.15);
-    border-color: var(--filroden-color-text-accent);
+    border-color: var(--fwmb-accent-main);
+}
+
+.fwmb-canvas-readout {
+    position: absolute;
+    inset-block-start: var(--fwmb-space-m);
+    inset-inline-start: var(--fwmb-space-m);
+    background: rgba(0, 0, 0, 0.7);
+    padding: var(--fwmb-space-xs) var(--fwmb-space-s);
+    border-radius: var(--fwmb-radius-small);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--fwmb-primary-200);
+    font-size: var(--fwmb-font-size-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-m);
+    z-index: 20;
+    pointer-events: none; /* Crucial: Prevents the readout from blocking brush clicks! */
+}
+
+.fwmb-canvas-readout .fwmb-divider-vertical {
+    height: var(--fwmb-font-size-m);
+    margin: 0;
+}
+
+.fwmb-readout-item {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-xxs);
+    font-family: monospace;
+}
+
+.fwmb-readout-item i {
+    width: var(--fwmb-font-size-m);
+    height: var(--fwmb-font-size-m);
+    min-width: var(--fwmb-font-size-m);
+    color: var(--fwmb-color-text-muted-solid);
+}
+
+.fwmb-readout-biome {
+    font-weight: bold;
+    color: var(--fwmb-color-text-accent);
 }
 
 /* --- RANGE SLIDERS --- */
@@ -736,12 +834,12 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: var(--filroden-space-s);
+    gap: var(--fwmb-space-s);
 }
 
 .fwmb .fwmb-slider-group input[type="range"] {
     flex: 1;
-    accent-color: var(--filroden-color-text-accent);
+    accent-color: var(--fwmb-accent-main);
     cursor: pointer;
 }
 
@@ -749,8 +847,8 @@
     width: 5ch;
     text-align: right;
     font-family: monospace;
-    font-size: var(--filroden-font-size-xs);
-    color: var(--filroden-color-text-accent);
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-accent-main);
 }
 
 /* --- STACKED FORM GROUPS --- */
@@ -758,7 +856,7 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: var(--filroden-space-xs);
+    gap: var(--fwmb-space-xs);
 }
 
 .fwmb .form-group.stacked input[type="range"] {
@@ -790,10 +888,10 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    padding: var(--filroden-space-s) var(--filroden-space-m);
-    background: var(--filroden-color-bg-darkest);
-    border-bottom: 1px solid var(--filroden-color-border);
-    gap: var(--filroden-space-m);
+    padding: var(--fwmb-space-s) var(--fwmb-space-m);
+    background: var(--fwmb-bg-base);
+    border-bottom: 1px solid var(--fwmb-border-main);
+    gap: var(--fwmb-space-m);
 }
 
 .fwmb .fwmb-brush-settings,
@@ -803,13 +901,13 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: var(--filroden-space-m);
+    gap: var(--fwmb-space-m);
 }
 
 .fwmb .fwmb-brush-settings label {
-    font-size: var(--filroden-font-size-xs);
-    color: var(--filroden-color-text-muted-solid);
-    margin-right: var(--filroden-space-xs);
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-text-secondary);
+    margin-right: var(--fwmb-space-xs);
     white-space: nowrap;
 }
 
@@ -830,76 +928,39 @@
 }
 
 .fwmb .fwmb-context-panel.fwmb-locked fieldset legend {
-    color: var(--filroden-color-text-muted);
-}
-
-/* --- CANVAS HOVER READOUT --- */
-.fwmb-canvas-readout {
-    position: absolute;
-    inset-block-start: var(--filroden-space-m);
-    inset-inline-start: var(--filroden-space-m);
-    background: rgba(0, 0, 0, 0.7);
-    padding: var(--filroden-space-xs) var(--filroden-space-s);
-    border-radius: var(--filroden-radius-small);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--filroden-color-text-main-solid);
-    font-size: var(--filroden-font-size-xs);
-    display: flex;
-    align-items: center;
-    gap: var(--filroden-space-m);
-    z-index: 20;
-    pointer-events: none; /* Crucial: Prevents the readout from blocking brush clicks! */
-}
-
-.fwmb-canvas-readout .fwmb-divider-vertical {
-    height: var(--filroden-font-size-m);
-    margin: 0;
-}
-
-.fwmb-readout-item {
-    display: flex;
-    align-items: center;
-    gap: var(--filroden-space-xxs);
-    font-family: monospace;
-}
-
-.fwmb-readout-item i {
-    width: var(--filroden-font-size-m);
-    height: var(--filroden-font-size-m);
-    min-width: var(--filroden-font-size-m);
-    color: var(--filroden-color-text-muted-solid);
-}
-
-.fwmb-readout-biome {
-    font-weight: bold;
-    color: var(--filroden-color-text-accent);
+    color: var(--fwmb-text-muted);
 }
 
 /* --- BIOME LEGEND --- */
 .fwmb-biome-legend {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--filroden-space-s);
-    font-size: var(--filroden-font-size-xs);
+    gap: var(--fwmb-space-s);
+    font-size: var(--fwmb-font-size-xs);
 }
 
 .fwmb-biome-item {
     display: flex;
     align-items: center;
-    gap: var(--filroden-space-m);
-    color: var(--filroden-color-text-main-solid);
+    gap: var(--fwmb-space-m);
+    color: var(--fwmb-text-primary);
+}
+
+.fwmb-biome-label {
+    font-size: var(--fwmb-font-size-xs);
+    flex: 1;
 }
 
 .fwmb-swatch {
     appearance: none;
     -webkit-appearance: none;
-    width: var(--filroden-font-size-l);
-    height: var(--filroden-font-size-l);
+    width: var(--fwmb-font-size-l);
+    height: var(--fwmb-font-size-l);
     padding: 0;
     flex-shrink: 0;
     border-radius: 3px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 2px rgba(0,0,0,0.5);
+    border: 1px solid var(--fwmb-border-main);
+    box-shadow: var(--fwmb-shadow-popout);
     cursor: default;
 }
 
@@ -926,16 +987,15 @@ input.fwmb-swatch {
     display: flex;
     justify-content: space-evenly;
     align-items: center;
-    background: rgba(0, 0, 0, 0.2);
-    padding: var(--filroden-space-m);
-    border-radius: var(--filroden-radius-medium);
-    border: 1px inset rgba(255, 255, 255, 0.05);
+    padding: var(--fwmb-space-m);
+    border-radius: var(--fwmb-radius-medium);
+    border: 1px solid var(--fwmb-border-main);
 }
 
 .fwmb-transform-zoom {
     display: flex;
     flex-direction: column;
-    gap: var(--filroden-space-xs);
+    gap: var(--fwmb-space-xs);
 }
 
 .fwmb-transform-dpad {
@@ -958,19 +1018,19 @@ input.fwmb-swatch {
 .fwmb-transform-dpad .dpad-down { grid-column: 2; grid-row: 3; }
 
 /* CSS Rotations for universal arrow directions */
-.fwmb-rotate-90 { transform: rotate(90deg) scaleX(var(--filroden-dir-flip)); }
-.fwmb-rotate-270 { transform: rotate(270deg) scaleX(var(--filroden-dir-flip)); }
+.fwmb-rotate-90 { transform: rotate(90deg) scaleX(var(--fwmb-dir-flip)); }
+.fwmb-rotate-270 { transform: rotate(270deg) scaleX(var(--fwmb-dir-flip)); }
 
 /* Map Studio Log Presentation Table Layers */
 .fwmb-journal-summary {
-    padding: var(--space-m);
+    padding: var(--fwmb-space-m);
 }
 
 .fwmb-summary-title {
     margin-top: 1.5rem;
-    border-bottom: 1px solid var(--color-border-dark);
+    border-bottom: 1px solid var(--fwmb-border-main);
     padding-bottom: 4px;
-    color: var(--color-text-light-heading);
+    color: var(--fwmb-text-primary);
 }
 
 .fwmb-summary-table {
@@ -980,24 +1040,24 @@ input.fwmb-swatch {
 }
 
 .fwmb-summary-table th {
-    background-color: rgba(255, 255, 255, 0.08);
-    border-bottom: 2px solid var(--color-border-dark);
+    background-color: var(--fwmb-bg-panel);
+    border-bottom: 2px solid var(--fwmb-border-main);
     padding: 8px;
     text-align: left;
 }
 
 .fwmb-summary-table td {
     padding: 8px;
-    border-bottom: 1px solid var(--color-border-light);
+    border-bottom: 1px solid var(--fwmb-border-subtle);
 }
 
 .fwmb-summary-table tr:hover {
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: var(--fwmb-bg-hover);
 }
 
 .fwmb-mono {
     font-family: var(--font-mono, monospace);
-    color: var(--color-shadow-highlight, #ffaa00);
+    color: var(--fwmb-accent-main);
 }
 
 .fwmb-capitalize {
@@ -1018,59 +1078,59 @@ input.fwmb-swatch {
 /* Manage Maps Card UI */
 .fwmb-panel-header h3 {
     font-weight: bold;
-    color: var(--filroden-color-text-accent);
-    font-size: var(--filroden-font-size-s);
-    margin: var(--filroden-space-l) var(--filroden-space-m);
+    color: var(--fwmb-accent-main);
+    font-size: var(--fwmb-font-size-s);
+    margin: var(--fwmb-space-l) var(--fwmb-space-m);
 }
 
 .fwmb-map-list {
     display: flex;
     flex-direction: column;
     flex: 1;
-    gap: var(--filroden-space-s);
+    gap: var(--fwmb-space-l);
     overflow-y: auto;
 }
 
 .fwmb-map-card {
-    background: var(--filroden-color-bg-light-solid);
-    border: 1px solid var(--filroden-color-text-accent);
-    border-radius: var(--filroden-radius-medium);
-    padding: var(--filroden-space-m);
+    background: var(--fwmb-bg-panel);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-medium);
+    padding: var(--fwmb-space-m);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: var(--filroden-shadow-card);
+    box-shadow: var(--fwmb-shadow-popout);
 }
 
 .fwmb-map-card-info {
-    font-size: var(--filroden-font-size-xs);
-    color: var(--filroden-color-text-main-solid);
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-text-primary);
     font-weight: bold;
 }
 
 .fwmb-map-card-actions {
     display: flex;
-    gap: var(--filroden-space-s);
+    gap: var(--fwmb-space-s);
 }
 
 /* Base button styling for Load and Kebab */
 .fwmb-map-card-actions > button,
 .fwmb-dropdown > button {
-    width: var(--filroden-space-xxl);
-    height: var(--filroden-space-xxl);
+    width: var(--fwmb-space-xxl);
+    height: var(--fwmb-space-xxl);
     padding: 0;
     display: flex;
     justify-content: inline-start;
     align-items: center;
-    border: 1px solid var(--filroden-color-border-dark);
-    border-radius: var(--filroden-radius-medium);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-medium);
     cursor: pointer;
     transition: background 0.2s ease;
 }
 
 .fwmb-map-card-actions > button:hover,
 .fwmb-dropdown > button:hover {
-    background: var(--filroden-color-bg-hover);
+    background: var(--fwmb-accent-hover);
 }
 
 /* ==========================================
@@ -1086,11 +1146,12 @@ input.fwmb-swatch {
     position: absolute;
     right: 0;
     top: 100%;
-    margin-top: var(--filroden-space-s);
-    background: var(--filroden-color-bg-darkest);
-    border: 1px solid var(--filroden-color-border-light);
+    margin-top: var(--fwmb-space-s);
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-primary);
+    border: 1px solid var(--fwmb-border-main);
     border-radius: 4px;
-    box-shadow: var(--filroden-shadow-popout);
+    box-shadow: var(--fwmb-shadow-window);
     flex-direction: column;
     min-width: 160px;
     z-index: 100;
@@ -1106,22 +1167,23 @@ input.fwmb-swatch {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: var(--filroden-space-s);
-    padding: var(--filroden-space-m) var(--filroden-space-l);
+    gap: var(--fwmb-space-s);
+    padding: var(--fwmb-space-m) var(--fwmb-space-l);
     background: transparent;
     border: none;
-    color: var(--filroden-color-text-main-solid);
+    color: var(--fwmb-text-primary);
     border-radius: 0;
     cursor: pointer;
-    font-size: var(--filroden-font-size-m);
+    font-size: var(--fwmb-font-size-m);
 }
 
 .fwmb-dropdown-menu button:hover {
-    background: var(--filroden-color-bg-hover);
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
 }
 
 .fwmb-dropdown-menu button.fwmb-danger {
-    color: var(--filroden-color-danger);
+    color: var(--fwmb-color-danger);
 }
 
 .fwmb-dropdown-menu button.fwmb-danger:hover {
@@ -1134,34 +1196,34 @@ input.fwmb-swatch {
 
 .fwmb-icon-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--filroden-font-size-xxl), 1fr));
-    gap: var(--filroden-space-s);
+    grid-template-columns: repeat(auto-fill, minmax(var(--fwmb-font-size-xxl), 1fr));
+    gap: var(--fwmb-space-s);
     max-height: 200px;
     overflow-y: auto;
-    padding: var(--filroden-space-s);
-    background: var(--filroden-color-bg-darkest);
-    border: 1px solid var(--filroden-color-border-light);
-    border-radius: var(--filroden-radius-medium);
+    padding: var(--fwmb-space-s);
+    background: var(--fwmb-bg-muted);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-medium);
 }
 
 .fwmb-icon-grid .fwmb-icon-btn {
-    width: var(--filroden-font-size-xxl);
-    height: var(--filroden-font-size-xxl);
-    padding: var(--filroden-space-xs);
+    width: var(--fwmb-font-size-xxl);
+    height: var(--fwmb-font-size-xxl);
+    padding: var(--fwmb-space-xs);
     background: transparent;
     border: 1px solid transparent;
-    border-radius: var(--filroden-radius-medium);
+    border-radius: var(--fwmb-radius-medium);
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
 .fwmb-icon-grid .fwmb-icon-btn:hover {
-    background: var(--filroden-color-bg-hover);
+    background: var(--fwmb-bg-highlight);
 }
 
 .fwmb-icon-grid .fwmb-icon-btn.active {
-    background: var(--filroden-color-bg-hover-solid);
-    border-color: var(--filroden-color-border-focus);
+    background: var(--fwmb-bg-hover);
+    border-color: var(--fwmb-border-focus);
 }
 
 .fwmb-icon-grid img, 
@@ -1169,14 +1231,18 @@ input.fwmb-swatch {
     width: 100%;
     height: 100%;
     object-fit: contain;
+}
+
+.theme-dark .fwmb-icon-grid img,
+.theme-dark .fwmb-list-icon {
     filter: invert(1);
 }
 
 .fwmb-list-container {
     display: flex;
     flex-direction: column;
-    gap: var(--filroden-space-xs);
-    padding-right: var(--filroden-space-xs);
+    gap: var(--fwmb-space-s);
+    padding-right: var(--fwmb-space-xs);
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -1185,20 +1251,21 @@ input.fwmb-swatch {
 .fwmb-list-item {
     display: flex;
     align-items: center;
-    gap: var(--filroden-space-m);
-    padding: var(--filroden-space-s);
-    background: var(--filroden-color-bg-medium);
-    border: var(--filroden-border-accent);
-    border-radius: var(--filroden-radius-medium);
+    gap: var(--fwmb-space-m);
+    padding: var(--fwmb-space-s);
+    background: var(--fwmb-bg-panel);
+    border: 1px solid var(--fwmb-border-focus);
+    border-radius: var(--fwmb-radius-medium);
+    box-shadow: var(--fwmb-shadow-popout);
 }
 
 .fwmb-list-item .fwmb-list-icon {
-    width: var(--filroden-font-size-m);
-    height: var(--filroden-font-size-m);
+    width: var(--fwmb-font-size-m);
+    height: var(--fwmb-font-size-m);
 }
 
 .fwmb-route-swatch {
-    width: var(--filroden-font-size-xxl);
+    width: var(--fwmb-font-size-xxl);
     border-top-width: 0;
     border-bottom-width: 0;
     border-left-width: 0;
@@ -1207,32 +1274,31 @@ input.fwmb-swatch {
 #fwmb-infra-tooltip {
     position: fixed;
     pointer-events: none;
-    background: var(--filroden-color-bg-darkest);
-    color: var(--filroden-color-text-main-solid);
-    padding: var(--filroden-space-s) var(--filroden-space-m);
-    border-radius: var(--filroden-radius-medium);
-    border: var(--filroden-border-accent);
-    font-size: var(--filroden-font-size-xs);
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-primary);
+    padding: var(--fwmb-space-s) var(--fwmb-space-m);
+    border-radius: var(--fwmb-radius-medium);
+    border: 1px solid var(--fwmb-border-focus);
+    font-size: var(--fwmb-font-size-xs);
     line-height: 1.4;
     z-index: 9999;
     max-width: 16rem;
     transform: translate(-50%, -100%);
-    box-shadow: var(--filroden-shadow-card);
+    box-shadow: var(--fwmb-shadow-window);
 }
 
 #fwmb-infra-tooltip strong {
     display: block;
-    color: var(--filroden-color-text-main-solid);
-    font-size: var(--filroden-font-size-s);
+    font-size: var(--fwmb-font-size-s);
     font-weight: bold;
-    margin-block-end: var(--filroden-space-xs);
-    border-block-end: var(--filroden-border-accent);
-    padding-block-end: var(--filroden-space-xxs);
+    margin-block-end: var(--fwmb-space-xs);
+    border-block-end: var(--fwmb-border-accent);
+    padding-block-end: var(--fwmb-space-xxs);
 }
 
 .fwmb .fwmb-name {
-    font-size: var(--filroden-font-size-xs);
-    color: var(--filroden-color-text-main-solid);
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-text-primary);
     min-width: 0; 
     white-space: nowrap; 
     overflow: hidden; 
@@ -1240,7 +1306,7 @@ input.fwmb-swatch {
 }
 
 .fwmb-empty-state {
-    color: var(--filroden-color-text-muted-solid);
+    color: var(--fwmb-text-muted);
 }
 
 /* ==========================================
@@ -1254,9 +1320,9 @@ input.fwmb-swatch {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--filroden-space-xs) var(--filroden-space-s);
-    background: var(--filroden-color-bg-darkest);
-    border: 1px solid var(--filroden-color-border-light);
+    padding: var(--fwmb-space-xs) var(--fwmb-space-s);
+    background: var(--fwmb-bg-base);
+    border: 1px solid var(--fwmb-border-main);
     border-radius: 4px;
     cursor: pointer;
     min-width: 60px;
@@ -1264,12 +1330,15 @@ input.fwmb-swatch {
 }
 
 .fwmb-select-trigger:hover {
-    background: var(--filroden-color-bg-hover);
+    background: var(--fwmb-bg-hover);
 }
 
 .fwmb-select-trigger img {
     width: 24px;
     height: 24px;
+}
+
+.theme-dark .fwmb-select-trigger img {
     filter: invert(1);
 }
 
@@ -1279,12 +1348,12 @@ input.fwmb-swatch {
     left: 0;
     z-index: 100;
     margin-top: 4px;
-    background: var(--filroden-color-bg-darkest);
-    border: 1px solid var(--filroden-color-border-focus);
+    background: var(--fwmb-bg-base);
+    border: 1px solid var(--fwmb-border-focus);
     border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    width: 260px; /* Expands to hold the grid nicely */
-    padding: var(--filroden-space-s);
+    box-shadow: var(--fwmb-shadow-popout);
+    width: 260px; /* Expands to hold the grid */
+    padding: var(--fwmb-space-s);
 }
 
 /* ==========================================
@@ -1294,25 +1363,24 @@ input.fwmb-swatch {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-block-end: var(--filroden-space-s);
+    margin-block-end: var(--fwmb-space-s);
 }
 
 .fwmb-layer-header {
-    background: rgba(0, 0, 0, 0.2);
-    padding: var(--filroden-space-xs) var(--filroden-space-s);
+    padding: var(--fwmb-space-xs) var(--fwmb-space-s);
 }
 
 .fwmb-list-item-content {
     display: flex;
     align-items: center;
-    gap: var(--filroden-space-s);
+    gap: var(--fwmb-space-s);
     flex: 1;
     min-width: 0; /* Ensures the text truncation child doesn't break the flex boundary */
 }
 
 .fwmb-list-item-actions {
     display: flex;
-    gap: var(--filroden-space-xs);
+    gap: var(--fwmb-space-xs);
 }
 
 .fwmb-layer-title {
@@ -1321,16 +1389,16 @@ input.fwmb-swatch {
 }
 
 .fwmb-accordion-content {
-    margin-block-start: var(--filroden-space-s);
-    padding-inline-start: var(--filroden-space-l);
-    border-inline-start: 2px solid rgba(255, 255, 255, 0.1);
+    margin-block-start: var(--fwmb-space-s);
+    padding-inline-start: var(--fwmb-space-l);
+    border-inline-start: 2px solid var(--fwmb-border-main);
     display: flex;
     flex-direction: column;
-    gap: var(--filroden-space-xs);
+    gap: var(--fwmb-space-xs);
 }
 
 .fwmb-hint.small {
-    padding: var(--filroden-space-xs);
+    padding: var(--fwmb-space-xs);
     opacity: 0.7;
     font-size: 0.9em;
 }
@@ -1349,7 +1417,7 @@ input.fwmb-swatch {
 
 .fwmb-setting-row {
     display: flex;
-    gap: var(--filroden-space-s);
+    gap: var(--fwmb-space-s);
     align-items: center;
 }
 
@@ -1372,14 +1440,14 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     background-image: linear-gradient(45deg, #ccc 25%, transparent 25%), 
                       linear-gradient(-45deg, #ccc 25%, transparent 25%), 
                       linear-gradient(45deg, transparent 75%, #ccc 75%), 
-                      linear-gradient(-45deg, transparent 75%, #ccc 75%);
-    background-size: 8px 8px;
-    background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
-    background-color: #fff;
+                      linear-gradient(-45deg, transparent 75%, #ccc 75%) !important;
+    background-size: 8px 8px !important;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0px !important;
+    background-color: #fff !important;
 }
 
 .fwmb-dialog-content {
     display: flex;
     flex-direction: column;
-    gap: var(--filroden-space-s);
+    gap: var(--fwmb-space-s);
 }
