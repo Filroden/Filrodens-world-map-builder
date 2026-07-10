@@ -348,8 +348,8 @@ The generator can be computationally heavy when calculating new terrain, moistur
 
 The long-term vision for this module is to allow users to create a world map, zoom into an area of interest, and use those boundaries to generate a larger-scale, higher-detail regional map containing all the same geographical data.
 
-- Plateau terrain brush to paint flat terrain (still feathering into the surroundings).
 - Configure quick styles for routes, etc.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
 - A Sandbox Mode allowing the import of DEM or greyscale heightmaps to bypass the procedural generation entirely.
+- Fault lines (see `Roadmap.md`).

@@ -1054,12 +1054,39 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #applyBrushStroke(x, y) {
         if (!this.currentElevationData) return;
+
         const seaLevel = this.uiState["seaLevel"];
 
-        if (this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel)) {
-            this.#repaintCanvas();
-            this.debouncedGenerateClimate();
+        const hasBrushed = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel);
+
+        if (!hasBrushed) return;
+
+        // Biome overrides do not alter topography or climate math.
+        // Bypass the global procedural engine and surgically update only the biome WebGL texture.
+        if (this.activeTool === "biomes") {
+            const { currentSeed, params } = this.#getMapParameters();
+            const engine = new ProceduralEngine(currentSeed);
+
+            engine.createBiomesMap(
+                this.currentElevationData,
+                this.currentMoistureData,
+                this.currentTemperatureData,
+                this.currentBiomeOverrides,
+                this.mapWidth,
+                this.mapHeight,
+                seaLevel,
+                this.bufferWaterMask,
+                params,
+                this.bufferBiomes,
+            );
+
+            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
+            return;
         }
+
+        // Terrain edits cascade through the entire procedural climate model.
+        this.#repaintCanvas();
+        this.debouncedGenerateClimate();
     }
 
     async #rebuildFromHistory() {

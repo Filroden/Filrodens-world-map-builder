@@ -199,18 +199,13 @@ export class BrushEngine {
     }
 
     #applyBiomeMath(index, x, y, influence, elevationData, biomeOverrideData, seaLevel) {
-        const { strength, paintValue, points } = this.currentStroke;
+        const { paintValue } = this.currentStroke;
 
-        const probability = strength * 15 * influence;
-        const pseudoRandom = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + points.length) * 43758.5453) % 1;
+        const isLand = elevationData[index] >= seaLevel;
+        const isWaterBiome = paintValue === 1 || paintValue === 2;
 
-        if (pseudoRandom < probability) {
-            const isLand = elevationData[index] >= seaLevel;
-            const isWaterBiome = paintValue === 1 || paintValue === 2;
-
-            if (paintValue === 13 || isLand !== isWaterBiome) {
-                biomeOverrideData[index] = paintValue;
-            }
+        if (paintValue === 13 || isLand !== isWaterBiome) {
+            biomeOverrideData[index] = paintValue;
         }
     }
 }
