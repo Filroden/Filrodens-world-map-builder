@@ -34,7 +34,7 @@ export async function getSavedMaps() {
             id: entry._id,
             name: entry.name,
         }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" }));
 }
 
 /**

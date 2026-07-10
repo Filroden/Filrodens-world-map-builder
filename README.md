@@ -348,7 +348,6 @@ The generator can be computationally heavy when calculating new terrain, moistur
 
 The long-term vision for this module is to allow users to create a world map, zoom into an area of interest, and use those boundaries to generate a larger-scale, higher-detail regional map containing all the same geographical data.
 
-- Sort infrastructure, regions, labels and decorations into alphabetical order.
 - Plateau terrain brush to paint flat terrain (still feathering into the surroundings).
 - Configure quick styles for routes, etc. Add a reset to return the other settings back to default and disable current quick style button.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).

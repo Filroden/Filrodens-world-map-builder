@@ -305,26 +305,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
-            context.mapPins = (this.mapPins || []).filter((p) => !!p.icon);
-            context.mapRoutes = this.mapRoutes || [];
-            context.mapLabels = this.mapLabels || [];
-            context.mapDecorations = this.mapDecorations || [];
 
-            // Extract native Foundry fonts for the UI dropdown
+            const alphaSort = (a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+
+            context.mapPins = (this.mapPins || []).filter((p) => !!p.icon).sort(alphaSort);
+            context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort);
+            context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort);
+            context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
+
+            const autoLabels = [];
+
+            context.mapPins.forEach((p) => {
+                autoLabels.push({ ...p, dataType: "pin", displayVisibility: p.label?.visibility || "all" });
+            });
+
+            context.mapRoutes.forEach((r) => {
+                autoLabels.push({ ...r, dataType: "route", displayVisibility: r.label?.visibility || "all" });
+            });
+
+            (this.regionLayers || []).forEach((layer) => {
+                (layer.regions || []).forEach((r) => {
+                    autoLabels.push({ ...r, dataType: "region", layerId: layer.id, displayVisibility: r.label?.visibility || "all" });
+                });
+            });
+
+            // Sort the unified list alphabetically by name
+            context.autoLabels = autoLabels.toSorted(alphaSort);
+
             context.fontFamilies = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
 
-            // --- Auto-select the first layer if none are currently active ---
             if (this.regionLayers.length > 0 && !this.activeRegionLayerId) {
                 this.activeRegionLayerId = this.regionLayers[0].id;
             }
 
-            // Map the layers and inject a boolean flag for the 'active' highlighted state
-            context.regionLayers = this.regionLayers.map((layer) => ({
+            context.regionLayers = [...(this.regionLayers || [])].sort(alphaSort).map((layer) => ({
                 ...layer,
                 isActive: layer.id === this.activeRegionLayerId,
+                regions: [...(layer.regions || [])].sort(alphaSort),
             }));
 
-            // Inject the compendium list dynamically when navigating to the Manage tab
             if (this.activeTool === "manage") {
                 context.savedMaps = await getSavedMaps();
             }
