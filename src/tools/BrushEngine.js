@@ -80,7 +80,7 @@ export class BrushEngine {
     #lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, shouldRecord) {
         if (this.lastX === null || this.lastY === null) {
             // Anchor the slope elevation to the exact pixel where the user first clicked
-            if (this.currentStroke.tool === "slopeUp" || this.currentStroke.tool === "slopeDown") {
+            if (this.currentStroke.tool === "slopeUp" || this.currentStroke.tool === "slopeDown" || this.currentStroke.tool === "level") {
                 const tx = Math.max(0, Math.min(this.mapWidth - 1, Math.round(x)));
                 const ty = Math.max(0, Math.min(this.mapHeight - 1, Math.round(y)));
                 this.activeSlopeElevation = elevationData[ty * this.mapWidth + tx];
@@ -190,9 +190,9 @@ export class BrushEngine {
             const targetElevation = elevationData[targetY * this.mapWidth + targetX];
 
             elevationData[index] += (targetElevation - currentElevation) * (modification * 0.5);
-        } else if (tool === "slopeUp" || tool === "slopeDown") {
+        } else if (tool === "slopeUp" || tool === "slopeDown" || tool === "level") {
             // Exponentiate the influence to counter the "hardening" effect of overlapping stamps.
-            // Centerline hits the exact slope, but edges fall off rapidly to preserve the feather.
+            // Centerline hits the exact target, but edges fall off rapidly to preserve the feather.
             const slopeInfluence = Math.pow(influence, 4);
             elevationData[index] = currentElevation * (1 - slopeInfluence) + this.activeSlopeElevation * slopeInfluence;
         }

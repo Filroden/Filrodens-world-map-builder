@@ -62,6 +62,7 @@
     "FILRODENSWMB.UI.ToolSmooth": "Smooth Terrain",
     "FILRODENSWMB.UI.ToolSlopeUp": "Slope Up",
     "FILRODENSWMB.UI.ToolSlopeDown": "Slope Down",
+    "FILRODENSWMB.UI.ToolLevel": "Level Terrain",
     "FILRODENSWMB.UI.Undo": "Undo",
     "FILRODENSWMB.UI.Redo": "Redo",
 

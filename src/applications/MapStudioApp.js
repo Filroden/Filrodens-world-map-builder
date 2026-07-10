@@ -622,8 +622,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
 
             if (layer === "features" && ["addSpring", "blockSpring", "erasePin"].includes(tool)) {
-                // Allow clicking massive block zones, but keep a minimum 8px target for tiny pins
-                const clickedIndex = this.mapPins.findIndex((p) => {
+                // Strictly filter for feature pins, and search backwards to hit the top-most visual pin first
+                const clickedIndex = this.mapPins.findLastIndex((p) => {
+                    if (p.type !== "spring" && p.type !== "block_spring") return false;
                     const r = p.radius || 6;
                     return Math.hypot(p.x - x, p.y - y) <= Math.max(r, 8);
                 });
@@ -2833,17 +2834,29 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static #onSetRouteStyle(event, target) {
         const styleId = target.dataset.style;
-        const styleData = FILRODENSWMB.ROUTE_STYLES[styleId];
-
-        if (!styleData) return;
+        const currentStyle = this.uiState.activeRouteQuickStyle;
 
         this.uiState.activeInfraMode = "route";
-        this.uiState.activeRouteQuickStyle = styleId;
         this.activeRouteId = null;
 
-        this.uiState.routeColor = styleData.color;
-        this.uiState.routeThickness = styleData.thickness;
-        this.uiState.routeStyle = styleData.style;
+        // 1. If clicking the active style, toggle it off and revert to defaults
+        if (currentStyle === styleId) {
+            this.uiState.activeRouteQuickStyle = "custom";
+
+            this.uiState.routeColor = "#ffffff";
+            this.uiState.routeThickness = 3;
+            this.uiState.routeStyle = "solid";
+        }
+        // 2. Otherwise, apply the new quick style
+        else {
+            const styleData = FILRODENSWMB.ROUTE_STYLES[styleId];
+            if (!styleData) return;
+
+            this.uiState.activeRouteQuickStyle = styleId;
+            this.uiState.routeColor = styleData.color;
+            this.uiState.routeThickness = styleData.thickness;
+            this.uiState.routeStyle = styleData.style;
+        }
 
         this.#syncDOMToState();
         this.#syncInfraModeButtons();

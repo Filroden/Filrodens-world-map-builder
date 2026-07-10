@@ -235,7 +235,7 @@ export class StudioCanvas {
                 // 1. Try to grab an existing infrastructure node or pin
                 const grabbedTarget = this.#getGrabbedInfrastructure(coords.x, coords.y);
 
-                // --- Ctrl-Click / Cmd-Click Node Deletion Intercept ---
+                // Ctrl-Click / Cmd-Click Node Deletion Intercept
                 if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -245,7 +245,11 @@ export class StudioCanvas {
                     return;
                 }
 
-                if (grabbedTarget) {
+                // Bypass drag grab if the UI is actively using the Eraser tool
+                const rootApp = this.container.closest(".fwmb-layout") || document;
+                const isEraserActive = !!rootApp.querySelector('.fwmb-brush-tools button.active[data-tool="erasePin"]');
+
+                if (grabbedTarget && !isEraserActive) {
                     e.preventDefault();
                     e.stopPropagation();
 

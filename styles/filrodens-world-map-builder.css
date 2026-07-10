@@ -84,6 +84,7 @@
 .fwmb-icon.add                  { --fwmb-mask: url('../assets/icons/add.svg'); }
 .fwmb-icon.gesture              { --fwmb-mask: url('../assets/icons/gesture.svg'); }
 .fwmb-icon.slope                { --fwmb-mask: url('../assets/icons/signal_cellular_null.svg'); }
+.fwmb-icon.plateau              { --fwmb-mask: url('../assets/icons/rectangle.svg'); }
 .fwmb-icon.security             { --fwmb-mask: url('../assets/icons/security.svg'); }
 
 
@@ -774,13 +775,13 @@
 }
 
 .fwmb-map-controls button:hover {
-    color: var(--fwmb-accent-hover);
+    color: var(--fwmb-primary-200);
     background: rgba(0 , 0, 0, 0.2);
     border-color: var(--fwmb-accent-main);
 }
 
 .fwmb-map-controls button.active {
-    color: var(--fwmb-accent-main);
+    color: var(--fwmb-primary-100);
     background: rgba(0, 0, 0, 0.4);
     border-color: var(--fwmb-accent-main);
 }
