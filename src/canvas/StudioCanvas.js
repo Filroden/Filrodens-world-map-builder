@@ -65,6 +65,14 @@ export class StudioCanvas {
         this.brushCursor = new PIXI.Graphics();
         this.brushCursor.visible = false;
 
+        // Setup the Crop Tool overlay
+        this.cropGraphics = new PIXI.Graphics();
+        this.cropBox = null;
+        this.activeCropAction = null;
+        this.cropStart = { x: 0, y: 0 };
+        this.cropOriginalBox = null;
+        this.onCropUpdate = null;
+
         // Add them to the zooming stage in ascending order
         this.stage.addChild(
             this.layers.base,
@@ -78,6 +86,7 @@ export class StudioCanvas {
             this.gridLayer,
             this.layers.labels,
             this.layers.cartography,
+            this.cropGraphics,
             this.brushCursor,
         );
 
@@ -93,6 +102,8 @@ export class StudioCanvas {
         this.hasGeneratedMap = false;
         this.mapWidth = FILRODENSWMB.DEFAULTS.MAP_WIDTH;
         this.mapHeight = FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
+
+        this.#updateGlobalMask();
 
         this.#setupInteractions(canvasElement);
 
@@ -194,6 +205,8 @@ export class StudioCanvas {
 
             this.stage.position.x = mouseX - localX * this.stage.scale.x;
             this.stage.position.y = mouseY - localY * this.stage.scale.y;
+
+            if (this.isCropMode) this.#drawCropOverlay();
         });
 
         // PREVENT NATIVE CONTEXT MENU
@@ -214,12 +227,31 @@ export class StudioCanvas {
             if (e.button === 0) {
                 const coords = this.#getMapCoordinates(e, canvasElement);
 
+                // --- Regional Crop Intercept ---
+                if (this.isCropMode) {
+                    const zone = this.#getCropHitZone(coords.x, coords.y);
+                    this.cropStart = { x: coords.x, y: coords.y };
+
+                    if (zone) {
+                        this.activeCropAction = zone;
+                        this.cropOriginalBox = { ...this.cropBox };
+                    } else {
+                        this.activeCropAction = "draw";
+                        this.cropBox = { x: coords.x, y: coords.y, width: 0, height: 0 };
+                    }
+
+                    canvasElement.style.cursor = "grabbing";
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+
                 // --- Reference Image Drag Intercept ---
                 if (this.isReferenceMode) {
                     this.isDraggingReference = true;
                     this.dragStart = { x: coords.x, y: coords.y };
                     canvasElement.style.cursor = "grabbing";
-                    return; // Abort all other edit tools
+                    return;
                 }
 
                 // --- Shift-Click Node Insertion Intercept ---
@@ -269,6 +301,56 @@ export class StudioCanvas {
         // MOUSE MOVE (Pan, Drag Item, or Continuous Paint)
         canvasElement.addEventListener("pointermove", (e) => {
             const coords = this.#getMapCoordinates(e, canvasElement);
+
+            // --- Regional Crop Movement Intercept ---
+            if (this.activeCropAction) {
+                const dx = coords.x - this.cropStart.x;
+                const dy = coords.y - this.cropStart.y;
+
+                if (this.activeCropAction === "draw") {
+                    this.cropBox.x = Math.min(this.cropStart.x, coords.x);
+                    this.cropBox.y = Math.min(this.cropStart.y, coords.y);
+                    this.cropBox.width = Math.abs(coords.x - this.cropStart.x);
+                    this.cropBox.height = Math.abs(coords.y - this.cropStart.y);
+                } else if (this.activeCropAction === "center") {
+                    this.cropBox.x = this.cropOriginalBox.x + dx;
+                    this.cropBox.y = this.cropOriginalBox.y + dy;
+                } else {
+                    const MIN_SIZE = 10;
+                    if (this.activeCropAction.includes("l")) {
+                        this.cropBox.x = Math.min(this.cropOriginalBox.x + dx, this.cropOriginalBox.x + this.cropOriginalBox.width - MIN_SIZE);
+                        this.cropBox.width = this.cropOriginalBox.x + this.cropOriginalBox.width - this.cropBox.x;
+                    }
+                    if (this.activeCropAction.includes("r")) {
+                        this.cropBox.width = Math.max(MIN_SIZE, this.cropOriginalBox.width + dx);
+                    }
+                    if (this.activeCropAction.includes("t")) {
+                        this.cropBox.y = Math.min(this.cropOriginalBox.y + dy, this.cropOriginalBox.y + this.cropOriginalBox.height - MIN_SIZE);
+                        this.cropBox.height = this.cropOriginalBox.y + this.cropOriginalBox.height - this.cropBox.y;
+                    }
+                    if (this.activeCropAction.includes("b")) {
+                        this.cropBox.height = Math.max(MIN_SIZE, this.cropOriginalBox.height + dy);
+                    }
+                }
+
+                // Keep strictly within boundaries
+                this.cropBox.x = Math.max(0, Math.min(this.cropBox.x, this.mapWidth - this.cropBox.width));
+                this.cropBox.y = Math.max(0, Math.min(this.cropBox.y, this.mapHeight - this.cropBox.height));
+
+                this.#drawCropOverlay();
+                if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+                return;
+            }
+
+            // --- Regional Crop Hover States ---
+            if (this.isCropMode && !this.activeCropAction) {
+                const zone = this.#getCropHitZone(coords.x, coords.y);
+                if (zone === "center") canvasElement.style.cursor = "move";
+                else if (zone === "tl" || zone === "br") canvasElement.style.cursor = "nwse-resize";
+                else if (zone === "tr" || zone === "bl") canvasElement.style.cursor = "nesw-resize";
+                else canvasElement.style.cursor = "crosshair";
+                return;
+            }
 
             if (this.isDraggingReference) {
                 const coords = this.#getMapCoordinates(e, canvasElement);
@@ -332,6 +414,12 @@ export class StudioCanvas {
             }
 
             if (e.button === 0) {
+                if (this.activeCropAction) {
+                    this.activeCropAction = null;
+                    canvasElement.style.cursor = "crosshair";
+                    return;
+                }
+
                 if (this.isDraggingReference) {
                     this.isDraggingReference = false;
                     canvasElement.style.cursor = "crosshair";
@@ -426,6 +514,8 @@ export class StudioCanvas {
 
         this.mapWidth = width;
         this.mapHeight = height;
+
+        this.#updateGlobalMask();
 
         let sprite = this.layerSprites[layerId];
 
@@ -1543,5 +1633,89 @@ export class StudioCanvas {
 
         if (vis === "gm") return this.viewFilters.gm;
         return this.viewFilters.all;
+    }
+
+    #getCropHitZone(x, y) {
+        if (!this.cropBox) return null;
+
+        // Maintain a constant grab radius regardless of zoom level
+        const handleR = 10 / this.stage.scale.x;
+        const { x: cx, y: cy, width: cw, height: ch } = this.cropBox;
+
+        if (Math.hypot(x - cx, y - cy) < handleR) return "tl";
+        if (Math.hypot(x - (cx + cw), y - cy) < handleR) return "tr";
+        if (Math.hypot(x - cx, y - (cy + ch)) < handleR) return "bl";
+        if (Math.hypot(x - (cx + cw), y - (cy + ch)) < handleR) return "br";
+
+        if (x > cx && x < cx + cw && y > cy && y < cy + ch) return "center";
+
+        return null;
+    }
+
+    setCropMode(isActive) {
+        this.isCropMode = isActive;
+        if (!isActive) {
+            this.cropGraphics.clear();
+            this.cropBox = null;
+        } else if (!this.cropBox) {
+            // Initialise default bounding box to 50% of the screen center
+            const w = this.mapWidth * 0.5;
+            const h = this.mapHeight * 0.5;
+            this.cropBox = { x: (this.mapWidth - w) / 2, y: (this.mapHeight - h) / 2, width: w, height: h };
+
+            this.#drawCropOverlay();
+            if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+        }
+    }
+
+    getCropData() {
+        return this.cropBox;
+    }
+
+    #drawCropOverlay() {
+        this.cropGraphics.clear();
+        if (!this.cropBox || this.cropBox.width <= 0) return;
+
+        // 1. Darkened negative space mask
+        this.cropGraphics.beginFill(0x000000, 0.6);
+        this.cropGraphics.drawRect(0, 0, this.mapWidth, this.mapHeight);
+        this.cropGraphics.beginHole();
+        this.cropGraphics.drawRect(this.cropBox.x, this.cropBox.y, this.cropBox.width, this.cropBox.height);
+        this.cropGraphics.endHole();
+        this.cropGraphics.endFill();
+
+        // 2. Scale-invariant outline
+        const lineW = 2 / this.stage.scale.x;
+        this.cropGraphics.lineStyle(lineW, 0xffffff, 1);
+        this.cropGraphics.drawRect(this.cropBox.x, this.cropBox.y, this.cropBox.width, this.cropBox.height);
+
+        // 3. Corner handles
+        const handleR = 6 / this.stage.scale.x;
+        this.cropGraphics.beginFill(0xffffff, 1);
+        this.cropGraphics.lineStyle(lineW / 2, 0x000000, 1);
+
+        const corners = [
+            { x: this.cropBox.x, y: this.cropBox.y },
+            { x: this.cropBox.x + this.cropBox.width, y: this.cropBox.y },
+            { x: this.cropBox.x, y: this.cropBox.y + this.cropBox.height },
+            { x: this.cropBox.x + this.cropBox.width, y: this.cropBox.y + this.cropBox.height },
+        ];
+
+        corners.forEach((c) => this.cropGraphics.drawCircle(c.x, c.y, handleR));
+        this.cropGraphics.endFill();
+    }
+
+    #updateGlobalMask() {
+        if (!this.mapMask) {
+            this.mapMask = new PIXI.Graphics();
+            // Add the mask to the stage, then assign it as the stage's official clipping mask
+            this.stage.addChild(this.mapMask);
+            this.stage.mask = this.mapMask;
+        }
+
+        this.mapMask.clear();
+        this.mapMask.beginFill(0xffffff); // Color doesn't matter for masks
+        this.mapMask.drawRect(0, 0, this.mapWidth, this.mapHeight);
+        this.mapMask.endFill();
     }
 }

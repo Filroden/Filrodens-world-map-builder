@@ -19,19 +19,6 @@
             </div>
         </div>
 
-        <div class="form-group stacked">
-            <label>{{localize "FILRODENSWMB.UI.Latitude"}}</label>
-            <div class="fwmb-flex-row">
-                <div class="fwmb-flex-1 form-group">
-                    <label class="hint">{{localize "FILRODENSWMB.UI.LatTop"}}</label>
-                    <input type="number" name="latTop" value="{{lookup uiState 'latTop'}}" min="-90" max="90" />
-                </div>
-                <div class="fwmb-flex-1 form-group">
-                    <label class="hint">{{localize "FILRODENSWMB.UI.LatBottom"}}</label>
-                    <input type="number" name="latBottom" value="{{lookup uiState 'latBottom'}}" min="-90" max="90" />
-                </div>
-            </div>
-        </div>
     </fieldset>
 
     <fieldset class="fwmb-fieldset">
@@ -48,7 +35,15 @@
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.MoistureScale"}}</label>
             <div class="fwmb-slider-group">
-                <input type="range" name="noise.moisture.scale" value="{{lookup uiState 'noise.moisture.scale'}}" min="100" max="2000" step="50" oninput="this.nextElementSibling.value = this.value" />
+                <input
+                    type="range"
+                    name="noise.moisture.scale"
+                    value="{{lookup uiState 'noise.moisture.scale'}}"
+                    min="100"
+                    max="4000"
+                    step="any"
+                    oninput="this.nextElementSibling.value = Number(this.value).toFixed(2)"
+                />
                 <output>{{lookup uiState "noise.moisture.scale"}}</output>
             </div>
         </div>

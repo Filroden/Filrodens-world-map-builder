@@ -21,20 +21,47 @@ export async function initializeCompendium() {
 }
 
 /**
- * Retrieves a flattened array of all saved maps for the UI.
+ * Retrieves a nested hierarchical array of all saved maps for the UI.
  */
 export async function getSavedMaps() {
     const packName = `world.${FILRODENSWMB.COMPENDIUM.NAME}`;
     const pack = game.packs.get(packName);
     if (!pack) return [];
 
-    const index = await pack.getIndex();
-    return index
-        .map((entry) => ({
+    // Instruct Foundry to extract the parentId flag into the index memory
+    const index = await pack.getIndex({ fields: [`flags.${FILRODENSWMB.ID}.mapData.parentId`] });
+
+    const mapDict = {};
+    const rootMaps = [];
+
+    // 1. Initialise all dictionary entries
+    index.forEach((entry) => {
+        mapDict[entry._id] = {
             id: entry._id,
-            name: entry.name,
-        }))
-        .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" }));
+            name: entry.name || "Unnamed Map",
+            parentId: entry.flags?.[FILRODENSWMB.ID]?.mapData?.parentId || null,
+            children: [],
+        };
+    });
+
+    const alphaSort = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+
+    // 2. Build the structural hierarchy
+    Object.values(mapDict).forEach((map) => {
+        // If a map has a parentId AND that parent still exists in the compendium, nest it
+        if (map.parentId && mapDict[map.parentId]) {
+            mapDict[map.parentId].children.push(map);
+        } else {
+            // Otherwise, it is a root-level map
+            rootMaps.push(map);
+        }
+    });
+
+    // 3. Sort roots and all nested children alphabetically
+    rootMaps.sort(alphaSort);
+    Object.values(mapDict).forEach((map) => map.children.sort(alphaSort));
+
+    return rootMaps;
 }
 
 /**

@@ -86,6 +86,7 @@
 .fwmb-icon.slope                { --fwmb-mask: url('../assets/icons/signal_cellular_null.svg'); }
 .fwmb-icon.plateau              { --fwmb-mask: url('../assets/icons/rectangle.svg'); }
 .fwmb-icon.security             { --fwmb-mask: url('../assets/icons/security.svg'); }
+.fwmb-icon.crop                 { --fwmb-mask: url('../assets/icons/crop.svg'); }
 
 
 /* --- APPLICATION SCROLLBARS --- */
@@ -268,8 +269,8 @@
 
 /* --- SELECT AND OPTIONS --- */
 
-.module-name select,
-.module-name-roll-footer select {
+.fwmb select,
+.fwmb-roll-footer select {
     width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -481,20 +482,21 @@
 
 /* --- SEMANTIC TEXT & STATES --- */
 /* Helper text below inputs or headers */
-.fwmb .hint,
+.fwmb .fwmb-hint,
 .fwmb .fwmb-notes {
     font-size: var(--fwmb-font-size-xs);
-    color: var(--fwmb-text-muted);
+    color: var(--fwmb-text-secondary);
     margin-block-start: var(--fwmb-space-xxs);
     line-height: var(--fwmb-line-height-body);
 }
 
-.fwmb .fwmb-notes.module-long {
+.fwmb .fwmb-hint.fwmb-long,
+.fwmb .fwmb-notes.fwmb-long {
     text-align: start;
     margin-block-end: var(--fwmb-space-m);
 }
 
-.fwmb .hint.indent {
+.fwmb .fwmb-hint.indent {
     margin-inline-start: var(--fwmb-space-xxl);
 }
 

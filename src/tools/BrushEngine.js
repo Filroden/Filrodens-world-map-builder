@@ -81,9 +81,15 @@ export class BrushEngine {
         if (this.lastX === null || this.lastY === null) {
             // Anchor the slope elevation to the exact pixel where the user first clicked
             if (this.currentStroke.tool === "slopeUp" || this.currentStroke.tool === "slopeDown" || this.currentStroke.tool === "level") {
-                const tx = Math.max(0, Math.min(this.mapWidth - 1, Math.round(x)));
-                const ty = Math.max(0, Math.min(this.mapHeight - 1, Math.round(y)));
-                this.activeSlopeElevation = elevationData[ty * this.mapWidth + tx];
+                const tx = Math.round(x);
+                const ty = Math.round(y);
+
+                // Disable the anchor if the ghost stroke originates off-screen
+                if (tx < 0 || tx >= this.mapWidth || ty < 0 || ty >= this.mapHeight) {
+                    this.activeSlopeElevation = null;
+                } else {
+                    this.activeSlopeElevation = elevationData[ty * this.mapWidth + tx];
+                }
             }
 
             if (shouldRecord) this.#recordControlPoint(x, y);
@@ -185,14 +191,16 @@ export class BrushEngine {
         } else if (tool === "lower") {
             elevationData[index] = Math.max(0, currentElevation - modification);
         } else if (tool === "smooth") {
-            const targetX = Math.max(0, Math.min(this.mapWidth - 1, Math.round(cx)));
-            const targetY = Math.max(0, Math.min(this.mapHeight - 1, Math.round(cy)));
-            const targetElevation = elevationData[targetY * this.mapWidth + targetX];
+            const targetX = Math.round(cx);
+            const targetY = Math.round(cy);
 
+            if (targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight) return;
+
+            const targetElevation = elevationData[targetY * this.mapWidth + targetX];
             elevationData[index] += (targetElevation - currentElevation) * (modification * 0.5);
         } else if (tool === "slopeUp" || tool === "slopeDown" || tool === "level") {
-            // Exponentiate the influence to counter the "hardening" effect of overlapping stamps.
-            // Centerline hits the exact target, but edges fall off rapidly to preserve the feather.
+            if (this.activeSlopeElevation === null) return;
+
             const slopeInfluence = Math.pow(influence, 4);
             elevationData[index] = currentElevation * (1 - slopeInfluence) + this.activeSlopeElevation * slopeInfluence;
         }

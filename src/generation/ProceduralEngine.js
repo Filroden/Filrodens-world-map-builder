@@ -231,7 +231,6 @@ export class ProceduralEngine {
      * Calculates pure geographical altitude, applying exponents strictly to landmasses.
      */
     generateTopography(width, height, params, outBuffer) {
-        const totalPixels = width * height;
         const elevationData = outBuffer;
 
         const eScale = params.noise.elevation.scale;
@@ -272,7 +271,6 @@ export class ProceduralEngine {
      * Applies globally deterministic Orographic Lift via Western Horizon sampling.
      */
     generateClimateData(elevationData, width, height, params, outMoisture, outTemperature) {
-        const totalPixels = width * height;
         const moistureData = outMoisture;
         const temperatureData = outTemperature;
 
@@ -292,8 +290,8 @@ export class ProceduralEngine {
         const latBottom = params.latBottom;
         const latRange = Math.abs(latTop - latBottom);
 
-        const moistureOffset = 10000;
-        const tempOffset = 20000;
+        const moistureOffset = params.noise.moistureOffset ?? 10000;
+        const tempOffset = params.noise.tempOffset ?? 20000;
 
         // Fetch elevation parameters to calculate geographical slope
         const eScale = params.noise.elevation.scale;
@@ -326,7 +324,8 @@ export class ProceduralEngine {
                     const windCellBlend = Math.cos(absLat * (Math.PI / 45));
 
                     // The sampling distance now smoothly scales, rather than instantly snapping
-                    const windDirectionX = 40 * windCellBlend;
+                    const windDistance = params.climate?.windDistance ?? 40;
+                    const windDirectionX = windDistance * windCellBlend;
 
                     // 1. Calculate the raw noise upwind
                     const upwindNoise = this.#fbm(worldX + windDirectionX, worldY, eOctaves, eScale);

@@ -346,5 +346,14 @@
     "FILRODENSWMB.Settings.ThemeHue.Teal": "Teal",
 
     "FILRODENSWMB.UI.AddCustomBiome": "Add Custom Biome",
-    "FILRODENSWMB.UI.DeleteBiome": "Are you sure you want to delete this custom biome? Any existing areas on the map will return to their original biomes."
+    "FILRODENSWMB.UI.DeleteBiome": "Are you sure you want to delete this custom biome? Any existing areas on the map will return to their original biomes.",
+
+    "FILRODENSWMB.UI.EditCanvas": "Create Regional Map from Existing Map",
+    "FILRODENSWMB.UI.EditCanvasHint": "Creates a regional map based on a crop of the existing map, preserving all edits. This provided enhanced detail in the terrain and biome layers.",
+    "FILRODENSWMB.UI.ToolRegionalMap": "Regional Map Tool",
+    "FILRODENSWMB.UI.RegionalResolution": "New Resolution",
+    "FILRODENSWMB.UI.TargetWidth": "Target Width",
+    "FILRODENSWMB.UI.CalculatedHeight": "Calculated Height",
+    "FILRODENSWMB.UI.RegionalLatitude": "New Latitude Range",
+    "FILRODENSWMB.UI.GenerateMap": "Generate Map"
 }

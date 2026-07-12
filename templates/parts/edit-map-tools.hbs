@@ -45,9 +45,30 @@
             </select>
         </div>
 
+        <button type="button" data-tool-group="scene" data-action="setBrushTool" data-tool="crop" class="fwmb-btn fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegionalMap'}}">
+            <i class="fwmb-icon crop"></i>
+        </button>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="scene">
+            <label>{{localize "FILRODENSWMB.UI.RegionalResolution"}}</label>
+            <div class="fwmb-flex-row">
+                <input type="number" name="regionalTargetWidth" value="{{lookup uiState 'regionalTargetWidth'}}" class="fwmb-flex-1" title="{{localize 'FILRODENSWMB.UI.TargetWidth'}}" step="100" min="500" />
+                <span style="align-self: center; margin: 0 4px;">x</span>
+                <input type="number" name="regionalTargetHeight" value="{{lookup uiState 'regionalTargetHeight'}}" class="fwmb-flex-1" disabled title="{{localize 'FILRODENSWMB.UI.CalculatedHeight'}}" />
+            </div>
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="scene">
+            <label>{{localize "FILRODENSWMB.UI.RegionalLatitude"}}</label>
+            <div class="fwmb-setting-row" style="justify-content: space-between; font-size: 0.9em;">
+                <span>{{localize "FILRODENSWMB.UI.LatTop"}}: <strong id="fwmb-readout-lat-top">--&deg;</strong></span>
+                <span>{{localize "FILRODENSWMB.UI.LatBottom"}}: <strong id="fwmb-readout-lat-bottom">--&deg;</strong></span>
+            </div>
+        </div>
+
     </div>
 
-    <div class="fwmb-divider-vertical" data-tool-group="terrain biomes"></div>
+    <div class="fwmb-divider-vertical" data-tool-group="regional terrain biomes"></div>
 
     <div class="fwmb-brush-tools">
 
@@ -155,7 +176,11 @@
 
     </div>
 
-    <button type="button" data-tool-group="regions" data-action="setRegionMode" data-mode="draw" class="active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.DrawRegion'}}">
+    <button type="button" data-tool-group="scene" data-action="generateRegionalMap" class="fwmb-btn primary wide fwmb-hidden">
+        <i class="fwmb-icon map"></i> {{localize "FILRODENSWMB.UI.GenerateMap"}}
+    </button>
+
+    <button type="button" data-tool-group="regions" data-action="setRegionMode" data-mode="draw" class="fwmb-btn active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.DrawRegion'}}">
         <i class="fwmb-icon edit"></i>
     </button>
 
@@ -212,13 +237,13 @@
         </div>
     </div>
 
-    <div class="hint fwmb-centered" data-tool-group="labels">
+    <div class="fwmb-hint fwmb-centered" data-tool-group="labels">
         {{localize "FILRODENSWMB.UI.LabelHelpText"}}
     </div>
 
     <div class="fwmb-divider-vertical" data-tool-group="terrain biomes features infrastructure regions labels cartography"></div>
 
-    <div class="fwmb-brush-history">
+    <div class="fwmb-brush-history" data-tool-group="terrain biomes features infrastructure regions labels cartography">
         <button type="button" data-action="undoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}">
             <i class="fwmb-icon undo"></i>
         </button>
