@@ -99,15 +99,11 @@
             <i class="fwmb-icon water-drop"></i>
         </button>
 
-        <button type="button" data-tool-group="features" data-action="setBrushTool" data-tool="blockSpring" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolBlockSpring'}}">
-            <i class="fwmb-icon format-color-reset"></i>
-        </button>
-
         <button type="button" data-tool-group="features" data-action="setBrushTool" data-tool="erasePin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolErasePin'}}">
             <i class="fwmb-icon ink-eraser"></i>
         </button>
 
-                <button type="button" data-tool-group="infrastructure" data-action="setInfraMode" data-mode="pin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ModePin'}}">
+        <button type="button" data-tool-group="infrastructure" data-action="setInfraMode" data-mode="pin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ModePin'}}">
             <i class="fwmb-icon place"></i>
         </button>
 
@@ -124,13 +120,13 @@
             <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
             <div class="fwmb-custom-select" id="fwmb-pin-select">
                 <div class="fwmb-select-trigger" data-action="togglePinDropdown">
-                    <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{uiState.activeIcon}}.svg" class="fwmb-active-icon-img" />
-                    <i class="fwmb-icon arrow-drop-down invert"></i>
+                    <i class="fwmb-icon {{uiState.activeIcon}}"></i>
+                    <i class="fwmb-icon arrow-drop-down"></i>
                 </div>
                 <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
                     {{#each infrastructureIcons}}
                     <button type="button" class="fwmb-btn {{#if (eq ../uiState.activeIcon this.id)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.id}}" data-tooltip="{{localize this.label}}">
-                        <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{this.id}}.svg" alt="{{localize this.label}}" />
+                        <i class="fwmb-icon {{this.id}}" alt="{{localize this.label}}"></i>
                     </button>
                     {{/each}}
                 </div>

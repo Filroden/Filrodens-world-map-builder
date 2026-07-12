@@ -9,7 +9,7 @@
                 <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>
-                <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{this.icon}}.svg" class="fwmb-list-icon" />
+                <i class="fwmb-icon fwmb-list-icon {{this.icon}}"></i>
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
                 <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon center-focus"></i>

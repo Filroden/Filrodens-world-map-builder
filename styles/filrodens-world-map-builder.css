@@ -2,7 +2,7 @@
    --- COMMON UI ELEMENTS ---
 =================================================================== */
 
-/* --- MATERIAL DESIGN ICONS --- */
+/* --- UI ICONS --- */
 .fwmb-icon {
     display: inline-block;
     width: var(--fwmb-font-size-l); 
@@ -31,6 +31,7 @@
     transform: scaleX(calc(-1 * var(--fwmb-dir-flip)));
 }
 
+/* --- MATERIAL DESIGN ICONS --- */
 .fwmb-icon.map                  { --fwmb-mask: url('../assets/icons/map.svg'); }
 .fwmb-icon.hex                  { --fwmb-mask: url('../assets/icons/hive.svg'); }
 .fwmb-icon.layers               { --fwmb-mask: url('../assets/icons/layers.svg'); }
@@ -88,6 +89,34 @@
 .fwmb-icon.security             { --fwmb-mask: url('../assets/icons/security.svg'); }
 .fwmb-icon.crop                 { --fwmb-mask: url('../assets/icons/crop.svg'); }
 
+/* --- PINHEAD ICONS --- */
+.fwmb-icon.anchor                         { --fwmb-mask: url('../assets/pinhead-icons/anchor.svg'); }
+.fwmb-icon.bridge                         { --fwmb-mask: url('../assets/pinhead-icons/bridge.svg'); }
+.fwmb-icon.castle_keep                    { --fwmb-mask: url('../assets/pinhead-icons/castle_keep.svg'); }
+.fwmb-icon.castle                         { --fwmb-mask: url('../assets/pinhead-icons/castle.svg'); }
+.fwmb-icon.cave                           { --fwmb-mask: url('../assets/pinhead-icons/cave.svg'); }
+.fwmb-icon.cindercone_volcano_erupting    { --fwmb-mask: url('../assets/pinhead-icons/cindercone_volcano_erupting.svg'); }
+.fwmb-icon.circle                         { --fwmb-mask: url('../assets/pinhead-icons/circle.svg'); }
+.fwmb-icon.circle_outline                 { --fwmb-mask: url('../assets/pinhead-icons/circle_outline.svg'); }
+.fwmb-icon.circle_outline_with_dot        { --fwmb-mask: url('../assets/pinhead-icons/circle_outline_with_dot.svg'); }
+.fwmb-icon.city_gate                      { --fwmb-mask: url('../assets/pinhead-icons/city_gate.svg'); }
+.fwmb-icon.column_shrine                  { --fwmb-mask: url('../assets/pinhead-icons/column_shrine.svg'); }
+.fwmb-icon.domed_tower                    { --fwmb-mask: url('../assets/pinhead-icons/domed_tower.svg'); }
+.fwmb-icon.dot                            { --fwmb-mask: url('../assets/pinhead-icons/dot.svg'); }
+.fwmb-icon.dot_outline                    { --fwmb-mask: url('../assets/pinhead-icons/dot_outline.svg'); }
+.fwmb-icon.fortress                       { --fwmb-mask: url('../assets/pinhead-icons/fortress.svg'); }
+.fwmb-icon.geyser_from_ground             { --fwmb-mask: url('../assets/pinhead-icons/geyser_from_ground.svg'); }
+.fwmb-icon.map_pin                        { --fwmb-mask: url('../assets/pinhead-icons/map_pin.svg'); }
+.fwmb-icon.map_pin_outline                { --fwmb-mask: url('../assets/pinhead-icons/map_pin_outline.svg'); }
+.fwmb-icon.map_pin_outline_with_dot       { --fwmb-mask: url('../assets/pinhead-icons/map_pin_outline_with_dot.svg'); }
+.fwmb-icon.map_pin_with_dot               { --fwmb-mask: url('../assets/pinhead-icons/map_pin_with_dot.svg'); }
+.fwmb-icon.megalith                       { --fwmb-mask: url('../assets/pinhead-icons/megalith.svg'); }
+.fwmb-icon.mineshaft_profile              { --fwmb-mask: url('../assets/pinhead-icons/mineshaft_profile.svg'); }
+.fwmb-icon.obelisk                        { --fwmb-mask: url('../assets/pinhead-icons/obelisk.svg'); }
+.fwmb-icon.obelisk_on_plinth              { --fwmb-mask: url('../assets/pinhead-icons/obelisk_on_plinth.svg'); }
+.fwmb-icon.place_of_worship_building      { --fwmb-mask: url('../assets/pinhead-icons/place_of_worship_building.svg'); }
+.fwmb-icon.shipwreck_in_water             { --fwmb-mask: url('../assets/pinhead-icons/shipwreck_in_water.svg'); }
+.fwmb-icon.skull                          { --fwmb-mask: url('../assets/pinhead-icons/skull.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
@@ -1040,6 +1069,7 @@ input.fwmb-swatch {
 }
 
 .fwmb-summary-table th {
+    color: var(--fwmb-text-primary);
     background-color: var(--fwmb-bg-panel);
     border-bottom: 2px solid var(--fwmb-border-main);
     padding: 8px;
@@ -1224,18 +1254,6 @@ input.fwmb-swatch {
 .fwmb-icon-grid .fwmb-icon-btn.active {
     background: var(--fwmb-bg-hover);
     border-color: var(--fwmb-border-focus);
-}
-
-.fwmb-icon-grid img, 
-.fwmb-list-icon {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-
-.theme-dark .fwmb-icon-grid img,
-.theme-dark .fwmb-list-icon {
-    filter: invert(1);
 }
 
 .fwmb-list-container {

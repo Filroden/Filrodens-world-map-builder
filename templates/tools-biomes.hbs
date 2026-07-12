@@ -44,7 +44,7 @@
                     step="any"
                     oninput="this.nextElementSibling.value = Number(this.value).toFixed(2)"
                 />
-                <output>{{lookup uiState "noise.moisture.scale"}}</output>
+                <output>{{numberFormat (lookup uiState "noise.moisture.scale") decimals=2}}</output>
             </div>
         </div>
     </fieldset>

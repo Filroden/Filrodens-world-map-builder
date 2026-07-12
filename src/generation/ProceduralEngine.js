@@ -59,13 +59,15 @@ export class ProceduralEngine {
     }
 
     /**
-     * Samples the map to find high-altitude, high-moisture starting points.
+     * Extracts high-altitude, high-moisture starting points to be baked as permanent pins.
      */
-    #findSprings(elevationData, moistureData, width, height, seaLevel, targetCount, params) {
+    bakeProceduralSprings(elevationData, moistureData, width, height, params) {
         const springs = [];
+        const targetCount = params.riverDensity || 40;
         const maxAttempts = targetCount * 50;
         let attempts = 0;
 
+        const seaLevel = params.seaLevel || 0.35;
         const altOffset = params?.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
         const moistMin = params?.hydrology?.springMoistMin ?? FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN;
 
@@ -567,8 +569,8 @@ export class ProceduralEngine {
 
         return pixelBuffer;
     }
+
     generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params, outRiverMap, outWaterMask) {
-        const riverDensity = params.riverDensity || 40;
         const seaLevel = params.seaLevel || 0.3;
 
         const rivers = [];
@@ -578,11 +580,8 @@ export class ProceduralEngine {
         riverMap.fill(0);
         waterMask.fill(0);
 
-        // 1. Setup springs
-        const { finalSprings, overrideSet, blockedSet } = this.#parseSpringPins(mapPins);
-        const proceduralSprings = this.#findSprings(elevationData, moistureData, width, height, seaLevel, riverDensity, params);
-
-        this.#mergeProceduralSprings(finalSprings, proceduralSprings, overrideSet, blockedSet);
+        // 1. Setup springs purely from the baked pins array
+        const finalSprings = this.#parseSpringPins(mapPins);
 
         // 2. Trace
         for (const spring of finalSprings) {
@@ -598,40 +597,17 @@ export class ProceduralEngine {
 
     #parseSpringPins(mapPins) {
         const finalSprings = [];
-        const overrideSet = new Set();
-        const blockedSet = new Set();
-
-        if (!mapPins) return { finalSprings, overrideSet, blockedSet };
+        if (!mapPins) return finalSprings;
 
         for (const pin of mapPins) {
-            if (pin.type === "spring") {
-                finalSprings.push({ x: pin.x, y: pin.y });
-                overrideSet.add(`${pin.x},${pin.y}`);
-            } else if (pin.type === "block_spring") {
-                const r = Math.round(pin.radius || 1);
-                const rSq = r * r; // Pre-calculate squared radius to avoid hypot in tight loops
-                const px = Math.round(pin.x);
-                const py = Math.round(pin.y);
-
-                for (let dy = -r; dy <= r; dy++) {
-                    for (let dx = -r; dx <= r; dx++) {
-                        if (dx * dx + dy * dy <= rSq) {
-                            blockedSet.add(`${px + dx},${py + dy}`);
-                        }
-                    }
-                }
+            if (pin.type === "spring" && pin.visibility !== "none") {
+                finalSprings.push({
+                    x: Math.round(pin.x),
+                    y: Math.round(pin.y),
+                });
             }
         }
-        return { finalSprings, overrideSet, blockedSet };
-    }
-
-    #mergeProceduralSprings(finalSprings, proceduralSprings, overrideSet, blockedSet) {
-        for (const spring of proceduralSprings) {
-            if (blockedSet.has(`${spring.x},${spring.y}`)) continue;
-            if (!overrideSet.has(`${spring.x},${spring.y}`)) {
-                finalSprings.push(spring);
-            }
-        }
+        return finalSprings;
     }
 
     /**

@@ -162,6 +162,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
             "noise.temperature.scale": FILRODENSWMB.NOISE.TEMPERATURE.SCALE,
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
+            springsBaked: false,
 
             contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
             biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,
@@ -658,10 +659,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
 
-            if (layer === "features" && ["addSpring", "blockSpring", "erasePin"].includes(tool)) {
+            if (layer === "features" && ["addSpring", "erasePin"].includes(tool)) {
                 // Strictly filter for feature pins, and search backwards to hit the top-most visual pin first
                 const clickedIndex = this.mapPins.findLastIndex((p) => {
-                    if (p.type !== "spring" && p.type !== "block_spring") return false;
+                    if (p.type !== "spring") return false;
                     const r = p.radius || 6;
                     return Math.hypot(p.x - x, p.y - y) <= Math.max(r, 8);
                 });
@@ -670,17 +671,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 if (tool === "erasePin") {
                     if (clickedIndex > -1) this.mapPins.splice(clickedIndex, 1);
-                } else {
-                    const pinType = tool === "addSpring" ? "spring" : "block_spring";
-                    const radius = tool === "blockSpring" ? getNum("brushSize") : 6;
-
-                    // Don't overwrite if placing a blocker, allow overlapping blockers for coverage
-                    if (clickedIndex > -1 && tool !== "blockSpring") {
-                        this.mapPins[clickedIndex].type = pinType;
-                        this.mapPins[clickedIndex].radius = radius;
-                    } else {
-                        this.mapPins.push({ id: foundry.utils.randomID(), x, y, type: pinType, radius: radius });
-                    }
+                } else if (clickedIndex === -1) {
+                    this.mapPins.push({ id: foundry.utils.randomID(), name: "River Source", x, y, type: "spring", radius: 6, visibility: "all" });
                 }
 
                 this.#repaintCanvas();
@@ -1180,6 +1172,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         console.log("World Map Builder | Generating Features...");
         const t0 = performance.now();
 
+        // Bake procedural springs into permanent pins on first load or new map generation
+        if (!this.uiState.springsBaked) {
+            const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
+            for (const s of newSprings) {
+                this.mapPins.push({
+                    id: foundry.utils.randomID(),
+                    name: "River Source",
+                    x: s.x,
+                    y: s.y,
+                    type: "spring",
+                    radius: 6,
+                    visibility: "all",
+                });
+            }
+            this.uiState.springsBaked = true;
+            this.markDirty();
+        }
+
         this.currentRiverData = engine.generateRivers(
             this.currentElevationData,
             this.currentMoistureData,
@@ -1222,6 +1232,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.latBottom = p.latBottom;
         this.uiState.globalMoisture = p.globalMoisture;
         this.uiState.riverDensity = p.riverDensity;
+        this.uiState.springsBaked = payload.springsBaked ?? false;
 
         this.uiState["noise.offsetX"] = p.noise.offsetX;
         this.uiState["noise.offsetY"] = p.noise.offsetY;
@@ -1594,6 +1605,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const { currentSeed, params } = this.#getMapParameters();
             const payload = {
                 seed: currentSeed,
+                springsBaked: this.uiState.springsBaked,
                 mapWidth: this.mapWidth,
                 mapHeight: this.mapHeight,
                 gridType: this.uiState.gridType,
@@ -2567,20 +2579,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.element.style.cursor = "wait";
 
         try {
+            // Temporarily strip the camera transform so the PNG exports at a mathematically 1:1 scale with 0 offsets
+            const origX = this.canvasEngine.stage.position.x;
+            const origY = this.canvasEngine.stage.position.y;
+            const origScaleX = this.canvasEngine.stage.scale.x;
+            const origScaleY = this.canvasEngine.stage.scale.y;
+
+            this.canvasEngine.stage.position.set(0, 0);
+            this.canvasEngine.stage.scale.set(1, 1);
+
             ui.notifications.info(`FWMB | Extracting Player View...`);
             this.canvasEngine.setRenderPass("player");
-            this.#repaintVectors(); // Forces canvas to instantly hide GM items
+            this.#repaintVectors(); // Forces canvas to hide GM items
             const playerBlob = await this.canvasEngine.extractCanvasBlob("player");
 
             let gmBlob = null;
             if (config.createGmOverlay) {
                 ui.notifications.info(`FWMB | Extracting GM Overlay...`);
                 this.canvasEngine.setRenderPass("gm");
-                this.#repaintVectors(); // Forces canvas to instantly hide Player items
+                this.#repaintVectors(); // Forces canvas to hide Player items
                 gmBlob = await this.canvasEngine.extractCanvasBlob("gm");
             }
 
-            // Restore the normal view
+            // Restore the normal view and the exact camera transform the user was looking at
+            this.canvasEngine.stage.position.set(origX, origY);
+            this.canvasEngine.stage.scale.set(origScaleX, origScaleY);
             this.canvasEngine.setRenderPass("normal");
             this.#repaintVectors();
 
@@ -2613,9 +2636,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.element.style.cursor = "wait";
 
         try {
-            const targetWidth = this.uiState.regionalTargetWidth;
+            const baseTargetWidth = this.uiState.regionalTargetWidth;
+            const tempZoomScale = baseTargetWidth / cropBox.width;
+
+            // Calculate the scaled grid size first
+            const targetGridSize = Math.max(10, Math.round(this.uiState.gridSize * tempZoomScale));
+
+            // Snap the map dimensions to be perfect multiples of the new grid size
+            const targetWidth = Math.max(targetGridSize, Math.round(baseTargetWidth / targetGridSize) * targetGridSize);
+
+            // Recalculate true mathematical scale using the grid-snapped width
             const zoomScale = targetWidth / cropBox.width;
-            const targetHeight = Math.round(cropBox.height * zoomScale);
+            const rawHeight = cropBox.height * zoomScale;
+
+            // Snap the height
+            const targetHeight = Math.max(targetGridSize, Math.round(rawHeight / targetGridSize) * targetGridSize);
 
             const mapName = await foundry.applications.api.DialogV2.prompt({
                 window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save Regional Map As" },
@@ -2625,8 +2660,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             if (!mapName) return;
 
-            // Phase 2: Translation Preparation
-            this.#getMapParameters(); // Ensure clone is current
+            this.#getMapParameters();
             const state = foundry.utils.deepClone(this.uiState);
 
             state.mapWidth = targetWidth;
@@ -2687,7 +2721,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 if (isVisible) newHistory.push(translatedStroke);
             }
 
-            // --- Phase 4: Translate Vectors ---
             const translateVectorList = (list) => {
                 const newList = [];
                 for (const item of list) {
@@ -2695,7 +2728,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     let isVisible = false;
 
                     // Translate nested auto-label spatial coordinates only.
-                    // We explicitly do not scale the fontSize to maintain crisp typography.
+                    // Do not scale the fontSize to maintain crisp typography.
                     if (translated.label?.x !== undefined) {
                         translated.label.x = (translated.label.x - cropBox.x) * zoomScale;
                         translated.label.y = (translated.label.y - cropBox.y) * zoomScale;
@@ -2745,6 +2778,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             const payload = {
                 seed: currentSeed,
+                springsBaked: true,
                 mapWidth: targetWidth,
                 mapHeight: targetHeight,
                 gridType: state.gridType,
@@ -3086,15 +3120,26 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     static #onSetInfrastructureIcon(event, target) {
-        this.uiState.activeIcon = target.dataset.icon;
+        const newIcon = target.dataset.icon;
+        this.uiState.activeIcon = newIcon;
         this.uiState.activeInfraMode = "pin";
         this.activeRouteId = null;
 
-        const triggerImg = this.element.querySelector(".fwmb-active-icon-img");
-        if (triggerImg) triggerImg.src = `modules/filrodens-world-map-builder/assets/pinhead-icons/${this.uiState.activeIcon}.svg`;
+        // Update the trigger icon so the UI shows the new selection
+        const triggerIcon = this.element.querySelector("#fwmb-pin-select .fwmb-select-trigger .fwmb-icon:first-child");
+        if (triggerIcon) {
+            triggerIcon.className = `fwmb-icon ${newIcon}`;
+        }
 
+        // Update the 'active' button state inside the dropdown grid
         const dropdown = this.element.querySelector("#fwmb-pin-select .fwmb-select-options");
-        if (dropdown) dropdown.classList.add("fwmb-hidden");
+        if (dropdown) {
+            for (const btn of dropdown.querySelectorAll("button")) {
+                btn.classList.toggle("active", btn.dataset.icon === newIcon);
+            }
+            // Hide the dropdown menu
+            dropdown.classList.add("fwmb-hidden");
+        }
 
         this.#syncInfraModeButtons();
     }

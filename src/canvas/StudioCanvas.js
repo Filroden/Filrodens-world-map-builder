@@ -1550,37 +1550,30 @@ export class StudioCanvas {
             cartography: this.layers.cartography.visible,
         };
 
-        // Inject Invisible Bounding Box
-        // Forces PIXI to extract the full map dimensions even if all background layers are hidden
-        const boundsBox = new PIXI.Graphics();
-        boundsBox.beginFill(0x000000, 0); // 0 Alpha = completely transparent, but counts for bounds
-        boundsBox.drawRect(0, 0, this.mapWidth, this.mapHeight);
-        boundsBox.endFill();
-        this.stage.addChildAt(boundsBox, 0);
-
         this.layers.reference.visible = false;
 
         if (passType === "player") {
             this.gridLayer.visible = false;
         } else if (passType === "gm") {
-            // Hide all background elements so the GM overlay is purely transparent
             this.layers.base.visible = false;
             this.layers.topography.visible = false;
             this.layers.biomes.visible = false;
             this.layers.contours.visible = false;
             this.layers.features.visible = false;
             this.gridLayer.visible = false;
-            this.layers.cartography.visible = false; // Usually procedural borders shouldn't duplicate
+            this.layers.cartography.visible = false;
         }
 
-        // Force an immediate synchronous WebGL render to capture the new visibility states
-        this.app.renderer.render(this.stage);
-        const canvas = this.app.renderer.extract.canvas(this.stage);
+        const renderTexture = PIXI.RenderTexture.create({
+            width: this.mapWidth,
+            height: this.mapHeight,
+            resolution: 1,
+        });
 
-        // Cleanup Bounding Box
-        boundsBox.destroy();
+        this.app.renderer.render(this.stage, { renderTexture: renderTexture });
 
-        // Restore the original visual state for the user
+        const canvas = this.app.renderer.extract.canvas(renderTexture);
+
         this.gridLayer.visible = originalVisibility.grid;
         this.layers.reference.visible = originalVisibility.reference;
         this.layers.cartography.visible = originalVisibility.cartography;
@@ -1589,8 +1582,10 @@ export class StudioCanvas {
         this.layers.biomes.visible = true;
         this.layers.contours.visible = true;
         this.layers.features.visible = true;
+
         return new Promise((resolve) => {
             canvas.toBlob((blob) => {
+                renderTexture.destroy(true);
                 resolve(blob);
             }, "image/png");
         });

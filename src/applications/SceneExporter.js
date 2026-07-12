@@ -136,6 +136,8 @@ export class SceneExporter {
 
         // Execute loops using the helper
         for (const pin of app.mapPins) {
+            if (pin.type === "spring" || pin.type === "block_spring") continue;
+
             await syncJournalPage(pin, "Unnamed Location");
         }
 
