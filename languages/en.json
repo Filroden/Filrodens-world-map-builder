@@ -62,6 +62,7 @@
     "FILRODENSWMB.UI.ToolSmooth": "Smooth Terrain",
     "FILRODENSWMB.UI.ToolSlopeUp": "Slope Up",
     "FILRODENSWMB.UI.ToolSlopeDown": "Slope Down",
+    "FILRODENSWMB.UI.ToolLevel": "Level Terrain",
     "FILRODENSWMB.UI.Undo": "Undo",
     "FILRODENSWMB.UI.Redo": "Redo",
 
@@ -87,7 +88,7 @@
 
     "FILRODENSWMB.UI.Hydrology": "Hydrology",
     "FILRODENSWMB.UI.RiverDensity": "River Density",
-    "FILRODENSWMB.UI.EditFeatures": "Toggle Edit Hydrology",
+    "FILRODENSWMB.UI.EditFeatures": "Toggle Edit Terrain Features",
     "FILRODENSWMB.UI.ToolAddSpring": "Add New River Source",
     "FILRODENSWMB.UI.ToolBlockSpring": "Block Prodcedurally Generated River Source",
     "FILRODENSWMB.UI.ToolErasePin": "Remove Pin",
@@ -337,5 +338,22 @@
     "FILRODENSWMB.UI.VisibilityNone": "Hidden Features",
 
     "FILRODENSWMB.UI.OverwriteJournals": "Overwrite Existing Journal Pages",
-    "FILRODENSWMB.UI.OverwriteJournalsHint": "If checked, existing map journals will be updated with your current descriptions. Warning: This will destroy any manual lore edits made by the GM."
+    "FILRODENSWMB.UI.OverwriteJournalsHint": "If checked, existing map journals will be updated with your current descriptions. Warning: This will destroy any manual lore edits made by the GM.",
+
+    "FILRODENSWMB.Settings.ThemeHue.Name": "Color Theme",
+    "FILRODENSWMB.Settings.ThemeHue.Hint": "Select the primary hue for the interface.",
+    "FILRODENSWMB.Settings.ThemeHue.Gold": "Gold",
+    "FILRODENSWMB.Settings.ThemeHue.Teal": "Teal",
+
+    "FILRODENSWMB.UI.AddCustomBiome": "Add Custom Biome",
+    "FILRODENSWMB.UI.DeleteBiome": "Are you sure you want to delete this custom biome? Any existing areas on the map will return to their original biomes.",
+
+    "FILRODENSWMB.UI.EditCanvas": "Create Regional Map from Existing Map",
+    "FILRODENSWMB.UI.EditCanvasHint": "Creates a regional map based on a crop of the existing map, preserving all edits. This provided enhanced detail in the terrain and biome layers.",
+    "FILRODENSWMB.UI.ToolRegionalMap": "Regional Map Tool",
+    "FILRODENSWMB.UI.RegionalResolution": "New Resolution",
+    "FILRODENSWMB.UI.TargetWidth": "Target Width",
+    "FILRODENSWMB.UI.CalculatedHeight": "Calculated Height",
+    "FILRODENSWMB.UI.RegionalLatitude": "New Latitude Range",
+    "FILRODENSWMB.UI.GenerateMap": "Generate Map"
 }

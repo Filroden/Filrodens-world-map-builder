@@ -80,10 +80,16 @@ export class BrushEngine {
     #lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, shouldRecord) {
         if (this.lastX === null || this.lastY === null) {
             // Anchor the slope elevation to the exact pixel where the user first clicked
-            if (this.currentStroke.tool === "slopeUp" || this.currentStroke.tool === "slopeDown") {
-                const tx = Math.max(0, Math.min(this.mapWidth - 1, Math.round(x)));
-                const ty = Math.max(0, Math.min(this.mapHeight - 1, Math.round(y)));
-                this.activeSlopeElevation = elevationData[ty * this.mapWidth + tx];
+            if (this.currentStroke.tool === "slopeUp" || this.currentStroke.tool === "slopeDown" || this.currentStroke.tool === "level") {
+                const tx = Math.round(x);
+                const ty = Math.round(y);
+
+                // Disable the anchor if the ghost stroke originates off-screen
+                if (tx < 0 || tx >= this.mapWidth || ty < 0 || ty >= this.mapHeight) {
+                    this.activeSlopeElevation = null;
+                } else {
+                    this.activeSlopeElevation = elevationData[ty * this.mapWidth + tx];
+                }
             }
 
             if (shouldRecord) this.#recordControlPoint(x, y);
@@ -185,32 +191,29 @@ export class BrushEngine {
         } else if (tool === "lower") {
             elevationData[index] = Math.max(0, currentElevation - modification);
         } else if (tool === "smooth") {
-            const targetX = Math.max(0, Math.min(this.mapWidth - 1, Math.round(cx)));
-            const targetY = Math.max(0, Math.min(this.mapHeight - 1, Math.round(cy)));
-            const targetElevation = elevationData[targetY * this.mapWidth + targetX];
+            const targetX = Math.round(cx);
+            const targetY = Math.round(cy);
 
+            if (targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight) return;
+
+            const targetElevation = elevationData[targetY * this.mapWidth + targetX];
             elevationData[index] += (targetElevation - currentElevation) * (modification * 0.5);
-        } else if (tool === "slopeUp" || tool === "slopeDown") {
-            // Exponentiate the influence to counter the "hardening" effect of overlapping stamps.
-            // Centerline hits the exact slope, but edges fall off rapidly to preserve the feather.
+        } else if (tool === "slopeUp" || tool === "slopeDown" || tool === "level") {
+            if (this.activeSlopeElevation === null) return;
+
             const slopeInfluence = Math.pow(influence, 4);
             elevationData[index] = currentElevation * (1 - slopeInfluence) + this.activeSlopeElevation * slopeInfluence;
         }
     }
 
     #applyBiomeMath(index, x, y, influence, elevationData, biomeOverrideData, seaLevel) {
-        const { strength, paintValue, points } = this.currentStroke;
+        const { paintValue } = this.currentStroke;
 
-        const probability = strength * 15 * influence;
-        const pseudoRandom = Math.abs(Math.sin(x * 12.9898 + y * 78.233 + points.length) * 43758.5453) % 1;
+        const isLand = elevationData[index] >= seaLevel;
+        const isWaterBiome = paintValue === 1 || paintValue === 2;
 
-        if (pseudoRandom < probability) {
-            const isLand = elevationData[index] >= seaLevel;
-            const isWaterBiome = paintValue === 1 || paintValue === 2;
-
-            if (paintValue === 13 || isLand !== isWaterBiome) {
-                biomeOverrideData[index] = paintValue;
-            }
+        if (paintValue === 13 || isLand !== isWaterBiome) {
+            biomeOverrideData[index] = paintValue;
         }
     }
 }

@@ -1,7 +1,7 @@
 <div class="fwmb-tool-content fwmb-scrollable">
     <div class="fwmb-panel-header-row">
         <label class="fwmb-title">{{localize "FILRODENSWMB.UI.LayerRegions"}}</label>
-        <button type="button" class="fwmb-btn small" data-action="addRegionLayer">
+        <button type="button" class="fwmb-btn" data-action="addRegionLayer">
             <i class="fwmb-icon add"></i> {{localize "FILRODENSWMB.UI.NewLayer"}}
         </button>
     </div>
@@ -9,21 +9,21 @@
     {{#each regionLayers}}
     <div class="fwmb-accordion-group" data-layer-id="{{this.id}}">
         
-        <div class="fwmb-list-item fwmb-layer-header" style="{{#if this.isActive}}border-color: var(--filroden-color-text-accent); background: rgba(0,0,0,0.4);{{/if}}">
+        <div class="fwmb-list-item fwmb-layer-header" style="{{#if this.isActive}}border-color: var(--fwmb-color-text-accent); background: var(--fwmb-bg-hover);{{/if}}">
             <div class="fwmb-list-item-content">
-                <button type="button" class="fwmb-icon-btn small" data-action="toggleVisibility" data-target="layer" title="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="layer" title="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>
                 
-                <span class="fwmb-name" data-action="selectRegionLayer" style="cursor: pointer; {{#if this.isActive}}color: var(--filroden-color-text-accent); font-weight: bold;{{/if}}">
+                <span class="fwmb-name" data-action="selectRegionLayer" style="cursor: pointer; {{#if this.isActive}}color: var(--fwmb-color-text-accent); font-weight: bold;{{/if}}">
                     {{this.name}}
                 </span>
             </div>
             <div class="fwmb-list-item-actions">
-                <button type="button" class="fwmb-icon-btn small" data-action="editRegionLayer" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                <button type="button" class="fwmb-btn small" data-action="editRegionLayer" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                     <i class="fwmb-icon edit"></i>
                 </button>
-                <button type="button" class="fwmb-icon-btn small" data-action="deleteRegionLayer" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                <button type="button" class="fwmb-btn small muted danger" data-action="deleteRegionLayer" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                     <i class="fwmb-icon delete"></i>
                 </button>
             </div>
@@ -34,20 +34,20 @@
                 {{#each this.regions}}
                 <div class="fwmb-list-item" data-id="{{this.id}}" data-layer-id="{{../id}}" data-type="region">
                     <div class="fwmb-list-item-content">
-                        <button type="button" class="fwmb-icon-btn small" data-action="toggleVisibility" data-target="feature">
+                        <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature">
                             <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                         </button>
                         <div class="fwmb-swatch small" style="background-color: {{this.fillColor}}; border-color: {{this.lineColor}};"></div>
                         <span class="fwmb-name" title="{{this.name}}">{{this.name}}</span>
                     </div>
                     <div class="fwmb-list-item-actions">
-                        <button type="button" class="fwmb-icon-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                        <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                             <i class="fwmb-icon center-focus"></i>
                         </button>
-                        <button type="button" class="fwmb-icon-btn small" data-action="editRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                        <button type="button" class="fwmb-btn small" data-action="editRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                             <i class="fwmb-icon edit"></i>
                         </button>
-                        <button type="button" class="fwmb-icon-btn small" data-action="deleteRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <button type="button" class="fwmb-btn muted small danger" data-action="deleteRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                             <i class="fwmb-icon delete"></i>
                         </button>
                     </div>

@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-1.0.0-beta1-blue)
+![Latest Version](https://img.shields.io/badge/Version-1.0.0-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -12,28 +12,45 @@
 
 ## Welcome to Filroden's World Map Builder
 
-> **WARNING** This is a Beta release. As the module develops there is a chance that the data structure for map saves will evolve. This could mean any maps saved will be lost. Please treat this release as a way to test the module and provide your feedback on what you would like to see.
+Filroden's World Map Builder is a system-agnostic cartography tool. It generates terrain, moisture and temperatures using a procedural, deterministic model so using the same "seed" will generate the same model. It then calculates appropriate biomes taking into account the latitude and underlying models including wind patterns. You can scale and offset the result to frame a map that is close to your idea so that you can apply the final edits to the world using non-destructive vector brushes, then place terrain features, infrastructure, regions, etc.
 
-Filroden's World Map Builder is a system-agnostic cartography tool. It generates terrain, moisture and temperatures using a procedural, deterministic model so using the same "seed" will generate the same model. It then calculates appropriate biomes taking into account the latitude and underlying models including wind patterns. You can scale and offset the result to frame a map that is close to your idea so that you can apply the final edits to the world using non-destructive brushes.
-
-The procedural plus non-destructive brush approach means the resulting saved journal is very compact.
+Maps are saved in Journals and stored in a Journal Compendium. The procedural plus non-destructive brush approach means the resulting saved journal is very compact in size.
 
 ### Main Features
 
 - **Advanced Procedural Generation**: The underlying engine calculates authentic topography using layered noise and geological stretch parameters. It dynamically simulates climate by mapping global temperature gradients and tracking geographical orographic lift (rain shadows) to accurately determine Whittaker biomes.
-- **Dynamic Hydrology Systems**: Rivers are carved procedurally using greedy downhill algorithms, naturally pooling into lakes until they overflow their basins, and freezing intelligently based on altitude and regional climate thresholds. Additional river sources can be added, and existing sources blocked.
+- **Dynamic Hydrology Systems**: Rivers are carved procedurally using greedy downhill algorithms, naturally pooling into lakes until they overflow their basins, and freezing intelligently based on altitude and regional climate thresholds. Additional river sources can be placed manually, and procedurally generated sources can be removed.
 - **Non-Destructive Vector Brush Engine**: Edit the terrain (raising, lowering, and smoothing) or paint custom biomes with a responsive freehand brush tool. Under the hood, edits are saved as a spatial vector history rather than static pixels, preserving your exact strokes for future map scaling and regional zooming.
+- **Vector Information Layers**: You can add infrastructure (points of interest, routes, etc), regional polygons, labels and cartographic decorations to any map, fine-tuning their placement, size and style.
+- **Easy Regional Map Creation**: Once your master world map is created you can generate regional maps that faithfully match the original but at much higher resolution. Because of procedural generation, this provides almost infinite ability to "zoom in" and create larger and larger scale maps (from World to almost street level). There are limits, so the more you increase map scale, the flatter the map will become.
+- **Export to Scene**: All features (and entire layers) can be set to be visible to players, GMs or no-one. When you export the map to create a new Foundry Scene, it will export the player visible elements to the background image and place a map tile over it containing the GM-only features. A Scene Journal is also created which contains any feature names and descriptions and each feature is linked from the map to the journal using map pins.
+- **Export to PNG**: If you want to save the map for external use, you can also export the current visible features to a PNG file.
 - **Interactive 3D Visualisation**: View your 2D cartography in an interactive 3D web view. The biome map is draped over your custom topography, complete with topographical river vectors, ocean planes, and dynamic lighting. This feature is purely visual and included for fun. It will not update to any changes made until it is toggled again.
 - **Compendium Integration**: Maps are saved directly to a dedicated compendium. Each save automatically generates a readable journal showing your parameters. The application UI contains map management tools which allow you to easily load, duplicate, rename, or export your worlds as shareable JSON files.
+
+---
+
+#### World Map (generated at 4000 x 4000 pixels)
+
+![World map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/original-map.png)
+
+---
+
+#### Regional Map generated from the above World Map (generated at 4000 x 2730 pixels)
+
+![Regional Map generated from the World map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/regional-map.png)
+
+---
 
 ## How to Use
 
 - [The Map Canvas](#the-map-canvas)
 - [Map Making Tools](#map-making-tools)
   - [Generating a New Map](#generating-a-new-map)
+  - [Generating Regional Maps](#generating-regional-maps)
   - [Terrain](#terrain)
   - [Biomes](#biomes-climate)
-  - [Hydrology](#hydrology)
+  - [Terrain Features](#terrain-features)
   - [Infrastructure](#infrastructure)
   - [Regions](#regions)
   - [Labels](#labels)
@@ -92,7 +109,7 @@ In edit mode, some layers allow features to be added, moved or removed with mous
 
 #### Generating a New Map
 
-1. To generate a new map either enter a map seed or generate a random seed, set the map resolution and click "Create New Map".
+1. On the "Create New Map" tool, to generate a new map either enter a map seed or generate a random seed, set the map resolution and the latitude range it represets and click "Create New Map".
 
    > Note: If you have an unsaved changes on the existing map you will be prompted to save or discard them.
 
@@ -101,6 +118,28 @@ In edit mode, some layers allow features to be added, moved or removed with mous
 Creating a new map will procedurally generate a terrain, moisture and temperature model for the world, and calculate appropriate biomes.
 
 It is recommended that you work through each map tool in turn to edit the map.
+
+![Map Tools](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/map-tools.png)
+
+#### Generating Regional Maps
+
+It is possible to create new, high-resolution maps based on a cropped area of existing maps. All terrain edits and vector features are preserved, and the new maps are nested as children under their parent map in the manager.
+
+> **Note:** Once created, the new regional map and the original map are completely independant of each other. Changes to one will not affect the other.
+
+1. With the existing map loaded, select the "Create Regional Map from Existing Map" button at the bottom of the "Create New Map" tool. This will open a toolbar and display a crop window.
+
+2. In the toolbar, change the resolution of the width of the new map (height will be calculated automatically).
+
+3. On the map canvas, drag the corners of the crop window to resize it, and drag it into position. The toolbar will update to show the calculated map resolution and the new latitude ranges of the map.
+
+   ![Map Crop Tool](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/map-crop-tool.png)
+
+4. Once you are happy, click the "Generate Map" button. You will be asked for a new map name. The map will then be created and saved. You can load it in the "Manage Maps" tool where it will appear as a child of the original map.
+
+5. Fine tune river positions, points of interest pins and labels.
+   - The additional terrain detail is likely to create new routes for rivers so you may need to edit the terrain slightly to allow rivers to continue their original paths.
+   - Points of Interest pins (infrastructure) and labels will be positioned at the same centred position of the original map but because the font/icon size is smaller (relative to the map) they will now be slightly offset.
 
 #### Terrain
 
@@ -125,6 +164,7 @@ The terrain is generated automatically. Once generated, the terrain can be edite
    - **Lower Terrain:** This brush reduces the elevation of the terrain beneath it.
    - **Smooth Terrain**: This brush "averages" the terrain elevations under it.
    - **Slope Up**: This brush takes the starting elevation and then increases elevation as you move away from that point.
+   - **Level Terrain**: This brush levels the terrain to match the exact elevation at the centre of your click, smoothly feathering into the surrounding landscape.
    - **Slope Down**: This brush takes the starting elevation and then decreases elevation as you move away from that point.
 
 #### Biomes (Climate)
@@ -134,7 +174,6 @@ Biomes are generated automatically depending on the latitude, terrain, temperatu
 1. **Climate Settings**
    - **Global Temperature:** Determine how warm or cold the overall global climate is. Lower the value to create ice worlds and raise it to create desert worlds.
    - **Season:** Determine the current season. Set a value of 0 for Spring/Autumn, and a value of -1 or 1 for Summer/Winter (by hemisphere).
-   - **Latitude:** Set the upper and lower latitude values for the world. This determines the overall climate across the map.
 
 2. **Moisture Settings**
    - **Global Moisture:** Determine how wet or dry the overall climate is.
@@ -147,23 +186,19 @@ Biomes are generated automatically depending on the latitude, terrain, temperatu
    - **Brush Strength:** How quickly the brush is applied.
    - **Brush Feather:** How much the brush is blended with the surrounding terrain. Feathering increases towards the edges of the brush.
 
-   - **Select Biome**: Select which biome type will be painted by the brush.
+   - **Select Biome**: Select which biome type to paint. Any custom biomes you have created in the Map Configuration tool will also appear here as selectable brushes.
 
-#### Hydrology
+#### Terrain Features
 
-River sources are automatically generated where the moisture levels are high enough. River sources form between certain elevations which can be changed in the Map Configuration settings. They find their way down the terrain until they reach natural depressions. Water will then pool to form lakes. If the lakes becomes large enough, they may find new paths down the terrain and potentially reach the ocean.
+- **Rivers and Lakes:** River sources are automatically generated where the moisture levels are high enough. River sources form between certain elevations which can be changed in the Map Configuration settings. They find their way down the terrain until they reach natural depressions. Water will then pool to form lakes. If the lakes becomes large enough, they may find new paths down the terrain and potentially reach the ocean. When a map is generated, the procedural river sources are permanently baked into the map as editable pins.
 
-1. **Hydrology**
-   - **River Density:** Determine how many rivers might spawn automatically on the map.
-
-2. **Edit Hydrology**
+1. **Edit Terrain Features**
 
    Brush tools work similar to brush tools in graphics packages.
    - **Brush Size:** The radius of the brush tool.
 
-   - **Add New River Source:**: Add a pin which spawns a new river source.
-   - **Block Procedurally Generated River Source:** Add a pin which blocks a river source which was generated by the module.
-   - **Remove Pin:** Use this brush to delete any pin added by the user.
+   - **Add New River Source:**: Add a pin to spawn a custom river.
+   - **Erase Pin:** Delete any river source pin within the brush area (whether procedurally generated or manually placed) to remove that river.
 
 #### Infrastructure
 
@@ -199,7 +234,7 @@ Both Points of Interest and Routes will show a label. The label can be edited se
 
    - **Routes**
      - **Snap to Points:** If enabled, route nodes will try to snap to a nearby point of interest.
-     - **Quick Styles:** Four quick styles have been pre-configured which set the colour, thickness and style of line.
+     - **Quick Styles:** Four quick styles have been pre-configured which set the colour, thickness and style of line. These can be toggled on and off.
      - **Colour** / **Thickness** / **Style** Or each property can be customised. All three can be changed from inside the "Edit Details" (see above).
 
 #### Regions
@@ -273,7 +308,7 @@ You can change some of the map configuration settings.
 2. **Hydrology**
    - **Max Lake Size:** Set how large lakes can become. The larger the value, the more likely the lake will continue to grow until it finds a new path to flow down the terrain. Smaller values will result in more inland lakes which have no links to the ocean.
    - **Spring Altitude (Min):** Set the lowest elevation where river sources can randomly spawn. This prevents rivers trying to form on flat plains.
-   - **Spring Altitude (Max):** Set the highest elevation where river sources can randomly spawn. This prevents rivers trying to form on at the top of a mountain.
+   - **Spring Moisture (Min):** Set the minimum moisture level where river sources can randomly spawn. This prevents rivers trying to form in deserts.
    - **River Meander:** Set how much a river will meander as it flows downhill. A value of 0 will mean it flows in a straight line.
 
 3. **Climate**
@@ -302,6 +337,8 @@ This tool exports the map directly into a playable Foundry scene. It will create
 
 **How to export:**
 
+> Note: Re-exporting a map to an existing scene is a non-destructive process for the canvas. It will safely update the background and grid without deleting any walls, lighting, or tokens already placed on the scene. Re-exporting journals will overwrite existing content if that option is selected.
+
 1. Open the *Export to Scene* tool to launch the dialogue.
 
    ![Scene Export Dialogue](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/export-to-scene.png)
@@ -311,7 +348,7 @@ This tool exports the map directly into a playable Foundry scene. It will create
 4. Select if you want to generate the associated journal and map pins.
 5. If updating an existing scene, choose whether to overwrite the existing journal. *(Warning: Overwriting will delete any edits made manually to the journal made directly through normal Foundry tools).*
 
-   > Note: Re-exporting a map to an existing scene is a non-destructive process for the canvas. It will safely update the background and grid without deleting any walls, lighting, or tokens already placed on the scene. It is only re-exporting the journals that will overwrite existing content.
+   ![Exported Scene showing linked journal](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/exported-scene.png)
 
 6. Select if you want to extract the GM-only overlay tile.
 
@@ -323,9 +360,9 @@ When you click "Confirm", the interface will lock to prevent changes during the 
 
    > If the map has not been saved before it will ask for a filename. If it has been saved before it will show the map name in the tooltip. Saved maps are found in the compendium called *Filroden's World Map Builder* as Journals. If the map has been saved before, it will save any changes to the existing map inside the compendium.
 
-2. Each map is saved as a data file inside the journal. The journal also shows the main map generation settings.
+2. Each map is saved as a data file inside the journal. The journal also shows the main map generation settings. **Important:** Save often!
 
-   > **Important:** Save often!
+   ![Journal Page for Exported Map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/map-export-journal.png)
 
 #### Loading an Existing Map
 
@@ -346,11 +383,8 @@ The generator can be computationally heavy when calculating new terrain, moistur
 
 ## Roadmap
 
-The long-term vision for this module is to allow users to create a world map, zoom into an area of interest, and use those boundaries to generate a larger-scale, higher-detail regional map containing all the same geographical data.
-
-- Plateau terrain brush to paint flat terrain (still feathering into the surroundings).
-- Custom biome support for the brush tool.
 - Configure quick styles for routes, etc.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
 - A Sandbox Mode allowing the import of DEM or greyscale heightmaps to bypass the procedural generation entirely.
+- Simulate the effects of tectonic plate boundaries (convergent, divergent and lateral) and simulate the effects of hot spots and continental drift.

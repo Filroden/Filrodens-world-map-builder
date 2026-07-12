@@ -14,7 +14,7 @@
             </div>
         </div>
 
-        <div class="fwmb-brush-setting" data-tool-group="terrain biomes">
+        <div class="fwmb-brush-setting" data-tool-group="terrain">
             <label>{{localize "FILRODENSWMB.UI.BrushStrength"}}</label>
             <div class="fwmb-slider-group">
                 <input type="range" name="brushStrength" value="0.02" min="0.01" max="0.05" step="0.01" oninput="this.nextElementSibling.value = this.value" />
@@ -22,7 +22,7 @@
             </div>
         </div>
 
-        <div class="fwmb-brush-setting" data-tool-group="terrain biomes">
+        <div class="fwmb-brush-setting" data-tool-group="terrain">
             <label>{{localize "FILRODENSWMB.UI.BrushFeather"}}</label>
             <div class="fwmb-slider-group">
                 <input type="range" name="brushFeather" value="0.4" min="0" max="0.8" step="0.1" oninput="this.nextElementSibling.value = this.value" />
@@ -34,14 +34,41 @@
             <label>{{localize "FILRODENSWMB.UI.BrushBiome"}}</label>
             <select name="brushBiome">
                 {{#each biomeList}}
-                    <option value="{{this.id}}">{{localize this.label}}</option>
+                    <option value="{{this.id}}" {{#if (eq ../uiState.brushBiome this.id)}}selected{{/if}}>
+                        {{#if this.isCustom}}
+                            {{this.label}}
+                        {{else}}
+                            {{localize this.label}}
+                        {{/if}}
+                    </option>
                 {{/each}}
             </select>
         </div>
 
+        <button type="button" data-tool-group="scene" data-action="setBrushTool" data-tool="crop" class="fwmb-btn fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegionalMap'}}">
+            <i class="fwmb-icon crop"></i>
+        </button>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="scene">
+            <label>{{localize "FILRODENSWMB.UI.RegionalResolution"}}</label>
+            <div class="fwmb-flex-row">
+                <input type="number" name="regionalTargetWidth" value="{{lookup uiState 'regionalTargetWidth'}}" class="fwmb-flex-1" title="{{localize 'FILRODENSWMB.UI.TargetWidth'}}" step="100" min="500" />
+                <span style="align-self: center; margin: 0 4px;">x</span>
+                <input type="number" name="regionalTargetHeight" value="{{lookup uiState 'regionalTargetHeight'}}" class="fwmb-flex-1" disabled title="{{localize 'FILRODENSWMB.UI.CalculatedHeight'}}" />
+            </div>
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="scene">
+            <label>{{localize "FILRODENSWMB.UI.RegionalLatitude"}}</label>
+            <div class="fwmb-setting-row" style="justify-content: space-between; font-size: 0.9em;">
+                <span>{{localize "FILRODENSWMB.UI.LatTop"}}: <strong id="fwmb-readout-lat-top">--&deg;</strong></span>
+                <span>{{localize "FILRODENSWMB.UI.LatBottom"}}: <strong id="fwmb-readout-lat-bottom">--&deg;</strong></span>
+            </div>
+        </div>
+
     </div>
 
-    <div class="fwmb-divider-vertical" data-tool-group="terrain biomes"></div>
+    <div class="fwmb-divider-vertical" data-tool-group="regional terrain biomes"></div>
 
     <div class="fwmb-brush-tools">
 
@@ -57,6 +84,9 @@
         <button type="button" data-tool-group="terrain" data-action="setBrushTool" data-tool="slopeUp" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSlopeUp'}}">
             <i class="fwmb-icon slope"></i>
         </button>
+        <button type="button" data-tool-group="terrain" data-action="setBrushTool" data-tool="level" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolLevel'}}">
+            <i class="fwmb-icon plateau"></i>
+        </button>
         <button type="button" data-tool-group="terrain" data-action="setBrushTool" data-tool="slopeDown" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSlopeDown'}}">
             <i class="fwmb-icon slope reverse"></i>
         </button>
@@ -69,15 +99,11 @@
             <i class="fwmb-icon water-drop"></i>
         </button>
 
-        <button type="button" data-tool-group="features" data-action="setBrushTool" data-tool="blockSpring" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolBlockSpring'}}">
-            <i class="fwmb-icon format-color-reset"></i>
-        </button>
-
         <button type="button" data-tool-group="features" data-action="setBrushTool" data-tool="erasePin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolErasePin'}}">
             <i class="fwmb-icon ink-eraser"></i>
         </button>
 
-                <button type="button" data-tool-group="infrastructure" data-action="setInfraMode" data-mode="pin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ModePin'}}">
+        <button type="button" data-tool-group="infrastructure" data-action="setInfraMode" data-mode="pin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ModePin'}}">
             <i class="fwmb-icon place"></i>
         </button>
 
@@ -94,13 +120,13 @@
             <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
             <div class="fwmb-custom-select" id="fwmb-pin-select">
                 <div class="fwmb-select-trigger" data-action="togglePinDropdown">
-                    <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{uiState.activeIcon}}.svg" class="fwmb-active-icon-img" />
-                    <i class="fwmb-icon arrow-drop-down invert"></i>
+                    <i class="fwmb-icon {{uiState.activeIcon}}"></i>
+                    <i class="fwmb-icon arrow-drop-down"></i>
                 </div>
                 <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
                     {{#each infrastructureIcons}}
-                    <button type="button" class="fwmb-icon-btn {{#if (eq ../uiState.activeIcon this.id)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.id}}" data-tooltip="{{localize this.label}}">
-                        <img src="modules/filrodens-world-map-builder/assets/pinhead-icons/{{this.id}}.svg" alt="{{localize this.label}}" />
+                    <button type="button" class="fwmb-btn {{#if (eq ../uiState.activeIcon this.id)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.id}}" data-tooltip="{{localize this.label}}">
+                        <i class="fwmb-icon {{this.id}}" alt="{{localize this.label}}"></i>
                     </button>
                     {{/each}}
                 </div>
@@ -111,7 +137,7 @@
             <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
             <div class="fwmb-flex-row" style="gap: 4px;">
                 {{#each routeStyles}}
-                <button type="button" class="fwmb-btn outline small wide {{#if (eq ../uiState.activeRouteQuickStyle this.id)}}active{{/if}}" data-action="setRouteStyle" data-style="{{this.id}}">
+                <button type="button" class="fwmb-btn outline wide {{#if (eq ../uiState.activeRouteQuickStyle this.id)}}active{{/if}}" data-action="setRouteStyle" data-style="{{this.id}}">
                     {{localize this.label}}
                 </button>
                 {{/each}}
@@ -146,7 +172,11 @@
 
     </div>
 
-    <button type="button" data-tool-group="regions" data-action="setRegionMode" data-mode="draw" class="active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.DrawRegion'}}">
+    <button type="button" data-tool-group="scene" data-action="generateRegionalMap" class="fwmb-btn primary wide fwmb-hidden">
+        <i class="fwmb-icon map"></i> {{localize "FILRODENSWMB.UI.GenerateMap"}}
+    </button>
+
+    <button type="button" data-tool-group="regions" data-action="setRegionMode" data-mode="draw" class="fwmb-btn active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.DrawRegion'}}">
         <i class="fwmb-icon edit"></i>
     </button>
 
@@ -203,13 +233,13 @@
         </div>
     </div>
 
-    <div class="hint fwmb-centered" data-tool-group="labels">
+    <div class="fwmb-hint fwmb-centered" data-tool-group="labels">
         {{localize "FILRODENSWMB.UI.LabelHelpText"}}
     </div>
 
     <div class="fwmb-divider-vertical" data-tool-group="terrain biomes features infrastructure regions labels cartography"></div>
 
-    <div class="fwmb-brush-history">
+    <div class="fwmb-brush-history" data-tool-group="terrain biomes features infrastructure regions labels cartography">
         <button type="button" data-action="undoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}">
             <i class="fwmb-icon undo"></i>
         </button>

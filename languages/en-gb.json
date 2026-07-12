@@ -2,5 +2,6 @@
     "FILRODENSWMB.Actions.Randomize": "Randomise Seed",
     "FILRODENSWMB.UI.SettingsBiomeColors": "Biome Colours",
     "FILRODENSWMB.UI.LineColor": "Colour",
-    "FILRODENSWMB.UI.FillColor": "Fill Colour"
+    "FILRODENSWMB.UI.FillColor": "Fill Colour",
+    "FILRODENSWMB.Settings.ThemeHue.Name": "Colour Theme"
 }

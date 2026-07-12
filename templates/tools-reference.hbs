@@ -6,7 +6,7 @@
             <label>{{localize "FILRODENSWMB.UI.ImageSource"}}</label>
             <div class="fwmb-flex-row" style="gap: 8px; align-items: center;">
                 <file-picker name="referenceImage" type="image" value="{{uiState.referenceImage}}" style="flex: 1;"></file-picker>
-                <button type="button" class="fwmb-icon-btn" data-action="removeReferenceImage" data-tooltip="{{localize 'FILRODENSWMB.UI.RemoveImage'}}">
+                <button type="button" class="fwmb-btn muted danger" data-action="removeReferenceImage" data-tooltip="{{localize 'FILRODENSWMB.UI.RemoveImage'}}">
                     <i class="fwmb-icon delete"></i>
                 </button>
             </div>
@@ -20,14 +20,20 @@
             </div>
         </div>
 
-        <div class="form-group stacked" style="margin-top: var(--filroden-space-m);">
+        <div class="form-group stacked" style="margin-top: var(--fwmb-space-m);">
             <label>{{localize "FILRODENSWMB.UI.MapTransform"}}</label>
             <div class="fwmb-transform-controls">
 
                 <div class="fwmb-transform-zoom">
-                    <button type="button" data-action="adjustReferenceScale" data-dir="1" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}"><i class="fwmb-icon zoom-in"></i></button>
-                    <button type="button" data-action="resetReferenceScale" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetScale'}}"><i class="fwmb-icon center-focus"></i></button>
-                    <button type="button" data-action="adjustReferenceScale" data-dir="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}"><i class="fwmb-icon zoom-out"></i></button>
+                    <button type="button" class="fwmb-btn" data-action="adjustReferenceScale" data-dir="1" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}">
+                        <i class="fwmb-icon zoom-in"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn" data-action="resetReferenceScale" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetScale'}}">
+                        <i class="fwmb-icon center-focus"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn" data-action="adjustReferenceScale" data-dir="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}">
+                        <i class="fwmb-icon zoom-out"></i>
+                    </button>
                 </div>
 
                 <div class="fwmb-transform-dpad">

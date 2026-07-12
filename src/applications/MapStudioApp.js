@@ -19,12 +19,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             resizable: true,
         },
         actions: {
+            addCustomBiome: MapStudioApp.#onAddCustomBiome,
             addDecoration: MapStudioApp.#onAddDecoration,
             addRegionLayer: MapStudioApp.#onAddRegionLayer,
             adjustNoiseScale: MapStudioApp.#onAdjustNoiseScale,
             adjustReferenceScale: MapStudioApp.#onAdjustReferenceScale,
             applyResolution: MapStudioApp.#onApplyResolution,
             changeTool: MapStudioApp.#onChangeTool,
+            deleteCustomBiome: MapStudioApp.#onDeleteCustomBiome,
             deleteDecoration: MapStudioApp.#onDeleteDecoration,
             deleteLabel: MapStudioApp.#onDeleteLabel,
             deletePin: MapStudioApp.#onDeletePin,
@@ -39,6 +41,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             editRoute: MapStudioApp.#onEditRoute,
             exportPng: MapStudioApp.#onExportPng,
             exportScene: MapStudioApp.#onExportScene,
+            generateRegionalMap: MapStudioApp.#onGenerateRegionalMap,
             importMapJson: MapStudioApp.#onImportMapJson,
             manageMap: MapStudioApp.#onManageMapAction,
             nudgeNoise: MapStudioApp.#onNudgeNoise,
@@ -141,6 +144,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             brushStrength: 0.02,
             brushFeather: 0.4,
             brushBiome: 6,
+            customBiomes: [],
 
             mapSeed: FILRODENSWMB.DEFAULTS.SEED,
             seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
@@ -156,7 +160,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             "noise.elevation.stretch": FILRODENSWMB.NOISE.ELEVATION.STRETCH,
             "noise.moisture.scale": FILRODENSWMB.NOISE.MOISTURE.SCALE,
             "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
+            "noise.temperature.scale": FILRODENSWMB.NOISE.TEMPERATURE.SCALE,
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
+            springsBaked: false,
 
             contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
             biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,
@@ -188,7 +194,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             regionLineColor: "#ffffff",
             regionLineThickness: 2,
             regionLineStyle: "solid",
-            regionSmoothing: false,
+            regionSmoothing: true,
             regionOpacity: 0.5,
 
             labelFontFamily: FILRODENSWMB.LABELS?.DEFAULT_FONT,
@@ -206,6 +212,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             cartographyBorderColor: "#000000",
             cartographyScaleX: 50,
             cartographyScaleY: FILRODENSWMB.DEFAULTS.MAP_HEIGHT - 50,
+
+            regionalTargetWidth: 1000,
+            regionalTargetHeight: 1000,
         };
 
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
@@ -269,8 +278,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     key: key,
                     label: `FILRODENSWMB.BIOMES.${key}`,
                     hex: rgbToHex(currentRgb),
+                    isCustom: false, // Ensure native biomes flag as false
                 };
             });
+
+        // Map custom biomes and append them to the UI list
+        const customBiomesMapped = (this.uiState.customBiomes || []).map((cb) => ({
+            id: cb.id,
+            key: `custom_${cb.id}`,
+            label: cb.name,
+            hex: rgbToHex(cb.color),
+            isCustom: true,
+        }));
+
+        context.biomeList = [...context.biomeList, ...customBiomesMapped];
 
         context.uiState = this.uiState;
         context.currentSaveName = this.currentSaveName;
@@ -290,26 +311,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
-            context.mapPins = (this.mapPins || []).filter((p) => !!p.icon);
-            context.mapRoutes = this.mapRoutes || [];
-            context.mapLabels = this.mapLabels || [];
-            context.mapDecorations = this.mapDecorations || [];
 
-            // Extract native Foundry fonts for the UI dropdown
+            const alphaSort = (a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+
+            context.mapPins = (this.mapPins || []).filter((p) => !!p.icon).sort(alphaSort);
+            context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort);
+            context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort);
+            context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
+
+            const autoLabels = [];
+
+            context.mapPins.forEach((p) => {
+                autoLabels.push({ ...p, dataType: "pin", displayVisibility: p.label?.visibility || "all" });
+            });
+
+            context.mapRoutes.forEach((r) => {
+                autoLabels.push({ ...r, dataType: "route", displayVisibility: r.label?.visibility || "all" });
+            });
+
+            (this.regionLayers || []).forEach((layer) => {
+                (layer.regions || []).forEach((r) => {
+                    autoLabels.push({ ...r, dataType: "region", layerId: layer.id, displayVisibility: r.label?.visibility || "all" });
+                });
+            });
+
+            // Sort the unified list alphabetically by name
+            context.autoLabels = autoLabels.toSorted(alphaSort);
+
             context.fontFamilies = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
 
-            // --- Auto-select the first layer if none are currently active ---
             if (this.regionLayers.length > 0 && !this.activeRegionLayerId) {
                 this.activeRegionLayerId = this.regionLayers[0].id;
             }
 
-            // Map the layers and inject a boolean flag for the 'active' highlighted state
-            context.regionLayers = this.regionLayers.map((layer) => ({
+            context.regionLayers = [...(this.regionLayers || [])].sort(alphaSort).map((layer) => ({
                 ...layer,
                 isActive: layer.id === this.activeRegionLayerId,
+                regions: [...(layer.regions || [])].sort(alphaSort),
             }));
 
-            // Inject the compendium list dynamically when navigating to the Manage tab
             if (this.activeTool === "manage") {
                 context.savedMaps = await getSavedMaps();
             }
@@ -348,6 +388,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine = new StudioCanvas(container);
             this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
             this.#wireBrushCallbacks();
+
+            this.canvasEngine.onCropUpdate = (cropBox) => {
+                const targetWidth = this.uiState.regionalTargetWidth;
+                const zoomScale = targetWidth / cropBox.width;
+                const calcHeight = Math.round(cropBox.height * zoomScale);
+
+                this.uiState.regionalTargetHeight = calcHeight;
+                const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
+                if (heightInput) heightInput.value = calcHeight;
+
+                const latRange = Math.abs(this.uiState.latTop - this.uiState.latBottom);
+                const newLatTop = this.uiState.latTop - (cropBox.y / this.mapHeight) * latRange;
+                const newLatBottom = this.uiState.latTop - ((cropBox.y + cropBox.height) / this.mapHeight) * latRange;
+
+                const latTopEl = this.element.querySelector("#fwmb-readout-lat-top");
+                const latBottomEl = this.element.querySelector("#fwmb-readout-lat-bottom");
+                if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;
+                if (latBottomEl) latBottomEl.innerHTML = `${newLatBottom.toFixed(2)}&deg;`;
+            };
         }
 
         const contextPanel = this.element.querySelector(".fwmb-context-panel");
@@ -406,6 +465,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         this.#repaintVectors();
                     }
                 }
+
+                // 5. Live-Update Regional Crop Target Height
+                if (name === "regionalTargetWidth" && this.canvasEngine) {
+                    const cropBox = this.canvasEngine.getCropData();
+                    if (cropBox && cropBox.width > 0) {
+                        const zoomScale = this.uiState.regionalTargetWidth / cropBox.width;
+                        const calcHeight = Math.round(cropBox.height * zoomScale);
+
+                        this.uiState.regionalTargetHeight = calcHeight;
+                        const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
+                        if (heightInput) heightInput.value = calcHeight;
+                    }
+                }
             };
 
             // Bind the listener to both continuous slides (input) and final clicks (change)
@@ -456,7 +528,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     const biomeKey = event.target.dataset.biome;
                     const hex = event.target.value;
                     const rgb = [Number.parseInt(hex.slice(1, 3), 16), Number.parseInt(hex.slice(3, 5), 16), Number.parseInt(hex.slice(5, 7), 16)];
-                    this.customBiomeColors[biomeKey] = rgb;
+
+                    if (biomeKey.startsWith("custom_")) {
+                        const id = Number.parseInt(biomeKey.split("_")[1]);
+                        const cb = this.uiState.customBiomes.find((c) => c.id === id);
+                        if (cb) cb.color = rgb;
+                    } else {
+                        this.customBiomeColors[biomeKey] = rgb;
+                    }
+
                     this.#repaintCanvas();
                     return;
                 }
@@ -579,9 +659,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
 
-            if (layer === "features" && ["addSpring", "blockSpring", "erasePin"].includes(tool)) {
-                // Allow clicking massive block zones, but keep a minimum 8px target for tiny pins
-                const clickedIndex = this.mapPins.findIndex((p) => {
+            if (layer === "features" && ["addSpring", "erasePin"].includes(tool)) {
+                // Strictly filter for feature pins, and search backwards to hit the top-most visual pin first
+                const clickedIndex = this.mapPins.findLastIndex((p) => {
+                    if (p.type !== "spring") return false;
                     const r = p.radius || 6;
                     return Math.hypot(p.x - x, p.y - y) <= Math.max(r, 8);
                 });
@@ -590,17 +671,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 if (tool === "erasePin") {
                     if (clickedIndex > -1) this.mapPins.splice(clickedIndex, 1);
-                } else {
-                    const pinType = tool === "addSpring" ? "spring" : "block_spring";
-                    const radius = tool === "blockSpring" ? getNum("brushSize") : 6;
-
-                    // Don't overwrite if placing a blocker, allow overlapping blockers for coverage
-                    if (clickedIndex > -1 && tool !== "blockSpring") {
-                        this.mapPins[clickedIndex].type = pinType;
-                        this.mapPins[clickedIndex].radius = radius;
-                    } else {
-                        this.mapPins.push({ id: foundry.utils.randomID(), x, y, type: pinType, radius: radius });
-                    }
+                } else if (clickedIndex === -1) {
+                    this.mapPins.push({ id: foundry.utils.randomID(), name: "River Source", x, y, type: "spring", radius: 6, visibility: "all" });
                 }
 
                 this.#repaintCanvas();
@@ -842,6 +914,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
+        // Compile a dual-key dictionary for the render buffers
+        const compiledPalette = {};
+        for (const [key, id] of Object.entries(FILRODENSWMB.BIOME_IDS)) {
+            const rgb = this.customBiomeColors[key] || FILRODENSWMB.BIOMES[key] || [0, 0, 0];
+            compiledPalette[id] = rgb;
+            compiledPalette[key] = rgb;
+        }
+        for (const cb of this.uiState.customBiomes || []) {
+            compiledPalette[cb.id] = cb.color;
+        }
+
         const params = {
             seaLevel: this.uiState["seaLevel"],
             globalTemp: this.uiState["globalTemp"],
@@ -853,6 +936,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             noise: {
                 offsetX: this.uiState["noise.offsetX"],
                 offsetY: this.uiState["noise.offsetY"],
+                moistureOffset: this.uiState["noise.moistureOffset"] ?? 10000,
+                tempOffset: this.uiState["noise.tempOffset"] ?? 20000,
                 elevation: {
                     scale: 1 / this.uiState["noise.elevation.scale"],
                     octaves: this.uiState["noise.elevation.octaves"],
@@ -863,7 +948,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     octaves: this.uiState["noise.moisture.octaves"],
                 },
                 temperature: {
-                    scale: 1 / FILRODENSWMB.NOISE.TEMPERATURE.SCALE,
+                    scale: 1 / (this.uiState["noise.temperature.scale"] || FILRODENSWMB.NOISE.TEMPERATURE.SCALE),
                     octaves: FILRODENSWMB.NOISE.TEMPERATURE.OCTAVES,
                 },
             },
@@ -876,7 +961,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             climate: {
                 altCooling: this.uiState["altCooling"],
                 freezingThreshold: this.uiState["freezingThreshold"],
+                windDistance: this.uiState.windDistance ?? 40,
             },
+            biomePalette: compiledPalette,
             customColors: this.customBiomeColors,
             display: {
                 contourInterval: this.uiState["contourInterval"],
@@ -999,12 +1086,39 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #applyBrushStroke(x, y) {
         if (!this.currentElevationData) return;
+
         const seaLevel = this.uiState["seaLevel"];
 
-        if (this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel)) {
-            this.#repaintCanvas();
-            this.debouncedGenerateClimate();
+        const hasBrushed = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel);
+
+        if (!hasBrushed) return;
+
+        // Biome overrides do not alter topography or climate math.
+        // Bypass the global procedural engine and surgically update only the biome WebGL texture.
+        if (this.activeTool === "biomes") {
+            const { currentSeed, params } = this.#getMapParameters();
+            const engine = new ProceduralEngine(currentSeed);
+
+            engine.createBiomesMap(
+                this.currentElevationData,
+                this.currentMoistureData,
+                this.currentTemperatureData,
+                this.currentBiomeOverrides,
+                this.mapWidth,
+                this.mapHeight,
+                seaLevel,
+                this.bufferWaterMask,
+                params,
+                this.bufferBiomes,
+            );
+
+            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
+            return;
         }
+
+        // Terrain edits cascade through the entire procedural climate model.
+        this.#repaintCanvas();
+        this.debouncedGenerateClimate();
     }
 
     async #rebuildFromHistory() {
@@ -1058,6 +1172,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         console.log("World Map Builder | Generating Features...");
         const t0 = performance.now();
 
+        // Bake procedural springs into permanent pins on first load or new map generation
+        if (!this.uiState.springsBaked) {
+            const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
+            for (const s of newSprings) {
+                this.mapPins.push({
+                    id: foundry.utils.randomID(),
+                    name: "River Source",
+                    x: s.x,
+                    y: s.y,
+                    type: "spring",
+                    radius: 6,
+                    visibility: "all",
+                });
+            }
+            this.uiState.springsBaked = true;
+            this.markDirty();
+        }
+
         this.currentRiverData = engine.generateRivers(
             this.currentElevationData,
             this.currentMoistureData,
@@ -1100,14 +1232,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.latBottom = p.latBottom;
         this.uiState.globalMoisture = p.globalMoisture;
         this.uiState.riverDensity = p.riverDensity;
+        this.uiState.springsBaked = payload.springsBaked ?? false;
 
         this.uiState["noise.offsetX"] = p.noise.offsetX;
         this.uiState["noise.offsetY"] = p.noise.offsetY;
-        this.uiState["noise.elevation.scale"] = Math.round(1 / p.noise.elevation.scale);
+        this.uiState["noise.moistureOffset"] = p.noise.moistureOffset ?? 10000;
+        this.uiState["noise.tempOffset"] = p.noise.tempOffset ?? 20000;
+        this.uiState.windDistance = p.climate?.windDistance ?? 40;
+        this.uiState["noise.elevation.scale"] = 1 / p.noise.elevation.scale;
         this.uiState["noise.elevation.octaves"] = p.noise.elevation.octaves;
         this.uiState["noise.elevation.stretch"] = p.noise.elevation.stretch;
-        this.uiState["noise.moisture.scale"] = Math.round(1 / p.noise.moisture.scale);
+        this.uiState["noise.moisture.scale"] = 1 / p.noise.moisture.scale;
         this.uiState["noise.moisture.octaves"] = p.noise.moisture.octaves;
+
+        this.uiState["noise.temperature.scale"] = p.noise.temperature?.scale ? 1 / p.noise.temperature.scale : FILRODENSWMB.NOISE.TEMPERATURE.SCALE;
+
+        this.uiState.customBiomes = payload.customBiomes || [];
 
         this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
@@ -1465,11 +1605,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const { currentSeed, params } = this.#getMapParameters();
             const payload = {
                 seed: currentSeed,
+                springsBaked: this.uiState.springsBaked,
                 mapWidth: this.mapWidth,
                 mapHeight: this.mapHeight,
                 gridType: this.uiState.gridType,
                 gridSize: this.uiState.gridSize,
                 params: params,
+                customBiomes: this.uiState.customBiomes,
                 history: this.brushEngine?.history || [],
                 mapPins: this.mapPins,
                 mapRoutes: this.mapRoutes,
@@ -1513,7 +1655,111 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return success;
     }
 
+    #getDerivedMapParameters(state) {
+        const compiledPalette = {};
+        for (const [key, id] of Object.entries(FILRODENSWMB.BIOME_IDS)) {
+            const rgb = this.customBiomeColors[key] || FILRODENSWMB.BIOMES[key] || [0, 0, 0];
+            compiledPalette[id] = rgb;
+            compiledPalette[key] = rgb;
+        }
+        for (const cb of state.customBiomes || []) {
+            compiledPalette[cb.id] = cb.color;
+        }
+
+        const params = {
+            seaLevel: state.seaLevel,
+            globalTemp: state.globalTemp,
+            seasonOffset: state.seasonOffset,
+            latTop: state.latTop,
+            latBottom: state.latBottom,
+            globalMoisture: state.globalMoisture,
+            riverDensity: state.riverDensity,
+            noise: {
+                offsetX: state["noise.offsetX"],
+                offsetY: state["noise.offsetY"],
+                moistureOffset: state["noise.moistureOffset"] ?? 10000,
+                tempOffset: state["noise.tempOffset"] ?? 20000,
+                elevation: {
+                    scale: 1 / state["noise.elevation.scale"],
+                    octaves: state["noise.elevation.octaves"],
+                    stretch: state["noise.elevation.stretch"],
+                },
+                moisture: {
+                    scale: 1 / state["noise.moisture.scale"],
+                    octaves: state["noise.moisture.octaves"],
+                },
+                temperature: {
+                    scale: 1 / (state["noise.temperature.scale"] || FILRODENSWMB.NOISE.TEMPERATURE.SCALE),
+                    octaves: FILRODENSWMB.NOISE.TEMPERATURE.OCTAVES,
+                },
+            },
+            hydrology: {
+                maxLakeSize: state.maxLakeSize,
+                springAltOffset: state.springAltOffset,
+                springMoistMin: state.springMoistMin,
+                meanderJitter: state.meanderJitter,
+            },
+            climate: {
+                altCooling: state.altCooling,
+                freezingThreshold: state.freezingThreshold,
+                windDistance: state.windDistance ?? 40,
+            },
+            biomePalette: compiledPalette,
+            customColors: this.customBiomeColors,
+            display: {
+                contourInterval: state.contourInterval,
+                biomeAlphaActive: state.biomeAlphaActive,
+                biomeAlphaInactive: state.biomeAlphaInactive,
+            },
+            cartography: {
+                scaleEnable: state.cartographyScaleEnable,
+                scaleUnits: state.cartographyScaleUnits,
+                scaleInterval: state.cartographyScaleInterval,
+                scaleValue: state.cartographyScaleValue,
+                scaleMajorTicks: state.cartographyScaleMajorTicks,
+                scaleMinorTicks: state.cartographyScaleMinorTicks,
+                scaleX: state.cartographyScaleX,
+                scaleY: state.cartographyScaleY,
+                borderEnable: state.cartographyBorderEnable,
+                borderStyle: state.cartographyBorderStyle,
+                borderColor: state.cartographyBorderColor,
+            },
+        };
+
+        return { currentSeed: state.mapSeed, params };
+    }
+
     // --- Action Handlers ---
+
+    static async #onAddCustomBiome(event, target) {
+        const name = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.AddCustomBiome") || "Add Custom Biome" },
+            content: `<div class="form-group"><label>Biome Name</label><input type="text" id="fwmb-biome-name" autofocus></div>`,
+            ok: { callback: (e, b) => b.form.querySelector("#fwmb-biome-name").value.trim() },
+        });
+
+        if (!name) return;
+
+        const currentIds = this.uiState.customBiomes.map((c) => c.id);
+        const nextId = currentIds.length > 0 ? Math.max(...currentIds) + 1 : 14;
+
+        this.uiState.customBiomes.push({
+            id: nextId,
+            name: name,
+            color: [128, 128, 128],
+        });
+
+        const select = this.element.querySelector('select[name="brushBiome"]');
+        if (select) {
+            const option = document.createElement("option");
+            option.value = nextId;
+            option.textContent = name;
+            select.appendChild(option);
+        }
+
+        this.render({ parts: ["context"] });
+        this.markDirty();
+    }
 
     static async #onAddDecoration(event, target) {
         if (!this.canvasEngine?.isEditMode) return;
@@ -1523,7 +1769,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
                 <input type="text" id="fwmb-dec-name" value="New Decoration">
             </div>
-            <div class="form-group fwmb-dialog-content" style="margin-top: var(--filroden-space-m);">
+            <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
                 <label>${game.i18n.localize("FILRODENSWMB.UI.ImageSource")}</label>
                 <file-picker id="fwmb-dec-src" type="image" value=""></file-picker>
             </div>
@@ -1787,6 +2033,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (this.canvasEngine) {
             this.canvasEngine.setReferenceMode(newTool === "reference");
+            if (this.canvasEngine.setCropMode) {
+                this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode);
+            }
         }
 
         if (editToolbar) {
@@ -1805,6 +2054,59 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#syncInfraModeButtons();
         this.#repaintVectors();
         this.render({ parts: ["toolbar", "context"] });
+    }
+
+    static async #onDeleteCustomBiome(event, target) {
+        const id = Number(target.dataset.id);
+
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
+            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteBiome")}</p>`,
+            modal: true,
+        });
+
+        if (!confirmed) return;
+
+        this.#pushVectorState();
+        this.uiState.customBiomes = this.uiState.customBiomes.filter((c) => c.id !== id);
+
+        if (Number(this.uiState.brushBiome) === id) {
+            this.uiState.brushBiome = 6;
+            this.#syncDOMToState();
+        }
+
+        const select = this.element.querySelector('select[name="brushBiome"]');
+        if (select) {
+            const option = select.querySelector(`option[value="${id}"]`);
+            if (option) option.remove();
+        }
+
+        // Fallback to Procedural
+        // 1. Wipe the active buffer globally
+        if (this.currentBiomeOverrides) {
+            const len = this.currentBiomeOverrides.length;
+            for (let i = 0; i < len; i++) {
+                if (this.currentBiomeOverrides[i] === id) {
+                    this.currentBiomeOverrides[i] = 0; // 0 = Procedural Engine Fallback
+                }
+            }
+        }
+
+        // 2. Scrub the brush history related to the deleted biome
+        if (this.brushEngine) {
+            const scrubHistory = (stroke) => {
+                if (stroke.layer !== "biome" || stroke.paintValue !== id) return;
+                stroke.paintValue = 0;
+            };
+            this.brushEngine.history.forEach(scrubHistory);
+            this.brushEngine.redoStack.forEach(scrubHistory);
+        }
+
+        // Redraw the canvas to show the healed procedural biomes
+        this.#repaintCanvas();
+
+        this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     static async #onDeleteDecoration(event, target) {
@@ -1915,7 +2217,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
                 <input type="text" id="fwmb-dec-name" value="${dec.name}">
             </div>
-            <div class="form-group fwmb-dialog-content" style="margin-top: var(--filroden-space-m);">
+            <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
                 <label>${game.i18n.localize("FILRODENSWMB.UI.Opacity")}</label>
                 <div class="fwmb-slider-group">
                     <input type="range" id="fwmb-dec-alpha" value="${dec.opacity ?? 1}" min="0.1" max="1" step="0.1" oninput="this.nextElementSibling.value = this.value" />
@@ -2277,20 +2579,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.element.style.cursor = "wait";
 
         try {
+            // Temporarily strip the camera transform so the PNG exports at a mathematically 1:1 scale with 0 offsets
+            const origX = this.canvasEngine.stage.position.x;
+            const origY = this.canvasEngine.stage.position.y;
+            const origScaleX = this.canvasEngine.stage.scale.x;
+            const origScaleY = this.canvasEngine.stage.scale.y;
+
+            this.canvasEngine.stage.position.set(0, 0);
+            this.canvasEngine.stage.scale.set(1, 1);
+
             ui.notifications.info(`FWMB | Extracting Player View...`);
             this.canvasEngine.setRenderPass("player");
-            this.#repaintVectors(); // Forces canvas to instantly hide GM items
+            this.#repaintVectors(); // Forces canvas to hide GM items
             const playerBlob = await this.canvasEngine.extractCanvasBlob("player");
 
             let gmBlob = null;
             if (config.createGmOverlay) {
                 ui.notifications.info(`FWMB | Extracting GM Overlay...`);
                 this.canvasEngine.setRenderPass("gm");
-                this.#repaintVectors(); // Forces canvas to instantly hide Player items
+                this.#repaintVectors(); // Forces canvas to hide Player items
                 gmBlob = await this.canvasEngine.extractCanvasBlob("gm");
             }
 
-            // Restore the normal view
+            // Restore the normal view and the exact camera transform the user was looking at
+            this.canvasEngine.stage.position.set(origX, origY);
+            this.canvasEngine.stage.scale.set(origScaleX, origScaleY);
             this.canvasEngine.setRenderPass("normal");
             this.#repaintVectors();
 
@@ -2303,6 +2616,198 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.element.style.pointerEvents = "auto";
             this.element.style.filter = "none";
             this.element.style.cursor = "default";
+        }
+    }
+
+    /**
+     * Executes the regional map extraction pipeline.
+     */
+    static async #onGenerateRegionalMap(event, target) {
+        if (!this.canvasEngine) return;
+
+        const cropBox = this.canvasEngine.getCropData();
+        if (!cropBox || cropBox.width <= 0 || cropBox.height <= 0) {
+            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnInvalidCrop") || "Please draw a valid crop area first.");
+            return;
+        }
+
+        this.element.style.pointerEvents = "none";
+        this.element.style.filter = "brightness(0.7)";
+        this.element.style.cursor = "wait";
+
+        try {
+            const baseTargetWidth = this.uiState.regionalTargetWidth;
+            const tempZoomScale = baseTargetWidth / cropBox.width;
+
+            // Calculate the scaled grid size first
+            const targetGridSize = Math.max(10, Math.round(this.uiState.gridSize * tempZoomScale));
+
+            // Snap the map dimensions to be perfect multiples of the new grid size
+            const targetWidth = Math.max(targetGridSize, Math.round(baseTargetWidth / targetGridSize) * targetGridSize);
+
+            // Recalculate true mathematical scale using the grid-snapped width
+            const zoomScale = targetWidth / cropBox.width;
+            const rawHeight = cropBox.height * zoomScale;
+
+            // Snap the height
+            const targetHeight = Math.max(targetGridSize, Math.round(rawHeight / targetGridSize) * targetGridSize);
+
+            const mapName = await foundry.applications.api.DialogV2.prompt({
+                window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save Regional Map As" },
+                content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${this.currentSaveName || "Map"} (Region)">`,
+                ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
+            });
+
+            if (!mapName) return;
+
+            this.#getMapParameters();
+            const state = foundry.utils.deepClone(this.uiState);
+
+            state.mapWidth = targetWidth;
+            state.mapHeight = targetHeight;
+
+            state["noise.offsetX"] = (state["noise.offsetX"] + cropBox.x) * zoomScale;
+            state["noise.offsetY"] = (state["noise.offsetY"] + cropBox.y) * zoomScale;
+
+            state["noise.moistureOffset"] = (state["noise.moistureOffset"] || 10000) * zoomScale;
+            state["noise.tempOffset"] = (state["noise.tempOffset"] || 20000) * zoomScale;
+            state.windDistance = (state.windDistance || 40) * zoomScale;
+
+            state["noise.elevation.scale"] = state["noise.elevation.scale"] * zoomScale;
+            state["noise.moisture.scale"] = state["noise.moisture.scale"] * zoomScale;
+            state["noise.temperature.scale"] = (state["noise.temperature.scale"] || FILRODENSWMB.NOISE.TEMPERATURE.SCALE) * zoomScale;
+
+            // Capture the original top latitude before mutating the state object
+            const originalLatTop = state.latTop;
+            const latRange = Math.abs(originalLatTop - state.latBottom);
+
+            state.latTop = originalLatTop - (cropBox.y / this.mapHeight) * latRange;
+            state.latBottom = originalLatTop - ((cropBox.y + cropBox.height) / this.mapHeight) * latRange;
+
+            state.gridSize = Math.max(10, Math.round(state.gridSize * zoomScale));
+
+            if (state.cartographyScaleEnable && state.cartographyScaleX !== undefined) {
+                const PADDING = 50;
+
+                state.cartographyScaleX = (state.cartographyScaleX - cropBox.x) * zoomScale;
+                state.cartographyScaleY = (state.cartographyScaleY - cropBox.y) * zoomScale;
+                state.cartographyScaleInterval = Math.round(state.cartographyScaleInterval * zoomScale);
+
+                state.cartographyScaleX = Math.max(PADDING, Math.min(state.cartographyScaleX, targetWidth - PADDING));
+                state.cartographyScaleY = Math.max(PADDING, Math.min(state.cartographyScaleY, targetHeight - PADDING));
+            }
+
+            const { currentSeed, params: newParams } = this.#getDerivedMapParameters(state);
+
+            // Translate Brush History
+            const newHistory = [];
+
+            for (const stroke of this.brushEngine.history) {
+                const translatedStroke = foundry.utils.deepClone(stroke);
+                translatedStroke.size *= zoomScale;
+
+                let isVisible = false;
+
+                for (const pt of translatedStroke.points) {
+                    pt.x = (pt.x - cropBox.x) * zoomScale;
+                    pt.y = (pt.y - cropBox.y) * zoomScale;
+
+                    // Lazy bounding box: retain if the stroke radius touches the new canvas
+                    if (pt.x + translatedStroke.size >= 0 && pt.x - translatedStroke.size <= targetWidth && pt.y + translatedStroke.size >= 0 && pt.y - translatedStroke.size <= targetHeight) {
+                        isVisible = true;
+                    }
+                }
+
+                if (isVisible) newHistory.push(translatedStroke);
+            }
+
+            const translateVectorList = (list) => {
+                const newList = [];
+                for (const item of list) {
+                    const translated = foundry.utils.deepClone(item);
+                    let isVisible = false;
+
+                    // Translate nested auto-label spatial coordinates only.
+                    // Do not scale the fontSize to maintain crisp typography.
+                    if (translated.label?.x !== undefined) {
+                        translated.label.x = (translated.label.x - cropBox.x) * zoomScale;
+                        translated.label.y = (translated.label.y - cropBox.y) * zoomScale;
+                    }
+
+                    // Standard spatial translation for point-based entities (Pins, Labels, Decorations)
+                    if (translated.x !== undefined && translated.y !== undefined) {
+                        translated.x = (translated.x - cropBox.x) * zoomScale;
+                        translated.y = (translated.y - cropBox.y) * zoomScale;
+
+                        // Generous 100px overflow buffer
+                        if (translated.x >= -100 && translated.x <= targetWidth + 100 && translated.y >= -100 && translated.y <= targetHeight + 100) {
+                            isVisible = true;
+                        }
+                    }
+                    // Standard spatial translation for node-based entities (Routes, Regions)
+                    else if (translated.points) {
+                        for (const pt of translated.points) {
+                            pt.x = (pt.x - cropBox.x) * zoomScale;
+                            pt.y = (pt.y - cropBox.y) * zoomScale;
+
+                            // Retain the entire vector if any single node is visible
+                            if (pt.x >= 0 && pt.x <= targetWidth && pt.y >= 0 && pt.y <= targetHeight) {
+                                isVisible = true;
+                            }
+                        }
+                    }
+
+                    if (isVisible) newList.push(translated);
+                }
+                return newList;
+            };
+
+            const newPins = translateVectorList(this.mapPins);
+            const newLabels = translateVectorList(this.mapLabels);
+            const newDecorations = translateVectorList(this.mapDecorations);
+            const newRoutes = translateVectorList(this.mapRoutes);
+
+            const newRegions = [];
+            for (const layer of this.regionLayers) {
+                const translatedLayer = foundry.utils.deepClone(layer);
+                translatedLayer.regions = translateVectorList(layer.regions);
+                if (translatedLayer.regions.length > 0) {
+                    newRegions.push(translatedLayer);
+                }
+            }
+
+            const payload = {
+                seed: currentSeed,
+                springsBaked: true,
+                mapWidth: targetWidth,
+                mapHeight: targetHeight,
+                gridType: state.gridType,
+                gridSize: state.gridSize,
+                params: newParams,
+                customBiomes: state.customBiomes,
+                history: newHistory,
+                mapPins: newPins,
+                mapRoutes: newRoutes,
+                regionLayers: newRegions,
+                mapLabels: newLabels,
+                mapDecorations: newDecorations,
+                parentId: this.currentSaveId,
+            };
+
+            const journal = await saveMapData(mapName, payload, null);
+            if (journal) ui.notifications.info(`Regional Map '${journal.name}' created successfully.`);
+        } catch (err) {
+            console.error("FWMB | Regional Map Generation Failed:", err);
+            ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.RegionalGenerationError") || "Failed to generate regional map.");
+        } finally {
+            this.element.style.pointerEvents = "auto";
+            this.element.style.filter = "none";
+            this.element.style.cursor = "default";
+
+            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
+            if (editBtn?.classList.contains("active")) {
+                editBtn.click();
+            }
         }
     }
 
@@ -2615,15 +3120,26 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     static #onSetInfrastructureIcon(event, target) {
-        this.uiState.activeIcon = target.dataset.icon;
+        const newIcon = target.dataset.icon;
+        this.uiState.activeIcon = newIcon;
         this.uiState.activeInfraMode = "pin";
         this.activeRouteId = null;
 
-        const triggerImg = this.element.querySelector(".fwmb-active-icon-img");
-        if (triggerImg) triggerImg.src = `modules/filrodens-world-map-builder/assets/pinhead-icons/${this.uiState.activeIcon}.svg`;
+        // Update the trigger icon so the UI shows the new selection
+        const triggerIcon = this.element.querySelector("#fwmb-pin-select .fwmb-select-trigger .fwmb-icon:first-child");
+        if (triggerIcon) {
+            triggerIcon.className = `fwmb-icon ${newIcon}`;
+        }
 
+        // Update the 'active' button state inside the dropdown grid
         const dropdown = this.element.querySelector("#fwmb-pin-select .fwmb-select-options");
-        if (dropdown) dropdown.classList.add("fwmb-hidden");
+        if (dropdown) {
+            for (const btn of dropdown.querySelectorAll("button")) {
+                btn.classList.toggle("active", btn.dataset.icon === newIcon);
+            }
+            // Hide the dropdown menu
+            dropdown.classList.add("fwmb-hidden");
+        }
 
         this.#syncInfraModeButtons();
     }
@@ -2693,17 +3209,29 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static #onSetRouteStyle(event, target) {
         const styleId = target.dataset.style;
-        const styleData = FILRODENSWMB.ROUTE_STYLES[styleId];
-
-        if (!styleData) return;
+        const currentStyle = this.uiState.activeRouteQuickStyle;
 
         this.uiState.activeInfraMode = "route";
-        this.uiState.activeRouteQuickStyle = styleId;
         this.activeRouteId = null;
 
-        this.uiState.routeColor = styleData.color;
-        this.uiState.routeThickness = styleData.thickness;
-        this.uiState.routeStyle = styleData.style;
+        // 1. If clicking the active style, toggle it off and revert to defaults
+        if (currentStyle === styleId) {
+            this.uiState.activeRouteQuickStyle = "custom";
+
+            this.uiState.routeColor = "#ffffff";
+            this.uiState.routeThickness = 3;
+            this.uiState.routeStyle = "solid";
+        }
+        // 2. Otherwise, apply the new quick style
+        else {
+            const styleData = FILRODENSWMB.ROUTE_STYLES[styleId];
+            if (!styleData) return;
+
+            this.uiState.activeRouteQuickStyle = styleId;
+            this.uiState.routeColor = styleData.color;
+            this.uiState.routeThickness = styleData.thickness;
+            this.uiState.routeStyle = styleData.style;
+        }
 
         this.#syncDOMToState();
         this.#syncInfraModeButtons();
@@ -2776,10 +3304,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!toolbar) return;
 
         const isActivating = toolbar.classList.toggle("fwmb-hidden") === false;
-        target.closest("button").classList.toggle("active");
+        target.closest("button").classList.toggle("active", isActivating);
+
+        toolbar.querySelectorAll("[data-tool-group]").forEach((el) => {
+            const allowedTools = el.dataset.toolGroup.split(" ");
+            let isVisible = allowedTools.includes(this.activeTool);
+
+            if (this.activeTool === "infrastructure" && allowedTools.some((t) => t.startsWith("infrastructure-"))) {
+                isVisible = allowedTools.includes(`infrastructure-${this.uiState.activeInfraMode}`);
+            }
+
+            el.classList.toggle("fwmb-hidden", !isVisible);
+        });
 
         if (this.canvasEngine) {
             this.canvasEngine.setEditMode(isActivating);
+
+            if (this.canvasEngine.setCropMode) {
+                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene");
+            }
         }
 
         if (this.activeTool !== "infrastructure" && this.activeTool !== "labels") {

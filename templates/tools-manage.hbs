@@ -1,10 +1,6 @@
 <div class="fwmb-tool-content">
-    <div class="fwmb-panel-header">
-        <h3>{{localize "FILRODENSWMB.UI.SavedMaps"}}</h3>
-    </div>
-
-    <div class="fwmb-map-list fwmb-scrollable stable">
-        {{#each savedMaps}}
+    {{#*inline "mapNode"}}
+        <div class="fwmb-accordion-group">
             <div class="fwmb-map-card" data-id="{{this.id}}">
                 <div class="fwmb-map-card-info">
                     {{this.name}}
@@ -33,16 +29,32 @@
                                 <i class="fwmb-icon file-export"></i>
                                 {{localize "FILRODENSWMB.UI.Export"}}
                             </button>
-                            <div class="fwmb-divider"></div>
-                            <button type="button" data-action="manageMap" data-action-type="delete" class="fwmb-danger">
+                            <button type="button" data-action="manageMap" data-action-type="delete" class="fwmb-danger" style="border-block-start: 1px solid var(--fwmb-border-subtle);">
                                 <i class="fwmb-icon delete"></i>
                                 {{localize "FILRODENSWMB.UI.Delete"}}
                             </button>
                         </div>
                     </div>
                 </div>
-
             </div>
+
+            {{#if this.children.length}}
+                <div class="fwmb-accordion-content" style="margin-left: 12px; padding-left: 8px; border-left: 2px solid var(--fwmb-border-subtle);">
+                    {{#each this.children}}
+                        {{> mapNode this}}
+                    {{/each}}
+                </div>
+            {{/if}}
+        </div>
+    {{/inline}}
+
+    <div class="fwmb-panel-header">
+        <h3>{{localize "FILRODENSWMB.UI.SavedMaps"}}</h3>
+    </div>
+
+    <div class="fwmb-map-list fwmb-scrollable stable">
+        {{#each savedMaps}}
+            {{> mapNode this}}
         {{else}}
             <div class="fwmb-empty-state">
                 <p>{{localize "FILRODENSWMB.UI.NoSavedMaps"}}</p>

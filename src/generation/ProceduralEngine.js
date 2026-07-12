@@ -16,23 +16,6 @@ export class ProceduralEngine {
         this.simplex = new SimplexNoise(this.prng);
     }
 
-    static BIOME_DICTIONARY = [
-        null, // 0 = Procedural
-        "DEEP_OCEAN",
-        "SHALLOW_OCEAN",
-        "SNOW",
-        "TUNDRA",
-        "TAIGA",
-        "GRASSLAND",
-        "DECIDUOUS_FOREST",
-        "TEMPERATE_RAINFOREST",
-        "TEMPERATE_DESERT",
-        "TROPICAL_RAINFOREST",
-        "SAVANNA",
-        "SUBTROPICAL_DESERT",
-        "PACK_ICE",
-    ];
-
     // Cardinal and ordinal directions for pathfinding to prevent array reallocation in tight loops
     static ADJACENT_OFFSETS = [
         { dx: 0, dy: -1 },
@@ -76,13 +59,15 @@ export class ProceduralEngine {
     }
 
     /**
-     * Samples the map to find high-altitude, high-moisture starting points.
+     * Extracts high-altitude, high-moisture starting points to be baked as permanent pins.
      */
-    #findSprings(elevationData, moistureData, width, height, seaLevel, targetCount, params) {
+    bakeProceduralSprings(elevationData, moistureData, width, height, params) {
         const springs = [];
+        const targetCount = params.riverDensity || 40;
         const maxAttempts = targetCount * 50;
         let attempts = 0;
 
+        const seaLevel = params.seaLevel || 0.35;
         const altOffset = params?.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
         const moistMin = params?.hydrology?.springMoistMin ?? FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN;
 
@@ -248,7 +233,6 @@ export class ProceduralEngine {
      * Calculates pure geographical altitude, applying exponents strictly to landmasses.
      */
     generateTopography(width, height, params, outBuffer) {
-        const totalPixels = width * height;
         const elevationData = outBuffer;
 
         const eScale = params.noise.elevation.scale;
@@ -289,7 +273,6 @@ export class ProceduralEngine {
      * Applies globally deterministic Orographic Lift via Western Horizon sampling.
      */
     generateClimateData(elevationData, width, height, params, outMoisture, outTemperature) {
-        const totalPixels = width * height;
         const moistureData = outMoisture;
         const temperatureData = outTemperature;
 
@@ -309,8 +292,8 @@ export class ProceduralEngine {
         const latBottom = params.latBottom;
         const latRange = Math.abs(latTop - latBottom);
 
-        const moistureOffset = 10000;
-        const tempOffset = 20000;
+        const moistureOffset = params.noise.moistureOffset ?? 10000;
+        const tempOffset = params.noise.tempOffset ?? 20000;
 
         // Fetch elevation parameters to calculate geographical slope
         const eScale = params.noise.elevation.scale;
@@ -343,7 +326,8 @@ export class ProceduralEngine {
                     const windCellBlend = Math.cos(absLat * (Math.PI / 45));
 
                     // The sampling distance now smoothly scales, rather than instantly snapping
-                    const windDirectionX = 40 * windCellBlend;
+                    const windDistance = params.climate?.windDistance ?? 40;
+                    const windDirectionX = windDistance * windCellBlend;
 
                     // 1. Calculate the raw noise upwind
                     const upwindNoise = this.#fbm(worldX + windDirectionX, worldY, eOctaves, eScale);
@@ -539,7 +523,6 @@ export class ProceduralEngine {
     createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer) {
         const totalPixels = width * height;
         const pixelBuffer = outBuffer;
-        const BIOMES = FILRODENSWMB.BIOMES;
 
         for (let i = 0; i < totalPixels; i++) {
             const bufferIndex = i * 4;
@@ -547,19 +530,27 @@ export class ProceduralEngine {
 
             // 1. Check for a manual brush override
             const overrideId = biomeOverrideData ? biomeOverrideData[i] : 0;
-            let biomeKey;
+
+            let lookupKey;
+            let isWater = false;
 
             if (overrideId > 0) {
-                biomeKey = ProceduralEngine.BIOME_DICTIONARY[overrideId];
+                lookupKey = overrideId;
+                // IDs 1 and 2 represent the native ocean brushes
+                if (overrideId === 1 || overrideId === 2) isWater = true;
             } else {
                 // 2. Fall back to procedural math if untouched
                 const temp = temperatureData[i];
                 const moisture = moistureData[i];
-                biomeKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
+                lookupKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
+
+                if (lookupKey === "DEEP_OCEAN" || lookupKey === "SHALLOW_OCEAN" || (waterMask && waterMask[i] > 0)) {
+                    isWater = true;
+                }
             }
 
             // Render Transparent Oceans
-            if (biomeKey === "DEEP_OCEAN" || biomeKey === "SHALLOW_OCEAN" || (waterMask && waterMask[i] > 0)) {
+            if (isWater) {
                 pixelBuffer[bufferIndex] = 0;
                 pixelBuffer[bufferIndex + 1] = 0;
                 pixelBuffer[bufferIndex + 2] = 0;
@@ -567,8 +558,9 @@ export class ProceduralEngine {
                 continue;
             }
 
-            // Render Solid Land/Ice using custom UI overrides if they exist
-            const color = params?.customColors?.[biomeKey] || BIOMES[biomeKey] || BIOMES.GRASSLAND;
+            // Render Solid Land/Ice using the unified palette lookup
+            const color = params?.biomePalette?.[lookupKey] || [0, 0, 0];
+
             pixelBuffer[bufferIndex] = color[0];
             pixelBuffer[bufferIndex + 1] = color[1];
             pixelBuffer[bufferIndex + 2] = color[2];
@@ -579,7 +571,6 @@ export class ProceduralEngine {
     }
 
     generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params, outRiverMap, outWaterMask) {
-        const riverDensity = params.riverDensity || 40;
         const seaLevel = params.seaLevel || 0.3;
 
         const rivers = [];
@@ -589,11 +580,8 @@ export class ProceduralEngine {
         riverMap.fill(0);
         waterMask.fill(0);
 
-        // 1. Setup springs
-        const { finalSprings, overrideSet, blockedSet } = this.#parseSpringPins(mapPins);
-        const proceduralSprings = this.#findSprings(elevationData, moistureData, width, height, seaLevel, riverDensity, params);
-
-        this.#mergeProceduralSprings(finalSprings, proceduralSprings, overrideSet, blockedSet);
+        // 1. Setup springs purely from the baked pins array
+        const finalSprings = this.#parseSpringPins(mapPins);
 
         // 2. Trace
         for (const spring of finalSprings) {
@@ -609,40 +597,17 @@ export class ProceduralEngine {
 
     #parseSpringPins(mapPins) {
         const finalSprings = [];
-        const overrideSet = new Set();
-        const blockedSet = new Set();
-
-        if (!mapPins) return { finalSprings, overrideSet, blockedSet };
+        if (!mapPins) return finalSprings;
 
         for (const pin of mapPins) {
-            if (pin.type === "spring") {
-                finalSprings.push({ x: pin.x, y: pin.y });
-                overrideSet.add(`${pin.x},${pin.y}`);
-            } else if (pin.type === "block_spring") {
-                const r = Math.round(pin.radius || 1);
-                const rSq = r * r; // Pre-calculate squared radius to avoid hypot in tight loops
-                const px = Math.round(pin.x);
-                const py = Math.round(pin.y);
-
-                for (let dy = -r; dy <= r; dy++) {
-                    for (let dx = -r; dx <= r; dx++) {
-                        if (dx * dx + dy * dy <= rSq) {
-                            blockedSet.add(`${px + dx},${py + dy}`);
-                        }
-                    }
-                }
+            if (pin.type === "spring" && pin.visibility !== "none") {
+                finalSprings.push({
+                    x: Math.round(pin.x),
+                    y: Math.round(pin.y),
+                });
             }
         }
-        return { finalSprings, overrideSet, blockedSet };
-    }
-
-    #mergeProceduralSprings(finalSprings, proceduralSprings, overrideSet, blockedSet) {
-        for (const spring of proceduralSprings) {
-            if (blockedSet.has(`${spring.x},${spring.y}`)) continue;
-            if (!overrideSet.has(`${spring.x},${spring.y}`)) {
-                finalSprings.push(spring);
-            }
-        }
+        return finalSprings;
     }
 
     /**

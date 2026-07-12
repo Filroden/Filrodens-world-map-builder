@@ -11,7 +11,7 @@
                     <i class="fwmb-icon shuffle"></i>
                 </button>
             </div>
-            <div class="hint">{{localize "FILRODENSWMB.UI.SeedHint"}}</div>
+            <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.SeedHint"}}</div>
         </div>
 
         <div class="form-group stacked">
@@ -21,10 +21,26 @@
                 <span style="align-self: center;">x</span>
                 <input type="number" name="mapHeight" class="fwmb-flex-1" value="{{uiState.mapHeight}}" min="500" max="4000" step="100" />
             </div>
-            <button type="button" class="fwmb-btn danger" data-action="applyResolution">
-                {{localize "FILRODENSWMB.UI.ApplyResolution"}}
-            </button>
         </div>
+
+        <div class="form-group stacked">
+            <label>{{localize "FILRODENSWMB.UI.Latitude"}}</label>
+            <div class="fwmb-flex-row">
+                <div class="fwmb-flex-1 form-group">
+                    <label class="fwmb-hint">{{localize "FILRODENSWMB.UI.LatTop"}}</label>
+                    <input type="number" name="latTop" value="{{lookup uiState 'latTop'}}" min="-90" max="90" />
+                </div>
+                <div class="fwmb-flex-1 form-group">
+                    <label class="fwmb-hint">{{localize "FILRODENSWMB.UI.LatBottom"}}</label>
+                    <input type="number" name="latBottom" value="{{lookup uiState 'latBottom'}}" min="-90" max="90" />
+                </div>
+            </div>
+        </div>
+
+        <button type="button" class="fwmb-btn" data-action="applyResolution">
+            {{localize "FILRODENSWMB.UI.ApplyResolution"}}
+        </button>
+
     </fieldset>
 
     <fieldset class="fwmb-fieldset">
@@ -48,5 +64,12 @@
             </div>
         </div>
     </fieldset>
+
+    <div class="fwmb-flex-1"></div>
+    <div class="fwmb-divider"></div>
+
+    <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditCanvasHint'}}">
+        {{localize "FILRODENSWMB.UI.EditCanvas"}}
+    </button>
 
 </div>
