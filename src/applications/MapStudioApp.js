@@ -625,7 +625,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 btn.classList.add("active");
             }
 
-            setTimeout(() => this.generateTerrain(), 50);
+            // Force the initial default map to be considered "clean" so it
+            // doesn't trigger save warnings if the user just wants to load a file.
+            setTimeout(async () => {
+                await this.generateTerrain();
+                this.isDirty = false;
+            }, 50);
         }
 
         if (this.canvasEngine?.isEditMode) {
