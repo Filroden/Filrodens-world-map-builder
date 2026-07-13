@@ -26,7 +26,7 @@ Maps are saved in Journals and stored in a Journal Compendium. The procedural pl
 - **Export to Scene**: All features (and entire layers) can be set to be visible to players, GMs or no-one. When you export the map to create a new Foundry Scene, it will export the player visible elements to the background image and place a map tile over it containing the GM-only features. A Scene Journal is also created which contains any feature names and descriptions and each feature is linked from the map to the journal using map pins.
 - **Export to PNG**: If you want to save the map for external use, you can also export the current visible features to a PNG file.
 - **Interactive 3D Visualisation**: View your 2D cartography in an interactive 3D web view. The biome map is draped over your custom topography, complete with topographical river vectors, ocean planes, and dynamic lighting. This feature is purely visual and included for fun. It will not update to any changes made until it is toggled again.
-- **Compendium Integration**: Maps are saved directly to a dedicated compendium. Each save automatically generates a readable journal showing your parameters. The application UI contains map management tools which allow you to easily load, duplicate, rename, or export your worlds as shareable JSON files.
+- **Compendium Integration**: Maps are saved directly to a dedicated compendium. Each save automatically generates a readable journal showing your parameters. The application UI contains map management tools which let you to load, duplicate, rename, or export your worlds as shareable JSON files.
 
 ---
 
@@ -36,7 +36,7 @@ Maps are saved in Journals and stored in a Journal Compendium. The procedural pl
 
 ---
 
-#### Regional Map generated from the above World Map (generated at 4000 x 2730 pixels)
+#### Regional Map created from the above World Map (generated at 4000 x 2730 pixels)
 
 ![Regional Map generated from the World map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/regional-map.png)
 
