@@ -49,10 +49,10 @@
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.GridType"}}</label>
             <select name="gridType">
-                <option value="none">{{localize "FILRODENSWMB.UI.GridNone"}}</option>
-                <option value="square">{{localize "FILRODENSWMB.UI.GridSquare"}}</option>
-                <option value="hexR">{{localize "FILRODENSWMB.UI.GridHexRows"}}</option>
-                <option value="hexC">{{localize "FILRODENSWMB.UI.GridHexCols"}}</option>
+                <option value="none" {{#if (eq uiState.gridType "none")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridNone"}}</option>
+                <option value="square" {{#if (eq uiState.gridType "square")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridSquare"}}</option>
+                <option value="hexR" {{#if (eq uiState.gridType "hexR")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridHexRows"}}</option>
+                <option value="hexC" {{#if (eq uiState.gridType "hexC")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridHexCols"}}</option>
             </select>
         </div>
 
