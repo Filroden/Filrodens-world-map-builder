@@ -354,6 +354,8 @@ This tool exports the map directly into a playable Foundry scene. It will create
 
 When you click "Confirm", the interface will lock to prevent changes during the extraction process. When completed, your canvas will switch to view the new scene.
 
+> Note: FoundryVTT Version 14 offers no way to completely hide map tiles from a GM's view, only from players. The module "Tile Sort" by TheRipper93 enables that feature.
+
 #### Saving a Map
 
 1. Use the *Quick Save* tool found near the bottom of the toolbar.
