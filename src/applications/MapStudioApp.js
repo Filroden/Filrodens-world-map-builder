@@ -134,9 +134,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#allocateBuffers();
         this.hasBooted = false;
 
-        this.defaultUiState = {
-            mapWidth: FILRODENSWMB.DEFAULTS.MAP_WIDTH,
-            mapHeight: FILRODENSWMB.DEFAULTS.MAP_HEIGHT,
+        this.defaultUiState = this.#buildDefaultUiState(this.mapWidth, this.mapHeight);
+
+        this.uiState = foundry.utils.deepClone(this.defaultUiState);
+        this.customBiomeColors = {};
+
+        this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), 800);
+        this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), 800);
+        this.debouncedGenerateFeatures = foundry.utils.debounce(this.generateFeatures.bind(this), 600);
+    }
+
+    #buildDefaultUiState(width, height) {
+        // Calculate the scale ratio based on the 1000px baseline
+        const baseline = Math.max(FILRODENSWMB.DEFAULTS.MAP_WIDTH, FILRODENSWMB.DEFAULTS.MAP_HEIGHT) || 1000;
+        const maxDim = Math.max(width, height);
+        const ratio = maxDim / baseline;
+
+        return {
+            mapWidth: width,
+            mapHeight: height,
             gridType: "square",
             gridSize: 50,
             gridVisible: false,
@@ -155,12 +171,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             globalMoisture: FILRODENSWMB.DEFAULTS.GLOBAL_MOISTURE,
             "noise.offsetX": 0,
             "noise.offsetY": 0,
-            "noise.elevation.scale": FILRODENSWMB.NOISE.ELEVATION.SCALE,
+
+            // Normalise the three noise scales based on the resolution ratio (capped safely at 8000)
+            "noise.elevation.scale": Math.min(Math.max(100, Math.round(FILRODENSWMB.NOISE.ELEVATION.SCALE * ratio)), 8000),
             "noise.elevation.octaves": FILRODENSWMB.NOISE.ELEVATION.OCTAVES,
             "noise.elevation.stretch": FILRODENSWMB.NOISE.ELEVATION.STRETCH,
-            "noise.moisture.scale": FILRODENSWMB.NOISE.MOISTURE.SCALE,
+            "noise.moisture.scale": Math.min(Math.max(100, Math.round(FILRODENSWMB.NOISE.MOISTURE.SCALE * ratio)), 8000),
             "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
-            "noise.temperature.scale": FILRODENSWMB.NOISE.TEMPERATURE.SCALE,
+            "noise.temperature.scale": Math.min(Math.max(100, Math.round(FILRODENSWMB.NOISE.TEMPERATURE.SCALE * ratio)), 8000),
+
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
             springsBaked: false,
 
@@ -185,8 +204,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             referenceImage: "",
             referenceAlpha: 0.5,
             referenceScale: 1,
-            referenceX: FILRODENSWMB.DEFAULTS.MAP_WIDTH / 2,
-            referenceY: FILRODENSWMB.DEFAULTS.MAP_HEIGHT / 2,
+            referenceX: width / 2,
+            referenceY: height / 2,
 
             regionPresets: FILRODENSWMB.REGIONS.PRESETS,
             regionFillColor: "#c6af53",
@@ -211,18 +230,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             cartographyBorderStyle: "solid",
             cartographyBorderColor: "#000000",
             cartographyScaleX: 50,
-            cartographyScaleY: FILRODENSWMB.DEFAULTS.MAP_HEIGHT - 50,
+            cartographyScaleY: height - 50,
 
             regionalTargetWidth: 1000,
             regionalTargetHeight: 1000,
         };
-
-        this.uiState = foundry.utils.deepClone(this.defaultUiState);
-        this.customBiomeColors = {};
-
-        this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), 400);
-        this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), 200);
-        this.debouncedGenerateFeatures = foundry.utils.debounce(this.generateFeatures.bind(this), 200);
     }
 
     markDirty() {
@@ -1218,6 +1230,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.mapWidth = payload.mapWidth;
         this.mapHeight = payload.mapHeight;
+
         this.uiState.mapWidth = this.mapWidth;
         this.uiState.mapHeight = this.mapHeight;
         this.uiState.gridType = payload.gridType || "square";
@@ -1314,6 +1327,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.brushEngine.redoStack = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
+
+        this.defaultUiState = foundry.utils.deepClone(this.uiState);
 
         this.#syncDOMToState();
         this.#updateGrid();
@@ -1943,10 +1958,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.#allocateBuffers();
 
-        // --- Master State Reset ---
+        this.defaultUiState = this.#buildDefaultUiState(newWidth, newHeight);
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
-        this.uiState.mapWidth = newWidth;
-        this.uiState.mapHeight = newHeight;
         this.uiState.mapSeed = newSeed;
 
         // Reset biome colors to defaults so the DOM sync catches them
@@ -2019,22 +2032,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 biomesBtn.classList.add("active");
                 this.canvasEngine?.toggleLayer("biomes", true);
             }
-            this.#updateBiomeOpacity();
         } else if (newTool === "terrain") {
             const topoBtn = this.element.querySelector('[data-layer="topography"]');
             if (topoBtn && !topoBtn.classList.contains("active")) {
                 topoBtn.classList.add("active");
                 this.canvasEngine?.toggleLayer("topography", true);
             }
-            this.#updateBiomeOpacity();
         } else if (newTool === "features") {
             const featuresBtn = this.element.querySelector('[data-layer="features"]');
             if (featuresBtn && !featuresBtn.classList.contains("active")) {
                 featuresBtn.classList.add("active");
                 this.canvasEngine?.toggleLayer("features", true);
             }
-            this.#updateBiomeOpacity();
         }
+
+        this.#updateBiomeOpacity();
 
         if (this.canvasEngine) {
             this.canvasEngine.setReferenceMode(newTool === "reference");

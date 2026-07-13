@@ -204,6 +204,8 @@ export class BrushEngine {
             const slopeInfluence = Math.pow(influence, 4);
             elevationData[index] = currentElevation * (1 - slopeInfluence) + this.activeSlopeElevation * slopeInfluence;
         }
+
+        elevationData[index] = Math.max(0, elevationData[index]);
     }
 
     #applyBiomeMath(index, x, y, influence, elevationData, biomeOverrideData, seaLevel) {
