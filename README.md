@@ -79,6 +79,22 @@ As you move the mouse pointer over the map, a display of the elevation, moisture
 
 There are map controls in the bottom right corner of the map (only visible when the mouse is inside the map canvas).
 
+<div style="display: flex; overflow-x:auto; gap: 1rem; margin: 1rem;">
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-create-new-map.png" alt="Create New Map Tool" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-terrain.png" alt="Terrain Tool" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-biomes.png" alt="Biome Tool" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-terrain-features.png" alt="Terrain Features Tool" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-infrastructure.png" alt="Infrastructure Tool" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-regions.png" alt="Regions Tool" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-labels.png" alt="Labels Tool" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-cartographic-decorations.png" alt="Cartographic Decorations Tool" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-reference-image.png" alt="Reference Image" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-map-configuration.png" alt="Map Configuration" />
+   <img src="https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/tool-manage.png" alt="Manage Maps" />
+</div>
+
+---
+
 ![Map Controls](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/map-controls.png)
 
 - The first three icons toggle different views of the map: the player-visible features, GM-visible features and hidden features.
