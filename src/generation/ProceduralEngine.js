@@ -372,6 +372,14 @@ export class ProceduralEngine {
         const totalPixels = width * height;
         const pixelBuffer = outBuffer;
 
+        // Perform a highly performant pre-pass to find the true map ceiling
+        let maxElevation = 1.0;
+        for (let i = 0; i < totalPixels; i++) {
+            if (elevationData[i] > maxElevation) {
+                maxElevation = elevationData[i];
+            }
+        }
+
         for (let i = 0; i < totalPixels; i++) {
             const elevation = elevationData[i];
             const bufferIndex = i * 4;
@@ -382,7 +390,8 @@ export class ProceduralEngine {
                 const temp = temperatureData ? temperatureData[i] : 1;
                 this.#paintLakePixel(pixelBuffer, bufferIndex, elevation, waterMask[i], temp, params);
             } else {
-                this.#paintLandPixel(pixelBuffer, bufferIndex, elevation, seaLevel);
+                // Pass the dynamic maximum into the land painter
+                this.#paintLandPixel(pixelBuffer, bufferIndex, elevation, seaLevel, maxElevation);
             }
         }
         return pixelBuffer;
@@ -412,9 +421,18 @@ export class ProceduralEngine {
         pixelBuffer[bufferIndex + 3] = 255;
     }
 
-    #paintLandPixel(pixelBuffer, bufferIndex, elevation, seaLevel) {
-        const heightParam = seaLevel < 1 ? (elevation - seaLevel) / (1 - seaLevel) : 1;
-        const grayValue = Math.max(60, 200 - 140 * heightParam);
+    #paintLandPixel(pixelBuffer, bufferIndex, elevation, seaLevel, maxElevation) {
+        // Prevent division by zero in the edge case of a completely flat map
+        const safeMax = Math.max(maxElevation, seaLevel + 0.01);
+
+        // Dynamically normalise the elevation against the true maximum peak
+        const heightParam = seaLevel < safeMax ? (elevation - seaLevel) / (safeMax - seaLevel) : 1;
+
+        const COLOR_BASE = 200;
+        const COLOR_RANGE = 140;
+        const MIN_BRIGHTNESS = 60;
+
+        const grayValue = Math.max(MIN_BRIGHTNESS, COLOR_BASE - COLOR_RANGE * heightParam);
 
         pixelBuffer[bufferIndex] = grayValue;
         pixelBuffer[bufferIndex + 1] = grayValue;
@@ -426,18 +444,19 @@ export class ProceduralEngine {
         let total = 0;
         let frequency = scale;
         let amplitude = 1;
-        let maxValue = 0;
+        let maxAmplitude = 0;
 
         for (let i = 0; i < octaves; i++) {
-            const noiseVal = (this.simplex.noise2D(x * frequency, y * frequency) + 1) / 2;
+            const noiseVal = this.simplex.noise2D(x * frequency, y * frequency);
             total += noiseVal * amplitude;
-
-            maxValue += amplitude;
+            maxAmplitude += amplitude;
             amplitude *= 0.5;
             frequency *= 2;
         }
 
-        return total / maxValue;
+        const normalized = total / maxAmplitude;
+
+        return Math.max(0, (normalized + 1) / 2);
     }
 
     /**
