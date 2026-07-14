@@ -40,13 +40,13 @@ The following are two examples of maps I created in the module together with lin
 
 ![World map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/original-map.png)
 
-Link to map JSON file: <https://github.com/Filroden/Filrodens-world-map-builder/samples/fwmb_aethoria.json> (36 KB)
+Link to map JSON file: [https://github.com/Filroden/Filrodens-world-map-builder/samples/fwmb_aethoria.json](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/samples/fwmb_aethoria.json) (36 KB)
 
 #### Regional Map created from the above World Map (generated at 4000 x 2730 pixels)
 
 ![Regional Map generated from the World map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/regional-map.png)
 
-Link to map JSON file: <https://github.com/Filroden/Filrodens-world-map-builder/samples/fwmb_eldoria.json> (32 KB)
+Link to map JSON file: [<https://github.com/Filroden/Filrodens-world-map-builder/samples/fwmb_eldoria.json>](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/samples/fwmb_eldoria.json) (32 KB)
 
 ---
 
