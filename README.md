@@ -16,6 +16,8 @@ Filroden's World Map Builder is a system-agnostic cartography tool. It generates
 
 Maps are saved in Journals and stored in a Journal Compendium. The procedural plus non-destructive brush approach means the resulting saved journal is very compact in size.
 
+![Module Interface](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/interface.png)
+
 ### Main Features
 
 - **Advanced Procedural Generation**: The underlying engine calculates authentic topography using layered noise and geological stretch parameters. It dynamically simulates climate by mapping global temperature gradients and tracking geographical orographic lift (rain shadows) to accurately determine Whittaker biomes.
@@ -30,15 +32,21 @@ Maps are saved in Journals and stored in a Journal Compendium. The procedural pl
 
 ---
 
+### Example Maps
+
+The following are two examples of maps I created in the module together with links to their JSON files which can be imported into the module.
+
 #### World Map (generated at 4000 x 4000 pixels)
 
 ![World map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/original-map.png)
 
----
+Link to map JSON file: <https://github.com/Filroden/Filrodens-world-map-builder/samples/fwmb_aethoria.json> (36 KB)
 
 #### Regional Map created from the above World Map (generated at 4000 x 2730 pixels)
 
 ![Regional Map generated from the World map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/regional-map.png)
+
+Link to map JSON file: <https://github.com/Filroden/Filrodens-world-map-builder/samples/fwmb_eldoria.json> (32 KB)
 
 ---
 
@@ -386,7 +394,9 @@ The generator can be computationally heavy when calculating new terrain, moistur
 ## Roadmap
 
 - Configure quick styles for routes, etc.
+- Coloured vector pins
+- Bulk edit vector (pins, lines, regions and text) properties.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
-- A Sandbox Mode allowing the import of DEM or greyscale heightmaps to bypass the procedural generation entirely.
+- A Sandbox Mode allowing the import of DEM or greyscale heightmaps to bypass the procedural generation entirely. **Risk**: Might prevent use of regional map creation.
 - Simulate the effects of tectonic plate boundaries (convergent, divergent and lateral) and simulate the effects of hot spots and continental drift.

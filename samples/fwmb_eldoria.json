@@ -1,0 +1,1453 @@
+{
+  "seed": "FILRODEN",
+  "springsBaked": true,
+  "mapWidth": 4000,
+  "mapHeight": 2370,
+  "gridType": "hexR",
+  "gridSize": 25,
+  "params": {
+    "seaLevel": 0.55,
+    "globalTemp": 0.5,
+    "seasonOffset": 0,
+    "latTop": 16.965000000000003,
+    "latBottom": -39.91499999999999,
+    "globalMoisture": 0.5,
+    "riverDensity": 75,
+    "noise": {
+      "offsetX": 718.2372245663386,
+      "offsetY": 4168.776371308017,
+      "moistureOffset": 18752.93014533521,
+      "tempOffset": 37505.86029067042,
+      "elevation": {
+        "scale": 0.0004266,
+        "octaves": 8,
+        "stretch": 2.2
+      },
+      "moisture": {
+        "scale": 0.0010664999999999993,
+        "octaves": 3
+      },
+      "temperature": {
+        "scale": 0.02133,
+        "octaves": 2
+      }
+    },
+    "hydrology": {
+      "maxLakeSize": 8000,
+      "springAltOffset": 0.25,
+      "springMoistMin": 0.45,
+      "meanderJitter": 0.005
+    },
+    "climate": {
+      "altCooling": 0.4,
+      "freezingThreshold": 0.2,
+      "windDistance": 75.01172058134084
+    },
+    "biomePalette": {
+      "1": [
+        26,
+        75,
+        132
+      ],
+      "2": [
+        46,
+        117,
+        182
+      ],
+      "3": [
+        240,
+        240,
+        240
+      ],
+      "4": [
+        149,
+        163,
+        164
+      ],
+      "5": [
+        77,
+        107,
+        83
+      ],
+      "6": [
+        141,
+        163,
+        104
+      ],
+      "7": [
+        58,
+        122,
+        70
+      ],
+      "8": [
+        41,
+        92,
+        53
+      ],
+      "9": [
+        194,
+        178,
+        128
+      ],
+      "10": [
+        23,
+        66,
+        32
+      ],
+      "11": [
+        196,
+        186,
+        114
+      ],
+      "12": [
+        214,
+        198,
+        137
+      ],
+      "13": [
+        225,
+        235,
+        240
+      ],
+      "DEEP_OCEAN": [
+        26,
+        75,
+        132
+      ],
+      "SHALLOW_OCEAN": [
+        46,
+        117,
+        182
+      ],
+      "SNOW": [
+        240,
+        240,
+        240
+      ],
+      "TUNDRA": [
+        149,
+        163,
+        164
+      ],
+      "TAIGA": [
+        77,
+        107,
+        83
+      ],
+      "GRASSLAND": [
+        141,
+        163,
+        104
+      ],
+      "DECIDUOUS_FOREST": [
+        58,
+        122,
+        70
+      ],
+      "TEMPERATE_RAINFOREST": [
+        41,
+        92,
+        53
+      ],
+      "TEMPERATE_DESERT": [
+        194,
+        178,
+        128
+      ],
+      "TROPICAL_RAINFOREST": [
+        23,
+        66,
+        32
+      ],
+      "SAVANNA": [
+        196,
+        186,
+        114
+      ],
+      "SUBTROPICAL_DESERT": [
+        214,
+        198,
+        137
+      ],
+      "PACK_ICE": [
+        225,
+        235,
+        240
+      ]
+    },
+    "customColors": {},
+    "display": {
+      "contourInterval": 0.1,
+      "biomeAlphaActive": 0.85,
+      "biomeAlphaInactive": 0.65
+    },
+    "cartography": {
+      "scaleEnable": true,
+      "scaleUnits": "Miles",
+      "scaleInterval": 188,
+      "scaleValue": 50,
+      "scaleMajorTicks": 10,
+      "scaleMinorTicks": 5,
+      "scaleX": 50,
+      "scaleY": 2320,
+      "borderEnable": true,
+      "borderStyle": "double",
+      "borderColor": "#000000"
+    }
+  },
+  "customBiomes": [],
+  "history": [
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 91.42053445850915,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3325.363338021566,
+          "y": 1028.1293952180029
+        },
+        {
+          "x": 3496.4838255977506,
+          "y": 849.9765588373184
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 91.42053445850915,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3327.7074542897344,
+          "y": 1086.7323019221753
+        },
+        {
+          "x": 3571.4955461790905,
+          "y": 1171.1204875761846
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 91.42053445850915,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3808.2512892639475,
+          "y": 983.5911861228326
+        },
+        {
+          "x": 3709.7984060009376,
+          "y": 1082.0440693858416
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 91.42053445850915,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3648.8513830285992,
+          "y": 798.4060009376474
+        },
+        {
+          "x": 3780.121894045945,
+          "y": 1098.4528832630099
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 91.42053445850915,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3676.980778246601,
+          "y": 777.3089545241444
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 91.42053445850915,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3676.980778246601,
+          "y": 800.7501172058135
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 91.42053445850915,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3533.9896858884194,
+          "y": 845.2883263009854
+        },
+        {
+          "x": 3517.5808720112536,
+          "y": 812.4706985466479
+        },
+        {
+          "x": 3508.204406938585,
+          "y": 737.458977965308
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 91.42053445850915,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3512.8926394749183,
+          "y": 1016.4088138771683
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 91.42053445850915,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3512.8926394749183,
+          "y": 1016.4088138771683
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 44.53820909517112,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3526.9573370839194,
+          "y": 1000
+        },
+        {
+          "x": 3533.9896858884194,
+          "y": 1023.4411626816691
+        },
+        {
+          "x": 3531.6455696202543,
+          "y": 1004.6882325363339
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 44.53820909517112,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3545.710267229254,
+          "y": 941.3970932958275
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 44.53820909517112,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3566.8073136427574,
+          "y": 1121.894045944679
+        },
+        {
+          "x": 3573.8396624472575,
+          "y": 1166.43225503985
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 234.41162681669013,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 1309.423347398031,
+          "y": 2443.975621190811
+        },
+        {
+          "x": 1813.4083450539147,
+          "y": 2514.2991092358184
+        },
+        {
+          "x": 1379.746835443038,
+          "y": 2451.0079699953126
+        },
+        {
+          "x": 1264.8851383028607,
+          "y": 2443.975621190811
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 234.41162681669013,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 1452.414439756213,
+          "y": 2469.760900140648
+        },
+        {
+          "x": 1621.190811064229,
+          "y": 2502.578527894984
+        },
+        {
+          "x": 2087.6699484294427,
+          "y": 2687.7637130801695
+        },
+        {
+          "x": 2188.466947960619,
+          "y": 2669.0107829348344
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "slopeUp",
+      "size": 7,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2693,
+          "y": 1091
+        },
+        {
+          "x": 2699,
+          "y": 1085
+        }
+      ]
+    },
+    {
+      "layer": "features",
+      "tool": "raise",
+      "size": 7,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2702,
+          "y": 1082
+        }
+      ]
+    }
+  ],
+  "mapPins": [
+    {
+      "id": "v4Br7tWipwR4hoWa",
+      "name": "Elaris",
+      "icon": "circle_outline_with_dot",
+      "x": 2929,
+      "y": 843,
+      "description": "<em>Eldoria</em> is the central jewel of Aethoria, a region of remarkable diversity both geographically and culturally.<br>\n<img src=\"images/Old Wing of University.webp\"/><br>\nAt its heart lies <em>Elaris</em>, the bustling cosmopolitan city known for its academic institutions and vibrant markets. As the political and economic hub, <em>Elaris</em> is surrounded by various landscapes that contribute to its prosperity and influence.",
+      "label": {
+        "x": 2869,
+        "y": 821,
+        "rotation": 0,
+        "fontFamily": "Signika",
+        "fontSize": 0.5,
+        "fillColor": "#dedcd3"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "2OUd86EmKKYfLJnV"
+    },
+    {
+      "id": "RpEOceUq5T2aseIL",
+      "name": "Forgepeak Keep",
+      "icon": "castle_keep",
+      "x": 3752,
+      "y": 978,
+      "label": {
+        "x": 3854,
+        "y": 978,
+        "fontFamily": "Signika",
+        "fontSize": 0.35,
+        "fillColor": "#dedcd3"
+      },
+      "description": "",
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "r2bUhqL6bmUWrsJX"
+    },
+    {
+      "id": "zH1QhctgZjLldL4n",
+      "name": "Lighthouse (East)",
+      "icon": "column_shrine",
+      "x": 3697,
+      "y": 829,
+      "description": "Surely this wouldn't be haunted...right?",
+      "label": {
+        "x": 3779,
+        "y": 870,
+        "rotation": 0,
+        "fontFamily": "Signika",
+        "fontSize": 0.35,
+        "fillColor": "#e0f0fa"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "6dTpOltZ9dviqcMH"
+    },
+    {
+      "id": "JOffO8KVBmwWuRw8",
+      "name": "Lighthouse (West)",
+      "icon": "column_shrine",
+      "x": 3535,
+      "y": 819,
+      "description": "",
+      "label": {
+        "x": 3618,
+        "y": 779,
+        "rotation": 0,
+        "fontFamily": "Signika",
+        "fontSize": 0.35,
+        "fillColor": "#e0f0fa"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "CyTJR3rHSUs3xfNC"
+    },
+    {
+      "id": "rhcvenvcwFGbdsv2",
+      "name": "Hidden Lair",
+      "icon": "map_pin_outline_with_dot",
+      "x": 2681,
+      "y": 1077,
+      "label": {
+        "x": 2597,
+        "y": 1075,
+        "visibility": "gm",
+        "fontFamily": "Signika",
+        "fontSize": 0.4,
+        "fillColor": "#ffffff"
+      },
+      "scale": 0.3,
+      "visibility": "gm",
+      "journalPageId": "dtiHjvtDRybPoKw6",
+      "description": ""
+    },
+    {
+      "id": "dN0rJiaqn1328T5p",
+      "name": "Dusthaven",
+      "icon": "dot",
+      "x": 3264.416315049226,
+      "y": 948.4294421003291,
+      "label": {
+        "x": 3371,
+        "y": 949,
+        "fontFamily": "Signika",
+        "fontSize": 0.5,
+        "fillColor": "#dedcd3",
+        "rotation": 0,
+        "visibility": "all"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "HLIRQhLv57TPzAMY"
+    },
+    {
+      "id": "bjUrSxYTECc6Y3dc",
+      "name": "Sylvanhaven",
+      "icon": "dot",
+      "x": 2978.4341303328665,
+      "y": 1396.1556493202072,
+      "label": {
+        "x": 3058,
+        "y": 1434,
+        "fontFamily": "Signika",
+        "fontSize": 0.5,
+        "fillColor": "#dedcd3",
+        "rotation": 0,
+        "visibility": "all"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "T8UgrlV1phM16zPK"
+    },
+    {
+      "id": "ifCFOXyiIq7PFEl6",
+      "name": "River Source",
+      "x": 2758.556024378809,
+      "y": 1237.6933895921238,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "10Q5dzWEU5yJKVGb"
+    },
+    {
+      "id": "nFoXOBVpcqkuZXsN",
+      "name": "River Source",
+      "x": 2102.203469292077,
+      "y": 810.126582278481,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "3Doa3zyuuBAhVJfw"
+    },
+    {
+      "id": "ZLjq4MZsw4MOOsLB",
+      "name": "River Source",
+      "x": 3052.9770276605723,
+      "y": 1005.1570557899672,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "bAbqJ9cvkuMkrGEv"
+    },
+    {
+      "id": "iUn4Krv9m41FS1bX",
+      "name": "River Source",
+      "x": 1404.5944678856072,
+      "y": 909.5171120487577,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "dy2UahzKdWR1pXh1"
+    },
+    {
+      "id": "2qgYU79EBalHrNNI",
+      "name": "River Source",
+      "x": 2612.2831692451946,
+      "y": 1477.7308954524144,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "H5VCs4Bygbn97pi9"
+    },
+    {
+      "id": "NhSObGS4JIsmNLPS",
+      "name": "River Source",
+      "x": 2548.523206751055,
+      "y": 1457.1026722925458,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "A3QVuhZnylAR4Aod"
+    },
+    {
+      "id": "rdgpCTZEFp43eaR9",
+      "name": "River Source",
+      "x": 67.51054852320675,
+      "y": 2394.7491795593064,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "9ifzXQeSJQDoAa2e"
+    },
+    {
+      "id": "8VsX7dCqNVuA6ZcR",
+      "name": "River Source",
+      "x": 131.27051101734648,
+      "y": 2201.5939990623538,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "YkJtKFavLRUgMAcD"
+    },
+    {
+      "id": "gGWPkAZqpVbztgaZ",
+      "name": "River Source",
+      "x": 3017.346460384435,
+      "y": 1121.4252226910455,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "Z3jj7n1zSYF0UDbI"
+    },
+    {
+      "id": "6ZWwuEtodbcOJGlo",
+      "name": "River Source",
+      "x": 2668.5419596812003,
+      "y": 1211.4392873886545,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "14fITWslLJ51vT6e"
+    },
+    {
+      "id": "rdl1ezi3ONcM71h4",
+      "name": "River Source",
+      "x": 2692.9207688701363,
+      "y": 1203.9381153305205,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "hwO4wTVn504B2xIj"
+    },
+    {
+      "id": "0sUSofYc7Grjs2PQ",
+      "name": "River Source",
+      "x": 2490.3891233005156,
+      "y": 862.6347866854196,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "keHsNAvayDhGxeR5"
+    },
+    {
+      "id": "7HhGtE67wBw8jJYn",
+      "name": "River Source",
+      "x": 2586.0290670417253,
+      "y": 928.2700421940929,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "CxUNMCWKTm2ZF5sw"
+    },
+    {
+      "id": "y9eETpdl2RZqAfK6",
+      "name": "River Source",
+      "x": 2606.657290201594,
+      "y": 1565.86966713549,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "o74X06fAM7ONgvre"
+    },
+    {
+      "id": "R8NcFkuHHoKoqOiV",
+      "name": "River Source",
+      "x": 2120.956399437412,
+      "y": 828.8795124238162,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "LJyq71k7STHmbBoG"
+    },
+    {
+      "id": "dJ7UNor135RFHVpg",
+      "name": "River Source",
+      "x": 234.4116268166901,
+      "y": 2314.1115799343647,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "ZFZ5XDPZCgtg69hA"
+    },
+    {
+      "id": "qM9yU4po2sXGXXL2",
+      "name": "River Source",
+      "x": 2677.918424753868,
+      "y": 1232.0675105485232,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "fOEmOq27nTgom6oa"
+    },
+    {
+      "id": "HCrI6StyLIaQdPfm",
+      "name": "River Source",
+      "x": 2496.0150023441165,
+      "y": 1462.7285513361464,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "HB27QxE8bMKFCaFV"
+    },
+    {
+      "id": "6gTs4BUgcMZ6ZPZW",
+      "name": "River Source",
+      "x": 133.14580403187998,
+      "y": 2349.7421472105016,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "cjWOan9RYpNc0qcQ"
+    },
+    {
+      "id": "6FPu2wH0O8HcSrxh",
+      "name": "River Source",
+      "x": 286.9198312236287,
+      "y": 2353.4927332395687,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "CoQTTPnb0jFcGFR6"
+    },
+    {
+      "id": "CV9hbZDO5NnMAIM3",
+      "name": "River Source",
+      "x": 2494.1397093295827,
+      "y": 1151.429910923582,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "Lc1kRPa2L99owkuN"
+    },
+    {
+      "id": "yFAsOZZ8pF2m1Avt",
+      "name": "River Source",
+      "x": 2743.553680262541,
+      "y": 1172.0581340834506,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "ZbXzZvLKVqwiPWk1"
+    },
+    {
+      "id": "p99FGMZuP6H7zW7C",
+      "name": "River Source",
+      "x": 2295.3586497890296,
+      "y": 1052.0393811533052,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "IBcpUiInmXpVjzbV"
+    },
+    {
+      "id": "ZIdQbTYlFUAWSoRB",
+      "name": "River Source",
+      "x": 1483.356774496015,
+      "y": 995.7805907172996,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "journalPageId": "l4QlPM6luOfopJ4T"
+    },
+    {
+      "id": "jxH8R75YUn7JmUH5",
+      "name": "River Source",
+      "x": 2799,
+      "y": 1071,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    }
+  ],
+  "mapRoutes": [
+    {
+      "id": "pNPoJoPAz6AYAPiA",
+      "name": "Hidden Trail",
+      "points": [
+        {
+          "x": 2680.731364275668,
+          "y": 1089.076418190343
+        },
+        {
+          "x": 2774.4960150023444,
+          "y": 1053.9146741678396
+        },
+        {
+          "x": 2816.6901078293477,
+          "y": 1021.097046413503
+        },
+        {
+          "x": 2882.325363338023,
+          "y": 1039.8499765588374
+        },
+        {
+          "x": 2947.9606188466933,
+          "y": 1023.4411626816691
+        },
+        {
+          "x": 2983.122362869197,
+          "y": 983.5911861228326
+        },
+        {
+          "x": 2957.3370839193617,
+          "y": 939.0529770276614
+        },
+        {
+          "x": 2936.2400375058587,
+          "y": 903.8912330051579
+        },
+        {
+          "x": 2926.863572433193,
+          "y": 866.3853727144875
+        },
+        {
+          "x": 2929,
+          "y": 843
+        }
+      ],
+      "color": "#8d6e63",
+      "thickness": 2,
+      "style": "dashed",
+      "description": "",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "gm"
+    },
+    {
+      "id": "9uKdSbSCO0WiuZBB",
+      "name": "Elaris Road",
+      "points": [
+        {
+          "x": 2929,
+          "y": 843
+        },
+        {
+          "x": 3022.9723394280372,
+          "y": 857.00890764182
+        },
+        {
+          "x": 3081.57524613221,
+          "y": 875.7618377871543
+        },
+        {
+          "x": 3133.1458040318794,
+          "y": 903.8912330051579
+        },
+        {
+          "x": 3264.416315049226,
+          "y": 946.0853258321613
+        }
+      ],
+      "color": "#ffb300",
+      "thickness": 6,
+      "style": "solid",
+      "description": "",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    },
+    {
+      "id": "1nr4lirwg8osyPs5",
+      "name": "Route 3",
+      "points": [
+        {
+          "x": 3264.416315049226,
+          "y": 948.4294421003291
+        },
+        {
+          "x": 3306.6104078762323,
+          "y": 976.558837318331
+        },
+        {
+          "x": 3398.0309423347417,
+          "y": 950.773558368496
+        },
+        {
+          "x": 3437.880918893577,
+          "y": 903.8912330051579
+        },
+        {
+          "x": 3489.451476793249,
+          "y": 875.7618377871543
+        },
+        {
+          "x": 3517.5808720112536,
+          "y": 849.9765588373184
+        },
+        {
+          "x": 3543.366150961089,
+          "y": 814.8148148148149
+        }
+      ],
+      "color": "#8d6e63",
+      "thickness": 2,
+      "style": "dashed",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    },
+    {
+      "id": "oz18HaDioLiH2jqC",
+      "name": "Route 4",
+      "points": [
+        {
+          "x": 2929,
+          "y": 843
+        },
+        {
+          "x": 2987.810595405534,
+          "y": 786.6854195968128
+        },
+        {
+          "x": 3142.522269104549,
+          "y": 798.4060009376474
+        },
+        {
+          "x": 3243.3192686357243,
+          "y": 842.9442100328185
+        },
+        {
+          "x": 3414.4397562119084,
+          "y": 798.4060009376474
+        },
+        {
+          "x": 3503.5161744022503,
+          "y": 732.7707454289733
+        },
+        {
+          "x": 3566.8073136427574,
+          "y": 709.3295827473042
+        },
+        {
+          "x": 3686.357243319269,
+          "y": 706.9854664791374
+        },
+        {
+          "x": 3789.4983591186133,
+          "y": 695.2648851383029
+        },
+        {
+          "x": 3925.457102672293,
+          "y": 631.9737458977974
+        },
+        {
+          "x": 3974.6835443037976,
+          "y": 524.1443975621191
+        },
+        {
+          "x": 4019.2217533989688,
+          "y": 428.03563056727614
+        },
+        {
+          "x": 4033.2864510079703,
+          "y": 334.2709798406001
+        },
+        {
+          "x": 4108.298171589312,
+          "y": 278.01218940459535
+        },
+        {
+          "x": 4241.912798874824,
+          "y": 245.19456165025872
+        }
+      ],
+      "color": "#4dd0e1",
+      "thickness": 4,
+      "style": "dotted",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    },
+    {
+      "id": "wK8B2Qxj4hTOki5a",
+      "name": "Route 5",
+      "points": [
+        {
+          "x": 3266.7604313173933,
+          "y": 946.0853258321613
+        },
+        {
+          "x": 3353.4927332395705,
+          "y": 826.5353961556493
+        }
+      ],
+      "color": "#4dd0e1",
+      "thickness": 4,
+      "style": "dotted",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    },
+    {
+      "id": "D78oGVZIJ2R2ESiw",
+      "name": "Route 6",
+      "points": [
+        {
+          "x": 2976.0900140646995,
+          "y": 1393.8115330520402
+        },
+        {
+          "x": 3093.2958274730445,
+          "y": 1375.0586029067042
+        },
+        {
+          "x": 3135.489920300046,
+          "y": 1346.9292076887023
+        },
+        {
+          "x": 3184.716361931552,
+          "y": 1365.6821378340367
+        },
+        {
+          "x": 3222.222222222224,
+          "y": 1321.1439287388655
+        },
+        {
+          "x": 3264.416315049226,
+          "y": 1267.2292545710277
+        },
+        {
+          "x": 3271.448663853729,
+          "y": 1196.9057665260207
+        },
+        {
+          "x": 3285.513361462729,
+          "y": 1067.979371776841
+        },
+        {
+          "x": 3266.7604313173933,
+          "y": 948.4294421003291
+        }
+      ],
+      "color": "#e0e0e0",
+      "thickness": 3,
+      "style": "solid",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    }
+  ],
+  "regionLayers": [
+    {
+      "id": "rS2w3uZY3Gegn14p",
+      "name": "Countries",
+      "opacity": 0.5,
+      "regions": [
+        {
+          "id": "HrC5LwYzeBO6Fuze",
+          "name": "Eldoria",
+          "description": "",
+          "points": [
+            {
+              "x": 2050.1640881387716,
+              "y": 184.2475386779193
+            },
+            {
+              "x": 2209.563994374121,
+              "y": 310.8298171589311
+            },
+            {
+              "x": 2357.243319268636,
+              "y": 360.05625879043686
+            },
+            {
+              "x": 2432.2550398499766,
+              "y": 470.2297233942812
+            },
+            {
+              "x": 2549.4608532583215,
+              "y": 606.1884669479606
+            },
+            {
+              "x": 2844.819503047351,
+              "y": 678.8560712611354
+            },
+            {
+              "x": 3144.866385372714,
+              "y": 751.5236755743093
+            },
+            {
+              "x": 3280.8251289263967,
+              "y": 772.6207219878115
+            },
+            {
+              "x": 3376.9338959212396,
+              "y": 735.1148616971402
+            },
+            {
+              "x": 3559.774964838256,
+              "y": 655.4149085794664
+            },
+            {
+              "x": 3606.657290201594,
+              "y": 735.1148616971402
+            },
+            {
+              "x": 3611.3455227379295,
+              "y": 842.9442100328185
+            },
+            {
+              "x": 3632.4425691514302,
+              "y": 974.2147210501649
+            },
+            {
+              "x": 3653.5396155649323,
+              "y": 1110.1734646038444
+            },
+            {
+              "x": 3641.819034224098,
+              "y": 1220.3469292076895
+            },
+            {
+              "x": 3473.0426629160816,
+              "y": 1300.0468823253643
+            },
+            {
+              "x": 3374.5897796530726,
+              "y": 1405.5321143928747
+            },
+            {
+              "x": 3273.7927801218934,
+              "y": 1571.9643694327249
+            },
+            {
+              "x": 3081.57524613221,
+              "y": 1724.3319268635732
+            },
+            {
+              "x": 2891.7018284106894,
+              "y": 1808.720112517581
+            },
+            {
+              "x": 2762.77543366151,
+              "y": 1965.7759024847642
+            },
+            {
+              "x": 2561.181434599156,
+              "y": 2061.884669479607
+            },
+            {
+              "x": 2345.5227379278012,
+              "y": 2134.552273792781
+            },
+            {
+              "x": 2099.390529770277,
+              "y": 2104.0787623066103
+            },
+            {
+              "x": 1827.4730426629162,
+              "y": 2007.9699953117683
+            },
+            {
+              "x": 1684.4819503047352,
+              "y": 1893.1082981715895
+            },
+            {
+              "x": 1609.4702297233944,
+              "y": 1677.4496015002353
+            },
+            {
+              "x": 1546.1790904828883,
+              "y": 1583.6849507735592
+            },
+            {
+              "x": 1335.2086263478677,
+              "y": 1506.3291139240507
+            },
+            {
+              "x": 1070.323488045008,
+              "y": 1443.0379746835451
+            },
+            {
+              "x": 866.3853727144875,
+              "y": 1445.3820909517112
+            },
+            {
+              "x": 854.664791373653,
+              "y": 1609.4702297233944
+            },
+            {
+              "x": 861.6971401781525,
+              "y": 1827.473042662917
+            },
+            {
+              "x": 739.8030942334732,
+              "y": 1914.2053445850922
+            },
+            {
+              "x": 559.3061415846227,
+              "y": 1850.914205344586
+            },
+            {
+              "x": 451.4767932489447,
+              "y": 1696.2025316455697
+            },
+            {
+              "x": 399.90623534927335,
+              "y": 1539.1467416783873
+            },
+            {
+              "x": 289.732770745429,
+              "y": 1417.2526957337093
+            },
+            {
+              "x": 172.52695733708393,
+              "y": 1300.0468823253643
+            },
+            {
+              "x": 174.8710736052504,
+              "y": 1126.5822784810136
+            },
+            {
+              "x": 266.29160806375995,
+              "y": 969.5264885138304
+            },
+            {
+              "x": 451.4767932489447,
+              "y": 953.1176746366621
+            },
+            {
+              "x": 653.0707923112986,
+              "y": 939.0529770276614
+            },
+            {
+              "x": 711.6736990154712,
+              "y": 864.0412564463197
+            },
+            {
+              "x": 789.0295358649798,
+              "y": 695.2648851383029
+            },
+            {
+              "x": 939.0529770276597,
+              "y": 512.4238162212846
+            },
+            {
+              "x": 1154.7116736990151,
+              "y": 423.3473980309432
+            },
+            {
+              "x": 1375.0586029067042,
+              "y": 317.8621659634318
+            },
+            {
+              "x": 1618.8466947960624,
+              "y": 275.66807313642755
+            },
+            {
+              "x": 1811.0642287857484,
+              "y": 261.6033755274262
+            },
+            {
+              "x": 1942.3347398030944,
+              "y": 198.3122362869207
+            }
+          ],
+          "fillColor": "#a89f91",
+          "fillStyle": "diagonal",
+          "lineColor": "#ffffff",
+          "lineThickness": 2,
+          "lineStyle": "dashdot",
+          "smoothing": true,
+          "label": {
+            "fontFamily": "Signika",
+            "fontSize": 1,
+            "fillColor": "#ffffff",
+            "x": 2094.7022972339428,
+            "y": 963.9006094702297
+          },
+          "visibility": "gm",
+          "journalPageId": "l50xU4WDdLGUawr9"
+        }
+      ],
+      "visibility": "gm"
+    }
+  ],
+  "mapLabels": [
+    {
+      "id": "D02uZdlfLyLd0JDL",
+      "name": "Valoria Plains",
+      "x": 2436.0056258790437,
+      "y": 1712.1425222691046,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.55,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    },
+    {
+      "id": "veSrNAS9jyOmtTqj",
+      "name": "Mystwood Forest",
+      "x": 1695.2648851383028,
+      "y": 650.7266760431318,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.5,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    },
+    {
+      "id": "NJAPfwR7nbsLJiGb",
+      "name": "Sundered Isles",
+      "x": 596.3431786216596,
+      "y": 1419.5968120018754,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.5,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    },
+    {
+      "id": "dIf68PDjeE17fOuV",
+      "name": "Grimlands",
+      "x": 1620.253164556962,
+      "y": 1308.9545241443975,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.5,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    },
+    {
+      "id": "yRcEPeBGyx7eoy5W",
+      "name": "Thundris Peaks",
+      "x": 2687.2948898265354,
+      "y": 1252.695733708392,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.5,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    }
+  ],
+  "mapDecorations": [
+    {
+      "id": "ba2jJkPKk36FkYQc",
+      "type": "decoration",
+      "name": "Compass",
+      "src": "sharedAssets/images/icons/image-from-rawpixel-id-6704634-png.png",
+      "x": 237,
+      "y": 236,
+      "rotation": 0,
+      "scale": 0.48767497911552943,
+      "visibility": "all"
+    }
+  ],
+  "parentId": "im9ZOyzF5YMfQef4"
+}

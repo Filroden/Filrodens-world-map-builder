@@ -1,0 +1,1757 @@
+{
+  "seed": "FILRODEN",
+  "mapWidth": 4000,
+  "mapHeight": 4000,
+  "gridType": "hexR",
+  "gridSize": 50,
+  "params": {
+    "seaLevel": 0.55,
+    "globalTemp": 0.5,
+    "seasonOffset": 0,
+    "latTop": 90,
+    "latBottom": -90,
+    "globalMoisture": 0.5,
+    "riverDensity": 75,
+    "noise": {
+      "offsetX": -500,
+      "offsetY": 600,
+      "elevation": {
+        "scale": 0.0008,
+        "octaves": 8,
+        "stretch": 2.2
+      },
+      "moisture": {
+        "scale": 0.002,
+        "octaves": 3
+      },
+      "temperature": {
+        "scale": 0.04,
+        "octaves": 2
+      }
+    },
+    "hydrology": {
+      "maxLakeSize": 8000,
+      "springAltOffset": 0.25,
+      "springMoistMin": 0.45,
+      "meanderJitter": 0.005
+    },
+    "climate": {
+      "altCooling": 0.4,
+      "freezingThreshold": 0.2
+    },
+    "customColors": {},
+    "display": {
+      "contourInterval": 0.1,
+      "biomeAlphaActive": 0.85,
+      "biomeAlphaInactive": 0.65
+    },
+    "cartography": {
+      "scaleEnable": true,
+      "scaleUnits": "Miles",
+      "scaleInterval": 100,
+      "scaleValue": 50,
+      "scaleMajorTicks": 10,
+      "scaleMinorTicks": 5,
+      "scaleX": 53,
+      "scaleY": 3937,
+      "borderEnable": true,
+      "borderStyle": "double",
+      "borderColor": "#000000"
+    }
+  },
+  "history": [
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 48.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2656.25,
+          "y": 2171.25
+        },
+        {
+          "x": 2747.5000000000005,
+          "y": 2076.25
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 48.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2657.500000000001,
+          "y": 2202.5
+        },
+        {
+          "x": 2787.5,
+          "y": 2247.5000000000005
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 48.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2913.75,
+          "y": 2147.5000000000005
+        },
+        {
+          "x": 2861.25,
+          "y": 2200
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 48.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2828.7500000000005,
+          "y": 2048.7500000000005
+        },
+        {
+          "x": 2898.75,
+          "y": 2208.75
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 48.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2843.75,
+          "y": 2037.5
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 48.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2843.75,
+          "y": 2050
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 48.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2767.4999999999995,
+          "y": 2073.7500000000005
+        },
+        {
+          "x": 2758.750000000001,
+          "y": 2056.25
+        },
+        {
+          "x": 2753.7500000000005,
+          "y": 2016.2500000000005
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 48.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2756.25,
+          "y": 2165
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 48.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2756.25,
+          "y": 2165
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 23.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2763.75,
+          "y": 2156.25
+        },
+        {
+          "x": 2767.4999999999995,
+          "y": 2168.75
+        },
+        {
+          "x": 2766.2500000000005,
+          "y": 2158.75
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 23.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2773.7499999999995,
+          "y": 2125
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 23.75,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2785.0000000000005,
+          "y": 2221.25
+        },
+        {
+          "x": 2788.75,
+          "y": 2245
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 81.25,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 4247.5,
+          "y": 3587.5
+        },
+        {
+          "x": 4444.999999999999,
+          "y": 3642.500000000001
+        },
+        {
+          "x": 4840.000000000002,
+          "y": 3808.750000000001
+        },
+        {
+          "x": 4480,
+          "y": 3758.750000000001
+        },
+        {
+          "x": 4072.5000000000005,
+          "y": 3845
+        },
+        {
+          "x": 4137.5,
+          "y": 3997.5
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 81.25,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 4281.25,
+          "y": 3621.250000000001
+        },
+        {
+          "x": 4410,
+          "y": 3793.75
+        },
+        {
+          "x": 4143.75,
+          "y": 3785
+        },
+        {
+          "x": 4202.5,
+          "y": 3893.75
+        },
+        {
+          "x": 4188.75,
+          "y": 3992.500000000001
+        },
+        {
+          "x": 4337.5,
+          "y": 3838.75
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 81.25,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 4135,
+          "y": 3743.75
+        },
+        {
+          "x": 4162.5,
+          "y": 3738.75
+        },
+        {
+          "x": 4336.25,
+          "y": 3696.250000000001
+        },
+        {
+          "x": 4366.25,
+          "y": 3696.250000000001
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 1581.25,
+          "y": 2926.25
+        },
+        {
+          "x": 1850,
+          "y": 2963.75
+        },
+        {
+          "x": 1618.75,
+          "y": 2930.0000000000005
+        },
+        {
+          "x": 1557.5000000000005,
+          "y": 2926.25
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 1657.5000000000005,
+          "y": 2940.0000000000005
+        },
+        {
+          "x": 1747.5,
+          "y": 2957.5
+        },
+        {
+          "x": 1996.2500000000002,
+          "y": 3056.2500000000005
+        },
+        {
+          "x": 2050,
+          "y": 3046.2500000000005
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 1557.5000000000005,
+          "y": 3055.0000000000005
+        },
+        {
+          "x": 1830.0000000000002,
+          "y": 3087.5000000000005
+        },
+        {
+          "x": 1972.5,
+          "y": 3116.2500000000005
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 1635,
+          "y": 3051.25
+        },
+        {
+          "x": 1755.0000000000002,
+          "y": 3153.7500000000005
+        },
+        {
+          "x": 1972.5,
+          "y": 3298.7500000000005
+        },
+        {
+          "x": 2158.75,
+          "y": 3473.7500000000005
+        },
+        {
+          "x": 2165,
+          "y": 3508.750000000001
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2053.75,
+          "y": 3372.5000000000005
+        },
+        {
+          "x": 2096.25,
+          "y": 3442.5000000000005
+        },
+        {
+          "x": 2103.75,
+          "y": 3682.5
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2696.250000000001,
+          "y": 3183.7500000000005
+        },
+        {
+          "x": 2756.25,
+          "y": 3205.0000000000005
+        },
+        {
+          "x": 3042.5000000000005,
+          "y": 3117.5000000000005
+        },
+        {
+          "x": 2985.0000000000005,
+          "y": 3221.2500000000005
+        },
+        {
+          "x": 2720.000000000001,
+          "y": 3315.000000000001
+        },
+        {
+          "x": 2628.7499999999995,
+          "y": 3512.5
+        },
+        {
+          "x": 2798.7499999999995,
+          "y": 3675
+        },
+        {
+          "x": 2841.2500000000005,
+          "y": 3832.5
+        },
+        {
+          "x": 3142.5000000000005,
+          "y": 3833.750000000001
+        },
+        {
+          "x": 3190,
+          "y": 3678.75
+        },
+        {
+          "x": 3057.5,
+          "y": 3393.7500000000005
+        },
+        {
+          "x": 2800,
+          "y": 3377.500000000001
+        },
+        {
+          "x": 3015,
+          "y": 3657.5
+        },
+        {
+          "x": 2898.75,
+          "y": 3470
+        },
+        {
+          "x": 2885.0000000000005,
+          "y": 3505.000000000001
+        },
+        {
+          "x": 2987.5,
+          "y": 3641.25
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2687.5,
+          "y": 3366.2500000000005
+        },
+        {
+          "x": 2711.2499999999995,
+          "y": 3457.5
+        },
+        {
+          "x": 2763.75,
+          "y": 3522.5
+        },
+        {
+          "x": 2788.75,
+          "y": 3590.000000000001
+        },
+        {
+          "x": 2921.2500000000005,
+          "y": 3701.25
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2562.5,
+          "y": 3581.25
+        },
+        {
+          "x": 2763.75,
+          "y": 3543.75
+        },
+        {
+          "x": 2821.250000000001,
+          "y": 3501.25
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2779.9999999999995,
+          "y": 3480.0000000000005
+        },
+        {
+          "x": 2865.0000000000005,
+          "y": 3613.75
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2915.0000000000005,
+          "y": 3748.750000000001
+        },
+        {
+          "x": 2856.25,
+          "y": 3275.0000000000005
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2921.2500000000005,
+          "y": 3732.5
+        },
+        {
+          "x": 2970,
+          "y": 3721.250000000001
+        },
+        {
+          "x": 3087.5,
+          "y": 3568.75
+        },
+        {
+          "x": 3185.0000000000005,
+          "y": 3455.0000000000005
+        },
+        {
+          "x": 3152.5,
+          "y": 3317.5000000000005
+        },
+        {
+          "x": 2985.0000000000005,
+          "y": 3292.5000000000005
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2860.0000000000005,
+          "y": 3397.5000000000005
+        },
+        {
+          "x": 2878.7500000000005,
+          "y": 3490.000000000001
+        },
+        {
+          "x": 2930,
+          "y": 3655.000000000001
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3028.7500000000005,
+          "y": 3355.0000000000005
+        },
+        {
+          "x": 3260.0000000000005,
+          "y": 3662.5
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 3061.2500000000005,
+          "y": 3365.000000000001
+        },
+        {
+          "x": 3282.5,
+          "y": 3666.25
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2988.75,
+          "y": 3498.750000000001
+        },
+        {
+          "x": 3061.2500000000005,
+          "y": 3683.750000000001
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2952.5,
+          "y": 3281.2500000000005
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2234.9999999999995,
+          "y": 3923.750000000001
+        },
+        {
+          "x": 2322.4999999999995,
+          "y": 4001.250000000001
+        },
+        {
+          "x": 2309.9999999999995,
+          "y": 4321.25
+        },
+        {
+          "x": 2215,
+          "y": 4561.25
+        },
+        {
+          "x": 2011.2500000000002,
+          "y": 4650
+        },
+        {
+          "x": 1881.25,
+          "y": 4512.5
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 2421.250000000001,
+          "y": 4408.75
+        },
+        {
+          "x": 2431.25,
+          "y": 4297.500000000001
+        },
+        {
+          "x": 2452.500000000001,
+          "y": 4056.25
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 989.9999999999999,
+          "y": 4352.5
+        },
+        {
+          "x": 1093.75,
+          "y": 4462.5
+        },
+        {
+          "x": 1208.7499999999995,
+          "y": 4570.000000000001
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 985.0000000000002,
+          "y": 4372.500000000001
+        },
+        {
+          "x": 864.9999999999999,
+          "y": 4245.000000000001
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 782.4999999999998,
+          "y": 4153.75
+        },
+        {
+          "x": 875,
+          "y": 4225
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 818.75,
+          "y": 4188.750000000001
+        },
+        {
+          "x": 877.4999999999999,
+          "y": 4245.000000000001
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 975,
+          "y": 4350
+        },
+        {
+          "x": 810.0000000000002,
+          "y": 4340
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 905.0000000000002,
+          "y": 4323.75
+        },
+        {
+          "x": 892.5000000000002,
+          "y": 4265
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 4131.25,
+          "y": 3191.2500000000005
+        },
+        {
+          "x": 4252.5,
+          "y": 3221.2500000000005
+        },
+        {
+          "x": 4488.749999999999,
+          "y": 3251.25
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 4668.75,
+          "y": 3202.5000000000005
+        },
+        {
+          "x": 4687.5,
+          "y": 3293.7500000000005
+        },
+        {
+          "x": 4673.750000000001,
+          "y": 3333.750000000001
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 4909.999999999999,
+          "y": 3311.2500000000005
+        },
+        {
+          "x": 5028.749999999999,
+          "y": 3383.750000000001
+        },
+        {
+          "x": 5078.749999999999,
+          "y": 3482.5
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 125.00000000000001,
+      "strength": 0.03,
+      "feather": 0.4,
+      "paintValue": null,
+      "points": [
+        {
+          "x": 4696.250000000002,
+          "y": 3523.750000000001
+        },
+        {
+          "x": 4752.500000000002,
+          "y": 3598.750000000001
+        },
+        {
+          "x": 4795,
+          "y": 3605.000000000001
+        }
+      ]
+    }
+  ],
+  "mapPins": [
+    {
+      "id": "v4Br7tWipwR4hoWa",
+      "name": "Elaris",
+      "icon": "circle_outline_with_dot",
+      "x": 2462.5,
+      "y": 2075,
+      "description": "<em>Eldoria</em> is the central jewel of Aethoria, a region of remarkable diversity both geographically and culturally.<br>\n<img src=\"images/Old Wing of University.webp\"/><br>\nAt its heart lies <em>Elaris</em>, the bustling cosmopolitan city known for its academic institutions and vibrant markets. As the political and economic hub, <em>Elaris</em> is surrounded by various landscapes that contribute to its prosperity and influence.",
+      "label": {
+        "x": 2393,
+        "y": 2071,
+        "rotation": 0,
+        "fontFamily": "Signika",
+        "fontSize": 0.5,
+        "fillColor": "#dedcd3"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "KnHQ5H2pNreuc7hQ"
+    },
+    {
+      "id": "4gZEMaxsTcrRrEps",
+      "name": "Valhold",
+      "icon": "circle_outline_with_dot",
+      "x": 3145,
+      "y": 1753.7500000000005,
+      "label": {
+        "x": 3224,
+        "y": 1754,
+        "fontFamily": "Signika",
+        "fontSize": 0.5,
+        "fillColor": "#dedcd3"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "PxbtmlcEuLrCiv5p"
+    },
+    {
+      "id": "RpEOceUq5T2aseIL",
+      "name": "Forgepeak Keep",
+      "icon": "castle_keep",
+      "x": 2881.25,
+      "y": 2140,
+      "label": {
+        "x": 2989,
+        "y": 2141,
+        "fontFamily": "Signika",
+        "fontSize": 0.35,
+        "fillColor": "#dedcd3"
+      },
+      "description": "",
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "yxIYdvWPZpyjHDif"
+    },
+    {
+      "id": "zH1QhctgZjLldL4n",
+      "name": "Lighthouse (East)",
+      "icon": "column_shrine",
+      "x": 2855,
+      "y": 2051.25,
+      "description": "Surely this wouldn't be haunted...right?",
+      "label": {
+        "x": 2959,
+        "y": 2051,
+        "rotation": 0,
+        "fontFamily": "Signika",
+        "fontSize": 0.35,
+        "fillColor": "#e0f0fa"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "lmMCJxz32Djr6lXZ"
+    },
+    {
+      "id": "JOffO8KVBmwWuRw8",
+      "name": "Lighthouse (West)",
+      "icon": "column_shrine",
+      "x": 2772.5000000000005,
+      "y": 2041.2500000000005,
+      "description": "",
+      "label": {
+        "x": 2666,
+        "y": 1990,
+        "rotation": 20,
+        "fontFamily": "Signika",
+        "fontSize": 0.35,
+        "fillColor": "#e0f0fa"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "l2sa71VHKOK9zIOt"
+    },
+    {
+      "id": "rhcvenvcwFGbdsv2",
+      "name": "Dotted Pin",
+      "icon": "map_pin_outline_with_dot",
+      "x": 2312.5,
+      "y": 2188.75,
+      "label": {
+        "x": 2400,
+        "y": 2232.5,
+        "visibility": "none"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "6qM7iAuiLPWszNYm"
+    },
+    {
+      "id": "dN0rJiaqn1328T5p",
+      "name": "Dusthaven",
+      "icon": "dot",
+      "x": 2623.7499999999995,
+      "y": 2128.7500000000005,
+      "label": {
+        "x": 2545,
+        "y": 2147,
+        "fontFamily": "Signika",
+        "fontSize": 0.5,
+        "fillColor": "#dedcd3",
+        "rotation": 0,
+        "visibility": "all"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "4sDT66953ERNYlb1"
+    },
+    {
+      "id": "bjUrSxYTECc6Y3dc",
+      "name": "Sylvanhaven",
+      "icon": "dot",
+      "x": 2471.250000000001,
+      "y": 2367.5000000000005,
+      "label": {
+        "x": 2551,
+        "y": 2399,
+        "fontFamily": "Signika",
+        "fontSize": 0.5,
+        "fillColor": "#dedcd3",
+        "rotation": 0,
+        "visibility": "all"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "wktc16qJewVrIKmA"
+    }
+  ],
+  "mapRoutes": [
+    {
+      "id": "pNPoJoPAz6AYAPiA",
+      "name": "Hidden Trail",
+      "points": [
+        {
+          "x": 2312.5,
+          "y": 2203.7500000000005
+        },
+        {
+          "x": 2362.5,
+          "y": 2185.0000000000005
+        },
+        {
+          "x": 2384.9999999999995,
+          "y": 2167.5000000000005
+        },
+        {
+          "x": 2420.000000000001,
+          "y": 2177.5
+        },
+        {
+          "x": 2454.999999999999,
+          "y": 2168.75
+        },
+        {
+          "x": 2473.749999999999,
+          "y": 2147.5000000000005
+        },
+        {
+          "x": 2459.9999999999995,
+          "y": 2123.7500000000005
+        },
+        {
+          "x": 2448.749999999999,
+          "y": 2105.0000000000005
+        },
+        {
+          "x": 2443.75,
+          "y": 2085.0000000000005
+        },
+        {
+          "x": 2461.249999999999,
+          "y": 2075
+        }
+      ],
+      "color": "#8d6e63",
+      "thickness": 2,
+      "style": "dashed",
+      "description": "",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    },
+    {
+      "id": "9uKdSbSCO0WiuZBB",
+      "name": "Elaris Road",
+      "points": [
+        {
+          "x": 2462.5,
+          "y": 2075
+        },
+        {
+          "x": 2495.000000000001,
+          "y": 2080.0000000000005
+        },
+        {
+          "x": 2526.250000000001,
+          "y": 2090
+        },
+        {
+          "x": 2553.7499999999995,
+          "y": 2105.0000000000005
+        },
+        {
+          "x": 2623.7499999999995,
+          "y": 2127.5
+        }
+      ],
+      "color": "#ffb300",
+      "thickness": 6,
+      "style": "solid",
+      "description": "",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    },
+    {
+      "id": "1nr4lirwg8osyPs5",
+      "name": "Route 3",
+      "points": [
+        {
+          "x": 2623.7499999999995,
+          "y": 2128.7500000000005
+        },
+        {
+          "x": 2646.250000000001,
+          "y": 2143.75
+        },
+        {
+          "x": 2695.000000000001,
+          "y": 2130.0000000000005
+        },
+        {
+          "x": 2716.25,
+          "y": 2105.0000000000005
+        },
+        {
+          "x": 2743.75,
+          "y": 2090
+        },
+        {
+          "x": 2758.750000000001,
+          "y": 2076.25
+        },
+        {
+          "x": 2772.5000000000005,
+          "y": 2057.5
+        }
+      ],
+      "color": "#8d6e63",
+      "thickness": 2,
+      "style": "dashed",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    },
+    {
+      "id": "oz18HaDioLiH2jqC",
+      "name": "Route 4",
+      "points": [
+        {
+          "x": 2461.249999999999,
+          "y": 2073.7500000000005
+        },
+        {
+          "x": 2476.250000000001,
+          "y": 2042.5000000000005
+        },
+        {
+          "x": 2558.750000000001,
+          "y": 2048.7500000000005
+        },
+        {
+          "x": 2612.5,
+          "y": 2072.5000000000005
+        },
+        {
+          "x": 2703.75,
+          "y": 2048.7500000000005
+        },
+        {
+          "x": 2751.25,
+          "y": 2013.75
+        },
+        {
+          "x": 2785.0000000000005,
+          "y": 2001.25
+        },
+        {
+          "x": 2848.75,
+          "y": 2000
+        },
+        {
+          "x": 2903.7500000000005,
+          "y": 1993.75
+        },
+        {
+          "x": 2976.25,
+          "y": 1960.0000000000005
+        },
+        {
+          "x": 3002.5,
+          "y": 1902.5
+        },
+        {
+          "x": 3026.25,
+          "y": 1851.25
+        },
+        {
+          "x": 3033.75,
+          "y": 1801.25
+        },
+        {
+          "x": 3073.7500000000005,
+          "y": 1771.2500000000005
+        },
+        {
+          "x": 3145,
+          "y": 1753.7500000000005
+        }
+      ],
+      "color": "#4dd0e1",
+      "thickness": 4,
+      "style": "dotted",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    },
+    {
+      "id": "wK8B2Qxj4hTOki5a",
+      "name": "Route 5",
+      "points": [
+        {
+          "x": 2625,
+          "y": 2127.5
+        },
+        {
+          "x": 2671.250000000001,
+          "y": 2063.75
+        }
+      ],
+      "color": "#4dd0e1",
+      "thickness": 4,
+      "style": "dotted",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    },
+    {
+      "id": "D78oGVZIJ2R2ESiw",
+      "name": "Route 6",
+      "points": [
+        {
+          "x": 2470.000000000001,
+          "y": 2366.2500000000005
+        },
+        {
+          "x": 2532.500000000001,
+          "y": 2356.25
+        },
+        {
+          "x": 2554.9999999999995,
+          "y": 2341.2500000000005
+        },
+        {
+          "x": 2581.25,
+          "y": 2351.25
+        },
+        {
+          "x": 2601.250000000001,
+          "y": 2327.5
+        },
+        {
+          "x": 2623.7499999999995,
+          "y": 2298.7500000000005
+        },
+        {
+          "x": 2627.500000000001,
+          "y": 2261.2500000000005
+        },
+        {
+          "x": 2635,
+          "y": 2192.5000000000005
+        },
+        {
+          "x": 2625,
+          "y": 2128.7500000000005
+        }
+      ],
+      "color": "#e0e0e0",
+      "thickness": 3,
+      "style": "solid",
+      "label": {
+        "visibility": "none"
+      },
+      "visibility": "all"
+    }
+  ],
+  "regionLayers": [
+    {
+      "id": "rS2w3uZY3Gegn14p",
+      "name": "Countries",
+      "opacity": 0.5,
+      "regions": [
+        {
+          "id": "HrC5LwYzeBO6Fuze",
+          "name": "Eldoria",
+          "description": "",
+          "points": [
+            {
+              "x": 1976.25,
+              "y": 1721.2500000000005
+            },
+            {
+              "x": 2061.25,
+              "y": 1788.75
+            },
+            {
+              "x": 2140,
+              "y": 1815.0000000000005
+            },
+            {
+              "x": 2180,
+              "y": 1873.7500000000005
+            },
+            {
+              "x": 2242.5,
+              "y": 1946.25
+            },
+            {
+              "x": 2400,
+              "y": 1985.0000000000005
+            },
+            {
+              "x": 2559.9999999999995,
+              "y": 2023.7500000000005
+            },
+            {
+              "x": 2632.500000000001,
+              "y": 2035.0000000000005
+            },
+            {
+              "x": 2683.750000000001,
+              "y": 2015
+            },
+            {
+              "x": 2781.25,
+              "y": 1972.5000000000005
+            },
+            {
+              "x": 2806.25,
+              "y": 2015
+            },
+            {
+              "x": 2808.750000000001,
+              "y": 2072.5000000000005
+            },
+            {
+              "x": 2820,
+              "y": 2142.5000000000005
+            },
+            {
+              "x": 2831.25,
+              "y": 2215
+            },
+            {
+              "x": 2825,
+              "y": 2273.7500000000005
+            },
+            {
+              "x": 2735.0000000000005,
+              "y": 2316.2500000000005
+            },
+            {
+              "x": 2682.500000000001,
+              "y": 2372.5000000000005
+            },
+            {
+              "x": 2628.7499999999995,
+              "y": 2461.2500000000005
+            },
+            {
+              "x": 2526.250000000001,
+              "y": 2542.5000000000005
+            },
+            {
+              "x": 2425,
+              "y": 2587.5
+            },
+            {
+              "x": 2356.25,
+              "y": 2671.2500000000005
+            },
+            {
+              "x": 2248.75,
+              "y": 2722.5000000000005
+            },
+            {
+              "x": 2133.75,
+              "y": 2761.2500000000005
+            },
+            {
+              "x": 2002.5000000000002,
+              "y": 2745
+            },
+            {
+              "x": 1857.5,
+              "y": 2693.7500000000005
+            },
+            {
+              "x": 1781.25,
+              "y": 2632.5
+            },
+            {
+              "x": 1741.25,
+              "y": 2517.5000000000005
+            },
+            {
+              "x": 1707.5000000000002,
+              "y": 2467.5000000000005
+            },
+            {
+              "x": 1595.0000000000005,
+              "y": 2426.25
+            },
+            {
+              "x": 1453.7500000000005,
+              "y": 2392.5000000000005
+            },
+            {
+              "x": 1345.0000000000005,
+              "y": 2393.75
+            },
+            {
+              "x": 1338.7500000000005,
+              "y": 2481.25
+            },
+            {
+              "x": 1342.4999999999998,
+              "y": 2597.5000000000005
+            },
+            {
+              "x": 1277.4999999999995,
+              "y": 2643.7500000000005
+            },
+            {
+              "x": 1181.25,
+              "y": 2610.0000000000005
+            },
+            {
+              "x": 1123.7499999999998,
+              "y": 2527.5
+            },
+            {
+              "x": 1096.25,
+              "y": 2443.75
+            },
+            {
+              "x": 1037.5,
+              "y": 2378.7500000000005
+            },
+            {
+              "x": 975,
+              "y": 2316.2500000000005
+            },
+            {
+              "x": 976.2499999999998,
+              "y": 2223.7500000000005
+            },
+            {
+              "x": 1025,
+              "y": 2140
+            },
+            {
+              "x": 1123.7499999999998,
+              "y": 2131.25
+            },
+            {
+              "x": 1231.25,
+              "y": 2123.7500000000005
+            },
+            {
+              "x": 1262.5,
+              "y": 2083.75
+            },
+            {
+              "x": 1303.7500000000005,
+              "y": 1993.75
+            },
+            {
+              "x": 1383.7499999999995,
+              "y": 1896.25
+            },
+            {
+              "x": 1498.7499999999998,
+              "y": 1848.7500000000005
+            },
+            {
+              "x": 1616.25,
+              "y": 1792.5
+            },
+            {
+              "x": 1746.2500000000002,
+              "y": 1770
+            },
+            {
+              "x": 1848.7500000000002,
+              "y": 1762.5
+            },
+            {
+              "x": 1918.75,
+              "y": 1728.7500000000005
+            }
+          ],
+          "fillColor": "#a89f91",
+          "fillStyle": "diagonal",
+          "lineColor": "#ffffff",
+          "lineThickness": 2,
+          "lineStyle": "dashdot",
+          "smoothing": true,
+          "label": {
+            "fontFamily": "Signika",
+            "fontSize": 1,
+            "fillColor": "#ffffff",
+            "x": 2000,
+            "y": 2137
+          },
+          "visibility": "all"
+        }
+      ],
+      "visibility": "all"
+    }
+  ],
+  "mapLabels": [
+    {
+      "id": "D02uZdlfLyLd0JDL",
+      "name": "Valoria Plains",
+      "x": 2182,
+      "y": 2536,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.55,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    },
+    {
+      "id": "veSrNAS9jyOmtTqj",
+      "name": "Mystwood Forest",
+      "x": 1787,
+      "y": 1970,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.5,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    },
+    {
+      "id": "NJAPfwR7nbsLJiGb",
+      "name": "Sundered Isles",
+      "x": 1201,
+      "y": 2380,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.5,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    },
+    {
+      "id": "dIf68PDjeE17fOuV",
+      "name": "Grimlands",
+      "x": 1747,
+      "y": 2321,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.5,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    },
+    {
+      "id": "yRcEPeBGyx7eoy5W",
+      "name": "Thundris Peaks",
+      "x": 2316,
+      "y": 2291,
+      "rotation": 0,
+      "fontFamily": "Signika",
+      "fontSize": 0.5,
+      "fillColor": "#cebb92",
+      "visibility": "all"
+    }
+  ],
+  "mapDecorations": [
+    {
+      "id": "yIWukLnJJvBT9fF3",
+      "type": "decoration",
+      "name": "Compass Rose",
+      "src": "sharedAssets/images/icons/image-from-rawpixel-id-6704634-png.png",
+      "x": 260,
+      "y": 261,
+      "rotation": 0,
+      "scale": 0.5133420832795047,
+      "opacity": 0.8,
+      "visibility": "all"
+    }
+  ]
+}
