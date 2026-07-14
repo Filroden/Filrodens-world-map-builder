@@ -52,6 +52,7 @@ Link to map JSON file: [<https://github.com/Filroden/Filrodens-world-map-builder
 
 ## How to Use
 
+- [How to Open the Module](#how-to-open-the-module)
 - [The Map Canvas](#the-map-canvas)
 - [Map Making Tools](#map-making-tools)
   - [Generating a New Map](#generating-a-new-map)
@@ -73,9 +74,9 @@ Link to map JSON file: [<https://github.com/Filroden/Filrodens-world-map-builder
   - [Saving a Map](#saving-a-map)
   - [Loading an Existing Map](#loading-an-existing-map)
 
-> *Note: This section will be completed and moved to the module wiki before release.*
+### How to Open the Module
 
-1. Filroden's World Map Builder can be opened from the *Scenes* sidebar. A new button has been added at the top of the sidebar called *Map Builder*.
+Filroden's World Map Builder can be opened from the *Scenes* sidebar. A new button has been added at the top of the sidebar called *Map Builder*.
 
 ### The Map Canvas
 
