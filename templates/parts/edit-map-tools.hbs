@@ -133,6 +133,19 @@
             </div>
         </div>
 
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-pin">
+            <label>{{localize "FILRODENSWMB.UI.PinColor"}}</label>
+            <input type="color" class="fwmb-swatch fwmb-wide" name="pinColor" value="{{lookup uiState 'pinColor'}}" />
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-pin">
+            <label>{{localize "FILRODENSWMB.UI.IconScale"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="pinScale" value="{{lookup uiState 'pinScale'}}" min="0.2" max="4" step="0.1" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState 'pinScale'}}</output>
+            </div>
+        </div>
+
         <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-route">
             <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
             <div class="fwmb-flex-row" style="gap: 4px;">

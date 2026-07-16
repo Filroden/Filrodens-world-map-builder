@@ -3,5 +3,6 @@
     "FILRODENSWMB.UI.SettingsBiomeColors": "Biome Colours",
     "FILRODENSWMB.UI.LineColor": "Colour",
     "FILRODENSWMB.UI.FillColor": "Fill Colour",
-    "FILRODENSWMB.Settings.ThemeHue.Name": "Colour Theme"
+    "FILRODENSWMB.Settings.ThemeHue.Name": "Colour Theme",
+    "FILRODENSWMB.UI.PinColor": "Pin Colour"
 }

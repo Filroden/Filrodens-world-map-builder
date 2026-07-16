@@ -355,5 +355,7 @@
     "FILRODENSWMB.UI.TargetWidth": "Target Width",
     "FILRODENSWMB.UI.CalculatedHeight": "Calculated Height",
     "FILRODENSWMB.UI.RegionalLatitude": "New Latitude Range",
-    "FILRODENSWMB.UI.GenerateMap": "Generate Map"
+    "FILRODENSWMB.UI.GenerateMap": "Generate Map",
+
+    "FILRODENSWMB.UI.PinColor": "Pin Color"
 }

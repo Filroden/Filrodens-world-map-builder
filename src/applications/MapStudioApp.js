@@ -195,6 +195,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             activeIcon: "map_pin",
             activeInfraMode: "pin",
+            pinColor: "#ffffff",
+            pinScale: 1,
             snapToPoints: true,
             routeColor: "#ffffff",
             routeThickness: 3,
@@ -1317,7 +1319,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         this.customBiomeColors = p.customColors || {};
-        this.mapPins = payload.mapPins || [];
+
+        // Guarantee every pin has a valid color property, defaulting to white for legacy maps
+        this.mapPins = (payload.mapPins || []).map((pin) => {
+            pin.color = pin.color || "#ffffff";
+            return pin;
+        });
+
         this.mapRoutes = payload.mapRoutes || [];
         this.regionLayers = payload.regionLayers || [];
         this.mapLabels = payload.mapLabels || [];
@@ -1411,8 +1419,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 icon: this.uiState.activeIcon,
                 x: finalPos.x,
                 y: finalPos.y,
-                scale: FILRODENSWMB.PINS?.DEFAULT_SCALE,
+                scale: this.uiState.pinScale ?? FILRODENSWMB.PINS?.DEFAULT_SCALE ?? 1,
                 visibility: "all",
+                color: this.uiState.pinColor || "#ffffff",
+                label: {
+                    fontSize: this.uiState.pinScale ?? 1,
+                },
             };
             this.mapPins.push(newPin);
         } else if (this.uiState.activeInfraMode === "route") {
@@ -2408,6 +2420,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         description: button.form.elements["pinDesc"].value,
                         icon: button.form.elements["pinIcon"].value,
                         scale: Number(button.form.elements["pinScale"].value),
+                        color: button.form.elements["pinColor"].value,
                     };
                 },
             },
@@ -2419,6 +2432,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             pin.description = result.description;
             pin.icon = result.icon;
             pin.scale = result.scale;
+            pin.color = result.color;
 
             this.#repaintVectors();
             this.render({ parts: ["context"] });
