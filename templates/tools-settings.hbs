@@ -76,7 +76,14 @@
     </fieldset>
 
     <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.SettingsBiomeColors"}}</legend>
+
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.SettingsBiomeColors"}}</span>
+            <a class="fwmb-legend-action" data-action="addCustomBiome" data-tooltip="{{localize 'FILRODENSWMB.UI.AddCustomBiome'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </legend>
+
         <div class="fwmb-biome-legend">
             {{#each biomeList}}
                 <div class="fwmb-biome-item">
@@ -94,10 +101,32 @@
             {{/each}}
         </div>
 
-        <button type="button" class="fwmb-btn outline wide" data-action="addCustomBiome" style="margin-top: var(--fwmb-space-m);">
-            <i class="fwmb-icon add"></i>
-            {{localize "FILRODENSWMB.UI.AddCustomBiome"}}
-        </button>
+    </fieldset>
+
+    <fieldset class="fwmb-fieldset">
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.SettingsRouteQuickStyles"}}</span>
+            <a class="fwmb-legend-action" data-action="addRouteQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.AddRouteQuickStyle'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </legend>
+
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+            {{#each customRouteStyles}}
+                <div class="fwmb-list-item" data-id="{{this.id}}">
+                    <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: {{this.thickness}}px; border-style: {{this.style}};"></div>
+                    <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                    <button type="button" class="fwmb-btn small" data-action="editRouteQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                        <i class="fwmb-icon edit"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn small muted danger" data-action="deleteRouteQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <i class="fwmb-icon delete"></i>
+                    </button>
+                </div>
+            {{else}}
+                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
+            {{/each}}
+        </div>
     </fieldset>
 
 </div>

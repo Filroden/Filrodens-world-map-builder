@@ -121,6 +121,10 @@
     "FILRODENSWMB.UI.SettingsBiomeColors": "Biome Colors",
     "FILRODENSWMB.UI.LayerContours": "Toggle Contour Lines",
     "FILRODENSWMB.UI.ContourInterval": "Contour Interval",
+    "FILRODENSWMB.UI.SettingsRouteQuickStyles": "Route Quick Styles",
+    "FILRODENSWMB.UI.AddRouteQuickStyle": "Add Quick Style",
+    "FILRODENSWMB.UI.Custom": "Custom",
+    "FILRODENSWMB.UI.NoCustomStyles": "No custom styles configured.",
 
     "FILRODENSWMB.UI.CanvasSettings": "Canvas Setup",
     "FILRODENSWMB.UI.MapResolution": "Map Resolution (Pixels)",

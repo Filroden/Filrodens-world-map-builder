@@ -928,7 +928,67 @@ export class StudioCanvas {
             const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
             const splinePoints = this.#getSplinePoints(route.points);
 
-            // Apply rounded caps and joins to blend intersections seamlessly
+            // Extract the geometry loop into a closure so we can stroke it twice
+            const drawRouteGeometry = () => {
+                if (route.style === "solid") {
+                    this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
+                    for (let i = 1; i < splinePoints.length; i++) {
+                        this.routeGraphics.lineTo(splinePoints[i].x, splinePoints[i].y);
+                    }
+                } else {
+                    const dashPattern = route.style === "dashed" ? [route.thickness * 4, route.thickness * 3] : [route.thickness, route.thickness * 2];
+                    let dashIndex = 0;
+                    let dashLength = 0;
+                    let isDrawing = true;
+
+                    this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
+
+                    for (let i = 1; i < splinePoints.length; i++) {
+                        const p1 = splinePoints[i - 1];
+                        const p2 = splinePoints[i];
+                        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+
+                        let remainingDist = dist;
+                        let currentX = p1.x;
+                        let currentY = p1.y;
+
+                        while (remainingDist > 0) {
+                            const step = Math.min(remainingDist, dashPattern[dashIndex] - dashLength);
+                            const ratio = step / remainingDist;
+
+                            currentX += (p2.x - currentX) * ratio;
+                            currentY += (p2.y - currentY) * ratio;
+
+                            if (isDrawing) {
+                                this.routeGraphics.lineTo(currentX, currentY);
+                            } else {
+                                this.routeGraphics.moveTo(currentX, currentY);
+                            }
+
+                            dashLength += step;
+                            remainingDist -= step;
+
+                            if (dashLength >= dashPattern[dashIndex]) {
+                                dashLength = 0;
+                                dashIndex = (dashIndex + 1) % dashPattern.length;
+                                isDrawing = !isDrawing;
+                            }
+                        }
+                    }
+                }
+            };
+
+            // Pass 1: Draw the 1px black outline shadow (thickness + 2)
+            this.routeGraphics.lineStyle({
+                width: route.thickness + 1,
+                color: 0x000000,
+                alpha: 1,
+                cap: PIXI.LINE_CAP.ROUND,
+                join: PIXI.LINE_JOIN.ROUND,
+            });
+            drawRouteGeometry();
+
+            // Pass 2: Draw the colored foreground line
             this.routeGraphics.lineStyle({
                 width: route.thickness,
                 color: colorHex,
@@ -936,54 +996,9 @@ export class StudioCanvas {
                 cap: PIXI.LINE_CAP.ROUND,
                 join: PIXI.LINE_JOIN.ROUND,
             });
+            drawRouteGeometry();
 
-            if (route.style === "solid") {
-                this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
-                for (let i = 1; i < splinePoints.length; i++) {
-                    this.routeGraphics.lineTo(splinePoints[i].x, splinePoints[i].y);
-                }
-            } else {
-                const dashPattern = route.style === "dashed" ? [route.thickness * 4, route.thickness * 3] : [route.thickness, route.thickness * 2];
-                let dashIndex = 0;
-                let dashLength = 0;
-                let isDrawing = true;
-
-                this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
-
-                for (let i = 1; i < splinePoints.length; i++) {
-                    const p1 = splinePoints[i - 1];
-                    const p2 = splinePoints[i];
-                    const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-
-                    let remainingDist = dist;
-                    let currentX = p1.x;
-                    let currentY = p1.y;
-
-                    while (remainingDist > 0) {
-                        const step = Math.min(remainingDist, dashPattern[dashIndex] - dashLength);
-                        const ratio = step / remainingDist;
-
-                        currentX += (p2.x - currentX) * ratio;
-                        currentY += (p2.y - currentY) * ratio;
-
-                        if (isDrawing) {
-                            this.routeGraphics.lineTo(currentX, currentY);
-                        } else {
-                            this.routeGraphics.moveTo(currentX, currentY);
-                        }
-
-                        dashLength += step;
-                        remainingDist -= step;
-
-                        if (dashLength >= dashPattern[dashIndex]) {
-                            dashLength = 0;
-                            dashIndex = (dashIndex + 1) % dashPattern.length;
-                            isDrawing = !isDrawing;
-                        }
-                    }
-                }
-            }
-
+            // Edit nodes...
             if (isEditMode) {
                 route.points.forEach((pt) => {
                     const node = new PIXI.Graphics();

@@ -45,6 +45,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs",
     ]);
 
     registerSidebarInjection();

@@ -222,7 +222,7 @@ Once created, they are shown in the sidebar as cards. Each card has four buttons
 - **Focus View:** Clicking this will pan the map and zoom to the feature.
 - **Edit Details:** You can edit the feature's name, add a description and:
   - For Points of Interest, change the marker icon and its size.
-  - For Routes, change its colour, its thickness and its line style (solid, dashed or dotted).
+  - For Routes, change its Quick Style, its colour, thickness and its line style (solid, dashed or dotted).
 - **Delete**
 
 Descriptions for Points of Interest will be shown as tooltips if you hover over its marker. Descriptions can be styled using `<HTML>` elements, including referencing images, etc.
@@ -240,11 +240,12 @@ Both Points of Interest and Routes will show a label. The label can be edited se
 
    - **Points of Interest**
      - **Select Marker Icon:** Select the icon to be used as the marker. The size of the marker can be changed inside the "Edit Details" from the sidebar (see above).
+     - **Colour** / **Size** Set the colour and size of the icon. The font size of the initial label will be the same as the pin size.
 
    - **Routes**
      - **Snap to Points:** If enabled, route nodes will try to snap to a nearby point of interest.
-     - **Quick Styles:** Four quick styles have been pre-configured which set the colour, thickness and style of line. These can be toggled on and off.
-     - **Colour** / **Thickness** / **Style** Or each property can be customised. All three can be changed from inside the "Edit Details" (see above).
+     - **Quick Styles:** Apply any of your custom Quick Styles to set the colour, thickness, and line style.
+     - **Colour** / **Thickness** / **Style** Each property can be customised. All three can be changed from inside the "Edit Details" (see above).
 
 #### Regions
 
@@ -327,6 +328,11 @@ You can change some of the map configuration settings.
 4. **Biome Colours**
    - Click the colour swatch to edit the colour of each biome.
 
+5. **Route Quick Styles**
+   - Add, edit or delete Quick Styles for Routes (line colour, thickness and style)
+   - Changing an existing Quick Style will change the style of all routes using that style.
+   - Deleting a Quick Style will preserve the existing style on routes but they can no longer be changed in bulk.
+
 ### Map Management Tools
 
 #### Exporting to an external PNG
@@ -394,7 +400,6 @@ The generator can be computationally heavy when calculating new terrain, moistur
 
 ## Roadmap
 
-- Configure quick styles for routes, etc.
 - Bulk edit vector (pins, lines, regions and text) properties.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.

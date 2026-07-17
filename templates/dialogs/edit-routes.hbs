@@ -7,6 +7,21 @@
         <label>{{localize "FILRODENSWMB.UI.Description"}}</label>
         <textarea class="fwmb-scrollable stable" name="routeDesc" rows="4">{{route.description}}</textarea>
     </div>
+    
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
+        <select name="routeQuickStyle">
+            <option value="custom" {{#if (eq route.quickStyle "custom")}}selected{{/if}}>
+                {{localize "FILRODENSWMB.UI.Custom"}}
+            </option>
+            {{#each customRouteStyles}}
+                <option value="{{this.id}}" {{#if (eq ../route.quickStyle this.id)}}selected{{/if}}>
+                    {{this.name}}
+                </option>
+            {{/each}}
+        </select>
+    </div>
+
     <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
         <input type="color" name="routeColor" value="{{route.color}}" />

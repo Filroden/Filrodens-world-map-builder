@@ -140,12 +140,6 @@ export const FILRODENSWMB = {
         shipwreck_in_water: "FILRODENSWMB.ICONS.Shipwreck",
         skull: "FILRODENSWMB.ICONS.Skull",
     },
-    ROUTE_STYLES: {
-        major: { label: "FILRODENSWMB.UI.StyleMajor", color: "#ffb300", thickness: 6, style: "solid" },
-        minor: { label: "FILRODENSWMB.UI.StyleMinor", color: "#e0e0e0", thickness: 3, style: "solid" },
-        trail: { label: "FILRODENSWMB.UI.StyleTrail", color: "#8d6e63", thickness: 2, style: "dashed" },
-        sea: { label: "FILRODENSWMB.UI.StyleSea", color: "#4dd0e1", thickness: 4, style: "dotted" },
-    },
     REGIONS: {
         PRESETS: ["#C84B31", "#E28743", "#E8B851", "#4F7942", "#8A9A5B", "#3B8388", "#2D70B3", "#4A4E69", "#7A5C9B", "#B56576", "#A0522D", "#CC7161", "#6C7A89", "#A89F91", "#E08E79"],
     },

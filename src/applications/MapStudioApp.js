@@ -22,6 +22,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             addCustomBiome: MapStudioApp.#onAddCustomBiome,
             addDecoration: MapStudioApp.#onAddDecoration,
             addRegionLayer: MapStudioApp.#onAddRegionLayer,
+            addRouteQuickStyle: MapStudioApp.#onAddRouteQuickStyle,
             adjustNoiseScale: MapStudioApp.#onAdjustNoiseScale,
             adjustReferenceScale: MapStudioApp.#onAdjustReferenceScale,
             applyResolution: MapStudioApp.#onApplyResolution,
@@ -33,12 +34,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteRegion: MapStudioApp.#onDeleteRegion,
             deleteRegionLayer: MapStudioApp.#onDeleteRegionLayer,
             deleteRoute: MapStudioApp.#onDeleteRoute,
+            deleteRouteQuickStyle: MapStudioApp.#onDeleteRouteQuickStyle,
             editDecoration: MapStudioApp.#onEditDecoration,
             editLabel: MapStudioApp.#onEditLabel,
             editPin: MapStudioApp.#onEditPin,
             editRegion: MapStudioApp.#onEditRegion,
             editRegionLayer: MapStudioApp.#onEditRegionLayer,
             editRoute: MapStudioApp.#onEditRoute,
+            editRouteQuickStyle: MapStudioApp.#onEditRouteQuickStyle,
             exportPng: MapStudioApp.#onExportPng,
             exportScene: MapStudioApp.#onExportScene,
             generateRegionalMap: MapStudioApp.#onGenerateRegionalMap,
@@ -61,7 +64,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             setInfrastructureIcon: MapStudioApp.#onSetInfrastructureIcon,
             setRegionMode: MapStudioApp.#onSetRegionMode,
             setRegionPreset: MapStudioApp.#onSetRegionPreset,
-            setRouteStyle: MapStudioApp.#onSetRouteStyle,
             threeDView: MapStudioApp.#onThreeDView,
             toggleEditMode: MapStudioApp.#onToggleEditMode,
             toggleGrid: MapStudioApp.#onToggleGrid,
@@ -202,6 +204,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             routeThickness: 3,
             routeStyle: "solid",
             activeRouteQuickStyle: "custom",
+            customRouteStyles: [],
 
             referenceImage: "",
             referenceAlpha: 0.5,
@@ -318,10 +321,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }))
             .sort((a, b) => a._localized.localeCompare(b._localized));
 
-        context.routeStyles = Object.entries(FILRODENSWMB.ROUTE_STYLES).map(([id, data]) => ({
-            id: id,
-            label: data.label,
+        context.routeStyles = (this.uiState.customRouteStyles || []).map((style) => ({
+            id: style.id,
+            label: style.name,
+            isCustom: true,
         }));
+
+        context.customRouteStyles = this.uiState.customRouteStyles || [];
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
@@ -436,7 +442,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 // Ignore clicks that don't have a specific input name
                 if (!name || !(name in this.uiState)) return;
 
-                // 1. Update the central Application State
+                // Update the central Application State
                 if (target.type === "checkbox") {
                     this.uiState[name] = target.checked;
                 } else if (target.type === "number" || target.type === "range") {
@@ -445,7 +451,40 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.uiState[name] = target.value;
                 }
 
-                // 2. Live-Update the Active Region
+                // If Quick Style dropdown changed, apply its properties
+                if (name === "activeRouteQuickStyle") {
+                    const styleId = target.value;
+                    if (styleId !== "custom") {
+                        let styleData = this.uiState.customRouteStyles.find((s) => s.id === styleId);
+
+                        if (styleData) {
+                            this.uiState.routeColor = styleData.color;
+                            this.uiState.routeThickness = styleData.thickness;
+                            this.uiState.routeStyle = styleData.style;
+                            this.#syncDOMToState();
+                        }
+                    }
+                }
+
+                // If a manual property changed, fallback to "custom"
+                if (["routeColor", "routeThickness", "routeStyle"].includes(name)) {
+                    this.uiState.activeRouteQuickStyle = "custom";
+                    this.#syncDOMToState();
+                }
+
+                // Cascade changes to the active route currently being drawn
+                if (["activeRouteQuickStyle", "routeColor", "routeThickness", "routeStyle"].includes(name) && this.activeRouteId) {
+                    const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
+                    if (route) {
+                        route.quickStyle = this.uiState.activeRouteQuickStyle;
+                        route.color = this.uiState.routeColor;
+                        route.thickness = this.uiState.routeThickness;
+                        route.style = this.uiState.routeStyle;
+                        this.#repaintVectors();
+                    }
+                }
+
+                // Live-Update the Active Region
                 if (name.startsWith("region") && this.activeRegionId && this.activeRegionLayerId) {
                     const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
                     const region = layer?.regions.find((r) => r.id === this.activeRegionId);
@@ -460,7 +499,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     }
                 }
 
-                // 3. Live-Update Region Layer Opacity
+                // Live-Update Region Layer Opacity
                 if (name === "regionOpacity" && this.activeRegionLayerId) {
                     const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
                     if (layer) {
@@ -469,7 +508,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     }
                 }
 
-                // 4. Live-Update the Active Route
+                // Live-Update the Active Route
                 if (name.startsWith("route") && this.activeRouteId) {
                     const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
                     if (route) {
@@ -480,7 +519,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     }
                 }
 
-                // 5. Live-Update Regional Crop Target Height
+                // Live-Update Regional Crop Target Height
                 if (name === "regionalTargetWidth" && this.canvasEngine) {
                     const cropBox = this.canvasEngine.getCropData();
                     if (cropBox && cropBox.width > 0) {
@@ -564,24 +603,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 if (event.target.matches('input[name="contourInterval"]')) {
                     this.#getMapParameters();
                     this.#repaintCanvas();
-                    return;
-                }
-
-                if (event.target.matches('input[name="routeColor"], input[name="routeThickness"], select[name="routeStyle"]')) {
-                    this.uiState.activeInfraMode = "route";
-                    this.uiState.activeRouteQuickStyle = "custom";
-                    this.#syncInfraModeButtons();
-                    this.#getMapParameters();
-
-                    if (this.activeRouteId) {
-                        const activeRoute = this.mapRoutes.find((r) => r.id === this.activeRouteId);
-                        if (activeRoute) {
-                            activeRoute.color = this.uiState.routeColor;
-                            activeRoute.thickness = this.uiState.routeThickness;
-                            activeRoute.style = this.uiState.routeStyle;
-                            this.#repaintVectors();
-                        }
-                    }
                     return;
                 }
 
@@ -1268,6 +1289,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState["noise.temperature.scale"] = p.noise.temperature?.scale ? 1 / p.noise.temperature.scale : FILRODENSWMB.NOISE.TEMPERATURE.SCALE;
 
         this.uiState.customBiomes = payload.customBiomes || [];
+        this.uiState.customRouteStyles = payload.customRouteStyles || [];
 
         this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
@@ -1305,9 +1327,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         };
 
         if (payload.mapPins) migrateVisibility(payload.mapPins);
-        if (payload.mapRoutes) migrateVisibility(payload.mapRoutes);
+
+        if (payload.mapRoutes) {
+            migrateVisibility(payload.mapRoutes);
+            payload.mapRoutes.forEach((route) => {
+                if (!route.quickStyle) route.quickStyle = "custom"; // Flag old routes as custom overrides
+            });
+        }
+
         if (payload.mapLabels) migrateVisibility(payload.mapLabels);
+
         if (payload.mapDecorations) migrateVisibility(payload.mapDecorations);
+
         if (payload.regionLayers) {
             payload.regionLayers.forEach((layer) => {
                 if (layer.hidden !== undefined) {
@@ -1444,6 +1475,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     id: this.activeRouteId,
                     name: `Route ${this.mapRoutes.length + 1}`,
                     points: [finalPos],
+                    quickStyle: this.uiState.activeRouteQuickStyle,
                     color: this.uiState.routeColor,
                     thickness: this.uiState.routeThickness,
                     style: this.uiState.routeStyle,
@@ -1464,11 +1496,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const modeBtns = this.element.querySelectorAll('.fwmb-edit-toolbar [data-action="setInfraMode"]');
         for (const btn of modeBtns) {
             btn.classList.toggle("active", btn.dataset.mode === mode);
-        }
-
-        const styleBtns = this.element.querySelectorAll('.fwmb-edit-toolbar [data-action="setRouteStyle"]');
-        for (const btn of styleBtns) {
-            btn.classList.toggle("active", btn.dataset.style === this.uiState.activeRouteQuickStyle);
         }
 
         if (this.activeTool === "infrastructure") {
@@ -1644,6 +1671,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 gridSize: this.uiState.gridSize,
                 params: params,
                 customBiomes: this.uiState.customBiomes,
+                customRouteStyles: this.uiState.customRouteStyles,
                 history: this.brushEngine?.history || [],
                 mapPins: this.mapPins,
                 mapRoutes: this.mapRoutes,
@@ -1851,6 +1879,46 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.regionLayers.push({ id: id, name: `Region Layer ${this.regionLayers.length + 1}`, visibility: "all", opacity: this.uiState.regionOpacity, regions: [] });
         this.activeRegionLayerId = id;
         this.render({ parts: ["context"] });
+    }
+
+    static async #onAddRouteQuickStyle(event, target) {
+        // Provide a default template state for new styles
+        const defaultStyle = { name: "New Quick Style", color: "#ffffff", thickness: 3, style: "solid" };
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs", { style: defaultStyle });
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.AddRouteQuickStyle") || "Add Quick Style" },
+            content: content,
+            ok: {
+                callback: (evt, button) => {
+                    return {
+                        name: button.form.elements["styleName"].value.trim() || "New Style",
+                        color: button.form.elements["styleColor"].value,
+                        thickness: Number(button.form.elements["styleThickness"].value) || 3,
+                        style: button.form.elements["styleStyle"].value,
+                    };
+                },
+            },
+        });
+
+        if (result) {
+            const id = foundry.utils.randomID();
+            this.uiState.customRouteStyles.push({ id, ...result });
+
+            // Dynamically append the new option to the toolbar
+            const select = this.element.querySelector('select[name="activeRouteQuickStyle"]');
+            if (select) {
+                const option = document.createElement("option");
+                option.value = id;
+                option.textContent = result.name;
+                select.appendChild(option);
+            }
+
+            this.markDirty();
+            this.render({ parts: ["context", "toolbar"] });
+        }
     }
 
     static #onAdjustNoiseScale(event, target) {
@@ -2236,6 +2304,46 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.markDirty();
     }
 
+    static async #onDeleteRouteQuickStyle(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
+            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
+            rejectClose: false,
+            modal: true,
+        });
+
+        if (!confirmed) return;
+
+        this.#pushVectorState();
+
+        // 1. Remove from registry
+        this.uiState.customRouteStyles = this.uiState.customRouteStyles.filter((s) => s.id !== id);
+
+        const select = this.element.querySelector('select[name="activeRouteQuickStyle"]');
+        if (select) {
+            const option = select.querySelector(`option[value="${id}"]`);
+            if (option) option.remove();
+        }
+
+        // 2. Disconnect existing routes gracefully, preserving their baked visual snapshot
+        for (const route of this.mapRoutes) {
+            if (route.quickStyle === id) {
+                route.quickStyle = "custom";
+            }
+        }
+
+        // 3. Update active UI tool if it was using the deleted style
+        if (this.uiState.activeRouteQuickStyle === id) {
+            this.uiState.activeRouteQuickStyle = "custom";
+            this.#syncDOMToState();
+        }
+
+        this.markDirty();
+        this.render({ parts: ["context", "toolbar"] });
+    }
+
     static async #onEditDecoration(event, target) {
         const id = target.closest(".fwmb-list-item").dataset.id;
         const dec = this.mapDecorations.find((d) => d.id === id);
@@ -2515,17 +2623,57 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const route = this.mapRoutes.find((r) => r.id === id);
         if (!route) return;
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs", { route });
+        // Ensure older routes map strictly to the custom fallback
+        const safeRoute = { ...route, quickStyle: route.quickStyle || "custom" };
+
+        const context = {
+            route: safeRoute,
+            customRouteStyles: this.uiState.customRouteStyles || [],
+        };
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs", context);
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
             window: { title: game.i18n.localize("FILRODENSWMB.UI.EditRoute") },
             content: content,
+            render: (event) => {
+                const app = event.target;
+                const html = app.element;
+
+                const quickStyleSelect = html.querySelector('select[name="routeQuickStyle"]');
+                const colorInput = html.querySelector('input[name="routeColor"]');
+                const thicknessInput = html.querySelector('input[name="routeThickness"]');
+                const styleSelect = html.querySelector('select[name="routeStyle"]');
+
+                // 1. If user selects a predefined style, automatically update the manual inputs
+                quickStyleSelect?.addEventListener("change", (e) => {
+                    const styleId = e.target.value;
+                    if (styleId !== "custom") {
+                        const styleData = this.uiState.customRouteStyles.find((s) => s.id === styleId);
+                        if (styleData) {
+                            colorInput.value = styleData.color;
+                            thicknessInput.value = styleData.thickness;
+                            styleSelect.value = styleData.style;
+                        }
+                    }
+                });
+
+                // 2. If user manually modifies an input, instantly revert dropdown to "custom"
+                const revertToCustom = () => {
+                    if (quickStyleSelect) quickStyleSelect.value = "custom";
+                };
+
+                colorInput?.addEventListener("input", revertToCustom);
+                thicknessInput?.addEventListener("input", revertToCustom);
+                styleSelect?.addEventListener("change", revertToCustom);
+            },
             ok: {
                 callback: (event, button, dialog) => {
                     return {
                         name: button.form.elements["routeName"].value,
                         description: button.form.elements["routeDesc"].value,
+                        quickStyle: button.form.elements["routeQuickStyle"].value,
                         color: button.form.elements["routeColor"].value,
                         thickness: Number(button.form.elements["routeThickness"].value),
                         style: button.form.elements["routeStyle"].value,
@@ -2539,13 +2687,84 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             route.name = result.name;
             route.description = result.description;
+            route.quickStyle = result.quickStyle;
             route.color = result.color;
             route.thickness = result.thickness;
             route.style = result.style;
 
+            // If the user happens to edit the exact route they are currently drawing,
+            // ensure the edit toolbar DOM syncs so the next node inherits the changes perfectly.
+            if (this.activeRouteId === id) {
+                this.uiState.activeRouteQuickStyle = result.quickStyle;
+                this.uiState.routeColor = result.color;
+                this.uiState.routeThickness = result.thickness;
+                this.uiState.routeStyle = result.style;
+                this.#syncDOMToState();
+            }
+
             this.#repaintVectors();
             this.render({ parts: ["context"] });
             this.markDirty();
+        }
+    }
+
+    static async #onEditRouteQuickStyle(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const style = this.uiState.customRouteStyles.find((s) => s.id === id);
+        if (!style) return;
+
+        // Pass the existing style object to prepopulate the template
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs", { style });
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Edit") || "Edit Quick Style" },
+            content: content,
+            ok: {
+                callback: (evt, button) => {
+                    return {
+                        name: button.form.elements["styleName"].value.trim() || style.name,
+                        color: button.form.elements["styleColor"].value,
+                        thickness: Number(button.form.elements["styleThickness"].value) || 3,
+                        style: button.form.elements["styleStyle"].value,
+                    };
+                },
+            },
+        });
+
+        if (result) {
+            this.#pushVectorState();
+
+            // 1. Update the style template
+            Object.assign(style, result);
+
+            // Dynamically update the option text in the toolbar
+            const select = this.element.querySelector('select[name="activeRouteQuickStyle"]');
+            if (select) {
+                const option = select.querySelector(`option[value="${id}"]`);
+                if (option) option.textContent = result.name;
+            }
+
+            // 2. Cascade changes to all routes utilizing this style
+            for (const route of this.mapRoutes) {
+                if (route.quickStyle === id) {
+                    route.color = result.color;
+                    route.thickness = result.thickness;
+                    route.style = result.style;
+                }
+            }
+
+            // 3. If this style is currently active in the UI, update the UI states
+            if (this.uiState.activeRouteQuickStyle === id) {
+                this.uiState.routeColor = result.color;
+                this.uiState.routeThickness = result.thickness;
+                this.uiState.routeStyle = result.style;
+                this.#syncDOMToState();
+            }
+
+            this.#repaintVectors();
+            this.markDirty();
+            this.render({ parts: ["context", "toolbar"] });
         }
     }
 
@@ -2816,6 +3035,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 gridSize: state.gridSize,
                 params: newParams,
                 customBiomes: state.customBiomes,
+                customRouteStyles: state.customRouteStyles,
                 history: newHistory,
                 mapPins: newPins,
                 mapRoutes: newRoutes,
@@ -3236,38 +3456,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.#repaintVectors();
             }
         }
-    }
-
-    static #onSetRouteStyle(event, target) {
-        const styleId = target.dataset.style;
-        const currentStyle = this.uiState.activeRouteQuickStyle;
-
-        this.uiState.activeInfraMode = "route";
-        this.activeRouteId = null;
-
-        // 1. If clicking the active style, toggle it off and revert to defaults
-        if (currentStyle === styleId) {
-            this.uiState.activeRouteQuickStyle = "custom";
-
-            this.uiState.routeColor = "#ffffff";
-            this.uiState.routeThickness = 3;
-            this.uiState.routeStyle = "solid";
-        }
-        // 2. Otherwise, apply the new quick style
-        else {
-            const styleData = FILRODENSWMB.ROUTE_STYLES[styleId];
-            if (!styleData) return;
-
-            this.uiState.activeRouteQuickStyle = styleId;
-            this.uiState.routeColor = styleData.color;
-            this.uiState.routeThickness = styleData.thickness;
-            this.uiState.routeStyle = styleData.style;
-        }
-
-        this.#syncDOMToState();
-        this.#syncInfraModeButtons();
-
-        this.render({ parts: ["context"] });
     }
 
     /**

@@ -1,0 +1,22 @@
+<div class="fwmb-dialog-content">
+    <div class="form-group fwmb-dialog-content">
+        <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <input type="text" name="styleName" value="{{style.name}}" autofocus>
+    </div>
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
+        <input type="color" name="styleColor" value="{{style.color}}" class="fwmb-swatch fwmb-wide" style="height: 24px; padding: 0;">
+    </div>
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
+        <input type="number" name="styleThickness" value="{{style.thickness}}" min="1" max="10">
+    </div>
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.LineStyle"}}</label>
+        <select name="styleStyle">
+            <option value="solid" {{#if (eq style.style "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+            <option value="dashed" {{#if (eq style.style "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
+            <option value="dotted" {{#if (eq style.style "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
+        </select>
+    </div>
+</div>

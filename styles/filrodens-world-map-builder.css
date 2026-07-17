@@ -608,6 +608,7 @@
     flex-direction: column;
     padding: var(--fwmb-space-m);
     gap: var(--fwmb-space-xs);
+    overflow-x: hidden;
     overflow-y: auto; /* Required to trigger fwmb-scrollable mechanics */
 }
 
@@ -1019,6 +1020,29 @@ input.fwmb-swatch {
     flex-shrink: 0;
 }
 
+/* --- Legend Actions --- */
+.fwmb-legend-with-action {
+    display: flex;
+    align-items: center;
+}
+
+.fwmb-legend-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--fwmb-text-secondary);
+    transition: color 0.1s, text-shadow 0.1s;
+    margin-inline: var(--fwmb-space-s);
+    border: 1px solid var(--fwmb-border-main);
+}
+
+.fwmb-legend-action:hover {
+    background-color: var(--fwmb-bg-hover);
+    color: var(--fwmb-accent-main);
+    text-shadow: var(--fwmb-shadow-focus);
+}
+
 /* --- TRANSFORMATION CONTROLS (D-PAD & ZOOM) --- */
 .fwmb-transform-controls {
     display: flex;
@@ -1292,9 +1316,8 @@ input.fwmb-swatch {
 
 .fwmb-route-swatch {
     width: var(--fwmb-font-size-xxl);
-    border-top-width: 0;
-    border-bottom-width: 0;
-    border-left-width: 0;
+    border-inline-width: 0;
+    border-block-width: 0.5px;
 }
 
 #fwmb-infra-tooltip {
