@@ -148,13 +148,18 @@
 
         <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-route">
             <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
-            <div class="fwmb-flex-row" style="gap: 4px;">
+            <select name="activeRouteQuickStyle">
+                <!-- Explicit Custom Fallback -->
+                <option value="custom" {{#if (eq uiState.activeRouteQuickStyle "custom")}}selected{{/if}}>
+                    {{localize "FILRODENSWMB.UI.Custom"}}
+                </option>
+
                 {{#each routeStyles}}
-                <button type="button" class="fwmb-btn outline wide {{#if (eq ../uiState.activeRouteQuickStyle this.id)}}active{{/if}}" data-action="setRouteStyle" data-style="{{this.id}}">
-                    {{localize this.label}}
-                </button>
+                    <option value="{{this.id}}" {{#if (eq ../uiState.activeRouteQuickStyle this.id)}}selected{{/if}}>
+                        {{this.label}}
+                    </option>
                 {{/each}}
-            </div>
+            </select>
         </div>
 
         <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-route">
