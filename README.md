@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-1.0.0-blue)
+![Latest Version](https://img.shields.io/badge/Version-1.1.0-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -395,7 +395,6 @@ The generator can be computationally heavy when calculating new terrain, moistur
 ## Roadmap
 
 - Configure quick styles for routes, etc.
-- Coloured vector pins
 - Bulk edit vector (pins, lines, regions and text) properties.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.

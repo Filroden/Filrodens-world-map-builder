@@ -1011,6 +1011,14 @@ input.fwmb-swatch {
     border-radius: 2px;
 }
 
+.fwmb-pin {
+    width: var(--fwmb-font-size-xs);
+    height: var(--fwmb-font-size-xs);
+    border-radius: 50%;
+    border: 1px solid var(--fwmb-border-main);
+    flex-shrink: 0;
+}
+
 /* --- TRANSFORMATION CONTROLS (D-PAD & ZOOM) --- */
 .fwmb-transform-controls {
     display: flex;

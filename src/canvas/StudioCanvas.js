@@ -1010,6 +1010,11 @@ export class StudioCanvas {
             const texturePath = `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg`;
             const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
 
+            // Apply multiplicative tinting (defaults to white if missing)
+            if (pin.color) {
+                sprite.tint = Number(pin.color.replace("#", "0x"));
+            }
+
             // Apply resolution scaling * user override scale
             const baseSize = 24 * resScale;
             sprite.width = baseSize * (pin.scale || 1);
