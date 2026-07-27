@@ -6,7 +6,7 @@
     </datalist>
 
     <div class="fwmb-brush-settings">
-        <div class="fwmb-brush-setting" data-tool-group="terrain biomes features">
+        <div class="fwmb-brush-setting" data-tool-group="terrain biomes">
             <label>{{localize "FILRODENSWMB.UI.BrushSize"}}</label>
             <div class="fwmb-slider-group">
                 <input type="range" name="brushSize" value="20" min="2" max="100" step="1" oninput="this.nextElementSibling.value = this.value" />
@@ -95,12 +95,17 @@
             <i class="fwmb-icon format-paint"></i>
         </button>
 
-        <button type="button" data-tool-group="features" data-action="setBrushTool" data-tool="addSpring" class="active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolAddSpring'}}">
+        <button type="button" data-tool-group="features" data-action="setFeatureMode" data-mode="spring" class="active fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolAddSpring'}}">
             <i class="fwmb-icon water-drop"></i>
         </button>
 
-        <button type="button" data-tool-group="features" data-action="setBrushTool" data-tool="erasePin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolErasePin'}}">
-            <i class="fwmb-icon ink-eraser"></i>
+        <button type="button" data-tool-group="features" data-action="setFeatureMode" data-mode="fault" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolDrawFault'}}">
+            <i class="fwmb-icon timeline"></i>
+        </button>
+
+        <button type="button" data-tool-group="features-fault" data-action="toggleSnapping" class="fwmb-btn wide {{#if uiState.snapToPoints}}active {{else}}fwmb-hidden {{/if}}">
+            <i class="fwmb-icon filter-center-focus"></i>
+            {{localize "FILRODENSWMB.UI.SnapToPoints"}}
         </button>
 
         <button type="button" data-tool-group="infrastructure" data-action="setInfraMode" data-mode="pin" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ModePin'}}">
@@ -184,6 +189,33 @@
             </select>
         </div>
 
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="features-fault">
+            <label>{{localize "FILRODENSWMB.UI.FaultType"}}</label>
+            <select name="faultType">
+                {{#each tectonicTypes}}
+                    <option value="{{this.id}}" {{#if (eq ../uiState.faultType this.id)}}selected{{/if}}>
+                        {{localize this.label}}
+                    </option>
+                {{/each}}
+            </select>
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="features-fault">
+            <label>{{localize "FILRODENSWMB.UI.FaultThickness"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="faultThickness" value="{{lookup uiState 'faultThickness'}}" min="10" max="100" step="5" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "faultThickness"}}</output>
+            </div>
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="features-fault">
+            <label>{{localize "FILRODENSWMB.UI.FaultStrength"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="faultStrength" value="{{lookup uiState 'faultStrength'}}" min="0.1" max="1.0" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{lookup uiState "faultStrength"}}</output>
+            </div>
+        </div>
+
         <button type="button" data-tool-group="cartography" data-action="addDecoration" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.AddDecoration'}}">
             <i class="fwmb-icon add"></i>
         </button>
@@ -241,14 +273,6 @@
         <button type="button" data-action="toggleRegionSmoothing" class="fwmb-btn wide {{#if uiState.regionSmoothing}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleSmoothing'}}">
             <i class="fwmb-icon {{#if uiState.regionSmoothing}}gesture{{else}}timeline{{/if}}"></i>
         </button>
-    </div>
-
-    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="regions">
-        <label>{{localize "FILRODENSWMB.UI.Opacity"}}</label>
-        <div class="fwmb-slider-group">
-            <input type="range" name="regionOpacity" value="{{lookup uiState 'regionOpacity'}}" min="0.1" max="1" step="0.1" oninput="this.nextElementSibling.value = this.value" />
-            <output>{{lookup uiState "regionOpacity"}}</output>
-        </div>
     </div>
 
     <div class="fwmb-hint fwmb-centered" data-tool-group="labels">

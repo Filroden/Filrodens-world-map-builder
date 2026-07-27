@@ -1,5 +1,31 @@
 <div class="fwmb-tool-content fwmb-scrollable">
 
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.TectonicFaults"}}</legend>
+
+        <div class="fwmb-list-container fwmb-scrollable stable">
+            {{#each tectonicFaults}}
+                <div class="fwmb-list-item" data-id="{{this.id}}" data-type="fault">
+                    <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: 5px; border-style: solid;"></div>
+
+                    <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+
+                    <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                        <i class="fwmb-icon center-focus"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn small" data-action="editFault" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                        <i class="fwmb-icon edit"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn small muted danger" data-action="deleteFault" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <i class="fwmb-icon delete"></i>
+                    </button>
+                </div>
+            {{else}}
+                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoFaultLines"}}</div>
+            {{/each}}
+        </div>
+    </fieldset>
+
     <div class="fwmb-flex-1"></div>
     <div class="fwmb-divider"></div>
 

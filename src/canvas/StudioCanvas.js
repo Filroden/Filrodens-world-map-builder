@@ -34,6 +34,10 @@ export class StudioCanvas {
         this.layers.biomes.alpha = 0.65;
 
         // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
+        this.haloGraphics = new PIXI.Graphics();
+        this.haloGraphics.filters = [new PIXI.filters.AlphaFilter(0.15)];
+        this.layers.features.addChild(this.haloGraphics);
+
         this.vectorGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.vectorGraphics);
 
@@ -409,6 +413,15 @@ export class StudioCanvas {
 
             if (e.button === 2 || e.button === 1) {
                 this.isDragging = false;
+
+                // Evaluate Right-Click-to-Cancel
+                if (e.button === 2 && this.dragStart) {
+                    const dist = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
+                    if (dist < 5 && this.onRightClick) {
+                        this.onRightClick();
+                    }
+                }
+
                 canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
                 return;
             }
@@ -913,17 +926,41 @@ export class StudioCanvas {
     /**
      * Renders vector routes and POI pins to the infrastructure layer.
      */
-    renderInfrastructure(pins = [], routes = [], isEditMode = false) {
+    renderInfrastructure(pins = [], routes = [], isEditMode = false, activeRouteId = null) {
         // Clone and sort the routes by thickness so major highways always draw on top
         const sortedRoutes = [...routes].sort((a, b) => a.thickness - b.thickness);
 
         this.routeGraphics.clear();
-        this.pinContainer.removeChildren().forEach((c) => c.destroy());
-        this.nodeContainer.removeChildren().forEach((c) => c.destroy());
+        this.pinContainer.removeChildren().forEach((c) => c.destroy(true));
+        this.nodeContainer.removeChildren().forEach((c) => c.destroy(true));
 
         // 1. Render Routes (Bottom Layer)
         sortedRoutes.forEach((route) => {
-            if (!this.#isVisibleInCurrentPass(route.visibility, "all", false) || !route.points || route.points.length < 2) return;
+            if (!this.#isVisibleInCurrentPass(route.visibility, "all", false) || !route.points || route.points.length === 0) return;
+
+            // 1a. Draw Edit Nodes FIRST (Guarantees the initial single click is visible)
+            if (isEditMode) {
+                const isActive = route.id === activeRouteId;
+                const nodeColor = isActive ? 0x00e5ff : 0xffffff;
+
+                route.points.forEach((pt, index) => {
+                    const isLast = isActive && index === route.points.length - 1;
+
+                    const node = new PIXI.Graphics();
+                    node.beginFill(nodeColor, 0.6);
+                    node.lineStyle(2, 0x000000, 0.6);
+                    node.drawCircle(0, 0, isLast ? 8 : 5);
+                    node.endFill();
+                    node.x = pt.x;
+                    node.y = pt.y;
+
+                    this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
+                    this.nodeContainer.addChild(node);
+                });
+            }
+
+            // 1b. Abort line geometry if there is no second point to connect to
+            if (route.points.length < 2) return;
 
             const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
             const splinePoints = this.#getSplinePoints(route.points);
@@ -997,23 +1034,6 @@ export class StudioCanvas {
                 join: PIXI.LINE_JOIN.ROUND,
             });
             drawRouteGeometry();
-
-            // Edit nodes...
-            if (isEditMode) {
-                route.points.forEach((pt) => {
-                    const node = new PIXI.Graphics();
-                    node.beginFill(0xffffff, 0.6);
-                    node.lineStyle(2, 0x000000, 0.6);
-                    node.drawCircle(0, 0, 5);
-                    node.endFill();
-                    node.x = pt.x;
-                    node.y = pt.y;
-
-                    // Push to mathematical cache instead of binding PIXI events
-                    this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
-                    this.nodeContainer.addChild(node);
-                });
-            }
         });
 
         // 2. Render Pins (Top Layer)
@@ -1042,8 +1062,8 @@ export class StudioCanvas {
             if (isEditMode) {
                 // The hit radius must expand to match the new size
                 this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2 });
-            } else if (pin.name || pin.description) {
-                // Keep PIXI hover events for tooltips ONLY when not in edit mode
+            } else if (!this.isEditMode && (pin.name || pin.description)) {
+                // Keep PIXI hover events for tooltips ONLY when the global canvas is not in ANY edit mode
                 sprite.eventMode = "static";
                 sprite.interactive = true;
                 sprite.cursor = "help";
@@ -1079,14 +1099,14 @@ export class StudioCanvas {
         });
     }
 
-    renderRegions(regionLayers = [], isEditMode = false, activeRegionId = null) {
-        this.layers.regions.removeChildren().forEach((c) => c.destroy());
+    renderRegions(regionLayers = [], isEditMode = false, activeRegionId = null, globalOpacity = 0.5) {
+        this.layers.regions.removeChildren().forEach((c) => c.destroy({ children: true }));
 
         regionLayers.forEach((layer) => {
             if (!this.#isVisibleInCurrentPass(layer.visibility, "all", true)) return;
 
             const layerContainer = new PIXI.Container();
-            layerContainer.alpha = layer.opacity === undefined ? 0.5 : layer.opacity;
+            layerContainer.alpha = globalOpacity;
             this.layers.regions.addChild(layerContainer);
 
             layer.regions.forEach((region) => {
@@ -1182,11 +1202,16 @@ export class StudioCanvas {
 
                 // 3. Draw Edit Nodes
                 if (isEditMode) {
-                    region.points.forEach((pt) => {
+                    const isActive = region.id === activeRegionId;
+                    const nodeColor = isActive ? 0x00e5ff : 0xffffff;
+
+                    region.points.forEach((pt, index) => {
+                        const isLast = isActive && index === region.points.length - 1;
+
                         const node = new PIXI.Graphics();
-                        node.beginFill(0xffffff, 0.6);
+                        node.beginFill(nodeColor, 0.6);
                         node.lineStyle(2, 0x000000, 0.6);
-                        node.drawCircle(0, 0, 5);
+                        node.drawCircle(0, 0, isLast ? 8 : 5);
                         node.endFill();
                         node.x = pt.x;
                         node.y = pt.y;
@@ -1304,7 +1329,7 @@ export class StudioCanvas {
     }
 
     renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], regionLayers = [], isEditMode = false) {
-        this.layers.labels.removeChildren().forEach((c) => c.destroy());
+        this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
 
         // Extract native OS root font size to mimic CSS 'rem' behaviour
         const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
@@ -1410,7 +1435,7 @@ export class StudioCanvas {
 
     renderCartography(uiState, mapWidth, mapHeight, isEditMode = false, decorations = []) {
         if (!this.layers.cartography) return;
-        this.layers.cartography.removeChildren().forEach((c) => c.destroy());
+        this.layers.cartography.removeChildren().forEach((c) => c.destroy({ children: true }));
 
         const vectorLayer = new PIXI.Graphics();
         this.layers.cartography.addChild(vectorLayer);
@@ -1732,5 +1757,79 @@ export class StudioCanvas {
         this.mapMask.beginFill(0xffffff); // Color doesn't matter for masks
         this.mapMask.drawRect(0, 0, this.mapWidth, this.mapHeight);
         this.mapMask.endFill();
+    }
+
+    renderFaultLines(faults = [], isEditMode = false, activeFaultId = null) {
+        if (this.haloGraphics) this.haloGraphics.clear();
+        if (!this.layers.features || !isEditMode) return;
+
+        faults.forEach((fault) => {
+            if (!this.#isVisibleInCurrentPass(fault.visibility, "all", false) || !fault.points || fault.points.length === 0) return;
+
+            // 1. Draw Halo and Line ONLY if there are enough points to form a path
+            if (fault.points.length >= 2) {
+                const rawSpline = this.#getSplinePoints(fault.points);
+
+                const spline = [rawSpline[0]];
+                for (let i = 1; i < rawSpline.length; i++) {
+                    const pt = rawSpline[i];
+                    const lastPt = spline.at(-1);
+                    if (Math.hypot(pt.x - lastPt.x, pt.y - lastPt.y) > 2 || i === rawSpline.length - 1) {
+                        spline.push(pt);
+                    }
+                }
+
+                const colorHex = typeof fault.color === "string" ? Number.parseInt(fault.color.replace("#", ""), 16) : fault.color || 0xffffff;
+                const thickness = fault.thickness || 40;
+
+                // Draw the Area of Effect Halo via circle stamping
+                this.haloGraphics.beginFill(colorHex, 1);
+                this.haloGraphics.lineStyle(0);
+
+                let lastX = -9999;
+                let lastY = -9999;
+                const stepThreshold = Math.max(2, thickness * 0.25);
+
+                for (let i = 0; i < spline.length; i++) {
+                    const pt = spline[i];
+                    if (Math.hypot(pt.x - lastX, pt.y - lastY) > stepThreshold || i === spline.length - 1) {
+                        this.haloGraphics.drawCircle(pt.x, pt.y, thickness);
+                        lastX = pt.x;
+                        lastY = pt.y;
+                    }
+                }
+                this.haloGraphics.endFill();
+
+                // Draw the Core Vector Line
+                this.vectorGraphics.lineStyle({
+                    width: 3,
+                    color: colorHex,
+                    alpha: 0.85,
+                    alignment: 0.5,
+                    join: PIXI.LINE_JOIN.ROUND,
+                    cap: PIXI.LINE_CAP.ROUND,
+                });
+                this.vectorGraphics.moveTo(spline[0].x, spline[0].y);
+                for (let i = 1; i < spline.length; i++) {
+                    this.vectorGraphics.lineTo(spline[i].x, spline[i].y);
+                }
+            }
+
+            // 2. Draw Edit Nodes LAST so they always render on top of the geometry
+            if (isEditMode) {
+                const isActive = fault.id === activeFaultId;
+                const nodeColor = isActive ? 0x00e5ff : 0xffffff;
+
+                fault.points.forEach((pt, index) => {
+                    const isLast = isActive && index === fault.points.length - 1;
+
+                    this.vectorGraphics.beginFill(nodeColor, 0.6);
+                    this.vectorGraphics.lineStyle(2, 0x000000, 0.6);
+                    this.vectorGraphics.drawCircle(pt.x, pt.y, isLast ? 8 : 5);
+                    this.vectorGraphics.endFill();
+                    this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
+                });
+            }
+        });
     }
 }

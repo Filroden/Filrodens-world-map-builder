@@ -52,28 +52,6 @@ Link to map JSON file: [<https://github.com/Filroden/Filrodens-world-map-builder
 
 ## How to Use
 
-- [How to Open the Module](#how-to-open-the-module)
-- [The Map Canvas](#the-map-canvas)
-- [Map Making Tools](#map-making-tools)
-  - [Generating a New Map](#generating-a-new-map)
-  - [Generating Regional Maps](#generating-regional-maps)
-  - [Terrain](#terrain)
-  - [Biomes](#biomes-climate)
-  - [Terrain Features](#terrain-features)
-  - [Infrastructure](#infrastructure)
-  - [Regions](#regions)
-  - [Labels](#labels)
-  - [Cartography](#cartography)
-- [Module Settings](#module-settings)
-  - [3D View](#3d-view)
-  - [Reference Images](#reference-images)
-  - [Map Configuration](#map-configuration)
-- [Map Management Tools](#map-management-tools)
-  - [Exporting to an external PNG](#exporting-to-an-external-png)
-  - [Exporting to a Scene](#exporting-to-a-scene)
-  - [Saving a Map](#saving-a-map)
-  - [Loading an Existing Map](#loading-an-existing-map)
-
 ### How to Open the Module
 
 Filroden's World Map Builder can be opened from the *Scenes* sidebar. A new button has been added at the top of the sidebar called *Map Builder*.
@@ -115,6 +93,7 @@ In edit mode, some layers allow features to be added, moved or removed with mous
 - **Remove**: Existing pins and region nodes can be removed by using `CTRL (or CMD) + left-click`.
 - **Rotate:** Labels and cartographic decorations can be rotated by using the `Scroll Wheel` while holding `Left-click`.
 - **Re-size:** Cartographic decorations can be re-sized using the `SHIFT + Scroll Wheel` while holding `Left-click`.
+- **End Line/Region:** Using `Right-click` without dragging will end any active line or region being edited.
 
 #### Generating a New Map
 
@@ -200,14 +179,17 @@ Biomes are generated automatically depending on the latitude, terrain, temperatu
 #### Terrain Features
 
 - **Rivers and Lakes:** River sources are automatically generated where the moisture levels are high enough. River sources form between certain elevations which can be changed in the Map Configuration settings. They find their way down the terrain until they reach natural depressions. Water will then pool to form lakes. If the lakes becomes large enough, they may find new paths down the terrain and potentially reach the ocean. When a map is generated, the procedural river sources are permanently baked into the map as editable pins.
+- **Plate Tectonics:** Tectonic plates (convergent, divergent and lateral/slip) and volcanic hotspot chains can be simulated using line tools.
 
 1. **Edit Terrain Features**
 
-   Brush tools work similar to brush tools in graphics packages.
-   - **Brush Size:** The radius of the brush tool.
+   - **Add New River Source:** Add a pin to spawn a custom river.
+   - **Draw Fault Line:** Draw a line to simulate a convergent, divergent or lateral/slip fault or a hotspot chain.
 
-   - **Add New River Source:**: Add a pin to spawn a custom river.
-   - **Erase Pin:** Delete any river source pin within the brush area (whether procedurally generated or manually placed) to remove that river.
+   For fault lines:
+   - **Tectonic Fault Type:** Choose the type of fault you want to simulate.
+   - **Fault Line Thickness:** Choose over how wide an area the effects will happen.
+   - **Fault Line Strength:** Determine the strength of the effect.
 
 #### Infrastructure
 

@@ -361,5 +361,19 @@
     "FILRODENSWMB.UI.RegionalLatitude": "New Latitude Range",
     "FILRODENSWMB.UI.GenerateMap": "Generate Map",
 
-    "FILRODENSWMB.UI.PinColor": "Pin Color"
+    "FILRODENSWMB.UI.PinColor": "Pin Color",
+
+    "FILRODENSWMB.UI.EditFault": "Edit Fault Line",
+    "FILRODENSWMB.UI.FaultType": "Tectonic Fault Type",
+    "FILRODENSWMB.TECTONICS.Convergent": "Convergent",
+    "FILRODENSWMB.TECTONICS.Divergent": "Divergent",
+    "FILRODENSWMB.TECTONICS.Slip": "Slip",
+    "FILRODENSWMB.TECTONICS.Hotspot": "Hotspot",
+    "FILRODENSWMB.UI.TectonicFaults": "Tectonic Fault Lines",
+    "FILRODENSWMB.UI.NoFaultLines": "No tectonic fault lines have been placed yet.",
+    "FILRODENSWMB.UI.FaultThickness": "Fault Line Thickness",
+    "FILRODENSWMB.UI.FaultStrength": "Fault Line Stength",
+    "FILRODENSWMB.UI.ToolDrawFault": "Draw Fault Line",
+
+    "FILRODENSWMB.UI.RegionOpacity": "Region Opacity"
 }
