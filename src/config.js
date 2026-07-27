@@ -152,4 +152,29 @@ export const FILRODENSWMB = {
     PINS: {
         DEFAULT_SCALE: 1,
     },
+    TECTONICS: {
+        DEFAULT_THICKNESS: 40,
+        DEFAULT_STRENGTH: 0.25,
+        HOTSPOT_SPACING: 35,
+        HOTSPOT_DECAY: 0.85,
+        BOUNDING_PADDING: 1.5,
+        TYPES: {
+            CONVERGENT: "convergent",
+            DIVERGENT: "divergent",
+            SLIP: "slip",
+            HOTSPOT: "hotspot",
+        },
+        LABELS: {
+            convergent: "FILRODENSWMB.TECTONICS.Convergent",
+            divergent: "FILRODENSWMB.TECTONICS.Divergent",
+            slip: "FILRODENSWMB.TECTONICS.Slip",
+            hotspot: "FILRODENSWMB.TECTONICS.Hotspot",
+        },
+        COLORS: {
+            convergent: "#ef4444",
+            divergent: "#06b6d4",
+            slip: "#f59e0b",
+            hotspot: "#d97706",
+        },
+    },
 };

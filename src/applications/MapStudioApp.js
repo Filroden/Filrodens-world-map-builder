@@ -29,6 +29,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             changeTool: MapStudioApp.#onChangeTool,
             deleteCustomBiome: MapStudioApp.#onDeleteCustomBiome,
             deleteDecoration: MapStudioApp.#onDeleteDecoration,
+            deleteFault: MapStudioApp.#onDeleteFault,
             deleteLabel: MapStudioApp.#onDeleteLabel,
             deletePin: MapStudioApp.#onDeletePin,
             deleteRegion: MapStudioApp.#onDeleteRegion,
@@ -36,6 +37,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteRoute: MapStudioApp.#onDeleteRoute,
             deleteRouteQuickStyle: MapStudioApp.#onDeleteRouteQuickStyle,
             editDecoration: MapStudioApp.#onEditDecoration,
+            editFault: MapStudioApp.#onEditFault,
             editLabel: MapStudioApp.#onEditLabel,
             editPin: MapStudioApp.#onEditPin,
             editRegion: MapStudioApp.#onEditRegion,
@@ -60,6 +62,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             saveMap: MapStudioApp.#onSaveMap,
             selectRegionLayer: MapStudioApp.#onSelectRegionLayer,
             setBrushTool: MapStudioApp.#onSetBrushTool,
+            setFeatureMode: MapStudioApp.#onSetFeatureMode,
             setInfraMode: MapStudioApp.#onSetInfraMode,
             setInfrastructureIcon: MapStudioApp.#onSetInfrastructureIcon,
             setRegionMode: MapStudioApp.#onSetRegionMode,
@@ -116,6 +119,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.currentMoistureData = null;
         this.currentTemperatureData = null;
         this.currentRiverData = null;
+        this.tectonicFaults = [];
+        this.activeFaultId = null;
         this.mapPins = [];
         this.mapRoutes = [];
         this.activeRouteId = null;
@@ -182,8 +187,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
             "noise.temperature.scale": Math.min(Math.max(100, Math.round(FILRODENSWMB.NOISE.TEMPERATURE.SCALE * ratio)), 8000),
 
+            activeFeatureMode: "spring",
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
             springsBaked: false,
+            faultType: "convergent",
+            faultThickness: FILRODENSWMB.TECTONICS?.DEFAULT_THICKNESS || 40,
+            faultStrength: FILRODENSWMB.TECTONICS?.DEFAULT_STRENGTH || 0.25,
 
             contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
             biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,
@@ -252,6 +261,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     #pushVectorState() {
         this.pinHistory.push({
+            tectonicFaults: foundry.utils.deepClone(this.tectonicFaults),
+            activeFaultId: this.activeFaultId,
             pins: foundry.utils.deepClone(this.mapPins),
             routes: foundry.utils.deepClone(this.mapRoutes),
             regionLayers: foundry.utils.deepClone(this.regionLayers),
@@ -260,6 +271,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             activeRouteId: this.activeRouteId,
             activeRegionId: this.activeRegionId,
         });
+
+        // Prevent RAM exhaustion from infinite history tracking
+        if (this.pinHistory.length > 40) {
+            this.pinHistory.shift();
+        }
+
         this.pinRedoStack = [];
     }
 
@@ -309,6 +326,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }));
 
         context.biomeList = [...context.biomeList, ...customBiomesMapped];
+
+        context.tectonicTypes = Object.entries(FILRODENSWMB.TECTONICS?.LABELS || {}).map(([id, label]) => ({
+            id: id,
+            label: label,
+        }));
+        context.tectonicFaults = [...(this.tectonicFaults || [])];
 
         context.uiState = this.uiState;
         context.currentSaveName = this.currentSaveName;
@@ -451,6 +474,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.uiState[name] = target.value;
                 }
 
+                if (["faultType", "faultThickness", "faultStrength"].includes(name) && this.activeFaultId) {
+                    const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
+                    if (fault) {
+                        fault.type = this.uiState.faultType;
+                        fault.thickness = this.uiState.faultThickness;
+                        fault.strength = this.uiState.faultStrength;
+
+                        if (name === "faultType") {
+                            fault.color = FILRODENSWMB.TECTONICS?.COLORS?.[this.uiState.faultType] || 0xffffff;
+                        }
+                        this.#repaintVectors();
+                        this.debouncedGenerateTerrain();
+                    }
+                }
+
                 // If Quick Style dropdown changed, apply its properties
                 if (name === "activeRouteQuickStyle") {
                     const styleId = target.value;
@@ -495,15 +533,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         region.lineColor = this.uiState.regionLineColor;
                         region.lineThickness = this.uiState.regionLineThickness;
                         region.lineStyle = this.uiState.regionLineStyle;
-                        this.#repaintVectors();
-                    }
-                }
-
-                // Live-Update Region Layer Opacity
-                if (name === "regionOpacity" && this.activeRegionLayerId) {
-                    const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
-                    if (layer) {
-                        layer.opacity = this.uiState.regionOpacity;
                         this.#repaintVectors();
                     }
                 }
@@ -565,6 +594,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     return;
                 }
 
+                if (event.target.matches('input[name="regionOpacity"]')) {
+                    this.uiState.regionOpacity = Number(event.target.value);
+                    this.#repaintVectors();
+                    this.markDirty();
+                    return;
+                }
+
                 if (event.target.matches('input[name="referenceAlpha"]')) {
                     this.uiState.referenceAlpha = Number(event.target.value);
                     this.#updateReferenceLayer();
@@ -606,11 +642,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     return;
                 }
 
-                if (event.target.matches('input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]')) {
+                if (event.target.matches('input[name="seaLevel"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]')) {
                     this.debouncedGenerateTerrain();
                 } else if (
                     event.target.matches(
-                        'input[name="seaLevel"], input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"], input[name="altCooling"], input[name="freezingThreshold"]',
+                        'input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"], input[name="altCooling"], input[name="freezingThreshold"]',
                     )
                 ) {
                     this.debouncedGenerateClimate();
@@ -623,8 +659,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (this.canvasEngine) {
             this.canvasEngine.onCanvasHover = (x, y) => {
-                const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes" || this.activeTool === "features";
+                const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
                 const showCursor = this.canvasEngine.isEditMode && isBrushActive && !this.canvasEngine.isDragging;
+
                 this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, showCursor);
 
                 // --- Update Canvas Readout ---
@@ -671,6 +708,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.canvasEngine?.isEditMode) {
             const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
             if (editBtn) editBtn.classList.add("active");
+
+            // Only lock the sidebar for procedural raster tools
+            const isVectorTool = ["features", "infrastructure", "regions", "labels", "cartography"].includes(this.activeTool);
+
+            if (!isVectorTool) {
+                const panel = this.element.querySelector(".fwmb-context-panel");
+                if (panel) {
+                    const controls = panel.querySelectorAll("fieldset input, fieldset button");
+                    for (const control of controls) {
+                        control.disabled = true;
+                    }
+                    panel.classList.add("fwmb-locked");
+                }
+            }
         }
     }
 
@@ -684,198 +735,250 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #wireBrushCallbacks() {
-        const getNum = (name) => Number.parseFloat(this.element.querySelector(`input[name="${name}"]`)?.value) || 0;
+        this.canvasEngine.onBrushStart = (x, y) => this.#handleBrushStart(x, y);
+        this.canvasEngine.onBrushMove = (x, y) => this.#handleBrushMove(x, y);
+        this.canvasEngine.onBrushEnd = () => this.#handleBrushEnd();
 
-        this.canvasEngine.onBrushStart = (x, y) => {
-            if (!this.canvasEngine.isEditMode) return;
+        this.canvasEngine.onReferencePan = (dx, dy) => this.#handleReferencePan(dx, dy);
+        this.canvasEngine.onReferenceScale = (factor) => this.#handleReferenceScale(factor);
 
-            let layer = "terrain";
-            if (this.activeTool === "biomes") layer = "biome";
-            if (this.activeTool === "features") layer = "features";
-            if (this.activeTool === "infrastructure") layer = "infrastructure";
-            if (this.activeTool === "regions") layer = "regions";
-            if (this.activeTool === "labels") layer = "labels";
-            if (this.activeTool === "cartography") layer = "cartography";
+        this.canvasEngine.onInfraDragStart = () => this.#pushVectorState();
+        this.canvasEngine.onInfraDrag = () => this.#handleInfraDrag();
+        this.canvasEngine.onInfraDragEnd = () => this.#handleInfraDragEnd();
 
-            let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
+        this.canvasEngine.onInfraInsertNode = (x, y) => this.#handleInfraInsertNode(x, y);
+        this.canvasEngine.onInfraDeleteNode = (target) => this.#handleInfraDeleteNode(target);
 
-            if (layer === "features" && ["addSpring", "erasePin"].includes(tool)) {
-                // Strictly filter for feature pins, and search backwards to hit the top-most visual pin first
-                const clickedIndex = this.mapPins.findLastIndex((p) => {
-                    if (p.type !== "spring") return false;
-                    const r = p.radius || 6;
-                    return Math.hypot(p.x - x, p.y - y) <= Math.max(r, 8);
-                });
+        this.canvasEngine.onRightClick = () => this.#handleRightClick();
+    }
 
-                this.#pushVectorState();
+    #handleRightClick() {
+        let cleared = false;
 
-                if (tool === "erasePin") {
-                    if (clickedIndex > -1) this.mapPins.splice(clickedIndex, 1);
-                } else if (clickedIndex === -1) {
-                    this.mapPins.push({ id: foundry.utils.randomID(), name: "River Source", x, y, type: "spring", radius: 6, visibility: "all" });
-                }
+        if (this.activeRouteId) {
+            this.activeRouteId = null;
+            cleared = true;
+        }
+        if (this.activeRegionId) {
+            this.activeRegionId = null;
+            cleared = true;
+        }
+        if (this.activeFaultId) {
+            this.activeFaultId = null;
+            cleared = true;
+        }
 
-                this.#repaintCanvas();
-                this.debouncedGenerateClimate();
-                return;
-            }
+        if (cleared) {
+            this.#repaintVectors();
+        }
+    }
 
-            if (layer === "infrastructure") {
-                this.#handleInfrastructureClick(x, y);
-                return;
-            }
+    #handleBrushStart(x, y) {
+        if (!this.canvasEngine.isEditMode) return;
 
-            if (layer === "regions") {
-                this.#handleRegionClick(x, y);
-                return;
-            }
+        let layer = "terrain";
+        if (this.activeTool === "biomes") layer = "biome";
+        if (this.activeTool === "features") layer = "features";
+        if (this.activeTool === "infrastructure") layer = "infrastructure";
+        if (this.activeTool === "regions") layer = "regions";
+        if (this.activeTool === "labels") layer = "labels";
+        if (this.activeTool === "cartography") layer = "cartography";
 
-            if (layer === "labels") {
-                this.#pushVectorState();
+        // 1. Immediately intercept vector-mode tools to bypass all raster brush logic
+        if (layer === "features") {
+            this.#handleFeatureClick(x, y);
+            return;
+        }
 
-                this.mapLabels.push({
-                    id: foundry.utils.randomID(),
-                    name: "New Label",
-                    x: x,
-                    y: y,
-                    rotation: 0,
-                    fontFamily: this.uiState.labelFontFamily,
-                    fontSize: this.uiState.labelFontSize,
-                    fillColor: this.uiState.labelFillColor,
-                    visibility: "all",
-                });
+        if (layer === "infrastructure") {
+            this.#handleInfrastructureClick(x, y);
+            return;
+        }
 
-                this.#repaintVectors();
-                this.render({ parts: ["context"] });
-                this.markDirty();
-                return;
-            }
+        if (layer === "regions") {
+            this.#handleRegionClick(x, y);
+            return;
+        }
 
-            if (layer === "cartography") {
-                return;
-            }
-
-            let paintValue = layer === "biome" ? Number.parseInt(this.element.querySelector('select[name="brushBiome"]')?.value) || 6 : null;
-            this.brushEngine.startStroke(layer, tool, getNum("brushSize"), getNum("brushStrength"), getNum("brushFeather"), paintValue);
-            this.#applyBrushStroke(x, y);
-        };
-
-        this.canvasEngine.onReferencePan = (dx, dy) => {
-            this.uiState.referenceX += dx;
-            this.uiState.referenceY += dy;
-            this.#updateReferenceLayer();
-        };
-
-        this.canvasEngine.onReferenceScale = (factor) => {
-            this.uiState.referenceScale *= factor;
-            this.uiState.referenceScale = Math.max(0.1, Math.min(this.uiState.referenceScale, 10));
-            this.#syncDOMToState();
-            this.#updateReferenceLayer();
-        };
-
-        this.canvasEngine.onBrushMove = (x, y) => {
-            this.#applyBrushStroke(x, y);
-
-            // Track the mouse while actively painting
-            const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes" || this.activeTool === "features";
-            if (this.canvasEngine.isEditMode && isBrushActive) {
-                this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, true);
-            }
-        };
-
-        this.canvasEngine.onBrushEnd = () => {
-            this.brushEngine.endStroke();
-            this.markDirty();
-        };
-
-        this.canvasEngine.onInfraDragStart = () => {
+        if (layer === "labels") {
             this.#pushVectorState();
-        };
+            this.mapLabels.push({
+                id: foundry.utils.randomID(),
+                name: "New Label",
+                x: x,
+                y: y,
+                rotation: 0,
+                fontFamily: this.uiState.labelFontFamily,
+                fontSize: this.uiState.labelFontSize,
+                fillColor: this.uiState.labelFillColor,
+                visibility: "all",
+            });
 
-        this.canvasEngine.onInfraDrag = () => {
-            this.canvasEngine.clearInteractiveTargets();
-
-            const isEdit = this.canvasEngine.isEditMode;
-            const infraPins = this.mapPins.filter((p) => !!p.icon);
-
-            // --- Isolate the edit state to the active tool ---
-            const isInfraEdit = this.activeTool === "infrastructure" && isEdit;
-            this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit);
-
-            const isRegionEdit = this.activeTool === "regions" && isEdit;
-            this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId);
-
-            if (this.activeTool === "features") {
-                this.canvasEngine.renderRiverVectors(this.currentRiverData?.vectors, this.mapPins, isEdit, this.bufferWaterMask);
-            }
-
-            if (this.activeTool === "labels") {
-                this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isEdit);
-            }
-
-            if (this.activeTool === "cartography" && this.canvasEngine.renderCartography) {
-                this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isEdit, this.mapDecorations);
-            }
-        };
-        this.canvasEngine.onInfraDragEnd = () => {
+            this.#repaintVectors();
             this.render({ parts: ["context"] });
             this.markDirty();
+            return;
+        }
 
-            if (this.activeTool === "features") this.debouncedGenerateClimate();
-        };
+        if (layer === "cartography") return;
 
-        this.canvasEngine.onInfraInsertNode = (x, y) => {
-            if (this.activeTool !== "infrastructure" && this.activeTool !== "regions") return;
-            if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+        // 2. Fall back to raster brush processing for Terrain and Biomes
+        let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
+        const getNum = (name) => Number.parseFloat(this.element.querySelector(`input[name="${name}"]`)?.value) || 0;
+        let paintValue = layer === "biome" ? Number.parseInt(this.element.querySelector('select[name="brushBiome"]')?.value) || 6 : null;
 
-            for (const route of this.mapRoutes) {
-                for (const pt of route.points) {
-                    if (Math.hypot(pt.x - x, pt.y - y) < 15) return;
+        this.brushEngine.startStroke(layer, tool, getNum("brushSize"), getNum("brushStrength"), getNum("brushFeather"), paintValue);
+        this.#applyBrushStroke(x, y);
+    }
+
+    #handleBrushMove(x, y) {
+        this.#applyBrushStroke(x, y);
+
+        const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
+
+        if (this.canvasEngine.isEditMode && isBrushActive) {
+            this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, true);
+        }
+    }
+
+    #handleBrushEnd() {
+        this.brushEngine.endStroke();
+        this.markDirty();
+    }
+
+    #handleReferencePan(dx, dy) {
+        this.uiState.referenceX += dx;
+        this.uiState.referenceY += dy;
+        this.#updateReferenceLayer();
+    }
+
+    #handleReferenceScale(factor) {
+        this.uiState.referenceScale *= factor;
+        this.uiState.referenceScale = Math.max(0.1, Math.min(this.uiState.referenceScale, 10));
+        this.#syncDOMToState();
+        this.#updateReferenceLayer();
+    }
+
+    #handleInfraDrag() {
+        this.canvasEngine.clearInteractiveTargets();
+
+        const isEdit = this.canvasEngine.isEditMode;
+        const infraPins = this.mapPins.filter((p) => !!p.icon);
+
+        const isInfraEdit = this.activeTool === "infrastructure" && isEdit;
+        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.activeRouteId);
+
+        const isRegionEdit = this.activeTool === "regions" && isEdit;
+        this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
+
+        if (this.activeTool === "features") {
+            this.canvasEngine.renderRiverVectors(this.currentRiverData?.vectors, this.mapPins, isEdit, this.bufferWaterMask);
+            if (this.canvasEngine.renderFaultLines) {
+                this.canvasEngine.renderFaultLines(this.tectonicFaults, isEdit, this.activeFaultId);
+            }
+        }
+
+        if (this.activeTool === "labels") {
+            this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isEdit);
+        }
+
+        if (this.activeTool === "cartography" && this.canvasEngine.renderCartography) {
+            this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isEdit, this.mapDecorations);
+        }
+    }
+
+    #handleInfraDragEnd() {
+        this.render({ parts: ["context"] });
+        this.markDirty();
+
+        if (this.activeTool === "features") {
+            this.debouncedGenerateClimate();
+            this.debouncedGenerateTerrain();
+        }
+    }
+
+    #handleInfraInsertNode(x, y) {
+        if (this.activeTool !== "infrastructure" && this.activeTool !== "regions" && this.activeTool !== "features") return;
+        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+
+        for (const route of this.mapRoutes) {
+            for (const pt of route.points) {
+                if (Math.hypot(pt.x - x, pt.y - y) < 15) return;
+            }
+        }
+        for (const pin of this.mapPins) {
+            if (pin.visibility !== "none" && pin.icon && Math.hypot(pin.x - x, pin.y - y) < 15) return;
+        }
+
+        const routeSegment = this.#getClosestRouteSegment(x, y);
+        if (routeSegment && this.activeTool === "infrastructure") {
+            this.#pushVectorState();
+            routeSegment.route.points.splice(routeSegment.insertIndex, 0, { x: routeSegment.projX, y: routeSegment.projY });
+            this.#repaintVectors();
+            this.render({ parts: ["context"] });
+            this.markDirty();
+            return;
+        }
+
+        const regionSegment = this.#getClosestRegionSegment(x, y);
+        if (regionSegment && this.activeTool === "regions") {
+            this.#pushVectorState();
+            regionSegment.region.points.splice(regionSegment.insertIndex, 0, { x: regionSegment.projX, y: regionSegment.projY });
+            this.#repaintVectors();
+            this.render({ parts: ["context"] });
+            this.markDirty();
+            return;
+        }
+
+        const faultSegment = this.#getClosestFaultSegment(x, y);
+        if (faultSegment && this.activeTool === "features") {
+            this.#pushVectorState();
+            faultSegment.fault.points.splice(faultSegment.insertIndex, 0, { x: faultSegment.projX, y: faultSegment.projY });
+            this.#repaintVectors();
+            this.debouncedGenerateTerrain();
+            this.render({ parts: ["context"] });
+            this.markDirty();
+        }
+    }
+
+    #handleInfraDeleteNode(target) {
+        if (this.activeTool !== "infrastructure" && this.activeTool !== "regions" && this.activeTool !== "features") return;
+        if (target.icon && this.activeTool !== "infrastructure") return;
+
+        if (this.activeTool === "infrastructure") {
+            for (let i = 0; i < this.mapRoutes.length; i++) {
+                const route = this.mapRoutes[i];
+                const nodeIndex = route.points.indexOf(target);
+
+                if (nodeIndex > -1) {
+                    this.#pushVectorState();
+                    route.points.splice(nodeIndex, 1);
+                    if (route.points.length < 2) {
+                        this.mapRoutes.splice(i, 1);
+                        if (this.activeRouteId === route.id) this.activeRouteId = null;
+                    }
+                    this.#repaintVectors();
+                    this.render({ parts: ["context"] });
+                    this.markDirty();
+                    return;
                 }
             }
-            for (const pin of this.mapPins) {
-                if (pin.visibility !== "none" && pin.icon && Math.hypot(pin.x - x, pin.y - y) < 15) return;
-            }
+        }
 
-            // 1. Try to insert into a Route
-            const routeSegment = this.#getClosestRouteSegment(x, y);
-            if (routeSegment && this.activeTool === "infrastructure") {
-                this.#pushVectorState();
-                routeSegment.route.points.splice(routeSegment.insertIndex, 0, { x: routeSegment.projX, y: routeSegment.projY });
-                this.#repaintVectors();
-                this.render({ parts: ["context"] });
-                this.markDirty();
-                return;
-            }
-
-            // 2. Try to insert into a Region
-            const regionSegment = this.#getClosestRegionSegment(x, y);
-            if (regionSegment && this.activeTool === "regions") {
-                this.#pushVectorState();
-                regionSegment.region.points.splice(regionSegment.insertIndex, 0, { x: regionSegment.projX, y: regionSegment.projY });
-                this.#repaintVectors();
-                this.render({ parts: ["context"] });
-                this.markDirty();
-            }
-        };
-
-        this.canvasEngine.onInfraDeleteNode = (target) => {
-            if (this.activeTool !== "infrastructure" && this.activeTool !== "regions" && this.activeTool !== "features") return;
-            if (target.icon && this.activeTool !== "infrastructure") return;
-
-            // 1. Check Routes
-            if (this.activeTool === "infrastructure") {
-                for (let i = 0; i < this.mapRoutes.length; i++) {
-                    const route = this.mapRoutes[i];
-                    const nodeIndex = route.points.indexOf(target);
+        if (this.activeTool === "regions") {
+            for (const layer of this.regionLayers) {
+                for (let j = 0; j < layer.regions.length; j++) {
+                    const region = layer.regions[j];
+                    const nodeIndex = region.points.indexOf(target);
 
                     if (nodeIndex > -1) {
                         this.#pushVectorState();
-                        route.points.splice(nodeIndex, 1);
-                        if (route.points.length < 2) {
-                            this.mapRoutes.splice(i, 1);
-                            if (this.activeRouteId === route.id) this.activeRouteId = null;
+                        region.points.splice(nodeIndex, 1);
+
+                        if (region.points.length < 3 && this.activeRegionId !== region.id) {
+                            layer.regions.splice(j, 1);
                         }
+
                         this.#repaintVectors();
                         this.render({ parts: ["context"] });
                         this.markDirty();
@@ -883,60 +986,106 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     }
                 }
             }
+        }
 
-            // 2. Check Regions
-            if (this.activeTool === "regions") {
-                for (const layer of this.regionLayers) {
-                    for (let j = 0; j < layer.regions.length; j++) {
-                        const region = layer.regions[j];
-                        const nodeIndex = region.points.indexOf(target);
+        if (this.activeTool === "features" && (target.type === "spring" || target.type === "block_spring")) {
+            const nodeIndex = this.mapPins.indexOf(target);
+            if (nodeIndex > -1) {
+                this.#pushVectorState();
+                this.mapPins.splice(nodeIndex, 1);
+                this.#repaintCanvas();
+                this.debouncedGenerateClimate();
+                this.markDirty();
+                return;
+            }
+        }
 
-                        if (nodeIndex > -1) {
-                            this.#pushVectorState();
-                            region.points.splice(nodeIndex, 1);
+        if (this.activeTool === "features") {
+            for (let i = 0; i < this.tectonicFaults.length; i++) {
+                const fault = this.tectonicFaults[i];
+                const nodeIndex = fault.points.indexOf(target);
 
-                            // Garbage collect empty/invalid polygons
-                            if (region.points.length < 3 && this.activeRegionId !== region.id) {
-                                layer.regions.splice(j, 1);
-                            }
-
-                            this.#repaintVectors();
-                            this.render({ parts: ["context"] });
-                            this.markDirty();
-                            return;
-                        }
+                if (nodeIndex > -1) {
+                    this.#pushVectorState();
+                    fault.points.splice(nodeIndex, 1);
+                    if (fault.points.length < 2) {
+                        this.tectonicFaults.splice(i, 1);
+                        if (this.activeFaultId === fault.id) this.activeFaultId = null;
                     }
-                }
-            }
-
-            // 3. Check Features
-            if (this.activeTool === "features" && (target.type === "spring" || target.type === "block_spring")) {
-                const nodeIndex = this.mapPins.indexOf(target);
-                if (nodeIndex > -1) {
-                    this.#pushVectorState();
-                    this.mapPins.splice(nodeIndex, 1);
-                    this.#repaintCanvas();
-                    this.debouncedGenerateClimate();
-                    this.markDirty();
-                    return;
-                }
-            }
-
-            // 4. Check Custom Labels
-            if (this.activeTool === "labels") {
-                const nodeIndex = this.mapLabels.indexOf(target);
-                if (nodeIndex > -1) {
-                    this.#pushVectorState();
-                    this.mapLabels.splice(nodeIndex, 1);
                     this.#repaintVectors();
+                    this.debouncedGenerateTerrain();
                     this.render({ parts: ["context"] });
                     this.markDirty();
                     return;
                 }
             }
+        }
 
-            this.markDirty();
-        };
+        if (this.activeTool === "labels") {
+            const nodeIndex = this.mapLabels.indexOf(target);
+            if (nodeIndex > -1) {
+                this.#pushVectorState();
+                this.mapLabels.splice(nodeIndex, 1);
+                this.#repaintVectors();
+                this.render({ parts: ["context"] });
+                this.markDirty();
+                return;
+            }
+        }
+
+        this.markDirty();
+    }
+
+    #handleFeatureClick(x, y) {
+        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+
+        this.#pushVectorState();
+        const finalPos = this.uiState.snapToPoints ? this.#getSnappedCoordinates(x, y) : { x, y };
+
+        if (this.uiState.activeFeatureMode === "spring") {
+            this.mapPins.push({
+                id: foundry.utils.randomID(),
+                name: "River Source",
+                x: finalPos.x,
+                y: finalPos.y,
+                type: "spring",
+                radius: 6,
+                visibility: "all",
+                color: "#ffffff",
+            });
+            this.#repaintCanvas();
+            this.debouncedGenerateClimate();
+        } else if (this.uiState.activeFeatureMode === "fault") {
+            if (this.activeFaultId) {
+                const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
+                if (fault) {
+                    const lastPt = fault.points[fault.points.length - 1];
+                    if (Math.hypot(lastPt.x - finalPos.x, lastPt.y - finalPos.y) < 15) {
+                        this.activeFaultId = null;
+                    } else {
+                        fault.points.push(finalPos);
+                    }
+                }
+            } else {
+                this.activeFaultId = foundry.utils.randomID();
+                this.tectonicFaults.push({
+                    id: this.activeFaultId,
+                    name: `Fault ${this.tectonicFaults.length + 1}`,
+                    description: "",
+                    points: [finalPos],
+                    type: this.uiState.faultType,
+                    thickness: this.uiState.faultThickness,
+                    strength: this.uiState.faultStrength,
+                    color: FILRODENSWMB.TECTONICS?.COLORS?.[this.uiState.faultType] || 0xffffff,
+                    visibility: "all",
+                });
+            }
+            this.#repaintVectors();
+            this.debouncedGenerateTerrain(); // Triggers the mathematical deformation
+        }
+
+        this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     #getMapParameters() {
@@ -1094,24 +1243,28 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #repaintVectors() {
         if (!this.canvasEngine) return;
 
-        // Clear old interactive targets before redrawing
         this.canvasEngine.clearInteractiveTargets();
         const isEditModeActive = this.canvasEngine.isEditMode;
 
-        // 1. Render Rivers & Springs
+        // 1. Render Rivers, Springs & Faults
         if (this.currentRiverData?.vectors) {
             const showPins = this.activeTool === "features" && isEditModeActive;
             this.canvasEngine.renderRiverVectors(this.currentRiverData.vectors, this.mapPins, showPins, this.bufferWaterMask);
         }
 
+        if (this.canvasEngine.renderFaultLines) {
+            const isFaultEdit = this.activeTool === "features" && isEditModeActive;
+            this.canvasEngine.renderFaultLines(this.tectonicFaults, isFaultEdit, this.activeFaultId);
+        }
+
         // 2. Render Infrastructure
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
         const infraPins = this.mapPins.filter((p) => !!p.icon);
-        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit);
+        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.activeRouteId);
 
         // 3. Render Regions
         const isRegionEdit = this.activeTool === "regions" && isEditModeActive;
-        this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId);
+        this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
 
         // 4. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
@@ -1176,7 +1329,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         console.log("World Map Builder | Generating Topography...");
         const t0 = performance.now();
 
-        engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData);
+        engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults);
 
         await this.#rebuildFromHistory();
 
@@ -1351,6 +1504,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.customBiomeColors = p.customColors || {};
 
+        this.tectonicFaults = payload.tectonicFaults || [];
+
         // Guarantee every pin has a valid color property, defaulting to white for legacy maps
         this.mapPins = (payload.mapPins || []).map((pin) => {
             pin.color = pin.color || "#ffffff";
@@ -1463,7 +1618,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
                 if (route) {
                     const lastPt = route.points[route.points.length - 1];
-                    if (Math.hypot(lastPt.x - finalPos.x, lastPt.y - finalPos.y) < 5) {
+                    if (Math.hypot(lastPt.x - finalPos.x, lastPt.y - finalPos.y) < 15) {
                         this.activeRouteId = null;
                     } else {
                         route.points.push(finalPos);
@@ -1507,6 +1662,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 }
             }
         }
+    }
+
+    #getClosestFaultSegment(x, y, threshold = 15) {
+        let closest = { fault: null, insertIndex: -1, dist: Infinity };
+
+        for (const fault of this.tectonicFaults) {
+            if (fault.visibility === "none" || !fault.points || fault.points.length < 2) continue;
+
+            for (let i = 0; i < fault.points.length - 1; i++) {
+                const p1 = fault.points[i];
+                const p2 = fault.points[i + 1];
+
+                const lengthSquared = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2);
+                let t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / lengthSquared));
+
+                const projX = p1.x + t * (p2.x - p1.x);
+                const projY = p1.y + t * (p2.y - p1.y);
+                const dist = Math.hypot(x - projX, y - projY);
+
+                if (dist < closest.dist && dist <= threshold) {
+                    closest = { fault, insertIndex: i + 1, dist, projX, projY };
+                }
+            }
+        }
+        return closest.fault ? closest : null;
     }
 
     #getClosestRouteSegment(x, y, threshold = 15) {
@@ -1591,7 +1771,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.activeRegionId) {
             const region = layer.regions.find((r) => r.id === this.activeRegionId);
             if (region) {
-                if (region.points.length > 2 && Math.hypot(region.points[0].x - finalPos.x, region.points[0].y - finalPos.y) < 15) {
+                const isNearStart = region.points.length > 2 && Math.hypot(region.points[0].x - finalPos.x, region.points[0].y - finalPos.y) < 15;
+                const lastPt = region.points[region.points.length - 1];
+                const isNearEnd = region.points.length > 1 && Math.hypot(lastPt.x - finalPos.x, lastPt.y - finalPos.y) < 15;
+
+                if (isNearStart || isNearEnd) {
                     this.activeRegionId = null;
                 } else {
                     region.points.push(finalPos);
@@ -1673,6 +1857,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 customBiomes: this.uiState.customBiomes,
                 customRouteStyles: this.uiState.customRouteStyles,
                 history: this.brushEngine?.history || [],
+                tectonicFaults: this.tectonicFaults,
                 mapPins: this.mapPins,
                 mapRoutes: this.mapRoutes,
                 regionLayers: this.regionLayers,
@@ -1876,7 +2061,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static #onAddRegionLayer(event, target) {
         const id = foundry.utils.randomID();
-        this.regionLayers.push({ id: id, name: `Region Layer ${this.regionLayers.length + 1}`, visibility: "all", opacity: this.uiState.regionOpacity, regions: [] });
+        this.regionLayers.push({ id: id, name: `Region Layer ${this.regionLayers.length + 1}`, visibility: "all", regions: [] });
         this.activeRegionLayerId = id;
         this.render({ parts: ["context"] });
     }
@@ -2144,6 +2329,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     isVisible = allowedTools.includes(`infrastructure-${this.uiState.activeInfraMode}`);
                 }
 
+                if (newTool === "features" && allowedTools.some((t) => t.startsWith("features-"))) {
+                    isVisible = allowedTools.includes(`features-${this.uiState.activeFeatureMode}`);
+                }
+
                 el.classList.toggle("fwmb-hidden", !isVisible);
             });
         }
@@ -2220,6 +2409,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#pushVectorState();
         this.mapDecorations = this.mapDecorations.filter((d) => d.id !== id);
         this.#repaintVectors();
+        this.render({ parts: ["context"] });
+        this.markDirty();
+    }
+
+    static #onDeleteFault(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        this.#pushVectorState();
+        this.tectonicFaults = this.tectonicFaults.filter((f) => f.id !== id);
+        if (this.activeFaultId === id) this.activeFaultId = null;
+
+        this.#repaintVectors();
+        this.debouncedGenerateTerrain();
         this.render({ parts: ["context"] });
         this.markDirty();
     }
@@ -2391,6 +2592,59 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             dec.name = result.name;
             dec.opacity = result.opacity;
             this.#repaintVectors();
+            this.render({ parts: ["context"] });
+            this.markDirty();
+        }
+    }
+
+    static async #onEditFault(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const fault = this.tectonicFaults.find((f) => f.id === id);
+        if (!fault) return;
+
+        const tectonicTypes = Object.entries(FILRODENSWMB.TECTONICS?.LABELS || {}).map(([key, label]) => ({
+            id: key,
+            label: label,
+        }));
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-tectonics.hbs", { fault, tectonicTypes });
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditFault") || "Edit Fault" },
+            content: content,
+            ok: {
+                callback: (event, button, dialog) => {
+                    return {
+                        name: button.form.elements["faultName"].value,
+                        description: button.form.elements["faultDesc"].value,
+                        type: button.form.elements["faultType"].value,
+                        thickness: Number(button.form.elements["faultThickness"].value),
+                        strength: Number(button.form.elements["faultStrength"].value),
+                    };
+                },
+            },
+        });
+
+        if (result) {
+            this.#pushVectorState();
+
+            fault.name = result.name;
+            fault.description = result.description;
+            fault.type = result.type;
+            fault.thickness = result.thickness;
+            fault.strength = result.strength;
+            fault.color = FILRODENSWMB.TECTONICS?.COLORS?.[result.type] || 0xffffff;
+
+            if (this.activeFaultId === id) {
+                this.uiState.faultType = result.type;
+                this.uiState.faultThickness = result.thickness;
+                this.uiState.faultStrength = result.strength;
+                this.#syncDOMToState();
+            }
+
+            this.#repaintVectors();
+            this.debouncedGenerateTerrain();
             this.render({ parts: ["context"] });
             this.markDirty();
         }
@@ -3254,6 +3508,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (this.pinRedoStack.length === 0) return;
 
             this.pinHistory.push({
+                tectonicFaults: foundry.utils.deepClone(this.tectonicFaults),
+                activeFaultId: this.activeFaultId,
                 pins: foundry.utils.deepClone(this.mapPins),
                 routes: foundry.utils.deepClone(this.mapRoutes),
                 regionLayers: foundry.utils.deepClone(this.regionLayers),
@@ -3264,6 +3520,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             });
 
             const state = this.pinRedoStack.pop();
+            this.tectonicFaults = state.tectonicFaults || this.tectonicFaults;
+            this.activeFaultId = state.activeFaultId || null;
             this.mapPins = state.pins;
             this.mapRoutes = state.routes;
             this.regionLayers = state.regionLayers;
@@ -3275,6 +3533,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (this.activeTool === "features") {
                 this.#repaintCanvas();
                 this.debouncedGenerateClimate();
+                this.debouncedGenerateTerrain();
             } else {
                 this.#repaintVectors();
             }
@@ -3359,6 +3618,41 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const activeBtn = target.closest("button");
         if (activeBtn) activeBtn.classList.add("active");
+
+        if (toolContainer.querySelector('[data-tool="drawFault"]')) {
+            const isFaultActive = activeBtn.dataset.tool === "drawFault";
+            const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+
+            if (editToolbar) {
+                editToolbar.querySelectorAll("[data-tool-group~='features-fault']").forEach((el) => {
+                    el.classList.toggle("fwmb-hidden", !isFaultActive);
+                });
+            }
+        }
+    }
+
+    static #onSetFeatureMode(event, target) {
+        this.uiState.activeFeatureMode = target.dataset.mode;
+        this.activeFaultId = null; // Ends the current fault line natively
+        this.#syncFeatureModeButtons();
+    }
+
+    #syncFeatureModeButtons() {
+        const mode = this.uiState.activeFeatureMode;
+        const modeBtns = this.element.querySelectorAll('.fwmb-edit-toolbar [data-action="setFeatureMode"]');
+        for (const btn of modeBtns) {
+            btn.classList.toggle("active", btn.dataset.mode === mode);
+        }
+
+        if (this.activeTool === "features") {
+            const toolGroups = this.element.querySelectorAll(".fwmb-edit-toolbar [data-tool-group]");
+            for (const group of toolGroups) {
+                const allowed = group.dataset.toolGroup.split(" ");
+                if (allowed.some((a) => a.startsWith("features-"))) {
+                    group.classList.toggle("fwmb-hidden", !allowed.includes(`features-${mode}`));
+                }
+            }
+        }
     }
 
     /**
@@ -3533,6 +3827,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 isVisible = allowedTools.includes(`infrastructure-${this.uiState.activeInfraMode}`);
             }
 
+            if (this.activeTool === "features" && allowedTools.some((t) => t.startsWith("features-"))) {
+                isVisible = allowedTools.includes(`features-${this.uiState.activeFeatureMode}`);
+            }
+
             el.classList.toggle("fwmb-hidden", !isVisible);
         });
 
@@ -3544,7 +3842,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        if (this.activeTool !== "infrastructure" && this.activeTool !== "labels") {
+        // Only lock the sidebar for procedural raster tools
+        const isVectorTool = ["features", "infrastructure", "regions", "labels", "cartography"].includes(this.activeTool);
+
+        if (!isVectorTool) {
             const panel = this.element.querySelector(".fwmb-context-panel");
             if (panel) {
                 const controls = panel.querySelectorAll("fieldset input, fieldset button");
@@ -3657,7 +3958,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             else if (type === "region") {
                 const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);
                 obj = layer?.regions.find((r) => r.id === id);
-            }
+            } else if (type === "fault") obj = this.tectonicFaults.find((f) => f.id === id);
 
             if (obj) {
                 this.#pushVectorState();
@@ -3688,6 +3989,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (this.pinHistory.length === 0) return;
 
             this.pinRedoStack.push({
+                tectonicFaults: foundry.utils.deepClone(this.tectonicFaults),
+                activeFaultId: this.activeFaultId,
                 pins: foundry.utils.deepClone(this.mapPins),
                 routes: foundry.utils.deepClone(this.mapRoutes),
                 regionLayers: foundry.utils.deepClone(this.regionLayers),
@@ -3698,6 +4001,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             });
 
             const state = this.pinHistory.pop();
+            this.tectonicFaults = state.tectonicFaults || this.tectonicFaults;
+            this.activeFaultId = state.activeFaultId || null;
             this.mapPins = state.pins || state;
             this.mapRoutes = state.routes || this.mapRoutes;
             this.regionLayers = state.regionLayers || this.regionLayers;
@@ -3709,6 +4014,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (this.activeTool === "features") {
                 this.#repaintCanvas();
                 this.debouncedGenerateClimate();
+                this.debouncedGenerateTerrain();
             } else {
                 this.#repaintVectors();
             }
@@ -3738,6 +4044,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const type = listItem.dataset.type;
 
         switch (type) {
+            case "fault": {
+                const fault = this.tectonicFaults.find((f) => f.id === id);
+                return fault?.points || [];
+            }
             case "custom": {
                 const label = this.mapLabels.find((l) => l.id === id);
                 return label ? [label] : [];

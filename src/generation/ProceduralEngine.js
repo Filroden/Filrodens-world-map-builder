@@ -1,4 +1,5 @@
 import { SimplexNoise } from "../../vendor/simplex-noise/simplex-noise.js";
+import { TectonicEngine } from "./TectonicEngine.js";
 import { FILRODENSWMB } from "../config.js";
 
 export class ProceduralEngine {
@@ -14,6 +15,10 @@ export class ProceduralEngine {
         // Store the PRNG on the instance so we can calculate deterministic rivers later
         this.prng = ProceduralEngine.#mulberry32(seedNum);
         this.simplex = new SimplexNoise(this.prng);
+
+        // Dedicated, isolated PRNG streams for distinct generation phases
+        this.springPrng = ProceduralEngine.#mulberry32(seedNum + 1);
+        this.riverPrng = ProceduralEngine.#mulberry32(seedNum + 2);
     }
 
     // Cardinal and ordinal directions for pathfinding to prevent array reallocation in tight loops
@@ -73,8 +78,8 @@ export class ProceduralEngine {
 
         while (springs.length < targetCount && attempts < maxAttempts) {
             attempts++;
-            const x = Math.floor(this.prng() * width);
-            const y = Math.floor(this.prng() * height);
+            const x = Math.floor(this.springPrng() * width);
+            const y = Math.floor(this.springPrng() * height);
             const index = y * width + x;
 
             if (elevationData[index] > seaLevel + altOffset && moistureData[index] > moistMin) {
@@ -90,7 +95,7 @@ export class ProceduralEngine {
     #getLowestNeighbor(cx, cy, elevationData, width, height, visitedLocal, params) {
         let minElev = Infinity;
         let bestTarget = null;
-        const startIdx = Math.floor(this.prng() * 8);
+        const startIdx = Math.floor(this.riverPrng() * 8);
         const meanderJitter = params?.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER;
 
         for (let i = 0; i < 8; i++) {
@@ -102,7 +107,7 @@ export class ProceduralEngine {
             if (visitedLocal.has(`${nx},${ny}`)) continue;
 
             const actualElev = elevationData[ny * width + nx];
-            const perceivedElev = actualElev + this.prng() * meanderJitter;
+            const perceivedElev = actualElev + this.riverPrng() * meanderJitter;
 
             if (perceivedElev < minElev) {
                 minElev = perceivedElev;
@@ -232,7 +237,7 @@ export class ProceduralEngine {
     /**
      * Calculates pure geographical altitude, applying exponents strictly to landmasses.
      */
-    generateTopography(width, height, params, outBuffer) {
+    generateTopography(width, height, params, outBuffer, tectonicFaults = []) {
         const elevationData = outBuffer;
 
         const eScale = params.noise.elevation.scale;
@@ -240,31 +245,35 @@ export class ProceduralEngine {
         const eStretch = params.noise.elevation.stretch || 1;
         const panX = params.noise.offsetX || 0;
         const panY = params.noise.offsetY || 0;
-
-        // Pull seaLevel to use as the mathematical pivot point
         const seaLevel = params.seaLevel || 0.35;
 
+        // 1. Generate Base Elevation Noise
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const worldX = x + panX;
                 const worldY = y + panY;
-                let elevation = this.#fbm(worldX, worldY, eOctaves, eScale);
-
-                if (elevation > seaLevel) {
-                    // 1. Isolate just the land and normalise it to a 0.0 - 1.0 scale
-                    const landHeight = (elevation - seaLevel) / (1 - seaLevel);
-
-                    // 2. Apply the exponent stretch (creates flat plains and sharp peaks)
-                    const stretchedLand = Math.pow(landHeight, eStretch);
-
-                    // 3. Map the stretched land back into the real geographical altitude range
-                    elevationData[y * width + x] = seaLevel + stretchedLand * (1 - seaLevel);
-                } else {
-                    // Leave the ocean floor entirely unaffected by the land stretch
-                    elevationData[y * width + x] = Math.max(0, elevation);
-                }
+                elevationData[y * width + x] = this.#fbm(worldX, worldY, eOctaves, eScale);
             }
         }
+
+        // 2. Apply Kinematic Fault & Hotspot Lines
+        if (tectonicFaults.length > 0) {
+            TectonicEngine.applyTectonicFaults(elevationData, width, height, tectonicFaults, this.simplex);
+        }
+
+        // 3. Apply Elevation Exponent & Pivot Map to Land/Sea Boundaries
+        for (let i = 0; i < width * height; i++) {
+            let elevation = elevationData[i];
+
+            if (elevation > seaLevel) {
+                const landHeight = (elevation - seaLevel) / (1 - seaLevel);
+                const stretchedLand = Math.pow(landHeight, eStretch);
+                elevationData[i] = seaLevel + stretchedLand * (1 - seaLevel);
+            } else {
+                elevationData[i] = Math.max(0, elevation);
+            }
+        }
+
         return elevationData;
     }
 
