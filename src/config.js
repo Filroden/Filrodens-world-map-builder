@@ -34,6 +34,12 @@ export const FILRODENSWMB = {
         SPRING_ALTITUDE_OFFSET: 0.25,
         SPRING_MOISTURE_MIN: 0.45,
         MEANDER_JITTER: 0.005,
+        MANUAL_RIVER_DEPTHS: {
+            2: 0.015,
+            4: 0.025,
+            6: 0.035,
+            8: 0.05,
+        },
     },
     CLIMATE: {
         ALTITUDE_COOLING: 0.4,

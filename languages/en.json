@@ -375,5 +375,14 @@
     "FILRODENSWMB.UI.FaultStrength": "Fault Line Stength",
     "FILRODENSWMB.UI.ToolDrawFault": "Draw Fault Line",
 
-    "FILRODENSWMB.UI.RegionOpacity": "Region Opacity"
+    "FILRODENSWMB.UI.RegionOpacity": "Region Opacity",
+
+    "FILRODENSWMB.UI.ManualRivers": "Custom Rivers",
+    "FILRODENSWMB.UI.ToolDrawRiver": "Draw Custom River",
+    "FILRODENSWMB.UI.RiverWidth": "River Width",
+    "FILRODENSWMB.UI.SizeSmall": "Small",
+    "FILRODENSWMB.UI.SizeMedium": "Medium",
+    "FILRODENSWMB.UI.SizeLarge": "Large",
+    "FILRODENSWMB.UI.SizeXLarge": "Extra Large",
+    "FILRODENSWMB.UI.NoManualRivers": "No custom rivers have been drawn yet."
 }

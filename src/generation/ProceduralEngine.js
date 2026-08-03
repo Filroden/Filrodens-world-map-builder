@@ -1,5 +1,6 @@
 import { SimplexNoise } from "../../vendor/simplex-noise/simplex-noise.js";
 import { TectonicEngine } from "./TectonicEngine.js";
+import { HydrologyEngine } from "./HydrologyEngine.js";
 import { FILRODENSWMB } from "../config.js";
 
 export class ProceduralEngine {
@@ -237,7 +238,7 @@ export class ProceduralEngine {
     /**
      * Calculates pure geographical altitude, applying exponents strictly to landmasses.
      */
-    generateTopography(width, height, params, outBuffer, tectonicFaults = []) {
+    generateTopography(width, height, params, outBuffer, tectonicFaults = [], manualRivers = []) {
         const elevationData = outBuffer;
 
         const eScale = params.noise.elevation.scale;
@@ -256,9 +257,12 @@ export class ProceduralEngine {
             }
         }
 
-        // 2. Apply Kinematic Fault & Hotspot Lines
+        // 2. Apply Vector Deformations
         if (tectonicFaults.length > 0) {
             TectonicEngine.applyTectonicFaults(elevationData, width, height, tectonicFaults, this.simplex);
+        }
+        if (manualRivers.length > 0) {
+            HydrologyEngine.carveManualRivers(elevationData, width, height, manualRivers, this.simplex, params.seaLevel);
         }
 
         // 3. Apply Elevation Exponent & Pivot Map to Land/Sea Boundaries

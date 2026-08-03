@@ -88,6 +88,7 @@
 .fwmb-icon.plateau              { --fwmb-mask: url('../assets/icons/rectangle.svg'); }
 .fwmb-icon.security             { --fwmb-mask: url('../assets/icons/security.svg'); }
 .fwmb-icon.crop                 { --fwmb-mask: url('../assets/icons/crop.svg'); }
+.fwmb-icon.water                { --fwmb-mask: url('../assets/icons/water.svg'); }
 
 /* --- PINHEAD ICONS --- */
 .fwmb-icon.anchor                         { --fwmb-mask: url('../assets/pinhead-icons/anchor.svg'); }

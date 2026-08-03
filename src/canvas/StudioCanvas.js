@@ -38,6 +38,9 @@ export class StudioCanvas {
         this.haloGraphics.filters = [new PIXI.filters.AlphaFilter(0.15)];
         this.layers.features.addChild(this.haloGraphics);
 
+        this.manualRiverGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.manualRiverGraphics);
+
         this.vectorGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.vectorGraphics);
 
@@ -1831,5 +1834,53 @@ export class StudioCanvas {
                 });
             }
         });
+    }
+
+    renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null) {
+        if (!this.manualRiverGraphics) return;
+
+        // Aggressively purge memory and nested nodes to prevent WebGL leaks
+        this.manualRiverGraphics.clear();
+        this.manualRiverGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
+
+        if (!this.layers.features || !isEditMode) return;
+
+        for (const river of rivers) {
+            if (!this.#isVisibleInCurrentPass(river.visibility, "all", false) || !river.points || river.points.length === 0) continue;
+
+            const isActive = river.id === activeRiverId;
+            const lineColor = isActive ? 0x00e5ff : 0x78aad2;
+
+            this.manualRiverGraphics.lineStyle(river.width || 4, lineColor, 0.8);
+
+            // Draw Catmull-Rom spline
+            const points = river.points;
+            if (points.length === 1) {
+                this.manualRiverGraphics.drawCircle(points[0].x, points[0].y, 2);
+            } else {
+                this.manualRiverGraphics.moveTo(points[0].x, points[0].y);
+                for (let i = 1; i < points.length; i++) {
+                    this.manualRiverGraphics.lineTo(points[i].x, points[i].y);
+                }
+            }
+
+            // Draw edit nodes
+            if (isEditMode) {
+                points.forEach((pt, index) => {
+                    const isLast = isActive && index === points.length - 1;
+
+                    const node = new PIXI.Graphics();
+                    node.beginFill(lineColor, 0.6);
+                    node.lineStyle(2, 0x000000, 0.6);
+                    node.drawCircle(0, 0, isLast ? 8 : 5);
+                    node.endFill();
+                    node.x = pt.x;
+                    node.y = pt.y;
+
+                    this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
+                    this.manualRiverGraphics.addChild(node);
+                });
+            }
+        }
     }
 }

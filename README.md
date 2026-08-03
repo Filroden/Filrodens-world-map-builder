@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-1.1.0-blue)
+![Latest Version](https://img.shields.io/badge/Version-1.2.0-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -179,17 +179,24 @@ Biomes are generated automatically depending on the latitude, terrain, temperatu
 #### Terrain Features
 
 - **Rivers and Lakes:** River sources are automatically generated where the moisture levels are high enough. River sources form between certain elevations which can be changed in the Map Configuration settings. They find their way down the terrain until they reach natural depressions. Water will then pool to form lakes. If the lakes becomes large enough, they may find new paths down the terrain and potentially reach the ocean. When a map is generated, the procedural river sources are permanently baked into the map as editable pins.
+- **Custom Rivers:** In addition to procedural rivers, custom rivers can be drawn using line tools. The engine automatically places a river source at the highest point of your line and carves a continuous downward channel. If your route passes through higher elevations, the engine cuts a gorge through the terrain. If it passes over a steep drop, it forms a waterfall.
 - **Plate Tectonics:** Tectonic plates (convergent, divergent and lateral/slip) and volcanic hotspot chains can be simulated using line tools.
 
 1. **Edit Terrain Features**
 
    - **Add New River Source:** Add a pin to spawn a custom river.
+   - **Draw Custom River:** Draw a line to carve a channel from the high end of the route to the low end. It will automatically carve gorges through any higher terrain between the two points.
    - **Draw Fault Line:** Draw a line to simulate a convergent, divergent or lateral/slip fault or a hotspot chain.
+
+   For custom rivers:
+   - **River width:** Choose the width of the river channel (small, medium, large and extra large).
 
    For fault lines:
    - **Tectonic Fault Type:** Choose the type of fault you want to simulate.
    - **Fault Line Thickness:** Choose over how wide an area the effects will happen.
    - **Fault Line Strength:** Determine the strength of the effect.
+
+> Note: by default, no terrain feature automatically generates a label. If you want to add a label, e.g., to a river or fault line, you should add a custom label using the label tool.
 
 #### Infrastructure
 
@@ -382,8 +389,7 @@ The generator can be computationally heavy when calculating new terrain, moistur
 
 ## Roadmap
 
+- Add world game setting to create default custom biomes and quick styles which are imported when creating a new map.
 - Bulk edit vector (pins, lines, regions and text) properties.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
-- A Sandbox Mode allowing the import of DEM or greyscale heightmaps to bypass the procedural generation entirely. **Risk**: Might prevent use of regional map creation.
-- Simulate the effects of tectonic plate boundaries (convergent, divergent and lateral) and simulate the effects of hot spots and continental drift.
