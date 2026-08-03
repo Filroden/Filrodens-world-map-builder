@@ -6,7 +6,6 @@ import { FILRODENSWMB } from "../config.js";
  */
 export class HydrologyEngine {
     static MATH = {
-        DROP_PER_STEP: 0.005, // Maximum elevation drop per path step to avoid unnatural aqueducts
         BANK_BLEND_POWER: 2,
         JITTER_SCALE: 0.05,
         JITTER_STRENGTH: 2,
@@ -63,7 +62,7 @@ export class HydrologyEngine {
     static #carveSingleRiver(elevationData, width, height, river, simplex, seaLevel) {
         if (!river.points || river.points.length < 2) return;
 
-        const path = this.#getSplinePoints(river.points, this.MATH.PATH_STEP_SIZE);
+        const path = this.#getSplinePoints(river.points, 0.25);
         if (path.length === 0) return;
 
         this.#ensureDownhillFlow(elevationData, width, path);
@@ -72,52 +71,92 @@ export class HydrologyEngine {
         const radius = river.width / 2;
         const radiusSq = radius * radius;
 
-        const startElev = this.#sampleElevation(elevationData, width, path[0]);
-        let currentBedElev = startElev - depth;
+        const bedProfile = this.#buildMonotonicBedProfile(elevationData, width, path, depth, seaLevel);
 
-        for (const pt of path) {
-            currentBedElev = this.#carveRiverCrossSection(elevationData, width, height, pt, radius, radiusSq, currentBedElev, depth, simplex, seaLevel);
+        for (let i = 0; i < path.length; i++) {
+            this.#carveRiverCrossSection(elevationData, width, height, path[i], radius, radiusSq, bedProfile[i], simplex);
         }
     }
 
-    static #carveRiverCrossSection(elevationData, width, height, pt, radius, radiusSq, previousBedElev, targetDepth, simplex, seaLevel) {
+    /**
+     * Builds a strictly non-increasing target bed elevation for every point on the path,
+     * following the natural terrain (so it dips into gorges and drops at waterfalls)
+     * but never rising, and never dropping below sea level.
+     */
+    static #buildMonotonicBedProfile(elevationData, width, path, depth, seaLevel) {
+        const EPSILON = 0.000001;
+        const SAFE_COASTAL_ELEVATION = seaLevel + 0.0001;
+
+        const profile = new Array(path.length);
+        const startElev = this.#sampleElevation(elevationData, width, path[0]);
+
+        let runningBed = startElev - depth;
+
+        for (let i = 0; i < path.length; i++) {
+            const terrainElev = this.#sampleElevation(elevationData, width, path[i]);
+
+            let naturalBed = terrainElev - depth;
+
+            // If on land, mathematically guarantee to budget enough
+            // remaining distance to never drop below sea level prematurely.
+            if (terrainElev >= seaLevel) {
+                const remainingSteps = path.length - 1 - i;
+                const minRequiredBed = SAFE_COASTAL_ELEVATION + remainingSteps * EPSILON;
+
+                naturalBed = Math.max(naturalBed, minRequiredBed);
+                runningBed = Math.min(naturalBed, runningBed - EPSILON);
+                runningBed = Math.max(runningBed, minRequiredBed);
+            } else {
+                runningBed = Math.min(naturalBed, runningBed - EPSILON);
+            }
+
+            profile[i] = runningBed;
+        }
+
+        return profile;
+    }
+
+    static #carveRiverCrossSection(elevationData, width, height, pt, radius, radiusSq, bedElev, simplex) {
         const cx = Math.floor(pt.x);
         const cy = Math.floor(pt.y);
 
-        // 1. Enforce monotonic downward flow
-        const originalElev = this.#sampleElevation(elevationData, width, pt);
-
-        // Calculate the theoretical downhill depth
-        let desiredBed = Math.min(originalElev - targetDepth, previousBedElev - this.MATH.DROP_PER_STEP);
-        const currentBedElev = Math.max(desiredBed, Math.min(seaLevel, originalElev));
-
-        // 2. Define a tight mathematical bounding box for the cross-section
         const bounds = this.#calculateBounds(cx, cy, radius + this.MATH.JITTER_STRENGTH, width, height);
 
-        // 3. Carve the banks using quadratic falloff
+        // Guarantee a flat floor to trap procedural water
+        const coreRadius = Math.max(1, radius * 0.5);
+        const coreRadiusSq = coreRadius * coreRadius;
+
         for (let y = bounds.minY; y <= bounds.maxY; y++) {
             for (let x = bounds.minX; x <= bounds.maxX; x++) {
                 const idx = y * width + x;
-                const distSq = this.#calculateJitteredDistanceSq(x, y, pt.x, pt.y, simplex);
 
-                if (distSq > radiusSq) continue;
+                const dx = x - pt.x;
+                const dy = y - pt.y;
+                const trueDistSq = dx * dx + dy * dy;
 
-                const normDist = Math.sqrt(distSq) / radius;
-                const blendFactor = Math.pow(normDist, this.MATH.BANK_BLEND_POWER);
+                let blendFactor = 0;
+
+                if (trueDistSq <= coreRadiusSq) {
+                    // Flawless, un-jittered core pipe ensures the water simulation never escapes
+                    blendFactor = 0;
+                } else {
+                    // Natural, simplex-jittered outer banks
+                    const jitterDistSq = this.#calculateJitteredDistanceSq(x, y, pt.x, pt.y, simplex);
+                    if (jitterDistSq > radiusSq) continue;
+
+                    const normDist = (Math.sqrt(jitterDistSq) - coreRadius) / (radius - coreRadius);
+                    blendFactor = Math.pow(Math.max(0, Math.min(1, normDist)), this.MATH.BANK_BLEND_POWER);
+                }
 
                 const terrainElev = elevationData[idx];
-                const carvedElev = currentBedElev + (terrainElev - currentBedElev) * blendFactor;
+                const carvedElev = bedElev + (terrainElev - bedElev) * blendFactor;
 
-                // Protect against creating aqueducts by strictly carving downwards
                 if (carvedElev < terrainElev) {
                     elevationData[idx] = Math.max(0, carvedElev);
                 }
             }
         }
-
-        return currentBedElev;
     }
-
     // --- Spatial Math Helpers ---
 
     static #sampleElevation(elevationData, width, pt) {

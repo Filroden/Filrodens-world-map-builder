@@ -917,6 +917,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #handleBrushEnd() {
         this.brushEngine.endStroke();
         this.markDirty();
+
+        if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
+            this.#rebuildFromHistory().then(() => {
+                this.#repaintCanvas();
+                this.debouncedGenerateClimate();
+            });
+        }
     }
 
     #handleReferencePan(dx, dy) {
@@ -1100,7 +1107,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
         this.#pushVectorState();
-        const finalPos = this.uiState.snapToPoints ? this.#getSnappedCoordinates(x, y) : { x, y };
+        const finalPos = { x, y };
 
         if (this.uiState.activeFeatureMode === "spring") {
             this.mapPins.push({
@@ -1409,11 +1416,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async #rebuildFromHistory() {
-        const { params } = this.#getMapParameters();
+        const { currentSeed, params } = this.#getMapParameters();
+        const engine = new ProceduralEngine(currentSeed);
 
         this.currentElevationData.set(this.baseElevationData);
         this.currentBiomeOverrides.fill(0);
         this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel);
+
+        // Carve rivers after brushes have mutated the terrain
+        if (this.manualRivers && this.manualRivers.length > 0) {
+            HydrologyEngine.carveManualRivers(this.currentElevationData, this.mapWidth, this.mapHeight, this.manualRivers, engine.simplex, params.seaLevel);
+        }
     }
 
     async generateTerrain() {
@@ -1423,7 +1436,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         console.log("World Map Builder | Generating Topography...");
         const t0 = performance.now();
 
-        engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, this.manualRivers);
+        // 1. Generate base noise and tectonics ONLY (pass empty array for rivers)
+        engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, []);
 
         await this.#rebuildFromHistory();
 
@@ -1686,27 +1700,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.bufferContours = new Uint8Array(totalPixels * 4);
     }
 
-    #getSnappedCoordinates(x, y, threshold = 20) {
-        let closest = { x, y, dist: Infinity };
-
-        for (const pin of this.mapPins) {
-            if (pin.visibility === "none" || !pin.icon) continue;
-
-            const dist = Math.hypot(pin.x - x, pin.y - y);
-            if (dist < closest.dist && dist <= threshold) {
-                closest = { x: pin.x, y: pin.y, dist };
-            }
-        }
-
-        return closest.dist === Infinity ? { x, y } : { x: closest.x, y: closest.y };
-    }
-
     #handleInfrastructureClick(x, y) {
         if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
         this.#pushVectorState();
 
-        const finalPos = this.uiState.snapToPoints ? this.#getSnappedCoordinates(x, y) : { x, y };
+        const finalPos = { x, y };
 
         if (this.uiState.activeInfraMode === "pin") {
             const newPin = {
@@ -1854,7 +1853,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.#pushVectorState();
 
-        const finalPos = this.uiState.snapToPoints ? this.#getSnappedCoordinates(x, y) : { x, y };
+        const finalPos = { x, y };
 
         if (this.activeRegionId) {
             const region = layer.regions.find((r) => r.id === this.activeRegionId);
@@ -2254,6 +2253,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 1. Reset all history and spatial arrays
         this.markDirty();
         this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        this.manualRivers = [];
+        this.tectonicFaults = [];
         this.mapPins = [];
         this.mapRoutes = [];
         this.regionLayers = [];
@@ -2266,6 +2267,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.activeRouteId = null;
         this.activeRegionLayerId = null;
         this.activeRegionId = null;
+        this.activeFaultId = null;
+        this.activeRiverId = null;
+        this.activeRouteId = null;
+        this.activeRegionLayerId = null;
 
         // 3. Wipe the save memory so the next save forces a "Save As" prompt
         this.currentSaveId = null;

@@ -588,33 +588,22 @@ export class StudioCanvas {
     }
 
     #drawSingleRiver(path, waterColor, frozenColor, waterMask) {
-        let isFlowing = false;
-        let currentIsFrozen = null;
+        if (!path || path.length === 0) return;
 
-        for (const point of path) {
-            // THE FIX: Intercept coordinates and evaluate against the submerged mask
-            const safeX = Math.max(0, Math.min(Math.round(point.x), this.mapWidth - 1));
-            const safeY = Math.max(0, Math.min(Math.round(point.y), this.mapHeight - 1));
-            const index = safeY * this.mapWidth + safeX;
-            const isWater = waterMask && waterMask[index] > 0;
+        let currentIsFrozen = path[0].isFrozen;
+        this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+        this.vectorGraphics.moveTo(path[0].x, path[0].y);
 
-            if (point.isLake || isWater) {
-                isFlowing = false;
-                continue;
-            }
+        for (let i = 1; i < path.length; i++) {
+            const point = path[i];
 
-            if (!isFlowing) {
+            // If the climate crosses the freezing threshold, snap the line and change colors
+            if (point.isFrozen !== currentIsFrozen) {
                 currentIsFrozen = point.isFrozen;
                 this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
                 this.vectorGraphics.moveTo(point.x, point.y);
-                isFlowing = true;
-            } else if (point.isFrozen === currentIsFrozen) {
-                this.vectorGraphics.lineTo(point.x, point.y);
             } else {
                 this.vectorGraphics.lineTo(point.x, point.y);
-                currentIsFrozen = point.isFrozen;
-                this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-                this.vectorGraphics.moveTo(point.x, point.y);
             }
         }
     }
