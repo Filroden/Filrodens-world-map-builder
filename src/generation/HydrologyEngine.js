@@ -7,8 +7,6 @@ import { FILRODENSWMB } from "../config.js";
 export class HydrologyEngine {
     static MATH = {
         BANK_BLEND_POWER: 2,
-        JITTER_SCALE: 0.05,
-        JITTER_STRENGTH: 2,
         PATH_STEP_SIZE: 1, // 1 pixel interval guarantees continuous carving
     };
 
@@ -68,13 +66,18 @@ export class HydrologyEngine {
         this.#ensureDownhillFlow(elevationData, width, path);
 
         const depth = FILRODENSWMB.HYDROLOGY.MANUAL_RIVER_DEPTHS?.[river.width] || 0.025;
-        const radius = river.width / 2;
-        const radiusSq = radius * radius;
+
+        const targetRadius = river.width / 2;
+        const startRadius = 1;
 
         const bedProfile = this.#buildMonotonicBedProfile(elevationData, width, path, depth, seaLevel);
 
         for (let i = 0; i < path.length; i++) {
-            this.#carveRiverCrossSection(elevationData, width, height, path[i], radius, radiusSq, bedProfile[i], simplex);
+            const progress = path.length > 1 ? i / (path.length - 1) : 1;
+            const currentRadius = startRadius + (targetRadius - startRadius) * progress;
+            const currentRadiusSq = currentRadius * currentRadius;
+
+            this.#carveRiverCrossSection(elevationData, width, height, path[i], currentRadius, currentRadiusSq, bedProfile[i]);
         }
     }
 
@@ -116,13 +119,12 @@ export class HydrologyEngine {
         return profile;
     }
 
-    static #carveRiverCrossSection(elevationData, width, height, pt, radius, radiusSq, bedElev, simplex) {
+    static #carveRiverCrossSection(elevationData, width, height, pt, radius, radiusSq, bedElev) {
         const cx = Math.floor(pt.x);
         const cy = Math.floor(pt.y);
 
-        const bounds = this.#calculateBounds(cx, cy, radius + this.MATH.JITTER_STRENGTH, width, height);
+        const bounds = this.#calculateBounds(cx, cy, radius, width, height);
 
-        // Guarantee a flat floor to trap procedural water
         const coreRadius = Math.max(1, radius * 0.5);
         const coreRadiusSq = coreRadius * coreRadius;
 
@@ -134,29 +136,26 @@ export class HydrologyEngine {
                 const dy = y - pt.y;
                 const trueDistSq = dx * dx + dy * dy;
 
+                if (trueDistSq > radiusSq) continue;
+
+                const distFromCenter = Math.sqrt(trueDistSq);
                 let blendFactor = 0;
 
-                if (trueDistSq <= coreRadiusSq) {
-                    // Flawless, un-jittered core pipe ensures the water simulation never escapes
-                    blendFactor = 0;
-                } else {
-                    // Natural, simplex-jittered outer banks
-                    const jitterDistSq = this.#calculateJitteredDistanceSq(x, y, pt.x, pt.y, simplex);
-                    if (jitterDistSq > radiusSq) continue;
-
-                    const normDist = (Math.sqrt(jitterDistSq) - coreRadius) / (radius - coreRadius);
+                if (trueDistSq > coreRadiusSq) {
+                    const normDist = (distFromCenter - coreRadius) / (radius - coreRadius);
                     blendFactor = Math.pow(Math.max(0, Math.min(1, normDist)), this.MATH.BANK_BLEND_POWER);
                 }
 
                 const terrainElev = elevationData[idx];
                 const carvedElev = bedElev + (terrainElev - bedElev) * blendFactor;
 
-                if (carvedElev < terrainElev) {
+                if (carvedElev < elevationData[idx]) {
                     elevationData[idx] = Math.max(0, carvedElev);
                 }
             }
         }
     }
+
     // --- Spatial Math Helpers ---
 
     static #sampleElevation(elevationData, width, pt) {

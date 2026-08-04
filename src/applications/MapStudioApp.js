@@ -350,6 +350,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
+     * Dynamically calculates the click-tolerance threshold in canvas-space pixels.
+     * Ensures proximity checks remain exactly 15 screen-pixels wide regardless of zoom.
+     */
+    get currentSnapThreshold() {
+        const baseThreshold = 15;
+        const zoomScale = this.canvasEngine?.stage?.scale?.x || 1;
+        return baseThreshold / zoomScale;
+    }
+
+    /**
      * Applies RTL directionality if the active language requires it.
      */
     static #applyRTLSupport(element) {
@@ -987,11 +997,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 1. Check for snaps on existing pins to prevent inserting a node inside a marker
         for (const route of this.mapRoutes) {
             for (const pt of route.points) {
-                if (Math.hypot(pt.x - x, pt.y - y) < 15) return;
+                if (Math.hypot(pt.x - x, pt.y - y) < this.currentSnapThreshold) return;
             }
         }
         for (const pin of this.mapPins) {
-            if (pin.visibility !== "none" && pin.icon && Math.hypot(pin.x - x, pin.y - y) < 15) return;
+            if (pin.visibility !== "none" && pin.icon && Math.hypot(pin.x - x, pin.y - y) < this.currentSnapThreshold) return;
         }
 
         // 2. Generic Vector Segment Check (Routes, Faults, Rivers)
@@ -1125,14 +1135,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         } else if (this.uiState.activeFeatureMode === "fault") {
             if (this.activeFaultId) {
                 const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
-                if (fault) {
-                    const lastPt = fault.points[fault.points.length - 1];
-                    if (Math.hypot(lastPt.x - finalPos.x, lastPt.y - finalPos.y) < 15) {
-                        this.activeFaultId = null;
-                    } else {
-                        fault.points.push(finalPos);
-                    }
-                }
+                if (fault) fault.points.push(finalPos);
             } else {
                 this.activeFaultId = foundry.utils.randomID();
                 this.tectonicFaults.push({
@@ -1152,16 +1155,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         } else if (this.uiState.activeFeatureMode === "river") {
             if (this.activeRiverId) {
                 const river = this.manualRivers.find((r) => r.id === this.activeRiverId);
-                if (river) {
-                    const lastPt = river.points[river.points.length - 1];
-                    // Finalise on double-click
-                    if (Math.hypot(lastPt.x - finalPos.x, lastPt.y - finalPos.y) < 15) {
-                        this.activeRiverId = null;
-                        this.debouncedGenerateTerrain();
-                    } else {
-                        river.points.push(finalPos);
-                    }
-                }
+                if (river) river.points.push(finalPos);
             } else {
                 this.activeRiverId = foundry.utils.randomID();
                 this.manualRivers.push({
@@ -1725,14 +1719,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         } else if (this.uiState.activeInfraMode === "route") {
             if (this.activeRouteId) {
                 const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
-                if (route) {
-                    const lastPt = route.points[route.points.length - 1];
-                    if (Math.hypot(lastPt.x - finalPos.x, lastPt.y - finalPos.y) < 15) {
-                        this.activeRouteId = null;
-                    } else {
-                        route.points.push(finalPos);
-                    }
-                }
+                if (route) route.points.push(finalPos);
             } else {
                 this.activeRouteId = foundry.utils.randomID();
                 const newRoute = {
@@ -1773,7 +1760,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    #getClosestVectorSegment(vectorArray, x, y, threshold = 15) {
+    #getClosestVectorSegment(vectorArray, x, y, threshold = this.currentSnapThreshold) {
         if (!vectorArray || vectorArray.length === 0) return null;
 
         let closest = { vector: null, insertIndex: -1, dist: Infinity, projX: 0, projY: 0 };
@@ -1801,7 +1788,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return closest.vector ? closest : null;
     }
 
-    #getClosestRegionSegment(x, y, threshold = 15) {
+    #getClosestRegionSegment(x, y, threshold = this.currentSnapThreshold) {
         let closest = { region: null, insertIndex: -1, dist: Infinity };
 
         for (const layer of this.regionLayers) {
@@ -1858,11 +1845,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.activeRegionId) {
             const region = layer.regions.find((r) => r.id === this.activeRegionId);
             if (region) {
-                const isNearStart = region.points.length > 2 && Math.hypot(region.points[0].x - finalPos.x, region.points[0].y - finalPos.y) < 15;
-                const lastPt = region.points[region.points.length - 1];
-                const isNearEnd = region.points.length > 1 && Math.hypot(lastPt.x - finalPos.x, lastPt.y - finalPos.y) < 15;
+                const isNearStart = region.points.length > 2 && Math.hypot(region.points[0].x - finalPos.x, region.points[0].y - finalPos.y) < this.currentSnapThreshold;
 
-                if (isNearStart || isNearEnd) {
+                if (isNearStart) {
                     this.activeRegionId = null;
                 } else {
                     region.points.push(finalPos);

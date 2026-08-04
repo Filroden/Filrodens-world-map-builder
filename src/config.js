@@ -33,7 +33,7 @@ export const FILRODENSWMB = {
         MAX_LAKE_SIZE: 8000,
         SPRING_ALTITUDE_OFFSET: 0.25,
         SPRING_MOISTURE_MIN: 0.45,
-        MEANDER_JITTER: 0.005,
+        MEANDER_JITTER: 0,
         MANUAL_RIVER_DEPTHS: {
             2: 0.015,
             4: 0.025,
