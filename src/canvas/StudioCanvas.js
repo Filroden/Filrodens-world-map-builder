@@ -1097,7 +1097,8 @@ export class StudioCanvas {
     }
 
     /**
-     * Frames the viewport to encompass a specific array of coordinates.
+     * Frames the viewport to encompass a specific array of coordinates
+     * and fires a temporary animated highlight box around the true bounds.
      */
     zoomToFeature(points) {
         if (!points || points.length === 0 || !this.stage) return;
@@ -1119,21 +1120,67 @@ export class StudioCanvas {
             if (points[i].y > maxY) maxY = points[i].y;
         }
 
-        const width = Math.max(maxX - minX, MIN_BOUNDS_SIZE);
-        const height = Math.max(maxY - minY, MIN_BOUNDS_SIZE);
+        // Separate the true visual dimensions from the padded camera bounding box
+        const trueWidth = maxX - minX;
+        const trueHeight = maxY - minY;
+        const centerX = minX + trueWidth / 2;
+        const centerY = minY + trueHeight / 2;
 
-        const centerX = minX + width / 2;
-        const centerY = minY + height / 2;
+        const zoomWidth = Math.max(trueWidth, MIN_BOUNDS_SIZE);
+        const zoomHeight = Math.max(trueHeight, MIN_BOUNDS_SIZE);
 
         // Calculate scale to fit with padding, constrained by maximum zoom limits
-        const scaleX = this.app.screen.width / (width * PADDING_FACTOR);
-        const scaleY = this.app.screen.height / (height * PADDING_FACTOR);
+        const scaleX = this.app.screen.width / (zoomWidth * PADDING_FACTOR);
+        const scaleY = this.app.screen.height / (zoomHeight * PADDING_FACTOR);
         const targetScale = Math.min(scaleX, scaleY, MAX_ZOOM_SCALE);
 
         // Apply transforms directly to the PIXI stage
         this.stage.scale.set(targetScale);
         this.stage.position.x = this.app.screen.width / 2 - centerX * targetScale;
         this.stage.position.y = this.app.screen.height / 2 - centerY * targetScale;
+
+        // Ensure interactive edit nodes shrink to match the new zoom level
+        this.#updateNodeScales();
+
+        // --- Animated Target Highlight ---
+        const invScale = 1 / targetScale;
+        const pad = 30 * invScale; // Keeps the visual padding exactly 30px thick at any zoom
+
+        const highlight = new PIXI.Graphics();
+        highlight.lineStyle(4 * invScale, 0x00e5ff, 1);
+        highlight.beginFill(0x00e5ff, 0.15);
+        highlight.drawRoundedRect(-trueWidth / 2 - pad, -trueHeight / 2 - pad, trueWidth + pad * 2, trueHeight + pad * 2, 12 * invScale);
+        highlight.endFill();
+
+        highlight.x = centerX;
+        highlight.y = centerY;
+        this.stage.addChild(highlight);
+
+        // Fire a self-cleaning animation loop directly into the PIXI ticker
+        let elapsed = 0;
+        const duration = 90; // Approx 1.5 seconds at 60fps
+
+        const tick = () => {
+            // Safety escape if the user closes the app mid-animation
+            if (highlight.destroyed) {
+                this.app.ticker.remove(tick);
+                return;
+            }
+
+            elapsed++;
+            const progress = elapsed / duration;
+
+            // Ease-out fade combined with a gentle outward expansion
+            highlight.alpha = 1 - Math.pow(progress, 2);
+            highlight.scale.set(1 + progress * 0.15);
+
+            if (elapsed >= duration) {
+                highlight.destroy();
+                this.app.ticker.remove(tick);
+            }
+        };
+
+        this.app.ticker.add(tick);
     }
 
     async updateReferenceImage(url, x, y, scale, alpha) {

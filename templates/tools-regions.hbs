@@ -7,7 +7,7 @@
     </div>
 
     {{#each regionLayers}}
-    <div class="fwmb-accordion-group" data-layer-id="{{this.id}}">
+    <div class="fwmb-accordion-group fwmb-scrollable" data-layer-id="{{this.id}}">
         
         <div class="fwmb-list-item fwmb-layer-header" style="{{#if this.isActive}}border-color: var(--fwmb-color-text-accent); background: var(--fwmb-bg-hover);{{/if}}">
             <div class="fwmb-list-item-content">
@@ -64,6 +64,7 @@
         <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.NoRegionLayers"}}</div>
     {{/each}}
 
+    <div class="fwmb-flex-1"></div>
     <div class="fwmb-divider"></div>
 
     <button type="button" class="fwmb-btn primary" data-action="toggleEditMode">

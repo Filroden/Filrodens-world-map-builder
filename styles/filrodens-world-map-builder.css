@@ -618,7 +618,7 @@
 }
 
 .fwmb-tool-content.fwmb-fixed-lists fieldset.fwmb-fieldset {
-    flex: 0 1 auto;
+    flex: 1;
     min-height: 5rem;
     margin: 0;
 }
