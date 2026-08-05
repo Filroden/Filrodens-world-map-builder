@@ -384,5 +384,8 @@
     "FILRODENSWMB.UI.SizeMedium": "Medium",
     "FILRODENSWMB.UI.SizeLarge": "Large",
     "FILRODENSWMB.UI.SizeXLarge": "Extra Large",
-    "FILRODENSWMB.UI.NoManualRivers": "No custom rivers have been drawn yet."
+    "FILRODENSWMB.UI.NoManualRivers": "No custom rivers have been drawn yet.",
+
+    "FILRODENSWMB.UI.Promote": "Clone as New",
+    "FILRODENSWMB.UI.PromoteConfirm": "Clone this regional map to a standalone master map?"
 }

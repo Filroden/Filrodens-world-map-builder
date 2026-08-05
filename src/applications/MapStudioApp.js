@@ -178,6 +178,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.currentSaveId = null;
         this.currentSaveName = null;
+        this.currentParentId = null;
         this.isDirty = false;
         this.isSaving = false;
 
@@ -804,6 +805,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 }
             }
         }
+
+        this.#syncDOMToState();
     }
 
     async close(options) {
@@ -1112,6 +1115,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 return;
             }
         }
+
+        // 4. Pin Deletion (Infrastructure)
+        if (this.activeTool === "infrastructure" && target.icon) {
+            const nodeIndex = this.mapPins.indexOf(target);
+            if (nodeIndex > -1) {
+                this.#pushVectorState();
+                this.mapPins.splice(nodeIndex, 1);
+                this.#repaintVectors();
+                this.render({ parts: ["context"] });
+                this.markDirty();
+                return;
+            }
+        }
     }
 
     #handleFeatureClick(x, y) {
@@ -1416,7 +1432,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.currentElevationData.set(this.baseElevationData);
         this.currentBiomeOverrides.fill(0);
-        this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel);
+
+        // Feed the compiled params into the replay so Custom Biomes are validated and restored
+        this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel, params);
 
         // Carve rivers after brushes have mutated the terrain
         if (this.manualRivers && this.manualRivers.length > 0) {
@@ -1512,6 +1530,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async #ingestMapPayload(payload) {
         this.uiState.mapSeed = payload.seed;
+        this.currentParentId = payload.parentId || null;
 
         this.mapWidth = payload.mapWidth;
         this.mapHeight = payload.mapHeight;
@@ -1651,6 +1670,32 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #syncDOMToState() {
+        // 1. Hydrate dynamic <select> options to guarantee they exist before values are applied
+        const styleSelect = this.element.querySelector('select[name="activeRouteQuickStyle"]');
+        if (styleSelect) {
+            (this.uiState.customRouteStyles || []).forEach((style) => {
+                if (!styleSelect.querySelector(`option[value="${style.id}"]`)) {
+                    const opt = document.createElement("option");
+                    opt.value = style.id;
+                    opt.textContent = style.name;
+                    styleSelect.appendChild(opt);
+                }
+            });
+        }
+
+        const biomeSelect = this.element.querySelector('select[name="brushBiome"]');
+        if (biomeSelect) {
+            (this.uiState.customBiomes || []).forEach((cb) => {
+                if (!biomeSelect.querySelector(`option[value="${cb.id}"]`)) {
+                    const opt = document.createElement("option");
+                    opt.value = cb.id;
+                    opt.textContent = cb.name;
+                    biomeSelect.appendChild(opt);
+                }
+            });
+        }
+
+        // 2. Sync all inputs and sliders
         for (const [key, value] of Object.entries(this.uiState)) {
             const input = this.element.querySelector(`[name="${key}"]`);
             if (!input) continue;
@@ -1937,6 +1982,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 regionLayers: this.regionLayers,
                 mapLabels: this.mapLabels,
                 mapDecorations: this.mapDecorations,
+                parentId: this.currentParentId,
             };
 
             if (!this.currentSaveId) {
@@ -3267,6 +3313,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const newLabels = translateVectorList(this.mapLabels);
             const newDecorations = translateVectorList(this.mapDecorations);
             const newRoutes = translateVectorList(this.mapRoutes);
+            const newRivers = translateVectorList(this.manualRivers);
+            const newFaults = translateVectorList(this.tectonicFaults);
 
             const newRegions = [];
             for (const layer of this.regionLayers) {
@@ -3288,6 +3336,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 customBiomes: state.customBiomes,
                 customRouteStyles: state.customRouteStyles,
                 history: newHistory,
+                tectonicFaults: newFaults,
+                manualRivers: newRivers,
                 mapPins: newPins,
                 mapRoutes: newRoutes,
                 regionLayers: newRegions,
@@ -3337,7 +3387,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 await saveMapData(`${cleanName} (Imported)`, parsedData);
 
                 ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ImportSuccess"));
-                this.render({ parts: ["context"] });
+                this.render({ parts: ["toolbar", "context"] });
             } catch (err) {
                 console.error("FWMB | Import Failed:", err);
                 ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.ImportError"));
@@ -3368,7 +3418,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
                     await this.#ingestMapPayload(payload);
                     ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
-                    this.render({ parts: ["toolbar"] });
+
+                    this.render({ parts: ["toolbar", "context"] });
                     this.isDirty = false;
                 }
                 break;
@@ -3414,6 +3465,32 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             case "duplicate": {
                 await duplicateSavedMap(mapId);
                 this.render({ parts: ["context"] });
+                break;
+            }
+
+            case "promote": {
+                const confirmed = await foundry.applications.api.DialogV2.confirm({
+                    window: { title: game.i18n.localize("FILRODENSWMB.UI.Promote") || "Promote Map" },
+                    content: `<p>${game.i18n.localize("FILRODENSWMB.UI.PromoteConfirm") || "Create a standalone copy of this regional map? The new map will not be linked to the original parent."}</p>`,
+                    rejectClose: false,
+                    modal: true,
+                });
+                if (!confirmed) return;
+
+                const exportData = await loadMapData(mapId);
+                if (exportData) {
+                    // Strip the lineage
+                    delete exportData.parentId;
+
+                    const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+                    const newName = `${originalName} (Standalone)`;
+
+                    // Passing null forces the creation of a brand new database entry
+                    await saveMapData(newName, exportData, null);
+
+                    ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.PromoteSuccess") || "Standalone map created successfully.");
+                    this.render({ parts: ["context"] });
+                }
                 break;
             }
 

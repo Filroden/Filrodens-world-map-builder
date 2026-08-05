@@ -389,7 +389,7 @@ The generator can be computationally heavy when calculating new terrain, moistur
 
 ## Roadmap
 
-- Add world game setting to create default custom biomes and quick styles which are imported when creating a new map.
+- Add quick styles for labels (and possible for pins and regions).
 - Bulk edit vector (pins, lines, regions and text) properties.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
