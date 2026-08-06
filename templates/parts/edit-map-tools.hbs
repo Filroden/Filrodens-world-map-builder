@@ -99,6 +99,10 @@
             <i class="fwmb-icon water-drop"></i>
         </button>
 
+        <button type="button" data-tool-group="features" data-action="setFeatureMode" data-mode="river" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolDrawRiver'}}">
+            <i class="fwmb-icon water"></i>
+        </button>
+
         <button type="button" data-tool-group="features" data-action="setFeatureMode" data-mode="fault" class="fwmb-hidden" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolDrawFault'}}">
             <i class="fwmb-icon timeline"></i>
         </button>
@@ -186,6 +190,16 @@
                 <option value="solid" {{#if (eq uiState.routeStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
                 <option value="dashed" {{#if (eq uiState.routeStyle "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
                 <option value="dotted" {{#if (eq uiState.routeStyle "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
+            </select>
+        </div>
+
+        <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="features-river">
+            <label>{{localize "FILRODENSWMB.UI.RiverWidth"}}</label>
+            <select name="riverWidth">
+                <option value="2" {{#if (eq uiState.riverWidth 2)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeSmall"}}</option>
+                <option value="4" {{#if (eq uiState.riverWidth 4)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeMedium"}}</option>
+                <option value="6" {{#if (eq uiState.riverWidth 6)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeLarge"}}</option>
+                <option value="8" {{#if (eq uiState.riverWidth 8)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeXLarge"}}</option>
             </select>
         </div>
 

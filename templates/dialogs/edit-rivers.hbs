@@ -1,0 +1,16 @@
+<div class="fwmb-dialog-content">
+    <div class="form-group stacked">
+        <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <input type="text" name="riverName" value="{{river.name}}" autofocus />
+    </div>
+    
+    <div class="form-group" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.RiverWidth"}}</label>
+        <select name="riverWidth">
+            <option value="2" {{#if (eq river.width 2)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeSmall"}}</option>
+            <option value="4" {{#if (eq river.width 4)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeMedium"}}</option>
+            <option value="6" {{#if (eq river.width 6)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeLarge"}}</option>
+            <option value="8" {{#if (eq river.width 8)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeXLarge"}}</option>
+        </select>
+    </div>
+</div>

@@ -38,6 +38,9 @@ export class StudioCanvas {
         this.haloGraphics.filters = [new PIXI.filters.AlphaFilter(0.15)];
         this.layers.features.addChild(this.haloGraphics);
 
+        this.manualRiverGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.manualRiverGraphics);
+
         this.vectorGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.vectorGraphics);
 
@@ -194,6 +197,9 @@ export class StudioCanvas {
             const zoomFactor = 1.1;
             const scaleDirection = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
 
+            // Dynamically allow deeper zooms on larger maps (e.g., 4000px allows up to 16x zoom)
+            const maxZoom = Math.max(5, this.mapWidth / 250);
+
             const rect = canvasElement.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
@@ -204,11 +210,13 @@ export class StudioCanvas {
             this.stage.scale.x *= scaleDirection;
             this.stage.scale.y *= scaleDirection;
 
-            this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x, 5));
-            this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y, 5));
+            this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x, maxZoom));
+            this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y, maxZoom));
 
             this.stage.position.x = mouseX - localX * this.stage.scale.x;
             this.stage.position.y = mouseY - localY * this.stage.scale.y;
+
+            this.#updateNodeScales(); // Trigger inverse scaling
 
             if (this.isCropMode) this.#drawCropOverlay();
         });
@@ -487,29 +495,32 @@ export class StudioCanvas {
         const localX = (center.x - this.stage.x) / this.stage.scale.x;
         const localY = (center.y - this.stage.y) / this.stage.scale.y;
 
-        this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * factor, 5));
-        this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * factor, 5));
+        const maxZoom = Math.max(5, this.mapWidth / 250);
+
+        this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * factor, maxZoom));
+        this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * factor, maxZoom));
 
         this.stage.position.x = center.x - localX * this.stage.scale.x;
         this.stage.position.y = center.y - localY * this.stage.scale.y;
+
+        this.#updateNodeScales(); // Trigger inverse scaling
     }
 
     resetCamera() {
-        // 1. Calculate the required bounding box (Map size + 10%)
         const paddedWidth = this.mapWidth * 1.1;
         const paddedHeight = this.mapHeight * 1.1;
 
-        // 2. Find the optimal scale to fit either the width or height of the screen
         const scaleX = this.app.screen.width / paddedWidth;
         const scaleY = this.app.screen.height / paddedHeight;
         const optimalScale = Math.min(scaleX, scaleY);
 
-        // 3. Constrain it to our zoom limits so it doesn't break limits on tiny maps
-        const finalScale = Math.max(0.1, Math.min(optimalScale, 5));
-        this.stage.scale.set(finalScale);
+        const maxZoom = Math.max(5, this.mapWidth / 250);
+        const finalScale = Math.max(0.1, Math.min(optimalScale, maxZoom));
 
-        // 4. Center the scaled map in the exact middle of the screen
+        this.stage.scale.set(finalScale);
         this.stage.position.set((this.app.screen.width - this.mapWidth * finalScale) / 2, (this.app.screen.height - this.mapHeight * finalScale) / 2);
+
+        this.#updateNodeScales(); // Trigger inverse scaling
     }
 
     destroy() {
@@ -585,33 +596,22 @@ export class StudioCanvas {
     }
 
     #drawSingleRiver(path, waterColor, frozenColor, waterMask) {
-        let isFlowing = false;
-        let currentIsFrozen = null;
+        if (!path || path.length === 0) return;
 
-        for (const point of path) {
-            // THE FIX: Intercept coordinates and evaluate against the submerged mask
-            const safeX = Math.max(0, Math.min(Math.round(point.x), this.mapWidth - 1));
-            const safeY = Math.max(0, Math.min(Math.round(point.y), this.mapHeight - 1));
-            const index = safeY * this.mapWidth + safeX;
-            const isWater = waterMask && waterMask[index] > 0;
+        let currentIsFrozen = path[0].isFrozen;
+        this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+        this.vectorGraphics.moveTo(path[0].x, path[0].y);
 
-            if (point.isLake || isWater) {
-                isFlowing = false;
-                continue;
-            }
+        for (let i = 1; i < path.length; i++) {
+            const point = path[i];
 
-            if (!isFlowing) {
+            // If the climate crosses the freezing threshold, snap the line and change colors
+            if (point.isFrozen !== currentIsFrozen) {
                 currentIsFrozen = point.isFrozen;
                 this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
                 this.vectorGraphics.moveTo(point.x, point.y);
-                isFlowing = true;
-            } else if (point.isFrozen === currentIsFrozen) {
-                this.vectorGraphics.lineTo(point.x, point.y);
             } else {
                 this.vectorGraphics.lineTo(point.x, point.y);
-                currentIsFrozen = point.isFrozen;
-                this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-                this.vectorGraphics.moveTo(point.x, point.y);
             }
         }
     }
@@ -941,22 +941,7 @@ export class StudioCanvas {
             // 1a. Draw Edit Nodes FIRST (Guarantees the initial single click is visible)
             if (isEditMode) {
                 const isActive = route.id === activeRouteId;
-                const nodeColor = isActive ? 0x00e5ff : 0xffffff;
-
-                route.points.forEach((pt, index) => {
-                    const isLast = isActive && index === route.points.length - 1;
-
-                    const node = new PIXI.Graphics();
-                    node.beginFill(nodeColor, 0.6);
-                    node.lineStyle(2, 0x000000, 0.6);
-                    node.drawCircle(0, 0, isLast ? 8 : 5);
-                    node.endFill();
-                    node.x = pt.x;
-                    node.y = pt.y;
-
-                    this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
-                    this.nodeContainer.addChild(node);
-                });
+                this.#renderEditNodes(route.points, this.nodeContainer, isActive);
             }
 
             // 1b. Abort line geometry if there is no second point to connect to
@@ -965,57 +950,7 @@ export class StudioCanvas {
             const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
             const splinePoints = this.#getSplinePoints(route.points);
 
-            // Extract the geometry loop into a closure so we can stroke it twice
-            const drawRouteGeometry = () => {
-                if (route.style === "solid") {
-                    this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
-                    for (let i = 1; i < splinePoints.length; i++) {
-                        this.routeGraphics.lineTo(splinePoints[i].x, splinePoints[i].y);
-                    }
-                } else {
-                    const dashPattern = route.style === "dashed" ? [route.thickness * 4, route.thickness * 3] : [route.thickness, route.thickness * 2];
-                    let dashIndex = 0;
-                    let dashLength = 0;
-                    let isDrawing = true;
-
-                    this.routeGraphics.moveTo(splinePoints[0].x, splinePoints[0].y);
-
-                    for (let i = 1; i < splinePoints.length; i++) {
-                        const p1 = splinePoints[i - 1];
-                        const p2 = splinePoints[i];
-                        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-
-                        let remainingDist = dist;
-                        let currentX = p1.x;
-                        let currentY = p1.y;
-
-                        while (remainingDist > 0) {
-                            const step = Math.min(remainingDist, dashPattern[dashIndex] - dashLength);
-                            const ratio = step / remainingDist;
-
-                            currentX += (p2.x - currentX) * ratio;
-                            currentY += (p2.y - currentY) * ratio;
-
-                            if (isDrawing) {
-                                this.routeGraphics.lineTo(currentX, currentY);
-                            } else {
-                                this.routeGraphics.moveTo(currentX, currentY);
-                            }
-
-                            dashLength += step;
-                            remainingDist -= step;
-
-                            if (dashLength >= dashPattern[dashIndex]) {
-                                dashLength = 0;
-                                dashIndex = (dashIndex + 1) % dashPattern.length;
-                                isDrawing = !isDrawing;
-                            }
-                        }
-                    }
-                }
-            };
-
-            // Pass 1: Draw the 1px black outline shadow (thickness + 2)
+            // Pass 1: Draw the 1px black outline shadow
             this.routeGraphics.lineStyle({
                 width: route.thickness + 1,
                 color: 0x000000,
@@ -1023,7 +958,7 @@ export class StudioCanvas {
                 cap: PIXI.LINE_CAP.ROUND,
                 join: PIXI.LINE_JOIN.ROUND,
             });
-            drawRouteGeometry();
+            this.#drawVectorPath(this.routeGraphics, splinePoints, route.style, route.thickness);
 
             // Pass 2: Draw the colored foreground line
             this.routeGraphics.lineStyle({
@@ -1033,7 +968,7 @@ export class StudioCanvas {
                 cap: PIXI.LINE_CAP.ROUND,
                 join: PIXI.LINE_JOIN.ROUND,
             });
-            drawRouteGeometry();
+            this.#drawVectorPath(this.routeGraphics, splinePoints, route.style, route.thickness);
         });
 
         // 2. Render Pins (Top Layer)
@@ -1146,86 +1081,24 @@ export class StudioCanvas {
                     g.endFill();
                 }
 
-                // 2. Draw Border (Separated to allow dashed/dotted borders around solid fills)
+                // 2. Draw Border
                 if (region.lineThickness > 0) {
                     g.lineStyle({ width: region.lineThickness, color: lineColorHex, alpha: 1, cap: PIXI.LINE_CAP.ROUND, join: PIXI.LINE_JOIN.ROUND });
-
-                    if (region.lineStyle === "solid") {
-                        g.moveTo(pts[0].x, pts[0].y);
-                        for (let i = 1; i < pts.length; i++) {
-                            g.lineTo(pts[i].x, pts[i].y);
-                        }
-                        if (isClosed) g.closePath();
-                    } else {
-                        // Dash drawing logic
-                        let pattern = [region.lineThickness * 4, region.lineThickness * 3]; // dashed
-                        if (region.lineStyle === "dotted") pattern = [region.lineThickness, region.lineThickness * 2];
-                        if (region.lineStyle === "dashdot") pattern = [region.lineThickness * 4, region.lineThickness * 2, region.lineThickness, region.lineThickness * 2];
-
-                        let dashIdx = 0;
-                        let dashLen = 0;
-                        let isDrawing = true;
-                        g.moveTo(pts[0].x, pts[0].y);
-
-                        const limit = isClosed ? pts.length + 1 : pts.length;
-                        for (let i = 1; i < limit; i++) {
-                            const p1 = pts[(i - 1) % pts.length];
-                            const p2 = pts[i % pts.length];
-                            const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-
-                            let remainingDist = dist;
-                            let currentX = p1.x;
-                            let currentY = p1.y;
-
-                            while (remainingDist > 0) {
-                                const step = Math.min(remainingDist, pattern[dashIdx] - dashLen);
-                                const ratio = step / remainingDist;
-
-                                currentX += (p2.x - currentX) * ratio;
-                                currentY += (p2.y - currentY) * ratio;
-
-                                if (isDrawing) g.lineTo(currentX, currentY);
-                                else g.moveTo(currentX, currentY);
-
-                                dashLen += step;
-                                remainingDist -= step;
-
-                                if (dashLen >= pattern[dashIdx]) {
-                                    dashLen = 0;
-                                    dashIdx = (dashIdx + 1) % pattern.length;
-                                    isDrawing = !isDrawing;
-                                }
-                            }
-                        }
-                    }
+                    this.#drawVectorPath(g, pts, region.lineStyle, region.lineThickness, isClosed);
                 }
 
                 // 3. Draw Edit Nodes
                 if (isEditMode) {
                     const isActive = region.id === activeRegionId;
-                    const nodeColor = isActive ? 0x00e5ff : 0xffffff;
-
-                    region.points.forEach((pt, index) => {
-                        const isLast = isActive && index === region.points.length - 1;
-
-                        const node = new PIXI.Graphics();
-                        node.beginFill(nodeColor, 0.6);
-                        node.lineStyle(2, 0x000000, 0.6);
-                        node.drawCircle(0, 0, isLast ? 8 : 5);
-                        node.endFill();
-                        node.x = pt.x;
-                        node.y = pt.y;
-
-                        this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
-                        layerContainer.addChild(node);
-                    });
+                    this.#renderEditNodes(region.points, layerContainer, isActive);
                 }
             });
         });
     }
 
     /**
-     * Frames the viewport to encompass a specific array of coordinates.
+     * Frames the viewport to encompass a specific array of coordinates
+     * and fires a temporary animated highlight box around the true bounds.
      */
     zoomToFeature(points) {
         if (!points || points.length === 0 || !this.stage) return;
@@ -1247,21 +1120,67 @@ export class StudioCanvas {
             if (points[i].y > maxY) maxY = points[i].y;
         }
 
-        const width = Math.max(maxX - minX, MIN_BOUNDS_SIZE);
-        const height = Math.max(maxY - minY, MIN_BOUNDS_SIZE);
+        // Separate the true visual dimensions from the padded camera bounding box
+        const trueWidth = maxX - minX;
+        const trueHeight = maxY - minY;
+        const centerX = minX + trueWidth / 2;
+        const centerY = minY + trueHeight / 2;
 
-        const centerX = minX + width / 2;
-        const centerY = minY + height / 2;
+        const zoomWidth = Math.max(trueWidth, MIN_BOUNDS_SIZE);
+        const zoomHeight = Math.max(trueHeight, MIN_BOUNDS_SIZE);
 
         // Calculate scale to fit with padding, constrained by maximum zoom limits
-        const scaleX = this.app.screen.width / (width * PADDING_FACTOR);
-        const scaleY = this.app.screen.height / (height * PADDING_FACTOR);
+        const scaleX = this.app.screen.width / (zoomWidth * PADDING_FACTOR);
+        const scaleY = this.app.screen.height / (zoomHeight * PADDING_FACTOR);
         const targetScale = Math.min(scaleX, scaleY, MAX_ZOOM_SCALE);
 
         // Apply transforms directly to the PIXI stage
         this.stage.scale.set(targetScale);
         this.stage.position.x = this.app.screen.width / 2 - centerX * targetScale;
         this.stage.position.y = this.app.screen.height / 2 - centerY * targetScale;
+
+        // Ensure interactive edit nodes shrink to match the new zoom level
+        this.#updateNodeScales();
+
+        // --- Animated Target Highlight ---
+        const invScale = 1 / targetScale;
+        const pad = 30 * invScale; // Keeps the visual padding exactly 30px thick at any zoom
+
+        const highlight = new PIXI.Graphics();
+        highlight.lineStyle(4 * invScale, 0x00e5ff, 1);
+        highlight.beginFill(0x00e5ff, 0.15);
+        highlight.drawRoundedRect(-trueWidth / 2 - pad, -trueHeight / 2 - pad, trueWidth + pad * 2, trueHeight + pad * 2, 12 * invScale);
+        highlight.endFill();
+
+        highlight.x = centerX;
+        highlight.y = centerY;
+        this.stage.addChild(highlight);
+
+        // Fire a self-cleaning animation loop directly into the PIXI ticker
+        let elapsed = 0;
+        const duration = 90; // Approx 1.5 seconds at 60fps
+
+        const tick = () => {
+            // Safety escape if the user closes the app mid-animation
+            if (highlight.destroyed) {
+                this.app.ticker.remove(tick);
+                return;
+            }
+
+            elapsed++;
+            const progress = elapsed / duration;
+
+            // Ease-out fade combined with a gentle outward expansion
+            highlight.alpha = 1 - Math.pow(progress, 2);
+            highlight.scale.set(1 + progress * 0.15);
+
+            if (elapsed >= duration) {
+                highlight.destroy();
+                this.app.ticker.remove(tick);
+            }
+        };
+
+        this.app.ticker.add(tick);
     }
 
     async updateReferenceImage(url, x, y, scale, alpha) {
@@ -1809,27 +1728,174 @@ export class StudioCanvas {
                     join: PIXI.LINE_JOIN.ROUND,
                     cap: PIXI.LINE_CAP.ROUND,
                 });
-                this.vectorGraphics.moveTo(spline[0].x, spline[0].y);
-                for (let i = 1; i < spline.length; i++) {
-                    this.vectorGraphics.lineTo(spline[i].x, spline[i].y);
-                }
+                this.#drawVectorPath(this.vectorGraphics, spline, "solid", 3);
             }
 
             // 2. Draw Edit Nodes LAST so they always render on top of the geometry
             if (isEditMode) {
                 const isActive = fault.id === activeFaultId;
-                const nodeColor = isActive ? 0x00e5ff : 0xffffff;
-
-                fault.points.forEach((pt, index) => {
-                    const isLast = isActive && index === fault.points.length - 1;
-
-                    this.vectorGraphics.beginFill(nodeColor, 0.6);
-                    this.vectorGraphics.lineStyle(2, 0x000000, 0.6);
-                    this.vectorGraphics.drawCircle(pt.x, pt.y, isLast ? 8 : 5);
-                    this.vectorGraphics.endFill();
-                    this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: 10 });
-                });
+                this.#renderEditNodes(fault.points, this.vectorGraphics, isActive);
             }
         });
+    }
+
+    renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null) {
+        if (!this.manualRiverGraphics) return;
+
+        // Aggressively purge memory and nested nodes to prevent WebGL leaks
+        this.manualRiverGraphics.clear();
+        this.manualRiverGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
+
+        if (!this.layers.features || !isEditMode) return;
+
+        for (const river of rivers) {
+            if (!this.#isVisibleInCurrentPass(river.visibility, "all", false) || !river.points || river.points.length === 0) continue;
+
+            const isActive = river.id === activeRiverId;
+            const lineColor = isActive ? 0x00e5ff : 0x78aad2;
+
+            this.manualRiverGraphics.lineStyle(2, lineColor, 0.8);
+
+            // Draw Catmull-Rom spline
+            const points = river.points;
+            if (points.length === 1) {
+                this.manualRiverGraphics.drawCircle(points[0].x, points[0].y, 2);
+            } else {
+                this.#drawVectorPath(this.manualRiverGraphics, points, "solid", 2);
+            }
+
+            // Draw edit nodes
+            if (isEditMode) {
+                const isActive = river.id === activeRiverId;
+                this.#renderEditNodes(points, this.manualRiverGraphics, isActive);
+            }
+        }
+    }
+
+    /**
+     * Centralised factory to spawn interactive vector nodes, automatically applying inverse scale.
+     */
+    #createEditNode(parentContainer, x, y, isLast, isActive) {
+        const nodeColor = isActive ? 0x00e5ff : 0xffffff;
+        const node = new PIXI.Graphics();
+
+        node.beginFill(nodeColor, 0.6);
+        node.lineStyle(2, 0x000000, 0.6);
+        node.drawCircle(0, 0, isLast ? 8 : 5);
+        node.endFill();
+
+        node.x = x;
+        node.y = y;
+        node.isEditNode = true; // Tag for the scale sweeper
+
+        // Immediately apply inverse scaling so it spawns at the correct visual size
+        node.scale.set(1 / (this.stage.scale.x || 1));
+        parentContainer.addChild(node);
+    }
+
+    /**
+     * Centralised helper to generate edit nodes and interactive hit targets for any vector array.
+     */
+    #renderEditNodes(points, parentContainer, isActive) {
+        if (!points || points.length === 0) return;
+
+        const hitRadius = 10 / (this.stage.scale.x || 1);
+
+        points.forEach((pt, index) => {
+            const isLast = isActive && index === points.length - 1;
+            this.#createEditNode(parentContainer, pt.x, pt.y, isLast, isActive);
+            this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: hitRadius });
+        });
+    }
+
+    /**
+     * Acts as a dictionary for dash geometries.
+     */
+    #getLinePattern(style, thickness) {
+        if (style === "dotted") return [thickness, thickness * 2];
+        if (style === "dashdot") return [thickness * 4, thickness * 2, thickness, thickness * 2];
+        return [thickness * 4, thickness * 3]; // Default to dashed
+    }
+
+    /**
+     * Dedicated inner loop processor. Mutates the 'state' object reference
+     * to persist pattern progress across multiple line segments.
+     */
+    #drawDashSegment(graphics, p1, p2, pattern, state) {
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        if (dist === 0) return;
+
+        let remainingDist = dist;
+        let currentX = p1.x;
+        let currentY = p1.y;
+
+        while (remainingDist > 0) {
+            const step = Math.min(remainingDist, pattern[state.dashIdx] - state.dashLen);
+            const ratio = step / remainingDist;
+
+            currentX += (p2.x - currentX) * ratio;
+            currentY += (p2.y - currentY) * ratio;
+
+            if (state.isDrawing) graphics.lineTo(currentX, currentY);
+            else graphics.moveTo(currentX, currentY);
+
+            state.dashLen += step;
+            remainingDist -= step;
+
+            if (state.dashLen >= pattern[state.dashIdx]) {
+                state.dashLen = 0;
+                state.dashIdx = (state.dashIdx + 1) % pattern.length;
+                state.isDrawing = !state.isDrawing;
+            }
+        }
+    }
+
+    /**
+     * Unified vector path generator.
+     */
+    #drawVectorPath(graphics, points, style, thickness, isClosed = false) {
+        if (!points || points.length < 2) return;
+
+        graphics.moveTo(points[0].x, points[0].y);
+
+        if (style === "solid") {
+            for (let i = 1; i < points.length; i++) {
+                graphics.lineTo(points[i].x, points[i].y);
+            }
+            if (isClosed) graphics.closePath();
+            return;
+        }
+
+        const pattern = this.#getLinePattern(style, thickness);
+
+        // Pass this state object by reference into the segment helper so the dash sequence remains continuous across sharp corners.
+        const state = { dashIdx: 0, dashLen: 0, isDrawing: true };
+        const limit = isClosed ? points.length + 1 : points.length;
+
+        for (let i = 1; i < limit; i++) {
+            const p1 = points[(i - 1) % points.length];
+            const p2 = points[i % points.length];
+            this.#drawDashSegment(graphics, p1, p2, pattern, state);
+        }
+    }
+
+    /**
+     * Sweeps the stage and forcefully inverts the scale of all edit nodes.
+     */
+    #updateNodeScales() {
+        const invScale = 1 / (this.stage.scale.x || 1);
+
+        const scaleNodes = (container) => {
+            if (!container?.children) return;
+            for (const child of container.children) {
+                if (child.isEditNode) {
+                    child.scale.set(invScale);
+                } else if (child instanceof PIXI.Container) {
+                    scaleNodes(child);
+                }
+            }
+        };
+
+        scaleNodes(this.stage);
     }
 }

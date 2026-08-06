@@ -1,4 +1,4 @@
-<div class="fwmb-tool-content fwmb-scrollable">
+<div class="fwmb-tool-content fwmb-fixed-lists">
     <div class="fwmb-panel-header-row">
         <label class="fwmb-title">{{localize "FILRODENSWMB.UI.LayerRegions"}}</label>
         <button type="button" class="fwmb-btn" data-action="addRegionLayer">
@@ -7,7 +7,7 @@
     </div>
 
     {{#each regionLayers}}
-    <div class="fwmb-accordion-group" data-layer-id="{{this.id}}">
+    <div class="fwmb-accordion-group fwmb-scrollable" data-layer-id="{{this.id}}">
         
         <div class="fwmb-list-item fwmb-layer-header" style="{{#if this.isActive}}border-color: var(--fwmb-color-text-accent); background: var(--fwmb-bg-hover);{{/if}}">
             <div class="fwmb-list-item-content">
