@@ -412,8 +412,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             id: id,
             label: label,
         }));
-        context.tectonicFaults = [...(this.tectonicFaults || [])];
-        context.manualRivers = [...(this.manualRivers || [])];
+
+        const alphaSort = (a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+
+        context.tectonicFaults = [...(this.tectonicFaults || [])].sort(alphaSort);
+        context.manualRivers = [...(this.manualRivers || [])].sort(alphaSort);
 
         context.uiState = this.uiState;
         context.currentSaveName = this.currentSaveName;
@@ -436,9 +439,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
-
-            const alphaSort = (a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
-
             context.mapPins = (this.mapPins || []).filter((p) => !!p.icon).sort(alphaSort);
             context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort);
             context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort);
@@ -1777,6 +1777,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     thickness: this.uiState.routeThickness,
                     style: this.uiState.routeStyle,
                     visibility: "all",
+                    label: {
+                        visibility: "none",
+                        fontSize: 0.5,
+                    },
                 };
                 this.mapRoutes.push(newRoute);
             }
