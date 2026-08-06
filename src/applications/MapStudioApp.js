@@ -2780,9 +2780,39 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             render: (event) => {
                 const app = event.target;
                 const html = app.element;
+
+                // 1. Bind Scale Slider
                 const range = html.querySelector('input[name="pinScale"]');
                 const output = html.querySelector("output");
                 if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
+
+                // 2. Bind Custom Icon Select
+                const trigger = html.querySelector("#fwmb-edit-pin-select .fwmb-select-trigger");
+                const optionsMenu = html.querySelector("#fwmb-edit-pin-select .fwmb-select-options");
+                const hiddenInput = html.querySelector("#fwmb-edit-pin-icon-input");
+                const triggerIcon = html.querySelector("#fwmb-edit-pin-trigger-icon");
+
+                if (trigger && optionsMenu) {
+                    trigger.addEventListener("click", () => optionsMenu.classList.toggle("fwmb-hidden"));
+
+                    const optionBtns = optionsMenu.querySelectorAll("button");
+                    optionBtns.forEach((btn) => {
+                        btn.addEventListener("click", (e) => {
+                            const newIcon = btn.dataset.icon;
+
+                            // Update hidden form data and visible trigger
+                            hiddenInput.value = newIcon;
+                            triggerIcon.className = `fwmb-icon ${newIcon}`;
+
+                            // Update active highlight states
+                            optionBtns.forEach((b) => b.classList.remove("active"));
+                            btn.classList.add("active");
+
+                            // Close dropdown
+                            optionsMenu.classList.add("fwmb-hidden");
+                        });
+                    });
+                }
             },
             ok: {
                 callback: (event, button, dialog) => {

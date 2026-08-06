@@ -10,13 +10,24 @@
         <textarea class="fwmb-scrollable stable" name="pinDesc" rows="4">{{pin.description}}</textarea>
     </div>
 
-    <div class="form-group">
+    <div class="form-group" style="display: flex; gap: var(--fwmb-space-xs);">
         <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
-        <select name="pinIcon">
-            {{#each icons}}
-                <option value="{{this.key}}" {{#if this.selected}}selected{{/if}}>{{this.localized}}</option>
-            {{/each}}
-        </select>
+        <input type="hidden" name="pinIcon" value="{{pin.icon}}" id="fwmb-edit-pin-icon-input" />
+        
+        <div class="fwmb-custom-select" id="fwmb-edit-pin-select">
+            <div class="fwmb-select-trigger" style="cursor: pointer;">
+                <i class="fwmb-icon {{pin.icon}}" id="fwmb-edit-pin-trigger-icon"></i>
+                <i class="fwmb-icon arrow-drop-down"></i>
+            </div>
+            <!-- Override absolute positioning to create an inline accordion expansion -->
+            <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden" style="position: relative; top: 0; left: 0; width: 100%; margin-block-start: var(--fwmb-space-s); box-shadow: none;">
+                {{#each icons}}
+                <button type="button" class="fwmb-btn {{#if this.selected}}active{{/if}}" data-icon="{{this.key}}" data-tooltip="{{this.localized}}">
+                    <i class="fwmb-icon {{this.key}}" alt="{{this.localized}}"></i>
+                </button>
+                {{/each}}
+            </div>
+        </div>
     </div>
 
     <div class="form-group">

@@ -170,7 +170,7 @@
     "FILRODENSWMB.UI.EditInfrastructure": "Edit Infrastructure",
     "FILRODENSWMB.UI.SnapToPoints": "Snap to Points",
     "FILRODENSWMB.UI.PointsOfInterest": "Points of Interest",
-    "FILRODENSWMB.UI.SelectIcon": "Select Marker Icon",
+    "FILRODENSWMB.UI.SelectIcon": "Select Icon",
     "FILRODENSWMB.UI.IconScale": "Icon Scale",
     "FILRODENSWMB.UI.NoPoints": "No points placed.",
     "FILRODENSWMB.UI.Routes": "Routes",
@@ -387,5 +387,26 @@
     "FILRODENSWMB.UI.NoManualRivers": "No custom rivers have been drawn yet.",
 
     "FILRODENSWMB.UI.Promote": "Clone as New",
-    "FILRODENSWMB.UI.PromoteConfirm": "Clone this regional map to a standalone master map?"
+    "FILRODENSWMB.UI.PromoteConfirm": "Clone this regional map to a standalone master map?",
+
+    "FILRODENSWMB.ICONS.BroadleavedTree": "Broadleaved Tree",
+    "FILRODENSWMB.ICONS.Campsite": "Campsite",
+    "FILRODENSWMB.ICONS.Cannon": "Cannon",
+    "FILRODENSWMB.ICONS.ClassicalBuilding": "Classical Building",
+    "FILRODENSWMB.ICONS.ConiferTree": "Conifer Tree",
+    "FILRODENSWMB.ICONS.Dagger": "Dagger",
+    "FILRODENSWMB.ICONS.DotRaysRight": "Radiating Dot (Right)",
+    "FILRODENSWMB.ICONS.DotRaysUp": "Radiating Dot (Up)",
+    "FILRODENSWMB.ICONS.ExclamationPoint": "Exclamation Mark",
+    "FILRODENSWMB.ICONS.Fence": "Fence",
+    "FILRODENSWMB.ICONS.FlagstickPennant": "Flagstick",
+    "FILRODENSWMB.ICONS.GableRoofedShelter": "Shelter",
+    "FILRODENSWMB.ICONS.Gravestone": "Gravestone",
+    "FILRODENSWMB.ICONS.Lighthouse": "Lighthouse",
+    "FILRODENSWMB.ICONS.MemorialStone": "Memorial Stone",
+    "FILRODENSWMB.ICONS.MesoamericanPyramid": "Mesoamerican Pyramid",
+    "FILRODENSWMB.ICONS.ObservatoryDome": "Observatory",
+    "FILRODENSWMB.ICONS.Palace": "Palace",
+    "FILRODENSWMB.ICONS.QuestionMark": "Question Mark",
+    "FILRODENSWMB.ICONS.WallTent": "Tent"
 }

@@ -119,6 +119,26 @@
 .fwmb-icon.place_of_worship_building      { --fwmb-mask: url('../assets/pinhead-icons/place_of_worship_building.svg'); }
 .fwmb-icon.shipwreck_in_water             { --fwmb-mask: url('../assets/pinhead-icons/shipwreck_in_water.svg'); }
 .fwmb-icon.skull                          { --fwmb-mask: url('../assets/pinhead-icons/skull.svg'); }
+.fwmb-icon.broadleaved_tree               { --fwmb-mask: url('../assets/pinhead-icons/broadleaved_tree.svg'); }
+.fwmb-icon.campsite                       { --fwmb-mask: url('../assets/pinhead-icons/campsite.svg'); }
+.fwmb-icon.cannon                         { --fwmb-mask: url('../assets/pinhead-icons/cannon.svg'); }
+.fwmb-icon.classical_building             { --fwmb-mask: url('../assets/pinhead-icons/classical_building.svg'); }
+.fwmb-icon.conifer_tree                   { --fwmb-mask: url('../assets/pinhead-icons/conifer_tree.svg'); }
+.fwmb-icon.dagger                         { --fwmb-mask: url('../assets/pinhead-icons/dagger.svg'); }
+.fwmb-icon.dot_with_rays_right            { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_right.svg'); }
+.fwmb-icon.dot_with_rays_up               { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_up.svg'); }
+.fwmb-icon.exclamation_point              { --fwmb-mask: url('../assets/pinhead-icons/exclamation_point.svg'); }
+.fwmb-icon.fence                          { --fwmb-mask: url('../assets/pinhead-icons/fence.svg'); }
+.fwmb-icon.flagstick_with_pennant         { --fwmb-mask: url('../assets/pinhead-icons/flagstick_with_pennant.svg'); }
+.fwmb-icon.gable_roofed_shelter           { --fwmb-mask: url('../assets/pinhead-icons/gable_roofed_shelter.svg'); }
+.fwmb-icon.gravestone                     { --fwmb-mask: url('../assets/pinhead-icons/gravestone.svg'); }
+.fwmb-icon.lighthouse                     { --fwmb-mask: url('../assets/pinhead-icons/lighthouse.svg'); }
+.fwmb-icon.memorial_stone                 { --fwmb-mask: url('../assets/pinhead-icons/memorial_stone.svg'); }
+.fwmb-icon.mesoamerican_pyramid           { --fwmb-mask: url('../assets/pinhead-icons/mesoamerican_pyramid.svg'); }
+.fwmb-icon.observatory_dome               { --fwmb-mask: url('../assets/pinhead-icons/observatory_dome.svg'); }
+.fwmb-icon.palace                         { --fwmb-mask: url('../assets/pinhead-icons/palace.svg'); }
+.fwmb-icon.question_mark                  { --fwmb-mask: url('../assets/pinhead-icons/question_mark.svg'); }
+.fwmb-icon.wall_tent                      { --fwmb-mask: url('../assets/pinhead-icons/wall_tent.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
