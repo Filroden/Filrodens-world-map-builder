@@ -147,6 +147,7 @@ export const FILRODENSWMB = {
         gable_roofed_shelter: "FILRODENSWMB.ICONS.GableRoofedShelter",
         geyser_from_ground: "FILRODENSWMB.ICONS.Geyser",
         gravestone: "FILRODENSWMB.ICONS.Gravestone",
+        jp_landmark: "FILRODENSWMB.ICONS.JPLandmark",
         lighthouse: "FILRODENSWMB.ICONS.Lighthouse",
         map_pin: "FILRODENSWMB.ICONS.MapPin",
         map_pin_outline: "FILRODENSWMB.ICONS.MapPinOutline",
