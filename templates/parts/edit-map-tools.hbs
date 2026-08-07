@@ -5,6 +5,12 @@
         {{/each}}
     </datalist>
 
+    <datalist id="fwmb-standard-colors">
+        {{#each labelColorPalette}}
+            <option value="{{this}}"></option>
+        {{/each}}
+    </datalist>
+
     <div class="fwmb-brush-settings">
         <div class="fwmb-brush-setting" data-tool-group="terrain biomes">
             <label>{{localize "FILRODENSWMB.UI.BrushSize"}}</label>
@@ -144,7 +150,7 @@
 
         <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-pin">
             <label>{{localize "FILRODENSWMB.UI.PinColor"}}</label>
-            <input type="color" class="fwmb-swatch fwmb-wide" name="pinColor" value="{{lookup uiState 'pinColor'}}" />
+            <input type="color" class="fwmb-swatch fwmb-wide" name="pinColor" value="{{lookup uiState 'pinColor'}}" list="fwmb-standard-colors" />
         </div>
 
         <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-pin">
@@ -173,7 +179,7 @@
 
         <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-route">
             <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
-            <input type="color" class="fwmb-swatch fwmb-wide" name="routeColor" value="{{lookup uiState 'routeColor'}}" style="height: 24px; padding: 0;" />
+            <input type="color" class="fwmb-swatch fwmb-wide" name="routeColor" value="{{lookup uiState 'routeColor'}}" style="height: 24px; padding: 0;" list="fwmb-standard-colors" />
         </div>
 
         <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="infrastructure-route">
@@ -289,8 +295,59 @@
         </button>
     </div>
 
-    <div class="fwmb-hint fwmb-centered" data-tool-group="labels">
-        {{localize "FILRODENSWMB.UI.LabelHelpText"}}
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="labels" style="width: fit-content; max-width: 60ch;">
+        <label>{{localize "FILRODENSWMB.UI.LabelText"}}</label>
+        <input type="text" class="fwmb-wide" name="nextLabelText" value="{{lookup uiState 'nextLabelText'}}" />
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="labels">
+        <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
+        <select name="activeLabelQuickStyle">
+            <option value="custom" {{#if (eq uiState.activeLabelQuickStyle "custom")}}selected{{/if}}>
+                {{localize "FILRODENSWMB.UI.Custom"}}
+            </option>
+            {{#each customLabelStyles}}
+                <option value="{{this.id}}" {{#if (eq ../uiState.activeLabelQuickStyle this.id)}}selected{{/if}}>
+                    {{this.name}}
+                </option>
+            {{/each}}
+        </select>
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="labels">
+        <label>{{localize "FILRODENSWMB.UI.FontFamily"}}</label>
+        <select name="labelFontFamily">
+            {{#each fontFamilies}}
+                <option value="{{this}}" {{#if (eq ../uiState.labelFontFamily this)}}selected{{/if}}>{{this}}</option>
+            {{/each}}
+        </select>
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="labels">
+        <label>{{localize "FILRODENSWMB.UI.FontSize"}}</label>
+        <div class="fwmb-slider-group">
+            <input type="range" name="labelFontSize" value="{{lookup uiState 'labelFontSize'}}" min="0.2" max="5.0" step="0.1" oninput="this.nextElementSibling.value = this.value" />
+            <output>{{lookup uiState "labelFontSize"}}</output>
+        </div>
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="labels">
+        <label>{{localize "FILRODENSWMB.UI.FontColor"}}</label>
+        <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{lookup uiState 'labelFillColor'}}" style="height: 24px; padding: 0;" list="fwmb-standard-colors" />
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="labels">
+        <label>{{localize "FILRODENSWMB.UI.MaxWidth"}}</label>
+        <input type="number" class="fwmb-wide" name="labelMaxWidth" value="{{lookup uiState 'labelMaxWidth'}}" min="0" step="10" placeholder="0 = No Limit" />
+    </div>
+
+    <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="labels">
+        <label>{{localize "FILRODENSWMB.UI.Justify"}}</label>
+        <select name="labelJustify">
+            <option value="left" {{#if (eq uiState.labelJustify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
+            <option value="center" {{#if (eq uiState.labelJustify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
+            <option value="right" {{#if (eq uiState.labelJustify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
+        </select>
     </div>
 
     <div class="fwmb-divider-vertical" data-tool-group="terrain biomes features infrastructure regions labels cartography"></div>

@@ -1273,7 +1273,8 @@ export class StudioCanvas {
             const fill = labelData.fillColor || "#ffffff";
             const stroke = this.#getAdaptiveStrokeColor(fill);
 
-            const style = new PIXI.TextStyle({
+            // 1. Setup Base Style
+            const styleConfig = {
                 fontFamily: font,
                 fontSize: size,
                 fill: fill,
@@ -1284,7 +1285,17 @@ export class StudioCanvas {
                 dropShadowColor: stroke,
                 dropShadowBlur: 2,
                 dropShadowDistance: 2,
-            });
+            };
+
+            // 2. Apply Word Wrapping & Justification
+            const rawMaxWidth = labelData.maxWidth || 0;
+            if (rawMaxWidth > 0) {
+                styleConfig.wordWrap = true;
+                styleConfig.wordWrapWidth = rawMaxWidth * resScale;
+                styleConfig.align = labelData.justify || "left";
+            }
+
+            const style = new PIXI.TextStyle(styleConfig);
 
             const text = new PIXI.Text(name, style);
             text.anchor.set(0.5);

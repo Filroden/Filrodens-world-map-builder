@@ -174,6 +174,7 @@ export const FILRODENSWMB = {
         DEFAULT_FONT: "Signika",
         DEFAULT_SIZE: 1,
         DEFAULT_COLOR: "#DEDCD3",
+        DEFAULT_TEXT: "FILRODENSWMB.LABELS.DefaultLabel",
         PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
     },
     PINS: {

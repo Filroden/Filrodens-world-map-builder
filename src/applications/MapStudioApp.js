@@ -22,6 +22,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         actions: {
             addCustomBiome: MapStudioApp.#onAddCustomBiome,
             addDecoration: MapStudioApp.#onAddDecoration,
+            addLabelQuickStyle: MapStudioApp.#onAddLabelQuickStyle,
             addRegionLayer: MapStudioApp.#onAddRegionLayer,
             addRouteQuickStyle: MapStudioApp.#onAddRouteQuickStyle,
             adjustNoiseScale: MapStudioApp.#onAdjustNoiseScale,
@@ -32,6 +33,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteDecoration: MapStudioApp.#onDeleteEntity,
             deleteFault: MapStudioApp.#onDeleteEntity,
             deleteLabel: MapStudioApp.#onDeleteEntity,
+            deleteLabelQuickStyle: MapStudioApp.#onDeleteLabelQuickStyle,
             deletePin: MapStudioApp.#onDeleteEntity,
             deleteRegion: MapStudioApp.#onDeleteRegion,
             deleteRegionLayer: MapStudioApp.#onDeleteEntity,
@@ -41,6 +43,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             editDecoration: MapStudioApp.#onEditDecoration,
             editFault: MapStudioApp.#onEditFault,
             editLabel: MapStudioApp.#onEditLabel,
+            editLabelQuickStyle: MapStudioApp.#onEditLabelQuickStyle,
             editPin: MapStudioApp.#onEditPin,
             editRegion: MapStudioApp.#onEditRegion,
             editRegionLayer: MapStudioApp.#onEditRegionLayer,
@@ -278,6 +281,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             labelFontFamily: FILRODENSWMB.LABELS?.DEFAULT_FONT,
             labelFontSize: FILRODENSWMB.LABELS?.DEFAULT_SIZE,
             labelFillColor: FILRODENSWMB.LABELS?.DEFAULT_COLOR,
+            labelMaxWidth: 0,
+            labelJustify: "left",
+            activeLabelQuickStyle: "custom",
+            nextLabelText: game.i18n.localize(FILRODENSWMB.LABELS?.DEFAULT_TEXT) || "New Label",
+            customLabelStyles: [],
 
             cartographyScaleEnable: false,
             cartographyScaleUnits: "Miles",
@@ -435,7 +443,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             isCustom: true,
         }));
 
-        context.customRouteStyles = this.uiState.customRouteStyles || [];
+        context.customRouteStyles = [...(this.uiState.customRouteStyles || [])].sort(alphaSort);
+        context.customLabelStyles = [...(this.uiState.customLabelStyles || [])].sort(alphaSort);
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
@@ -462,8 +471,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             // Sort the unified list alphabetically by name
             context.autoLabels = autoLabels.toSorted(alphaSort);
-
             context.fontFamilies = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
+            context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
             if (this.regionLayers.length > 0 && !this.activeRegionLayerId) {
                 this.activeRegionLayerId = this.regionLayers[0].id;
@@ -891,13 +900,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.#pushVectorState();
             this.mapLabels.push({
                 id: foundry.utils.randomID(),
-                name: "New Label",
+                name: this.uiState.nextLabelText || "New Label",
                 x: x,
                 y: y,
                 rotation: 0,
+                quickStyle: this.uiState.activeLabelQuickStyle,
                 fontFamily: this.uiState.labelFontFamily,
                 fontSize: this.uiState.labelFontSize,
                 fillColor: this.uiState.labelFillColor,
+                maxWidth: this.uiState.labelMaxWidth,
+                justify: this.uiState.labelJustify,
                 visibility: "all",
             });
 
@@ -1571,6 +1583,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState.customBiomes = payload.customBiomes || [];
         this.uiState.customRouteStyles = payload.customRouteStyles || [];
+        this.uiState.customLabelStyles = payload.customLabelStyles || [];
 
         this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
@@ -1670,7 +1683,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #syncDOMToState() {
-        // 1. Hydrate dynamic <select> options to guarantee they exist before values are applied
+        // Hydrate dynamic <select> options to guarantee they exist before values are applied
         const styleSelect = this.element.querySelector('select[name="activeRouteQuickStyle"]');
         if (styleSelect) {
             (this.uiState.customRouteStyles || []).forEach((style) => {
@@ -1679,6 +1692,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     opt.value = style.id;
                     opt.textContent = style.name;
                     styleSelect.appendChild(opt);
+                }
+            });
+        }
+
+        // Hydrate dynamic Label Quick Style options
+        const labelStyleSelect = this.element.querySelector('select[name="activeLabelQuickStyle"]');
+        if (labelStyleSelect) {
+            (this.uiState.customLabelStyles || []).forEach((style) => {
+                if (!labelStyleSelect.querySelector(`option[value="${style.id}"]`)) {
+                    const opt = document.createElement("option");
+                    opt.value = style.id;
+                    opt.textContent = style.name;
+                    labelStyleSelect.appendChild(opt);
                 }
             });
         }
@@ -1695,12 +1721,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             });
         }
 
-        // 2. Sync all inputs and sliders
+        // Sync all inputs and sliders
         for (const [key, value] of Object.entries(this.uiState)) {
             const input = this.element.querySelector(`[name="${key}"]`);
             if (!input) continue;
 
-            // --- Safely route specific input types ---
+            // Route specific input types
             if (input.type === "color" && value === "transparent") {
                 input.value = "#000000"; // Fallback to silence browser warning
             } else if (input.type === "checkbox") {
@@ -1978,6 +2004,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 params: params,
                 customBiomes: this.uiState.customBiomes,
                 customRouteStyles: this.uiState.customRouteStyles,
+                customLabelStyles: this.uiState.customLabelStyles,
                 history: this.brushEngine?.history || [],
                 tectonicFaults: this.tectonicFaults,
                 manualRivers: this.manualRivers,
@@ -2109,6 +2136,60 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    static async #onAddLabelQuickStyle(event, target) {
+        const defaultStyle = {
+            name: "New Label Style",
+            fontFamily: this.uiState.labelFontFamily || "Signika",
+            fontSize: this.uiState.labelFontSize || 1,
+            fillColor: this.uiState.labelFillColor || "#000000",
+            maxWidth: this.uiState.labelMaxWidth || 0,
+            justify: this.uiState.labelJustify || "left",
+        };
+
+        const fonts = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
+        const palette = FILRODENSWMB.LABELS?.PRESETS || [];
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-label-quick-style.hbs", {
+            style: defaultStyle,
+            fonts,
+            palette,
+        });
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.AddLabelQuickStyle") || "Add Label Style" },
+            content: content,
+            render: (event) => {
+                const html = event.target.element;
+                const range = html.querySelector('input[name="styleFontSize"]');
+                const output = html.querySelector("output");
+                if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
+
+                const colorInput = html.querySelector('input[name="styleFillColor"]');
+            },
+            ok: {
+                callback: (evt, button) => {
+                    return {
+                        name: button.form.elements["styleName"].value.trim() || "New Style",
+                        fontFamily: button.form.elements["styleFontFamily"].value,
+                        fontSize: Number(button.form.elements["styleFontSize"].value) || 1,
+                        fillColor: button.form.elements["styleFillColor"].value,
+                        maxWidth: Number(button.form.elements["styleMaxWidth"].value) || 0,
+                        justify: button.form.elements["styleJustify"].value,
+                    };
+                },
+            },
+        });
+
+        if (result) {
+            const id = foundry.utils.randomID();
+            this.uiState.customLabelStyles.push({ id, ...result });
+
+            this.markDirty();
+            this.render({ parts: ["context", "toolbar"] });
+        }
+    }
+
     static #onAddRegionLayer(event, target) {
         const id = foundry.utils.randomID();
         this.regionLayers.push({ id: id, name: `Region Layer ${this.regionLayers.length + 1}`, visibility: "all", regions: [] });
@@ -2120,7 +2201,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Provide a default template state for new styles
         const defaultStyle = { name: "New Quick Style", color: "#ffffff", thickness: 3, style: "solid" };
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs", { style: defaultStyle });
+        const palette = FILRODENSWMB.LABELS?.PRESETS || [];
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs", { style: defaultStyle, palette });
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
@@ -2488,6 +2570,46 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.markDirty();
     }
 
+    static async #onDeleteLabelQuickStyle(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
+            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
+            rejectClose: false,
+            modal: true,
+        });
+
+        if (!confirmed) return;
+
+        this.#pushVectorState();
+
+        // 1. Remove from registry
+        this.uiState.customLabelStyles = this.uiState.customLabelStyles.filter((s) => s.id !== id);
+
+        // 2. Disconnect existing standalone labels gracefully
+        for (const lbl of this.mapLabels) {
+            if (lbl.quickStyle === id) lbl.quickStyle = "custom";
+        }
+
+        // 3. Disconnect existing attached auto-labels gracefully
+        const disconnectAttachedLabel = (entity) => {
+            if (entity.label && entity.label.quickStyle === id) entity.label.quickStyle = "custom";
+        };
+        this.mapPins.forEach(disconnectAttachedLabel);
+        this.mapRoutes.forEach(disconnectAttachedLabel);
+        this.regionLayers.forEach((layer) => layer.regions.forEach(disconnectAttachedLabel));
+
+        // 4. Update active UI tool if it was using the deleted style
+        if (this.uiState.activeLabelQuickStyle === id) {
+            this.uiState.activeLabelQuickStyle = "custom";
+            this.#syncDOMToState();
+        }
+
+        this.markDirty();
+        this.render({ parts: ["context", "toolbar"] });
+    }
+
     static async #onDeleteRegion(event, target) {
         const layerId = target.closest(".fwmb-accordion-group").dataset.layerId;
         const regionId = target.closest(".fwmb-list-item").dataset.id;
@@ -2685,16 +2807,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             // Merge defaults for auto labels if they haven't been edited yet
             labelData = {
                 name: sourceObj.name,
+                quickStyle: sourceObj.label?.quickStyle || "custom",
                 fontFamily: sourceObj.label?.fontFamily || this.uiState.labelFontFamily,
                 fontSize: sourceObj.label?.fontSize || this.uiState.labelFontSize,
                 fillColor: sourceObj.label?.fillColor || this.uiState.labelFillColor,
+                maxWidth: sourceObj.label?.maxWidth ?? this.uiState.labelMaxWidth,
+                justify: sourceObj.label?.justify ?? this.uiState.labelJustify,
             };
         }
 
         const fonts = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
         const palette = FILRODENSWMB.LABELS?.PRESETS || [];
+        const customLabelStyles = this.uiState.customLabelStyles || [];
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-labels.hbs", { label: labelData, fonts, palette });
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-labels.hbs", {
+            label: labelData,
+            fonts,
+            palette,
+            customLabelStyles,
+        });
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
@@ -2704,32 +2835,56 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const app = event.target;
                 const html = app.element;
 
-                // 1. Bind Font Size Slider
-                const range = html.querySelector('input[name="labelFontSize"]');
-                const output = html.querySelector("output");
-                if (range && output) {
-                    range.addEventListener("input", (e) => (output.value = e.target.value));
-                }
-
-                // 2. Bind Preset Color Swatches
+                const quickStyleSelect = html.querySelector('select[name="labelQuickStyle"]');
+                const fontFamilySelect = html.querySelector('select[name="labelFontFamily"]');
+                const fontSizeInput = html.querySelector('input[name="labelFontSize"]');
+                const fontSizeOutput = html.querySelector("output");
                 const colorInput = html.querySelector('input[name="labelFillColor"]');
-                const swatches = html.querySelectorAll(".fwmb-preset-swatch");
-                if (colorInput && swatches.length) {
-                    swatches.forEach((swatch) => {
-                        swatch.addEventListener("click", (e) => {
-                            // Apply the preset hex to the native color picker
-                            colorInput.value = e.target.dataset.color;
-                        });
-                    });
-                }
+                const maxWidthInput = html.querySelector('input[name="labelMaxWidth"]');
+                const justifySelect = html.querySelector('select[name="labelJustify"]');
+
+                // 1. If user selects a predefined style, automatically update the manual inputs
+                quickStyleSelect?.addEventListener("change", (e) => {
+                    const styleId = e.target.value;
+                    if (styleId !== "custom") {
+                        const styleData = this.uiState.customLabelStyles.find((s) => s.id === styleId);
+                        if (styleData) {
+                            if (fontFamilySelect) fontFamilySelect.value = styleData.fontFamily;
+                            if (fontSizeInput) {
+                                fontSizeInput.value = styleData.fontSize;
+                                if (fontSizeOutput) fontSizeOutput.value = styleData.fontSize;
+                            }
+                            if (colorInput) colorInput.value = styleData.fillColor;
+                            if (maxWidthInput) maxWidthInput.value = styleData.maxWidth;
+                            if (justifySelect) justifySelect.value = styleData.justify;
+                        }
+                    }
+                });
+
+                // 2. If user manually modifies an input, instantly revert dropdown to "custom"
+                const revertToCustom = () => {
+                    if (quickStyleSelect) quickStyleSelect.value = "custom";
+                };
+
+                fontFamilySelect?.addEventListener("change", revertToCustom);
+
+                fontSizeInput?.addEventListener("input", (e) => {
+                    if (fontSizeOutput) fontSizeOutput.value = e.target.value;
+                    revertToCustom();
+                });
+
+                colorInput?.addEventListener("input", revertToCustom);
             },
             ok: {
                 callback: (evt, button) => {
                     return {
                         name: button.form.elements["labelName"].value,
+                        quickStyle: button.form.elements["labelQuickStyle"].value,
                         fontFamily: button.form.elements["labelFontFamily"].value,
                         fontSize: Number(button.form.elements["labelFontSize"].value),
                         fillColor: button.form.elements["labelFillColor"].value,
+                        maxWidth: Number(button.form.elements["labelMaxWidth"].value) || 0,
+                        justify: button.form.elements["labelJustify"].value,
                     };
                 },
             },
@@ -2737,22 +2892,111 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (result) {
             this.#pushVectorState();
+
             if (type === "custom") {
                 sourceObj.name = result.name;
+                sourceObj.quickStyle = result.quickStyle;
                 sourceObj.fontFamily = result.fontFamily;
                 sourceObj.fontSize = result.fontSize;
                 sourceObj.fillColor = result.fillColor;
+                sourceObj.maxWidth = result.maxWidth;
+                sourceObj.justify = result.justify;
             } else {
-                sourceObj.name = result.name; // Crucial: Syncs the name back to the core object
+                sourceObj.name = result.name; // Syncs the name back to the core object
                 if (!sourceObj.label) sourceObj.label = {};
+                sourceObj.label.quickStyle = result.quickStyle;
                 sourceObj.label.fontFamily = result.fontFamily;
                 sourceObj.label.fontSize = result.fontSize;
                 sourceObj.label.fillColor = result.fillColor;
+                sourceObj.label.maxWidth = result.maxWidth;
+                sourceObj.label.justify = result.justify;
             }
 
             this.#repaintVectors();
             this.render({ parts: ["context"] });
             this.markDirty();
+        }
+    }
+
+    static async #onEditLabelQuickStyle(event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const style = this.uiState.customLabelStyles.find((s) => s.id === id);
+        if (!style) return;
+
+        const fonts = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
+        const palette = FILRODENSWMB.LABELS?.PRESETS || [];
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-label-quick-style.hbs", { style, fonts, palette });
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Edit") || "Edit Label Style" },
+            content: content,
+            render: (event) => {
+                const html = event.target.element;
+                const range = html.querySelector('input[name="styleFontSize"]');
+                const output = html.querySelector("output");
+                if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
+
+                const colorInput = html.querySelector('input[name="styleFillColor"]');
+            },
+            ok: {
+                callback: (evt, button) => {
+                    return {
+                        name: button.form.elements["styleName"].value.trim() || style.name,
+                        fontFamily: button.form.elements["styleFontFamily"].value,
+                        fontSize: Number(button.form.elements["styleFontSize"].value) || 1,
+                        fillColor: button.form.elements["styleFillColor"].value,
+                        // Extract the new max width and justify properties
+                        maxWidth: Number(button.form.elements["styleMaxWidth"].value) || 0,
+                        justify: button.form.elements["styleJustify"].value,
+                    };
+                },
+            },
+        });
+
+        if (result) {
+            this.#pushVectorState();
+            Object.assign(style, result);
+
+            // 1. Cascade changes to standalone custom labels
+            for (const lbl of this.mapLabels) {
+                if (lbl.quickStyle === id) {
+                    lbl.fontFamily = result.fontFamily;
+                    lbl.fontSize = result.fontSize;
+                    lbl.fillColor = result.fillColor;
+                    lbl.maxWidth = result.maxWidth;
+                    lbl.justify = result.justify;
+                }
+            }
+
+            // 2. Cascade changes to auto-generated attached labels
+            const updateAttachedLabel = (entity) => {
+                if (entity.label && entity.label.quickStyle === id) {
+                    entity.label.fontFamily = result.fontFamily;
+                    entity.label.fontSize = result.fontSize;
+                    entity.label.fillColor = result.fillColor;
+                    entity.label.maxWidth = result.maxWidth;
+                    entity.label.justify = result.justify;
+                }
+            };
+            this.mapPins.forEach(updateAttachedLabel);
+            this.mapRoutes.forEach(updateAttachedLabel);
+            this.regionLayers.forEach((layer) => layer.regions.forEach(updateAttachedLabel));
+
+            // 3. Update the global UI state if this style is currently active
+            if (this.uiState.activeLabelQuickStyle === id) {
+                this.uiState.labelFontFamily = result.fontFamily;
+                this.uiState.labelFontSize = result.fontSize;
+                this.uiState.labelFillColor = result.fillColor;
+                this.uiState.labelMaxWidth = result.maxWidth;
+                this.uiState.labelJustify = result.justify;
+                this.#syncDOMToState();
+            }
+
+            this.#repaintVectors();
+            this.markDirty();
+            this.render({ parts: ["context", "toolbar"] });
         }
     }
 
@@ -2770,8 +3014,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             .sort((a, b) => a.localized.localeCompare(b.localized));
 
         const safePin = { ...pin, scale: pin.scale ?? 1 };
+        const palette = FILRODENSWMB.LABELS?.PRESETS || []; // Extract presets
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs", { pin: safePin, icons });
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs", { pin: safePin, icons, palette });
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
@@ -2960,6 +3205,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const context = {
             route: safeRoute,
             customRouteStyles: this.uiState.customRouteStyles || [],
+            palette: FILRODENSWMB.LABELS?.PRESETS || [],
         };
 
         const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs", context);
@@ -3045,7 +3291,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!style) return;
 
         // Pass the existing style object to prepopulate the template
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs", { style });
+        const palette = FILRODENSWMB.LABELS?.PRESETS || [];
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs", { style: style, palette });
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
@@ -3369,6 +3616,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 params: newParams,
                 customBiomes: state.customBiomes,
                 customRouteStyles: state.customRouteStyles,
+                customLabelStyles: state.customLabelStyles,
                 history: newHistory,
                 tectonicFaults: newFaults,
                 manualRivers: newRivers,

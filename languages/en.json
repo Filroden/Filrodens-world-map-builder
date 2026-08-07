@@ -232,7 +232,7 @@
     "FILRODENSWMB.UI.LabelHelpText": "Click to add a new label. Drag labels to reposition them. Use the scroll wheel while dragging to rotate them.",
     "FILRODENSWMB.UI.LabelText": "Label Text",
     "FILRODENSWMB.UI.FontFamily": "Font Family",
-    "FILRODENSWMB.UI.FontSize": "Font Size (REM)",
+    "FILRODENSWMB.UI.FontSize": "Font Size (rem)",
     "FILRODENSWMB.UI.FontColor": "Font Color",
     "FILRODENSWMB.UI.EditLabel": "Edit Label",
     "FILRODENSWMB.UI.NoLabels": "No custom labels have been added yet.",
@@ -405,9 +405,18 @@
     "FILRODENSWMB.ICONS.JPLandmark": "Landmark",
     "FILRODENSWMB.ICONS.Lighthouse": "Lighthouse",
     "FILRODENSWMB.ICONS.MemorialStone": "Memorial Stone",
-    "FILRODENSWMB.ICONS.MesoamericanPyramid": "Mesoamerican Pyramid",
+    "FILRODENSWMB.ICONS.MesoamericanPyramid": "Meso-american Pyramid",
     "FILRODENSWMB.ICONS.ObservatoryDome": "Observatory",
     "FILRODENSWMB.ICONS.Palace": "Palace",
     "FILRODENSWMB.ICONS.QuestionMark": "Question Mark",
-    "FILRODENSWMB.ICONS.WallTent": "Tent"
+    "FILRODENSWMB.ICONS.WallTent": "Tent",
+
+    "FILRODENSWMB.LABELS.DefaultLabel": "New Label",
+    "FILRODENSWMB.UI.SettingsLabelQuickStyles": "Label Quick Styles",
+    "FILRODENSWMB.UI.AddLabelQuickStyle": "Add Label Style",
+    "FILRODENSWMB.UI.MaxWidth": "Max Width (px)",
+    "FILRODENSWMB.UI.Justify": "Justification",
+    "FILRODENSWMB.UI.JustifyLeft": "Left",
+    "FILRODENSWMB.UI.JustifyCenter": "Center",
+    "FILRODENSWMB.UI.JustifyRight": "Right"
 }

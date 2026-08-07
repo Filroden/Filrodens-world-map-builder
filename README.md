@@ -317,10 +317,10 @@ You can change some of the map configuration settings.
 4. **Biome Colours**
    - Click the colour swatch to edit the colour of each biome.
 
-5. **Route Quick Styles**
-   - Add, edit or delete Quick Styles for Routes (line colour, thickness and style)
-   - Changing an existing Quick Style will change the style of all routes using that style.
-   - Deleting a Quick Style will preserve the existing style on routes but they can no longer be changed in bulk.
+5. **Route and Label Quick Styles**
+   - Add, edit or delete Quick Styles for Routes (line colour, thickness and style) and Labels (font, size, colour, maximum width and justification)
+   - Changing an existing Quick Style will change the style of all routes or labels using that style.
+   - Deleting a Quick Style will preserve the existing style but they can no longer be changed in bulk.
 
 ### Map Management Tools
 
@@ -389,7 +389,6 @@ The generator can be computationally heavy when calculating new terrain, moistur
 
 ## Roadmap
 
-- Add quick styles for labels (and possible for pins and regions).
 - Bulk edit vector (pins, lines, regions and text) properties.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.

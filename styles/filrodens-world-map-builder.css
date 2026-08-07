@@ -1021,7 +1021,7 @@
     height: var(--fwmb-font-size-l);
     padding: 0;
     flex-shrink: 0;
-    border-radius: 3px;
+    border-radius: var(--fwmb-radius-small);
     border: 1px solid var(--fwmb-border-main);
     box-shadow: var(--fwmb-shadow-popout);
     cursor: default;
