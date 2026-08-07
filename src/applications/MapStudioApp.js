@@ -1458,20 +1458,26 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const { currentSeed, params } = this.#getMapParameters();
         const engine = new ProceduralEngine(currentSeed);
 
-        console.log("World Map Builder | Generating Topography...");
-        const t0 = performance.now();
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
 
-        // 1. Generate base noise and tectonics ONLY (pass empty array for rivers)
-        engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, []);
+        try {
+            console.log("World Map Builder | Generating Topography...");
+            const t0 = performance.now();
 
-        await this.#rebuildFromHistory();
+            // 1. Generate base noise and tectonics ONLY (pass empty array for rivers)
+            engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, []);
 
-        this.currentSpringOverrides.fill(0);
+            await this.#rebuildFromHistory();
 
-        const t1 = performance.now();
-        console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
+            this.currentSpringOverrides.fill(0);
 
-        await this.generateClimate();
+            const t1 = performance.now();
+            console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
+
+            await this.generateClimate();
+        } finally {
+            this.#endProcessing();
+        }
     }
 
     async generateClimate() {
@@ -1479,15 +1485,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const { currentSeed, params } = this.#getMapParameters();
         const engine = new ProceduralEngine(currentSeed);
 
-        console.log("World Map Builder | Generating Climate Data...");
-        const t0 = performance.now();
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
 
-        engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params, this.currentMoistureData, this.currentTemperatureData);
+        try {
+            console.log("World Map Builder | Generating Climate Data...");
+            const t0 = performance.now();
 
-        const t1 = performance.now();
-        console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
+            engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params, this.currentMoistureData, this.currentTemperatureData);
 
-        await this.generateFeatures();
+            const t1 = performance.now();
+            console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
+
+            await this.generateFeatures();
+        } finally {
+            this.#endProcessing();
+        }
     }
 
     async generateFeatures() {
@@ -1495,49 +1507,55 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const { currentSeed, params } = this.#getMapParameters();
         const engine = new ProceduralEngine(currentSeed);
 
-        console.log("World Map Builder | Generating Features...");
-        const t0 = performance.now();
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
 
-        // Bake procedural springs into permanent pins on first load or new map generation
-        if (!this.uiState.springsBaked) {
-            const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
-            for (const s of newSprings) {
-                this.mapPins.push({
-                    id: foundry.utils.randomID(),
-                    name: "River Source",
-                    x: s.x,
-                    y: s.y,
-                    type: "spring",
-                    radius: 6,
-                    visibility: "all",
-                });
+        try {
+            console.log("World Map Builder | Generating Features...");
+            const t0 = performance.now();
+
+            // Bake procedural springs into permanent pins on first load or new map generation
+            if (!this.uiState.springsBaked) {
+                const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
+                for (const s of newSprings) {
+                    this.mapPins.push({
+                        id: foundry.utils.randomID(),
+                        name: "River Source",
+                        x: s.x,
+                        y: s.y,
+                        type: "spring",
+                        radius: 6,
+                        visibility: "all",
+                    });
+                }
+                this.uiState.springsBaked = true;
+                this.markDirty();
             }
-            this.uiState.springsBaked = true;
-            this.markDirty();
+
+            const dynamicPins = [...this.mapPins];
+
+            // Ensure procedural water spawns exactly at the highest point of our manual carve
+            const manualSprings = HydrologyEngine.getRiverSources(this.currentElevationData, this.mapWidth, this.manualRivers);
+            dynamicPins.push(...manualSprings);
+
+            this.currentRiverData = engine.generateRivers(
+                this.currentElevationData,
+                this.currentMoistureData,
+                this.currentTemperatureData,
+                dynamicPins,
+                this.mapWidth,
+                this.mapHeight,
+                params,
+                this.bufferRiverMap,
+                this.bufferWaterMask,
+            );
+
+            const t1 = performance.now();
+            console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
+
+            await this.#repaintCanvas();
+        } finally {
+            this.#endProcessing();
         }
-
-        const dynamicPins = [...this.mapPins];
-
-        // Ensure procedural water spawns exactly at the highest point of our manual carve
-        const manualSprings = HydrologyEngine.getRiverSources(this.currentElevationData, this.mapWidth, this.manualRivers);
-        dynamicPins.push(...manualSprings);
-
-        this.currentRiverData = engine.generateRivers(
-            this.currentElevationData,
-            this.currentMoistureData,
-            this.currentTemperatureData,
-            dynamicPins,
-            this.mapWidth,
-            this.mapHeight,
-            params,
-            this.bufferRiverMap,
-            this.bufferWaterMask,
-        );
-
-        const t1 = performance.now();
-        console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
-
-        await this.#repaintCanvas();
     }
 
     async #ingestMapPayload(payload) {
@@ -1986,13 +2004,28 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.isSaving) return false;
         this.isSaving = true;
 
-        // Visually lock the application to prevent array mutation during serialisation
-        this.element.style.pointerEvents = "none";
-        this.element.style.filter = "brightness(0.7)";
-        this.element.style.cursor = "wait";
+        let mapName = this.currentSaveName;
 
-        let success = false;
         try {
+            // 1. Prompt the user BEFORE locking the UI
+            if (!this.currentSaveId) {
+                const { currentSeed } = this.#getMapParameters();
+                const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
+                const defaultName = `Terrain Map (${hash})`;
+
+                mapName = await foundry.applications.api.DialogV2.prompt({
+                    window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save As" },
+                    content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${defaultName}">`,
+                    ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
+                });
+
+                if (!mapName) return false; // User cancelled the save prompt
+            }
+
+            // 2. Lock the UI and show the spinner
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.SavingMap") || "Saving Map...");
+            this.currentSaveName = mapName;
+
             const { currentSeed, params } = this.#getMapParameters();
             const payload = {
                 seed: currentSeed,
@@ -2016,39 +2049,63 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 parentId: this.currentParentId,
             };
 
-            if (!this.currentSaveId) {
-                const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
-                const defaultName = `Terrain Map (${hash})`;
-
-                const mapName = await foundry.applications.api.DialogV2.prompt({
-                    window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save As" },
-                    content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${defaultName}">`,
-                    ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
-                });
-
-                if (!mapName) return false; // User cancelled the save prompt
-                this.currentSaveName = mapName;
-            }
-
             const journal = await saveMapData(this.currentSaveName, payload, this.currentSaveId);
 
             if (journal) {
                 this.currentSaveId = journal.id;
                 this.isDirty = false; // Successfully saved, map is no longer dirty
-                success = true;
                 ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
                 this.render({ parts: ["toolbar"] });
+                return true;
             } else {
                 ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
+                return false;
             }
         } finally {
-            // Guarantee the UI unlocks even if an unexpected error occurs
             this.isSaving = false;
-            this.element.style.pointerEvents = "auto";
-            this.element.style.filter = "none";
-            this.element.style.cursor = "default";
+            this.#endProcessing();
         }
-        return success;
+    }
+
+    /**
+     * Spawns the processing overlay and forces the browser to paint the DOM
+     * before executing the next synchronous JavaScript operation.
+     */
+    async #startProcessing(message) {
+        this.processingTasks = (this.processingTasks || 0) + 1;
+
+        let overlay = this.element.querySelector(".fwmb-processing-overlay");
+        if (!overlay) {
+            overlay = document.createElement("div");
+            overlay.className = "fwmb-processing-overlay fwmb-hidden";
+            overlay.innerHTML = `
+                <div class="fwmb-processing-content">
+                    <i class="fwmb-icon sync fwmb-spin"></i>
+                    <span class="fwmb-processing-text"></span>
+                </div>
+            `;
+            const mapContainer = this.element.querySelector(".fwmb-map-preview") || this.element.querySelector(".fwmb-map");
+            if (mapContainer) mapContainer.appendChild(overlay);
+        }
+
+        const textEl = overlay.querySelector(".fwmb-processing-text");
+        if (textEl) textEl.textContent = message;
+
+        overlay.classList.remove("fwmb-hidden");
+
+        // Force the render cycle to complete before unblocking the main thread
+        await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    }
+
+    /**
+     * Decrements the active task counter, hiding the overlay only when all chained tasks are complete.
+     */
+    #endProcessing() {
+        this.processingTasks = Math.max(0, (this.processingTasks || 0) - 1);
+        if (this.processingTasks > 0) return;
+
+        const overlay = this.element.querySelector(".fwmb-processing-overlay");
+        if (overlay) overlay.classList.add("fwmb-hidden");
     }
 
     // --- Action Handlers ---
@@ -3402,9 +3459,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * The background orchestrator for slicing the canvas and creating the Foundry Documents.
      */
     async #executeSceneExportPipeline(config) {
-        this.element.style.pointerEvents = "none";
-        this.element.style.filter = "brightness(0.7)";
-        this.element.style.cursor = "wait";
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.ExportingScene") || "Exporting Scene...");
 
         try {
             // Temporarily strip the camera transform so the PNG exports at a mathematically 1:1 scale with 0 offsets
@@ -3416,18 +3471,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.stage.position.set(0, 0);
             this.canvasEngine.stage.scale.set(1, 1);
 
-            ui.notifications.info(`FWMB | Extracting Player View...`);
+            // Update the overlay text dynamically during processing
+            const textEl = this.element.querySelector(".fwmb-processing-text");
+            if (textEl) textEl.textContent = "Extracting Player View...";
+
             this.canvasEngine.setRenderPass("player");
             this.#repaintVectors(); // Forces canvas to hide GM items
             const playerBlob = await this.canvasEngine.extractCanvasBlob("player");
 
             let gmBlob = null;
             if (config.createGmOverlay) {
-                ui.notifications.info(`FWMB | Extracting GM Overlay...`);
+                if (textEl) textEl.textContent = "Extracting GM Overlay...";
                 this.canvasEngine.setRenderPass("gm");
                 this.#repaintVectors(); // Forces canvas to hide Player items
                 gmBlob = await this.canvasEngine.extractCanvasBlob("gm");
             }
+
+            if (textEl) textEl.textContent = "Building Foundry Scene...";
 
             // Restore the normal view and the exact camera transform the user was looking at
             this.canvasEngine.stage.position.set(origX, origY);
@@ -3441,9 +3501,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             console.error("FWMB | Pipeline Error:", err);
             ui.notifications.error("Export pipeline failed. See console for details.");
         } finally {
-            this.element.style.pointerEvents = "auto";
-            this.element.style.filter = "none";
-            this.element.style.cursor = "default";
+            this.#endProcessing();
         }
     }
 
@@ -3459,9 +3517,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return;
         }
 
-        this.element.style.pointerEvents = "none";
-        this.element.style.filter = "brightness(0.7)";
-        this.element.style.cursor = "wait";
+        // 1. Prompt the user BEFORE locking the UI
+        const mapName = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save Regional Map As" },
+            content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${this.currentSaveName || "Map"} (Region)">`,
+            ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
+        });
+
+        if (!mapName) return;
+
+        // 2. Lock the UI and show the spinner
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingRegion") || "Extracting Region...");
 
         try {
             const baseTargetWidth = this.uiState.regionalTargetWidth;
@@ -3479,14 +3545,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             // Snap the height
             const targetHeight = Math.max(targetGridSize, Math.round(rawHeight / targetGridSize) * targetGridSize);
-
-            const mapName = await foundry.applications.api.DialogV2.prompt({
-                window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save Regional Map As" },
-                content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${this.currentSaveName || "Map"} (Region)">`,
-                ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
-            });
-
-            if (!mapName) return;
 
             this.#getMapParameters();
             const state = foundry.utils.deepClone(this.uiState);
@@ -3634,9 +3692,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             console.error("FWMB | Regional Map Generation Failed:", err);
             ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.RegionalGenerationError") || "Failed to generate regional map.");
         } finally {
-            this.element.style.pointerEvents = "auto";
-            this.element.style.filter = "none";
-            this.element.style.cursor = "default";
+            this.#endProcessing();
 
             const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
             if (editBtn?.classList.contains("active")) {
@@ -3657,6 +3713,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const file = e.target.files[0];
             if (!file) return;
 
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.ImportingMap") || "Importing Map...");
+
             try {
                 const text = await file.text();
                 const parsedData = JSON.parse(text);
@@ -3673,6 +3731,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             } catch (err) {
                 console.error("FWMB | Import Failed:", err);
                 ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.ImportError"));
+            } finally {
+                this.#endProcessing();
             }
         };
 

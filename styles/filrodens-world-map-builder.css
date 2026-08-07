@@ -90,6 +90,7 @@
 .fwmb-icon.crop                 { --fwmb-mask: url('../assets/icons/crop.svg'); }
 .fwmb-icon.water                { --fwmb-mask: url('../assets/icons/water.svg'); }
 .fwmb-icon.upgrade              { --fwmb-mask: url('../assets/icons/upgrade.svg'); }
+.fwmb-icon.sync                 { --fwmb-mask: url('../assets/icons/sync.svg'); }
 
 /* --- PINHEAD ICONS --- */
 .fwmb-icon.anchor                         { --fwmb-mask: url('../assets/pinhead-icons/anchor.svg'); }
@@ -125,6 +126,8 @@
 .fwmb-icon.classical_building             { --fwmb-mask: url('../assets/pinhead-icons/classical_building.svg'); }
 .fwmb-icon.conifer_tree                   { --fwmb-mask: url('../assets/pinhead-icons/conifer_tree.svg'); }
 .fwmb-icon.dagger                         { --fwmb-mask: url('../assets/pinhead-icons/dagger.svg'); }
+.fwmb-icon.dot_with_rays_down             { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_down.svg'); }
+.fwmb-icon.dot_with_rays_left             { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_left.svg'); }
 .fwmb-icon.dot_with_rays_right            { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_right.svg'); }
 .fwmb-icon.dot_with_rays_up               { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_up.svg'); }
 .fwmb-icon.exclamation_point              { --fwmb-mask: url('../assets/pinhead-icons/exclamation_point.svg'); }
@@ -1532,4 +1535,36 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     display: flex;
     flex-direction: column;
     gap: var(--fwmb-space-s);
+}
+
+/* --- PROCESSING OVERLAY --- */
+.fwmb-processing-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+}
+
+.fwmb-processing-content {
+    background: var(--fwmb-bg-panel);
+    padding: var(--fwmb-space-l) var(--fwmb-space-xl);
+    border-radius: var(--fwmb-radius-medium);
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-m);
+    color: var(--fwmb-text-primary);
+    font-size: var(--fwmb-font-size-l);
+    box-shadow: var(--fwmb-shadow-popout);
+}
+
+.fwmb-spin {
+    animation: fwmb-spin-anim 1s linear infinite;
+}
+
+@keyframes fwmb-spin-anim {
+    100% { transform: rotate(360deg); }
 }

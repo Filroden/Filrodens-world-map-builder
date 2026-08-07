@@ -395,6 +395,8 @@
     "FILRODENSWMB.ICONS.ClassicalBuilding": "Classical Building",
     "FILRODENSWMB.ICONS.ConiferTree": "Conifer Tree",
     "FILRODENSWMB.ICONS.Dagger": "Dagger",
+    "FILRODENSWMB.ICONS.DotRaysDown": "Radiating Dot (Down)",
+    "FILRODENSWMB.ICONS.DotRaysLeft": "Radiating Dot (Left)",
     "FILRODENSWMB.ICONS.DotRaysRight": "Radiating Dot (Right)",
     "FILRODENSWMB.ICONS.DotRaysUp": "Radiating Dot (Up)",
     "FILRODENSWMB.ICONS.ExclamationPoint": "Exclamation Mark",
@@ -418,5 +420,13 @@
     "FILRODENSWMB.UI.Justify": "Justification",
     "FILRODENSWMB.UI.JustifyLeft": "Left",
     "FILRODENSWMB.UI.JustifyCenter": "Center",
-    "FILRODENSWMB.UI.JustifyRight": "Right"
+    "FILRODENSWMB.UI.JustifyRight": "Right",
+
+    "FILRODENSWMB.UI.GeneratingTopography": "Generating Topography...",
+    "FILRODENSWMB.UI.GeneratingClimate": "Generating Climate...",
+    "FILRODENSWMB.UI.GeneratingFeatures": "Generating Features...",
+    "FILRODENSWMB.UI.SavingMap": "Saving Map...",
+    "FILRODENSWMB.UI.GeneratingRegion": "Extracting Region...",
+    "FILRODENSWMB.UI.ExportingScene": "Exporting Scene...",
+    "FILRODENSWMB.UI.ImportingMap": "Importing Map..."
 }

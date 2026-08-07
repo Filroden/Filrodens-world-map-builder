@@ -138,6 +138,8 @@ export const FILRODENSWMB = {
         domed_tower: "FILRODENSWMB.ICONS.DomedTower",
         dot: "FILRODENSWMB.ICONS.Dot",
         dot_outline: "FILRODENSWMB.ICONS.DotOutline",
+        dot_with_rays_down: "FILRODENSWMB.ICONS.DotRaysDown",
+        dot_with_rays_left: "FILRODENSWMB.ICONS.DotRaysLeft",
         dot_with_rays_right: "FILRODENSWMB.ICONS.DotRaysRight",
         dot_with_rays_up: "FILRODENSWMB.ICONS.DotRaysUp",
         exclamation_point: "FILRODENSWMB.ICONS.ExclamationPoint",
