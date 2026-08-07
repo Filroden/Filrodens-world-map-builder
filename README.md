@@ -322,6 +322,8 @@ You can change some of the map configuration settings.
    - Changing an existing Quick Style will change the style of all routes or labels using that style.
    - Deleting a Quick Style will preserve the existing style but they can no longer be changed in bulk.
 
+   ![Quick Styles](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/quick-styles.png)
+
 ### Map Management Tools
 
 #### Exporting to an external PNG
