@@ -389,6 +389,39 @@ When you click "Confirm", the interface will lock to prevent changes during the 
 
 The generator can be computationally heavy when calculating new terrain, moisture, and temperature models, particularly at larger resolutions. Maps of 1000x1000 pixels process very quickly. Maps of 4000x4000 pixels look beautiful, but may take a few seconds to calculate even on powerful PCs. Once the initial calculation is complete, the application returns to being highly responsive.
 
+## FAQs
+
+### Can I import my own map?
+
+You can bring in any image as a reference, and it will be shown as a canvas overlay. You cannot bypass the procedurally generated terrain, but if you want to recreate an existing map, I have found the following workflows work well. Either:
+
+- Generate random maps until you find one that has most of the land and sea in roughly the right areas. Do not forget you can use the pan and scale buttons on the Scene tool if you think a specific area within the map might be better. Then, use the terrain edit tools to sculpt your terrain.
+- Use the first random map. In the terrain tool, use the Level brush with a very large radius and find a point that is at or just below sea level. Now "paint" over the entire map to create a flat plain. You can then use the terrain edit tools to sculpt your topography from scratch.
+
+### Will you add the ability to load a Digital Elevation Model (DEM) or a greyscale elevation map to generate the terrain?
+
+No. One of the key benefits of using a procedural engine is the ability to create a world map, and then extract regional maps from it. These regional maps inherit the exact same terrain, biomes, and features, but are mathematically recalculated to provide significantly more detail while retaining sharp cliffs and accurate coastlines. Because the environment is procedurally generated, you can infinitely zoom into the model and generate higher-resolution iterations.
+
+If the module imported an elevation model, which is just a static grid of pixels with height values, it would break this feature. The only way to upscale a raster model is to interpolate the pixels, which produces very smooth, "blurred" results rather than sharp, realistic topography.
+
+### Why is it taking longer and longer for the terrain to regenerate when I make a new edit?
+
+All terrain edit brush strokes are stored and replayed in chronological order whenever the terrain must be recalculated. The more edits you make, the more history the engine must process in sequence. If you are just making a few changes to a map, this will not impact performance. However, if you are hand-drawing an entire map at a high resolution, you could easily generate thousands of brush strokes that must be reapplied on every update.
+
+### Do you have any tips for how to improve performance?
+
+1. Create your initial terrain map at a lower resolution, such as 1600 x 1200. This reduces the computational power required to calculate the terrain and biomes. Once you have your topography, custom rivers, and tectonic faults (which physically deform the terrain) in place, you can generate a high-resolution regional map from it. Instead of cropping a small area, expand the crop box to cover the entire map and increase the target resolution. The module will automatically upscale the map, calculating more granular detail while perfectly preserving your custom features. Please note: once you are working at this higher resolution, any further structural changes to the terrain, rivers, or faults will take proportionally longer to process.
+
+### Why did my custom river create a massive, unnatural canyon?
+
+The procedural hydrology engine mathematically forces water to flow monotonically downhill. If you draw a custom river route directly over a high mountain range, the engine will safely cut a gorge deep enough through that terrain to ensure the river never flows upwards. To avoid extreme canyons, try to route your rivers through natural valleys, or use the terrain Lower/Level brushes to flatten the path before drawing the river.
+
+### Why do my rivers suddenly change their path when I edit the terrain?
+
+Procedural rivers (those flowing from the automatically generated springs) calculate the path of least resistance downhill to the coast or a lake. If you use the terrain brushes to raise a hill, carve a valley, or smooth a slope anywhere near a river's path, you alter the underlying topography. The hydrology engine recalculates the most natural route based on your new landscape, which will sometimes divert the water down a new valley.
+
+> Tip: If you need a river to stay in an exact, permanent location regardless of how you sculpt the nearby terrain, use the Custom River tool instead. Custom rivers physically carve their own channels into the landscape, whereas procedural rivers simply adapt to the landscape as it currently exists.
+
 ## Roadmap
 
 - Bulk edit vector (pins, lines, regions and text) properties.
