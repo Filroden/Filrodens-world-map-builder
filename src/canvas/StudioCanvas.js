@@ -136,9 +136,10 @@ export class StudioCanvas {
     }
 
     /**
-     * Mathematically checks if the mouse coordinates are hovering over a draggable node or pin.
+     * Mathematically checks if the mouse coordinates are hovering over an interactive target.
+     * Returns the full target data packet (including entityType and entityId).
      */
-    #getGrabbedInfrastructure(x, y) {
+    #getHitTarget(x, y) {
         let closest = null;
         let minDist = Infinity;
 
@@ -146,7 +147,7 @@ export class StudioCanvas {
             const dist = Math.hypot(item.x - x, item.y - y);
             if (dist <= item.radius && dist < minDist) {
                 minDist = dist;
-                closest = item.target;
+                closest = item;
             }
         }
         return closest;
@@ -277,7 +278,8 @@ export class StudioCanvas {
                 }
 
                 // 1. Try to grab an existing infrastructure node or pin
-                const grabbedTarget = this.#getGrabbedInfrastructure(coords.x, coords.y);
+                const hit = this.#getHitTarget(coords.x, coords.y);
+                const grabbedTarget = hit ? hit.target : null;
 
                 // Ctrl-Click / Cmd-Click Node Deletion Intercept
                 if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
@@ -408,8 +410,22 @@ export class StudioCanvas {
             if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
 
             if (this.isEditMode && !this.isDragging && !this.activeDrag) {
-                const hoverTarget = this.#getGrabbedInfrastructure(coords.x, coords.y);
-                canvasElement.style.cursor = hoverTarget ? "grab" : "crosshair";
+                const hit = this.#getHitTarget(coords.x, coords.y);
+                canvasElement.style.cursor = hit ? "grab" : "crosshair";
+            }
+        });
+
+        // DOUBLE CLICK (Open Quick Edit Dialog)
+        canvasElement.addEventListener("dblclick", (e) => {
+            if (!this.isEditMode) return;
+
+            const coords = this.#getMapCoordinates(e, canvasElement);
+            const hit = this.#getHitTarget(coords.x, coords.y);
+
+            if (hit && this.onDoubleClick) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.onDoubleClick(hit);
             }
         });
 
@@ -643,7 +659,7 @@ export class StudioCanvas {
                 this.vectorGraphics.endFill();
 
                 if (isFeatureEdit) {
-                    this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: Math.max(radius, 10) });
+                    this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: Math.max(radius, 10), entityType: "pin", entityId: pin.id });
                 }
             }
         }
@@ -941,7 +957,7 @@ export class StudioCanvas {
             // 1a. Draw Edit Nodes FIRST (Guarantees the initial single click is visible)
             if (isEditMode) {
                 const isActive = route.id === activeRouteId;
-                this.#renderEditNodes(route.points, this.nodeContainer, isActive);
+                this.#renderEditNodes(route.points, this.nodeContainer, isActive, route, "route");
             }
 
             // 1b. Abort line geometry if there is no second point to connect to
@@ -996,7 +1012,7 @@ export class StudioCanvas {
 
             if (isEditMode) {
                 // The hit radius must expand to match the new size
-                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2 });
+                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2, entityType: "pin", entityId: pin.id });
             } else if (!this.isEditMode && (pin.name || pin.description)) {
                 // Keep PIXI hover events for tooltips ONLY when the global canvas is not in ANY edit mode
                 sprite.eventMode = "static";
@@ -1090,7 +1106,7 @@ export class StudioCanvas {
                 // 3. Draw Edit Nodes
                 if (isEditMode) {
                     const isActive = region.id === activeRegionId;
-                    this.#renderEditNodes(region.points, layerContainer, isActive);
+                    this.#renderEditNodes(region.points, layerContainer, isActive, region, "region", layer.id);
                 }
             });
         });
@@ -1261,7 +1277,7 @@ export class StudioCanvas {
             return obj.label;
         };
 
-        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all") => {
+        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all", parentId = null, parentType = "custom", layerId = null) => {
             if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name) return;
 
             const x = labelData.x ?? defaultX;
@@ -1306,23 +1322,31 @@ export class StudioCanvas {
             this.layers.labels.addChild(text);
 
             if (isEditMode) {
-                // Ensure the initial coordinates are written to the object so they can be dragged
                 labelData.x = x;
                 labelData.y = y;
 
                 const hitRadius = Math.max(text.width, text.height) / 2;
-                this.interactiveTargets.push({ target: labelData, x: x, y: y, radius: hitRadius, isLabel: true });
+                this.interactiveTargets.push({
+                    target: labelData,
+                    x: x,
+                    y: y,
+                    radius: hitRadius,
+                    isLabel: true,
+                    entityType: "label",
+                    entityId: parentId || labelData.id,
+                    parentType: parentType,
+                    layerId: layerId,
+                });
             }
         };
 
         // Custom Labels
-        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all"));
+        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all", label.id, "custom"));
 
         // Auto-Labels: Pins (Offset Top Right)
         mapPins.forEach((pin) => {
             if (!pin.icon) return;
-            // NEW: Pass the pin's visibility to the label
-            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility);
+            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility, pin.id, "pin");
         });
 
         // Auto-Labels: Routes (Spline Midpoint)
@@ -1332,8 +1356,7 @@ export class StudioCanvas {
 
             const spline = this.#getSplinePoints(route.points);
             const mid = spline[Math.floor(spline.length / 2)];
-            // NEW: Pass the route's visibility to the label
-            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15, route.visibility);
+            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15, route.visibility, route.id, "route");
         });
 
         // Auto-Labels: Regions (Polygon Centroid)
@@ -1357,8 +1380,7 @@ export class StudioCanvas {
                     if (p.y > maxY) maxY = p.y;
                 });
 
-                // Pass the effective region visibility to the label
-                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, regionVis);
+                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, regionVis, region.id, "region", layer.id);
             });
         });
     }
@@ -1510,6 +1532,8 @@ export class StudioCanvas {
                     y: dec.y,
                     radius: hitRadius,
                     isDecoration: true,
+                    entityType: "decoration",
+                    entityId: dec.id,
                 });
             }
         });
@@ -1745,7 +1769,7 @@ export class StudioCanvas {
             // 2. Draw Edit Nodes LAST so they always render on top of the geometry
             if (isEditMode) {
                 const isActive = fault.id === activeFaultId;
-                this.#renderEditNodes(fault.points, this.vectorGraphics, isActive);
+                this.#renderEditNodes(fault.points, this.vectorGraphics, isActive, fault, "fault");
             }
         });
     }
@@ -1778,7 +1802,7 @@ export class StudioCanvas {
             // Draw edit nodes
             if (isEditMode) {
                 const isActive = river.id === activeRiverId;
-                this.#renderEditNodes(points, this.manualRiverGraphics, isActive);
+                this.#renderEditNodes(points, this.manualRiverGraphics, isActive, river, "river");
             }
         }
     }
@@ -1807,7 +1831,7 @@ export class StudioCanvas {
     /**
      * Centralised helper to generate edit nodes and interactive hit targets for any vector array.
      */
-    #renderEditNodes(points, parentContainer, isActive) {
+    #renderEditNodes(points, parentContainer, isActive, parentEntity, entityType, layerId = null) {
         if (!points || points.length === 0) return;
 
         const hitRadius = 10 / (this.stage.scale.x || 1);
@@ -1815,7 +1839,15 @@ export class StudioCanvas {
         points.forEach((pt, index) => {
             const isLast = isActive && index === points.length - 1;
             this.#createEditNode(parentContainer, pt.x, pt.y, isLast, isActive);
-            this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: hitRadius });
+            this.interactiveTargets.push({
+                target: pt,
+                x: pt.x,
+                y: pt.y,
+                radius: hitRadius,
+                entityType: entityType,
+                entityId: parentEntity.id,
+                layerId: layerId,
+            });
         });
     }
 

@@ -843,6 +843,39 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.onInfraDeleteNode = (target) => this.#handleInfraDeleteNode(target);
 
         this.canvasEngine.onRightClick = () => this.#handleRightClick();
+        this.canvasEngine.onDoubleClick = (hitData) => this.#handleCanvasDoubleClick(hitData);
+    }
+
+    #handleCanvasDoubleClick(hitData) {
+        if (!hitData?.entityType || !hitData.entityId) return;
+
+        const { entityType, entityId, parentType, layerId } = hitData;
+
+        // We must use .call(this) to ensure the static action handlers
+        // operate on this specific application instance.
+        switch (entityType) {
+            case "pin":
+                MapStudioApp.#onEditPin.call(this, null, null, entityId);
+                break;
+            case "route":
+                MapStudioApp.#onEditRoute.call(this, null, null, entityId);
+                break;
+            case "region":
+                MapStudioApp.#onEditRegion.call(this, null, null, { regionId: entityId, layerId });
+                break;
+            case "fault":
+                MapStudioApp.#onEditFault.call(this, null, null, entityId);
+                break;
+            case "river":
+                MapStudioApp.#onEditRiver.call(this, null, null, entityId);
+                break;
+            case "decoration":
+                MapStudioApp.#onEditDecoration.call(this, null, null, entityId);
+                break;
+            case "label":
+                MapStudioApp.#onEditLabel.call(this, null, null, { id: entityId, type: parentType, layerId });
+                break;
+        }
     }
 
     #handleRightClick() {
@@ -2108,6 +2141,43 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (overlay) overlay.classList.add("fwmb-hidden");
     }
 
+    static #bindLabelPropertiesDialog(html, uiState) {
+        const labelQuickStyleSelect = html.querySelector('select[name="labelQuickStyle"]');
+        const labelFontFamilySelect = html.querySelector('select[name="labelFontFamily"]');
+        const labelFontSizeInput = html.querySelector('input[name="labelFontSize"]');
+        const labelFontSizeOutput = html.querySelector('input[name="labelFontSize"] + output');
+        const labelColorInput = html.querySelector('input[name="labelFillColor"]');
+        const labelMaxWidthInput = html.querySelector('input[name="labelMaxWidth"]');
+        const labelJustifySelect = html.querySelector('select[name="labelJustify"]');
+
+        labelQuickStyleSelect?.addEventListener("change", (e) => {
+            const styleId = e.target.value;
+            if (styleId !== "custom") {
+                const styleData = uiState.customLabelStyles.find((s) => s.id === styleId);
+                if (styleData) {
+                    if (labelFontFamilySelect) labelFontFamilySelect.value = styleData.fontFamily;
+                    if (labelFontSizeInput) {
+                        labelFontSizeInput.value = styleData.fontSize;
+                        if (labelFontSizeOutput) labelFontSizeOutput.value = styleData.fontSize;
+                    }
+                    if (labelColorInput) labelColorInput.value = styleData.fillColor;
+                    if (labelMaxWidthInput) labelMaxWidthInput.value = styleData.maxWidth;
+                    if (labelJustifySelect) labelJustifySelect.value = styleData.justify;
+                }
+            }
+        });
+
+        const revertLabelToCustom = () => {
+            if (labelQuickStyleSelect) labelQuickStyleSelect.value = "custom";
+        };
+
+        labelFontFamilySelect?.addEventListener("change", revertLabelToCustom);
+        labelFontSizeInput?.addEventListener("input", revertLabelToCustom);
+        labelColorInput?.addEventListener("input", revertLabelToCustom);
+        labelMaxWidthInput?.addEventListener("input", revertLabelToCustom);
+        labelJustifySelect?.addEventListener("change", revertLabelToCustom);
+    }
+
     // --- Action Handlers ---
 
     static async #onAddCustomBiome(event, target) {
@@ -2733,8 +2803,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.render({ parts: ["context", "toolbar"] });
     }
 
-    static async #onEditDecoration(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
+    static async #onEditDecoration(event, target, explicitId = null) {
+        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
         const dec = this.mapDecorations.find((d) => d.id === id);
         if (!dec) return;
 
@@ -2785,8 +2855,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    static async #onEditFault(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
+    static async #onEditFault(event, target, explicitId = null) {
+        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
         const fault = this.tectonicFaults.find((f) => f.id === id);
         if (!fault) return;
 
@@ -2838,10 +2908,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    static async #onEditLabel(event, target) {
-        const listItem = target.closest(".fwmb-list-item");
-        const id = listItem.dataset.id;
-        const type = listItem.dataset.type;
+    static async #onEditLabel(event, target, explicitData = null) {
+        let id, type, layerId;
+
+        if (explicitData) {
+            id = explicitData.id;
+            type = explicitData.type;
+            layerId = explicitData.layerId;
+        } else {
+            const listItem = target.closest(".fwmb-list-item");
+            id = listItem.dataset.id;
+            type = listItem.dataset.type;
+            layerId = listItem.dataset.layerId;
+        }
 
         let labelData = {};
         let sourceObj = null;
@@ -2856,7 +2935,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (type === "pin") sourceObj = this.mapPins.find((p) => p.id === id);
             if (type === "route") sourceObj = this.mapRoutes.find((r) => r.id === id);
             if (type === "region") {
-                const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);
+                const layer = this.regionLayers.find((l) => l.id === layerId);
                 sourceObj = layer?.regions.find((r) => r.id === id);
             }
             if (!sourceObj) return;
@@ -3057,8 +3136,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    static async #onEditPin(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
+    static async #onEditPin(event, target, explicitId = null) {
+        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
         const pin = this.mapPins.find((p) => p.id === id);
         if (!pin) return;
 
@@ -3070,10 +3149,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }))
             .sort((a, b) => a.localized.localeCompare(b.localized));
 
+        const fonts = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
+        const customLabelStyles = this.uiState.customLabelStyles || [];
+
+        // Ensure older pins without labels inherit the global UI state defaults
         const safePin = { ...pin, scale: pin.scale ?? 1 };
+        if (!safePin.label) {
+            safePin.label = {
+                quickStyle: "custom",
+                fontFamily: this.uiState.labelFontFamily,
+                fontSize: this.uiState.labelFontSize,
+                fillColor: this.uiState.labelFillColor,
+                maxWidth: this.uiState.labelMaxWidth,
+                justify: this.uiState.labelJustify,
+            };
+        }
+
         const palette = FILRODENSWMB.LABELS?.PRESETS || []; // Extract presets
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs", { pin: safePin, icons, palette });
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs", {
+            pin: safePin,
+            icons,
+            palette,
+            fonts,
+            customLabelStyles,
+        });
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
@@ -3115,6 +3215,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         });
                     });
                 }
+
+                // Bind the unified Label properties
+                MapStudioApp.#bindLabelPropertiesDialog(html, this.uiState);
             },
             ok: {
                 callback: (event, button, dialog) => {
@@ -3124,6 +3227,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         icon: button.form.elements["pinIcon"].value,
                         scale: Number(button.form.elements["pinScale"].value),
                         color: button.form.elements["pinColor"].value,
+                        labelQuickStyle: button.form.elements["labelQuickStyle"].value,
+                        labelFontFamily: button.form.elements["labelFontFamily"].value,
+                        labelFontSize: Number(button.form.elements["labelFontSize"].value) || 1,
+                        labelFillColor: button.form.elements["labelFillColor"].value,
+                        labelMaxWidth: Number(button.form.elements["labelMaxWidth"].value) || 0,
+                        labelJustify: button.form.elements["labelJustify"].value,
                     };
                 },
             },
@@ -3137,17 +3246,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             pin.scale = result.scale;
             pin.color = result.color;
 
+            if (!pin.label) pin.label = {};
+            pin.label.quickStyle = result.labelQuickStyle;
+            pin.label.fontFamily = result.labelFontFamily;
+            pin.label.fontSize = result.labelFontSize;
+            pin.label.fillColor = result.labelFillColor;
+            pin.label.maxWidth = result.labelMaxWidth;
+            pin.label.justify = result.labelJustify;
+
             this.#repaintVectors();
             this.render({ parts: ["context"] });
             this.markDirty();
         }
     }
 
-    static async #onEditRegion(event, target) {
+    static async #onEditRegion(event, target, explicitData = null) {
         this.activeRegionId = null;
 
-        const layerId = target.closest(".fwmb-accordion-group").dataset.layerId;
-        const regionId = target.closest(".fwmb-list-item").dataset.id;
+        const layerId = explicitData ? explicitData.layerId : target.closest(".fwmb-accordion-group").dataset.layerId;
+        const regionId = explicitData ? explicitData.regionId : target.closest(".fwmb-list-item").dataset.id;
 
         const layer = this.regionLayers.find((l) => l.id === layerId);
         if (!layer) return;
@@ -3155,12 +3272,41 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const region = layer.regions.find((r) => r.id === regionId);
         if (!region) return;
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs", { region });
+        const fonts = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
+        const customLabelStyles = this.uiState.customLabelStyles || [];
+        const palette = FILRODENSWMB.LABELS?.PRESETS || [];
+
+        // Ensure older regions without labels inherit the global UI state defaults
+        const safeRegion = { ...region };
+        if (!safeRegion.label) {
+            safeRegion.label = {
+                quickStyle: "custom",
+                fontFamily: this.uiState.labelFontFamily,
+                fontSize: this.uiState.labelFontSize,
+                fillColor: this.uiState.labelFillColor,
+                maxWidth: this.uiState.labelMaxWidth,
+                justify: this.uiState.labelJustify,
+            };
+        }
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs", {
+            region: safeRegion,
+            fonts,
+            customLabelStyles,
+            palette,
+        });
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
             window: { title: game.i18n.localize("FILRODENSWMB.UI.EditRegion") },
             content: content,
+            render: (event) => {
+                const app = event.target;
+                const html = app.element;
+
+                // Bind the unified Label properties
+                MapStudioApp.#bindLabelPropertiesDialog(html, this.uiState);
+            },
             ok: {
                 callback: (event, button, dialog) => {
                     return {
@@ -3172,6 +3318,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         lineThickness: Number(button.form.elements["regionLineThickness"].value),
                         lineStyle: button.form.elements["regionLineStyle"].value,
                         smoothing: button.form.elements["regionSmoothing"].value === "true",
+                        labelQuickStyle: button.form.elements["labelQuickStyle"].value,
+                        labelFontFamily: button.form.elements["labelFontFamily"].value,
+                        labelFontSize: Number(button.form.elements["labelFontSize"].value) || 1,
+                        labelFillColor: button.form.elements["labelFillColor"].value,
+                        labelMaxWidth: Number(button.form.elements["labelMaxWidth"].value) || 0,
+                        labelJustify: button.form.elements["labelJustify"].value,
                     };
                 },
             },
@@ -3189,6 +3341,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         region.lineThickness = result.lineThickness;
         region.lineStyle = result.lineStyle;
         region.smoothing = result.smoothing;
+
+        if (!region.label) region.label = {};
+        region.label.quickStyle = result.labelQuickStyle;
+        region.label.fontFamily = result.labelFontFamily;
+        region.label.fontSize = result.labelFontSize;
+        region.label.fillColor = result.labelFillColor;
+        region.label.maxWidth = result.labelMaxWidth;
+        region.label.justify = result.labelJustify;
 
         this.#repaintVectors();
         this.render({ parts: ["context"] });
@@ -3213,8 +3373,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    static async #onEditRiver(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
+    static async #onEditRiver(event, target, explicitId = null) {
+        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
         const river = this.manualRivers.find((r) => r.id === id);
         if (!river) return;
 
@@ -3251,18 +3411,33 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    static async #onEditRoute(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
+    static async #onEditRoute(event, target, explicitId = null) {
+        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
         const route = this.mapRoutes.find((r) => r.id === id);
         if (!route) return;
 
+        const fonts = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
+        const customLabelStyles = this.uiState.customLabelStyles || [];
+
         // Ensure older routes map strictly to the custom fallback
         const safeRoute = { ...route, quickStyle: route.quickStyle || "custom" };
+        if (!safeRoute.label) {
+            safeRoute.label = {
+                quickStyle: "custom",
+                fontFamily: this.uiState.labelFontFamily,
+                fontSize: this.uiState.labelFontSize,
+                fillColor: this.uiState.labelFillColor,
+                maxWidth: this.uiState.labelMaxWidth,
+                justify: this.uiState.labelJustify,
+            };
+        }
 
         const context = {
             route: safeRoute,
             customRouteStyles: this.uiState.customRouteStyles || [],
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
+            fonts: fonts,
+            customLabelStyles: customLabelStyles,
         };
 
         const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs", context);
@@ -3301,6 +3476,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 colorInput?.addEventListener("input", revertToCustom);
                 thicknessInput?.addEventListener("input", revertToCustom);
                 styleSelect?.addEventListener("change", revertToCustom);
+
+                // Bind the unified Label properties
+                MapStudioApp.#bindLabelPropertiesDialog(html, this.uiState);
             },
             ok: {
                 callback: (event, button, dialog) => {
@@ -3311,6 +3489,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         color: button.form.elements["routeColor"].value,
                         thickness: Number(button.form.elements["routeThickness"].value),
                         style: button.form.elements["routeStyle"].value,
+                        labelQuickStyle: button.form.elements["labelQuickStyle"].value,
+                        labelFontFamily: button.form.elements["labelFontFamily"].value,
+                        labelFontSize: Number(button.form.elements["labelFontSize"].value) || 1,
+                        labelFillColor: button.form.elements["labelFillColor"].value,
+                        labelMaxWidth: Number(button.form.elements["labelMaxWidth"].value) || 0,
+                        labelJustify: button.form.elements["labelJustify"].value,
                     };
                 },
             },
@@ -3335,6 +3519,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.uiState.routeStyle = result.style;
                 this.#syncDOMToState();
             }
+
+            if (!route.label) route.label = {};
+            route.label.quickStyle = result.labelQuickStyle;
+            route.label.fontFamily = result.labelFontFamily;
+            route.label.fontSize = result.labelFontSize;
+            route.label.fillColor = result.labelFillColor;
+            route.label.maxWidth = result.labelMaxWidth;
+            route.label.justify = result.labelJustify;
 
             this.#repaintVectors();
             this.render({ parts: ["context"] });

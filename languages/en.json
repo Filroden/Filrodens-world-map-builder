@@ -428,5 +428,7 @@
     "FILRODENSWMB.UI.SavingMap": "Saving Map...",
     "FILRODENSWMB.UI.GeneratingRegion": "Extracting Region...",
     "FILRODENSWMB.UI.ExportingScene": "Exporting Scene...",
-    "FILRODENSWMB.UI.ImportingMap": "Importing Map..."
+    "FILRODENSWMB.UI.ImportingMap": "Importing Map...",
+
+    "FILRODENSWMB.UI.LabelEditHint": "Label properties can also be edited directly from the Labels tool."
 }

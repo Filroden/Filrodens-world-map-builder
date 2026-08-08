@@ -86,11 +86,14 @@ Many of the following tools offer an edit mode. This mode has certain common fea
 - All edit toolbars have an "Undo" and "Redo" action.
 - Either click the "Toggle Edit [Tool]" button again to exit edit mode, or switch to a different map tool.
 
-In edit mode, some layers allow features to be added, moved or removed with mouse actions. Only the features relating to the specific tool can be edited. Not every action is available for every tool.
+In edit mode, some layers allow features to be added, moved or removed with mouse actions. **Only the features relating to the specific selected tool can be edited.** Not every action is available for every tool.
 
-- **Move:** Pins, region nodes, labels and cartographic decorations can be moved by holding the `Left-click` and dragging.
-- **Add:** New region nodes can be added by using `SHIFT + left-click`.
-- **Remove**: Existing pins and region nodes can be removed by using `CTRL (or CMD) + left-click`.
+Interactable features include: infrastructure pins, nodes (custom rivers, tectonic faults, routes and region layers), labels and cartographic decorations.
+
+- **Move:** Interactable features can be moved by holding the `Left-click` and dragging.
+- **Add:** New nodes can be added by using `SHIFT + left-click` anywhere on the line or region.
+- **Remove**: Interactable features can be removed by using `CTRL (or CMD) + left-click`.
+- **Edit Properties**: Interactable features can be edited using the `Double Left-Click` to open their properties dialogue.
 - **Rotate:** Labels and cartographic decorations can be rotated by using the `Scroll Wheel` while holding `Left-click`.
 - **Re-size:** Cartographic decorations can be re-sized using the `SHIFT + Scroll Wheel` while holding `Left-click`.
 - **End Line/Region:** Using `Right-click` without dragging will end any active line or region being edited.
