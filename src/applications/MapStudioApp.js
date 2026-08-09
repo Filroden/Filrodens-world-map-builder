@@ -60,46 +60,48 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             addRegionLayer(e, t)    { MapDialogManager.onAddRegionLayer(this, e, t); },
 
             // --- MAP STUDIO APP: Internal Tooling & States ---
-            adjustNoiseScale(e, t)     { this._onAdjustNoiseScale(e, t); },
-            adjustReferenceScale(e, t) { this._onAdjustReferenceScale(e, t); },
-            applyResolution(e, t)      { this._onApplyResolution(e, t); },
-            changeTool(e, t)           { this._onChangeTool(e, t); },
-            exportPng(e, t)            { this._onExportPng(e, t); },
-            exportScene(e, t)          { this._onExportScene(e, t); },
-            generateRegionalMap(e, t)  { this._onGenerateRegionalMap(e, t); },
-            importMapJson(e, t)        { this._onImportMapJson(e, t); },
-            manageMap(e, t)            { this._onManageMapAction(e, t); },
-            nudgeNoise(e, t)           { this._onNudgeNoise(e, t); },
-            nudgeReference(e, t)       { this._onNudgeReference(e, t); },
-            randomizeSeed(e, t)        { this._onRandomizeSeed(e, t); },
-            redoBrush(e, t)            { this._onRedoBrush(e, t); },
-            removeReferenceImage(e, t) { this._onRemoveReferenceImage(e, t); },
-            resetNoisePan(e, t)        { this._onResetNoisePan(e, t); },
-            resetNoiseScale(e, t)      { this._onResetNoiseScale(e, t); },
-            resetReferencePan(e, t)    { this._onResetReferencePan(e, t); },
-            resetReferenceScale(e, t)  { this._onResetReferenceScale(e, t); },
-            resetZoom(e, t)            { this._onResetZoom(e, t); },
-            saveMap(e, t)              { this._onSaveMap(e, t); },
-            selectRegionLayer(e, t)    { this._onSelectRegionLayer(e, t); },
-            setBrushTool(e, t)         { this._onSetBrushTool(e, t); },
-            setFeatureMode(e, t)       { this._onSetFeatureMode(e, t); },
-            setInfraMode(e, t)         { this._onSetInfraMode(e, t); },
-            setInfrastructureIcon(e, t){ this._onSetInfrastructureIcon(e, t); },
-            setRegionMode(e, t)        { this._onSetRegionMode(e, t); },
-            setRegionPreset(e, t)      { this._onSetRegionPreset(e, t); },
-            threeDView(e, t)           { this._onThreeDView(e, t); },
-            toggleEditMode(e, t)       { this._onToggleEditMode(e, t); },
-            toggleGrid(e, t)           { this._onToggleGrid(e, t); },
-            toggleLayer(e, t)          { this._onToggleLayer(e, t); },
-            togglePinDropdown(e, t)    { this._onTogglePinDropdown(e, t); },
-            toggleRegionSmoothing(e, t){ this._onToggleRegionSmoothing(e, t); },
-            toggleSnapping(e, t)       { this._onToggleSnapping(e, t); },
-            toggleViewFilter(e, t)     { this._onToggleViewFilter(e, t); },
-            toggleVisibility(e, t)     { this._onToggleVisibility(e, t); },
-            undoBrush(e, t)            { this._onUndoBrush(e, t); },
-            zoomIn(e, t)               { this._onZoomIn(e, t); },
-            zoomOut(e, t)              { this._onZoomOut(e, t); },
-            zoomToFeature(e, t)        { this._onZoomToFeature(e, t); },
+            adjustNoiseScale(e, t)          { this._onAdjustNoiseScale(e, t); },
+            adjustReferenceScale(e, t)      { this._onAdjustReferenceScale(e, t); },
+            applyFeatureMath(e, t)          { this._onApplyFeatureMath(e, t); },
+            applyResolution(e, t)           { this._onApplyResolution(e, t); },
+            changeTool(e, t)                { this._onChangeTool(e, t); },
+            exportPng(e, t)                 { this._onExportPng(e, t); },
+            exportScene(e, t)               { this._onExportScene(e, t); },
+            generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
+            importMapJson(e, t)             { this._onImportMapJson(e, t); },
+            manageMap(e, t)                 { this._onManageMapAction(e, t); },
+            nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
+            nudgeReference(e, t)            { this._onNudgeReference(e, t); },
+            randomizeSeed(e, t)             { this._onRandomizeSeed(e, t); },
+            redoBrush(e, t)                 { this._onRedoBrush(e, t); },
+            removeReferenceImage(e, t)      { this._onRemoveReferenceImage(e, t); },
+            resetNoisePan(e, t)             { this._onResetNoisePan(e, t); },
+            resetNoiseScale(e, t)           { this._onResetNoiseScale(e, t); },
+            resetReferencePan(e, t)         { this._onResetReferencePan(e, t); },
+            resetReferenceScale(e, t)       { this._onResetReferenceScale(e, t); },
+            resetZoom(e, t)                 { this._onResetZoom(e, t); },
+            saveMap(e, t)                   { this._onSaveMap(e, t); },
+            selectRegionLayer(e, t)         { this._onSelectRegionLayer(e, t); },
+            setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
+            setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
+            setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
+            setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
+            setRegionMode(e, t)             { this._onSetRegionMode(e, t); },
+            setRegionPreset(e, t)           { this._onSetRegionPreset(e, t); },
+            threeDView(e, t)                { this._onThreeDView(e, t); },
+            toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
+            toggleGrid(e, t)                { this._onToggleGrid(e, t); },
+            toggleLayer(e, t)               { this._onToggleLayer(e, t); },
+            toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
+            togglePinDropdown(e, t)         { this._onTogglePinDropdown(e, t); },
+            toggleRegionSmoothing(e, t)     { this._onToggleRegionSmoothing(e, t); },
+            toggleSnapping(e, t)            { this._onToggleSnapping(e, t); },
+            toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
+            toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
+            undoBrush(e, t)                 { this._onUndoBrush(e, t); },
+            zoomIn(e, t)                    { this._onZoomIn(e, t); },
+            zoomOut(e, t)                   { this._onZoomOut(e, t); },
+            zoomToFeature(e, t)             { this._onZoomToFeature(e, t); },
         },
     };
 
@@ -156,6 +158,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.pinRedoStack = [];
         this.globalHistoryLedger = [];
         this.globalRedoLedger = [];
+        this.hasPendingFeatureMath = false;
         this.brushEngine = null;
 
         this.currentSaveId = null;
@@ -417,7 +420,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         this._repaintVectors();
-        this.debouncedGenerateTerrain();
+        this.requestTerrainUpdate();
     }
 
     #syncRouteLiveEdits(name, target) {
@@ -726,7 +729,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (cleared) {
             this._repaintVectors();
-            if (requiresTerrainUpdate) this.debouncedGenerateTerrain();
+            if (requiresTerrainUpdate) this.requestTerrainUpdate();
             return true;
         }
     }
@@ -882,7 +885,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (this.activeTool === "features") {
             this.debouncedGenerateClimate();
-            this.debouncedGenerateTerrain();
+            this.requestTerrainUpdate();
         }
     }
 
@@ -902,7 +905,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         match.vector.points.splice(match.insertIndex, 0, { x: match.projX, y: match.projY });
 
         this._repaintVectors();
-        if (match.triggersTerrain) this.debouncedGenerateTerrain();
+        if (match.triggersTerrain) this.requestTerrainUpdate();
 
         this.render({ parts: ["context"] });
         this.markDirty();
@@ -974,7 +977,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (match.repaintCanvas) this._repaintCanvas();
         else this._repaintVectors();
 
-        if (match.triggersTerrain) this.debouncedGenerateTerrain();
+        if (match.triggersTerrain) this.requestTerrainUpdate();
         if (match.triggersClimate) this.debouncedGenerateClimate();
 
         this.render({ parts: ["context"] });
@@ -1082,7 +1085,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 });
             }
             this._repaintVectors();
-            this.debouncedGenerateTerrain(); // Triggers the mathematical deformation
+            this.requestTerrainUpdate(); // Triggers the mathematical deformation
         } else if (this.uiState.activeFeatureMode === "river") {
             if (this.activeRiverId) {
                 const river = this.manualRivers.find((r) => r.id === this.activeRiverId);
@@ -1557,6 +1560,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             });
         }
 
+        const liveUpdateBtn = this.element.querySelector('[data-action="toggleLiveFeatureUpdates"]');
+        if (liveUpdateBtn) {
+            liveUpdateBtn.classList.toggle("active", this.uiState.liveFeatureUpdates);
+            const icon = liveUpdateBtn.querySelector("i");
+            if (icon) icon.className = this.uiState.liveFeatureUpdates ? "fwmb-icon sync" : "fwmb-icon sync_disabled";
+        }
+        this.#syncApplyButtonState();
+
         // Sync all inputs and sliders
         for (const [key, value] of Object.entries(this.uiState)) {
             const input = this.element.querySelector(`[name="${key}"]`);
@@ -1846,6 +1857,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (overlay) overlay.classList.add("fwmb-hidden");
     }
 
+    /**
+     * Intercepts all terrain modifications. Evaluates if the math should be generated
+     * live, or deferred to the manual Apply button.
+     */
+    requestTerrainUpdate() {
+        if (this.uiState.liveFeatureUpdates) {
+            this.debouncedGenerateTerrain();
+        } else {
+            this.hasPendingFeatureMath = true;
+            this.#syncApplyButtonState();
+        }
+    }
+
     // --- Action Handlers ---
 
     _onAdjustNoiseScale(event, target) {
@@ -1922,6 +1946,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.referenceScale = Math.max(FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MIN, Math.min(this.uiState.referenceScale, FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MAX));
 
         this.#updateReferenceLayer();
+    }
+
+    async _onApplyFeatureMath(event, target) {
+        if (!this.hasPendingFeatureMath) return;
+
+        await this.generateTerrain();
+        this.hasPendingFeatureMath = false;
+        this.#syncApplyButtonState();
+    }
+
+    #syncApplyButtonState() {
+        const applyBtn = this.element.querySelector('[data-action="applyFeatureMath"]');
+        if (applyBtn) {
+            applyBtn.classList.toggle("active", this.hasPendingFeatureMath);
+            applyBtn.classList.toggle("disabled", !this.hasPendingFeatureMath);
+            applyBtn.disabled = !this.hasPendingFeatureMath;
+        }
     }
 
     /**
@@ -2010,6 +2051,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     _onChangeTool(event, target) {
+        if (this.hasPendingFeatureMath) {
+            this.generateTerrain();
+            this.hasPendingFeatureMath = false;
+            this.#syncApplyButtonState();
+        }
+
         const newTool = target.dataset.tool;
         if (!newTool || this.activeTool === newTool) return;
 
@@ -2779,6 +2826,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // End all active vector drawing sessions when leaving edit mode
         if (!isActivating) {
+            if (this.hasPendingFeatureMath) {
+                this.generateTerrain();
+                this.hasPendingFeatureMath = false;
+                this.#syncApplyButtonState();
+            }
+
             for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
                 this[config.activeKey] = null;
             }
@@ -2845,6 +2898,26 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const isVisible = target.classList.toggle("active");
 
         this.canvasEngine.toggleLayer(layerId, isVisible);
+    }
+
+    _onToggleLiveFeatureUpdates(event, target) {
+        this.uiState.liveFeatureUpdates = !this.uiState.liveFeatureUpdates;
+
+        const btn = target.closest("button");
+        if (btn) {
+            btn.classList.toggle("active", this.uiState.liveFeatureUpdates);
+            const icon = btn.querySelector("i");
+            if (icon) {
+                icon.className = this.uiState.liveFeatureUpdates ? "fwmb-icon sync" : "fwmb-icon sync_disabled";
+            }
+        }
+
+        // If turned back on while changes are pending, immediately process them
+        if (this.uiState.liveFeatureUpdates && this.hasPendingFeatureMath) {
+            this.generateTerrain();
+            this.hasPendingFeatureMath = false;
+            this.#syncApplyButtonState();
+        }
     }
 
     _onTogglePinDropdown(event, target) {

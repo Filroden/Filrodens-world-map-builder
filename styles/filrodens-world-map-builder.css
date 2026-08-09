@@ -91,6 +91,7 @@
 .fwmb-icon.water                { --fwmb-mask: url('../assets/icons/water.svg'); }
 .fwmb-icon.upgrade              { --fwmb-mask: url('../assets/icons/upgrade.svg'); }
 .fwmb-icon.sync                 { --fwmb-mask: url('../assets/icons/sync.svg'); }
+.fwmb-icon.sync_disabled        { --fwmb-mask: url('../assets/icons/sync_disabled.svg'); }
 
 /* --- PINHEAD ICONS --- */
 .fwmb-icon.anchor                         { --fwmb-mask: url('../assets/pinhead-icons/anchor.svg'); }
@@ -267,6 +268,18 @@
 }
 
 .fwmb .fwmb-btn.primary:hover {
+    color: var(--fwmb-text-inverse);
+}
+
+.fwmb .fwmb-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--fwmb-bg-muted);
+    color: var(--fwmb-text-muted);
+}
+
+.fwmb .fwmb-btn.active {
+    background: var(--fwmb-accent-main);
     color: var(--fwmb-text-inverse);
 }
 

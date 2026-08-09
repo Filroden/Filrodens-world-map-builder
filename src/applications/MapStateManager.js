@@ -67,6 +67,7 @@ export class MapStateManager {
             faultThickness: FILRODENSWMB.TECTONICS?.DEFAULT_THICKNESS || 40,
             faultStrength: FILRODENSWMB.TECTONICS?.DEFAULT_STRENGTH || 0.25,
             riverWidth: 4,
+            liveFeatureUpdates: true,
 
             contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
             biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,

@@ -199,6 +199,10 @@ Biomes are generated automatically depending on the latitude, terrain, temperatu
    - **Fault Line Thickness:** Choose over how wide an area the effects will happen.
    - **Fault Line Strength:** Determine the strength of the effect.
 
+   For both rivers and fault lines:
+   - **Toggle Live Terrain Generation:** Toggles live terrain generation on or off.
+   - **Apply Changes:** When the toggle is off, if any changes are made that could affect the terrain, this button allows them to be manually applied. This helps you to create or edit the river or fault lines without constantly generating terrain changes.
+
 > Note: by default, no terrain feature automatically generates a label. If you want to add a label, e.g., to a river or fault line, you should add a custom label using the label tool.
 
 #### Infrastructure

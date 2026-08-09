@@ -430,5 +430,8 @@
     "FILRODENSWMB.UI.ExportingScene": "Exporting Scene...",
     "FILRODENSWMB.UI.ImportingMap": "Importing Map...",
 
-    "FILRODENSWMB.UI.LabelEditHint": "Label properties can also be edited directly from the Labels tool."
+    "FILRODENSWMB.UI.LabelEditHint": "Label properties can also be edited directly from the Labels tool.",
+
+    "FILRODENSWMB.UI.ApplyChanges": "Apply Changes",
+    "FILRODENSWMB.UI.ToggleLiveTerrainGeneration": "Toggle Live Terrain Generation"
 }

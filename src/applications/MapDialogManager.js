@@ -129,7 +129,7 @@ export class MapDialogManager {
             if (onSave) onSave(entity, result);
 
             app._repaintVectors();
-            if (triggersTerrain) app.debouncedGenerateTerrain();
+            if (triggersTerrain) app.requestTerrainUpdate();
             app.render({ parts: renderParts });
             app.markDirty();
         }
