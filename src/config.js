@@ -18,8 +18,48 @@ export const FILRODENSWMB = {
         MAP_WIDTH: 1000,
         MAP_HEIGHT: 1000,
     },
+    LIMITS: {
+        HISTORY_MAX: 40,
+        SNAP_THRESHOLD: 15,
+        NOISE_SCALE_MIN: 100,
+        NOISE_SCALE_MAX: 8000,
+        NOISE_SCALE_STEP: 50,
+        OVERFLOW_BUFFER: 100,
+        BASELINE_DIMENSION: 1000,
+        CUSTOM_BIOME_START_ID: 14,
+    },
+    UI: {
+        RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
+        VISIBILITY_STATES: ["all", "gm", "none"],
+        WHEEL: {
+            SCALE_FACTOR: 1.05,
+            ROTATION_STEP: 5,
+            CAMERA_FACTOR: 1.1,
+        },
+        ZOOM: {
+            FACTOR: 1.25,
+            MIN_BOUNDS_SIZE: 400,
+            PADDING_FACTOR: 1.2,
+            MAX_ZOOM_SCALE: 2,
+            VISUAL_PADDING: 30,
+        },
+        REFERENCE_IMAGE: {
+            SCALE_MIN: 0.1,
+            SCALE_MAX: 10,
+            SCALE_FACTOR: 1.01,
+        },
+        REGIONAL_CROP: {
+            PADDING: 50,
+        },
+        DEBOUNCE_MS: {
+            TERRAIN: 800,
+            CLIMATE: 800,
+            FEATURES: 600,
+        },
+    },
     DISPLAY: {
         ALPHA: 0.8,
+        GRID_ALPHA: 0.15,
         BIOME_ALPHA_ACTIVE: 0.85,
         BIOME_ALPHA_INACTIVE: 0.65,
         RIVER_WIDTH: 2,
@@ -206,5 +246,14 @@ export const FILRODENSWMB = {
             slip: "#f59e0b",
             hotspot: "#d97706",
         },
+    },
+    ENTITY_CONFIG: {
+        decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },
+        fault: { stateKey: "tectonicFaults", activeKey: "activeFaultId", triggersTerrain: true, toolCategory: "features" },
+        label: { stateKey: "mapLabels", activeKey: null, triggersTerrain: false },
+        pin: { stateKey: "mapPins", activeKey: null, triggersTerrain: false },
+        regionLayer: { stateKey: "regionLayers", activeKey: "activeRegionLayerId", triggersTerrain: false, isLayer: true },
+        river: { stateKey: "manualRivers", activeKey: "activeRiverId", triggersTerrain: true, toolCategory: "features" },
+        route: { stateKey: "mapRoutes", activeKey: "activeRouteId", triggersTerrain: false, toolCategory: "infrastructure" },
     },
 };

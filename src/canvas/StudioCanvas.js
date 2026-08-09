@@ -31,7 +31,7 @@ export class StudioCanvas {
             cartography: new PIXI.Container(),
         };
 
-        this.layers.biomes.alpha = 0.65;
+        this.layers.biomes.alpha = FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
 
         // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
         this.haloGraphics = new PIXI.Graphics();
@@ -41,8 +41,14 @@ export class StudioCanvas {
         this.manualRiverGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.manualRiverGraphics);
 
-        this.vectorGraphics = new PIXI.Graphics();
-        this.layers.features.addChild(this.vectorGraphics);
+        this.faultGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.faultGraphics);
+
+        this.proceduralRiverGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.proceduralRiverGraphics);
+
+        this.featurePinGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.featurePinGraphics);
 
         // Setup Infrastructure Sub-containers
         this.routeGraphics = new PIXI.Graphics();
@@ -154,354 +160,294 @@ export class StudioCanvas {
     }
 
     #setupInteractions(canvasElement) {
-        // SCROLL TO ZOOM / SCALE
-        canvasElement.addEventListener("wheel", (e) => {
-            // --- Label & Decoration Transformation Intercept ---
-            if (this.activeDrag) {
-                const dragWrapper = this.interactiveTargets.find((t) => t.target === this.activeDrag.target);
-
-                if (dragWrapper?.isLabel || dragWrapper?.isDecoration) {
-                    e.preventDefault();
-
-                    if (dragWrapper.isDecoration) {
-                        // Shift + Scroll to Scale Decorations
-                        if (e.shiftKey) {
-                            const scaleDir = e.deltaY < 0 ? 1.05 : 0.95;
-                            this.activeDrag.target.scale = (this.activeDrag.target.scale || 1) * scaleDir;
-                        }
-                        // Standard Scroll to Rotate Decorations
-                        else {
-                            const dir = e.deltaY < 0 ? -5 : 5;
-                            this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
-                        }
-                    }
-                    // Standard Scroll to Rotate Labels
-                    else if (dragWrapper.isLabel) {
-                        const dir = e.deltaY < 0 ? -5 : 5;
-                        this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
-                    }
-
-                    // Force the immediate-mode redraw!
-                    if (this.onInfraDrag) this.onInfraDrag();
-                    return;
-                }
-            }
-
-            // --- Reference Image Scaling Intercept ---
-            if (this.isReferenceMode && e.shiftKey) {
-                const scaleDirection = e.deltaY < 0 ? 1.05 : 0.95;
-                if (this.onReferenceScale) this.onReferenceScale(scaleDirection);
-                return; // Abort standard camera zoom
-            }
-
-            e.preventDefault();
-            const zoomFactor = 1.1;
-            const scaleDirection = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
-
-            // Dynamically allow deeper zooms on larger maps (e.g., 4000px allows up to 16x zoom)
-            const maxZoom = Math.max(5, this.mapWidth / 250);
-
-            const rect = canvasElement.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            const localX = (mouseX - this.stage.x) / this.stage.scale.x;
-            const localY = (mouseY - this.stage.y) / this.stage.scale.y;
-
-            this.stage.scale.x *= scaleDirection;
-            this.stage.scale.y *= scaleDirection;
-
-            this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x, maxZoom));
-            this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y, maxZoom));
-
-            this.stage.position.x = mouseX - localX * this.stage.scale.x;
-            this.stage.position.y = mouseY - localY * this.stage.scale.y;
-
-            this.#updateNodeScales(); // Trigger inverse scaling
-
-            if (this.isCropMode) this.#drawCropOverlay();
-        });
-
-        // PREVENT NATIVE CONTEXT MENU
+        canvasElement.addEventListener("wheel", (e) => this.#handleWheel(e, canvasElement));
         canvasElement.addEventListener("contextmenu", (e) => e.preventDefault());
+        canvasElement.addEventListener("pointerdown", (e) => this.#handlePointerDown(e, canvasElement));
+        canvasElement.addEventListener("pointermove", (e) => this.#handlePointerMove(e, canvasElement));
+        canvasElement.addEventListener("dblclick", (e) => this.#handleDoubleClick(e, canvasElement));
 
-        // MOUSE DOWN (Start Pan, Drag, or Paint/Place)
-        canvasElement.addEventListener("pointerdown", (e) => {
-            canvasElement.setPointerCapture(e.pointerId);
+        // Unified completion events prevent duplicate listener binds
+        const endInteraction = (e) => this.#handlePointerUp(e, canvasElement);
+        canvasElement.addEventListener("pointerup", endInteraction);
+        canvasElement.addEventListener("pointercancel", endInteraction);
+        canvasElement.addEventListener("pointerleave", (e) => this.#handlePointerLeave(e, canvasElement));
+    }
 
-            if (e.button === 2 || e.button === 1) {
-                this.isDragging = true;
-                this.dragStart = { x: e.clientX, y: e.clientY };
-                this.stageStart = { x: this.stage.position.x, y: this.stage.position.y };
-                canvasElement.style.cursor = "grabbing";
-                return;
+    #handleWheel(e, canvasElement) {
+        const isZoomIn = e.deltaY < 0;
+        const config = FILRODENSWMB.UI.WHEEL;
+
+        // --- Reference Image Scaling Intercept ---
+        if (this.isReferenceMode && e.shiftKey) {
+            const scale = isZoomIn ? FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_FACTOR : 1 / FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_FACTOR;
+            if (this.onReferenceScale) this.onReferenceScale(scale);
+            return;
+        }
+
+        // --- Label & Decoration Transformation Intercept ---
+        const dragWrapper = this.activeDrag ? this.interactiveTargets.find((t) => t.target === this.activeDrag.target) : null;
+        const isTransformable = dragWrapper?.isLabel || dragWrapper?.isDecoration;
+
+        if (isTransformable) {
+            e.preventDefault();
+            const target = this.activeDrag.target;
+
+            if (e.shiftKey && dragWrapper.isDecoration) {
+                const scale = isZoomIn ? config.SCALE_FACTOR : 1 / config.SCALE_FACTOR;
+                target.scale = (target.scale || 1) * scale;
+            } else if (!e.shiftKey) {
+                const rotation = isZoomIn ? -config.ROTATION_STEP : config.ROTATION_STEP;
+                target.rotation = (target.rotation || 0) + rotation;
             }
 
-            if (e.button === 0) {
-                const coords = this.#getMapCoordinates(e, canvasElement);
+            if (this.onInfraDrag) this.onInfraDrag();
+            return;
+        }
 
-                // --- Regional Crop Intercept ---
-                if (this.isCropMode) {
-                    const zone = this.#getCropHitZone(coords.x, coords.y);
-                    this.cropStart = { x: coords.x, y: coords.y };
+        // --- Standard Camera Zoom ---
+        e.preventDefault();
 
-                    if (zone) {
-                        this.activeCropAction = zone;
-                        this.cropOriginalBox = { ...this.cropBox };
-                    } else {
-                        this.activeCropAction = "draw";
-                        this.cropBox = { x: coords.x, y: coords.y, width: 0, height: 0 };
-                    }
+        const scaleDirection = isZoomIn ? config.CAMERA_FACTOR : 1 / config.CAMERA_FACTOR;
+        const maxZoom = Math.max(5, this.mapWidth / 250);
 
-                    canvasElement.style.cursor = "grabbing";
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return;
-                }
+        const rect = canvasElement.getBoundingClientRect();
+        const localX = (e.clientX - rect.left - this.stage.x) / this.stage.scale.x;
+        const localY = (e.clientY - rect.top - this.stage.y) / this.stage.scale.y;
 
-                // --- Reference Image Drag Intercept ---
-                if (this.isReferenceMode) {
-                    this.isDraggingReference = true;
-                    this.dragStart = { x: coords.x, y: coords.y };
-                    canvasElement.style.cursor = "grabbing";
-                    return;
-                }
+        this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * scaleDirection, maxZoom));
+        this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * scaleDirection, maxZoom));
 
-                // --- Shift-Click Node Insertion Intercept ---
-                if (this.isEditMode && e.shiftKey && this.onInfraInsertNode) {
-                    e.preventDefault();
-                    e.stopPropagation();
+        this.stage.position.x = e.clientX - rect.left - localX * this.stage.scale.x;
+        this.stage.position.y = e.clientY - rect.top - localY * this.stage.scale.y;
 
-                    this.activeDrag = null;
-                    this.onInfraInsertNode(coords.x, coords.y);
-                    return;
-                }
+        this.#updateNodeScales();
+        if (this.isCropMode) this.#drawCropOverlay();
+    }
 
-                // 1. Try to grab an existing infrastructure node or pin
-                const hit = this.#getHitTarget(coords.x, coords.y);
-                const grabbedTarget = hit ? hit.target : null;
+    #handlePointerDown(e, canvasElement) {
+        canvasElement.setPointerCapture(e.pointerId);
 
-                // Ctrl-Click / Cmd-Click Node Deletion Intercept
-                if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
-                    e.preventDefault();
-                    e.stopPropagation();
+        // Right/Middle Click Drag Pan
+        if (e.button === 2 || e.button === 1) {
+            this.isDragging = true;
+            this.dragStart = { x: e.clientX, y: e.clientY };
+            this.stageStart = { x: this.stage.position.x, y: this.stage.position.y };
+            canvasElement.style.cursor = "grabbing";
+            return;
+        }
 
-                    this.activeDrag = null;
-                    this.onInfraDeleteNode(grabbedTarget);
-                    return;
-                }
+        if (e.button !== 0) return;
 
-                // Bypass drag grab if the UI is actively using the Eraser tool
-                const rootApp = this.container.closest(".fwmb-layout") || document;
-                const isEraserActive = !!rootApp.querySelector('.fwmb-brush-tools button.active[data-tool="erasePin"]');
+        const coords = this.#getMapCoordinates(e, canvasElement);
 
-                if (grabbedTarget && !isEraserActive) {
-                    e.preventDefault();
-                    e.stopPropagation();
+        if (this.isCropMode) return this.#handleCropPointerDown(e, coords, canvasElement);
 
-                    this.activeDrag = { target: grabbedTarget };
-                    canvasElement.style.cursor = "grabbing";
-                    if (this.onInfraDragStart) this.onInfraDragStart();
-                    return;
-                }
+        if (this.isReferenceMode) {
+            this.isDraggingReference = true;
+            this.dragStart = { x: coords.x, y: coords.y };
+            canvasElement.style.cursor = "grabbing";
+            return;
+        }
 
-                // 2. Otherwise, pass to brush engine
-                if (this.isEditMode && this.onBrushStart) {
-                    this.onBrushStart(coords.x, coords.y);
-                }
+        if (this.isEditMode && e.shiftKey && this.onInfraInsertNode) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.activeDrag = null;
+            this.onInfraInsertNode(coords.x, coords.y);
+            return;
+        }
+
+        const hit = this.#getHitTarget(coords.x, coords.y);
+        const grabbedTarget = hit ? hit.target : null;
+
+        if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.activeDrag = null;
+            this.onInfraDeleteNode(grabbedTarget);
+            return;
+        }
+
+        const rootApp = this.container.closest(".fwmb-layout") || document;
+        const isEraserActive = !!rootApp.querySelector('.fwmb-brush-tools button.active[data-tool="erasePin"]');
+
+        if (grabbedTarget && !isEraserActive) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.activeDrag = { target: grabbedTarget };
+            canvasElement.style.cursor = "grabbing";
+            if (this.onInfraDragStart) this.onInfraDragStart();
+            return;
+        }
+
+        if (this.isEditMode && this.onBrushStart) {
+            this.onBrushStart(coords.x, coords.y);
+        }
+    }
+
+    #handleCropPointerDown(e, coords, canvasElement) {
+        const zone = this.#getCropHitZone(coords.x, coords.y);
+        this.cropStart = { x: coords.x, y: coords.y };
+
+        if (zone) {
+            this.activeCropAction = zone;
+            this.cropOriginalBox = { ...this.cropBox };
+        } else {
+            this.activeCropAction = "draw";
+            this.cropBox = { x: coords.x, y: coords.y, width: 0, height: 0 };
+        }
+
+        canvasElement.style.cursor = "grabbing";
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    #handlePointerMove(e, canvasElement) {
+        const coords = this.#getMapCoordinates(e, canvasElement);
+
+        if (this.activeCropAction) return this.#processCropDrag(coords);
+
+        if (this.isCropMode && !this.activeCropAction) {
+            const zone = this.#getCropHitZone(coords.x, coords.y);
+            if (zone === "center") canvasElement.style.cursor = "move";
+            else if (zone === "tl" || zone === "br") canvasElement.style.cursor = "nwse-resize";
+            else if (zone === "tr" || zone === "bl") canvasElement.style.cursor = "nesw-resize";
+            else canvasElement.style.cursor = "crosshair";
+            return;
+        }
+
+        if (this.isDraggingReference) {
+            const dx = coords.x - this.dragStart.x;
+            const dy = coords.y - this.dragStart.y;
+            this.dragStart = { x: coords.x, y: coords.y };
+            if (this.onReferencePan) this.onReferencePan(dx, dy);
+            return;
+        }
+
+        if (this.isDragging) {
+            const dx = e.clientX - this.dragStart.x;
+            const dy = e.clientY - this.dragStart.y;
+            this.stage.position.x = this.stageStart.x + dx;
+            this.stage.position.y = this.stageStart.y + dy;
+            return;
+        }
+
+        if (this.activeDrag) {
+            this.activeDrag.target.x = Math.max(0, Math.min(coords.x, this.mapWidth));
+            this.activeDrag.target.y = Math.max(0, Math.min(coords.y, this.mapHeight));
+            if (this.onInfraDrag) this.onInfraDrag();
+            return;
+        }
+
+        if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
+            const now = performance.now();
+            if (now - this.lastBrushTime > 100) {
+                this.onBrushMove(coords.x, coords.y);
+                this.lastBrushTime = now;
             }
-        });
+            return;
+        }
 
-        // MOUSE MOVE (Pan, Drag Item, or Continuous Paint)
-        canvasElement.addEventListener("pointermove", (e) => {
-            const coords = this.#getMapCoordinates(e, canvasElement);
+        if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
 
-            // --- Regional Crop Movement Intercept ---
-            if (this.activeCropAction) {
-                const dx = coords.x - this.cropStart.x;
-                const dy = coords.y - this.cropStart.y;
-
-                if (this.activeCropAction === "draw") {
-                    this.cropBox.x = Math.min(this.cropStart.x, coords.x);
-                    this.cropBox.y = Math.min(this.cropStart.y, coords.y);
-                    this.cropBox.width = Math.abs(coords.x - this.cropStart.x);
-                    this.cropBox.height = Math.abs(coords.y - this.cropStart.y);
-                } else if (this.activeCropAction === "center") {
-                    this.cropBox.x = this.cropOriginalBox.x + dx;
-                    this.cropBox.y = this.cropOriginalBox.y + dy;
-                } else {
-                    const MIN_SIZE = 10;
-                    if (this.activeCropAction.includes("l")) {
-                        this.cropBox.x = Math.min(this.cropOriginalBox.x + dx, this.cropOriginalBox.x + this.cropOriginalBox.width - MIN_SIZE);
-                        this.cropBox.width = this.cropOriginalBox.x + this.cropOriginalBox.width - this.cropBox.x;
-                    }
-                    if (this.activeCropAction.includes("r")) {
-                        this.cropBox.width = Math.max(MIN_SIZE, this.cropOriginalBox.width + dx);
-                    }
-                    if (this.activeCropAction.includes("t")) {
-                        this.cropBox.y = Math.min(this.cropOriginalBox.y + dy, this.cropOriginalBox.y + this.cropOriginalBox.height - MIN_SIZE);
-                        this.cropBox.height = this.cropOriginalBox.y + this.cropOriginalBox.height - this.cropBox.y;
-                    }
-                    if (this.activeCropAction.includes("b")) {
-                        this.cropBox.height = Math.max(MIN_SIZE, this.cropOriginalBox.height + dy);
-                    }
-                }
-
-                // Keep strictly within boundaries
-                this.cropBox.x = Math.max(0, Math.min(this.cropBox.x, this.mapWidth - this.cropBox.width));
-                this.cropBox.y = Math.max(0, Math.min(this.cropBox.y, this.mapHeight - this.cropBox.height));
-
-                this.#drawCropOverlay();
-                if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
-                return;
-            }
-
-            // --- Regional Crop Hover States ---
-            if (this.isCropMode && !this.activeCropAction) {
-                const zone = this.#getCropHitZone(coords.x, coords.y);
-                if (zone === "center") canvasElement.style.cursor = "move";
-                else if (zone === "tl" || zone === "br") canvasElement.style.cursor = "nwse-resize";
-                else if (zone === "tr" || zone === "bl") canvasElement.style.cursor = "nesw-resize";
-                else canvasElement.style.cursor = "crosshair";
-                return;
-            }
-
-            if (this.isDraggingReference) {
-                const coords = this.#getMapCoordinates(e, canvasElement);
-                const dx = coords.x - this.dragStart.x;
-                const dy = coords.y - this.dragStart.y;
-
-                // Reset start point for continuous relative movement
-                this.dragStart = { x: coords.x, y: coords.y };
-
-                if (this.onReferencePan) this.onReferencePan(dx, dy);
-                return;
-            }
-
-            if (this.isDragging) {
-                const dx = e.clientX - this.dragStart.x;
-                const dy = e.clientY - this.dragStart.y;
-                this.stage.position.x = this.stageStart.x + dx;
-                this.stage.position.y = this.stageStart.y + dy;
-                return;
-            }
-
-            // Dragging an Infrastructure Item
-            if (this.activeDrag) {
-                // Clamp coordinates to prevent dragging items off the map boundaries
-                this.activeDrag.target.x = Math.max(0, Math.min(coords.x, this.mapWidth));
-                this.activeDrag.target.y = Math.max(0, Math.min(coords.y, this.mapHeight));
-
-                if (this.onInfraDrag) this.onInfraDrag();
-                return;
-            }
-
-            // Continuous Painting
-            if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
-                const now = performance.now();
-                if (now - this.lastBrushTime > 100) {
-                    this.onBrushMove(coords.x, coords.y);
-                    this.lastBrushTime = now;
-                }
-                return;
-            }
-
-            // --- HOVER STATES ---
-            if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
-
-            if (this.isEditMode && !this.isDragging && !this.activeDrag) {
-                const hit = this.#getHitTarget(coords.x, coords.y);
-                canvasElement.style.cursor = hit ? "grab" : "crosshair";
-            }
-        });
-
-        // DOUBLE CLICK (Open Quick Edit Dialog)
-        canvasElement.addEventListener("dblclick", (e) => {
-            if (!this.isEditMode) return;
-
-            const coords = this.#getMapCoordinates(e, canvasElement);
+        if (this.isEditMode && !this.isDragging && !this.activeDrag) {
             const hit = this.#getHitTarget(coords.x, coords.y);
+            canvasElement.style.cursor = hit ? "grab" : "crosshair";
+        }
+    }
 
-            if (hit && this.onDoubleClick) {
-                e.preventDefault();
-                e.stopPropagation();
-                this.onDoubleClick(hit);
+    #processCropDrag(coords) {
+        const dx = coords.x - this.cropStart.x;
+        const dy = coords.y - this.cropStart.y;
+
+        if (this.activeCropAction === "draw") {
+            this.cropBox.x = Math.min(this.cropStart.x, coords.x);
+            this.cropBox.y = Math.min(this.cropStart.y, coords.y);
+            this.cropBox.width = Math.abs(coords.x - this.cropStart.x);
+            this.cropBox.height = Math.abs(coords.y - this.cropStart.y);
+        } else if (this.activeCropAction === "center") {
+            this.cropBox.x = this.cropOriginalBox.x + dx;
+            this.cropBox.y = this.cropOriginalBox.y + dy;
+        } else {
+            const MIN_SIZE = 10;
+            if (this.activeCropAction.includes("l")) {
+                this.cropBox.x = Math.min(this.cropOriginalBox.x + dx, this.cropOriginalBox.x + this.cropOriginalBox.width - MIN_SIZE);
+                this.cropBox.width = this.cropOriginalBox.x + this.cropOriginalBox.width - this.cropBox.x;
             }
-        });
-
-        // RELEASE MOUSE (End Pan, Drag, or Brush)
-        const endPointer = (e) => {
-            if (canvasElement.hasPointerCapture(e.pointerId)) {
-                canvasElement.releasePointerCapture(e.pointerId);
+            if (this.activeCropAction.includes("r")) {
+                this.cropBox.width = Math.max(MIN_SIZE, this.cropOriginalBox.width + dx);
             }
+            if (this.activeCropAction.includes("t")) {
+                this.cropBox.y = Math.min(this.cropOriginalBox.y + dy, this.cropOriginalBox.y + this.cropOriginalBox.height - MIN_SIZE);
+                this.cropBox.height = this.cropOriginalBox.y + this.cropOriginalBox.height - this.cropBox.y;
+            }
+            if (this.activeCropAction.includes("b")) {
+                this.cropBox.height = Math.max(MIN_SIZE, this.cropOriginalBox.height + dy);
+            }
+        }
 
-            if (e.button === 2 || e.button === 1) {
-                this.isDragging = false;
+        this.cropBox.x = Math.max(0, Math.min(this.cropBox.x, this.mapWidth - this.cropBox.width));
+        this.cropBox.y = Math.max(0, Math.min(this.cropBox.y, this.mapHeight - this.cropBox.height));
 
-                // Evaluate Right-Click-to-Cancel
-                if (e.button === 2 && this.dragStart) {
-                    const dist = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
-                    if (dist < 5 && this.onRightClick) {
-                        this.onRightClick();
-                    }
-                }
+        this.#drawCropOverlay();
+        if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+    }
 
-                canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
+    #handleDoubleClick(e, canvasElement) {
+        if (!this.isEditMode) return;
+
+        const coords = this.#getMapCoordinates(e, canvasElement);
+        const hit = this.#getHitTarget(coords.x, coords.y);
+
+        if (hit && this.onDoubleClick) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.onDoubleClick(hit);
+        }
+    }
+
+    #handlePointerUp(e, canvasElement) {
+        if (canvasElement.hasPointerCapture(e.pointerId)) {
+            canvasElement.releasePointerCapture(e.pointerId);
+        }
+
+        if (e.button === 2 || e.button === 1) {
+            this.isDragging = false;
+            if (e.button === 2 && this.dragStart) {
+                const dist = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
+                if (dist < 5 && this.onRightClick) this.onRightClick();
+            }
+            canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
+            return;
+        }
+
+        if (e.button === 0) {
+            if (this.activeCropAction) {
+                this.activeCropAction = null;
+                canvasElement.style.cursor = "crosshair";
                 return;
             }
-
-            if (e.button === 0) {
-                if (this.activeCropAction) {
-                    this.activeCropAction = null;
-                    canvasElement.style.cursor = "crosshair";
-                    return;
-                }
-
-                if (this.isDraggingReference) {
-                    this.isDraggingReference = false;
-                    canvasElement.style.cursor = "crosshair";
-                    return;
-                }
-
-                if (this.activeDrag) {
-                    this.activeDrag = null;
-                    canvasElement.style.cursor = "crosshair";
-                    if (this.onInfraDragEnd) this.onInfraDragEnd();
-                    return; // CRITICAL: Abort so we don't trigger brush end
-                }
-
-                if (this.isEditMode && this.onBrushEnd) {
-                    this.onBrushEnd();
-                }
+            if (this.isDraggingReference) {
+                this.isDraggingReference = false;
+                canvasElement.style.cursor = "crosshair";
+                return;
             }
-        };
-
-        canvasElement.addEventListener("pointerup", endPointer);
-        canvasElement.addEventListener("pointercancel", endPointer);
-
-        canvasElement.addEventListener("pointerleave", (e) => {
-            if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
-                this.onCanvasHover(null, null);
+            if (this.activeDrag) {
+                this.activeDrag = null;
+                canvasElement.style.cursor = "crosshair";
+                if (this.onInfraDragEnd) this.onInfraDragEnd();
+                return;
             }
-        });
-
-        canvasElement.addEventListener("pointerup", (e) => {
-            if (e.button === 0) {
-                if (this.isDraggingReference) {
-                    this.isDraggingReference = false;
-                    canvasElement.style.cursor = "crosshair";
-                    return;
-                }
+            if (this.isEditMode && this.onBrushEnd) {
+                this.onBrushEnd();
             }
-        });
+        }
+    }
 
-        canvasElement.addEventListener("pointercancel", endPointer);
-
-        canvasElement.addEventListener("pointerleave", (e) => {
-            if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
-                this.onCanvasHover(null, null);
-            }
-        });
+    #handlePointerLeave(e, canvasElement) {
+        if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
+            this.onCanvasHover(null, null);
+        }
     }
 
     // --- Public API for the UI Buttons ---
@@ -587,14 +533,27 @@ export class StudioCanvas {
     }
 
     /**
-     * Renders an array of vector paths and POI pins.
+     * Renders procedural, non-interactive water vectors.
      */
-    renderRiverVectors(rivers, mapPins, isFeatureEdit, waterMask) {
-        this.vectorGraphics.clear();
+    renderProceduralRivers(rivers, waterMask) {
+        if (!this.proceduralRiverGraphics) return;
+
+        this.proceduralRiverGraphics.clear();
+        this.proceduralRiverGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
 
         if (rivers && rivers.length > 0) {
             this.#drawRivers(rivers, waterMask);
         }
+    }
+
+    /**
+     * Renders interactive feature pins (like Springs and Blockers).
+     */
+    renderFeaturePins(mapPins, isFeatureEdit) {
+        if (!this.featurePinGraphics) return;
+
+        this.featurePinGraphics.clear();
+        this.featurePinGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
 
         if (mapPins && mapPins.length > 0) {
             this.#drawMapPins(mapPins, isFeatureEdit);
@@ -615,8 +574,8 @@ export class StudioCanvas {
         if (!path || path.length === 0) return;
 
         let currentIsFrozen = path[0].isFrozen;
-        this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-        this.vectorGraphics.moveTo(path[0].x, path[0].y);
+        this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+        this.proceduralRiverGraphics.moveTo(path[0].x, path[0].y);
 
         for (let i = 1; i < path.length; i++) {
             const point = path[i];
@@ -624,10 +583,10 @@ export class StudioCanvas {
             // If the climate crosses the freezing threshold, snap the line and change colors
             if (point.isFrozen !== currentIsFrozen) {
                 currentIsFrozen = point.isFrozen;
-                this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-                this.vectorGraphics.moveTo(point.x, point.y);
+                this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+                this.proceduralRiverGraphics.moveTo(point.x, point.y);
             } else {
-                this.vectorGraphics.lineTo(point.x, point.y);
+                this.proceduralRiverGraphics.lineTo(point.x, point.y);
             }
         }
     }
@@ -636,7 +595,7 @@ export class StudioCanvas {
      * Renders Vector Pins directly from the POI array using a flattened color map.
      */
     #drawMapPins(mapPins, isFeatureEdit) {
-        this.vectorGraphics.lineStyle(0);
+        this.featurePinGraphics.lineStyle(0);
 
         // Dictionary to completely eliminate if/else cognitive complexity
         const pinColors = {
@@ -653,10 +612,10 @@ export class StudioCanvas {
             const hexColor = pinColors[pin.type];
 
             if (hexColor !== undefined) {
-                const radius = pin.radius || 6;
-                this.vectorGraphics.beginFill(hexColor, 0.4);
-                this.vectorGraphics.drawCircle(pin.x, pin.y, radius);
-                this.vectorGraphics.endFill();
+                const radius = pin.radius || FILRODENSWMB.DISPLAY.PIN_RADIUS;
+                this.featurePinGraphics.beginFill(hexColor, FILRODENSWMB.DISPLAY.PIN_ALPHA);
+                this.featurePinGraphics.drawCircle(pin.x, pin.y, radius);
+                this.featurePinGraphics.endFill();
 
                 if (isFeatureEdit) {
                     this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: Math.max(radius, 10), entityType: "pin", entityId: pin.id });
@@ -736,7 +695,7 @@ export class StudioCanvas {
         this.gridLayer.mask = this.gridMask;
 
         // 3. Configure the drawing line styles
-        this.gridLayer.lineStyle(1, 0xffffff, 0.25);
+        this.gridLayer.lineStyle(1, 0xffffff, FILRODENSWMB.DISPLAY.GRID_ALPHA);
 
         const width = this.mapWidth;
         const height = this.mapHeight;
@@ -1119,10 +1078,6 @@ export class StudioCanvas {
     zoomToFeature(points) {
         if (!points || points.length === 0 || !this.stage) return;
 
-        const MIN_BOUNDS_SIZE = 400;
-        const PADDING_FACTOR = 1.2;
-        const MAX_ZOOM_SCALE = 2;
-
         let minX = points[0].x;
         let maxX = points[0].x;
         let minY = points[0].y;
@@ -1142,13 +1097,13 @@ export class StudioCanvas {
         const centerX = minX + trueWidth / 2;
         const centerY = minY + trueHeight / 2;
 
-        const zoomWidth = Math.max(trueWidth, MIN_BOUNDS_SIZE);
-        const zoomHeight = Math.max(trueHeight, MIN_BOUNDS_SIZE);
+        const zoomWidth = Math.max(trueWidth, FILRODENSWMB.UI.ZOOM.MIN_BOUNDS_SIZE);
+        const zoomHeight = Math.max(trueHeight, FILRODENSWMB.UI.ZOOM.MIN_BOUNDS_SIZE);
 
         // Calculate scale to fit with padding, constrained by maximum zoom limits
-        const scaleX = this.app.screen.width / (zoomWidth * PADDING_FACTOR);
-        const scaleY = this.app.screen.height / (zoomHeight * PADDING_FACTOR);
-        const targetScale = Math.min(scaleX, scaleY, MAX_ZOOM_SCALE);
+        const scaleX = this.app.screen.width / (zoomWidth * FILRODENSWMB.UI.ZOOM.PADDING_FACTOR);
+        const scaleY = this.app.screen.height / (zoomHeight * FILRODENSWMB.UI.ZOOM.PADDING_FACTOR);
+        const targetScale = Math.min(scaleX, scaleY, FILRODENSWMB.UI.ZOOM.MAX_ZOOM_SCALE);
 
         // Apply transforms directly to the PIXI stage
         this.stage.scale.set(targetScale);
@@ -1160,7 +1115,7 @@ export class StudioCanvas {
 
         // --- Animated Target Highlight ---
         const invScale = 1 / targetScale;
-        const pad = 30 * invScale; // Keeps the visual padding exactly 30px thick at any zoom
+        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale; // Maintain constant visual padding at any zoom
 
         const highlight = new PIXI.Graphics();
         highlight.lineStyle(4 * invScale, 0x00e5ff, 1);
@@ -1715,6 +1670,12 @@ export class StudioCanvas {
 
     renderFaultLines(faults = [], isEditMode = false, activeFaultId = null) {
         if (this.haloGraphics) this.haloGraphics.clear();
+
+        if (this.faultGraphics) {
+            this.faultGraphics.clear();
+            this.faultGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
+        }
+
         if (!this.layers.features || !isEditMode) return;
 
         faults.forEach((fault) => {
@@ -1755,7 +1716,7 @@ export class StudioCanvas {
                 this.haloGraphics.endFill();
 
                 // Draw the Core Vector Line
-                this.vectorGraphics.lineStyle({
+                this.faultGraphics.lineStyle({
                     width: 3,
                     color: colorHex,
                     alpha: 0.85,
@@ -1763,13 +1724,13 @@ export class StudioCanvas {
                     join: PIXI.LINE_JOIN.ROUND,
                     cap: PIXI.LINE_CAP.ROUND,
                 });
-                this.#drawVectorPath(this.vectorGraphics, spline, "solid", 3);
+                this.#drawVectorPath(this.faultGraphics, spline, "solid", 3);
             }
 
             // 2. Draw Edit Nodes LAST so they always render on top of the geometry
             if (isEditMode) {
                 const isActive = fault.id === activeFaultId;
-                this.#renderEditNodes(fault.points, this.vectorGraphics, isActive, fault, "fault");
+                this.#renderEditNodes(fault.points, this.faultGraphics, isActive, fault, "fault");
             }
         });
     }
