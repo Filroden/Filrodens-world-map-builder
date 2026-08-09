@@ -431,7 +431,6 @@ Procedural rivers (those flowing from the automatically generated springs) calcu
 
 ## Roadmap
 
-- Pause procedural generation during editing of a custom river or tectonic fault until it is complete.
 - Bulk edit vector (pins, lines, regions and text) properties.
 - Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
