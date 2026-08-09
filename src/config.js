@@ -19,7 +19,7 @@ export const FILRODENSWMB = {
         MAP_HEIGHT: 1000,
     },
     LIMITS: {
-        HISTORY_MAX: 40,
+        HISTORY_MAX: 100,
         SNAP_THRESHOLD: 15,
         NOISE_SCALE_MIN: 100,
         NOISE_SCALE_MAX: 8000,
@@ -31,6 +31,7 @@ export const FILRODENSWMB = {
     UI: {
         RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
         VISIBILITY_STATES: ["all", "gm", "none"],
+        VECTOR_TOOLS: ["features", "infrastructure", "regions", "labels", "cartography"],
         WHEEL: {
             SCALE_FACTOR: 1.05,
             ROTATION_STEP: 5,
@@ -41,6 +42,8 @@ export const FILRODENSWMB = {
             MIN_BOUNDS_SIZE: 400,
             PADDING_FACTOR: 1.2,
             MAX_ZOOM_SCALE: 2,
+            MIN_ZOOM_FLOOR: 5,
+            MAX_ZOOM_DIVISOR: 250,
             VISUAL_PADDING: 30,
         },
         REFERENCE_IMAGE: {
@@ -82,6 +85,7 @@ export const FILRODENSWMB = {
         },
     },
     CLIMATE: {
+        WIND_DISTANCE: 40,
         ALTITUDE_COOLING: 0.4,
         FREEZING_THRESHOLD: 0.2,
         THRESHOLDS: {
@@ -112,6 +116,8 @@ export const FILRODENSWMB = {
         },
     },
     NOISE: {
+        OFFSET_MOISTURE: 10000,
+        OFFSET_TEMP: 20000,
         ELEVATION: { SCALE: 250, OCTAVES: 5, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1.2, STRETCH: 1.75 },
         MOISTURE: { SCALE: 500, OCTAVES: 3, PERSISTENCE: 0.6, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1.2 },
         TEMPERATURE: { SCALE: 500, OCTAVES: 2, PERSISTENCE: 0.5, LACUNARITY: 2, EXPONENT: 1, STRETCH: 1 },

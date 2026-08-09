@@ -208,7 +208,7 @@ export class StudioCanvas {
         e.preventDefault();
 
         const scaleDirection = isZoomIn ? config.CAMERA_FACTOR : 1 / config.CAMERA_FACTOR;
-        const maxZoom = Math.max(5, this.mapWidth / 250);
+        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
 
         const rect = canvasElement.getBoundingClientRect();
         const localX = (e.clientX - rect.left - this.stage.x) / this.stage.scale.x;
@@ -457,7 +457,7 @@ export class StudioCanvas {
         const localX = (center.x - this.stage.x) / this.stage.scale.x;
         const localY = (center.y - this.stage.y) / this.stage.scale.y;
 
-        const maxZoom = Math.max(5, this.mapWidth / 250);
+        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
 
         this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * factor, maxZoom));
         this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * factor, maxZoom));
@@ -476,7 +476,7 @@ export class StudioCanvas {
         const scaleY = this.app.screen.height / paddedHeight;
         const optimalScale = Math.min(scaleX, scaleY);
 
-        const maxZoom = Math.max(5, this.mapWidth / 250);
+        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
         const finalScale = Math.max(0.1, Math.min(optimalScale, maxZoom));
 
         this.stage.scale.set(finalScale);
@@ -947,7 +947,7 @@ export class StudioCanvas {
         });
 
         // 2. Render Pins (Top Layer)
-        const resScale = Math.max(this.mapWidth, this.mapHeight) / 1000;
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
 
         pins.forEach((pin) => {
             if (!this.#isVisibleInCurrentPass(pin.visibility, "all", false)) return;
@@ -1224,8 +1224,8 @@ export class StudioCanvas {
         // Extract native OS root font size to mimic CSS 'rem' behaviour
         const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 
-        // Dynamically scale vectors based on the canvas dimensions (1000px = baseline 1x)
-        const resScale = Math.max(this.mapWidth, this.mapHeight) / 1000;
+        // Dynamically scale vectors based on the canvas dimensions
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
 
         const ensureLabelData = (obj) => {
             if (!obj.label) obj.label = {};
@@ -1344,128 +1344,135 @@ export class StudioCanvas {
         if (!this.layers.cartography) return;
         this.layers.cartography.removeChildren().forEach((c) => c.destroy({ children: true }));
 
+        // Delegate to isolated drawing pipelines
+        this.#drawCartographyBorder(uiState, mapWidth, mapHeight);
+        this.#drawScaleBar(uiState, mapHeight, isEditMode);
+        this.#drawCartographyDecorations(decorations, isEditMode);
+    }
+
+    #drawCartographyBorder(uiState, mapWidth, mapHeight) {
+        if (!uiState.cartographyBorderEnable) return;
+
         const vectorLayer = new PIXI.Graphics();
         this.layers.cartography.addChild(vectorLayer);
 
         const borderColorHex = Number.parseInt((uiState.cartographyBorderColor || "#000000").replace("#", ""), 16);
+        const style = uiState.cartographyBorderStyle;
+        const margin = 20;
 
-        // 1. Draw Procedural Map Border
-        if (uiState.cartographyBorderEnable) {
-            const style = uiState.cartographyBorderStyle;
-            const margin = 20;
+        if (style === "solid") {
+            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+        } else if (style === "double") {
+            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+            vectorLayer.lineStyle(3, borderColorHex, 1, 0);
+            vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
+        } else if (style === "ornate") {
+            vectorLayer.lineStyle(12, borderColorHex, 1, 0);
+            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+            vectorLayer.lineStyle(4, borderColorHex, 1, 0);
+            vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
 
-            if (style === "solid") {
-                vectorLayer.lineStyle(10, borderColorHex, 1, 0);
-                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-            } else if (style === "double") {
-                vectorLayer.lineStyle(10, borderColorHex, 1, 0);
-                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-                vectorLayer.lineStyle(3, borderColorHex, 1, 0);
-                vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
-            } else if (style === "ornate") {
-                vectorLayer.lineStyle(12, borderColorHex, 1, 0);
-                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-                vectorLayer.lineStyle(4, borderColorHex, 1, 0);
-                vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
-
-                const boxSize = 40;
-                vectorLayer.beginFill(borderColorHex);
-                vectorLayer.drawRect(0, 0, boxSize, boxSize);
-                vectorLayer.drawRect(mapWidth - boxSize, 0, boxSize, boxSize);
-                vectorLayer.drawRect(0, mapHeight - boxSize, boxSize, boxSize);
-                vectorLayer.drawRect(mapWidth - boxSize, mapHeight - boxSize, boxSize, boxSize);
-                vectorLayer.endFill();
-            }
+            const boxSize = 40;
+            vectorLayer.beginFill(borderColorHex);
+            vectorLayer.drawRect(0, 0, boxSize, boxSize);
+            vectorLayer.drawRect(mapWidth - boxSize, 0, boxSize, boxSize);
+            vectorLayer.drawRect(0, mapHeight - boxSize, boxSize, boxSize);
+            vectorLayer.drawRect(mapWidth - boxSize, mapHeight - boxSize, boxSize, boxSize);
+            vectorLayer.endFill();
         }
+    }
 
-        // 2. Draw Procedural Scale Bar (Inside a Movable Container)
-        if (uiState.cartographyScaleEnable) {
-            const scaleContainer = new PIXI.Container();
+    #drawScaleBar(uiState, mapHeight, isEditMode) {
+        if (!uiState.cartographyScaleEnable) return;
 
-            // Set position based on UI State
-            scaleContainer.x = uiState.cartographyScaleX ?? 50;
-            scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
+        const scaleContainer = new PIXI.Container();
 
-            const interval = uiState.cartographyScaleInterval || 100;
-            const majorTicks = uiState.cartographyScaleMajorTicks || 4;
-            const minorTicks = uiState.cartographyScaleMinorTicks || 4;
-            const scaleValue = uiState.cartographyScaleValue || 1;
-            const units = uiState.cartographyScaleUnits || "Miles";
+        // Set position based on UI State
+        scaleContainer.x = uiState.cartographyScaleX ?? 50;
+        scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
 
-            const height = 10;
-            const totalWidth = interval * majorTicks;
+        const interval = uiState.cartographyScaleInterval || 100;
+        const majorTicks = uiState.cartographyScaleMajorTicks || 4;
+        const minorTicks = uiState.cartographyScaleMinorTicks || 4;
+        const scaleValue = uiState.cartographyScaleValue || 1;
+        const units = uiState.cartographyScaleUnits || "Miles";
 
-            const scaleGraphics = new PIXI.Graphics();
+        const height = 10;
+        const totalWidth = interval * majorTicks;
 
-            // Base graphics are drawn relative to 0,0 inside the container
-            scaleGraphics.lineStyle(2, 0x000000, 1);
-            scaleGraphics.beginFill(0xffffff, 0.9);
-            scaleGraphics.drawRect(0, 0, totalWidth, height);
-            scaleGraphics.endFill();
+        const scaleGraphics = new PIXI.Graphics();
 
+        // Base graphics are drawn relative to 0,0 inside the container
+        scaleGraphics.lineStyle(2, 0x000000, 1);
+        scaleGraphics.beginFill(0xffffff, 0.9);
+        scaleGraphics.drawRect(0, 0, totalWidth, height);
+        scaleGraphics.endFill();
+
+        scaleGraphics.beginFill(0x000000, 0.9);
+        for (let i = 0; i < majorTicks; i++) {
+            if (i % 2 !== 0) scaleGraphics.drawRect(i * interval, 0, interval, height);
+        }
+        scaleGraphics.endFill();
+
+        if (minorTicks > 0) {
+            const minorInterval = interval / minorTicks;
             scaleGraphics.beginFill(0x000000, 0.9);
-            for (let i = 0; i < majorTicks; i++) {
-                if (i % 2 !== 0) scaleGraphics.drawRect(i * interval, 0, interval, height);
+            for (let i = 0; i < minorTicks; i++) {
+                if (i % 2 === 0) {
+                    scaleGraphics.drawRect(i * minorInterval, height / 2, minorInterval, height / 2);
+                } else {
+                    scaleGraphics.drawRect(i * minorInterval, 0, minorInterval, height / 2);
+                }
             }
             scaleGraphics.endFill();
-
-            if (minorTicks > 0) {
-                const minorInterval = interval / minorTicks;
-                scaleGraphics.beginFill(0x000000, 0.9);
-                for (let i = 0; i < minorTicks; i++) {
-                    if (i % 2 === 0) {
-                        scaleGraphics.drawRect(i * minorInterval, height / 2, minorInterval, height / 2);
-                    } else {
-                        scaleGraphics.drawRect(i * minorInterval, 0, minorInterval, height / 2);
-                    }
-                }
-                scaleGraphics.endFill();
-            }
-            scaleContainer.addChild(scaleGraphics);
-
-            const textStyle = new PIXI.TextStyle({ fontFamily: "Signika", fontSize: 16, fill: "#000000", stroke: "#ffffff", strokeThickness: 4, fontWeight: "bold" });
-            const text0 = new PIXI.Text("0", textStyle);
-            text0.anchor.set(0.5, 1);
-            text0.x = 0;
-            text0.y = -5;
-            scaleContainer.addChild(text0);
-
-            // Apply the multiplier mathematically
-            const textMax = new PIXI.Text(`${majorTicks * scaleValue} ${units}`, textStyle);
-            textMax.anchor.set(0.5, 1);
-            textMax.x = totalWidth;
-            textMax.y = -5;
-            scaleContainer.addChild(textMax);
-
-            this.layers.cartography.addChild(scaleContainer);
-
-            if (isEditMode) {
-                const scaleDataObj = {
-                    get x() {
-                        return uiState.cartographyScaleX;
-                    },
-                    set x(val) {
-                        uiState.cartographyScaleX = val;
-                    },
-                    get y() {
-                        return uiState.cartographyScaleY;
-                    },
-                    set y(val) {
-                        uiState.cartographyScaleY = val;
-                    },
-                };
-
-                this.interactiveTargets.push({
-                    target: scaleDataObj,
-                    x: scaleContainer.x + totalWidth / 2,
-                    y: scaleContainer.y,
-                    radius: totalWidth / 2,
-                    isDecoration: false,
-                });
-            }
         }
+        scaleContainer.addChild(scaleGraphics);
 
-        // 3. Draw Custom Decorations
+        const textStyle = new PIXI.TextStyle({ fontFamily: "Signika", fontSize: 16, fill: "#000000", stroke: "#ffffff", strokeThickness: 4, fontWeight: "bold" });
+        const text0 = new PIXI.Text("0", textStyle);
+        text0.anchor.set(0.5, 1);
+        text0.x = 0;
+        text0.y = -5;
+        scaleContainer.addChild(text0);
+
+        // Apply the multiplier mathematically
+        const textMax = new PIXI.Text(`${majorTicks * scaleValue} ${units}`, textStyle);
+        textMax.anchor.set(0.5, 1);
+        textMax.x = totalWidth;
+        textMax.y = -5;
+        scaleContainer.addChild(textMax);
+
+        this.layers.cartography.addChild(scaleContainer);
+
+        if (isEditMode) {
+            const scaleDataObj = {
+                get x() {
+                    return uiState.cartographyScaleX;
+                },
+                set x(val) {
+                    uiState.cartographyScaleX = val;
+                },
+                get y() {
+                    return uiState.cartographyScaleY;
+                },
+                set y(val) {
+                    uiState.cartographyScaleY = val;
+                },
+            };
+
+            this.interactiveTargets.push({
+                target: scaleDataObj,
+                x: scaleContainer.x + totalWidth / 2,
+                y: scaleContainer.y,
+                radius: totalWidth / 2,
+                isDecoration: false,
+            });
+        }
+    }
+
+    #drawCartographyDecorations(decorations, isEditMode) {
         decorations.forEach((dec) => {
             if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false) || !dec.src) return;
 
@@ -1695,7 +1702,7 @@ export class StudioCanvas {
                 }
 
                 const colorHex = typeof fault.color === "string" ? Number.parseInt(fault.color.replace("#", ""), 16) : fault.color || 0xffffff;
-                const thickness = fault.thickness || 40;
+                const thickness = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
 
                 // Draw the Area of Effect Halo via circle stamping
                 this.haloGraphics.beginFill(colorHex, 1);
@@ -1750,7 +1757,7 @@ export class StudioCanvas {
             const isActive = river.id === activeRiverId;
             const lineColor = isActive ? 0x00e5ff : 0x78aad2;
 
-            this.manualRiverGraphics.lineStyle(2, lineColor, 0.8);
+            this.manualRiverGraphics.lineStyle(FILRODENSWMB.DISPLAY.RIVER_WIDTH, lineColor, 0.8);
 
             // Draw Catmull-Rom spline
             const points = river.points;

@@ -40,7 +40,7 @@ export class MapStateManager {
             brushSize: 20,
             brushStrength: 0.02,
             brushFeather: 0.4,
-            brushBiome: 6,
+            brushBiome: FILRODENSWMB.BIOME_IDS.GRASSLAND,
             customBiomes: [],
 
             mapSeed: FILRODENSWMB.DEFAULTS.SEED,
@@ -160,6 +160,15 @@ export class MapStateManager {
         }
 
         app.pinRedoStack = [];
+
+        // Push to the Global Ledger and clear forward redos
+        if (!app.globalHistoryLedger) app.globalHistoryLedger = [];
+        app.globalHistoryLedger.push("vector");
+        app.globalRedoLedger = [];
+
+        if (app.globalHistoryLedger.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
+            app.globalHistoryLedger.shift();
+        }
     }
 
     /**
@@ -225,8 +234,8 @@ export class MapStateManager {
             noise: {
                 offsetX: state["noise.offsetX"],
                 offsetY: state["noise.offsetY"],
-                moistureOffset: state["noise.moistureOffset"] ?? 10000,
-                tempOffset: state["noise.tempOffset"] ?? 20000,
+                moistureOffset: state["noise.moistureOffset"] ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE,
+                tempOffset: state["noise.tempOffset"] ?? FILRODENSWMB.NOISE.OFFSET_TEMP,
                 elevation: {
                     scale: 1 / state["noise.elevation.scale"],
                     octaves: state["noise.elevation.octaves"],
@@ -250,7 +259,7 @@ export class MapStateManager {
             climate: {
                 altCooling: state.altCooling,
                 freezingThreshold: state.freezingThreshold,
-                windDistance: state.windDistance ?? 40,
+                windDistance: state.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE,
             },
             biomePalette: compiledPalette,
             customColors: customBiomeColors,

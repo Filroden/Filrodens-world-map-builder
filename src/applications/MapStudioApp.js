@@ -154,6 +154,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapDecorations = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
+        this.globalHistoryLedger = [];
+        this.globalRedoLedger = [];
         this.brushEngine = null;
 
         this.currentSaveId = null;
@@ -636,7 +638,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
         if (editBtn) editBtn.classList.add("active");
 
-        const isVectorTool = ["features", "infrastructure", "regions", "labels", "cartography"].includes(this.activeTool);
+        const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
         if (!isVectorTool) {
             const panel = this.element.querySelector(".fwmb-context-panel");
             if (panel) {
@@ -801,7 +803,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #handleBrushEnd() {
+        const prevLength = this.brushEngine?.history?.length || 0;
         this.brushEngine.endStroke();
+
+        // Only push to ledger if the brush engine actually registered a stroke
+        if (this.brushEngine?.history?.length > prevLength) {
+            this.globalHistoryLedger.push("raster");
+            this.globalRedoLedger = [];
+
+            if (this.globalHistoryLedger.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
+                this.globalHistoryLedger.shift();
+            }
+        }
+
         this.markDirty();
 
         if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
@@ -1441,6 +1455,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             migrateVisibility(payload.mapRoutes);
             payload.mapRoutes.forEach((route) => {
                 if (!route.quickStyle) route.quickStyle = "custom"; // Flag old routes as custom overrides
+
+                // Heal legacy routes missing visual properties
+                route.color = route.color || "#ffffff";
+                route.thickness = route.thickness || 3;
+                route.style = route.style || "solid";
             });
         }
 
@@ -1487,6 +1506,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.brushEngine.redoStack = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
+        this.globalHistoryLedger = this.brushEngine.history.map(() => "raster");
+        this.globalRedoLedger = [];
 
         this.defaultUiState = foundry.utils.deepClone(this.uiState);
 
@@ -1733,11 +1754,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
                 const defaultName = `Terrain Map (${hash})`;
 
-                mapName = await foundry.applications.api.DialogV2.prompt({
-                    window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save As" },
-                    content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${defaultName}">`,
-                    ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
-                });
+                mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), defaultName);
 
                 if (!mapName) return false; // User cancelled the save prompt
             }
@@ -1928,12 +1945,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const hasPinEdits = this.mapPins && this.mapPins.length > 0;
 
         if (hasBrushEdits || hasPinEdits) {
-            const confirmed = await foundry.applications.api.DialogV2.confirm({
-                window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
-                content: `<p>${game.i18n.localize("FILRODENSWMB.UI.ResolutionWarningContent")}</p>`,
-                rejectClose: false,
-                modal: true,
-            });
+            const confirmed = await MapDialogManager._confirmDialog(game.i18n.localize("FILRODENSWMB.UI.Warning"), game.i18n.localize("FILRODENSWMB.UI.ResolutionWarningContent"));
 
             if (!confirmed) {
                 if (widthInput) widthInput.value = this.mapWidth;
@@ -1973,6 +1985,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapDecorations = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
+        this.globalHistoryLedger = [];
+        this.globalRedoLedger = [];
 
         // 2. Drop all active drawing states
         this.activeRouteId = null;
@@ -2212,11 +2226,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         // 2. Prompt for save name
-        const mapName = await foundry.applications.api.DialogV2.prompt({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save Regional Map As" },
-            content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${this.currentSaveName || "Map"} (Region)">`,
-            ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
-        });
+        const mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), `${this.currentSaveName || "Map"} (Region)`);
 
         if (!mapName) return;
 
@@ -2334,11 +2344,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async #handleMapRename(mapId, card) {
         const currentName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-        const newName = await foundry.applications.api.DialogV2.prompt({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Rename") },
-            content: `<input type="text" id="fwmb-rename" value="${currentName}">`,
-            ok: { callback: (event, button, dialog) => button.form.elements["fwmb-rename"].value },
-        });
+        const newName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.Rename"), game.i18n.localize("FILRODENSWMB.UI.Name") || "Name", currentName);
 
         if (newName && newName !== currentName) {
             const updatedDoc = await renameSavedMap(mapId, newName);
@@ -2359,12 +2365,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async #handleMapPromote(mapId, card) {
-        const confirmed = await foundry.applications.api.DialogV2.confirm({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Promote") || "Promote Map" },
-            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.PromoteConfirm") || "Create a standalone copy of this regional map? The new map will not be linked to the original parent."}</p>`,
-            rejectClose: false,
-            modal: true,
-        });
+        const confirmed = await MapDialogManager._confirmDialog(
+            game.i18n.localize("FILRODENSWMB.UI.Promote") || "Promote Map",
+            game.i18n.localize("FILRODENSWMB.UI.PromoteConfirm") || "Create a standalone copy of this regional map?",
+        );
         if (!confirmed) return;
 
         const exportData = await loadMapData(mapId);
@@ -2462,33 +2466,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     _onRedoBrush(event, target) {
-        if (["features", "infrastructure", "regions", "labels"].includes(this.activeTool)) {
-            if (this.pinRedoStack.length === 0) return;
+        let action = this.globalRedoLedger?.pop();
 
-            // Push the current state back to the undo history
-            this.pinHistory.push(MapStateManager.getVectorStateSnapshot(this));
+        while (action) {
+            if (action === "vector") {
+                if (this.pinRedoStack.length > 0) {
+                    const previousFaults = JSON.stringify(this.tectonicFaults);
+                    const previousRivers = JSON.stringify(this.manualRivers);
+                    const previousPins = JSON.stringify(this.mapPins);
 
-            // Pop the forward state and apply it
-            const state = this.pinRedoStack.pop();
-            MapStateManager.restoreVectorStateSnapshot(this, state);
+                    this.pinHistory.push(MapStateManager.getVectorStateSnapshot(this));
+                    const state = this.pinRedoStack.pop();
+                    MapStateManager.restoreVectorStateSnapshot(this, state);
 
-            if (this.activeTool === "features") {
-                this._repaintCanvas();
-                this.debouncedGenerateClimate();
-                this.debouncedGenerateTerrain();
-            } else {
-                this._repaintVectors();
+                    this.globalHistoryLedger.push("vector");
+
+                    if (previousFaults !== JSON.stringify(this.tectonicFaults) || previousRivers !== JSON.stringify(this.manualRivers)) {
+                        this._repaintCanvas();
+                        this.debouncedGenerateTerrain();
+                    } else if (previousPins !== JSON.stringify(this.mapPins)) {
+                        this._repaintCanvas();
+                        this.debouncedGenerateClimate();
+                    } else {
+                        this._repaintVectors();
+                    }
+                    break;
+                }
+            } else if (action === "raster") {
+                if (this.baseElevationData && this.brushEngine?.redo()) {
+                    this.globalHistoryLedger.push("raster");
+                    this.#rebuildFromHistory();
+                    this._repaintCanvas();
+                    this.debouncedGenerateClimate();
+                    break;
+                }
             }
-            this.render({ parts: ["context"] });
-        } else {
-            if (!this.baseElevationData || !this.brushEngine) return;
-            if (this.brushEngine.redo()) {
-                this.#rebuildFromHistory();
-                this._repaintCanvas();
-                this.debouncedGenerateClimate();
-            }
+            action = this.globalRedoLedger?.pop();
         }
 
+        this.render({ parts: ["context"] });
         this.markDirty();
     }
 
@@ -2793,7 +2809,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         // Only lock the sidebar for procedural raster tools
-        const isVectorTool = ["features", "infrastructure", "regions", "labels", "cartography"].includes(this.activeTool);
+        const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
 
         if (!isVectorTool) {
             const panel = this.element.querySelector(".fwmb-context-panel");
@@ -2806,7 +2822,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        if (["features", "infrastructure", "regions", "labels", "cartography"].includes(this.activeTool)) {
+        if (isVectorTool) {
             this._repaintVectors();
         }
     }
@@ -2963,33 +2979,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     _onUndoBrush(event, target) {
-        if (["features", "infrastructure", "regions", "labels"].includes(this.activeTool)) {
-            if (this.pinHistory.length === 0) return;
+        let action = this.globalHistoryLedger?.pop();
 
-            // Push the current state to the redo stack
-            this.pinRedoStack.push(MapStateManager.getVectorStateSnapshot(this));
+        while (action) {
+            if (action === "vector") {
+                if (this.pinHistory.length > 0) {
+                    const previousFaults = JSON.stringify(this.tectonicFaults);
+                    const previousRivers = JSON.stringify(this.manualRivers);
+                    const previousPins = JSON.stringify(this.mapPins);
 
-            // Pop the historical state and apply it
-            const state = this.pinHistory.pop();
-            MapStateManager.restoreVectorStateSnapshot(this, state);
+                    this.pinRedoStack.push(MapStateManager.getVectorStateSnapshot(this));
+                    const state = this.pinHistory.pop();
+                    MapStateManager.restoreVectorStateSnapshot(this, state);
 
-            if (this.activeTool === "features") {
-                this._repaintCanvas();
-                this.debouncedGenerateClimate();
-                this.debouncedGenerateTerrain();
-            } else {
-                this._repaintVectors();
+                    this.globalRedoLedger.push("vector");
+
+                    if (previousFaults !== JSON.stringify(this.tectonicFaults) || previousRivers !== JSON.stringify(this.manualRivers)) {
+                        this._repaintCanvas();
+                        this.debouncedGenerateTerrain();
+                    } else if (previousPins !== JSON.stringify(this.mapPins)) {
+                        this._repaintCanvas();
+                        this.debouncedGenerateClimate();
+                    } else {
+                        this._repaintVectors();
+                    }
+                    break;
+                }
+            } else if (action === "raster") {
+                if (this.baseElevationData && this.brushEngine?.undo()) {
+                    this.globalRedoLedger.push("raster");
+                    this.#rebuildFromHistory();
+                    this._repaintCanvas();
+                    this.debouncedGenerateClimate();
+                    break;
+                }
             }
-            this.render({ parts: ["context"] });
-        } else {
-            if (!this.baseElevationData || !this.brushEngine) return;
-            if (this.brushEngine.undo()) {
-                this.#rebuildFromHistory();
-                this._repaintCanvas();
-                this.debouncedGenerateClimate();
-            }
+            action = this.globalHistoryLedger?.pop();
         }
 
+        this.render({ parts: ["context"] });
         this.markDirty();
     }
 

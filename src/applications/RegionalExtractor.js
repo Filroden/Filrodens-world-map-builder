@@ -67,9 +67,9 @@ export class RegionalExtractor {
 
         state["noise.offsetX"] = (state["noise.offsetX"] + cropBox.x) * zoomScale;
         state["noise.offsetY"] = (state["noise.offsetY"] + cropBox.y) * zoomScale;
-        state["noise.moistureOffset"] = (state["noise.moistureOffset"] || 10000) * zoomScale;
-        state["noise.tempOffset"] = (state["noise.tempOffset"] || 20000) * zoomScale;
-        state.windDistance = (state.windDistance || 40) * zoomScale;
+        state["noise.moistureOffset"] = (state["noise.moistureOffset"] || FILRODENSWMB.NOISE.OFFSET_MOISTURE) * zoomScale;
+        state["noise.tempOffset"] = (state["noise.tempOffset"] || FILRODENSWMB.NOISE.OFFSET_TEMP) * zoomScale;
+        state.windDistance = (state.windDistance || FILRODENSWMB.CLIMATE.WIND_DISTANCE) * zoomScale;
 
         state["noise.elevation.scale"] *= zoomScale;
         state["noise.moisture.scale"] *= zoomScale;

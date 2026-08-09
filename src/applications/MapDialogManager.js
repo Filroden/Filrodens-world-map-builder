@@ -5,10 +5,10 @@ export class MapDialogManager {
     /**
      * Shows a standard Yes/No confirmation dialog.
      */
-    static async _confirmDialog(contentKey = "FILRODENSWMB.UI.DeleteConfirm", titleKey = "FILRODENSWMB.UI.Delete", contentFallback = "", titleFallback = "") {
+    static async _confirmDialog(title, content) {
         return foundry.applications.api.DialogV2.confirm({
-            window: { title: game.i18n.localize(titleKey) || titleFallback },
-            content: `<p>${game.i18n.localize(contentKey) || contentFallback}</p>`,
+            window: { title: title || game.i18n.localize("FILRODENSWMB.UI.Warning") },
+            content: `<p>${content || game.i18n.localize("FILRODENSWMB.UI.ConfirmDelete")}</p>`,
             rejectClose: false,
             modal: true,
         });
@@ -17,12 +17,11 @@ export class MapDialogManager {
     /**
      * Prompts for a single line of text via a minimal DialogV2 form.
      */
-    static async _promptTextValue(titleKey, defaultValue, { label = "", titleFallback = "" } = {}) {
-        const labelHtml = label ? `<label>${label}</label>` : "";
+    static async _promptTextValue(title, label, defaultValue) {
         return foundry.applications.api.DialogV2.prompt({
-            window: { title: game.i18n.localize(titleKey) || titleFallback },
-            content: `${labelHtml}<input type="text" id="fwmb-prompt-value" value="${defaultValue}">`,
-            ok: { callback: (event, button) => button.form.elements["fwmb-prompt-value"].value.trim() },
+            window: { title: title },
+            content: `<label>${label}</label><input type="text" id="fwmb-prompt-input" value="${defaultValue}">`,
+            ok: { callback: (event, button) => button.form.elements["fwmb-prompt-input"].value },
         });
     }
 
@@ -49,26 +48,13 @@ export class MapDialogManager {
      */
     static _extractLabelResultFields(form) {
         return {
-            labelQuickStyle: form.elements["labelQuickStyle"].value,
-            labelFontFamily: form.elements["labelFontFamily"].value,
-            labelFontSize: Number(form.elements["labelFontSize"].value) || 1,
-            labelFillColor: form.elements["labelFillColor"].value,
-            labelMaxWidth: Number(form.elements["labelMaxWidth"].value) || 0,
-            labelJustify: form.elements["labelJustify"].value,
+            quickStyle: form.elements["labelQuickStyle"].value,
+            fontFamily: form.elements["labelFontFamily"].value,
+            fontSize: Number(form.elements["labelFontSize"].value) || 1,
+            fillColor: form.elements["labelFillColor"].value,
+            maxWidth: Number(form.elements["labelMaxWidth"].value) || 0,
+            justify: form.elements["labelJustify"].value,
         };
-    }
-
-    /**
-     * Applies the shared label properties fields onto an entity's `.label` sub-object.
-     */
-    static _applyLabelResultFields(entity, result) {
-        if (!entity.label) entity.label = {};
-        entity.label.quickStyle = result.labelQuickStyle;
-        entity.label.fontFamily = result.labelFontFamily;
-        entity.label.fontSize = result.labelFontSize;
-        entity.label.fillColor = result.labelFillColor;
-        entity.label.maxWidth = result.labelMaxWidth;
-        entity.label.justify = result.labelJustify;
     }
 
     /**
@@ -132,14 +118,14 @@ export class MapDialogManager {
                 if (onRender) onRender(event.target, event.target.element);
             },
             ok: {
-                callback: (event, button) => (onExtract ? onExtract(button.form) : null),
+                callback: (event, button) => (onExtract ? onExtract(button.form, entity.name) : null),
             },
         });
 
         if (result) {
             MapStateManager.pushVectorState(app);
 
-            Object.assign(entity, result);
+            foundry.utils.mergeObject(entity, result);
             if (onSave) onSave(entity, result);
 
             app._repaintVectors();
@@ -186,10 +172,10 @@ export class MapDialogManager {
                 }),
                 onCascade: (app, id, result) => {
                     for (const lbl of app.mapLabels) {
-                        if (lbl.quickStyle === id) Object.assign(lbl, result);
+                        if (lbl.quickStyle === id) foundry.utils.mergeObject(lbl, result);
                     }
                     const updateAttached = (ent) => {
-                        if (ent.label && ent.label.quickStyle === id) Object.assign(ent.label, result);
+                        if (ent.label && ent.label.quickStyle === id) foundry.utils.mergeObject(ent.label, result);
                     };
                     app.mapPins.forEach(updateAttached);
                     app.mapRoutes.forEach(updateAttached);
@@ -233,7 +219,7 @@ export class MapDialogManager {
                     style: form.elements["styleStyle"].value,
                 }),
                 onCascade: (app, id, result) => {
-                    for (const route of app.mapRoutes) if (route.quickStyle === id) Object.assign(route, result);
+                    for (const route of app.mapRoutes) if (route.quickStyle === id) foundry.utils.mergeObject(route, result);
                 },
                 onDisconnect: (app, id) => {
                     for (const route of app.mapRoutes) if (route.quickStyle === id) route.quickStyle = "custom";
@@ -250,7 +236,7 @@ export class MapDialogManager {
     // --- ADD ACTIONS ---
 
     static async onAddCustomBiome(app, event, target) {
-        const name = await this._promptTextValue("FILRODENSWMB.UI.AddCustomBiome", "", { label: "Biome Name" });
+        const name = await this._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.AddCustomBiome"), "Biome Name", "");
         if (!name) return;
 
         const currentIds = app.uiState.customBiomes.map((c) => c.id);
@@ -368,14 +354,14 @@ export class MapDialogManager {
     static async onDeleteCustomBiome(app, event, target) {
         const id = Number(target.dataset.id);
 
-        const confirmed = await this._confirmDialog("FILRODENSWMB.UI.DeleteBiome");
+        const confirmed = await this._confirmDialog(undefined, game.i18n.localize("FILRODENSWMB.UI.DeleteBiome"));
         if (!confirmed) return;
 
         MapStateManager.pushVectorState(app);
         app.uiState.customBiomes = app.uiState.customBiomes.filter((c) => c.id !== id);
 
         if (Number(app.uiState.brushBiome) === id) {
-            app.uiState.brushBiome = 6;
+            app.uiState.brushBiome = FILRODENSWMB.BIOME_IDS.GRASSLAND;
             app._syncDOMToState();
         }
 
@@ -575,10 +561,10 @@ export class MapDialogManager {
         let labelData = { name: sourceObj.name };
 
         if (type === "custom") {
-            Object.assign(labelData, sourceObj);
+            foundry.utils.mergeObject(labelData, sourceObj);
         } else {
             const safeObj = this._withLabelDefaults(app, sourceObj);
-            Object.assign(labelData, safeObj.label);
+            foundry.utils.mergeObject(labelData, safeObj.label);
         }
 
         await this._processEditDialog(app, sourceObj, {
@@ -593,16 +579,11 @@ export class MapDialogManager {
             onRender: (dialogApp, html) => {
                 this.bindLabelPropertiesDialog(html, app.uiState);
             },
-            onExtract: (form) => ({
-                name: form.elements["labelName"].value,
-                ...this._extractLabelResultFields(form),
-            }),
-            onSave: (entity, result) => {
-                if (type === "custom") {
-                    Object.assign(entity, result);
-                } else {
-                    this._applyLabelResultFields(entity, result);
-                }
+            onExtract: (form, fallbackName) => {
+                const result = { name: form.elements["labelName"]?.value.trim() || fallbackName };
+                if (type === "custom") Object.assign(result, this._extractLabelResultFields(form));
+                else result.label = this._extractLabelResultFields(form);
+                return result;
             },
         });
     }
@@ -653,17 +634,14 @@ export class MapDialogManager {
                 }
                 this.bindLabelPropertiesDialog(html, app.uiState);
             },
-            onExtract: (form) => ({
-                name: form.elements["pinName"].value,
+            onExtract: (form, fallbackName) => ({
+                name: form.elements["pinName"]?.value.trim() || fallbackName,
                 description: form.elements["pinDesc"].value,
                 icon: form.elements["pinIcon"].value,
                 scale: Number(form.elements["pinScale"].value),
                 color: form.elements["pinColor"].value,
-                ...this._extractLabelResultFields(form),
+                label: this._extractLabelResultFields(form),
             }),
-            onSave: (entity, result) => {
-                this._applyLabelResultFields(entity, result);
-            },
         });
     }
 
@@ -727,8 +705,8 @@ export class MapDialogManager {
             onRender: (dialogApp, html) => {
                 this.bindLabelPropertiesDialog(html, app.uiState);
             },
-            onExtract: (form) => ({
-                name: form.elements["regionName"].value,
+            onExtract: (form, fallbackName) => ({
+                name: form.elements["regionName"]?.value.trim() || fallbackName,
                 description: form.elements["regionDesc"].value,
                 fillColor: form.elements["regionFillTransparent"].checked ? "transparent" : form.elements["regionFillColor"].value,
                 fillStyle: form.elements["regionFillStyle"].value,
@@ -736,11 +714,8 @@ export class MapDialogManager {
                 lineThickness: Number(form.elements["regionLineThickness"].value),
                 lineStyle: form.elements["regionLineStyle"].value,
                 smoothing: form.elements["regionSmoothing"].value === "true",
-                ...this._extractLabelResultFields(form),
+                label: this._extractLabelResultFields(form),
             }),
-            onSave: (entity, result) => {
-                this._applyLabelResultFields(entity, result);
-            },
         });
     }
 
@@ -749,7 +724,7 @@ export class MapDialogManager {
         const layer = app.regionLayers.find((l) => l.id === id);
         if (!layer) return;
 
-        const newName = await this._promptTextValue("FILRODENSWMB.UI.EditLayer", layer.name);
+        const newName = await this._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.EditLayer"), "Layer Name", layer.name);
         if (newName) {
             layer.name = newName;
             app.render({ parts: ["context"] });
@@ -824,14 +799,14 @@ export class MapDialogManager {
 
                 this.bindLabelPropertiesDialog(html, app.uiState);
             },
-            onExtract: (form) => ({
-                name: form.elements["routeName"].value,
+            onExtract: (form, fallbackName) => ({
+                name: form.elements["routeName"]?.value.trim() || fallbackName,
                 description: form.elements["routeDesc"].value,
                 quickStyle: form.elements["routeQuickStyle"].value,
                 color: form.elements["routeColor"].value,
                 thickness: Number(form.elements["routeThickness"].value),
                 style: form.elements["routeStyle"].value,
-                ...this._extractLabelResultFields(form),
+                label: this._extractLabelResultFields(form),
             }),
             onSave: (entity, result) => {
                 if (app.activeRouteId === id) {
@@ -841,7 +816,6 @@ export class MapDialogManager {
                     app.uiState.routeStyle = result.style;
                     app._syncDOMToState();
                 }
-                this._applyLabelResultFields(entity, result);
             },
         });
     }
