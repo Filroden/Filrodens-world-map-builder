@@ -2075,28 +2075,29 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Resolves the localised UI label for a modified vector entity.
+     * Resolves the localized UI label for a modified vector entity.
      */
     #getActionLabel(key, entity) {
-        if (!key) return game.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit");
+        if (!key) return game.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
 
-        const labelConfig = {
-            tectonicFaults: "FILRODENSWMB.UI.ActionTectonicFault",
-            manualRivers: "FILRODENSWMB.UI.ActionCustomRiver",
-            mapRoutes: "FILRODENSWMB.UI.ActionRoute",
-            regionLayers: "FILRODENSWMB.UI.ActionRegion",
-            mapLabels: "FILRODENSWMB.UI.ActionLabel",
-            mapDecorations: "FILRODENSWMB.UI.ActionDecoration",
-        };
-
-        if (key === "mapPins") {
+        if (key === "pins") {
             const isSpring = entity?.type === "spring" || entity?.type === "block_spring";
             const pinKey = isSpring ? "FILRODENSWMB.UI.ActionRiverSpring" : "FILRODENSWMB.UI.ActionInfrastructurePin";
-            return game.i18n.localize(pinKey);
+            return game.i18n.localize(pinKey) || (isSpring ? "River Spring" : "Infrastructure Pin");
         }
 
-        const localizationKey = labelConfig[key];
-        return localizationKey ? game.i18n.localize(localizationKey) || key : "Vector Edit";
+        const labelConfig = {
+            tectonicFaults: ["FILRODENSWMB.UI.ActionTectonicFault", "Tectonic Fault"],
+            manualRivers: ["FILRODENSWMB.UI.ActionCustomRiver", "Custom River"],
+            routes: ["FILRODENSWMB.UI.ActionRoute", "Route"],
+            regionLayers: ["FILRODENSWMB.UI.ActionRegion", "Region"],
+            mapLabels: ["FILRODENSWMB.UI.ActionLabel", "Label"],
+            mapDecorations: ["FILRODENSWMB.UI.ActionDecoration", "Decoration"],
+        };
+
+        const match = labelConfig[key];
+
+        return match ? game.i18n.localize(match[0]) || match[1] : game.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
     }
 
     /**
