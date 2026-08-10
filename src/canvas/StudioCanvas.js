@@ -5,13 +5,17 @@ export class StudioCanvas {
         this.container = htmlContainer;
 
         this.app = new PIXI.Application({
-            resizeTo: this.container,
+            autoDensity: true,
             backgroundColor: 0x1a4b84,
             antialias: true,
             resolution: window.devicePixelRatio || 1,
+            sharedTicker: false,
+            autoStart: false,
         });
 
         const canvasElement = this.app.canvas ?? this.app.view;
+        canvasElement.style.display = "block";
+
         this.container.appendChild(canvasElement);
 
         this.stage = new PIXI.Container();
@@ -120,14 +124,31 @@ export class StudioCanvas {
 
         this.#setupInteractions(canvasElement);
 
-        this.resizeObserver = new ResizeObserver(() => {
-            this.app.resize();
-            if (!this.isInitialized && this.container.clientWidth > 0) {
-                this.resetCamera();
-                this.isInitialized = true;
+        let lastW = 0;
+        let lastH = 0;
+        this.resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const w = Math.floor(entry.contentRect.width);
+                const h = Math.floor(entry.contentRect.height);
+
+                if (w > 0 && h > 0 && (w !== lastW || h !== lastH)) {
+                    lastW = w;
+                    lastH = h;
+
+                    this.app.renderer.resize(w, h);
+                    this.resetCamera();
+                    this.isInitialized = true;
+                }
             }
         });
         this.resizeObserver.observe(this.container);
+        const renderLoop = (time) => {
+            const activeWindow = this.container.ownerDocument.defaultView || window;
+            this.app.ticker.update(time);
+            this.app.renderer.render(this.stage);
+            this.animationFrameId = activeWindow.requestAnimationFrame(renderLoop);
+        };
+        renderLoop();
 
         // Callbacks for brush tools
         this.onBrushStart = null;
@@ -486,6 +507,10 @@ export class StudioCanvas {
     }
 
     destroy() {
+        if (this.animationFrameId) {
+            const activeWindow = this.container?.ownerDocument?.defaultView || window;
+            activeWindow.cancelAnimationFrame(this.animationFrameId);
+        }
         if (this.resizeObserver) this.resizeObserver.disconnect();
         if (this.app) this.app.destroy(true, { children: true, texture: true, baseTexture: true });
     }
@@ -1908,5 +1933,91 @@ export class StudioCanvas {
         };
 
         scaleNodes(this.stage);
+    }
+
+    /**
+     * Draws a persistently pulsing cyan bounding box and text label to preview an upcoming action.
+     */
+    showActionPreview(bounds, actionLabel = "") {
+        this.clearActionPreview();
+        if (!bounds || !this.stage) return;
+
+        const trueWidth = bounds.maxX - bounds.minX;
+        const trueHeight = bounds.maxY - bounds.minY;
+        const centerX = bounds.minX + trueWidth / 2;
+        const centerY = bounds.minY + trueHeight / 2;
+
+        this.actionPreview = new PIXI.Container();
+
+        const invScale = 1 / (this.stage.scale.x || 1);
+        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale;
+
+        const boxWidth = trueWidth + pad * 2;
+        const boxHeight = trueHeight + pad * 2;
+        const boxX = -trueWidth / 2 - pad;
+        const boxY = -trueHeight / 2 - pad;
+
+        // 1. Draw the bounding box
+        const graphics = new PIXI.Graphics();
+        graphics.lineStyle(4 * invScale, 0x00e5ff, 1);
+        graphics.beginFill(0x00e5ff, 0.15);
+        graphics.drawRoundedRect(boxX, boxY, boxWidth, boxHeight, 12 * invScale);
+        graphics.endFill();
+        this.actionPreview.addChild(graphics);
+
+        // 2. Add the dynamic text label
+        if (actionLabel) {
+            const textStyle = new PIXI.TextStyle({
+                fontFamily: "Signika",
+                fontSize: 16 * invScale,
+                fill: "#00e5ff",
+                fontWeight: "bold",
+                stroke: "#000000",
+                strokeThickness: 4 * invScale,
+                dropShadow: true,
+                dropShadowColor: "#000000",
+                dropShadowBlur: 2,
+                dropShadowDistance: 2 * invScale,
+            });
+
+            const text = new PIXI.Text(actionLabel, textStyle);
+            // Position slightly inside the top-left corner
+            text.x = boxX + 8 * invScale;
+            text.y = boxY - text.height - 4 * invScale;
+
+            // Safety fallback: if the box is hard against the top of the map, push the text inside the box
+            if (centerY + text.y < 0) {
+                text.y = boxY + 8 * invScale;
+            }
+
+            this.actionPreview.addChild(text);
+        }
+
+        this.actionPreview.x = centerX;
+        this.actionPreview.y = centerY;
+        this.stage.addChild(this.actionPreview);
+
+        let elapsed = 0;
+        this.previewTick = () => {
+            if (this.actionPreview.destroyed) return;
+            elapsed += 0.05;
+            this.actionPreview.alpha = 0.55 + Math.sin(elapsed) * 0.25;
+        };
+        this.app.ticker.add(this.previewTick);
+    }
+
+    /**
+     * Clears the action preview and halts its animation ticker.
+     */
+    clearActionPreview() {
+        if (this.previewTick) {
+            this.app.ticker.remove(this.previewTick);
+            this.previewTick = null;
+        }
+        if (this.actionPreview) {
+            // Must pass { children: true } so the text and graphics nodes are purged from VRAM
+            this.actionPreview.destroy({ children: true });
+            this.actionPreview = null;
+        }
     }
 }

@@ -791,6 +791,7 @@
     flex: 1; 
     position: relative;
     min-width: 0;
+    min-height: 0;
     height: 100%;
 }
 
@@ -798,6 +799,8 @@
     position: absolute;
     inset: 0;
     overflow: hidden;
+    min-width: 0;
+    min-height: 0;
 }
 
 .fwmb-map-preview canvas {
@@ -950,6 +953,8 @@
     height: 100%;
     width: 100%;
     position: relative;
+    overflow: hidden;
+    -webkit-app-region: no-drag;
 }
 
 .fwmb .fwmb-map-preview {

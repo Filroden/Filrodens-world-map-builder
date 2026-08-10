@@ -434,5 +434,19 @@
     "FILRODENSWMB.UI.LabelEditHint": "Label properties can also be edited directly from the Labels tool.",
 
     "FILRODENSWMB.UI.ApplyChanges": "Apply Changes",
-    "FILRODENSWMB.UI.ToggleLiveTerrainGeneration": "Toggle Live Terrain Generation"
+    "FILRODENSWMB.UI.ToggleLiveTerrainGeneration": "Toggle Live Terrain Generation",
+
+    "FILRODENSWMB.UI.ActionUndo": "Undo: ",
+    "FILRODENSWMB.UI.ActionRedo": "Redo: ",
+    "FILRODENSWMB.UI.ActionVectorEdit": "Vector Edit",
+    "FILRODENSWMB.UI.ActionTectonicFault": "Tectonic Fault",
+    "FILRODENSWMB.UI.ActionCustomRiver": "Custom River",
+    "FILRODENSWMB.UI.ActionRoute": "Route",
+    "FILRODENSWMB.UI.ActionRegion": "Region",
+    "FILRODENSWMB.UI.ActionLabel": "Label",
+    "FILRODENSWMB.UI.ActionDecoration": "Decoration",
+    "FILRODENSWMB.UI.ActionRiverSpring": "River Spring",
+    "FILRODENSWMB.UI.ActionInfrastructurePin": "Infrastructure Pin",
+    "FILRODENSWMB.UI.ActionBiomeBrush": "Biome Brush",
+    "FILRODENSWMB.UI.ActionTerrainBrush": "Terrain Brush"
 }

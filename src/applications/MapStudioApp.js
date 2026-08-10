@@ -385,6 +385,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         editToolbar.dataset.hasListeners = "true";
         editToolbar.addEventListener("input", (e) => this.#handleToolbarInput(e));
         editToolbar.addEventListener("change", (e) => this.#handleToolbarInput(e));
+
+        // Action Preview Hover Hooks
+        const undoBtn = editToolbar.querySelector('[data-action="undoBrush"]');
+        const redoBtn = editToolbar.querySelector('[data-action="redoBrush"]');
+
+        if (undoBtn) {
+            undoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("undo"));
+            undoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
+        }
+        if (redoBtn) {
+            redoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("redo"));
+            redoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
+        }
     }
 
     #handleToolbarInput(event) {
@@ -631,7 +644,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const layerBtns = this.element.querySelectorAll('[data-action="toggleLayer"]');
         for (const btn of layerBtns) btn.classList.add("active");
 
-        setTimeout(async () => {
+        const activeWindow = this.element.ownerDocument.defaultView || window;
+        activeWindow.setTimeout(async () => {
             await this.generateTerrain();
             this.isDirty = false;
         }, 50);
@@ -1804,7 +1818,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (!saved) return false;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        const activeWindow = this.element.ownerDocument.defaultView || window;
+        await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
 
         return true;
     }
@@ -1903,8 +1918,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         overlay.classList.remove("fwmb-hidden");
 
-        // Force the render cycle to complete before unblocking the main thread
-        await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+        const activeWindow = this.element.ownerDocument.defaultView || window;
+        await new Promise((resolve) => activeWindow.requestAnimationFrame(() => activeWindow.setTimeout(resolve, 0)));
     }
 
     /**
@@ -1930,6 +1945,183 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.hasPendingFeatureMath = true;
             this.#syncApplyButtonState();
         }
+    }
+
+    /**
+     * Identifies the spatial bounds of the next Undo or Redo action.
+     */
+    #previewActionBounds(direction) {
+        if (!this.canvasEngine) return;
+
+        const ledger = direction === "undo" ? this.globalHistoryLedger : this.globalRedoLedger;
+        const actionType = ledger.at(-1);
+
+        if (!actionType) return;
+
+        let targetBounds = null;
+        let actionLabel = "";
+
+        if (actionType === "raster") {
+            const stack = direction === "undo" ? this.brushEngine.history : this.brushEngine.redoStack;
+            const targetStroke = stack.at(-1);
+
+            if (targetStroke?.points && targetStroke.points.length > 0) {
+                targetBounds = this.#calculatePointBounds(targetStroke.points, targetStroke.size || 20);
+
+                // Map the raster layer to its localisation key
+                const isBiome = targetStroke.layer === "biome";
+                const locKey = isBiome ? "FILRODENSWMB.UI.ActionBiomeBrush" : "FILRODENSWMB.UI.ActionTerrainBrush";
+                const fallback = isBiome ? "Biome Brush" : "Terrain Brush";
+
+                actionLabel = game.i18n.localize(locKey) || fallback;
+            }
+        } else if (actionType === "vector") {
+            const stack = direction === "undo" ? this.pinHistory : this.pinRedoStack;
+            const targetSnapshot = stack.at(-1);
+
+            if (targetSnapshot) {
+                const currentState = MapStateManager.getVectorStateSnapshot(this);
+                const diffResult = this.#diffVectorSnapshots(currentState, targetSnapshot);
+
+                if (diffResult) {
+                    targetBounds = diffResult.bounds;
+                    actionLabel = diffResult.label;
+                }
+            }
+        }
+
+        if (targetBounds) {
+            const prefixKey = direction === "undo" ? "FILRODENSWMB.UI.ActionUndo" : "FILRODENSWMB.UI.ActionRedo";
+            const prefix = game.i18n.localize(prefixKey);
+
+            this.canvasEngine.showActionPreview(targetBounds, `${prefix} ${actionLabel}`);
+        }
+    }
+
+    /**
+     * Compares two global state snapshots to find the specific entity that changed.
+     */
+    #diffVectorSnapshots(current, target) {
+        let changedEntity = null;
+        let entityKey = null;
+
+        for (const key of Object.keys(current)) {
+            if (!Array.isArray(current[key]) || !Array.isArray(target[key])) continue;
+
+            const currentMap = new Map(current[key].map((item, idx) => [item.id || `idx_${idx}`, item]));
+            const targetMap = new Map(target[key].map((item, idx) => [item.id || `idx_${idx}`, item]));
+
+            for (const [id, targetItem] of targetMap.entries()) {
+                const currentItem = currentMap.get(id);
+
+                if (!currentItem || JSON.stringify(currentItem) !== JSON.stringify(targetItem)) {
+                    changedEntity = currentItem || targetItem;
+                    entityKey = key;
+
+                    if (changedEntity.regions && Array.isArray(changedEntity.regions)) {
+                        const cRegs = new Map((currentItem?.regions || []).map((r, i) => [r.id || `idx_${i}`, r]));
+                        const tRegs = new Map((targetItem?.regions || []).map((r, i) => [r.id || `idx_${i}`, r]));
+                        let changedReg = null;
+
+                        for (const [rId, tReg] of tRegs.entries()) {
+                            const cReg = cRegs.get(rId);
+                            if (!cReg || JSON.stringify(cReg) !== JSON.stringify(tReg)) {
+                                changedReg = cReg || tReg;
+                                break;
+                            }
+                        }
+                        if (!changedReg) {
+                            for (const [rId, cReg] of cRegs.entries()) {
+                                if (!tRegs.has(rId)) {
+                                    changedReg = cReg;
+                                    break;
+                                }
+                            }
+                        }
+                        if (changedReg) changedEntity = changedReg;
+                    }
+                    break;
+                }
+            }
+
+            if (!changedEntity) {
+                for (const [id, currentItem] of currentMap.entries()) {
+                    if (!targetMap.has(id)) {
+                        changedEntity = currentItem;
+                        entityKey = key;
+                        break;
+                    }
+                }
+            }
+
+            if (changedEntity) break;
+        }
+
+        if (!changedEntity) return null;
+
+        let points = [];
+        if (changedEntity.points) {
+            points = changedEntity.points;
+        } else if (changedEntity.regions) {
+            points = changedEntity.regions.flatMap((r) => r.points || []);
+        } else if (changedEntity.x !== undefined && changedEntity.y !== undefined) {
+            points = [changedEntity];
+        }
+
+        return {
+            bounds: this.#calculatePointBounds(points, 50),
+            label: this.#getActionLabel(entityKey, changedEntity),
+        };
+    }
+
+    /**
+     * Resolves the localised UI label for a modified vector entity.
+     */
+    #getActionLabel(key, entity) {
+        if (!key) return game.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit");
+
+        const labelConfig = {
+            tectonicFaults: "FILRODENSWMB.UI.ActionTectonicFault",
+            manualRivers: "FILRODENSWMB.UI.ActionCustomRiver",
+            mapRoutes: "FILRODENSWMB.UI.ActionRoute",
+            regionLayers: "FILRODENSWMB.UI.ActionRegion",
+            mapLabels: "FILRODENSWMB.UI.ActionLabel",
+            mapDecorations: "FILRODENSWMB.UI.ActionDecoration",
+        };
+
+        if (key === "mapPins") {
+            const isSpring = entity?.type === "spring" || entity?.type === "block_spring";
+            const pinKey = isSpring ? "FILRODENSWMB.UI.ActionRiverSpring" : "FILRODENSWMB.UI.ActionInfrastructurePin";
+            return game.i18n.localize(pinKey);
+        }
+
+        const localizationKey = labelConfig[key];
+        return localizationKey ? game.i18n.localize(localizationKey) || key : "Vector Edit";
+    }
+
+    /**
+     * Converts an array of {x,y} points into a spatial bounding box.
+     */
+    #calculatePointBounds(points, padding = 0) {
+        if (!points || points.length === 0) return null;
+
+        let minX = Infinity,
+            maxX = -Infinity,
+            minY = Infinity,
+            maxY = -Infinity;
+        for (const pt of points) {
+            if (pt.x < minX) minX = pt.x;
+            if (pt.x > maxX) maxX = pt.x;
+            if (pt.y < minY) minY = pt.y;
+            if (pt.y > maxY) maxY = pt.y;
+        }
+
+        return {
+            minX: Math.max(0, minX - padding),
+            maxX: Math.min(this.mapWidth, maxX + padding),
+            minY: Math.max(0, minY - padding),
+            maxY: Math.min(this.mapHeight, maxY + padding),
+        };
     }
 
     // --- Action Handlers ---
@@ -2676,15 +2868,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Handles swapping between the Raise, Lower, and Smooth brush tools.
      */
     _onSetBrushTool(event, target) {
-        const toolContainer = target.closest(".fwmb-brush-tools");
+        const activeBtn = target.closest("button");
+        if (!activeBtn) return;
+
+        const toolContainer = activeBtn.closest(".fwmb-brush-tools");
         if (!toolContainer) return;
 
-        for (const btn of toolContainer.querySelectorAll("button")) {
+        // Extract the tool group and only strip the 'active' class from sibling tools
+        const group = activeBtn.dataset.toolGroup;
+        for (const btn of toolContainer.querySelectorAll(`button[data-tool-group~="${group}"]`)) {
             btn.classList.remove("active");
         }
 
-        const activeBtn = target.closest("button");
-        if (activeBtn) activeBtn.classList.add("active");
+        activeBtn.classList.add("active");
 
         if (toolContainer.querySelector('[data-tool="drawFault"]')) {
             const isFaultActive = activeBtn.dataset.tool === "drawFault";
