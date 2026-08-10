@@ -1698,6 +1698,8 @@ export class StudioCanvas {
         this.mapMask.beginFill(0xffffff); // Color doesn't matter for masks
         this.mapMask.drawRect(0, 0, this.mapWidth, this.mapHeight);
         this.mapMask.endFill();
+
+        this.stage.hitArea = new PIXI.Rectangle(0, 0, this.mapWidth, this.mapHeight);
     }
 
     renderFaultLines(faults = [], isEditMode = false, activeFaultId = null) {

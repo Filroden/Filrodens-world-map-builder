@@ -335,19 +335,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #bindGlobalListeners() {
-        if (this.element.dataset.hasDblClickListener) return;
-        this.element.addEventListener("dblclick", (event) => {
-            const target = event.target;
-            if (target.tagName === "INPUT" && target.type === "range") {
-                const defaultVal = this.defaultUiState[target.name];
-                if (defaultVal !== undefined && target.value !== String(defaultVal)) {
-                    target.value = defaultVal;
-                    if (target.nextElementSibling?.tagName === "OUTPUT") target.nextElementSibling.value = defaultVal;
-                    target.dispatchEvent(new Event("input", { bubbles: true }));
+        if (!this.element.dataset.hasDblClickListener) {
+            this.element.addEventListener("dblclick", (event) => {
+                const target = event.target;
+                if (target.tagName === "INPUT" && target.type === "range") {
+                    const defaultVal = this.defaultUiState[target.name];
+                    if (defaultVal !== undefined && target.value !== String(defaultVal)) {
+                        target.value = defaultVal;
+                        if (target.nextElementSibling?.tagName === "OUTPUT") target.nextElementSibling.value = defaultVal;
+                        target.dispatchEvent(new Event("input", { bubbles: true }));
+                    }
                 }
-            }
-        });
-        this.element.dataset.hasDblClickListener = "true";
+            });
+            this.element.dataset.hasDblClickListener = "true";
+        }
+
+        // Universal Keyboard Shortcuts
+        if (!this.element.dataset.hasKeyboardListeners) {
+            this.element.addEventListener("keydown", (event) => {
+                // Ensure shortcuts only fire if the user is focused on this module app (bypassing text inputs)
+                const activeElement = document.activeElement;
+                const isInputFocused = activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA");
+                if (isInputFocused) return;
+
+                const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+
+                if (isCtrlOrCmd && event.key.toLowerCase() === "z") {
+                    event.preventDefault();
+                    if (event.shiftKey) {
+                        this._onRedoBrush();
+                    } else {
+                        this._onUndoBrush();
+                    }
+                } else if (isCtrlOrCmd && event.key.toLowerCase() === "y") {
+                    event.preventDefault();
+                    this._onRedoBrush();
+                }
+            });
+            this.element.dataset.hasKeyboardListeners = "true";
+        }
     }
 
     #initCanvasAndEngines() {
@@ -380,23 +406,26 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #bindToolbarListeners() {
         const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-        if (!editToolbar || editToolbar.dataset.hasListeners) return;
-
-        editToolbar.dataset.hasListeners = "true";
-        editToolbar.addEventListener("input", (e) => this.#handleToolbarInput(e));
-        editToolbar.addEventListener("change", (e) => this.#handleToolbarInput(e));
-
-        // Action Preview Hover Hooks
-        const undoBtn = editToolbar.querySelector('[data-action="undoBrush"]');
-        const redoBtn = editToolbar.querySelector('[data-action="redoBrush"]');
-
-        if (undoBtn) {
-            undoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("undo"));
-            undoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
+        if (editToolbar && !editToolbar.dataset.hasListeners) {
+            editToolbar.dataset.hasListeners = "true";
+            editToolbar.addEventListener("input", (e) => this.#handleToolbarInput(e));
+            editToolbar.addEventListener("change", (e) => this.#handleToolbarInput(e));
         }
-        if (redoBtn) {
-            redoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("redo"));
-            redoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
+
+        if (!this.element.dataset.hasUndoListeners) {
+            this.element.dataset.hasUndoListeners = "true";
+
+            const undoBtn = this.element.querySelector('[data-action="undoBrush"]');
+            const redoBtn = this.element.querySelector('[data-action="redoBrush"]');
+
+            if (undoBtn) {
+                undoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("undo"));
+                undoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
+            }
+            if (redoBtn) {
+                redoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("redo"));
+                redoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
+            }
         }
     }
 
@@ -778,25 +807,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         if (layer === "labels") {
-            MapStateManager.pushVectorState(this);
-            this.mapLabels.push({
-                id: foundry.utils.randomID(),
-                name: this.uiState.nextLabelText || "New Label",
-                x: x,
-                y: y,
-                rotation: 0,
-                quickStyle: this.uiState.activeLabelQuickStyle,
-                fontFamily: this.uiState.labelFontFamily,
-                fontSize: this.uiState.labelFontSize,
-                fillColor: this.uiState.labelFillColor,
-                maxWidth: this.uiState.labelMaxWidth,
-                justify: this.uiState.labelJustify,
-                visibility: "all",
-            });
-
-            this._repaintVectors();
-            this.render({ parts: ["context"] });
-            this.markDirty();
+            this.#handleLabelClick(x, y);
             return;
         }
 
@@ -1738,6 +1749,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 }
             }
         }
+    }
+
+    #handleLabelClick(x, y) {
+        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+
+        MapStateManager.pushVectorState(this);
+        this.mapLabels.push({
+            id: foundry.utils.randomID(),
+            name: this.uiState.nextLabelText || "New Label",
+            x: x,
+            y: y,
+            rotation: 0,
+            quickStyle: this.uiState.activeLabelQuickStyle,
+            fontFamily: this.uiState.labelFontFamily,
+            fontSize: this.uiState.labelFontSize,
+            fillColor: this.uiState.labelFillColor,
+            maxWidth: this.uiState.labelMaxWidth,
+            justify: this.uiState.labelJustify,
+            visibility: "all",
+        });
+
+        this._repaintVectors();
+        this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     #updateReferenceLayer() {

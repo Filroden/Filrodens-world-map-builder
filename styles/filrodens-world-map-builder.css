@@ -787,17 +787,9 @@
 }
 
 /* 3. The Map Part */
-.fwmb .fwmb-map {
+.fwmb-map-preview {
     flex: 1; 
     position: relative;
-    min-width: 0;
-    min-height: 0;
-    height: 100%;
-}
-
-.fwmb-map-preview {
-    position: absolute;
-    inset: 0;
     overflow: hidden;
     min-width: 0;
     min-height: 0;
@@ -822,7 +814,7 @@
     border-radius: var(--fwmb-radius-small);
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 20;
-    opacity: 0; /* Hidden by default, shown on hover */
+    opacity: 0;
     transition: opacity 0.2s ease;
 }
 
@@ -841,12 +833,29 @@
     transition: opacity 0.2s ease;
 }
 
+.fwmb-map-history {
+    position: absolute;
+    inset-block-start: var(--fwmb-space-m);
+    inset-inline-end: var(--fwmb-space-m);
+    display: flex;
+    gap: var(--fwmb-space-xs);
+    background: rgba(0, 0, 0, 0.5);
+    padding: var(--fwmb-space-xs);
+    border-radius: var(--fwmb-radius-small);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
 .fwmb-map:hover .fwmb-map-controls,
-.fwmb-map:hover .fwmb-map-hint {
+.fwmb-map:hover .fwmb-map-hint,
+.fwmb-map:hover .fwmb-map-history {
     opacity: 1;
 }
 
-.fwmb-map-controls button {
+.fwmb-map-controls button,
+.fwmb-map-history button {
     width: var(--fwmb-font-size-xxl);
     height: var(--fwmb-font-size-xxl);
     background: transparent;
@@ -858,13 +867,15 @@
     justify-content: center;
 }
 
-.fwmb-map-controls button:hover {
+.fwmb-map-controls button:hover,
+.fwmb-map-history button:hover {
     color: var(--fwmb-primary-200);
     background: rgba(0 , 0, 0, 0.2);
     border-color: var(--fwmb-accent-main);
 }
 
-.fwmb-map-controls button.active {
+.fwmb-map-controls button.active,
+.fwmb-map-history button.active {
     color: var(--fwmb-primary-100);
     background: rgba(0, 0, 0, 0.4);
     border-color: var(--fwmb-accent-main);
@@ -971,6 +982,7 @@
     flex: 0 0 auto;
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     padding: var(--fwmb-space-s) var(--fwmb-space-m);
     background: var(--fwmb-bg-base);

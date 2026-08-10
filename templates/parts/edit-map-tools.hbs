@@ -297,7 +297,7 @@
 
     <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="labels">
         <label>{{localize "FILRODENSWMB.UI.LabelText"}}</label>
-        <input type="text" class="fwmb-wide" name="nextLabelText" value="{{lookup uiState 'nextLabelText'}}" style="width: fit-content; max-width: 60ch;" />
+        <input type="text" name="nextLabelText" value="{{lookup uiState 'nextLabelText'}}" />
     </div>
 
     <div class="fwmb-brush-setting fwmb-hidden" data-tool-group="labels">
@@ -359,15 +359,4 @@
     <button type="button" class="fwmb-btn disabled wide" data-action="applyFeatureMath" disabled>
         {{localize "FILRODENSWMB.UI.ApplyChanges"}}
     </button>
-
-    <div class="fwmb-divider-vertical" data-tool-group="terrain biomes features infrastructure regions labels cartography"></div>
-
-    <div class="fwmb-brush-history" data-tool-group="terrain biomes features infrastructure regions labels cartography">
-        <button type="button" data-action="undoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}">
-            <i class="fwmb-icon undo"></i>
-        </button>
-        <button type="button" data-action="redoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Redo'}}">
-            <i class="fwmb-icon redo"></i>
-        </button>
-    </div>
 </div>

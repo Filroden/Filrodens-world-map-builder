@@ -62,7 +62,17 @@ The main window in the module shows the current map.
 
 Hold `Left Click` to drag the map, and use the `Scroll Wheel` to zoom in and out.
 
+#### Map Preview Information
+
 As you move the mouse pointer over the map, a display of the elevation, moisture, temperature values and biome type will show in the top left corner of the map.
+
+#### Undo / Redo History
+
+- There are undo and redo buttons in the top right corner of the map. These will step back or forward through the global edit history.
+- Hovering over the undo or redo button will show which area of the map and what type of feature will be changed if you press it.
+- Undo and redo can also be accessed through their standard keyboard shortcuts (for Windows undo is `Ctrl + Z` and redo is `Ctrl + Y` or `Ctrl + Shift + Z`).
+
+#### Map Controls
 
 There are map controls in the bottom right corner of the map (only visible when the mouse is inside the map canvas).
 
@@ -82,8 +92,6 @@ There are map controls in the bottom right corner of the map (only visible when 
 Many of the following tools offer an edit mode. This mode has certain common features:
 
 - If you click the "Toggle Edit [Tool]" button in the sidebar a new toolbar will appear above the map containing edit tools.
-- While in edit mode the tool sidebar is locked to prevent changes while you are editing.
-- All edit toolbars have an "Undo" and "Redo" action.
 - Either click the "Toggle Edit [Tool]" button again to exit edit mode, or switch to a different map tool.
 
 In edit mode, some layers allow features to be added, moved or removed with mouse actions. **Only the features relating to the specific selected tool can be edited.** Not every action is available for every tool.
@@ -223,8 +231,6 @@ Once created, they are shown in the sidebar as cards. Each card has four buttons
 
 Descriptions for Points of Interest will be shown as tooltips if you hover over its marker. Descriptions can be styled using `<HTML>` elements, including referencing images, etc.
 
-Both Points of Interest and Routes will show a label. The label can be edited seperately using the label tool.
-
 1. **Edit Infrastructure**
 
    The Edit Infrastructure toolbar offers the following buttons and options:
@@ -262,7 +268,7 @@ The *Regions* tool allows you to draw custom polygons to show political, economi
 
 #### Labels
 
-The *Labels* tool allows you to edit existing labels and add/delete custom labels.
+The *Labels* tool allows you to edit existing labels and add/delete custom labels. Note that if the label is associated to another feature then the label can also be edited in that feature's main edit dialogue. The label settings remain synchronised whether they are edited on the feature or the label.
 
 1. Labels are automatically created for any vector item created using other tools, e.g., Points of Interest, routes and regions. These labels can be renamed, their styles edited and have their visibility toggled. They cannot be deleted.
 
@@ -271,6 +277,8 @@ The *Labels* tool allows you to edit existing labels and add/delete custom label
 
 3. Individual labels can have their visibility toggled by clicking the visibility button before its name in the sidebar.
    > Hidden labels will not be exported. Use the visibility toggle to control what information you want to share, e.g., by creating a player map and a GM map.
+
+4. Custom labels appear in their own group below the automatically generated labels. These work indentically to regular labels, except they can also be deleted.
 
 #### Cartography
 
@@ -394,7 +402,9 @@ When you click "Confirm", the interface will lock to prevent changes during the 
 
 ## Important Note on Performance
 
-The generator can be computationally heavy when calculating new terrain, moisture, and temperature models, particularly at larger resolutions. Maps of 1000x1000 pixels process very quickly. Maps of 4000x4000 pixels look beautiful, but may take a few seconds to calculate even on powerful PCs. Once the initial calculation is complete, the application returns to being highly responsive.
+Version 2 introduced significant performance improvements to the terrain and biome brushes so you can see their changes more quickly (almost real time depending on the map resolution). Other performance optimisations were also added.
+
+However, there are times when the full procedural generation engine must run (loading a map, after completing an edit, etc). The generator can be computationally heavy when calculating new terrain, moisture, and temperature models, particularly at larger resolutions. Maps of 1000x1000 pixels process very quickly. Maps of 4000x4000 pixels look beautiful, but may take a few seconds to calculate even on powerful PCs.
 
 ## FAQs
 
@@ -413,7 +423,7 @@ If the module imported an elevation model, which is just a static grid of pixels
 
 ### Why is it taking longer and longer for the terrain to regenerate when I make a new edit?
 
-All terrain edit brush strokes are stored and replayed in chronological order whenever the terrain must be recalculated. The more edits you make, the more history the engine must process in sequence. If you are just making a few changes to a map, this will not impact performance. However, if you are hand-drawing an entire map at a high resolution, you could easily generate thousands of brush strokes that must be reapplied on every update.
+Version 2 introduced significant performance improvements to the terrain and biome brushes so you can see their changes more quickly (almost real time depending on the map resolution). However, once an edit is complete, all terrain edit brush strokes must be replayed in chronological order whenever the terrain must be recalculated. The more edits you make, the more history the engine must process in sequence. If you are just making a few changes to a map, this will not impact performance. However, if you are hand-drawing an entire map at a high resolution, you could easily generate thousands of brush strokes that must be reapplied after the edit is complete.
 
 ### Do you have any tips for how to improve performance?
 
