@@ -159,6 +159,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.globalHistoryLedger = [];
         this.globalRedoLedger = [];
         this.hasPendingFeatureMath = false;
+        this.pendingTerrainBounds = null;
+        this.cachedMaxElevation = null;
         this.brushEngine = null;
 
         this.currentSaveId = null;
@@ -809,11 +811,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const prevLength = this.brushEngine?.history?.length || 0;
         this.brushEngine.endStroke();
 
-        // Only push to ledger if the brush engine actually registered a stroke
         if (this.brushEngine?.history?.length > prevLength) {
             this.globalHistoryLedger.push("raster");
             this.globalRedoLedger = [];
-
             if (this.globalHistoryLedger.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
                 this.globalHistoryLedger.shift();
             }
@@ -822,9 +822,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.markDirty();
 
         if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
-            this.#rebuildFromHistory().then(() => {
-                this._repaintCanvas();
-                this.debouncedGenerateClimate();
+            this.pendingTerrainBounds = null;
+
+            this.#rebuildFromHistory(true).then(() => {
+                this._repaintCanvas(null);
+                this.generateClimate(null);
             });
         }
     }
@@ -1052,6 +1054,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         MapStateManager.pushVectorState(this);
         const finalPos = { x, y };
+        let activeEntity = null;
 
         if (this.uiState.activeFeatureMode === "spring") {
             this.mapPins.push({
@@ -1067,6 +1070,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this._repaintCanvas();
             this.debouncedGenerateClimate();
         } else if (this.uiState.activeFeatureMode === "fault") {
+            activeEntity = this.activeFaultId ? this.tectonicFaults.find((f) => f.id === this.activeFaultId) : null;
+            const oldBounds = SpatialMath.getVectorBounds(activeEntity);
             if (this.activeFaultId) {
                 const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
                 if (fault) fault.points.push(finalPos);
@@ -1084,9 +1089,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     visibility: "all",
                 });
             }
+            activeEntity = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
+            const newBounds = SpatialMath.getVectorBounds(activeEntity);
             this._repaintVectors();
-            this.requestTerrainUpdate(); // Triggers the mathematical deformation
+            this.requestTerrainUpdate(SpatialMath.mergeBounds(oldBounds, newBounds));
         } else if (this.uiState.activeFeatureMode === "river") {
+            activeEntity = this.activeRiverId ? this.manualRivers.find((r) => r.id === this.activeRiverId) : null;
+            const oldBounds = SpatialMath.getVectorBounds(activeEntity);
             if (this.activeRiverId) {
                 const river = this.manualRivers.find((r) => r.id === this.activeRiverId);
                 if (river) river.points.push(finalPos);
@@ -1100,7 +1109,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     visibility: "all",
                 });
             }
+            activeEntity = this.manualRivers.find((r) => r.id === this.activeRiverId);
+            const newBounds = SpatialMath.getVectorBounds(activeEntity);
             this._repaintVectors();
+            this.requestTerrainUpdate(SpatialMath.mergeBounds(oldBounds, newBounds));
         }
 
         this.render({ parts: ["context"] });
@@ -1119,21 +1131,33 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.drawGrid(this.uiState.gridType, this.uiState.gridSize, this.uiState.gridVisible);
     }
 
-    async _repaintCanvas() {
+    async _repaintCanvas(bounds = null) {
         if (!this.currentElevationData) return;
+
+        // If repainting the FULL map, recalculate the true peak for accurate contrast
+        if (!bounds || !this.cachedMaxElevation) {
+            this.cachedMaxElevation = 0;
+            for (let i = 0; i < this.mapWidth * this.mapHeight; i++) {
+                if (this.currentElevationData[i] > this.cachedMaxElevation) {
+                    this.cachedMaxElevation = this.currentElevationData[i];
+                }
+            }
+        }
 
         const seaLevel = this.uiState["seaLevel"];
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
         const waterMask = this.bufferWaterMask;
 
-        engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, this.bufferBase);
+        engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, this.bufferBase, bounds);
         this.canvasEngine.renderPixelBuffer("base", this.bufferBase, this.mapWidth, this.mapHeight);
 
         const baseBtn = this.element.querySelector('[data-layer="base"]');
         this.canvasEngine.toggleLayer("base", baseBtn ? baseBtn.classList.contains("active") : true);
 
-        engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography);
+        // Pass the cached peak into the coloriser
+        const maxPeak = this.cachedMaxElevation || 1.0;
+        engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography, bounds, maxPeak);
         this.canvasEngine.renderPixelBuffer("topography", this.bufferTopography, this.mapWidth, this.mapHeight);
 
         const topoBtn = this.element.querySelector('[data-layer="topography"]');
@@ -1151,6 +1175,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 waterMask,
                 params,
                 this.bufferBiomes,
+                bounds,
             );
             this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
 
@@ -1159,14 +1184,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         const contourInterval = this.uiState["contourInterval"];
-        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours);
+        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds);
         this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight);
 
         if (this.canvasEngine) {
             this.canvasEngine.clearInteractiveTargets();
         }
 
-        // Render all non-destructive vector layers on top of the pixel maps
         this._repaintVectors();
     }
 
@@ -1218,13 +1242,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.currentElevationData) return;
 
         const seaLevel = this.uiState["seaLevel"];
+        const strokeBounds = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel);
 
-        const hasBrushed = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel);
+        if (!strokeBounds) return;
 
-        if (!hasBrushed) return;
+        // Accumulate the bounds for the deferred procedural generation
+        this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, strokeBounds);
 
         // Biome overrides do not alter topography or climate math.
-        // Bypass the global procedural engine and surgically update only the biome WebGL texture.
         if (this.activeTool === "biomes") {
             const { currentSeed, params } = MapStateManager.getMapParameters(this);
             const engine = new ProceduralEngine(currentSeed);
@@ -1240,30 +1265,44 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.bufferWaterMask,
                 params,
                 this.bufferBiomes,
+                this.pendingTerrainBounds,
             );
 
             this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
+            this.pendingTerrainBounds = null;
             return;
         }
 
-        // Terrain edits cascade through the entire procedural climate model.
-        this._repaintCanvas();
+        this._repaintCanvas(strokeBounds);
         this.debouncedGenerateClimate();
     }
 
-    async #rebuildFromHistory() {
+    async #rebuildFromHistory(showUI = false) {
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
 
-        this.currentElevationData.set(this.baseElevationData);
-        this.currentBiomeOverrides.fill(0);
+        // 1. Conditionally trigger the UI overlay
+        if (showUI) {
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.RebuildingHistory"));
+        }
 
-        // Feed the compiled params into the replay so Custom Biomes are validated and restored
-        this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel, params);
+        try {
+            // 2. Instant global array copy
+            this.currentElevationData.set(this.baseElevationData);
+            this.currentBiomeOverrides.fill(0);
 
-        // Carve rivers after brushes have mutated the terrain
-        if (this.manualRivers && this.manualRivers.length > 0) {
-            HydrologyEngine.carveManualRivers(this.currentElevationData, this.mapWidth, this.mapHeight, this.manualRivers, engine.simplex, params.seaLevel);
+            // 3. Global history replay
+            this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel);
+
+            // 4. Global river carving
+            if (this.manualRivers && this.manualRivers.length > 0) {
+                HydrologyEngine.carveManualRivers(this.currentElevationData, this.mapWidth, this.mapHeight, this.manualRivers, engine.simplex, params.seaLevel);
+            }
+        } finally {
+            // 5. Conditionally clear the UI overlay
+            if (showUI) {
+                this.#endProcessing();
+            }
         }
     }
 
@@ -1271,15 +1310,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
 
+        // Clear the accumulator so it doesn't linger
+        this.pendingTerrainBounds = null;
+
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
 
         try {
             console.log("World Map Builder | Generating Topography...");
             const t0 = performance.now();
 
-            // 1. Generate base noise and tectonics ONLY (pass empty array for rivers)
-            engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, []);
-
+            engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, [], null);
             await this.#rebuildFromHistory();
 
             this.currentSpringOverrides.fill(0);
@@ -1287,16 +1327,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const t1 = performance.now();
             console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
 
-            await this.generateClimate();
+            await this.generateClimate(null);
         } finally {
             this.#endProcessing();
         }
     }
 
-    async generateClimate() {
+    async generateClimate(bounds = null) {
         if (!this.currentElevationData) return;
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
+
+        let activeBounds = bounds || this.pendingTerrainBounds;
+
+        // Dynamically scale the wind distance relative to a baseline
+        if (activeBounds) {
+            const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
+            const widthScale = this.mapWidth / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+            const dynamicWindDistance = Math.round(baseWind * widthScale);
+
+            activeBounds = SpatialMath.padBounds(activeBounds, dynamicWindDistance, 0, this.mapWidth, this.mapHeight);
+        }
+
+        if (!bounds && this.pendingTerrainBounds) {
+            this.pendingTerrainBounds = null;
+        }
 
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
 
@@ -1304,18 +1359,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             console.log("World Map Builder | Generating Climate Data...");
             const t0 = performance.now();
 
-            engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params, this.currentMoistureData, this.currentTemperatureData);
+            engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params, this.currentMoistureData, this.currentTemperatureData, activeBounds);
 
             const t1 = performance.now();
             console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
 
-            await this.generateFeatures();
+            await this.generateFeatures(activeBounds);
         } finally {
             this.#endProcessing();
         }
     }
 
-    async generateFeatures() {
+    async generateFeatures(bounds = null) {
         if (!this.currentElevationData) return;
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
@@ -1365,7 +1420,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const t1 = performance.now();
             console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
 
-            await this._repaintCanvas();
+            await this._repaintCanvas(bounds); // Cascade to final render
         } finally {
             this.#endProcessing();
         }
@@ -1861,7 +1916,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Intercepts all terrain modifications. Evaluates if the math should be generated
      * live, or deferred to the manual Apply button.
      */
-    requestTerrainUpdate() {
+    requestTerrainUpdate(bounds = null) {
+        this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, bounds);
         if (this.uiState.liveFeatureUpdates) {
             this.debouncedGenerateTerrain();
         } else {
@@ -2512,7 +2568,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         input.value = Math.random().toString(36).substring(2, 8).toUpperCase();
     }
 
-    _onRedoBrush(event, target) {
+    async _onRedoBrush(event, target) {
         let action = this.globalRedoLedger?.pop();
 
         while (action) {
@@ -2542,7 +2598,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             } else if (action === "raster") {
                 if (this.baseElevationData && this.brushEngine?.redo()) {
                     this.globalHistoryLedger.push("raster");
-                    this.#rebuildFromHistory();
+                    await this.#rebuildFromHistory(true);
                     this._repaintCanvas();
                     this.debouncedGenerateClimate();
                     break;
@@ -3051,7 +3107,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return states[(currentIdx + 1) % states.length];
     }
 
-    _onUndoBrush(event, target) {
+    async _onUndoBrush(event, target) {
         let action = this.globalHistoryLedger?.pop();
 
         while (action) {
@@ -3081,7 +3137,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             } else if (action === "raster") {
                 if (this.baseElevationData && this.brushEngine?.undo()) {
                     this.globalRedoLedger.push("raster");
-                    this.#rebuildFromHistory();
+                    await this.#rebuildFromHistory(true);
                     this._repaintCanvas();
                     this.debouncedGenerateClimate();
                     break;

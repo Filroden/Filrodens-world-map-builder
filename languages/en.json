@@ -423,6 +423,7 @@
     "FILRODENSWMB.UI.JustifyRight": "Right",
 
     "FILRODENSWMB.UI.GeneratingTopography": "Generating Topography...",
+    "FILRODENSWMB.UI.RebuildingHistory": "Re-applying Brush History...",
     "FILRODENSWMB.UI.GeneratingClimate": "Generating Climate...",
     "FILRODENSWMB.UI.GeneratingFeatures": "Generating Features...",
     "FILRODENSWMB.UI.SavingMap": "Saving Map...",

@@ -79,4 +79,88 @@ export class SpatialMath {
 
         return closest.region ? closest : null;
     }
+
+    // --- Bounding Box API ---
+
+    /**
+     * Generates a mathematically empty bounding box.
+     */
+    static getEmptyBounds() {
+        return { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+    }
+
+    /**
+     * Evaluates whether a bounding box contains valid spatial data.
+     */
+    static isValidBounds(bounds) {
+        return bounds && bounds.minX !== Infinity && bounds.minX <= bounds.maxX && bounds.minY <= bounds.maxY;
+    }
+
+    /**
+     * Merges two bounding boxes into a single box that encompasses both.
+     */
+    static mergeBounds(b1, b2) {
+        if (!b1 && !b2) return this.getEmptyBounds();
+        if (!b1) return b2;
+        if (!b2) return b1;
+
+        return {
+            minX: Math.min(b1.minX, b2.minX),
+            maxX: Math.max(b1.maxX, b2.maxX),
+            minY: Math.min(b1.minY, b2.minY),
+            maxY: Math.max(b1.maxY, b2.maxY),
+        };
+    }
+
+    /**
+     * Expands a bounding box by a given padding, safely clamping it to the map edges.
+     */
+    static padBounds(bounds, padX, padY, width, height) {
+        if (!this.isValidBounds(bounds)) return bounds;
+
+        return {
+            minX: Math.max(0, Math.floor(bounds.minX - padX)),
+            maxX: Math.min(width - 1, Math.ceil(bounds.maxX + padX)),
+            minY: Math.max(0, Math.floor(bounds.minY - padY)),
+            maxY: Math.min(height - 1, Math.ceil(bounds.maxY + padY)),
+        };
+    }
+
+    /**
+     * Intersects two bounding boxes. Returns empty bounds if they do not overlap.
+     */
+    static intersectBounds(b1, b2) {
+        if (!b1 || !b2) return b1 || b2;
+        const minX = Math.max(b1.minX, b2.minX);
+        const maxX = Math.min(b1.maxX, b2.maxX);
+        const minY = Math.max(b1.minY, b2.minY);
+        const maxY = Math.min(b1.maxY, b2.maxY);
+
+        if (minX > maxX || minY > maxY) return this.getEmptyBounds();
+        return { minX, maxX, minY, maxY };
+    }
+
+    /**
+     * Calculates the padded bounding box of a vector entity.
+     */
+    static getVectorBounds(entity, defaultPad = 40) {
+        if (!entity?.points || entity.points.length === 0) return null;
+        let minX = Infinity,
+            maxX = -Infinity,
+            minY = Infinity,
+            maxY = -Infinity;
+        for (const pt of entity.points) {
+            minX = Math.min(minX, pt.x);
+            maxX = Math.max(maxX, pt.x);
+            minY = Math.min(minY, pt.y);
+            maxY = Math.max(maxY, pt.y);
+        }
+        const pad = entity.thickness || entity.width || defaultPad;
+        return {
+            minX: Math.floor(minX - pad),
+            maxX: Math.ceil(maxX + pad),
+            minY: Math.floor(minY - pad),
+            maxY: Math.ceil(maxY + pad),
+        };
+    }
 }

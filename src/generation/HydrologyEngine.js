@@ -1,3 +1,4 @@
+import { SpatialMath } from "../tools/SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
 
 /**
@@ -6,17 +7,16 @@ import { FILRODENSWMB } from "../config.js";
  */
 export class HydrologyEngine {
     static MATH = {
-        BANK_BLEND_POWER: 2,
         PATH_STEP_SIZE: 1, // 1 pixel interval guarantees continuous carving
     };
 
     /**
      * Iterates through all manual rivers and carves their physical trenches into the elevation data.
      */
-    static carveManualRivers(elevationData, width, height, rivers, simplex, seaLevel) {
+    static carveManualRivers(elevationData, width, height, rivers, simplex, seaLevel, activeBounds = null) {
         if (!rivers || rivers.length === 0) return;
         for (const river of rivers) {
-            this.#carveSingleRiver(elevationData, width, height, river, simplex, seaLevel);
+            this.#carveSingleRiver(elevationData, width, height, river, simplex, seaLevel, activeBounds);
         }
     }
 
@@ -57,7 +57,7 @@ export class HydrologyEngine {
         return sources;
     }
 
-    static #carveSingleRiver(elevationData, width, height, river, simplex, seaLevel) {
+    static #carveSingleRiver(elevationData, width, height, river, simplex, seaLevel, activeBounds = null) {
         if (!river.points || river.points.length < 2) return;
 
         const path = this.#getSplinePoints(river.points, 0.25);
@@ -77,7 +77,7 @@ export class HydrologyEngine {
             const currentRadius = startRadius + (targetRadius - startRadius) * progress;
             const currentRadiusSq = currentRadius * currentRadius;
 
-            this.#carveRiverCrossSection(elevationData, width, height, path[i], currentRadius, currentRadiusSq, bedProfile[i]);
+            this.#carveRiverCrossSection(elevationData, width, height, path[i], currentRadius, currentRadiusSq, bedProfile[i], activeBounds);
         }
     }
 
@@ -119,11 +119,14 @@ export class HydrologyEngine {
         return profile;
     }
 
-    static #carveRiverCrossSection(elevationData, width, height, pt, radius, radiusSq, bedElev) {
+    static #carveRiverCrossSection(elevationData, width, height, pt, radius, radiusSq, bedElev, activeBounds = null) {
         const cx = Math.floor(pt.x);
         const cy = Math.floor(pt.y);
 
-        const bounds = this.#calculateBounds(cx, cy, radius, width, height);
+        let bounds = this.#calculateBounds(cx, cy, radius, width, height);
+        bounds = SpatialMath.intersectBounds(bounds, activeBounds);
+
+        if (!SpatialMath.isValidBounds(bounds)) return;
 
         const coreRadius = Math.max(1, radius * 0.5);
         const coreRadiusSq = coreRadius * coreRadius;
@@ -143,7 +146,8 @@ export class HydrologyEngine {
 
                 if (trueDistSq > coreRadiusSq) {
                     const normDist = (distFromCenter - coreRadius) / (radius - coreRadius);
-                    blendFactor = Math.pow(Math.max(0, Math.min(1, normDist)), this.MATH.BANK_BLEND_POWER);
+                    const clampedDist = Math.max(0, Math.min(1, normDist));
+                    blendFactor = clampedDist * clampedDist; // Replaced Math.pow
                 }
 
                 const terrainElev = elevationData[idx];
@@ -179,13 +183,6 @@ export class HydrologyEngine {
             minY: Math.max(0, Math.floor(cy - pad)),
             maxY: Math.min(height - 1, Math.ceil(cy + pad)),
         };
-    }
-
-    static #calculateJitteredDistanceSq(x, y, cx, cy, simplex) {
-        const jitterX = simplex.noise2D(x * this.MATH.JITTER_SCALE, y * this.MATH.JITTER_SCALE) * this.MATH.JITTER_STRENGTH;
-        const jitterY = simplex.noise2D(x * this.MATH.JITTER_SCALE + 1000, y * this.MATH.JITTER_SCALE + 1000) * this.MATH.JITTER_STRENGTH;
-
-        return Math.pow(x + jitterX - cx, 2) + Math.pow(y + jitterY - cy, 2);
     }
 
     /**
