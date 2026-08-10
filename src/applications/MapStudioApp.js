@@ -1340,11 +1340,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         let activeBounds = bounds || this.pendingTerrainBounds;
 
-        // Dynamically scale the wind distance relative to a baseline
+        // Dynamically scale the wind distance relative to a baseline map resolution and map scale
         if (activeBounds) {
             const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
             const widthScale = this.mapWidth / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
-            const dynamicWindDistance = Math.round(baseWind * widthScale);
+
+            const latTop = params.latTop ?? 90;
+            const latBottom = params.latBottom ?? -90;
+            const latRange = Math.max(0.1, Math.abs(latTop - latBottom)); // Prevent Infinity
+            const latScale = 180 / latRange;
+
+            const dynamicWindDistance = Math.round(baseWind * widthScale * latScale);
 
             activeBounds = SpatialMath.padBounds(activeBounds, dynamicWindDistance, 0, this.mapWidth, this.mapHeight);
         }

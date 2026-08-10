@@ -311,7 +311,11 @@ export class ProceduralEngine {
         // Scale the mathematical wind distance to match the padded boundaries
         const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
         const widthScale = width / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
-        const dynamicWindDistance = Math.round(baseWind * widthScale);
+        const latTop = params.latTop ?? 90;
+        const latBottom = params.latBottom ?? -90;
+        const latRange = Math.max(0.1, Math.abs(latTop - latBottom));
+        const latScale = 180 / latRange;
+        const dynamicWindDistance = Math.round(baseWind * widthScale * latScale);
 
         const panX = params.noise.offsetX || 0;
         const panY = params.noise.offsetY || 0;
@@ -322,9 +326,6 @@ export class ProceduralEngine {
         const tOctaves = params.noise.temperature.octaves || 3;
         const globalTemp = params.globalTemp;
         const seasonOffset = params.seasonOffset || 0;
-        const latTop = params.latTop;
-        const latBottom = params.latBottom;
-        const latRange = Math.abs(latTop - latBottom);
         const moistureOffset = params.noise.moistureOffset ?? 10000;
         const tempOffset = params.noise.tempOffset ?? 20000;
 
