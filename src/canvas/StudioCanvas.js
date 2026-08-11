@@ -1999,13 +1999,22 @@ export class StudioCanvas {
         this.actionPreview.y = centerY;
         this.stage.addChild(this.actionPreview);
 
-        let elapsed = 0;
-        this.previewTick = () => {
-            if (this.actionPreview.destroyed) return;
-            elapsed += 0.05;
-            this.actionPreview.alpha = 0.55 + Math.sin(elapsed) * 0.25;
-        };
-        this.app.ticker.add(this.previewTick);
+        // --- ACCESSIBILITY CHECK ---
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if (!prefersReducedMotion) {
+            // Standard smooth pulse for users who haven't opted out of motion
+            let elapsed = 0;
+            this.previewTick = () => {
+                if (this.actionPreview.destroyed) return;
+                elapsed += 0.05;
+                this.actionPreview.alpha = 0.55 + Math.sin(elapsed) * 0.25;
+            };
+            this.app.ticker.add(this.previewTick);
+        } else {
+            // Static, fixed state for users with accessibility preferences
+            this.actionPreview.alpha = 0.75;
+        }
     }
 
     /**

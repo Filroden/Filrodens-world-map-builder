@@ -408,6 +408,12 @@ However, there are times when the full procedural generation engine must run (lo
 
 ## FAQs
 
+### Why do my maps look different in v2+ compared to in v1
+
+What you are seeing is a difference in how biomes are being procedurally generated as a result of orographic lift (rain shadows caused by mountain ranges). In v1, there was a bug which cause orographic lift to only consider the procedurally-generated elevation model. If you used any tool to edit the terrain (terrain brushes, custom rivers or tectonic faults), these would not be taken into account. In addition, the original strength of the orographic lift was using a fixed value which did not change with the map's resolution or its scale. Both these were fixed in v2. This means procedurally generated biomes will look a little different (more realistic), particulaly on maps that have a lot of terrain edits.
+
+Note that because orographic lift is scaled, biomes in regional maps should still look the same as the original map from which they were created.
+
 ### Can I import my own map?
 
 You can bring in any image as a reference, and it will be shown as a canvas overlay. You cannot bypass the procedurally generated terrain, but if you want to recreate an existing map, I have found the following workflows work well. Either:
@@ -442,5 +448,5 @@ Procedural rivers (those flowing from the automatically generated springs) calcu
 ## Roadmap
 
 - Bulk edit vector (pins, lines, regions and text) properties.
-- Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
-- Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
+- Scene tools to allow quicker toggling of the in-game map grid, map pins and tiles (which would otherwise take multiple clicks through Foundry's UI).
+- Multi-tile export support, allowing the user to toggle distinct layers (like political borders or trade routes) on and off during live play.
