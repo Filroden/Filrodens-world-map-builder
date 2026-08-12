@@ -147,10 +147,18 @@ The terrain is generated automatically. Once generated, the terrain can be edite
 1. **Global Settings**
    - **Sea Level:** Set the sea level. This will update the map to show the new coastline.
 
-2. **Elevation Model** The terrain model is infinite in size. These controls determine which part of the model you see.
-   - **Map Transformation:** Use the zoom buttons and the nudge buttons to change your position in the model. Both groups have a reset button between them, to return you to the original positions.
-   - **Detail:** Determine how smooth or detailed the model will be.
-   - **Stretch:** Higher values result in mid-elevations being stretched and high/low elevations being compressed. This allows for larger plains to form.
+2. **Elevation Model:** The terrain model is infinite in size. These controls determine which part of the model you see.
+   - **Map Transformation:** Use the zoom and nudge buttons to change your position in the model. Both groups feature a central reset button to return you to the original coordinates.
+   - **Detail:** Determines how smooth or intricate the model will be. Because the results are deterministic, you can treat this as a balance between performance and detail.
+     > The higher the detail value, the longer it takes to generate the terrain. This is a linear relationship: a map with a detail of 10 will take ten times longer to generate than one with a detail of 1.
+
+     >**Note:** This performance scaling only applies to the base procedural generation. If a map contains many terrain edits, the history replay will still take time to render, brush stroke by brush stroke. This is an intentional design choice ensuring you can recreate complex, custom maps from a lightweight journal entry.
+
+     >**Tip:**
+     > - **For Prototyping:** Keep the detail slider at the default of 5 (or lower). This allows the map to render very quickly while you are actively making changes.
+     > - **For Final Export:** Increase the slider to 8 or 10 right before exporting the final image. This will lock up the UI and take significantly longer to render, but it will yield highly detailed terrain textures for the final map.
+
+   - **Stretch:** Higher values result in mid-elevations being stretched, whilst high and low elevations are compressed. This allows for larger plains to form.
 
 3. **Edit Terrain** Use the edit tools to adjust your terrain.
 

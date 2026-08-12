@@ -990,6 +990,10 @@
     gap: var(--fwmb-space-m);
 }
 
+.fwmb .fwmb-toolbar-content {
+    display: contents;
+}
+
 .fwmb .fwmb-brush-settings,
 .fwmb .fwmb-brush-setting,
 .fwmb .fwmb-brush-tools,

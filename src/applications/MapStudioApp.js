@@ -119,6 +119,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             template: "modules/filrodens-world-map-builder/templates/map.hbs",
             classes: ["fwmb-map"],
         },
+        editToolbar: {
+            template: "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
+            classes: ["fwmb-edit-toolbar"],
+        },
     };
 
     constructor(options) {
@@ -180,6 +184,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
         this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
         this.debouncedGenerateFeatures = foundry.utils.debounce(this.generateFeatures.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.FEATURES);
+
+        this.debouncedCanvasTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedCanvasClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+
+        this.debouncedHistoryRebuild = foundry.utils.debounce(() => {
+            this.#rebuildFromHistory(true).then(() => {
+                this._repaintCanvas(null);
+                this.generateClimate(null);
+            });
+        }, FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
     }
 
     markDirty() {
@@ -212,13 +226,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async _preparePartContext(partId, context, options) {
         context = await super._preparePartContext(partId, context, options);
+
+        context.hasPendingFeatureMath = this.hasPendingFeatureMath;
+        this.uiState.isEditMode = this.canvasEngine?.isEditMode ?? false;
+
         context.config = FILRODENSWMB;
         context.activeTool = this.activeTool;
+
+        const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
+        context.isLocked = this.uiState.isEditMode && !isVectorTool;
+
+        if (partId === "editToolbar") {
+            const editableTools = FILRODENSWMB.UI.EDITABLE_TOOLS;
+
+            if (editableTools.includes(this.activeTool)) {
+                context.toolbarPartial = `modules/filrodens-world-map-builder/templates/parts/toolbar-${this.activeTool}.hbs`;
+            } else {
+                context.toolbarPartial = `modules/filrodens-world-map-builder/templates/parts/toolbar-empty.hbs`;
+            }
+        }
 
         const rgbToHex = (rgb) => "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
 
         context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS)
-            .filter(([key, id]) => id !== 1 && id !== 2)
+            .filter(([key, id]) => id !== 1 && id !== 2 && !key.toLowerCase().startsWith("custom"))
             .map(([key, id]) => {
                 const defaultRgb = FILRODENSWMB.BIOMES[key] || [0, 0, 0];
                 const currentRgb = this.customBiomeColors[key] || defaultRgb;
@@ -228,7 +259,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     key: key,
                     label: `FILRODENSWMB.BIOMES.${key}`,
                     hex: rgbToHex(currentRgb),
-                    isCustom: false, // Ensure native biomes flag as false
+                    isCustom: false,
                 };
             });
 
@@ -329,12 +360,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#bindContextPanelListeners();
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
-        this.#applyUIRestrictions();
 
-        this._syncDOMToState();
+        const mapContainer = this.element.querySelector(".fwmb-map-container");
+        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+
+        if (mapContainer && editToolbar && editToolbar.parentElement !== mapContainer) {
+            mapContainer.prepend(editToolbar);
+        }
     }
 
     #bindGlobalListeners() {
+        this.element.addEventListener("input", (event) => {
+            if (event.target.type === "range") {
+                const output = event.target.parentElement.querySelector("output");
+                if (output) output.value = event.target.value;
+            }
+        });
+
         if (!this.element.dataset.hasDblClickListener) {
             this.element.addEventListener("dblclick", (event) => {
                 const target = event.target;
@@ -431,6 +473,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #handleToolbarInput(event) {
         const target = event.target;
+
+        if ((target.type === "number" || target.type === "text") && event.type === "input") {
+            return;
+        }
+
         const name = target.name;
 
         if (!name || !(name in this.uiState)) return;
@@ -471,7 +518,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Fallback to custom if a manual property is changed
         if (["routeColor", "routeThickness", "routeStyle"].includes(name)) {
             this.uiState.activeRouteQuickStyle = "custom";
-            this._syncDOMToState();
+            this.render({ parts: ["toolbar", "editToolbar"] });
         }
 
         // Apply preset if dropdown is changed
@@ -483,7 +530,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.uiState.routeColor = styleData.color;
                     this.uiState.routeThickness = styleData.thickness;
                     this.uiState.routeStyle = styleData.style;
-                    this._syncDOMToState();
+                    this.render({ parts: ["toolbar", "editToolbar"] });
                 }
             }
         }
@@ -541,7 +588,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (event.target.matches('file-picker[name="referenceImage"]')) {
                 this.uiState.referenceImage = event.target.value;
                 this.#updateReferenceLayer();
+                return; // Stop here for the file picker
             }
+            // Route all other change events (like hitting Enter) to the handler
+            this.#handleContextPanelInput(event);
         });
 
         contextPanel.addEventListener("input", (e) => this.#handleContextPanelInput(e));
@@ -549,6 +599,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #handleContextPanelInput(event) {
         const target = event.target;
+
+        if ((target.type === "number" || target.type === "text") && event.type === "input") {
+            return;
+        }
+
         const name = target.name || "";
 
         // Skip marking dirty for temporary visual overlays
@@ -680,23 +735,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }, 50);
     }
 
-    #applyUIRestrictions() {
-        if (!this.canvasEngine?.isEditMode) return;
-
-        const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
-        if (editBtn) editBtn.classList.add("active");
-
-        const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
-        if (!isVectorTool) {
-            const panel = this.element.querySelector(".fwmb-context-panel");
-            if (panel) {
-                const controls = panel.querySelectorAll("fieldset input, fieldset button");
-                for (const control of controls) control.disabled = true;
-                panel.classList.add("fwmb-locked");
-            }
-        }
-    }
-
     async close(options) {
         const canClose = await this.#gateUnsavedChanges();
         if (!canClose) return; // Abort closure entirely
@@ -760,6 +798,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         let requiresTerrainUpdate = false;
 
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
+            if (config.isLayer) continue;
             if (this[config.activeKey]) {
                 this[config.activeKey] = null;
                 cleared = true;
@@ -814,11 +853,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (layer === "cartography") return;
 
         // 2. Fall back to raster brush processing for Terrain and Biomes
-        let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
-        const getNum = (name) => Number.parseFloat(this.element.querySelector(`input[name="${name}"]`)?.value) || 0;
-        let paintValue = layer === "biome" ? Number.parseInt(this.element.querySelector('select[name="brushBiome"]')?.value) || 6 : null;
+        const stateKey = `${this.activeTool}BrushTool`;
+        const tool = this.uiState[stateKey] || "raise";
 
-        this.brushEngine.startStroke(layer, tool, getNum("brushSize"), getNum("brushStrength"), getNum("brushFeather"), paintValue);
+        const size = this.uiState.brushSize || 20;
+        const strength = this.uiState.brushStrength || 0.02;
+        const feather = this.uiState.brushFeather || 0.4;
+        const paintValue = layer === "biome" ? this.uiState.brushBiome || 6 : null;
+
+        this.brushEngine.startStroke(layer, tool, size, strength, feather, paintValue);
         this.#applyBrushStroke(x, y);
     }
 
@@ -848,11 +891,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
             this.pendingTerrainBounds = null;
-
-            this.#rebuildFromHistory(true).then(() => {
-                this._repaintCanvas(null);
-                this.generateClimate(null);
-            });
+            this.debouncedHistoryRebuild();
         }
     }
 
@@ -864,8 +903,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #handleReferenceScale(factor) {
         this.uiState.referenceScale *= factor;
-        this.uiState.referenceScale = Math.max(FILRODENSWMB.REFERENCE_IMAGE.SCALE_MIN, Math.min(this.uiState.referenceScale, FILRODENSWMB.REFERENCE_IMAGE.SCALE_MAX));
-        this._syncDOMToState();
+        this.uiState.referenceScale = Math.max(FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MIN, Math.min(this.uiState.referenceScale, FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MAX));
+        this.render({ parts: ["context"] });
         this.#updateReferenceLayer();
     }
 
@@ -911,7 +950,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.markDirty();
 
         if (this.activeTool === "features") {
-            this.debouncedGenerateClimate();
             this.requestTerrainUpdate();
         }
     }
@@ -1004,8 +1042,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (match.repaintCanvas) this._repaintCanvas();
         else this._repaintVectors();
 
-        if (match.triggersTerrain) this.requestTerrainUpdate();
-        if (match.triggersClimate) this.debouncedGenerateClimate();
+        if (match.triggersTerrain) {
+            this.requestTerrainUpdate();
+        } else if (match.triggersClimate) {
+            this.debouncedCanvasClimate();
+        }
 
         this.render({ parts: ["context"] });
         this.markDirty();
@@ -1093,7 +1134,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 color: "#ffffff",
             });
             this._repaintCanvas();
-            this.debouncedGenerateClimate();
+            this.debouncedCanvasClimate();
         } else if (this.uiState.activeFeatureMode === "fault") {
             activeEntity = this.activeFaultId ? this.tectonicFaults.find((f) => f.id === this.activeFaultId) : null;
             const oldBounds = SpatialMath.getVectorBounds(activeEntity);
@@ -1299,7 +1340,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         this._repaintCanvas(strokeBounds);
-        this.debouncedGenerateClimate();
+        if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
+            this.debouncedHistoryRebuild();
+        } else {
+            this.debouncedCanvasClimate();
+        }
     }
 
     async #rebuildFromHistory(showUI = false) {
@@ -1600,85 +1645,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.defaultUiState = foundry.utils.deepClone(this.uiState);
 
-        this._syncDOMToState();
+        this.render({ parts: ["toolbar", "context"] });
         this.#updateGrid();
 
         await this.generateTerrain();
         this.canvasEngine.resetCamera();
-    }
-
-    _syncDOMToState() {
-        // Hydrate dynamic <select> options to guarantee they exist before values are applied
-        const styleSelect = this.element.querySelector('select[name="activeRouteQuickStyle"]');
-        if (styleSelect) {
-            (this.uiState.customRouteStyles || []).forEach((style) => {
-                if (!styleSelect.querySelector(`option[value="${style.id}"]`)) {
-                    const opt = document.createElement("option");
-                    opt.value = style.id;
-                    opt.textContent = style.name;
-                    styleSelect.appendChild(opt);
-                }
-            });
-        }
-
-        // Hydrate dynamic Label Quick Style options
-        const labelStyleSelect = this.element.querySelector('select[name="activeLabelQuickStyle"]');
-        if (labelStyleSelect) {
-            (this.uiState.customLabelStyles || []).forEach((style) => {
-                if (!labelStyleSelect.querySelector(`option[value="${style.id}"]`)) {
-                    const opt = document.createElement("option");
-                    opt.value = style.id;
-                    opt.textContent = style.name;
-                    labelStyleSelect.appendChild(opt);
-                }
-            });
-        }
-
-        const biomeSelect = this.element.querySelector('select[name="brushBiome"]');
-        if (biomeSelect) {
-            (this.uiState.customBiomes || []).forEach((cb) => {
-                if (!biomeSelect.querySelector(`option[value="${cb.id}"]`)) {
-                    const opt = document.createElement("option");
-                    opt.value = cb.id;
-                    opt.textContent = cb.name;
-                    biomeSelect.appendChild(opt);
-                }
-            });
-        }
-
-        const liveUpdateBtn = this.element.querySelector('[data-action="toggleLiveFeatureUpdates"]');
-        if (liveUpdateBtn) {
-            liveUpdateBtn.classList.toggle("active", this.uiState.liveFeatureUpdates);
-            const icon = liveUpdateBtn.querySelector("i");
-            if (icon) icon.className = this.uiState.liveFeatureUpdates ? "fwmb-icon sync" : "fwmb-icon sync_disabled";
-        }
-        this.#syncApplyButtonState();
-
-        // Sync all inputs and sliders
-        for (const [key, value] of Object.entries(this.uiState)) {
-            const input = this.element.querySelector(`[name="${key}"]`);
-            if (!input) continue;
-
-            // Route specific input types
-            if (input.type === "color" && value === "transparent") {
-                input.value = "#000000"; // Fallback to silence browser warning
-            } else if (input.type === "checkbox") {
-                input.checked = Boolean(value);
-            } else {
-                input.value = value;
-            }
-
-            if (input.nextElementSibling?.tagName === "OUTPUT") {
-                input.nextElementSibling.value = value;
-            }
-        }
-
-        for (const [key, rgb] of Object.entries(this.customBiomeColors)) {
-            const input = this.element.querySelector(`input[data-biome="${key}"]`);
-            if (!input) continue;
-
-            input.value = "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
-        }
     }
 
     #handleInfrastructureClick(x, y) {
@@ -1730,25 +1701,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this._repaintVectors();
         this.render({ parts: ["context"] });
         this.markDirty();
-    }
-
-    #syncInfraModeButtons() {
-        const mode = this.uiState.activeInfraMode;
-
-        const modeBtns = this.element.querySelectorAll('.fwmb-edit-toolbar [data-action="setInfraMode"]');
-        for (const btn of modeBtns) {
-            btn.classList.toggle("active", btn.dataset.mode === mode);
-        }
-
-        if (this.activeTool === "infrastructure") {
-            const toolGroups = this.element.querySelectorAll(".fwmb-edit-toolbar [data-tool-group]");
-            for (const group of toolGroups) {
-                const allowed = group.dataset.toolGroup.split(" ");
-                if (allowed.some((a) => a.startsWith("infrastructure-"))) {
-                    group.classList.toggle("fwmb-hidden", !allowed.includes(`infrastructure-${mode}`));
-                }
-            }
-        }
     }
 
     #handleLabelClick(x, y) {
@@ -1934,25 +1886,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async #startProcessing(message) {
         this.processingTasks = (this.processingTasks || 0) + 1;
 
-        let overlay = this.element.querySelector(".fwmb-processing-overlay");
-        if (!overlay) {
-            overlay = document.createElement("div");
-            overlay.className = "fwmb-processing-overlay fwmb-hidden";
-            overlay.innerHTML = `
-                <div class="fwmb-processing-content">
-                    <i class="fwmb-icon sync fwmb-spin"></i>
-                    <span class="fwmb-processing-text"></span>
-                </div>
-            `;
-            const mapContainer = this.element.querySelector(".fwmb-map-preview") || this.element.querySelector(".fwmb-map");
-            if (mapContainer) mapContainer.appendChild(overlay);
+        const overlay = this.element.querySelector(".fwmb-processing-overlay");
+        if (overlay) {
+            const textEl = overlay.querySelector(".fwmb-processing-text");
+            if (textEl) textEl.textContent = message;
+            overlay.classList.remove("fwmb-hidden");
         }
 
-        const textEl = overlay.querySelector(".fwmb-processing-text");
-        if (textEl) textEl.textContent = message;
-
-        overlay.classList.remove("fwmb-hidden");
-
+        // Force browser to paint the DOM before locking the main thread
         const activeWindow = this.element.ownerDocument.defaultView || window;
         await new Promise((resolve) => activeWindow.requestAnimationFrame(() => activeWindow.setTimeout(resolve, 0)));
     }
@@ -1975,10 +1916,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     requestTerrainUpdate(bounds = null) {
         this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, bounds);
         if (this.uiState.liveFeatureUpdates) {
-            this.debouncedGenerateTerrain();
+            this.debouncedCanvasTerrain();
         } else {
             this.hasPendingFeatureMath = true;
-            this.#syncApplyButtonState();
+            this.render({ parts: ["editToolbar"] });
         }
     }
 
@@ -2164,15 +2105,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _onAdjustNoiseScale(event, target) {
         const dir = Number(target.dataset.dir);
-        const inputScale = this.element.querySelector('input[name="noise.elevation.scale"]');
-        const inputOffsetX = this.element.querySelector('input[name="noise.offsetX"]');
-        const inputOffsetY = this.element.querySelector('input[name="noise.offsetY"]');
-
-        if (!inputScale) return;
-
-        const currentScale = Number(inputScale.value);
-
-        // Dynamically calculate the maximum bound based on the current map resolution
+        const currentScale = this.uiState["noise.elevation.scale"];
         const maxScale = Math.max(this.mapWidth, this.mapHeight);
         const targetScale = Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.min(currentScale + dir * FILRODENSWMB.LIMITS.NOISE_SCALE_STEP, maxScale));
 
@@ -2181,15 +2114,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return;
         }
 
-        // 1. Capture vector history before transforming the points
         MapStateManager.pushVectorState(this);
-
-        // 2. Calculate the exact mathematical scaling ratio
         const scaleRatio = targetScale / currentScale;
-        const offsetX = inputOffsetX ? Number(inputOffsetX.value) : 0;
-        const offsetY = inputOffsetY ? Number(inputOffsetY.value) : 0;
+        const offsetX = this.uiState["noise.offsetX"] || 0;
+        const offsetY = this.uiState["noise.offsetY"] || 0;
 
-        // 3. Apply the scale transformation (accounting for pan offset and nested labels)
         const scalePoint = (pt) => {
             if (pt?.x !== undefined) {
                 pt.x = (pt.x + offsetX) * scaleRatio - offsetX;
@@ -2222,10 +2151,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.brushEngine.redoStack.forEach(scaleStroke);
         }
 
-        // 4. Update the DOM and trigger the procedural rebuild
-        inputScale.value = targetScale;
-        inputScale.dispatchEvent(new Event("input", { bubbles: true }));
+        this.uiState["noise.elevation.scale"] = targetScale;
+        this.render({ parts: ["context"] });
         this.markDirty();
+        this.debouncedGenerateTerrain();
     }
 
     _onAdjustReferenceScale(event, target) {
@@ -2243,31 +2172,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         await this.generateTerrain();
         this.hasPendingFeatureMath = false;
-        this.#syncApplyButtonState();
-    }
-
-    #syncApplyButtonState() {
-        const applyBtn = this.element.querySelector('[data-action="applyFeatureMath"]');
-        if (applyBtn) {
-            applyBtn.classList.toggle("active", this.hasPendingFeatureMath);
-            applyBtn.classList.toggle("disabled", !this.hasPendingFeatureMath);
-            applyBtn.disabled = !this.hasPendingFeatureMath;
-        }
+        this.render({ parts: ["editToolbar"] });
     }
 
     /**
      * Highly destructive action: Rebuilds the underlying webgl canvas and spatial arrays.
      */
     async _onApplyResolution(event, target) {
-        const widthInput = this.element.querySelector('input[name="mapWidth"]');
-        const heightInput = this.element.querySelector('input[name="mapHeight"]');
-        const seedInput = this.element.querySelector('input[name="mapSeed"]'); // <-- NEW
+        // 1. Extract all uncommitted data natively (No DOM scraping)
+        const formData = new FormDataExtended(target.form).object;
 
-        const newWidth = Number.parseInt(widthInput?.value) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
-        const newHeight = Number.parseInt(heightInput?.value) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
-        let newSeed = seedInput?.value?.trim(); // <-- NEW
+        const newWidth = Number.parseInt(formData.mapWidth) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
+        const newHeight = Number.parseInt(formData.mapHeight) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
+        let newSeed = formData.mapSeed?.trim();
 
-        // If the user left the seed blank, generate a random one automatically
+        // 2. If the user left the seed blank, generate a random one automatically
         if (!newSeed) {
             newSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
         }
@@ -2279,9 +2198,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const confirmed = await MapDialogManager._confirmDialog(game.i18n.localize("FILRODENSWMB.UI.Warning"), game.i18n.localize("FILRODENSWMB.UI.ResolutionWarningContent"));
 
             if (!confirmed) {
-                if (widthInput) widthInput.value = this.mapWidth;
-                if (heightInput) heightInput.value = this.mapHeight;
-                if (seedInput) seedInput.value = this.uiState.mapSeed; // Revert visually
+                this.render({ parts: ["context"] });
                 return;
             }
         }
@@ -2301,8 +2218,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.customBiomeColors[key] = rgb;
         });
 
-        // Force all HTML inputs, sliders, and checkboxes to visually snap back to defaults
-        this._syncDOMToState();
+        this.render({ parts: ["toolbar", "context"] });
 
         // 1. Reset all history and spatial arrays
         this.markDirty();
@@ -2325,8 +2241,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.activeRegionId = null;
         this.activeFaultId = null;
         this.activeRiverId = null;
-        this.activeRouteId = null;
-        this.activeRegionLayerId = null;
 
         // 3. Wipe the save memory so the next save forces a "Save As" prompt
         this.currentSaveId = null;
@@ -2336,7 +2250,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateGrid();
         this.canvasEngine.resetCamera();
 
-        // 4. Force UI to update (clears old layers from the sidebar and map name from the save tooltip)
+        // 4. Force UI to update
         this.render({ parts: ["toolbar", "context"] });
     }
 
@@ -2344,7 +2258,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.hasPendingFeatureMath) {
             this.generateTerrain();
             this.hasPendingFeatureMath = false;
-            this.#syncApplyButtonState();
         }
 
         const newTool = target.dataset.tool;
@@ -2362,12 +2275,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#ensureToolLayerVisible(newTool);
         this.#updateBiomeOpacity();
         this.#updateCanvasModes(newTool);
-        this.#updateToolbarVisibility(newTool);
-        this.#syncInfraModeButtons();
 
         // 4. Paint
         this._repaintVectors();
-        this.render({ parts: ["toolbar", "context"] });
+        this.render({ parts: ["toolbar", "context", "editToolbar"] });
     }
 
     #clearActiveDrawingStates() {
@@ -2377,36 +2288,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.activeRegionId = null;
     }
 
-    #deactivateEditMode() {
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-        if (!editToolbar || editToolbar.classList.contains("fwmb-hidden")) return;
+    async #deactivateEditMode() {
+        if (!this.uiState.isEditMode) return;
 
-        // Hide toolbar and end brushes
-        editToolbar.classList.add("fwmb-hidden");
+        this.uiState.isEditMode = false;
         this.brushEngine?.endStroke();
-
-        // Toggle button visual state
-        const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
-        if (editBtn) editBtn.classList.remove("active");
-
-        // Disable canvas interactivity
         if (this.canvasEngine) this.canvasEngine.setEditMode(false);
 
-        // Unlock the sidebar panel
-        const panel = this.element.querySelector(".fwmb-context-panel");
-        if (panel) {
-            const controls = panel.querySelectorAll("fieldset input, fieldset button");
-            for (const control of controls) control.disabled = false;
-            panel.classList.remove("fwmb-locked");
-        }
+        await this.render({ parts: ["toolbar", "editToolbar", "context"] });
     }
 
-    // This is the specific fix for your nested if-block!
     #ensureToolLayerVisible(newTool) {
         const toolLayerMap = {
-            biomes: "biomes",
             terrain: "topography",
+            biomes: "biomes",
             features: "features",
+            infrastructure: "infrastructure",
+            regions: "regions",
+            labels: "labels",
         };
 
         const layerId = toolLayerMap[newTool];
@@ -2426,25 +2325,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.canvasEngine.setCropMode) {
             this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode);
         }
-    }
-
-    #updateToolbarVisibility(newTool) {
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-        if (!editToolbar) return;
-
-        editToolbar.querySelectorAll("[data-tool-group]").forEach((el) => {
-            const allowedTools = el.dataset.toolGroup.split(" ");
-            let isVisible = allowedTools.includes(newTool);
-
-            // Handle sub-tool routing for Features and Infrastructure
-            if (newTool === "infrastructure" && allowedTools.some((t) => t.startsWith("infrastructure-"))) {
-                isVisible = allowedTools.includes(`infrastructure-${this.uiState.activeInfraMode}`);
-            } else if (newTool === "features" && allowedTools.some((t) => t.startsWith("features-"))) {
-                isVisible = allowedTools.includes(`features-${this.uiState.activeFeatureMode}`);
-            }
-
-            el.classList.toggle("fwmb-hidden", !isVisible);
-        });
     }
 
     /**
@@ -2583,11 +2463,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         } finally {
             // 6. Cleanup
             this.#endProcessing();
-
-            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
-            if (editBtn?.classList.contains("active")) {
-                editBtn.click();
-            }
+            this.#deactivateEditMode();
         }
     }
 
@@ -2741,14 +2617,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const dx = Number(target.dataset.dx);
         const dy = Number(target.dataset.dy);
 
-        const inputX = this.element.querySelector('input[name="noise.offsetX"]');
-        const inputY = this.element.querySelector('input[name="noise.offsetY"]');
-        if (!inputX || !inputY) return;
-
-        // 1. Capture vector history before moving the world
         MapStateManager.pushVectorState(this);
 
-        // 2. Translate all vector nodes and their associated label offsets
         const translatePoint = (pt) => {
             if (pt?.x !== undefined) {
                 pt.x -= dx;
@@ -2778,12 +2648,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.brushEngine.redoStack.forEach(translateStroke);
         }
 
-        // 3. Shift the procedural window
-        inputX.value = Number(inputX.value) + dx;
-        inputY.value = Number(inputY.value) + dy;
+        this.uiState["noise.offsetX"] += dx;
+        this.uiState["noise.offsetY"] += dy;
 
-        inputX.dispatchEvent(new Event("input", { bubbles: true }));
+        this.render({ parts: ["context"] });
         this.markDirty();
+        this.debouncedGenerateTerrain();
     }
 
     _onNudgeReference(event, target) {
@@ -2796,10 +2666,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _onRandomizeSeed(event, target) {
-        const input = this.element.querySelector('input[name="mapSeed"]');
-        if (!input) return;
-
-        input.value = Math.random().toString(36).substring(2, 8).toUpperCase();
+        this.uiState.mapSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
+        this.render({ parts: ["context"] });
     }
 
     async _onRedoBrush(event, target) {
@@ -2847,29 +2715,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _onRemoveReferenceImage(event, target) {
         this.uiState.referenceImage = "";
-
-        const filePicker = this.element.querySelector('file-picker[name="referenceImage"]');
-        if (filePicker) filePicker.value = "";
-
         this.#updateReferenceLayer();
+        this.render({ parts: ["context"] });
     }
 
     _onResetNoisePan(event, target) {
-        const inputX = this.element.querySelector('input[name="noise.offsetX"]');
-        const inputY = this.element.querySelector('input[name="noise.offsetY"]');
-        if (inputX && inputY) {
-            inputX.value = this.defaultUiState["noise.offsetX"];
-            inputY.value = this.defaultUiState["noise.offsetY"];
-            inputX.dispatchEvent(new Event("input", { bubbles: true }));
-        }
+        this.uiState["noise.offsetX"] = this.defaultUiState["noise.offsetX"];
+        this.uiState["noise.offsetY"] = this.defaultUiState["noise.offsetY"];
+        this.render({ parts: ["context"] });
+        this.markDirty();
+        this.debouncedGenerateTerrain();
     }
 
     _onResetNoiseScale(event, target) {
-        const input = this.element.querySelector('input[name="noise.elevation.scale"]');
-        if (input) {
-            input.value = this.defaultUiState["noise.elevation.scale"];
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-        }
+        this.uiState["noise.elevation.scale"] = this.defaultUiState["noise.elevation.scale"];
+        this.render({ parts: ["context"] });
+        this.markDirty();
+        this.debouncedGenerateTerrain();
     }
 
     _onResetReferencePan(event, target) {
@@ -2904,54 +2766,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Handles swapping between the Raise, Lower, and Smooth brush tools.
      */
     _onSetBrushTool(event, target) {
-        const activeBtn = target.closest("button");
-        if (!activeBtn) return;
-
-        const toolContainer = activeBtn.closest(".fwmb-brush-tools");
-        if (!toolContainer) return;
-
-        // Extract the tool group and only strip the 'active' class from sibling tools
-        const group = activeBtn.dataset.toolGroup;
-        for (const btn of toolContainer.querySelectorAll(`button[data-tool-group~="${group}"]`)) {
-            btn.classList.remove("active");
-        }
-
-        activeBtn.classList.add("active");
-
-        if (toolContainer.querySelector('[data-tool="drawFault"]')) {
-            const isFaultActive = activeBtn.dataset.tool === "drawFault";
-            const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-
-            if (editToolbar) {
-                editToolbar.querySelectorAll("[data-tool-group~='features-fault']").forEach((el) => {
-                    el.classList.toggle("fwmb-hidden", !isFaultActive);
-                });
-            }
-        }
+        const stateKey = `${this.activeTool}BrushTool`;
+        this.uiState[stateKey] = target.dataset.tool;
+        this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
     _onSetFeatureMode(event, target) {
         this.uiState.activeFeatureMode = target.dataset.mode;
         this.activeFaultId = null; // Ends the current fault line natively
-        this.#syncFeatureModeButtons();
-    }
-
-    #syncFeatureModeButtons() {
-        const mode = this.uiState.activeFeatureMode;
-        const modeBtns = this.element.querySelectorAll('.fwmb-edit-toolbar [data-action="setFeatureMode"]');
-        for (const btn of modeBtns) {
-            btn.classList.toggle("active", btn.dataset.mode === mode);
-        }
-
-        if (this.activeTool === "features") {
-            const toolGroups = this.element.querySelectorAll(".fwmb-edit-toolbar [data-tool-group]");
-            for (const group of toolGroups) {
-                const allowed = group.dataset.toolGroup.split(" ");
-                if (allowed.some((a) => a.startsWith("features-"))) {
-                    group.classList.toggle("fwmb-hidden", !allowed.includes(`features-${mode}`));
-                }
-            }
-        }
+        this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
     /**
@@ -2960,42 +2783,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     _onSetInfraMode(event, target) {
         this.uiState.activeInfraMode = target.dataset.mode;
         this.activeRouteId = null;
-        this.#syncInfraModeButtons();
+        this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
     _onSetInfrastructureIcon(event, target) {
         const newIcon = target.dataset.icon;
+
         this.uiState.activeIcon = newIcon;
         this.uiState.activeInfraMode = "pin";
         this.activeRouteId = null;
 
-        // Update the trigger icon so the UI shows the new selection
-        const triggerIcon = this.element.querySelector("#fwmb-pin-select .fwmb-select-trigger .fwmb-icon:first-child");
-        if (triggerIcon) {
-            triggerIcon.className = `fwmb-icon ${newIcon}`;
-        }
-
-        // Update the 'active' button state inside the dropdown grid
-        const dropdown = this.element.querySelector("#fwmb-pin-select .fwmb-select-options");
-        if (dropdown) {
-            for (const btn of dropdown.querySelectorAll("button")) {
-                btn.classList.toggle("active", btn.dataset.icon === newIcon);
-            }
-            // Hide the dropdown menu
-            dropdown.classList.add("fwmb-hidden");
-        }
-
-        this.#syncInfraModeButtons();
+        this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
     _onSetRegionMode(event, target) {
-        const toolContainer = target.closest(".fwmb-edit-toolbar");
-        if (!toolContainer) return;
-
-        for (const btn of toolContainer.querySelectorAll('[data-action="setRegionMode"]')) {
-            btn.classList.remove("active");
-        }
-        target.classList.add("active");
+        this.uiState.regionMode = target.dataset.mode;
 
         if (!this.activeRegionLayerId) {
             ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");
@@ -3030,7 +2832,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
 
         this._repaintVectors();
-        this.render({ parts: ["context"] });
+        this.render({ parts: ["toolbar", "context", "editToolbar"] });
     }
 
     _onSetRegionPreset(event, target) {
@@ -3038,7 +2840,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const targetProperty = target.dataset.target === "line" ? "regionLineColor" : "regionFillColor";
 
         this.uiState[targetProperty] = color;
-        this._syncDOMToState();
+        this.render({ parts: ["toolbar", "editToolbar"] });
 
         if (this.activeRegionId && this.activeRegionLayerId) {
             const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
@@ -3056,35 +2858,51 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     async _onThreeDView(event, target) {
         const overlay = this.element.querySelector("#fwmb-3d-overlay");
-        const mapControls = this.element.querySelector(".fwmb-map-controls");
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-        const contextPanel = this.element.querySelector(".fwmb-context-panel");
 
         if (!overlay || !this.currentElevationData) return;
 
+        // 1. Exiting 3D Mode
         if (this.scene3D) {
             this.scene3D.destroy();
             this.scene3D = null;
+
             overlay.classList.add("fwmb-hidden");
-            target.classList.remove("active");
+
+            // Query the button safely to remove the active state
+            const btn = this.element.querySelector('[data-action="threeDView"]');
+            if (btn) btn.classList.remove("active");
+
+            // Restore the manual layout wrappers
+            const mapControls = this.element.querySelector(".fwmb-map-controls");
+            const contextPanel = this.element.querySelector(".fwmb-context-panel");
+            const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
 
             if (mapControls) mapControls.classList.remove("fwmb-hidden");
             if (contextPanel) contextPanel.style.display = "";
+            if (editToolbar) editToolbar.style.display = ""; // Restores standard CSS flow
 
-            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
-            if (editToolbar && editBtn?.classList.contains("active")) {
-                editToolbar.classList.remove("fwmb-hidden");
-            }
             return;
         }
 
+        // 2. Entering 3D Mode: Teardown state
+        this.#clearActiveDrawingStates();
+        await this.#deactivateEditMode();
+
+        // 3. Setup 3D overlay UI
+        const mapControls = this.element.querySelector(".fwmb-map-controls");
+        const contextPanel = this.element.querySelector(".fwmb-context-panel");
+        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+        const freshTarget = this.element.querySelector('[data-action="threeDView"]');
+
         overlay.classList.remove("fwmb-hidden");
-        target.classList.add("active");
+        if (freshTarget) freshTarget.classList.add("active");
 
+        // Manually hide layout wrappers so the 3D canvas fills the entire screen
         if (mapControls) mapControls.classList.add("fwmb-hidden");
-        if (editToolbar) editToolbar.classList.add("fwmb-hidden");
         if (contextPanel) contextPanel.style.display = "none";
+        if (editToolbar) editToolbar.style.display = "none"; // Destroys the bottom margin bug!
 
+        // 4. Generate 3D Scene
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
         const seaLevel = this.uiState["seaLevel"];
@@ -3105,7 +2923,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         );
 
         this.scene3D = new Scene3D(overlay);
-
         const riverVectors = this.currentRiverData ? this.currentRiverData.vectors : null;
 
         this.scene3D.render3DMap(this.currentElevationData, biomeBuffer, this.mapWidth, this.mapHeight, seaLevel, riverVectors, waterMask);
@@ -3115,15 +2932,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const toolbar = this.element.querySelector(".fwmb-edit-toolbar");
         if (!toolbar) return;
 
-        const isActivating = toolbar.classList.toggle("fwmb-hidden") === false;
-        target.closest("button").classList.toggle("active", isActivating);
+        const isActivating = !this.uiState.isEditMode;
+        this.uiState.isEditMode = isActivating;
 
-        // End all active vector drawing sessions when leaving edit mode
-        if (!isActivating) {
+        if (isActivating) {
+            const stillValid = this.regionLayers.some((l) => l.id === this.activeRegionLayerId);
+            if (!stillValid) {
+                this.activeRegionLayerId = this.regionLayers[0]?.id ?? null;
+            }
+        } else {
             if (this.hasPendingFeatureMath) {
                 this.generateTerrain();
                 this.hasPendingFeatureMath = false;
-                this.#syncApplyButtonState();
             }
 
             for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
@@ -3132,46 +2952,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.activeRegionId = null;
         }
 
-        toolbar.querySelectorAll("[data-tool-group]").forEach((el) => {
-            const allowedTools = el.dataset.toolGroup.split(" ");
-            let isVisible = allowedTools.includes(this.activeTool);
-
-            if (this.activeTool === "infrastructure" && allowedTools.some((t) => t.startsWith("infrastructure-"))) {
-                isVisible = allowedTools.includes(`infrastructure-${this.uiState.activeInfraMode}`);
-            }
-
-            if (this.activeTool === "features" && allowedTools.some((t) => t.startsWith("features-"))) {
-                isVisible = allowedTools.includes(`features-${this.uiState.activeFeatureMode}`);
-            }
-
-            el.classList.toggle("fwmb-hidden", !isVisible);
-        });
-
         if (this.canvasEngine) {
             this.canvasEngine.setEditMode(isActivating);
-
             if (this.canvasEngine.setCropMode) {
                 this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene");
             }
         }
 
-        // Only lock the sidebar for procedural raster tools
-        const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
-
-        if (!isVectorTool) {
-            const panel = this.element.querySelector(".fwmb-context-panel");
-            if (panel) {
-                const controls = panel.querySelectorAll("fieldset input, fieldset button");
-                for (const control of controls) {
-                    control.disabled = isActivating;
-                }
-                panel.classList.toggle("fwmb-locked", isActivating);
-            }
-        }
-
-        if (isVectorTool) {
+        if (FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool)) {
             this._repaintVectors();
         }
+
+        this.render({ parts: ["context", "toolbar", "editToolbar"] });
     }
 
     _onToggleGrid(event, target) {
@@ -3197,21 +2989,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     _onToggleLiveFeatureUpdates(event, target) {
         this.uiState.liveFeatureUpdates = !this.uiState.liveFeatureUpdates;
 
-        const btn = target.closest("button");
-        if (btn) {
-            btn.classList.toggle("active", this.uiState.liveFeatureUpdates);
-            const icon = btn.querySelector("i");
-            if (icon) {
-                icon.className = this.uiState.liveFeatureUpdates ? "fwmb-icon sync" : "fwmb-icon sync_disabled";
-            }
-        }
-
         // If turned back on while changes are pending, immediately process them
         if (this.uiState.liveFeatureUpdates && this.hasPendingFeatureMath) {
             this.generateTerrain();
             this.hasPendingFeatureMath = false;
-            this.#syncApplyButtonState();
         }
+        this.render({ parts: ["editToolbar"] });
     }
 
     _onTogglePinDropdown(event, target) {

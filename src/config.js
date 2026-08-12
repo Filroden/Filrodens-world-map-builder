@@ -31,6 +31,7 @@ export const FILRODENSWMB = {
     UI: {
         RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
         VISIBILITY_STATES: ["all", "gm", "none"],
+        EDITABLE_TOOLS: ["scene", "terrain", "biomes", "features", "infrastructure", "regions", "labels", "cartography"],
         VECTOR_TOOLS: ["features", "infrastructure", "regions", "labels", "cartography"],
         WHEEL: {
             SCALE_FACTOR: 1.05,
@@ -58,6 +59,7 @@ export const FILRODENSWMB = {
             TERRAIN: 800,
             CLIMATE: 800,
             FEATURES: 600,
+            CANVAS: 2000,
         },
     },
     DISPLAY: {

@@ -1,0 +1,24 @@
+<div class="fwmb-toolbar-content">
+    <div class="fwmb-brush-settings">
+        {{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs"}}
+
+        <div class="fwmb-brush-setting">
+            <label>{{localize "FILRODENSWMB.UI.BrushBiome"}}</label>
+            <select name="brushBiome">
+                {{#each biomeList}}
+                    <option value="{{this.id}}" {{#if (eq ../uiState.brushBiome this.id)}}selected{{/if}}>
+                        {{#if this.isCustom}}{{this.label}}{{else}}{{localize this.label}}{{/if}}
+                    </option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+
+    <div class="fwmb-divider-vertical"></div>
+
+    <div class="fwmb-brush-tools">
+        <button type="button" data-action="setBrushTool" data-tool="paint" class="fwmb-btn {{#if (eq uiState.biomesBrushTool 'paint')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolPaint'}}">
+            <i class="fwmb-icon format-paint"></i>
+        </button>
+    </div>
+</div>

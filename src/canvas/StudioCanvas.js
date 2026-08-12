@@ -135,9 +135,14 @@ export class StudioCanvas {
                     lastW = w;
                     lastH = h;
 
+                    // Always update the WebGL renderer resolution to prevent pixel stretching
                     this.app.renderer.resize(w, h);
-                    this.resetCamera();
-                    this.isInitialized = true;
+
+                    // Only reset the camera on the very first DOM render
+                    if (!this.isInitialized) {
+                        this.resetCamera();
+                        this.isInitialized = true;
+                    }
                 }
             }
         });

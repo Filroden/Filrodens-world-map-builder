@@ -37,6 +37,11 @@ export class MapStateManager {
             gridType: "square",
             gridSize: 50,
             gridVisible: false,
+
+            terrainBrushTool: "raise",
+            biomesBrushTool: "paint",
+            sceneBrushTool: "crop",
+
             brushSize: 20,
             brushStrength: 0.02,
             brushFeather: 0.4,
@@ -96,6 +101,7 @@ export class MapStateManager {
             referenceX: width / 2,
             referenceY: height / 2,
 
+            regionMode: "draw",
             regionPresets: FILRODENSWMB.REGIONS.PRESETS,
             regionFillColor: "#c6af53",
             regionFillStyle: "solid",

@@ -1,0 +1,67 @@
+<div class="fwmb-toolbar-content">
+    <div class="fwmb-brush-tools">
+        <button type="button" data-action="setFeatureMode" data-mode="spring" class="fwmb-btn {{#if (eq uiState.activeFeatureMode 'spring')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolAddSpring'}}">
+            <i class="fwmb-icon water-drop"></i>
+        </button>
+        <button type="button" data-action="setFeatureMode" data-mode="river" class="fwmb-btn {{#if (eq uiState.activeFeatureMode 'river')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolDrawRiver'}}">
+            <i class="fwmb-icon water"></i>
+        </button>
+        <button type="button" data-action="setFeatureMode" data-mode="fault" class="fwmb-btn {{#if (eq uiState.activeFeatureMode 'fault')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolDrawFault'}}">
+            <i class="fwmb-icon timeline"></i>
+        </button>
+    </div>
+
+    {{#if (eq uiState.activeFeatureMode 'fault')}}
+        <button type="button" data-action="toggleSnapping" class="fwmb-btn wide {{#if uiState.snapToPoints}}active{{/if}}">
+            <i class="fwmb-icon filter-center-focus"></i>
+            {{localize "FILRODENSWMB.UI.SnapToPoints"}}
+        </button>
+        <div class="fwmb-brush-settings">
+            <div class="fwmb-brush-setting">
+                <label>{{localize "FILRODENSWMB.UI.FaultType"}}</label>
+                <select name="faultType">
+                    {{#each tectonicTypes}}
+                        <option value="{{this.id}}" {{#if (eq ../uiState.faultType this.id)}}selected{{/if}}>{{localize this.label}}</option>
+                    {{/each}}
+                </select>
+            </div>
+            <div class="fwmb-brush-setting">
+                <label>{{localize "FILRODENSWMB.UI.FaultThickness"}}</label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="faultThickness" value="{{lookup uiState 'faultThickness'}}" min="10" max="100" step="5" />
+                    <output>{{lookup uiState "faultThickness"}}</output>
+                </div>
+            </div>
+            <div class="fwmb-brush-setting">
+                <label>{{localize "FILRODENSWMB.UI.FaultStrength"}}</label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="faultStrength" value="{{lookup uiState 'faultStrength'}}" min="0.1" max="1.0" step="0.05" />
+                    <output>{{lookup uiState "faultStrength"}}</output>
+                </div>
+            </div>
+        </div>
+    {{/if}}
+
+    {{#if (eq uiState.activeFeatureMode 'river')}}
+        <div class="fwmb-brush-settings">
+            <div class="fwmb-brush-setting">
+                <label>{{localize "FILRODENSWMB.UI.RiverWidth"}}</label>
+                <select name="riverWidth">
+                    <option value="2" {{#if (eq uiState.riverWidth 2)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeSmall"}}</option>
+                    <option value="4" {{#if (eq uiState.riverWidth 4)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeMedium"}}</option>
+                    <option value="6" {{#if (eq uiState.riverWidth 6)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeLarge"}}</option>
+                    <option value="8" {{#if (eq uiState.riverWidth 8)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.SizeXLarge"}}</option>
+                </select>
+            </div>
+        </div>
+    {{/if}}
+
+    <div class="fwmb-divider-vertical"></div>
+
+    <button type="button" class="fwmb-btn {{#if uiState.liveFeatureUpdates}}active{{/if}}" data-action="toggleLiveFeatureUpdates">
+        <i class="fwmb-icon {{#if uiState.liveFeatureUpdates}}sync{{else}}sync_disabled{{/if}}"></i>
+    </button>
+    <button type="button" class="fwmb-btn wide {{#unless hasPendingFeatureMath}}disabled{{/unless}}" data-action="applyFeatureMath" {{#unless hasPendingFeatureMath}}disabled{{/unless}}>
+        {{localize "FILRODENSWMB.UI.ApplyChanges"}}
+    </button>
+</div>

@@ -1,10 +1,8 @@
 <div class="fwmb-map-container">
 
-    {{> "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs" }}
-
     <div class="fwmb-map-preview">
         <!-- The PIXI Canvas renders in here -->
-        
+
         <!-- ALL Overlays now live inside the preview container -->
         <div class="fwmb-canvas-readout fwmb-hidden">
             <div class="fwmb-readout-item"><i class="fwmb-icon elevation"></i> <span id="fwmb-readout-elev">--</span></div>
@@ -25,7 +23,7 @@
                 <i class="fwmb-icon redo"></i>
             </button>
         </div>
-            
+
         <div id="fwmb-3d-overlay" class="fwmb-3d-overlay fwmb-hidden"></div>
 
         <div class="fwmb-map-hint">{{localize "FILRODENSWMB.UI.CanvasHint"}}</div>
@@ -85,6 +83,14 @@
             <button type="button" data-action="zoomIn" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}">
                 <i class="fwmb-icon zoom-in"></i>
             </button>
+        </div>
+    </div>
+
+    <!-- Permanent Processing Overlay -->
+    <div class="fwmb-processing-overlay fwmb-hidden">
+        <div class="fwmb-processing-content">
+            <i class="fwmb-icon sync fwmb-spin"></i>
+            <span class="fwmb-processing-text"></span>
         </div>
     </div>
 </div>

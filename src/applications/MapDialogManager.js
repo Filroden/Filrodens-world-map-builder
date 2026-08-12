@@ -8,7 +8,7 @@ export class MapDialogManager {
     static async _confirmDialog(title, content) {
         return foundry.applications.api.DialogV2.confirm({
             window: { title: title || game.i18n.localize("FILRODENSWMB.UI.Warning") },
-            content: `<p>${content || game.i18n.localize("FILRODENSWMB.UI.ConfirmDelete")}</p>`,
+            content: `<p>${content || game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
             rejectClose: false,
             modal: true,
         });
@@ -236,7 +236,8 @@ export class MapDialogManager {
     // --- ADD ACTIONS ---
 
     static async onAddCustomBiome(app, event, target) {
-        const name = await this._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.AddCustomBiome"), "Biome Name", "");
+        const defaultName = `Custom Biome ${app.uiState.customBiomes.length + 1}`;
+        const name = await this._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.AddCustomBiome"), game.i18n.localize("FILRODENSWMB.UI.Name"), defaultName);
         if (!name) return;
 
         const currentIds = app.uiState.customBiomes.map((c) => c.id);
@@ -248,14 +249,6 @@ export class MapDialogManager {
             color: [128, 128, 128],
         });
 
-        const select = app.element.querySelector('select[name="brushBiome"]');
-        if (select) {
-            const option = document.createElement("option");
-            option.value = nextId;
-            option.textContent = name;
-            select.appendChild(option);
-        }
-
         app.render({ parts: ["context"] });
         app.markDirty();
     }
@@ -263,16 +256,9 @@ export class MapDialogManager {
     static async onAddDecoration(app, event, target) {
         if (!app.canvasEngine?.isEditMode) return;
 
-        const content = `
-                <div class="form-group fwmb-dialog-content">
-                    <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
-                    <input type="text" id="fwmb-dec-name" value="New Decoration">
-                </div>
-                <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
-                    <label>${game.i18n.localize("FILRODENSWMB.UI.ImageSource")}</label>
-                    <file-picker id="fwmb-dec-src" type="image" value=""></file-picker>
-                </div>
-            `;
+        const defaultName = `Decoration ${app.mapDecorations.length + 1}`;
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/add-decoration.hbs", { defaultName });
 
         const result = await foundry.applications.api.DialogV2.prompt({
             classes: ["fwmb"],
@@ -281,12 +267,14 @@ export class MapDialogManager {
             ok: {
                 callback: (evt, button) => {
                     return {
-                        name: button.form.querySelector("#fwmb-dec-name").value,
-                        src: button.form.querySelector("#fwmb-dec-src").value,
+                        name: button.form.elements["fwmb-dec-name"].value.trim() || defaultName,
+                        src: button.form.elements["fwmb-dec-src"].value,
                     };
                 },
             },
         });
+
+        if (!result) return;
 
         if (result?.src) {
             MapStateManager.pushVectorState(app);
@@ -329,15 +317,6 @@ export class MapDialogManager {
             onSave: (entity, result) => {
                 const id = foundry.utils.randomID();
                 app.uiState[config.registryKey].push({ id, ...result });
-
-                // Append the new option to the UI select element dynamically
-                const select = app.element.querySelector(`select[name="${config.activeStateKey}"]`);
-                if (select) {
-                    const option = document.createElement("option");
-                    option.value = id;
-                    option.textContent = result.name;
-                    select.appendChild(option);
-                }
             },
         });
     }
@@ -362,13 +341,7 @@ export class MapDialogManager {
 
         if (Number(app.uiState.brushBiome) === id) {
             app.uiState.brushBiome = FILRODENSWMB.BIOME_IDS.GRASSLAND;
-            app._syncDOMToState();
-        }
-
-        const select = app.element.querySelector('select[name="brushBiome"]');
-        if (select) {
-            const option = select.querySelector(`option[value="${id}"]`);
-            if (option) option.remove();
+            app.render({ parts: ["toolbar"] });
         }
 
         if (app.currentBiomeOverrides) {
@@ -388,7 +361,7 @@ export class MapDialogManager {
         }
 
         app._repaintCanvas();
-        app.render({ parts: ["context"] });
+        app.render({ parts: ["toolbar", "context"] });
         app.markDirty();
     }
 
@@ -434,17 +407,11 @@ export class MapDialogManager {
 
         app.uiState[config.registryKey] = app.uiState[config.registryKey].filter((s) => s.id !== id);
 
-        const select = app.element.querySelector(`select[name="${config.activeStateKey}"]`);
-        if (select) {
-            const option = select.querySelector(`option[value="${id}"]`);
-            if (option) option.remove();
-        }
-
         if (config.onDisconnect) config.onDisconnect(app, id);
 
         if (app.uiState[config.activeStateKey] === id) {
             app.uiState[config.activeStateKey] = "custom";
-            app._syncDOMToState();
+            app.render({ parts: ["toolbar", "context"] });
         }
 
         app.markDirty();
@@ -534,7 +501,7 @@ export class MapDialogManager {
                     app.uiState.faultType = result.type;
                     app.uiState.faultThickness = result.thickness;
                     app.uiState.faultStrength = result.strength;
-                    app._syncDOMToState();
+                    app.render({ parts: ["toolbar"] });
                 }
             },
             triggersTerrain: true,
@@ -662,18 +629,10 @@ export class MapDialogManager {
             onRender: config.onRender,
             onExtract: (form) => config.onExtract(form, style.name),
             onSave: (entity, result) => {
-                // Update select option text dynamically
-                const select = app.element.querySelector(`select[name="${config.activeStateKey}"]`);
-                if (select) {
-                    const option = select.querySelector(`option[value="${id}"]`);
-                    if (option) option.textContent = result.name;
-                }
-
                 if (config.onCascade) config.onCascade(app, id, result);
 
                 if (app.uiState[config.activeStateKey] === id) {
                     if (config.onUpdateActiveUI) config.onUpdateActiveUI(app, result);
-                    app._syncDOMToState();
                 }
             },
         });
@@ -748,7 +707,7 @@ export class MapDialogManager {
             onSave: (entity, result) => {
                 if (app.activeRiverId === id) {
                     app.uiState.riverWidth = result.width;
-                    app._syncDOMToState();
+                    app.render({ parts: ["toolbar"] });
                 }
             },
             triggersTerrain: true,
@@ -814,7 +773,7 @@ export class MapDialogManager {
                     app.uiState.routeColor = result.color;
                     app.uiState.routeThickness = result.thickness;
                     app.uiState.routeStyle = result.style;
-                    app._syncDOMToState();
+                    app.render({ parts: ["toolbar"] });
                 }
             },
         });
