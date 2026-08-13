@@ -1502,7 +1502,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    async #ingestMapPayload(payload) {
+    async #ingestMapPayload(rawPayload) {
+        // Deep clone to sever the connection to Foundry's memory cache
+        const payload = foundry.utils.deepClone(rawPayload);
+
         this.uiState.mapSeed = payload.seed;
         this.currentParentId = payload.parentId || null;
 
@@ -1800,9 +1803,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
 
         if (choice === "cancel") return false;
+
         if (choice === "save") {
             const saved = await this.saveCurrentMap();
             if (!saved) return false;
+        }
+
+        if (choice === "discard") {
+            this.isDirty = false;
         }
 
         const activeWindow = this.element.ownerDocument.defaultView || window;
@@ -2099,6 +2107,60 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             minY: Math.max(0, minY - padding),
             maxY: Math.min(this.mapHeight, maxY + padding),
         };
+    }
+
+    async #processHistoryStep(isUndo) {
+        // Dynamically assign the source and target stacks based on the direction
+        const sourceLedger = isUndo ? this.globalHistoryLedger : this.globalRedoLedger;
+        const targetLedger = isUndo ? this.globalRedoLedger : this.globalHistoryLedger;
+        const sourcePinStack = isUndo ? this.pinHistory : this.pinRedoStack;
+        const targetPinStack = isUndo ? this.pinRedoStack : this.pinHistory;
+
+        let action = sourceLedger?.pop();
+
+        while (action) {
+            if (action === "vector") {
+                if (sourcePinStack.length > 0) {
+                    const previousFaults = JSON.stringify(this.tectonicFaults);
+                    const previousRivers = JSON.stringify(this.manualRivers);
+                    const previousFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
+
+                    targetPinStack.push(MapStateManager.getVectorStateSnapshot(this));
+                    const state = sourcePinStack.pop();
+                    MapStateManager.restoreVectorStateSnapshot(this, state);
+
+                    targetLedger.push("vector");
+
+                    const currentFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
+
+                    if (previousFaults !== JSON.stringify(this.tectonicFaults) || previousRivers !== JSON.stringify(this.manualRivers)) {
+                        this._repaintCanvas();
+                        this.debouncedGenerateTerrain();
+                    } else if (previousFeaturePins !== currentFeaturePins) {
+                        this._repaintCanvas();
+                        this.debouncedGenerateClimate();
+                    } else {
+                        this._repaintVectors();
+                    }
+                    break;
+                }
+            } else if (action === "raster") {
+                // Dynamically trigger the brush engine's internal undo or redo
+                const brushAction = isUndo ? this.brushEngine?.undo() : this.brushEngine?.redo();
+
+                if (this.baseElevationData && brushAction) {
+                    targetLedger.push("raster");
+                    await this.#rebuildFromHistory(true);
+                    this._repaintCanvas();
+                    this.debouncedGenerateClimate();
+                    break;
+                }
+            }
+            action = sourceLedger?.pop();
+        }
+
+        this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     // --- Action Handlers ---
@@ -2683,46 +2745,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _onRedoBrush(event, target) {
-        let action = this.globalRedoLedger?.pop();
-
-        while (action) {
-            if (action === "vector") {
-                if (this.pinRedoStack.length > 0) {
-                    const previousFaults = JSON.stringify(this.tectonicFaults);
-                    const previousRivers = JSON.stringify(this.manualRivers);
-                    const previousPins = JSON.stringify(this.mapPins);
-
-                    this.pinHistory.push(MapStateManager.getVectorStateSnapshot(this));
-                    const state = this.pinRedoStack.pop();
-                    MapStateManager.restoreVectorStateSnapshot(this, state);
-
-                    this.globalHistoryLedger.push("vector");
-
-                    if (previousFaults !== JSON.stringify(this.tectonicFaults) || previousRivers !== JSON.stringify(this.manualRivers)) {
-                        this._repaintCanvas();
-                        this.debouncedGenerateTerrain();
-                    } else if (previousPins !== JSON.stringify(this.mapPins)) {
-                        this._repaintCanvas();
-                        this.debouncedGenerateClimate();
-                    } else {
-                        this._repaintVectors();
-                    }
-                    break;
-                }
-            } else if (action === "raster") {
-                if (this.baseElevationData && this.brushEngine?.redo()) {
-                    this.globalHistoryLedger.push("raster");
-                    await this.#rebuildFromHistory(true);
-                    this._repaintCanvas();
-                    this.debouncedGenerateClimate();
-                    break;
-                }
-            }
-            action = this.globalRedoLedger?.pop();
-        }
-
-        this.render({ parts: ["context"] });
-        this.markDirty();
+        await this.#processHistoryStep(false);
     }
 
     _onRemoveReferenceImage(event, target) {
@@ -3141,46 +3164,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _onUndoBrush(event, target) {
-        let action = this.globalHistoryLedger?.pop();
-
-        while (action) {
-            if (action === "vector") {
-                if (this.pinHistory.length > 0) {
-                    const previousFaults = JSON.stringify(this.tectonicFaults);
-                    const previousRivers = JSON.stringify(this.manualRivers);
-                    const previousPins = JSON.stringify(this.mapPins);
-
-                    this.pinRedoStack.push(MapStateManager.getVectorStateSnapshot(this));
-                    const state = this.pinHistory.pop();
-                    MapStateManager.restoreVectorStateSnapshot(this, state);
-
-                    this.globalRedoLedger.push("vector");
-
-                    if (previousFaults !== JSON.stringify(this.tectonicFaults) || previousRivers !== JSON.stringify(this.manualRivers)) {
-                        this._repaintCanvas();
-                        this.debouncedGenerateTerrain();
-                    } else if (previousPins !== JSON.stringify(this.mapPins)) {
-                        this._repaintCanvas();
-                        this.debouncedGenerateClimate();
-                    } else {
-                        this._repaintVectors();
-                    }
-                    break;
-                }
-            } else if (action === "raster") {
-                if (this.baseElevationData && this.brushEngine?.undo()) {
-                    this.globalRedoLedger.push("raster");
-                    await this.#rebuildFromHistory(true);
-                    this._repaintCanvas();
-                    this.debouncedGenerateClimate();
-                    break;
-                }
-            }
-            action = this.globalHistoryLedger?.pop();
-        }
-
-        this.render({ parts: ["context"] });
-        this.markDirty();
+        await this.#processHistoryStep(true);
     }
 
     _onZoomIn(event, target) {
