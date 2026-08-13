@@ -782,7 +782,33 @@ export class StudioCanvas {
     exportToPNG(filename = "world-map") {
         try {
             this.layers.reference.visible = false;
-            const canvas = this.app.renderer.extract.canvas(this.stage);
+
+            const optimalRes = 2000 / this.mapWidth;
+            const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
+
+            const renderTexture = PIXI.RenderTexture.create({
+                width: Math.round(this.mapWidth * dynamicRes),
+                height: Math.round(this.mapHeight * dynamicRes),
+                resolution: 1,
+            });
+
+            // Temporarily strip the camera transform for a clean, 0-offset export
+            const origX = this.stage.position.x;
+            const origY = this.stage.position.y;
+            const origScaleX = this.stage.scale.x;
+            const origScaleY = this.stage.scale.y;
+
+            this.stage.position.set(0, 0);
+            this.stage.scale.set(dynamicRes);
+
+            // Render to texture (instead of relying on the live monitor output)
+            this.app.renderer.render(this.stage, { renderTexture: renderTexture });
+            const canvas = this.app.renderer.extract.canvas(renderTexture);
+
+            // Restore camera
+            this.stage.position.set(origX, origY);
+            this.stage.scale.set(origScaleX, origScaleY);
+
             this.layers.reference.visible = true;
 
             const dataUrl = canvas.toDataURL("image/png");
@@ -805,6 +831,9 @@ export class StudioCanvas {
             a.click();
 
             URL.revokeObjectURL(blobUrl);
+
+            // Clean up the temporary texture from VRAM
+            renderTexture.destroy(true);
         } catch (err) {
             console.error("FWMB | Failed to export PNG:", err);
             ui.notifications.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
@@ -1555,15 +1584,27 @@ export class StudioCanvas {
             this.layers.cartography.visible = false;
         }
 
+        // Dynamically oversample small maps for vector crispness, capped at 2x.
+        const optimalRes = 2000 / this.mapWidth;
+        const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
+
+        // Physically multiply the pixel bounds rather than relying on PIXI's resolution flag
         const renderTexture = PIXI.RenderTexture.create({
-            width: this.mapWidth,
-            height: this.mapHeight,
+            width: Math.round(this.mapWidth * dynamicRes),
+            height: Math.round(this.mapHeight * dynamicRes),
             resolution: 1,
         });
 
-        this.app.renderer.render(this.stage, { renderTexture: renderTexture });
+        // Temporarily scale the stage up to draw into the larger texture
+        const origScaleX = this.stage.scale.x;
+        const origScaleY = this.stage.scale.y;
+        this.stage.scale.set(dynamicRes);
 
+        this.app.renderer.render(this.stage, { renderTexture: renderTexture });
         const canvas = this.app.renderer.extract.canvas(renderTexture);
+
+        // Restore the original scale
+        this.stage.scale.set(origScaleX, origScaleY);
 
         this.gridLayer.visible = originalVisibility.grid;
         this.layers.reference.visible = originalVisibility.reference;

@@ -2395,19 +2395,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.stage.position.set(0, 0);
             this.canvasEngine.stage.scale.set(1, 1);
 
-            // Update the overlay text dynamically during processing
+            const activeWindow = this.element.ownerDocument.defaultView || window;
             const textEl = this.element.querySelector(".fwmb-processing-text");
+
+            // --- 1. PLAYER PASS ---
             if (textEl) textEl.textContent = "Extracting Player View...";
 
             this.canvasEngine.setRenderPass("player");
-            this._repaintVectors(); // Forces canvas to hide GM items
+            this._repaintVectors(); // Rebuilds the vectors based on player visibility
+
+            // YIELD to the browser so the newly created PIXI SVG Sprites can upload to the GPU
+            await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
+
             const playerBlob = await this.canvasEngine.extractCanvasBlob("player");
 
+            // --- 2. GM OVERLAY PASS ---
             let gmBlob = null;
             if (config.createGmOverlay) {
                 if (textEl) textEl.textContent = "Extracting GM Overlay...";
+
                 this.canvasEngine.setRenderPass("gm");
-                this._repaintVectors(); // Forces canvas to hide Player items
+                this._repaintVectors(); // Rebuilds the vectors based on GM visibility
+
+                // YIELD again for the new GM sprites
+                await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
+
                 gmBlob = await this.canvasEngine.extractCanvasBlob("gm");
             }
 

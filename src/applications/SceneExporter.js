@@ -235,6 +235,9 @@ export class SceneExporter {
             try {
                 const noteData = [];
 
+                // Scale pin size relative to map width (1:50 ratio), clamped between 32px and 96px
+                const calculatedSize = Math.max(32, Math.min(Math.round(app.mapWidth / 50), 96));
+
                 app.mapPins.forEach((pin) => {
                     if (pin.icon && pin.journalPageId) {
                         noteData.push({
@@ -242,6 +245,7 @@ export class SceneExporter {
                             pageId: pin.journalPageId,
                             x: pin.x,
                             y: pin.y,
+                            iconSize: calculatedSize,
                             texture: { src: `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg` },
                         });
                     }
@@ -267,6 +271,7 @@ export class SceneExporter {
                             pageId: region.journalPageId,
                             x: minX + (maxX - minX) / 2,
                             y: minY + (maxY - minY) / 2,
+                            iconSize: calculatedSize,
                         });
                     });
                 });
@@ -279,7 +284,7 @@ export class SceneExporter {
             }
         }
 
-        // Generate thumbnail for V14 Levels architecture
+        // Generate thumbnail
         try {
             ui.notifications.info(`FWMB | Generating Thumbnail...`);
             const thumbData = await scene.createThumbnail();
