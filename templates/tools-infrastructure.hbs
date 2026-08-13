@@ -3,7 +3,7 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.PointsOfInterest"}}</legend>
         
-        <div class="fwmb-list-container fwmb-scrollable stable">
+        <div id="fwmb-scroll-pins" class="fwmb-list-container fwmb-scrollable stable">
             {{#each mapPins}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="pin">
                 <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature">
@@ -33,7 +33,7 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.Routes"}}</legend>
 
-        <div class="fwmb-list-container fwmb-scrollable stable">
+        <div id="fwmb-scroll-routes" class="fwmb-list-container fwmb-scrollable stable">
             {{#each mapRoutes}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="route">
                 <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature">

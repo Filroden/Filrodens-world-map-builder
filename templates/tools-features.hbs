@@ -3,7 +3,7 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.ManualRivers"}}</legend>
 
-        <div class="fwmb-list-container fwmb-scrollable stable">
+        <div id="fwmb-scroll-rivers" lass="fwmb-list-container fwmb-scrollable stable">
             {{#each manualRivers}}
                 <div class="fwmb-list-item" data-id="{{this.id}}" data-type="river">
                     <div class="fwmb-route-swatch" style="background-color: #78aad2; height: 3px; border-style: solid;"></div>
@@ -27,7 +27,7 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.TectonicFaults"}}</legend>
 
-        <div class="fwmb-list-container fwmb-scrollable stable">
+        <div id="fwmb-scroll-faults" lass="fwmb-list-container fwmb-scrollable stable">
             {{#each tectonicFaults}}
                 <div class="fwmb-list-item" data-id="{{this.id}}" data-type="fault">
                     <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: 5px; border-style: solid;"></div>

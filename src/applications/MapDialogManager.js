@@ -171,11 +171,19 @@ export class MapDialogManager {
                     justify: form.elements["styleJustify"].value,
                 }),
                 onCascade: (app, id, result) => {
+                    const aestheticProperties = {
+                        fontFamily: result.fontFamily,
+                        fontSize: result.fontSize,
+                        fillColor: result.fillColor,
+                        maxWidth: result.maxWidth,
+                        justify: result.justify,
+                    };
+
                     for (const lbl of app.mapLabels) {
-                        if (lbl.quickStyle === id) foundry.utils.mergeObject(lbl, result);
+                        if (lbl.quickStyle === id) foundry.utils.mergeObject(lbl, aestheticProperties);
                     }
                     const updateAttached = (ent) => {
-                        if (ent.label && ent.label.quickStyle === id) foundry.utils.mergeObject(ent.label, result);
+                        if (ent.label && ent.label.quickStyle === id) foundry.utils.mergeObject(ent.label, aestheticProperties);
                     };
                     app.mapPins.forEach(updateAttached);
                     app.mapRoutes.forEach(updateAttached);
@@ -219,7 +227,15 @@ export class MapDialogManager {
                     style: form.elements["styleStyle"].value,
                 }),
                 onCascade: (app, id, result) => {
-                    for (const route of app.mapRoutes) if (route.quickStyle === id) foundry.utils.mergeObject(route, result);
+                    const aestheticProperties = {
+                        color: result.color,
+                        thickness: result.thickness,
+                        style: result.style,
+                    };
+
+                    for (const route of app.mapRoutes) {
+                        if (route.quickStyle === id) foundry.utils.mergeObject(route, aestheticProperties);
+                    }
                 },
                 onDisconnect: (app, id) => {
                     for (const route of app.mapRoutes) if (route.quickStyle === id) route.quickStyle = "custom";

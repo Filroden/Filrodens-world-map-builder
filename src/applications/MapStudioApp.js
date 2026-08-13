@@ -113,7 +113,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context: {
             template: "modules/filrodens-world-map-builder/templates/context.hbs",
             classes: ["fwmb-context-panel"],
-            scrollable: [".fwmb-scrollable"],
+            scrollable: [".fwmb-scrollable", "#fwmb-scroll-auto-labels", "#fwmb-scroll-custom-labels", "#fwmb-scroll-rivers", "#fwmb-scroll-faults", "#fwmb-scroll-pins", "#fwmb-scroll-routes"],
         },
         map: {
             template: "modules/filrodens-world-map-builder/templates/map.hbs",

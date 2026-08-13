@@ -455,6 +455,7 @@ Procedural rivers (those flowing from the automatically generated springs) calcu
 
 ## Roadmap
 
+- Allow custom biomes to be renamed.
 - Bulk edit vector (pins, lines, regions and text) properties.
 - Scene tools to allow quicker toggling of the in-game map grid, map pins and tiles (which would otherwise take multiple clicks through Foundry's UI).
 - Multi-tile export support, allowing the user to toggle distinct layers (like political borders or trade routes) on and off during live play.

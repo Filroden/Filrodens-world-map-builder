@@ -1568,7 +1568,6 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-dialog-content {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-space-s);
 }
 
 /* --- PROCESSING OVERLAY --- */
