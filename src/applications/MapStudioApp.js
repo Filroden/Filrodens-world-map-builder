@@ -1648,9 +1648,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.defaultUiState = foundry.utils.deepClone(this.uiState);
 
         this.render({ parts: ["toolbar", "context"] });
-        this.#updateGrid();
-
         await this.generateTerrain();
+        this.#updateGrid();
         this.canvasEngine.resetCamera();
     }
 
