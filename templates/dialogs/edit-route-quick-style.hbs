@@ -1,16 +1,25 @@
 <div class="fwmb-dialog-content">
+    <datalist id="fwmb-standard-colors">
+        {{#each palette}}
+            <option value="{{this}}"></option>
+        {{/each}}
+    </datalist>
+
     <div class="form-group fwmb-dialog-content">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
         <input type="text" name="styleName" value="{{style.name}}" autofocus>
     </div>
+
     <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
         <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
-        <input type="color" name="styleColor" value="{{style.color}}" class="fwmb-swatch fwmb-wide" style="height: 24px; padding: 0;">
+        <input type="color" name="styleColor" value="{{style.color}}" list="fwmb-standard-colors" class="fwmb-swatch fwmb-wide" style="height: 24px; padding: 0;">
     </div>
+
     <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
         <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
         <input type="number" name="styleThickness" value="{{style.thickness}}" min="1" max="10">
     </div>
+
     <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
         <label>{{localize "FILRODENSWMB.UI.LineStyle"}}</label>
         <select name="styleStyle">

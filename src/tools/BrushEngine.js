@@ -1,3 +1,5 @@
+import { SpatialMath } from "./SpatialMath.js";
+
 export class BrushEngine {
     constructor(mapWidth, mapHeight) {
         this.mapWidth = mapWidth;
@@ -29,9 +31,8 @@ export class BrushEngine {
     }
 
     applyBrush(x, y, elevationData, biomeOverrideData, springOverrides, seaLevel) {
-        if (!this.currentStroke) return false;
-        this.#lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, true);
-        return true;
+        if (!this.currentStroke) return null;
+        return this.#lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, true);
     }
 
     endStroke() {
@@ -58,18 +59,24 @@ export class BrushEngine {
         return true;
     }
 
-    replayHistory(elevationData, biomeOverrideData, seaLevel) {
+    replayHistory(elevationData, biomeOverrideData, seaLevel, activeBounds = null) {
         for (const stroke of this.history) {
+            // Fast box check to skip strokes entirely outside the active rebuild zone
+            if (activeBounds) {
+                const strokeBounds = SpatialMath.getVectorBounds(stroke, stroke.size);
+                if (!SpatialMath.isValidBounds(SpatialMath.intersectBounds(strokeBounds, activeBounds))) continue;
+            }
+
             this.currentStroke = stroke;
             this.lastX = null;
             this.lastY = null;
             this.activeSlopeElevation = null;
 
             for (const pt of stroke.points) {
-                this.#lerpAndStamp(pt.x, pt.y, elevationData, biomeOverrideData, seaLevel, false);
+                // Pass activeBounds down to restrict the internal stamping loops
+                this.#lerpAndStamp(pt.x, pt.y, elevationData, biomeOverrideData, seaLevel, false, activeBounds);
             }
         }
-
         this.currentStroke = null;
         this.lastX = null;
         this.lastY = null;
@@ -77,14 +84,15 @@ export class BrushEngine {
 
     // --- Private Interpolation Engine ---
 
-    #lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, shouldRecord) {
+    #lerpAndStamp(x, y, elevationData, biomeOverrideData, seaLevel, shouldRecord, activeBounds) {
+        let dirtyBounds = SpatialMath.getEmptyBounds();
+
         if (this.lastX === null || this.lastY === null) {
             // Anchor the slope elevation to the exact pixel where the user first clicked
             if (this.currentStroke.tool === "slopeUp" || this.currentStroke.tool === "slopeDown" || this.currentStroke.tool === "level") {
                 const tx = Math.round(x);
                 const ty = Math.round(y);
 
-                // Disable the anchor if the ghost stroke originates off-screen
                 if (tx < 0 || tx >= this.mapWidth || ty < 0 || ty >= this.mapHeight) {
                     this.activeSlopeElevation = null;
                 } else {
@@ -93,10 +101,13 @@ export class BrushEngine {
             }
 
             if (shouldRecord) this.#recordControlPoint(x, y);
-            this.#stampBrush(x, y, elevationData, biomeOverrideData, seaLevel);
+
+            const stampBounds = this.#stampBrush(x, y, elevationData, biomeOverrideData, seaLevel);
+            dirtyBounds = SpatialMath.mergeBounds(dirtyBounds, stampBounds);
+
             this.lastX = x;
             this.lastY = y;
-            return;
+            return dirtyBounds;
         }
 
         const dx = x - this.lastX;
@@ -108,7 +119,7 @@ export class BrushEngine {
 
         // Accumulator: Required so slow mouse movements eventually trigger a stamp
         if (distance < stepSpacing) {
-            return;
+            return dirtyBounds; // Returns the safe 'Infinity' bounds
         }
 
         const steps = Math.floor(distance / stepSpacing);
@@ -118,7 +129,6 @@ export class BrushEngine {
             const interpX = this.lastX + dx * lerpFactor;
             const interpY = this.lastY + dy * lerpFactor;
 
-            // Apply Continuous Gradient (Boosted for stronger carving)
             const gradientBoost = 0.3;
 
             if (this.currentStroke.tool === "slopeUp") {
@@ -129,17 +139,19 @@ export class BrushEngine {
                 this.activeSlopeElevation = Math.max(0, this.activeSlopeElevation);
             }
 
-            this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel);
+            const stampBounds = this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel);
+            dirtyBounds = SpatialMath.mergeBounds(dirtyBounds, stampBounds);
         }
 
         if (shouldRecord) {
             this.#recordControlPoint(x, y);
         }
 
-        // Leave fractional distance in the accumulator for the next frame
         const finalLerp = (steps * stepSpacing) / distance;
         this.lastX = this.lastX + dx * finalLerp;
         this.lastY = this.lastY + dy * finalLerp;
+
+        return dirtyBounds;
     }
 
     #recordControlPoint(x, y) {
@@ -150,16 +162,26 @@ export class BrushEngine {
 
     // --- Private Rasterisation & Math ---
 
-    #stampBrush(cx, cy, elevationData, biomeOverrideData, seaLevel) {
+    #stampBrush(cx, cy, elevationData, biomeOverrideData, seaLevel, activeBounds = null) {
         const { layer, size } = this.currentStroke;
 
+        // Calculate the raw, physical footprint of the brush
         const minX = Math.max(0, Math.floor(cx - size));
         const maxX = Math.min(this.mapWidth - 1, Math.ceil(cx + size));
         const minY = Math.max(0, Math.floor(cy - size));
         const maxY = Math.min(this.mapHeight - 1, Math.ceil(cy + size));
 
-        for (let y = minY; y <= maxY; y++) {
-            for (let x = minX; x <= maxX; x++) {
+        // Intersect it with the restricted rebuild zone
+        const b = SpatialMath.intersectBounds({ minX, maxX, minY, maxY }, activeBounds);
+
+        // Safety Check: If the brush stroke is entirely outside the rebuild zone, abort early
+        if (!SpatialMath.isValidBounds(b)) {
+            return { minX, maxX, minY, maxY };
+        }
+
+        // Run the mathematical loops strictly within the intersected bounds 'b'
+        for (let y = b.minY; y <= b.maxY; y++) {
+            for (let x = b.minX; x <= b.maxX; x++) {
                 const distance = Math.hypot(x - cx, y - cy);
                 if (distance > size) continue;
 
@@ -173,6 +195,9 @@ export class BrushEngine {
                 }
             }
         }
+
+        // Return the true footprint so the accumulator knows what was touched
+        return { minX, maxX, minY, maxY };
     }
 
     #calculateInfluence(distance, size, feather) {

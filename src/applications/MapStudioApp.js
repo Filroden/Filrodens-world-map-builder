@@ -6,6 +6,10 @@ import { BrushEngine } from "../tools/BrushEngine.js";
 import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
 import { Scene3D } from "../canvas/Scene3D.js";
 import { SceneExporter } from "./SceneExporter.js";
+import { SpatialMath } from "../tools/SpatialMath.js";
+import { MapStateManager } from "./MapStateManager.js";
+import { MapDialogManager } from "./MapDialogManager.js";
+import { RegionalExtractor } from "./RegionalExtractor.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -19,70 +23,84 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             icon: "fwmb-icon map",
             resizable: true,
         },
+        // prettier-ignore
         actions: {
-            addCustomBiome: MapStudioApp.#onAddCustomBiome,
-            addDecoration: MapStudioApp.#onAddDecoration,
-            addRegionLayer: MapStudioApp.#onAddRegionLayer,
-            addRouteQuickStyle: MapStudioApp.#onAddRouteQuickStyle,
-            adjustNoiseScale: MapStudioApp.#onAdjustNoiseScale,
-            adjustReferenceScale: MapStudioApp.#onAdjustReferenceScale,
-            applyResolution: MapStudioApp.#onApplyResolution,
-            changeTool: MapStudioApp.#onChangeTool,
-            deleteCustomBiome: MapStudioApp.#onDeleteCustomBiome,
-            deleteDecoration: MapStudioApp.#onDeleteEntity,
-            deleteFault: MapStudioApp.#onDeleteEntity,
-            deleteLabel: MapStudioApp.#onDeleteEntity,
-            deletePin: MapStudioApp.#onDeleteEntity,
-            deleteRegion: MapStudioApp.#onDeleteRegion,
-            deleteRegionLayer: MapStudioApp.#onDeleteEntity,
-            deleteRiver: MapStudioApp.#onDeleteEntity,
-            deleteRoute: MapStudioApp.#onDeleteEntity,
-            deleteRouteQuickStyle: MapStudioApp.#onDeleteRouteQuickStyle,
-            editDecoration: MapStudioApp.#onEditDecoration,
-            editFault: MapStudioApp.#onEditFault,
-            editLabel: MapStudioApp.#onEditLabel,
-            editPin: MapStudioApp.#onEditPin,
-            editRegion: MapStudioApp.#onEditRegion,
-            editRegionLayer: MapStudioApp.#onEditRegionLayer,
-            editRiver: MapStudioApp.#onEditRiver,
-            editRoute: MapStudioApp.#onEditRoute,
-            editRouteQuickStyle: MapStudioApp.#onEditRouteQuickStyle,
-            exportPng: MapStudioApp.#onExportPng,
-            exportScene: MapStudioApp.#onExportScene,
-            generateRegionalMap: MapStudioApp.#onGenerateRegionalMap,
-            importMapJson: MapStudioApp.#onImportMapJson,
-            manageMap: MapStudioApp.#onManageMapAction,
-            nudgeNoise: MapStudioApp.#onNudgeNoise,
-            nudgeReference: MapStudioApp.#onNudgeReference,
-            randomizeSeed: MapStudioApp.#onRandomizeSeed,
-            redoBrush: MapStudioApp.#onRedoBrush,
-            removeReferenceImage: MapStudioApp.#onRemoveReferenceImage,
-            resetNoisePan: MapStudioApp.#onResetNoisePan,
-            resetNoiseScale: MapStudioApp.#onResetNoiseScale,
-            resetReferencePan: MapStudioApp.#onResetReferencePan,
-            resetReferenceScale: MapStudioApp.#onResetReferenceScale,
-            resetZoom: MapStudioApp.#onResetZoom,
-            saveMap: MapStudioApp.#onSaveMap,
-            selectRegionLayer: MapStudioApp.#onSelectRegionLayer,
-            setBrushTool: MapStudioApp.#onSetBrushTool,
-            setFeatureMode: MapStudioApp.#onSetFeatureMode,
-            setInfraMode: MapStudioApp.#onSetInfraMode,
-            setInfrastructureIcon: MapStudioApp.#onSetInfrastructureIcon,
-            setRegionMode: MapStudioApp.#onSetRegionMode,
-            setRegionPreset: MapStudioApp.#onSetRegionPreset,
-            threeDView: MapStudioApp.#onThreeDView,
-            toggleEditMode: MapStudioApp.#onToggleEditMode,
-            toggleGrid: MapStudioApp.#onToggleGrid,
-            toggleLayer: MapStudioApp.#onToggleLayer,
-            togglePinDropdown: MapStudioApp.#onTogglePinDropdown,
-            toggleRegionSmoothing: MapStudioApp.#onToggleRegionSmoothing,
-            toggleSnapping: MapStudioApp.#onToggleSnapping,
-            toggleViewFilter: MapStudioApp.#onToggleViewFilter,
-            toggleVisibility: MapStudioApp.#onToggleVisibility,
-            undoBrush: MapStudioApp.#onUndoBrush,
-            zoomIn: MapStudioApp.#onZoomIn,
-            zoomOut: MapStudioApp.#onZoomOut,
-            zoomToFeature: MapStudioApp.#onZoomToFeature,
+            // --- DIALOG MANAGER: Quick Styles ---
+            addLabelQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
+            addRouteQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
+            editLabelQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
+            editRouteQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
+            deleteLabelQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+            deleteRouteQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+
+            // --- DIALOG MANAGER: Entity Deletion ---
+            deleteDecoration(e, t)  { MapDialogManager.onDeleteEntity(this, e, t); },
+            deleteFault(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+            deleteLabel(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+            deletePin(e, t)         { MapDialogManager.onDeleteEntity(this, e, t); },
+            deleteRegion(e, t)      { MapDialogManager.onDeleteRegion(this, e, t); },
+            deleteRegionLayer(e, t) { MapDialogManager.onDeleteEntity(this, e, t); },
+            deleteRiver(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+            deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+
+            // --- DIALOG MANAGER: Entity Editing ---
+            editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
+            editFault(e, t)       { MapDialogManager.onEditFault(this, e, t); },
+            editLabel(e, t)       { MapDialogManager.onEditLabel(this, e, t); },
+            editPin(e, t)         { MapDialogManager.onEditPin(this, e, t); },
+            editRegion(e, t)      { MapDialogManager.onEditRegion(this, e, t); },
+            editRegionLayer(e, t) { MapDialogManager.onEditRegionLayer(this, e, t); },
+            editRiver(e, t)       { MapDialogManager.onEditRiver(this, e, t); },
+            editRoute(e, t)       { MapDialogManager.onEditRoute(this, e, t); },
+
+            // --- DIALOG MANAGER: Custom Biomes & Misc ---
+            addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
+            deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
+            addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
+            addRegionLayer(e, t)    { MapDialogManager.onAddRegionLayer(this, e, t); },
+
+            // --- MAP STUDIO APP: Internal Tooling & States ---
+            adjustNoiseScale(e, t)          { this._onAdjustNoiseScale(e, t); },
+            adjustReferenceScale(e, t)      { this._onAdjustReferenceScale(e, t); },
+            applyFeatureMath(e, t)          { this._onApplyFeatureMath(e, t); },
+            applyResolution(e, t)           { this._onApplyResolution(e, t); },
+            changeTool(e, t)                { this._onChangeTool(e, t); },
+            exportPng(e, t)                 { this._onExportPng(e, t); },
+            exportScene(e, t)               { this._onExportScene(e, t); },
+            generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
+            importMapJson(e, t)             { this._onImportMapJson(e, t); },
+            manageMap(e, t)                 { this._onManageMapAction(e, t); },
+            nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
+            nudgeReference(e, t)            { this._onNudgeReference(e, t); },
+            randomizeSeed(e, t)             { this._onRandomizeSeed(e, t); },
+            redoBrush(e, t)                 { this._onRedoBrush(e, t); },
+            removeReferenceImage(e, t)      { this._onRemoveReferenceImage(e, t); },
+            resetNoisePan(e, t)             { this._onResetNoisePan(e, t); },
+            resetNoiseScale(e, t)           { this._onResetNoiseScale(e, t); },
+            resetReferencePan(e, t)         { this._onResetReferencePan(e, t); },
+            resetReferenceScale(e, t)       { this._onResetReferenceScale(e, t); },
+            resetZoom(e, t)                 { this._onResetZoom(e, t); },
+            saveMap(e, t)                   { this._onSaveMap(e, t); },
+            selectRegionLayer(e, t)         { this._onSelectRegionLayer(e, t); },
+            setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
+            setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
+            setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
+            setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
+            setRegionMode(e, t)             { this._onSetRegionMode(e, t); },
+            setRegionPreset(e, t)           { this._onSetRegionPreset(e, t); },
+            threeDView(e, t)                { this._onThreeDView(e, t); },
+            toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
+            toggleGrid(e, t)                { this._onToggleGrid(e, t); },
+            toggleLayer(e, t)               { this._onToggleLayer(e, t); },
+            toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
+            togglePinDropdown(e, t)         { this._onTogglePinDropdown(e, t); },
+            toggleRegionSmoothing(e, t)     { this._onToggleRegionSmoothing(e, t); },
+            toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
+            toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
+            undoBrush(e, t)                 { this._onUndoBrush(e, t); },
+            zoomIn(e, t)                    { this._onZoomIn(e, t); },
+            zoomOut(e, t)                   { this._onZoomOut(e, t); },
+            zoomToFeature(e, t)             { this._onZoomToFeature(e, t); },
         },
     };
 
@@ -94,49 +112,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context: {
             template: "modules/filrodens-world-map-builder/templates/context.hbs",
             classes: ["fwmb-context-panel"],
-            scrollable: [".fwmb-scrollable"],
+            scrollable: [".fwmb-scrollable", "#fwmb-scroll-auto-labels", "#fwmb-scroll-custom-labels", "#fwmb-scroll-rivers", "#fwmb-scroll-faults", "#fwmb-scroll-pins", "#fwmb-scroll-routes"],
         },
         map: {
             template: "modules/filrodens-world-map-builder/templates/map.hbs",
             classes: ["fwmb-map"],
         },
-    };
-
-    static VECTOR_CONFIG = {
-        fault: {
-            stateKey: "tectonicFaults",
-            activeKey: "activeFaultId",
-            namePrefix: "Fault Line",
-            widthKey: "faultThickness",
-            toolCategory: "features",
-            triggersTerrain: true,
+        editToolbar: {
+            template: "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
+            classes: ["fwmb-edit-toolbar"],
         },
-        river: {
-            stateKey: "manualRivers",
-            activeKey: "activeRiverId",
-            namePrefix: "Manual River",
-            widthKey: "riverWidth",
-            toolCategory: "features",
-            triggersTerrain: true,
-        },
-        route: {
-            stateKey: "mapRoutes",
-            activeKey: "activeRouteId",
-            namePrefix: "New Route",
-            widthKey: null,
-            toolCategory: "infrastructure",
-            triggersTerrain: false,
-        },
-    };
-
-    static DELETE_CONFIG = {
-        deleteDecoration: { stateKey: "mapDecorations", confirm: true, triggersTerrain: false },
-        deleteFault: { stateKey: "tectonicFaults", activeKey: "activeFaultId", confirm: true, triggersTerrain: true },
-        deleteLabel: { stateKey: "mapLabels", confirm: true, triggersTerrain: false },
-        deletePin: { stateKey: "mapPins", confirm: true, triggersTerrain: false },
-        deleteRegionLayer: { stateKey: "regionLayers", activeKey: "activeRegionLayerId", confirm: true, triggersTerrain: false, isLayer: true },
-        deleteRiver: { stateKey: "manualRivers", activeKey: "activeRiverId", confirm: true, triggersTerrain: true },
-        deleteRoute: { stateKey: "mapRoutes", activeKey: "activeRouteId", confirm: true, triggersTerrain: false },
     };
 
     constructor(options) {
@@ -174,6 +159,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapDecorations = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
+        this.globalHistoryLedger = [];
+        this.globalRedoLedger = [];
+        this.hasPendingFeatureMath = false;
+        this.pendingTerrainBounds = null;
+        this.cachedMaxElevation = null;
         this.brushEngine = null;
 
         this.currentSaveId = null;
@@ -182,118 +172,27 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.isDirty = false;
         this.isSaving = false;
 
-        this.#allocateBuffers();
+        MapStateManager.allocateBuffers(this);
         this.hasBooted = false;
 
-        this.defaultUiState = this.#buildDefaultUiState(this.mapWidth, this.mapHeight);
+        this.defaultUiState = MapStateManager.buildDefaultUiState(this.mapWidth, this.mapHeight);
 
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
         this.customBiomeColors = {};
 
-        this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), 800);
-        this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), 800);
-        this.debouncedGenerateFeatures = foundry.utils.debounce(this.generateFeatures.bind(this), 600);
-    }
+        this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
+        this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
+        this.debouncedGenerateFeatures = foundry.utils.debounce(this.generateFeatures.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.FEATURES);
 
-    #buildDefaultUiState(width, height) {
-        // Calculate the scale ratio based on the 1000px baseline
-        const baseline = Math.max(FILRODENSWMB.DEFAULTS.MAP_WIDTH, FILRODENSWMB.DEFAULTS.MAP_HEIGHT) || 1000;
-        const maxDim = Math.max(width, height);
-        const ratio = maxDim / baseline;
+        this.debouncedCanvasTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedCanvasClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
-        return {
-            mapWidth: width,
-            mapHeight: height,
-            gridType: "square",
-            gridSize: 50,
-            gridVisible: false,
-            brushSize: 20,
-            brushStrength: 0.02,
-            brushFeather: 0.4,
-            brushBiome: 6,
-            customBiomes: [],
-
-            mapSeed: FILRODENSWMB.DEFAULTS.SEED,
-            seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
-            globalTemp: FILRODENSWMB.DEFAULTS.GLOBAL_TEMP,
-            seasonOffset: 0,
-            latTop: FILRODENSWMB.DEFAULTS.LAT_TOP,
-            latBottom: FILRODENSWMB.DEFAULTS.LAT_BOTTOM,
-            globalMoisture: FILRODENSWMB.DEFAULTS.GLOBAL_MOISTURE,
-            "noise.offsetX": 0,
-            "noise.offsetY": 0,
-
-            // Normalise the three noise scales based on the resolution ratio (capped safely at 8000)
-            "noise.elevation.scale": Math.min(Math.max(100, Math.round(FILRODENSWMB.NOISE.ELEVATION.SCALE * ratio)), 8000),
-            "noise.elevation.octaves": FILRODENSWMB.NOISE.ELEVATION.OCTAVES,
-            "noise.elevation.stretch": FILRODENSWMB.NOISE.ELEVATION.STRETCH,
-            "noise.moisture.scale": Math.min(Math.max(100, Math.round(FILRODENSWMB.NOISE.MOISTURE.SCALE * ratio)), 8000),
-            "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
-            "noise.temperature.scale": Math.min(Math.max(100, Math.round(FILRODENSWMB.NOISE.TEMPERATURE.SCALE * ratio)), 8000),
-
-            activeFeatureMode: "spring",
-            riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
-            springsBaked: false,
-            faultType: "convergent",
-            faultThickness: FILRODENSWMB.TECTONICS?.DEFAULT_THICKNESS || 40,
-            faultStrength: FILRODENSWMB.TECTONICS?.DEFAULT_STRENGTH || 0.25,
-            riverWidth: 4,
-
-            contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
-            biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,
-            biomeAlphaInactive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE,
-            maxLakeSize: FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE,
-            springAltOffset: FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET,
-            springMoistMin: FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN,
-            meanderJitter: FILRODENSWMB.HYDROLOGY.MEANDER_JITTER,
-            altCooling: FILRODENSWMB.CLIMATE.ALTITUDE_COOLING,
-            freezingThreshold: FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD,
-
-            activeIcon: "map_pin",
-            activeInfraMode: "pin",
-            pinColor: "#ffffff",
-            pinScale: 1,
-            snapToPoints: true,
-            routeColor: "#ffffff",
-            routeThickness: 3,
-            routeStyle: "solid",
-            activeRouteQuickStyle: "custom",
-            customRouteStyles: [],
-
-            referenceImage: "",
-            referenceAlpha: 0.5,
-            referenceScale: 1,
-            referenceX: width / 2,
-            referenceY: height / 2,
-
-            regionPresets: FILRODENSWMB.REGIONS.PRESETS,
-            regionFillColor: "#c6af53",
-            regionFillStyle: "solid",
-            regionLineColor: "#ffffff",
-            regionLineThickness: 2,
-            regionLineStyle: "solid",
-            regionSmoothing: true,
-            regionOpacity: 0.5,
-
-            labelFontFamily: FILRODENSWMB.LABELS?.DEFAULT_FONT,
-            labelFontSize: FILRODENSWMB.LABELS?.DEFAULT_SIZE,
-            labelFillColor: FILRODENSWMB.LABELS?.DEFAULT_COLOR,
-
-            cartographyScaleEnable: false,
-            cartographyScaleUnits: "Miles",
-            cartographyScaleValue: 1,
-            cartographyScaleInterval: 100,
-            cartographyScaleMajorTicks: 4,
-            cartographyScaleMinorTicks: 4,
-            cartographyBorderEnable: false,
-            cartographyBorderStyle: "solid",
-            cartographyBorderColor: "#000000",
-            cartographyScaleX: 50,
-            cartographyScaleY: height - 50,
-
-            regionalTargetWidth: 1000,
-            regionalTargetHeight: 1000,
-        };
+        this.debouncedHistoryRebuild = foundry.utils.debounce(() => {
+            this.#rebuildFromHistory(true).then(() => {
+                this._repaintCanvas(null);
+                this.generateClimate(null);
+            });
+        }, FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
     }
 
     markDirty() {
@@ -301,62 +200,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Captures the current state of all non-destructive vector arrays and pushes them to the history stack.
-     * Automatically clears the redo stack, as any new action invalidates future redos.
-     */
-    #pushVectorState() {
-        this.pinHistory.push(this.#getVectorStateSnapshot());
-
-        // Prevent RAM exhaustion from infinite history tracking
-        if (this.pinHistory.length > 40) {
-            this.pinHistory.shift();
-        }
-
-        this.pinRedoStack = [];
-    }
-
-    /**
-     * Generates a deep-cloned snapshot of the current vector state.
-     */
-    #getVectorStateSnapshot() {
-        return {
-            tectonicFaults: foundry.utils.deepClone(this.tectonicFaults),
-            activeFaultId: this.activeFaultId,
-            manualRivers: foundry.utils.deepClone(this.manualRivers),
-            activeRiverId: this.activeRiverId,
-            pins: foundry.utils.deepClone(this.mapPins),
-            routes: foundry.utils.deepClone(this.mapRoutes),
-            regionLayers: foundry.utils.deepClone(this.regionLayers),
-            mapLabels: foundry.utils.deepClone(this.mapLabels),
-            mapDecorations: foundry.utils.deepClone(this.mapDecorations),
-            activeRouteId: this.activeRouteId,
-            activeRegionId: this.activeRegionId,
-        };
-    }
-
-    /**
-     * Restores the vector arrays and active IDs from a history snapshot.
-     */
-    #restoreVectorStateSnapshot(state) {
-        this.tectonicFaults = state.tectonicFaults || this.tectonicFaults;
-        this.activeFaultId = state.activeFaultId || null;
-        this.manualRivers = state.manualRivers || this.manualRivers;
-        this.activeRiverId = state.activeRiverId || null;
-        this.mapPins = state.pins || this.mapPins;
-        this.mapRoutes = state.routes || this.mapRoutes;
-        this.regionLayers = state.regionLayers || this.regionLayers;
-        this.mapLabels = state.mapLabels || this.mapLabels;
-        this.mapDecorations = state.mapDecorations || this.mapDecorations;
-        this.activeRouteId = state.activeRouteId || null;
-        this.activeRegionId = state.activeRegionId || null;
-    }
-
-    /**
      * Dynamically calculates the click-tolerance threshold in canvas-space pixels.
      * Ensures proximity checks remain exactly 15 screen-pixels wide regardless of zoom.
      */
     get currentSnapThreshold() {
-        const baseThreshold = 15;
+        const baseThreshold = FILRODENSWMB.LIMITS.SNAP_THRESHOLD;
         const zoomScale = this.canvasEngine?.stage?.scale?.x || 1;
         return baseThreshold / zoomScale;
     }
@@ -365,7 +213,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Applies RTL directionality if the active language requires it.
      */
     static #applyRTLSupport(element) {
-        const rtlLanguages = ["ar", "he", "fa", "ur"];
+        const rtlLanguages = FILRODENSWMB.UI.RTL_LANGUAGES || [];
         // Fallback to "en" if game.i18n is not fully initialised during early render
         const currentLang = game?.i18n?.lang || "en";
 
@@ -377,13 +225,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async _preparePartContext(partId, context, options) {
         context = await super._preparePartContext(partId, context, options);
+
+        context.hasPendingFeatureMath = this.hasPendingFeatureMath;
+        this.uiState.isEditMode = this.canvasEngine?.isEditMode ?? false;
+
         context.config = FILRODENSWMB;
         context.activeTool = this.activeTool;
+
+        const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
+        context.isLocked = this.uiState.isEditMode && !isVectorTool;
+
+        if (partId === "editToolbar") {
+            const editableTools = FILRODENSWMB.UI.EDITABLE_TOOLS;
+
+            if (editableTools.includes(this.activeTool)) {
+                context.toolbarPartial = `modules/filrodens-world-map-builder/templates/parts/toolbar-${this.activeTool}.hbs`;
+            } else {
+                context.toolbarPartial = `modules/filrodens-world-map-builder/templates/parts/toolbar-empty.hbs`;
+            }
+        }
 
         const rgbToHex = (rgb) => "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
 
         context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS)
-            .filter(([key, id]) => id !== 1 && id !== 2)
+            .filter(([key, id]) => id !== 1 && id !== 2 && !key.toLowerCase().startsWith("custom"))
             .map(([key, id]) => {
                 const defaultRgb = FILRODENSWMB.BIOMES[key] || [0, 0, 0];
                 const currentRgb = this.customBiomeColors[key] || defaultRgb;
@@ -393,7 +258,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     key: key,
                     label: `FILRODENSWMB.BIOMES.${key}`,
                     hex: rgbToHex(currentRgb),
-                    isCustom: false, // Ensure native biomes flag as false
+                    isCustom: false,
                 };
             });
 
@@ -435,7 +300,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             isCustom: true,
         }));
 
-        context.customRouteStyles = this.uiState.customRouteStyles || [];
+        context.customRouteStyles = [...(this.uiState.customRouteStyles || [])].sort(alphaSort);
+        context.customLabelStyles = [...(this.uiState.customLabelStyles || [])].sort(alphaSort);
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
@@ -462,8 +328,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             // Sort the unified list alphabetically by name
             context.autoLabels = autoLabels.toSorted(alphaSort);
-
             context.fontFamilies = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
+            context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
             if (this.regionLayers.length > 0 && !this.activeRegionLayerId) {
                 this.activeRegionLayerId = this.regionLayers[0].id;
@@ -487,20 +353,37 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         super._onRender(context, options);
         MapStudioApp.#applyRTLSupport(this.element);
 
+        this.#bindGlobalListeners();
+        this.#initCanvasAndEngines();
+        this.#bindToolbarListeners();
+        this.#bindContextPanelListeners();
+        this.#bindCanvasCallbacks();
+        this.#applyInitialBootState();
+
+        const mapContainer = this.element.querySelector(".fwmb-map-container");
+        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+
+        if (mapContainer && editToolbar && editToolbar.parentElement !== mapContainer) {
+            mapContainer.prepend(editToolbar);
+        }
+    }
+
+    #bindGlobalListeners() {
+        this.element.addEventListener("input", (event) => {
+            if (event.target.type === "range") {
+                const output = event.target.parentElement.querySelector("output");
+                if (output) output.value = event.target.value;
+            }
+        });
+
         if (!this.element.dataset.hasDblClickListener) {
             this.element.addEventListener("dblclick", (event) => {
                 const target = event.target;
-
                 if (target.tagName === "INPUT" && target.type === "range") {
                     const defaultVal = this.defaultUiState[target.name];
-
                     if (defaultVal !== undefined && target.value !== String(defaultVal)) {
                         target.value = defaultVal;
-
-                        if (target.nextElementSibling?.tagName === "OUTPUT") {
-                            target.nextElementSibling.value = defaultVal;
-                        }
-
+                        if (target.nextElementSibling?.tagName === "OUTPUT") target.nextElementSibling.value = defaultVal;
                         target.dispatchEvent(new Event("input", { bubbles: true }));
                     }
                 }
@@ -508,305 +391,347 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.element.dataset.hasDblClickListener = "true";
         }
 
-        const container = this.element.querySelector(".fwmb-map-preview");
-        if (container && !this.canvasEngine) {
-            this.canvasEngine = new StudioCanvas(container);
-            this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
-            this.#wireBrushCallbacks();
+        // Universal Keyboard Shortcuts
+        if (!this.element.dataset.hasKeyboardListeners) {
+            this.element.addEventListener("keydown", (event) => {
+                // Ensure shortcuts only fire if the user is focused on this module app (bypassing text inputs)
+                const activeElement = document.activeElement;
+                const isInputFocused = activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA");
+                if (isInputFocused) return;
 
-            this.canvasEngine.onCropUpdate = (cropBox) => {
-                const targetWidth = this.uiState.regionalTargetWidth;
-                const zoomScale = targetWidth / cropBox.width;
-                const calcHeight = Math.round(cropBox.height * zoomScale);
+                const isCtrlOrCmd = event.ctrlKey || event.metaKey;
 
-                this.uiState.regionalTargetHeight = calcHeight;
-                const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
-                if (heightInput) heightInput.value = calcHeight;
-
-                const latRange = Math.abs(this.uiState.latTop - this.uiState.latBottom);
-                const newLatTop = this.uiState.latTop - (cropBox.y / this.mapHeight) * latRange;
-                const newLatBottom = this.uiState.latTop - ((cropBox.y + cropBox.height) / this.mapHeight) * latRange;
-
-                const latTopEl = this.element.querySelector("#fwmb-readout-lat-top");
-                const latBottomEl = this.element.querySelector("#fwmb-readout-lat-bottom");
-                if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;
-                if (latBottomEl) latBottomEl.innerHTML = `${newLatBottom.toFixed(2)}&deg;`;
-            };
+                if (isCtrlOrCmd && event.key.toLowerCase() === "z") {
+                    event.preventDefault();
+                    if (event.shiftKey) {
+                        this._onRedoBrush();
+                    } else {
+                        this._onUndoBrush();
+                    }
+                } else if (isCtrlOrCmd && event.key.toLowerCase() === "y") {
+                    event.preventDefault();
+                    this._onRedoBrush();
+                }
+            });
+            this.element.dataset.hasKeyboardListeners = "true";
         }
+    }
 
-        const contextPanel = this.element.querySelector(".fwmb-context-panel");
+    #initCanvasAndEngines() {
+        const container = this.element.querySelector(".fwmb-map-preview");
+        if (!container || this.canvasEngine) return;
+
+        this.canvasEngine = new StudioCanvas(container);
+        this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        this.#wireBrushCallbacks();
+
+        this.canvasEngine.onCropUpdate = (cropBox) => {
+            const targetWidth = this.uiState.regionalTargetWidth;
+            const zoomScale = targetWidth / cropBox.width;
+            const calcHeight = Math.round(cropBox.height * zoomScale);
+
+            this.uiState.regionalTargetHeight = calcHeight;
+            const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
+            if (heightInput) heightInput.value = calcHeight;
+
+            const latRange = Math.abs(this.uiState.latTop - this.uiState.latBottom);
+            const newLatTop = this.uiState.latTop - (cropBox.y / this.mapHeight) * latRange;
+            const newLatBottom = this.uiState.latTop - ((cropBox.y + cropBox.height) / this.mapHeight) * latRange;
+
+            const latTopEl = this.element.querySelector("#fwmb-readout-lat-top");
+            const latBottomEl = this.element.querySelector("#fwmb-readout-lat-bottom");
+            if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;
+            if (latBottomEl) latBottomEl.innerHTML = `${newLatBottom.toFixed(2)}&deg;`;
+        };
+    }
+
+    #bindToolbarListeners() {
         const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-
         if (editToolbar && !editToolbar.dataset.hasListeners) {
             editToolbar.dataset.hasListeners = "true";
-
-            const syncToolbarState = (event) => {
-                const target = event.target;
-                const name = target.name;
-
-                // Ignore clicks that don't have a specific input name
-                if (!name || !(name in this.uiState)) return;
-
-                // Update the central Application State
-                if (target.type === "checkbox") {
-                    this.uiState[name] = target.checked;
-                } else if (target.type === "number" || target.type === "range") {
-                    this.uiState[name] = Number(target.value);
-                } else {
-                    this.uiState[name] = target.value;
-                }
-
-                if (["faultType", "faultThickness", "faultStrength"].includes(name) && this.activeFaultId) {
-                    const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
-                    if (fault) {
-                        fault.type = this.uiState.faultType;
-                        fault.thickness = this.uiState.faultThickness;
-                        fault.strength = this.uiState.faultStrength;
-
-                        if (name === "faultType") {
-                            fault.color = FILRODENSWMB.TECTONICS?.COLORS?.[this.uiState.faultType] || 0xffffff;
-                        }
-                        this.#repaintVectors();
-                        this.debouncedGenerateTerrain();
-                    }
-                }
-
-                // If Quick Style dropdown changed, apply its properties
-                if (name === "activeRouteQuickStyle") {
-                    const styleId = target.value;
-                    if (styleId !== "custom") {
-                        let styleData = this.uiState.customRouteStyles.find((s) => s.id === styleId);
-
-                        if (styleData) {
-                            this.uiState.routeColor = styleData.color;
-                            this.uiState.routeThickness = styleData.thickness;
-                            this.uiState.routeStyle = styleData.style;
-                            this.#syncDOMToState();
-                        }
-                    }
-                }
-
-                // If a manual property changed, fallback to "custom"
-                if (["routeColor", "routeThickness", "routeStyle"].includes(name)) {
-                    this.uiState.activeRouteQuickStyle = "custom";
-                    this.#syncDOMToState();
-                }
-
-                // Cascade changes to the active route currently being drawn
-                if (["activeRouteQuickStyle", "routeColor", "routeThickness", "routeStyle"].includes(name) && this.activeRouteId) {
-                    const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
-                    if (route) {
-                        route.quickStyle = this.uiState.activeRouteQuickStyle;
-                        route.color = this.uiState.routeColor;
-                        route.thickness = this.uiState.routeThickness;
-                        route.style = this.uiState.routeStyle;
-                        this.#repaintVectors();
-                    }
-                }
-
-                // Live-Update the Active Region
-                if (name.startsWith("region") && this.activeRegionId && this.activeRegionLayerId) {
-                    const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
-                    const region = layer?.regions.find((r) => r.id === this.activeRegionId);
-
-                    if (region) {
-                        region.fillColor = this.uiState.regionFillColor;
-                        region.fillStyle = this.uiState.regionFillStyle;
-                        region.lineColor = this.uiState.regionLineColor;
-                        region.lineThickness = this.uiState.regionLineThickness;
-                        region.lineStyle = this.uiState.regionLineStyle;
-                        this.#repaintVectors();
-                    }
-                }
-
-                // Live-Update the Active Route
-                if (name.startsWith("route") && this.activeRouteId) {
-                    const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
-                    if (route) {
-                        route.color = this.uiState.routeColor;
-                        route.thickness = this.uiState.routeThickness;
-                        route.style = this.uiState.routeStyle;
-                        this.#repaintVectors();
-                    }
-                }
-
-                // Live-Update Regional Crop Target Height
-                if (name === "regionalTargetWidth" && this.canvasEngine) {
-                    const cropBox = this.canvasEngine.getCropData();
-                    if (cropBox && cropBox.width > 0) {
-                        const zoomScale = this.uiState.regionalTargetWidth / cropBox.width;
-                        const calcHeight = Math.round(cropBox.height * zoomScale);
-
-                        this.uiState.regionalTargetHeight = calcHeight;
-                        const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
-                        if (heightInput) heightInput.value = calcHeight;
-                    }
-                }
-            };
-
-            // Bind the listener to both continuous slides (input) and final clicks (change)
-            editToolbar.addEventListener("input", syncToolbarState);
-            editToolbar.addEventListener("change", syncToolbarState);
+            editToolbar.addEventListener("input", (e) => this.#handleToolbarInput(e));
+            editToolbar.addEventListener("change", (e) => this.#handleToolbarInput(e));
         }
 
-        if (contextPanel && !contextPanel.dataset.hasNoiseListeners) {
-            contextPanel.addEventListener("change", (event) => {
-                if (event.target.matches('file-picker[name="referenceImage"]')) {
-                    this.uiState.referenceImage = event.target.value;
-                    this.#updateReferenceLayer();
-                }
-            });
+        if (!this.element.dataset.hasUndoListeners) {
+            this.element.dataset.hasUndoListeners = "true";
 
-            contextPanel.addEventListener("input", (event) => {
-                if (event.target.matches('[name^="cartography"]')) {
-                    const t = event.target;
-                    let value;
+            const undoBtn = this.element.querySelector('[data-action="undoBrush"]');
+            const redoBtn = this.element.querySelector('[data-action="redoBrush"]');
 
-                    if (t.type === "checkbox") {
-                        value = t.checked;
-                    } else if (t.type === "number") {
-                        value = Number(t.value);
-                    } else {
-                        value = t.value;
-                    }
-
-                    this.uiState[t.name] = value;
-                    this.#repaintVectors();
-                    this.markDirty();
-                    return;
-                }
-
-                if (event.target.matches('input[name="regionOpacity"]')) {
-                    this.uiState.regionOpacity = Number(event.target.value);
-                    this.#repaintVectors();
-                    this.markDirty();
-                    return;
-                }
-
-                if (event.target.matches('input[name="referenceAlpha"]')) {
-                    this.uiState.referenceAlpha = Number(event.target.value);
-                    this.#updateReferenceLayer();
-                    return;
-                }
-
-                if (event.target.matches('[name="gridType"], input[name="gridSize"]')) {
-                    this.#getMapParameters();
-                    this.#updateGrid();
-                    return;
-                }
-
-                if (event.target.matches('input[type="color"]')) {
-                    const biomeKey = event.target.dataset.biome;
-                    const hex = event.target.value;
-                    const rgb = [Number.parseInt(hex.slice(1, 3), 16), Number.parseInt(hex.slice(3, 5), 16), Number.parseInt(hex.slice(5, 7), 16)];
-
-                    if (biomeKey.startsWith("custom_")) {
-                        const id = Number.parseInt(biomeKey.split("_")[1]);
-                        const cb = this.uiState.customBiomes.find((c) => c.id === id);
-                        if (cb) cb.color = rgb;
-                    } else {
-                        this.customBiomeColors[biomeKey] = rgb;
-                    }
-
-                    this.#repaintCanvas();
-                    return;
-                }
-
-                if (event.target.matches('input[name="biomeAlphaActive"], input[name="biomeAlphaInactive"]')) {
-                    this.#getMapParameters();
-                    this.#updateBiomeOpacity();
-                    return;
-                }
-
-                if (event.target.matches('input[name="contourInterval"]')) {
-                    this.#getMapParameters();
-                    this.#repaintCanvas();
-                    return;
-                }
-
-                if (event.target.matches('input[name="seaLevel"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]')) {
-                    this.debouncedGenerateTerrain();
-                } else if (
-                    event.target.matches(
-                        'input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"], input[name="altCooling"], input[name="freezingThreshold"]',
-                    )
-                ) {
-                    this.debouncedGenerateClimate();
-                } else if (event.target.matches('input[name="riverDensity"], input[name="maxLakeSize"], input[name="springAltOffset"], input[name="springMoistMin"], input[name="meanderJitter"]')) {
-                    this.debouncedGenerateFeatures();
-                }
-            });
-            contextPanel.dataset.hasNoiseListeners = "true";
-        }
-
-        if (this.canvasEngine) {
-            this.canvasEngine.onCanvasHover = (x, y) => {
-                const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
-                const showCursor = this.canvasEngine.isEditMode && isBrushActive && !this.canvasEngine.isDragging;
-
-                this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, showCursor);
-
-                // --- Update Canvas Readout ---
-                const readout = this.element.querySelector(".fwmb-canvas-readout");
-                if (!readout) return;
-
-                if (x === null || y === null || x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight || !this.currentElevationData) {
-                    readout.classList.add("fwmb-hidden");
-                    return;
-                }
-
-                readout.classList.remove("fwmb-hidden");
-
-                const index = y * this.mapWidth + x;
-                const elev = this.currentElevationData[index];
-                const mois = this.currentMoistureData ? this.currentMoistureData[index] : 0;
-                const temp = this.currentTemperatureData ? this.currentTemperatureData[index] : 0;
-                const seaLevel = this.uiState["seaLevel"];
-
-                const biomeKey = ProceduralEngine.getBiomeKey(elev, mois, temp, seaLevel);
-
-                this.element.querySelector("#fwmb-readout-elev").textContent = Math.round(elev * 100) + "%";
-                this.element.querySelector("#fwmb-readout-mois").textContent = Math.round(mois * 100) + "%";
-                this.element.querySelector("#fwmb-readout-temp").textContent = Math.round(temp * 100) + "%";
-                this.element.querySelector("#fwmb-readout-biome").textContent = game.i18n.localize(`FILRODENSWMB.BIOMES.${biomeKey}`);
-            };
-        }
-
-        if (!this.hasBooted) {
-            this.hasBooted = true;
-            const layerBtns = this.element.querySelectorAll('[data-action="toggleLayer"]');
-            for (const btn of layerBtns) {
-                btn.classList.add("active");
+            if (undoBtn) {
+                undoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("undo"));
+                undoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
             }
+            if (redoBtn) {
+                redoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("redo"));
+                redoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
+            }
+        }
+    }
 
-            // Force the initial default map to be considered "clean" so it
-            // doesn't trigger save warnings if the user just wants to load a file.
-            setTimeout(async () => {
-                await this.generateTerrain();
-                this.isDirty = false;
-            }, 50);
+    #handleToolbarInput(event) {
+        const target = event.target;
+
+        if ((target.type === "number" || target.type === "text") && event.type === "input") {
+            return;
         }
 
-        if (this.canvasEngine?.isEditMode) {
-            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
-            if (editBtn) editBtn.classList.add("active");
+        const name = target.name;
 
-            // Only lock the sidebar for procedural raster tools
-            const isVectorTool = ["features", "infrastructure", "regions", "labels", "cartography"].includes(this.activeTool);
+        if (!name || !(name in this.uiState)) return;
 
-            if (!isVectorTool) {
-                const panel = this.element.querySelector(".fwmb-context-panel");
-                if (panel) {
-                    const controls = panel.querySelectorAll("fieldset input, fieldset button");
-                    for (const control of controls) {
-                        control.disabled = true;
-                    }
-                    panel.classList.add("fwmb-locked");
+        this.markDirty();
+
+        // 1. Assign Value
+        if (target.type === "checkbox") this.uiState[name] = target.checked;
+        else if (target.type === "number" || target.type === "range") this.uiState[name] = Number(target.value);
+        else this.uiState[name] = target.value;
+
+        // 2. Delegate to Sub-Systems
+        this.#syncFaultLiveEdits(name);
+        this.#syncRouteLiveEdits(name, target);
+        this.#syncRegionLiveEdits(name);
+        this.#syncCropLiveEdits(name);
+    }
+
+    #syncFaultLiveEdits(name) {
+        if (!["faultType", "faultThickness", "faultStrength"].includes(name) || !this.activeFaultId) return;
+
+        const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
+        if (!fault) return;
+
+        fault.type = this.uiState.faultType;
+        fault.thickness = this.uiState.faultThickness;
+        fault.strength = this.uiState.faultStrength;
+
+        if (name === "faultType") {
+            fault.color = FILRODENSWMB.TECTONICS?.COLORS?.[this.uiState.faultType] || 0xffffff;
+        }
+
+        this._repaintVectors();
+        this.requestTerrainUpdate();
+    }
+
+    #syncRouteLiveEdits(name, target) {
+        // Fallback to custom if a manual property is changed
+        if (["routeColor", "routeThickness", "routeStyle"].includes(name)) {
+            this.uiState.activeRouteQuickStyle = "custom";
+            this.render({ parts: ["toolbar", "editToolbar"] });
+        }
+
+        // Apply preset if dropdown is changed
+        if (name === "activeRouteQuickStyle") {
+            const styleId = target.value;
+            if (styleId !== "custom") {
+                const styleData = this.uiState.customRouteStyles.find((s) => s.id === styleId);
+                if (styleData) {
+                    this.uiState.routeColor = styleData.color;
+                    this.uiState.routeThickness = styleData.thickness;
+                    this.uiState.routeStyle = styleData.style;
+                    this.render({ parts: ["toolbar", "editToolbar"] });
                 }
             }
         }
 
-        this.#syncDOMToState();
+        // Apply changes to the active route currently being drawn
+        if (["activeRouteQuickStyle", "routeColor", "routeThickness", "routeStyle"].includes(name) && this.activeRouteId) {
+            const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
+            if (route) {
+                route.quickStyle = this.uiState.activeRouteQuickStyle;
+                route.color = this.uiState.routeColor;
+                route.thickness = this.uiState.routeThickness;
+                route.style = this.uiState.routeStyle;
+                this._repaintVectors();
+            }
+        }
+    }
+
+    #syncRegionLiveEdits(name) {
+        if (!name.startsWith("region") || !this.activeRegionId || !this.activeRegionLayerId) return;
+
+        const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
+        const region = layer?.regions.find((r) => r.id === this.activeRegionId);
+
+        if (region) {
+            region.fillColor = this.uiState.regionFillColor;
+            region.fillStyle = this.uiState.regionFillStyle;
+            region.lineColor = this.uiState.regionLineColor;
+            region.lineThickness = this.uiState.regionLineThickness;
+            region.lineStyle = this.uiState.regionLineStyle;
+            this._repaintVectors();
+        }
+    }
+
+    #syncCropLiveEdits(name) {
+        if (name !== "regionalTargetWidth" || !this.canvasEngine) return;
+
+        const cropBox = this.canvasEngine.getCropData();
+        if (cropBox && cropBox.width > 0) {
+            const zoomScale = this.uiState.regionalTargetWidth / cropBox.width;
+            const calcHeight = Math.round(cropBox.height * zoomScale);
+            this.uiState.regionalTargetHeight = calcHeight;
+
+            const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
+            if (heightInput) heightInput.value = calcHeight;
+        }
+    }
+
+    #bindContextPanelListeners() {
+        const contextPanel = this.element.querySelector(".fwmb-context-panel");
+        if (!contextPanel || contextPanel.dataset.hasNoiseListeners) return;
+
+        contextPanel.dataset.hasNoiseListeners = "true";
+
+        contextPanel.addEventListener("change", (event) => {
+            if (event.target.matches('file-picker[name="referenceImage"]')) {
+                this.uiState.referenceImage = event.target.value;
+                this.#updateReferenceLayer();
+                return; // Stop here for the file picker
+            }
+            // Route all other change events (like hitting Enter) to the handler
+            this.#handleContextPanelInput(event);
+        });
+
+        contextPanel.addEventListener("input", (e) => this.#handleContextPanelInput(e));
+    }
+
+    #handleContextPanelInput(event) {
+        const target = event.target;
+
+        if ((target.type === "number" || target.type === "text") && event.type === "input") {
+            return;
+        }
+
+        const name = target.name || "";
+
+        // Skip marking dirty for temporary visual overlays
+        if (!name.startsWith("reference")) this.markDirty();
+
+        // 1. Route specific single-action updates
+        if (name.startsWith("cartography")) return this.#updateCartography(target, name);
+        if (name === "regionOpacity") return this.#updateRegionOpacity(target);
+        if (name === "referenceAlpha") return this.#updateReferenceAlpha(target);
+        if (name === "gridType" || name === "gridSize") return this.#updateGridSettings();
+        if (name === "biomeAlphaActive" || name === "biomeAlphaInactive") return this.#updateBiomeAlphas();
+        if (name === "contourInterval") return this.#updateContours();
+
+        // 2. Custom biome color handler (uses dataset instead of name)
+        if (target.type === "color" && target.dataset.biome) return this.#updateBiomeColor(target);
+
+        // 3. Delegate debounced procedural map generation
+        this.#routeProceduralGenerators(target);
+    }
+
+    #updateCartography(target, name) {
+        let value = target.value;
+        if (target.type === "checkbox") value = target.checked;
+        else if (target.type === "number") value = Number(target.value);
+
+        this.uiState[name] = value;
+        this._repaintVectors();
+    }
+
+    #updateRegionOpacity(target) {
+        this.uiState.regionOpacity = Number(target.value);
+        this._repaintVectors();
+    }
+
+    #updateReferenceAlpha(target) {
+        this.uiState.referenceAlpha = Number(target.value);
+        this.#updateReferenceLayer();
+    }
+
+    #updateGridSettings() {
+        MapStateManager.getMapParameters(this);
+        this.#updateGrid();
+    }
+
+    #updateBiomeAlphas() {
+        MapStateManager.getMapParameters(this);
+        this.#updateBiomeOpacity();
+    }
+
+    #updateContours() {
+        MapStateManager.getMapParameters(this);
+        this._repaintCanvas();
+    }
+
+    #updateBiomeColor(target) {
+        const biomeKey = target.dataset.biome;
+        const hex = target.value;
+        const rgb = [Number.parseInt(hex.slice(1, 3), 16), Number.parseInt(hex.slice(3, 5), 16), Number.parseInt(hex.slice(5, 7), 16)];
+
+        if (biomeKey.startsWith("custom_")) {
+            const id = Number.parseInt(biomeKey.split("_")[1]);
+            const cb = this.uiState.customBiomes.find((c) => c.id === id);
+            if (cb) cb.color = rgb;
+        } else {
+            this.customBiomeColors[biomeKey] = rgb;
+        }
+
+        this._repaintCanvas();
+    }
+
+    #routeProceduralGenerators(target) {
+        if (target.matches('input[name="seaLevel"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]')) {
+            this.debouncedGenerateTerrain();
+        } else if (
+            target.matches(
+                'input[name^="noise.moisture"], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"], input[name="altCooling"], input[name="freezingThreshold"]',
+            )
+        ) {
+            this.debouncedGenerateClimate();
+        } else if (target.matches('input[name="riverDensity"], input[name="maxLakeSize"], input[name="springAltOffset"], input[name="springMoistMin"], input[name="meanderJitter"]')) {
+            this.debouncedGenerateFeatures();
+        }
+    }
+
+    #bindCanvasCallbacks() {
+        if (!this.canvasEngine) return;
+        this.canvasEngine.onCanvasHover = (x, y) => {
+            const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
+            const showCursor = this.canvasEngine.isEditMode && isBrushActive && !this.canvasEngine.isDragging;
+
+            this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, showCursor);
+
+            const readout = this.element.querySelector(".fwmb-canvas-readout");
+            if (!readout) return;
+
+            if (x === null || y === null || x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight || !this.currentElevationData) {
+                readout.classList.add("fwmb-hidden");
+                return;
+            }
+
+            readout.classList.remove("fwmb-hidden");
+
+            const index = y * this.mapWidth + x;
+            const elev = this.currentElevationData[index];
+            const mois = this.currentMoistureData ? this.currentMoistureData[index] : 0;
+            const temp = this.currentTemperatureData ? this.currentTemperatureData[index] : 0;
+            const seaLevel = this.uiState["seaLevel"];
+
+            const biomeKey = ProceduralEngine.getBiomeKey(elev, mois, temp, seaLevel);
+
+            this.element.querySelector("#fwmb-readout-elev").textContent = Math.round(elev * 100) + "%";
+            this.element.querySelector("#fwmb-readout-mois").textContent = Math.round(mois * 100) + "%";
+            this.element.querySelector("#fwmb-readout-temp").textContent = Math.round(temp * 100) + "%";
+            this.element.querySelector("#fwmb-readout-biome").textContent = game.i18n.localize(`FILRODENSWMB.BIOMES.${biomeKey}`);
+        };
+    }
+
+    #applyInitialBootState() {
+        if (this.hasBooted) return;
+
+        this.hasBooted = true;
+        const layerBtns = this.element.querySelectorAll('[data-action="toggleLayer"]');
+        for (const btn of layerBtns) btn.classList.add("active");
+
+        const activeWindow = this.element.ownerDocument.defaultView || window;
+        activeWindow.setTimeout(async () => {
+            await this.generateTerrain();
+            this.isDirty = false;
+        }, 50);
     }
 
     async close(options) {
@@ -826,7 +751,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.onReferencePan = (dx, dy) => this.#handleReferencePan(dx, dy);
         this.canvasEngine.onReferenceScale = (factor) => this.#handleReferenceScale(factor);
 
-        this.canvasEngine.onInfraDragStart = () => this.#pushVectorState();
+        this.canvasEngine.onInfraDragStart = () => MapStateManager.pushVectorState(this);
         this.canvasEngine.onInfraDrag = () => this.#handleInfraDrag();
         this.canvasEngine.onInfraDragEnd = () => this.#handleInfraDragEnd();
 
@@ -834,13 +759,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.onInfraDeleteNode = (target) => this.#handleInfraDeleteNode(target);
 
         this.canvasEngine.onRightClick = () => this.#handleRightClick();
+        this.canvasEngine.onDoubleClick = (hitData) => this.#handleCanvasDoubleClick(hitData);
+    }
+
+    #handleCanvasDoubleClick(hitData) {
+        if (!hitData?.entityType || !hitData.entityId) return;
+
+        const { entityType, entityId, parentType, layerId } = hitData;
+
+        switch (entityType) {
+            case "pin":
+                MapDialogManager.onEditPin(this, null, null, entityId);
+                break;
+            case "route":
+                MapDialogManager.onEditRoute(this, null, null, entityId);
+                break;
+            case "region":
+                MapDialogManager.onEditRegion(this, null, null, { regionId: entityId, layerId });
+                break;
+            case "fault":
+                MapDialogManager.onEditFault(this, null, null, entityId);
+                break;
+            case "river":
+                MapDialogManager.onEditRiver(this, null, null, entityId);
+                break;
+            case "decoration":
+                MapDialogManager.onEditDecoration(this, null, null, entityId);
+                break;
+            case "label":
+                MapDialogManager.onEditLabel(this, null, null, { id: entityId, type: parentType, layerId });
+                break;
+        }
     }
 
     #handleRightClick() {
         let cleared = false;
         let requiresTerrainUpdate = false;
 
-        for (const config of Object.values(MapStudioApp.VECTOR_CONFIG)) {
+        for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
+            if (config.isLayer) continue;
             if (this[config.activeKey]) {
                 this[config.activeKey] = null;
                 cleared = true;
@@ -854,8 +811,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         if (cleared) {
-            this.#repaintVectors();
-            if (requiresTerrainUpdate) this.debouncedGenerateTerrain();
+            this._repaintVectors();
+            if (requiresTerrainUpdate) this.requestTerrainUpdate();
             return true;
         }
     }
@@ -888,33 +845,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         if (layer === "labels") {
-            this.#pushVectorState();
-            this.mapLabels.push({
-                id: foundry.utils.randomID(),
-                name: "New Label",
-                x: x,
-                y: y,
-                rotation: 0,
-                fontFamily: this.uiState.labelFontFamily,
-                fontSize: this.uiState.labelFontSize,
-                fillColor: this.uiState.labelFillColor,
-                visibility: "all",
-            });
-
-            this.#repaintVectors();
-            this.render({ parts: ["context"] });
-            this.markDirty();
+            this.#handleLabelClick(x, y);
             return;
         }
 
         if (layer === "cartography") return;
 
         // 2. Fall back to raster brush processing for Terrain and Biomes
-        let tool = this.element.querySelector(`.fwmb-brush-tools button.active[data-tool-group~="${this.activeTool}"]`)?.dataset.tool || "raise";
-        const getNum = (name) => Number.parseFloat(this.element.querySelector(`input[name="${name}"]`)?.value) || 0;
-        let paintValue = layer === "biome" ? Number.parseInt(this.element.querySelector('select[name="brushBiome"]')?.value) || 6 : null;
+        const stateKey = `${this.activeTool}BrushTool`;
+        const tool = this.uiState[stateKey] || "raise";
 
-        this.brushEngine.startStroke(layer, tool, getNum("brushSize"), getNum("brushStrength"), getNum("brushFeather"), paintValue);
+        const size = this.uiState.brushSize || 20;
+        const strength = this.uiState.brushStrength || 0.02;
+        const feather = this.uiState.brushFeather || 0.4;
+        const paintValue = layer === "biome" ? this.uiState.brushBiome || 6 : null;
+
+        this.brushEngine.startStroke(layer, tool, size, strength, feather, paintValue);
         this.#applyBrushStroke(x, y);
     }
 
@@ -929,14 +875,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #handleBrushEnd() {
+        const prevLength = this.brushEngine?.history?.length || 0;
         this.brushEngine.endStroke();
+
+        if (this.brushEngine?.history?.length > prevLength) {
+            this.globalHistoryLedger.push("raster");
+            this.globalRedoLedger = [];
+            if (this.globalHistoryLedger.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
+                this.globalHistoryLedger.shift();
+            }
+        }
+
         this.markDirty();
 
         if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
-            this.#rebuildFromHistory().then(() => {
-                this.#repaintCanvas();
-                this.debouncedGenerateClimate();
-            });
+            this.pendingTerrainBounds = null;
+            this.debouncedHistoryRebuild();
         }
     }
 
@@ -948,8 +902,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #handleReferenceScale(factor) {
         this.uiState.referenceScale *= factor;
-        this.uiState.referenceScale = Math.max(0.1, Math.min(this.uiState.referenceScale, 10));
-        this.#syncDOMToState();
+        this.uiState.referenceScale = Math.max(FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MIN, Math.min(this.uiState.referenceScale, FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MAX));
+        this.render({ parts: ["context"] });
         this.#updateReferenceLayer();
     }
 
@@ -966,10 +920,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
 
         if (this.activeTool === "features") {
-            this.canvasEngine.renderRiverVectors(this.currentRiverData?.vectors, this.mapPins, isEdit, this.bufferWaterMask);
+            this.canvasEngine.renderFeaturePins(this.mapPins, isEdit);
+
+            if (this.currentRiverData?.vectors) {
+                this.canvasEngine.renderProceduralRivers(this.currentRiverData.vectors, this.bufferWaterMask);
+            }
+
             if (this.canvasEngine.renderFaultLines) {
                 this.canvasEngine.renderFaultLines(this.tectonicFaults, isEdit, this.activeFaultId);
             }
+
             if (this.canvasEngine.renderManualRivers) {
                 this.canvasEngine.renderManualRivers(this.manualRivers, isEdit, this.activeRiverId);
             }
@@ -989,152 +949,177 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.markDirty();
 
         if (this.activeTool === "features") {
-            this.debouncedGenerateClimate();
-            this.debouncedGenerateTerrain();
+            this.requestTerrainUpdate();
         }
     }
 
     #handleInfraInsertNode(x, y) {
-        if (this.activeTool !== "infrastructure" && this.activeTool !== "regions" && this.activeTool !== "features") return;
+        if (!["infrastructure", "regions", "features"].includes(this.activeTool)) return;
         if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
-        // 1. Check for snaps on existing pins to prevent inserting a node inside a marker
-        for (const route of this.mapRoutes) {
-            for (const pt of route.points) {
-                if (Math.hypot(pt.x - x, pt.y - y) < this.currentSnapThreshold) return;
-            }
-        }
-        for (const pin of this.mapPins) {
-            if (pin.visibility !== "none" && pin.icon && Math.hypot(pin.x - x, pin.y - y) < this.currentSnapThreshold) return;
-        }
+        // 1. Prevent inserting a node inside an existing marker/node
+        if (this.#isNearExistingNode(x, y)) return;
 
-        // 2. Generic Vector Segment Check (Routes, Faults, Rivers)
-        let closest = null;
-        let activeConfig = null;
+        // 2. Find the closest segment to split across all active layers
+        const match = this.#findClosestSegment(x, y);
+        if (!match) return; // Replaces your redundant returns!
 
-        for (const config of Object.values(MapStudioApp.VECTOR_CONFIG)) {
+        // 3. Execute the insertion universally
+        MapStateManager.pushVectorState(this);
+        match.vector.points.splice(match.insertIndex, 0, { x: match.projX, y: match.projY });
+
+        this._repaintVectors();
+        if (match.triggersTerrain) this.requestTerrainUpdate();
+
+        this.render({ parts: ["context"] });
+        this.markDirty();
+    }
+
+    #isNearExistingNode(x, y) {
+        const isNear = (pt) => Math.hypot(pt.x - x, pt.y - y) < this.currentSnapThreshold;
+
+        // Check Routes
+        if (this.mapRoutes.some((route) => route.points.some(isNear))) return true;
+
+        // Check Pins
+        return this.mapPins.some((pin) => pin.visibility !== "none" && pin.icon && isNear(pin));
+    }
+
+    #findClosestSegment(x, y) {
+        let bestMatch = null;
+
+        // Check Generic Vectors (Routes, Rivers, Faults)
+        for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             if (config.toolCategory !== this.activeTool) continue;
 
-            const segment = this.#getClosestVectorSegment(this[config.stateKey], x, y);
-            if (segment && (!closest || segment.dist < closest.dist)) {
-                closest = segment;
-                activeConfig = config;
+            const segment = SpatialMath.getClosestVectorSegment(this[config.stateKey], x, y, this.currentSnapThreshold);
+            if (segment && (!bestMatch || segment.dist < bestMatch.dist)) {
+                bestMatch = {
+                    vector: segment.vector,
+                    insertIndex: segment.insertIndex,
+                    projX: segment.projX,
+                    projY: segment.projY,
+                    dist: segment.dist,
+                    triggersTerrain: config.triggersTerrain,
+                };
             }
         }
 
-        if (closest) {
-            this.#pushVectorState();
-            closest.vector.points.splice(closest.insertIndex, 0, { x: closest.projX, y: closest.projY });
-
-            this.#repaintVectors();
-            if (activeConfig.triggersTerrain) this.debouncedGenerateTerrain();
-            this.render({ parts: ["context"] });
-            this.markDirty();
-            return;
+        // Check Region Vectors
+        if (this.activeTool === "regions") {
+            const regionSegment = SpatialMath.getClosestRegionSegment(this.regionLayers, this.activeRegionId, x, y, this.currentSnapThreshold);
+            if (regionSegment && (!bestMatch || regionSegment.dist < bestMatch.dist)) {
+                bestMatch = {
+                    vector: regionSegment.region, // Map 'region' to 'vector' for universal handling
+                    insertIndex: regionSegment.insertIndex,
+                    projX: regionSegment.projX,
+                    projY: regionSegment.projY,
+                    dist: regionSegment.dist,
+                    triggersTerrain: false,
+                };
+            }
         }
 
-        // 3. Region Segment Check
-        const regionSegment = this.#getClosestRegionSegment(x, y);
-        if (regionSegment && this.activeTool === "regions") {
-            this.#pushVectorState();
-            regionSegment.region.points.splice(regionSegment.insertIndex, 0, { x: regionSegment.projX, y: regionSegment.projY });
-            this.#repaintVectors();
-            this.render({ parts: ["context"] });
-            this.markDirty();
-            return;
-        }
+        return bestMatch;
     }
 
     #handleInfraDeleteNode(target) {
-        if (this.activeTool !== "infrastructure" && this.activeTool !== "regions" && this.activeTool !== "features") return;
+        if (!["infrastructure", "regions", "features"].includes(this.activeTool)) return;
         if (target.icon && this.activeTool !== "infrastructure") return;
 
-        // 1. Generic Vector Node Deletion (Routes, Faults, Rivers)
-        for (const config of Object.values(MapStudioApp.VECTOR_CONFIG)) {
+        // 1. Locate the target and its specific deletion instructions
+        const match = this.#findNodeToDelete(target);
+        if (!match) return;
+
+        // 2. Execute the deletion universally
+        MapStateManager.pushVectorState(this);
+
+        match.array.splice(match.index, 1);
+        if (match.cleanup) match.cleanup();
+
+        // 3. Cascade updates
+        if (match.repaintCanvas) this._repaintCanvas();
+        else this._repaintVectors();
+
+        if (match.triggersTerrain) {
+            this.requestTerrainUpdate();
+        } else if (match.triggersClimate) {
+            this.debouncedCanvasClimate();
+        }
+
+        this.render({ parts: ["context"] });
+        this.markDirty();
+    }
+
+    #findNodeToDelete(target) {
+        // 1. Check Pins (Springs or Icons)
+        const pinIndex = this.mapPins.indexOf(target);
+        if (pinIndex > -1) {
+            const isFeaturePin = this.activeTool === "features" && ["spring", "block_spring"].includes(target.type);
+            const isInfraPin = this.activeTool === "infrastructure" && target.icon;
+
+            if (isFeaturePin) {
+                return { array: this.mapPins, index: pinIndex, triggersClimate: true, repaintCanvas: true };
+            }
+            if (isInfraPin) {
+                return { array: this.mapPins, index: pinIndex };
+            }
+        }
+
+        // 2. Check Generic Vectors (Routes, Faults, Rivers)
+        for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             if (config.toolCategory !== this.activeTool) continue;
 
             const vectorArray = this[config.stateKey];
-            for (let i = 0; i < vectorArray.length; i++) {
-                const vector = vectorArray[i];
-                const nodeIndex = vector.points.indexOf(target);
+            const vIndex = vectorArray.findIndex((v) => v.points.includes(target));
 
-                if (nodeIndex > -1) {
-                    this.#pushVectorState();
-                    vector.points.splice(nodeIndex, 1);
-
-                    // Cleanup orphaned lines
-                    if (vector.points.length < 2) {
-                        vectorArray.splice(i, 1);
-                        if (this[config.activeKey] === vector.id) {
-                            this[config.activeKey] = null;
+            if (vIndex > -1) {
+                const vector = vectorArray[vIndex];
+                return {
+                    array: vector.points,
+                    index: vector.points.indexOf(target),
+                    triggersTerrain: config.triggersTerrain,
+                    cleanup: () => {
+                        // Orphan cleanup: destroy the vector if it has fewer than 2 points
+                        if (vector.points.length < 2) {
+                            vectorArray.splice(vIndex, 1);
+                            if (this[config.activeKey] === vector.id) this[config.activeKey] = null;
                         }
-                    }
-
-                    this.#repaintVectors();
-                    if (config.triggersTerrain) this.debouncedGenerateTerrain();
-                    this.render({ parts: ["context"] });
-                    this.markDirty();
-                    return;
-                }
+                    },
+                };
             }
         }
 
-        // 2. Region Node Deletion
+        // 3. Check Regions
         if (this.activeTool === "regions") {
             for (const layer of this.regionLayers) {
-                for (let j = 0; j < layer.regions.length; j++) {
-                    const region = layer.regions[j];
-                    const nodeIndex = region.points.indexOf(target);
+                const rIndex = layer.regions.findIndex((r) => r.points.includes(target));
 
-                    if (nodeIndex > -1) {
-                        this.#pushVectorState();
-                        region.points.splice(nodeIndex, 1);
-
-                        if (region.points.length < 3 && this.activeRegionId !== region.id) {
-                            layer.regions.splice(j, 1);
-                        }
-
-                        this.#repaintVectors();
-                        this.render({ parts: ["context"] });
-                        this.markDirty();
-                        return;
-                    }
+                if (rIndex > -1) {
+                    const region = layer.regions[rIndex];
+                    return {
+                        array: region.points,
+                        index: region.points.indexOf(target),
+                        cleanup: () => {
+                            // Orphan cleanup: destroy region if it has fewer than 3 points (unless actively drawing)
+                            if (region.points.length < 3 && this.activeRegionId !== region.id) {
+                                layer.regions.splice(rIndex, 1);
+                            }
+                        },
+                    };
                 }
             }
         }
 
-        // 3. Pin Deletion (Springs)
-        if (this.activeTool === "features" && (target.type === "spring" || target.type === "block_spring")) {
-            const nodeIndex = this.mapPins.indexOf(target);
-            if (nodeIndex > -1) {
-                this.#pushVectorState();
-                this.mapPins.splice(nodeIndex, 1);
-                this.#repaintCanvas();
-                this.debouncedGenerateClimate();
-                this.markDirty();
-                return;
-            }
-        }
-
-        // 4. Pin Deletion (Infrastructure)
-        if (this.activeTool === "infrastructure" && target.icon) {
-            const nodeIndex = this.mapPins.indexOf(target);
-            if (nodeIndex > -1) {
-                this.#pushVectorState();
-                this.mapPins.splice(nodeIndex, 1);
-                this.#repaintVectors();
-                this.render({ parts: ["context"] });
-                this.markDirty();
-                return;
-            }
-        }
+        return null;
     }
 
     #handleFeatureClick(x, y) {
         if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
-        this.#pushVectorState();
+        MapStateManager.pushVectorState(this);
         const finalPos = { x, y };
+        let activeEntity = null;
 
         if (this.uiState.activeFeatureMode === "spring") {
             this.mapPins.push({
@@ -1147,9 +1132,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 visibility: "all",
                 color: "#ffffff",
             });
-            this.#repaintCanvas();
-            this.debouncedGenerateClimate();
+            this._repaintCanvas();
+            this.debouncedCanvasClimate();
         } else if (this.uiState.activeFeatureMode === "fault") {
+            activeEntity = this.activeFaultId ? this.tectonicFaults.find((f) => f.id === this.activeFaultId) : null;
+            const oldBounds = SpatialMath.getVectorBounds(activeEntity);
             if (this.activeFaultId) {
                 const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
                 if (fault) fault.points.push(finalPos);
@@ -1167,9 +1154,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     visibility: "all",
                 });
             }
-            this.#repaintVectors();
-            this.debouncedGenerateTerrain(); // Triggers the mathematical deformation
+            activeEntity = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
+            const newBounds = SpatialMath.getVectorBounds(activeEntity);
+            this._repaintVectors();
+            this.requestTerrainUpdate(SpatialMath.mergeBounds(oldBounds, newBounds));
         } else if (this.uiState.activeFeatureMode === "river") {
+            activeEntity = this.activeRiverId ? this.manualRivers.find((r) => r.id === this.activeRiverId) : null;
+            const oldBounds = SpatialMath.getVectorBounds(activeEntity);
             if (this.activeRiverId) {
                 const river = this.manualRivers.find((r) => r.id === this.activeRiverId);
                 if (river) river.points.push(finalPos);
@@ -1183,105 +1174,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     visibility: "all",
                 });
             }
-            this.#repaintVectors();
+            activeEntity = this.manualRivers.find((r) => r.id === this.activeRiverId);
+            const newBounds = SpatialMath.getVectorBounds(activeEntity);
+            this._repaintVectors();
+            this.requestTerrainUpdate(SpatialMath.mergeBounds(oldBounds, newBounds));
         }
 
         this.render({ parts: ["context"] });
         this.markDirty();
-    }
-
-    #getMapParameters() {
-        // 1. Sync the active UI state from the DOM
-        for (const key of Object.keys(this.uiState)) {
-            const input = this.element.querySelector(`[name="${key}"]`);
-            if (!input) continue;
-
-            if (key === "mapSeed" || key === "gridType") {
-                this.uiState[key] = input.value;
-            } else {
-                const parsed = Number.parseFloat(input.value);
-                if (!Number.isNaN(parsed)) {
-                    this.uiState[key] = parsed;
-                }
-            }
-        }
-
-        // 2. Pass the updated state to the single source of truth for object generation
-        return this.#getDerivedMapParameters(this.uiState);
-    }
-
-    #getDerivedMapParameters(state) {
-        const compiledPalette = {};
-        for (const [key, id] of Object.entries(FILRODENSWMB.BIOME_IDS)) {
-            const rgb = this.customBiomeColors[key] || FILRODENSWMB.BIOMES[key] || [0, 0, 0];
-            compiledPalette[id] = rgb;
-            compiledPalette[key] = rgb;
-        }
-        for (const cb of state.customBiomes || []) {
-            compiledPalette[cb.id] = cb.color;
-        }
-
-        const params = {
-            seaLevel: state.seaLevel,
-            globalTemp: state.globalTemp,
-            seasonOffset: state.seasonOffset,
-            latTop: state.latTop,
-            latBottom: state.latBottom,
-            globalMoisture: state.globalMoisture,
-            riverDensity: state.riverDensity,
-            noise: {
-                offsetX: state["noise.offsetX"],
-                offsetY: state["noise.offsetY"],
-                moistureOffset: state["noise.moistureOffset"] ?? 10000,
-                tempOffset: state["noise.tempOffset"] ?? 20000,
-                elevation: {
-                    scale: 1 / state["noise.elevation.scale"],
-                    octaves: state["noise.elevation.octaves"],
-                    stretch: state["noise.elevation.stretch"],
-                },
-                moisture: {
-                    scale: 1 / state["noise.moisture.scale"],
-                    octaves: state["noise.moisture.octaves"],
-                },
-                temperature: {
-                    scale: 1 / (state["noise.temperature.scale"] || FILRODENSWMB.NOISE.TEMPERATURE.SCALE),
-                    octaves: FILRODENSWMB.NOISE.TEMPERATURE.OCTAVES,
-                },
-            },
-            hydrology: {
-                maxLakeSize: state.maxLakeSize,
-                springAltOffset: state.springAltOffset,
-                springMoistMin: state.springMoistMin,
-                meanderJitter: state.meanderJitter,
-            },
-            climate: {
-                altCooling: state.altCooling,
-                freezingThreshold: state.freezingThreshold,
-                windDistance: state.windDistance ?? 40,
-            },
-            biomePalette: compiledPalette,
-            customColors: this.customBiomeColors,
-            display: {
-                contourInterval: state.contourInterval,
-                biomeAlphaActive: state.biomeAlphaActive,
-                biomeAlphaInactive: state.biomeAlphaInactive,
-            },
-            cartography: {
-                scaleEnable: state.cartographyScaleEnable,
-                scaleUnits: state.cartographyScaleUnits,
-                scaleInterval: state.cartographyScaleInterval,
-                scaleValue: state.cartographyScaleValue,
-                scaleMajorTicks: state.cartographyScaleMajorTicks,
-                scaleMinorTicks: state.cartographyScaleMinorTicks,
-                scaleX: state.cartographyScaleX,
-                scaleY: state.cartographyScaleY,
-                borderEnable: state.cartographyBorderEnable,
-                borderStyle: state.cartographyBorderStyle,
-                borderColor: state.cartographyBorderColor,
-            },
-        };
-
-        return { currentSeed: state.mapSeed, params };
     }
 
     #updateBiomeOpacity() {
@@ -1296,21 +1196,33 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.drawGrid(this.uiState.gridType, this.uiState.gridSize, this.uiState.gridVisible);
     }
 
-    async #repaintCanvas() {
+    async _repaintCanvas(bounds = null) {
         if (!this.currentElevationData) return;
 
+        // If repainting the FULL map, recalculate the true peak for accurate contrast
+        if (!bounds || !this.cachedMaxElevation) {
+            this.cachedMaxElevation = 0;
+            for (let i = 0; i < this.mapWidth * this.mapHeight; i++) {
+                if (this.currentElevationData[i] > this.cachedMaxElevation) {
+                    this.cachedMaxElevation = this.currentElevationData[i];
+                }
+            }
+        }
+
         const seaLevel = this.uiState["seaLevel"];
-        const { currentSeed, params } = this.#getMapParameters();
+        const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
         const waterMask = this.bufferWaterMask;
 
-        engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, this.bufferBase);
+        engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, this.bufferBase, bounds);
         this.canvasEngine.renderPixelBuffer("base", this.bufferBase, this.mapWidth, this.mapHeight);
 
         const baseBtn = this.element.querySelector('[data-layer="base"]');
         this.canvasEngine.toggleLayer("base", baseBtn ? baseBtn.classList.contains("active") : true);
 
-        engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography);
+        // Pass the cached peak into the coloriser
+        const maxPeak = this.cachedMaxElevation || 1.0;
+        engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography, bounds, maxPeak);
         this.canvasEngine.renderPixelBuffer("topography", this.bufferTopography, this.mapWidth, this.mapHeight);
 
         const topoBtn = this.element.querySelector('[data-layer="topography"]');
@@ -1328,6 +1240,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 waterMask,
                 params,
                 this.bufferBiomes,
+                bounds,
             );
             this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
 
@@ -1336,27 +1249,28 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         const contourInterval = this.uiState["contourInterval"];
-        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours);
+        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds);
         this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight);
 
         if (this.canvasEngine) {
             this.canvasEngine.clearInteractiveTargets();
         }
 
-        // Render all non-destructive vector layers on top of the pixel maps
-        this.#repaintVectors();
+        this._repaintVectors();
     }
 
-    #repaintVectors() {
+    _repaintVectors() {
         if (!this.canvasEngine) return;
 
         this.canvasEngine.clearInteractiveTargets();
         const isEditModeActive = this.canvasEngine.isEditMode;
 
         // 1. Render Rivers, Springs & Faults
+        const showPins = this.activeTool === "features" && isEditModeActive;
+        this.canvasEngine.renderFeaturePins(this.mapPins, showPins);
+
         if (this.currentRiverData?.vectors) {
-            const showPins = this.activeTool === "features" && isEditModeActive;
-            this.canvasEngine.renderRiverVectors(this.currentRiverData.vectors, this.mapPins, showPins, this.bufferWaterMask);
+            this.canvasEngine.renderProceduralRivers(this.currentRiverData.vectors, this.bufferWaterMask);
         }
 
         if (this.canvasEngine.renderFaultLines) {
@@ -1393,15 +1307,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.currentElevationData) return;
 
         const seaLevel = this.uiState["seaLevel"];
+        const strokeBounds = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel);
 
-        const hasBrushed = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel);
+        if (!strokeBounds) return;
 
-        if (!hasBrushed) return;
+        // Accumulate the bounds for the deferred procedural generation
+        this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, strokeBounds);
 
         // Biome overrides do not alter topography or climate math.
-        // Bypass the global procedural engine and surgically update only the biome WebGL texture.
         if (this.activeTool === "biomes") {
-            const { currentSeed, params } = this.#getMapParameters();
+            const { currentSeed, params } = MapStateManager.getMapParameters(this);
             const engine = new ProceduralEngine(currentSeed);
 
             engine.createBiomesMap(
@@ -1415,120 +1330,181 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.bufferWaterMask,
                 params,
                 this.bufferBiomes,
+                this.pendingTerrainBounds,
             );
 
             this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
+            this.pendingTerrainBounds = null;
             return;
         }
 
-        // Terrain edits cascade through the entire procedural climate model.
-        this.#repaintCanvas();
-        this.debouncedGenerateClimate();
+        this._repaintCanvas(strokeBounds);
+        if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
+            this.debouncedHistoryRebuild();
+        } else {
+            this.debouncedCanvasClimate();
+        }
     }
 
-    async #rebuildFromHistory() {
-        const { currentSeed, params } = this.#getMapParameters();
+    async #rebuildFromHistory(showUI = false) {
+        const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
 
-        this.currentElevationData.set(this.baseElevationData);
-        this.currentBiomeOverrides.fill(0);
+        // 1. Conditionally trigger the UI overlay
+        if (showUI) {
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.RebuildingHistory"));
+        }
 
-        // Feed the compiled params into the replay so Custom Biomes are validated and restored
-        this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel, params);
+        try {
+            // 2. Instant global array copy
+            this.currentElevationData.set(this.baseElevationData);
+            this.currentBiomeOverrides.fill(0);
 
-        // Carve rivers after brushes have mutated the terrain
-        if (this.manualRivers && this.manualRivers.length > 0) {
-            HydrologyEngine.carveManualRivers(this.currentElevationData, this.mapWidth, this.mapHeight, this.manualRivers, engine.simplex, params.seaLevel);
+            // 3. Global history replay
+            this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel);
+
+            // 4. Global river carving
+            if (this.manualRivers && this.manualRivers.length > 0) {
+                HydrologyEngine.carveManualRivers(this.currentElevationData, this.mapWidth, this.mapHeight, this.manualRivers, engine.simplex, params.seaLevel);
+            }
+        } finally {
+            // 5. Conditionally clear the UI overlay
+            if (showUI) {
+                this.#endProcessing();
+            }
         }
     }
 
     async generateTerrain() {
-        const { currentSeed, params } = this.#getMapParameters();
+        const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
 
-        console.log("World Map Builder | Generating Topography...");
-        const t0 = performance.now();
+        // Clear the accumulator so it doesn't linger
+        this.pendingTerrainBounds = null;
 
-        // 1. Generate base noise and tectonics ONLY (pass empty array for rivers)
-        engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, []);
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
 
-        await this.#rebuildFromHistory();
+        try {
+            console.log("World Map Builder | Generating Topography...");
+            const t0 = performance.now();
 
-        this.currentSpringOverrides.fill(0);
+            engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, [], null);
+            await this.#rebuildFromHistory();
 
-        const t1 = performance.now();
-        console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
+            this.currentSpringOverrides.fill(0);
 
-        await this.generateClimate();
+            const t1 = performance.now();
+            console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
+
+            await this.generateClimate(null);
+        } finally {
+            this.#endProcessing();
+        }
     }
 
-    async generateClimate() {
+    async generateClimate(bounds = null) {
         if (!this.currentElevationData) return;
-        const { currentSeed, params } = this.#getMapParameters();
+        const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
 
-        console.log("World Map Builder | Generating Climate Data...");
-        const t0 = performance.now();
+        let activeBounds = bounds || this.pendingTerrainBounds;
 
-        engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params, this.currentMoistureData, this.currentTemperatureData);
+        // Dynamically scale the wind distance relative to a baseline map resolution and map scale
+        if (activeBounds) {
+            const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
+            const widthScale = this.mapWidth / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
 
-        const t1 = performance.now();
-        console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
+            const latTop = params.latTop ?? 90;
+            const latBottom = params.latBottom ?? -90;
+            const latRange = Math.max(0.1, Math.abs(latTop - latBottom)); // Prevent Infinity
+            const latScale = 180 / latRange;
 
-        await this.generateFeatures();
-    }
+            const dynamicWindDistance = Math.round(baseWind * widthScale * latScale);
 
-    async generateFeatures() {
-        if (!this.currentElevationData) return;
-        const { currentSeed, params } = this.#getMapParameters();
-        const engine = new ProceduralEngine(currentSeed);
-
-        console.log("World Map Builder | Generating Features...");
-        const t0 = performance.now();
-
-        // Bake procedural springs into permanent pins on first load or new map generation
-        if (!this.uiState.springsBaked) {
-            const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
-            for (const s of newSprings) {
-                this.mapPins.push({
-                    id: foundry.utils.randomID(),
-                    name: "River Source",
-                    x: s.x,
-                    y: s.y,
-                    type: "spring",
-                    radius: 6,
-                    visibility: "all",
-                });
-            }
-            this.uiState.springsBaked = true;
-            this.markDirty();
+            activeBounds = SpatialMath.padBounds(activeBounds, dynamicWindDistance, 0, this.mapWidth, this.mapHeight);
         }
 
-        const dynamicPins = [...this.mapPins];
+        if (!bounds && this.pendingTerrainBounds) {
+            this.pendingTerrainBounds = null;
+        }
 
-        // Ensure procedural water spawns exactly at the highest point of our manual carve
-        const manualSprings = HydrologyEngine.getRiverSources(this.currentElevationData, this.mapWidth, this.manualRivers);
-        dynamicPins.push(...manualSprings);
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
 
-        this.currentRiverData = engine.generateRivers(
-            this.currentElevationData,
-            this.currentMoistureData,
-            this.currentTemperatureData,
-            dynamicPins,
-            this.mapWidth,
-            this.mapHeight,
-            params,
-            this.bufferRiverMap,
-            this.bufferWaterMask,
-        );
+        try {
+            console.log("World Map Builder | Generating Climate Data...");
+            const t0 = performance.now();
 
-        const t1 = performance.now();
-        console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
+            engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params, this.currentMoistureData, this.currentTemperatureData, activeBounds);
 
-        await this.#repaintCanvas();
+            const t1 = performance.now();
+            console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
+
+            await this.generateFeatures(activeBounds);
+        } finally {
+            this.#endProcessing();
+        }
     }
 
-    async #ingestMapPayload(payload) {
+    async generateFeatures(bounds = null) {
+        if (!this.currentElevationData) return;
+        const { currentSeed, params } = MapStateManager.getMapParameters(this);
+        const engine = new ProceduralEngine(currentSeed);
+
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
+
+        try {
+            console.log("World Map Builder | Generating Features...");
+            const t0 = performance.now();
+
+            // Bake procedural springs into permanent pins on first load or new map generation
+            if (!this.uiState.springsBaked) {
+                const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
+                for (const s of newSprings) {
+                    this.mapPins.push({
+                        id: foundry.utils.randomID(),
+                        name: "River Source",
+                        x: s.x,
+                        y: s.y,
+                        type: "spring",
+                        radius: 6,
+                        visibility: "all",
+                    });
+                }
+                this.uiState.springsBaked = true;
+                this.markDirty();
+            }
+
+            const dynamicPins = [...this.mapPins];
+
+            // Ensure procedural water spawns exactly at the highest point of our manual carve
+            const manualSprings = HydrologyEngine.getRiverSources(this.currentElevationData, this.mapWidth, this.manualRivers);
+            dynamicPins.push(...manualSprings);
+
+            this.currentRiverData = engine.generateRivers(
+                this.currentElevationData,
+                this.currentMoistureData,
+                this.currentTemperatureData,
+                dynamicPins,
+                this.mapWidth,
+                this.mapHeight,
+                params,
+                this.bufferRiverMap,
+                this.bufferWaterMask,
+            );
+
+            const t1 = performance.now();
+            console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
+
+            await this._repaintCanvas(bounds); // Cascade to final render
+        } finally {
+            this.#endProcessing();
+        }
+    }
+
+    async #ingestMapPayload(rawPayload) {
+        // Deep clone to sever the connection to Foundry's memory cache
+        const payload = foundry.utils.deepClone(rawPayload);
+
         this.uiState.mapSeed = payload.seed;
         this.currentParentId = payload.parentId || null;
 
@@ -1539,8 +1515,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.mapHeight = this.mapHeight;
         this.uiState.gridType = payload.gridType || "square";
         this.uiState.gridSize = payload.gridSize || 100;
+        this.uiState.gridVisible = payload.gridVisible ?? false;
 
-        this.#allocateBuffers();
+        MapStateManager.allocateBuffers(this);
 
         this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
 
@@ -1571,6 +1548,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState.customBiomes = payload.customBiomes || [];
         this.uiState.customRouteStyles = payload.customRouteStyles || [];
+        this.uiState.customLabelStyles = payload.customLabelStyles || [];
 
         this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
@@ -1613,6 +1591,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             migrateVisibility(payload.mapRoutes);
             payload.mapRoutes.forEach((route) => {
                 if (!route.quickStyle) route.quickStyle = "custom"; // Flag old routes as custom overrides
+
+                // Heal legacy routes missing visual properties
+                route.color = route.color || "#ffffff";
+                route.thickness = route.thickness || 3;
+                route.style = route.style || "solid";
             });
         }
 
@@ -1659,91 +1642,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.brushEngine.redoStack = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
+        this.globalHistoryLedger = this.brushEngine.history.map(() => "raster");
+        this.globalRedoLedger = [];
 
         this.defaultUiState = foundry.utils.deepClone(this.uiState);
 
-        this.#syncDOMToState();
-        this.#updateGrid();
-
+        this.render({ parts: ["toolbar", "context"] });
         await this.generateTerrain();
+        this.#updateGrid();
         this.canvasEngine.resetCamera();
-    }
-
-    #syncDOMToState() {
-        // 1. Hydrate dynamic <select> options to guarantee they exist before values are applied
-        const styleSelect = this.element.querySelector('select[name="activeRouteQuickStyle"]');
-        if (styleSelect) {
-            (this.uiState.customRouteStyles || []).forEach((style) => {
-                if (!styleSelect.querySelector(`option[value="${style.id}"]`)) {
-                    const opt = document.createElement("option");
-                    opt.value = style.id;
-                    opt.textContent = style.name;
-                    styleSelect.appendChild(opt);
-                }
-            });
-        }
-
-        const biomeSelect = this.element.querySelector('select[name="brushBiome"]');
-        if (biomeSelect) {
-            (this.uiState.customBiomes || []).forEach((cb) => {
-                if (!biomeSelect.querySelector(`option[value="${cb.id}"]`)) {
-                    const opt = document.createElement("option");
-                    opt.value = cb.id;
-                    opt.textContent = cb.name;
-                    biomeSelect.appendChild(opt);
-                }
-            });
-        }
-
-        // 2. Sync all inputs and sliders
-        for (const [key, value] of Object.entries(this.uiState)) {
-            const input = this.element.querySelector(`[name="${key}"]`);
-            if (!input) continue;
-
-            // --- Safely route specific input types ---
-            if (input.type === "color" && value === "transparent") {
-                input.value = "#000000"; // Fallback to silence browser warning
-            } else if (input.type === "checkbox") {
-                input.checked = Boolean(value);
-            } else {
-                input.value = value;
-            }
-
-            if (input.nextElementSibling?.tagName === "OUTPUT") {
-                input.nextElementSibling.value = value;
-            }
-        }
-
-        for (const [key, rgb] of Object.entries(this.customBiomeColors)) {
-            const input = this.element.querySelector(`input[data-biome="${key}"]`);
-            if (!input) continue;
-
-            input.value = "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
-        }
-    }
-
-    #allocateBuffers() {
-        const totalPixels = this.mapWidth * this.mapHeight;
-
-        this.baseElevationData = new Float32Array(totalPixels);
-        this.currentElevationData = new Float32Array(totalPixels);
-        this.currentMoistureData = new Float32Array(totalPixels);
-        this.currentTemperatureData = new Float32Array(totalPixels);
-        this.currentBiomeOverrides = new Uint8Array(totalPixels);
-        this.currentSpringOverrides = new Uint8Array(totalPixels);
-        this.bufferRiverMap = new Uint8Array(totalPixels);
-        this.bufferWaterMask = new Float32Array(totalPixels);
-
-        this.bufferBase = new Uint8Array(totalPixels * 4);
-        this.bufferTopography = new Uint8Array(totalPixels * 4);
-        this.bufferBiomes = new Uint8Array(totalPixels * 4);
-        this.bufferContours = new Uint8Array(totalPixels * 4);
     }
 
     #handleInfrastructureClick(x, y) {
         if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
-        this.#pushVectorState();
+        MapStateManager.pushVectorState(this);
 
         const finalPos = { x, y };
 
@@ -1786,89 +1699,33 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        this.#repaintVectors();
+        this._repaintVectors();
         this.render({ parts: ["context"] });
         this.markDirty();
     }
 
-    #syncInfraModeButtons() {
-        const mode = this.uiState.activeInfraMode;
+    #handleLabelClick(x, y) {
+        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
-        const modeBtns = this.element.querySelectorAll('.fwmb-edit-toolbar [data-action="setInfraMode"]');
-        for (const btn of modeBtns) {
-            btn.classList.toggle("active", btn.dataset.mode === mode);
-        }
+        MapStateManager.pushVectorState(this);
+        this.mapLabels.push({
+            id: foundry.utils.randomID(),
+            name: this.uiState.nextLabelText || "New Label",
+            x: x,
+            y: y,
+            rotation: 0,
+            quickStyle: this.uiState.activeLabelQuickStyle,
+            fontFamily: this.uiState.labelFontFamily,
+            fontSize: this.uiState.labelFontSize,
+            fillColor: this.uiState.labelFillColor,
+            maxWidth: this.uiState.labelMaxWidth,
+            justify: this.uiState.labelJustify,
+            visibility: "all",
+        });
 
-        if (this.activeTool === "infrastructure") {
-            const toolGroups = this.element.querySelectorAll(".fwmb-edit-toolbar [data-tool-group]");
-            for (const group of toolGroups) {
-                const allowed = group.dataset.toolGroup.split(" ");
-                if (allowed.some((a) => a.startsWith("infrastructure-"))) {
-                    group.classList.toggle("fwmb-hidden", !allowed.includes(`infrastructure-${mode}`));
-                }
-            }
-        }
-    }
-
-    #getClosestVectorSegment(vectorArray, x, y, threshold = this.currentSnapThreshold) {
-        if (!vectorArray || vectorArray.length === 0) return null;
-
-        let closest = { vector: null, insertIndex: -1, dist: Infinity, projX: 0, projY: 0 };
-
-        for (const vector of vectorArray) {
-            if (vector.visibility === "none" || !vector.points || vector.points.length < 2) continue;
-
-            for (let i = 0; i < vector.points.length - 1; i++) {
-                const p1 = vector.points[i];
-                const p2 = vector.points[i + 1];
-
-                const lengthSq = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2);
-                const t = lengthSq === 0 ? 0 : Math.max(0, Math.min(1, ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / lengthSq));
-
-                const projX = p1.x + t * (p2.x - p1.x);
-                const projY = p1.y + t * (p2.y - p1.y);
-                const dist = Math.hypot(x - projX, y - projY);
-
-                if (dist < closest.dist && dist <= threshold) {
-                    closest = { vector, insertIndex: i + 1, dist, projX, projY };
-                }
-            }
-        }
-
-        return closest.vector ? closest : null;
-    }
-
-    #getClosestRegionSegment(x, y, threshold = this.currentSnapThreshold) {
-        let closest = { region: null, insertIndex: -1, dist: Infinity };
-
-        for (const layer of this.regionLayers) {
-            if (layer.visibility === "none") continue;
-
-            for (const region of layer.regions) {
-                if (region.visibility === "none" || !region.points || region.points.length < 2) continue;
-
-                // Closed polygons check the segment returning to the start node
-                const isClosed = region.points.length >= 3 && region.id !== this.activeRegionId;
-                const limit = isClosed ? region.points.length : region.points.length - 1;
-
-                for (let i = 0; i < limit; i++) {
-                    const p1 = region.points[i];
-                    const p2 = region.points[(i + 1) % region.points.length];
-
-                    const lengthSquared = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2);
-                    let t = lengthSquared === 0 ? 0 : Math.max(0, Math.min(1, ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / lengthSquared));
-
-                    const projX = p1.x + t * (p2.x - p1.x);
-                    const projY = p1.y + t * (p2.y - p1.y);
-                    const dist = Math.hypot(x - projX, y - projY);
-
-                    if (dist < closest.dist && dist <= threshold) {
-                        closest = { region, insertIndex: i + 1, dist, projX, projY };
-                    }
-                }
-            }
-        }
-        return closest.region ? closest : null;
+        this._repaintVectors();
+        this.render({ parts: ["context"] });
+        this.markDirty();
     }
 
     #updateReferenceLayer() {
@@ -1888,7 +1745,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
         if (!layer) return;
 
-        this.#pushVectorState();
+        MapStateManager.pushVectorState(this);
 
         const finalPos = { x, y };
 
@@ -1920,7 +1777,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             });
         }
 
-        this.#repaintVectors();
+        this._repaintVectors();
         this.render({ parts: ["context"] });
         this.markDirty();
     }
@@ -1944,10 +1801,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
 
         if (choice === "cancel") return false;
+
         if (choice === "save") {
             const saved = await this.saveCurrentMap();
             if (!saved) return false;
         }
+
+        if (choice === "discard") {
+            this.isDirty = false;
+        }
+
+        const activeWindow = this.element.ownerDocument.defaultView || window;
+        await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
 
         return true;
     }
@@ -1960,14 +1825,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.isSaving) return false;
         this.isSaving = true;
 
-        // Visually lock the application to prevent array mutation during serialisation
-        this.element.style.pointerEvents = "none";
-        this.element.style.filter = "brightness(0.7)";
-        this.element.style.cursor = "wait";
+        let mapName = this.currentSaveName;
 
-        let success = false;
         try {
-            const { currentSeed, params } = this.#getMapParameters();
+            // 1. Prompt the user BEFORE locking the UI
+            if (!this.currentSaveId) {
+                const { currentSeed } = MapStateManager.getMapParameters(this);
+                const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
+                const defaultName = `Terrain Map (${hash})`;
+
+                mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), defaultName);
+
+                if (!mapName) return false; // User cancelled the save prompt
+            }
+
+            // 2. Lock the UI and show the spinner
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.SavingMap") || "Saving Map...");
+            this.currentSaveName = mapName;
+
+            const { currentSeed, params } = MapStateManager.getMapParameters(this);
             const payload = {
                 seed: currentSeed,
                 springsBaked: this.uiState.springsBaked,
@@ -1975,9 +1851,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 mapHeight: this.mapHeight,
                 gridType: this.uiState.gridType,
                 gridSize: this.uiState.gridSize,
+                gridVisible: this.uiState.gridVisible,
                 params: params,
                 customBiomes: this.uiState.customBiomes,
                 customRouteStyles: this.uiState.customRouteStyles,
+                customLabelStyles: this.uiState.customLabelStyles,
                 history: this.brushEngine?.history || [],
                 tectonicFaults: this.tectonicFaults,
                 manualRivers: this.manualRivers,
@@ -1989,201 +1867,318 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 parentId: this.currentParentId,
             };
 
-            if (!this.currentSaveId) {
-                const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
-                const defaultName = `Terrain Map (${hash})`;
-
-                const mapName = await foundry.applications.api.DialogV2.prompt({
-                    window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save As" },
-                    content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${defaultName}">`,
-                    ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
-                });
-
-                if (!mapName) return false; // User cancelled the save prompt
-                this.currentSaveName = mapName;
-            }
-
             const journal = await saveMapData(this.currentSaveName, payload, this.currentSaveId);
 
             if (journal) {
                 this.currentSaveId = journal.id;
                 this.isDirty = false; // Successfully saved, map is no longer dirty
-                success = true;
                 ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
                 this.render({ parts: ["toolbar"] });
+                return true;
             } else {
                 ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
+                return false;
             }
         } finally {
-            // Guarantee the UI unlocks even if an unexpected error occurs
             this.isSaving = false;
-            this.element.style.pointerEvents = "auto";
-            this.element.style.filter = "none";
-            this.element.style.cursor = "default";
+            this.#endProcessing();
         }
-        return success;
     }
 
-    // --- Action Handlers ---
+    /**
+     * Spawns the processing overlay and forces the browser to paint the DOM
+     * before executing the next synchronous JavaScript operation.
+     */
+    async #startProcessing(message) {
+        this.processingTasks = (this.processingTasks || 0) + 1;
 
-    static async #onAddCustomBiome(event, target) {
-        const name = await foundry.applications.api.DialogV2.prompt({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.AddCustomBiome") || "Add Custom Biome" },
-            content: `<div class="form-group"><label>Biome Name</label><input type="text" id="fwmb-biome-name" autofocus></div>`,
-            ok: { callback: (e, b) => b.form.querySelector("#fwmb-biome-name").value.trim() },
-        });
+        const overlay = this.element.querySelector(".fwmb-processing-overlay");
+        if (overlay) {
+            const textEl = overlay.querySelector(".fwmb-processing-text");
+            if (textEl) textEl.textContent = message;
+            overlay.classList.remove("fwmb-hidden");
+        }
 
-        if (!name) return;
+        // Force browser to paint the DOM before locking the main thread
+        const activeWindow = this.element.ownerDocument.defaultView || window;
+        await new Promise((resolve) => activeWindow.requestAnimationFrame(() => activeWindow.setTimeout(resolve, 0)));
+    }
 
-        const currentIds = this.uiState.customBiomes.map((c) => c.id);
-        const nextId = currentIds.length > 0 ? Math.max(...currentIds) + 1 : 14;
+    /**
+     * Decrements the active task counter, hiding the overlay only when all chained tasks are complete.
+     */
+    #endProcessing() {
+        this.processingTasks = Math.max(0, (this.processingTasks || 0) - 1);
+        if (this.processingTasks > 0) return;
 
-        this.uiState.customBiomes.push({
-            id: nextId,
-            name: name,
-            color: [128, 128, 128],
-        });
+        const overlay = this.element.querySelector(".fwmb-processing-overlay");
+        if (overlay) overlay.classList.add("fwmb-hidden");
+    }
 
-        const select = this.element.querySelector('select[name="brushBiome"]');
-        if (select) {
-            const option = document.createElement("option");
-            option.value = nextId;
-            option.textContent = name;
-            select.appendChild(option);
+    /**
+     * Intercepts all terrain modifications. Evaluates if the math should be generated
+     * live, or deferred to the manual Apply button.
+     */
+    requestTerrainUpdate(bounds = null) {
+        this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, bounds);
+        if (this.uiState.liveFeatureUpdates) {
+            this.debouncedCanvasTerrain();
+        } else {
+            this.hasPendingFeatureMath = true;
+            this.render({ parts: ["editToolbar"] });
+        }
+    }
+
+    /**
+     * Identifies the spatial bounds of the next Undo or Redo action.
+     */
+    #previewActionBounds(direction) {
+        if (!this.canvasEngine) return;
+
+        const ledger = direction === "undo" ? this.globalHistoryLedger : this.globalRedoLedger;
+        const actionType = ledger.at(-1);
+
+        if (!actionType) return;
+
+        let targetBounds = null;
+        let actionLabel = "";
+
+        if (actionType === "raster") {
+            const stack = direction === "undo" ? this.brushEngine.history : this.brushEngine.redoStack;
+            const targetStroke = stack.at(-1);
+
+            if (targetStroke?.points && targetStroke.points.length > 0) {
+                targetBounds = this.#calculatePointBounds(targetStroke.points, targetStroke.size || 20);
+
+                // Map the raster layer to its localisation key
+                const isBiome = targetStroke.layer === "biome";
+                const locKey = isBiome ? "FILRODENSWMB.UI.ActionBiomeBrush" : "FILRODENSWMB.UI.ActionTerrainBrush";
+                const fallback = isBiome ? "Biome Brush" : "Terrain Brush";
+
+                actionLabel = game.i18n.localize(locKey) || fallback;
+            }
+        } else if (actionType === "vector") {
+            const stack = direction === "undo" ? this.pinHistory : this.pinRedoStack;
+            const targetSnapshot = stack.at(-1);
+
+            if (targetSnapshot) {
+                const currentState = MapStateManager.getVectorStateSnapshot(this);
+                const diffResult = this.#diffVectorSnapshots(currentState, targetSnapshot);
+
+                if (diffResult) {
+                    targetBounds = diffResult.bounds;
+                    actionLabel = diffResult.label;
+                }
+            }
+        }
+
+        if (targetBounds) {
+            const prefixKey = direction === "undo" ? "FILRODENSWMB.UI.ActionUndo" : "FILRODENSWMB.UI.ActionRedo";
+            const prefix = game.i18n.localize(prefixKey);
+
+            this.canvasEngine.showActionPreview(targetBounds, `${prefix} ${actionLabel}`);
+        }
+    }
+
+    /**
+     * Compares two global state snapshots to find the specific entity that changed.
+     */
+    #diffVectorSnapshots(current, target) {
+        let changedEntity = null;
+        let entityKey = null;
+
+        for (const key of Object.keys(current)) {
+            if (!Array.isArray(current[key]) || !Array.isArray(target[key])) continue;
+
+            const currentMap = new Map(current[key].map((item, idx) => [item.id || `idx_${idx}`, item]));
+            const targetMap = new Map(target[key].map((item, idx) => [item.id || `idx_${idx}`, item]));
+
+            for (const [id, targetItem] of targetMap.entries()) {
+                const currentItem = currentMap.get(id);
+
+                if (!currentItem || JSON.stringify(currentItem) !== JSON.stringify(targetItem)) {
+                    changedEntity = currentItem || targetItem;
+                    entityKey = key;
+
+                    if (changedEntity.regions && Array.isArray(changedEntity.regions)) {
+                        const cRegs = new Map((currentItem?.regions || []).map((r, i) => [r.id || `idx_${i}`, r]));
+                        const tRegs = new Map((targetItem?.regions || []).map((r, i) => [r.id || `idx_${i}`, r]));
+                        let changedReg = null;
+
+                        for (const [rId, tReg] of tRegs.entries()) {
+                            const cReg = cRegs.get(rId);
+                            if (!cReg || JSON.stringify(cReg) !== JSON.stringify(tReg)) {
+                                changedReg = cReg || tReg;
+                                break;
+                            }
+                        }
+                        if (!changedReg) {
+                            for (const [rId, cReg] of cRegs.entries()) {
+                                if (!tRegs.has(rId)) {
+                                    changedReg = cReg;
+                                    break;
+                                }
+                            }
+                        }
+                        if (changedReg) changedEntity = changedReg;
+                    }
+                    break;
+                }
+            }
+
+            if (!changedEntity) {
+                for (const [id, currentItem] of currentMap.entries()) {
+                    if (!targetMap.has(id)) {
+                        changedEntity = currentItem;
+                        entityKey = key;
+                        break;
+                    }
+                }
+            }
+
+            if (changedEntity) break;
+        }
+
+        if (!changedEntity) return null;
+
+        let points = [];
+        if (changedEntity.points) {
+            points = changedEntity.points;
+        } else if (changedEntity.regions) {
+            points = changedEntity.regions.flatMap((r) => r.points || []);
+        } else if (changedEntity.x !== undefined && changedEntity.y !== undefined) {
+            points = [changedEntity];
+        }
+
+        return {
+            bounds: this.#calculatePointBounds(points, 50),
+            label: this.#getActionLabel(entityKey, changedEntity),
+        };
+    }
+
+    /**
+     * Resolves the localized UI label for a modified vector entity.
+     */
+    #getActionLabel(key, entity) {
+        if (!key) return game.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
+
+        if (key === "pins") {
+            const isSpring = entity?.type === "spring" || entity?.type === "block_spring";
+            const pinKey = isSpring ? "FILRODENSWMB.UI.ActionRiverSpring" : "FILRODENSWMB.UI.ActionInfrastructurePin";
+            return game.i18n.localize(pinKey) || (isSpring ? "River Spring" : "Infrastructure Pin");
+        }
+
+        const labelConfig = {
+            tectonicFaults: ["FILRODENSWMB.UI.ActionTectonicFault", "Tectonic Fault"],
+            manualRivers: ["FILRODENSWMB.UI.ActionCustomRiver", "Custom River"],
+            routes: ["FILRODENSWMB.UI.ActionRoute", "Route"],
+            regionLayers: ["FILRODENSWMB.UI.ActionRegion", "Region"],
+            mapLabels: ["FILRODENSWMB.UI.ActionLabel", "Label"],
+            mapDecorations: ["FILRODENSWMB.UI.ActionDecoration", "Decoration"],
+        };
+
+        const match = labelConfig[key];
+
+        return match ? game.i18n.localize(match[0]) || match[1] : game.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
+    }
+
+    /**
+     * Converts an array of {x,y} points into a spatial bounding box.
+     */
+    #calculatePointBounds(points, padding = 0) {
+        if (!points || points.length === 0) return null;
+
+        let minX = Infinity,
+            maxX = -Infinity,
+            minY = Infinity,
+            maxY = -Infinity;
+        for (const pt of points) {
+            if (pt.x < minX) minX = pt.x;
+            if (pt.x > maxX) maxX = pt.x;
+            if (pt.y < minY) minY = pt.y;
+            if (pt.y > maxY) maxY = pt.y;
+        }
+
+        return {
+            minX: Math.max(0, minX - padding),
+            maxX: Math.min(this.mapWidth, maxX + padding),
+            minY: Math.max(0, minY - padding),
+            maxY: Math.min(this.mapHeight, maxY + padding),
+        };
+    }
+
+    async #processHistoryStep(isUndo) {
+        // Dynamically assign the source and target stacks based on the direction
+        const sourceLedger = isUndo ? this.globalHistoryLedger : this.globalRedoLedger;
+        const targetLedger = isUndo ? this.globalRedoLedger : this.globalHistoryLedger;
+        const sourcePinStack = isUndo ? this.pinHistory : this.pinRedoStack;
+        const targetPinStack = isUndo ? this.pinRedoStack : this.pinHistory;
+
+        let action = sourceLedger?.pop();
+
+        while (action) {
+            if (action === "vector") {
+                if (sourcePinStack.length > 0) {
+                    const previousFaults = JSON.stringify(this.tectonicFaults);
+                    const previousRivers = JSON.stringify(this.manualRivers);
+                    const previousFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
+
+                    targetPinStack.push(MapStateManager.getVectorStateSnapshot(this));
+                    const state = sourcePinStack.pop();
+                    MapStateManager.restoreVectorStateSnapshot(this, state);
+
+                    targetLedger.push("vector");
+
+                    const currentFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
+
+                    if (previousFaults !== JSON.stringify(this.tectonicFaults) || previousRivers !== JSON.stringify(this.manualRivers)) {
+                        this._repaintCanvas();
+                        this.debouncedGenerateTerrain();
+                    } else if (previousFeaturePins !== currentFeaturePins) {
+                        this._repaintCanvas();
+                        this.debouncedGenerateClimate();
+                    } else {
+                        this._repaintVectors();
+                    }
+                    break;
+                }
+            } else if (action === "raster") {
+                // Dynamically trigger the brush engine's internal undo or redo
+                const brushAction = isUndo ? this.brushEngine?.undo() : this.brushEngine?.redo();
+
+                if (this.baseElevationData && brushAction) {
+                    targetLedger.push("raster");
+                    await this.#rebuildFromHistory(true);
+                    this._repaintCanvas();
+                    this.debouncedGenerateClimate();
+                    break;
+                }
+            }
+            action = sourceLedger?.pop();
         }
 
         this.render({ parts: ["context"] });
         this.markDirty();
     }
 
-    static async #onAddDecoration(event, target) {
-        if (!this.canvasEngine?.isEditMode) return;
+    // --- Action Handlers ---
 
-        const content = `
-            <div class="form-group fwmb-dialog-content">
-                <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
-                <input type="text" id="fwmb-dec-name" value="New Decoration">
-            </div>
-            <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
-                <label>${game.i18n.localize("FILRODENSWMB.UI.ImageSource")}</label>
-                <file-picker id="fwmb-dec-src" type="image" value=""></file-picker>
-            </div>
-        `;
-
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.AddDecoration") },
-            content: content,
-            ok: {
-                callback: (evt, button) => {
-                    return {
-                        name: button.form.querySelector("#fwmb-dec-name").value,
-                        src: button.form.querySelector("#fwmb-dec-src").value,
-                    };
-                },
-            },
-        });
-
-        if (result?.src) {
-            this.#pushVectorState();
-
-            // Default to spawning in the absolute mathematical center of the map
-            const spawnX = this.mapWidth / 2;
-            const spawnY = this.mapHeight / 2;
-
-            this.mapDecorations.push({
-                id: foundry.utils.randomID(),
-                type: "decoration",
-                name: result.name || "Unnamed Decoration",
-                src: result.src,
-                x: spawnX,
-                y: spawnY,
-                rotation: 0,
-                scale: 1, // Default PIXI Sprite scale
-                visibility: "all",
-            });
-
-            this.#repaintVectors();
-            this.render({ parts: ["context"] });
-            this.markDirty();
-        }
-    }
-
-    static #onAddRegionLayer(event, target) {
-        const id = foundry.utils.randomID();
-        this.regionLayers.push({ id: id, name: `Region Layer ${this.regionLayers.length + 1}`, visibility: "all", regions: [] });
-        this.activeRegionLayerId = id;
-        this.render({ parts: ["context"] });
-    }
-
-    static async #onAddRouteQuickStyle(event, target) {
-        // Provide a default template state for new styles
-        const defaultStyle = { name: "New Quick Style", color: "#ffffff", thickness: 3, style: "solid" };
-
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs", { style: defaultStyle });
-
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.AddRouteQuickStyle") || "Add Quick Style" },
-            content: content,
-            ok: {
-                callback: (evt, button) => {
-                    return {
-                        name: button.form.elements["styleName"].value.trim() || "New Style",
-                        color: button.form.elements["styleColor"].value,
-                        thickness: Number(button.form.elements["styleThickness"].value) || 3,
-                        style: button.form.elements["styleStyle"].value,
-                    };
-                },
-            },
-        });
-
-        if (result) {
-            const id = foundry.utils.randomID();
-            this.uiState.customRouteStyles.push({ id, ...result });
-
-            // Dynamically append the new option to the toolbar
-            const select = this.element.querySelector('select[name="activeRouteQuickStyle"]');
-            if (select) {
-                const option = document.createElement("option");
-                option.value = id;
-                option.textContent = result.name;
-                select.appendChild(option);
-            }
-
-            this.markDirty();
-            this.render({ parts: ["context", "toolbar"] });
-        }
-    }
-
-    static #onAdjustNoiseScale(event, target) {
+    _onAdjustNoiseScale(event, target) {
         const dir = Number(target.dataset.dir);
-        const inputScale = this.element.querySelector('input[name="noise.elevation.scale"]');
-        const inputOffsetX = this.element.querySelector('input[name="noise.offsetX"]');
-        const inputOffsetY = this.element.querySelector('input[name="noise.offsetY"]');
-
-        if (!inputScale) return;
-
-        const currentScale = Number(inputScale.value);
-
-        // Dynamically calculate the maximum bound based on the current map resolution
+        const currentScale = this.uiState["noise.elevation.scale"];
         const maxScale = Math.max(this.mapWidth, this.mapHeight);
-        const targetScale = Math.max(100, Math.min(currentScale + dir * 50, maxScale));
+        const targetScale = Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.min(currentScale + dir * FILRODENSWMB.LIMITS.NOISE_SCALE_STEP, maxScale));
 
         if (currentScale === targetScale) {
             ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnScaleLimit") || "Noise scale limit reached.");
             return;
         }
 
-        // 1. Capture vector history before transforming the points
-        this.#pushVectorState();
-
-        // 2. Calculate the exact mathematical scaling ratio
+        MapStateManager.pushVectorState(this);
         const scaleRatio = targetScale / currentScale;
-        const offsetX = inputOffsetX ? Number(inputOffsetX.value) : 0;
-        const offsetY = inputOffsetY ? Number(inputOffsetY.value) : 0;
+        const offsetX = this.uiState["noise.offsetX"] || 0;
+        const offsetY = this.uiState["noise.offsetY"] || 0;
 
-        // 3. Apply the scale transformation (accounting for pan offset and nested labels)
         const scalePoint = (pt) => {
             if (pt?.x !== undefined) {
                 pt.x = (pt.x + offsetX) * scaleRatio - offsetX;
@@ -2216,35 +2211,42 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.brushEngine.redoStack.forEach(scaleStroke);
         }
 
-        // 4. Update the DOM and trigger the procedural rebuild
-        inputScale.value = targetScale;
-        inputScale.dispatchEvent(new Event("input", { bubbles: true }));
+        this.uiState["noise.elevation.scale"] = targetScale;
+        this.render({ parts: ["context"] });
         this.markDirty();
+        this.debouncedGenerateTerrain();
     }
 
-    static #onAdjustReferenceScale(event, target) {
+    _onAdjustReferenceScale(event, target) {
         const dir = Number(target.dataset.dir);
-        const factor = dir > 0 ? 1.01 : 0.99;
+        const factor = dir > 0 ? FILRODENSWMB.UI.REFERENCE_IMAGE.IN_FACTOR : FILRODENSWMB.UI.REFERENCE_IMAGE.OUT_FACTOR;
 
         this.uiState.referenceScale *= factor;
-        this.uiState.referenceScale = Math.max(0.1, Math.min(this.uiState.referenceScale, 10));
+        this.uiState.referenceScale = Math.max(FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MIN, Math.min(this.uiState.referenceScale, FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MAX));
 
         this.#updateReferenceLayer();
+    }
+
+    async _onApplyFeatureMath(event, target) {
+        if (!this.hasPendingFeatureMath) return;
+
+        await this.generateTerrain();
+        this.hasPendingFeatureMath = false;
+        this.render({ parts: ["editToolbar"] });
     }
 
     /**
      * Highly destructive action: Rebuilds the underlying webgl canvas and spatial arrays.
      */
-    static async #onApplyResolution(event, target) {
-        const widthInput = this.element.querySelector('input[name="mapWidth"]');
-        const heightInput = this.element.querySelector('input[name="mapHeight"]');
-        const seedInput = this.element.querySelector('input[name="mapSeed"]'); // <-- NEW
+    async _onApplyResolution(event, target) {
+        // 1. Extract all uncommitted data natively (No DOM scraping)
+        const formData = new foundry.applications.ux.FormDataExtended(target.form).object;
 
-        const newWidth = Number.parseInt(widthInput?.value) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
-        const newHeight = Number.parseInt(heightInput?.value) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
-        let newSeed = seedInput?.value?.trim(); // <-- NEW
+        const newWidth = Number.parseInt(formData.mapWidth) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
+        const newHeight = Number.parseInt(formData.mapHeight) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
+        let newSeed = formData.mapSeed?.trim();
 
-        // If the user left the seed blank, generate a random one automatically
+        // 2. If the user left the seed blank, generate a random one automatically
         if (!newSeed) {
             newSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
         }
@@ -2253,17 +2255,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const hasPinEdits = this.mapPins && this.mapPins.length > 0;
 
         if (hasBrushEdits || hasPinEdits) {
-            const confirmed = await foundry.applications.api.DialogV2.confirm({
-                window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
-                content: `<p>${game.i18n.localize("FILRODENSWMB.UI.ResolutionWarningContent")}</p>`,
-                rejectClose: false,
-                modal: true,
-            });
+            const confirmed = await MapDialogManager._confirmDialog(game.i18n.localize("FILRODENSWMB.UI.Warning"), game.i18n.localize("FILRODENSWMB.UI.ResolutionWarningContent"));
 
             if (!confirmed) {
-                if (widthInput) widthInput.value = this.mapWidth;
-                if (heightInput) heightInput.value = this.mapHeight;
-                if (seedInput) seedInput.value = this.uiState.mapSeed; // Revert visually
+                this.render({ parts: ["context"] });
                 return;
             }
         }
@@ -2271,9 +2266,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapWidth = newWidth;
         this.mapHeight = newHeight;
 
-        this.#allocateBuffers();
+        MapStateManager.allocateBuffers(this);
 
-        this.defaultUiState = this.#buildDefaultUiState(newWidth, newHeight);
+        this.defaultUiState = MapStateManager.buildDefaultUiState(newWidth, newHeight);
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
         this.uiState.mapSeed = newSeed;
 
@@ -2283,8 +2278,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.customBiomeColors[key] = rgb;
         });
 
-        // Force all HTML inputs, sliders, and checkboxes to visually snap back to defaults
-        this.#syncDOMToState();
+        this.render({ parts: ["toolbar", "context"] });
 
         // 1. Reset all history and spatial arrays
         this.markDirty();
@@ -2298,6 +2292,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapDecorations = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
+        this.globalHistoryLedger = [];
+        this.globalRedoLedger = [];
 
         // 2. Drop all active drawing states
         this.activeRouteId = null;
@@ -2305,8 +2301,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.activeRegionId = null;
         this.activeFaultId = null;
         this.activeRiverId = null;
-        this.activeRouteId = null;
-        this.activeRegionLayerId = null;
 
         // 3. Wipe the save memory so the next save forces a "Save As" prompt
         this.currentSaveId = null;
@@ -2316,763 +2310,87 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateGrid();
         this.canvasEngine.resetCamera();
 
-        // 4. Force UI to update (clears old layers from the sidebar and map name from the save tooltip)
+        // 4. Force UI to update
         this.render({ parts: ["toolbar", "context"] });
     }
 
-    static #onChangeTool(event, target) {
+    _onChangeTool(event, target) {
+        if (this.hasPendingFeatureMath) {
+            this.generateTerrain();
+            this.hasPendingFeatureMath = false;
+        }
+
         const newTool = target.dataset.tool;
         if (!newTool || this.activeTool === newTool) return;
 
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-        if (editToolbar && !editToolbar.classList.contains("fwmb-hidden")) {
-            editToolbar.classList.add("fwmb-hidden");
-            this.brushEngine?.endStroke();
+        // 1. Teardown current state
+        this.#clearActiveDrawingStates();
+        this.#deactivateEditMode();
 
-            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
-            if (editBtn) editBtn.classList.remove("active");
-
-            if (this.canvasEngine) this.canvasEngine.setEditMode(false);
-
-            const panel = this.element.querySelector(".fwmb-context-panel");
-            if (panel) {
-                const controls = panel.querySelectorAll("fieldset input, fieldset button");
-                for (const control of controls) {
-                    control.disabled = false;
-                }
-                panel.classList.remove("fwmb-locked");
-            }
-        }
-
-        this.#getMapParameters();
+        // 2. Setup new state
+        MapStateManager.getMapParameters(this);
         this.activeTool = newTool;
 
-        if (newTool === "biomes") {
-            const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
-            if (biomesBtn && !biomesBtn.classList.contains("active")) {
-                biomesBtn.classList.add("active");
-                this.canvasEngine?.toggleLayer("biomes", true);
-            }
-        } else if (newTool === "terrain") {
-            const topoBtn = this.element.querySelector('[data-layer="topography"]');
-            if (topoBtn && !topoBtn.classList.contains("active")) {
-                topoBtn.classList.add("active");
-                this.canvasEngine?.toggleLayer("topography", true);
-            }
-        } else if (newTool === "features") {
-            const featuresBtn = this.element.querySelector('[data-layer="features"]');
-            if (featuresBtn && !featuresBtn.classList.contains("active")) {
-                featuresBtn.classList.add("active");
-                this.canvasEngine?.toggleLayer("features", true);
-            }
-        }
-
+        // 3. Delegate UI & Canvas updates
+        this.#ensureToolLayerVisible(newTool);
         this.#updateBiomeOpacity();
+        this.#updateCanvasModes(newTool);
 
-        if (this.canvasEngine) {
-            this.canvasEngine.setReferenceMode(newTool === "reference");
-            if (this.canvasEngine.setCropMode) {
-                this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode);
-            }
-        }
-
-        if (editToolbar) {
-            editToolbar.querySelectorAll("[data-tool-group]").forEach((el) => {
-                const allowedTools = el.dataset.toolGroup.split(" ");
-                let isVisible = allowedTools.includes(newTool);
-
-                if (newTool === "infrastructure" && allowedTools.some((t) => t.startsWith("infrastructure-"))) {
-                    isVisible = allowedTools.includes(`infrastructure-${this.uiState.activeInfraMode}`);
-                }
-
-                if (newTool === "features" && allowedTools.some((t) => t.startsWith("features-"))) {
-                    isVisible = allowedTools.includes(`features-${this.uiState.activeFeatureMode}`);
-                }
-
-                el.classList.toggle("fwmb-hidden", !isVisible);
-            });
-        }
-
-        this.#syncInfraModeButtons();
-        this.#repaintVectors();
-        this.render({ parts: ["toolbar", "context"] });
+        // 4. Paint
+        this._repaintVectors();
+        this.render({ parts: ["toolbar", "context", "editToolbar"] });
     }
 
-    static async #onDeleteCustomBiome(event, target) {
-        const id = Number(target.dataset.id);
-
-        const confirmed = await foundry.applications.api.DialogV2.confirm({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
-            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteBiome")}</p>`,
-            modal: true,
-        });
-
-        if (!confirmed) return;
-
-        this.#pushVectorState();
-        this.uiState.customBiomes = this.uiState.customBiomes.filter((c) => c.id !== id);
-
-        if (Number(this.uiState.brushBiome) === id) {
-            this.uiState.brushBiome = 6;
-            this.#syncDOMToState();
-        }
-
-        const select = this.element.querySelector('select[name="brushBiome"]');
-        if (select) {
-            const option = select.querySelector(`option[value="${id}"]`);
-            if (option) option.remove();
-        }
-
-        // Fallback to Procedural
-        // 1. Wipe the active buffer globally
-        if (this.currentBiomeOverrides) {
-            const len = this.currentBiomeOverrides.length;
-            for (let i = 0; i < len; i++) {
-                if (this.currentBiomeOverrides[i] === id) {
-                    this.currentBiomeOverrides[i] = 0; // 0 = Procedural Engine Fallback
-                }
-            }
-        }
-
-        // 2. Scrub the brush history related to the deleted biome
-        if (this.brushEngine) {
-            const scrubHistory = (stroke) => {
-                if (stroke.layer !== "biome" || stroke.paintValue !== id) return;
-                stroke.paintValue = 0;
-            };
-            this.brushEngine.history.forEach(scrubHistory);
-            this.brushEngine.redoStack.forEach(scrubHistory);
-        }
-
-        // Redraw the canvas to show the healed procedural biomes
-        this.#repaintCanvas();
-
-        this.render({ parts: ["context"] });
-        this.markDirty();
-    }
-
-    static async #onDeleteEntity(event, target) {
-        const action = target.dataset.action;
-        const config = MapStudioApp.DELETE_CONFIG[action];
-        if (!config) return;
-
-        // Extract the ID depending on the UI container
-        const id = config.isLayer ? target.closest(".fwmb-accordion-group").dataset.layerId : target.closest(".fwmb-list-item").dataset.id;
-
-        // Process optional UI confirmation dialog
-        if (config.confirm) {
-            const confirmed = await foundry.applications.api.DialogV2.confirm({
-                window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
-                content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
-                rejectClose: false,
-                modal: true,
-            });
-            if (!confirmed) return;
-        }
-
-        this.#pushVectorState();
-
-        // Mutate state
-        this[config.stateKey] = this[config.stateKey].filter((item) => item.id !== id);
-
-        // Reset active drawing tool if the deleted item was currently selected
-        if (config.activeKey && this[config.activeKey] === id) {
+    #clearActiveDrawingStates() {
+        for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             this[config.activeKey] = null;
         }
-
-        // Trigger updates
-        this.#repaintVectors();
-        if (config.triggersTerrain) this.debouncedGenerateTerrain();
-
-        this.render({ parts: ["context"] });
-        this.markDirty();
-    }
-
-    static async #onDeleteRegion(event, target) {
-        const layerId = target.closest(".fwmb-accordion-group").dataset.layerId;
-        const regionId = target.closest(".fwmb-list-item").dataset.id;
-
-        const layer = this.regionLayers.find((l) => l.id === layerId);
-        if (!layer) return;
-
-        const confirmed = await foundry.applications.api.DialogV2.confirm({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
-            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
-            rejectClose: false,
-            modal: true,
-        });
-
-        if (!confirmed) return;
-
-        this.#pushVectorState();
-
-        layer.regions = layer.regions.filter((r) => r.id !== regionId);
-        if (this.activeRegionId === regionId) this.activeRegionId = null;
-
-        this.#repaintVectors();
-        this.render({ parts: ["context"] });
-        this.markDirty();
-    }
-
-    static async #onDeleteRouteQuickStyle(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
-
-        const confirmed = await foundry.applications.api.DialogV2.confirm({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
-            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
-            rejectClose: false,
-            modal: true,
-        });
-
-        if (!confirmed) return;
-
-        this.#pushVectorState();
-
-        // 1. Remove from registry
-        this.uiState.customRouteStyles = this.uiState.customRouteStyles.filter((s) => s.id !== id);
-
-        const select = this.element.querySelector('select[name="activeRouteQuickStyle"]');
-        if (select) {
-            const option = select.querySelector(`option[value="${id}"]`);
-            if (option) option.remove();
-        }
-
-        // 2. Disconnect existing routes gracefully, preserving their baked visual snapshot
-        for (const route of this.mapRoutes) {
-            if (route.quickStyle === id) {
-                route.quickStyle = "custom";
-            }
-        }
-
-        // 3. Update active UI tool if it was using the deleted style
-        if (this.uiState.activeRouteQuickStyle === id) {
-            this.uiState.activeRouteQuickStyle = "custom";
-            this.#syncDOMToState();
-        }
-
-        this.markDirty();
-        this.render({ parts: ["context", "toolbar"] });
-    }
-
-    static async #onEditDecoration(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
-        const dec = this.mapDecorations.find((d) => d.id === id);
-        if (!dec) return;
-
-        const content = `
-            <div class="form-group fwmb-dialog-content">
-                <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
-                <input type="text" id="fwmb-dec-name" value="${dec.name}">
-            </div>
-            <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
-                <label>${game.i18n.localize("FILRODENSWMB.UI.Opacity")}</label>
-                <div class="fwmb-slider-group">
-                    <input type="range" id="fwmb-dec-alpha" value="${dec.opacity ?? 1}" min="0.1" max="1" step="0.1" oninput="this.nextElementSibling.value = this.value" />
-                    <output>${dec.opacity ?? 1}</output>
-                </div>
-            </div>
-        `;
-
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Edit") || "Edit Decoration" },
-            content: content,
-            render: (event) => {
-                const app = event.target;
-                const html = app.element;
-                const range = html.querySelector("#fwmb-dec-alpha");
-                const output = html.querySelector("output");
-                if (range && output) {
-                    range.addEventListener("input", (e) => (output.value = e.target.value));
-                }
-            },
-            ok: {
-                callback: (evt, button) => {
-                    return {
-                        name: button.form.querySelector("#fwmb-dec-name").value,
-                        opacity: Number(button.form.querySelector("#fwmb-dec-alpha").value),
-                    };
-                },
-            },
-        });
-
-        if (result) {
-            this.#pushVectorState();
-            dec.name = result.name;
-            dec.opacity = result.opacity;
-            this.#repaintVectors();
-            this.render({ parts: ["context"] });
-            this.markDirty();
-        }
-    }
-
-    static async #onEditFault(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
-        const fault = this.tectonicFaults.find((f) => f.id === id);
-        if (!fault) return;
-
-        const tectonicTypes = Object.entries(FILRODENSWMB.TECTONICS?.LABELS || {}).map(([key, label]) => ({
-            id: key,
-            label: label,
-        }));
-
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-tectonics.hbs", { fault, tectonicTypes });
-
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditFault") || "Edit Fault" },
-            content: content,
-            ok: {
-                callback: (event, button, dialog) => {
-                    return {
-                        name: button.form.elements["faultName"].value,
-                        description: button.form.elements["faultDesc"].value,
-                        type: button.form.elements["faultType"].value,
-                        thickness: Number(button.form.elements["faultThickness"].value),
-                        strength: Number(button.form.elements["faultStrength"].value),
-                    };
-                },
-            },
-        });
-
-        if (result) {
-            this.#pushVectorState();
-
-            fault.name = result.name;
-            fault.description = result.description;
-            fault.type = result.type;
-            fault.thickness = result.thickness;
-            fault.strength = result.strength;
-            fault.color = FILRODENSWMB.TECTONICS?.COLORS?.[result.type] || 0xffffff;
-
-            if (this.activeFaultId === id) {
-                this.uiState.faultType = result.type;
-                this.uiState.faultThickness = result.thickness;
-                this.uiState.faultStrength = result.strength;
-                this.#syncDOMToState();
-            }
-
-            this.#repaintVectors();
-            this.debouncedGenerateTerrain();
-            this.render({ parts: ["context"] });
-            this.markDirty();
-        }
-    }
-
-    static async #onEditLabel(event, target) {
-        const listItem = target.closest(".fwmb-list-item");
-        const id = listItem.dataset.id;
-        const type = listItem.dataset.type;
-
-        let labelData = {};
-        let sourceObj = null;
-
-        // Extract existing data
-        if (type === "custom") {
-            sourceObj = this.mapLabels.find((l) => l.id === id);
-            if (!sourceObj) return;
-            labelData = { ...sourceObj };
-        } else {
-            // Auto-generated extraction
-            if (type === "pin") sourceObj = this.mapPins.find((p) => p.id === id);
-            if (type === "route") sourceObj = this.mapRoutes.find((r) => r.id === id);
-            if (type === "region") {
-                const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);
-                sourceObj = layer?.regions.find((r) => r.id === id);
-            }
-            if (!sourceObj) return;
-
-            // Merge defaults for auto labels if they haven't been edited yet
-            labelData = {
-                name: sourceObj.name,
-                fontFamily: sourceObj.label?.fontFamily || this.uiState.labelFontFamily,
-                fontSize: sourceObj.label?.fontSize || this.uiState.labelFontSize,
-                fillColor: sourceObj.label?.fillColor || this.uiState.labelFillColor,
-            };
-        }
-
-        const fonts = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
-        const palette = FILRODENSWMB.LABELS?.PRESETS || [];
-
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-labels.hbs", { label: labelData, fonts, palette });
-
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditLabel") || "Edit Label" },
-            content: content,
-            render: (event) => {
-                const app = event.target;
-                const html = app.element;
-
-                // 1. Bind Font Size Slider
-                const range = html.querySelector('input[name="labelFontSize"]');
-                const output = html.querySelector("output");
-                if (range && output) {
-                    range.addEventListener("input", (e) => (output.value = e.target.value));
-                }
-
-                // 2. Bind Preset Color Swatches
-                const colorInput = html.querySelector('input[name="labelFillColor"]');
-                const swatches = html.querySelectorAll(".fwmb-preset-swatch");
-                if (colorInput && swatches.length) {
-                    swatches.forEach((swatch) => {
-                        swatch.addEventListener("click", (e) => {
-                            // Apply the preset hex to the native color picker
-                            colorInput.value = e.target.dataset.color;
-                        });
-                    });
-                }
-            },
-            ok: {
-                callback: (evt, button) => {
-                    return {
-                        name: button.form.elements["labelName"].value,
-                        fontFamily: button.form.elements["labelFontFamily"].value,
-                        fontSize: Number(button.form.elements["labelFontSize"].value),
-                        fillColor: button.form.elements["labelFillColor"].value,
-                    };
-                },
-            },
-        });
-
-        if (result) {
-            this.#pushVectorState();
-            if (type === "custom") {
-                sourceObj.name = result.name;
-                sourceObj.fontFamily = result.fontFamily;
-                sourceObj.fontSize = result.fontSize;
-                sourceObj.fillColor = result.fillColor;
-            } else {
-                sourceObj.name = result.name; // Crucial: Syncs the name back to the core object
-                if (!sourceObj.label) sourceObj.label = {};
-                sourceObj.label.fontFamily = result.fontFamily;
-                sourceObj.label.fontSize = result.fontSize;
-                sourceObj.label.fillColor = result.fillColor;
-            }
-
-            this.#repaintVectors();
-            this.render({ parts: ["context"] });
-            this.markDirty();
-        }
-    }
-
-    static async #onEditPin(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
-        const pin = this.mapPins.find((p) => p.id === id);
-        if (!pin) return;
-
-        const icons = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS)
-            .map(([key, label]) => ({
-                key: key,
-                localized: game.i18n.localize(label),
-                selected: key === pin.icon,
-            }))
-            .sort((a, b) => a.localized.localeCompare(b.localized));
-
-        const safePin = { ...pin, scale: pin.scale ?? 1 };
-
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs", { pin: safePin, icons });
-
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditPin") },
-            content: content,
-            render: (event) => {
-                const app = event.target;
-                const html = app.element;
-                const range = html.querySelector('input[name="pinScale"]');
-                const output = html.querySelector("output");
-                if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
-            },
-            ok: {
-                callback: (event, button, dialog) => {
-                    return {
-                        name: button.form.elements["pinName"].value,
-                        description: button.form.elements["pinDesc"].value,
-                        icon: button.form.elements["pinIcon"].value,
-                        scale: Number(button.form.elements["pinScale"].value),
-                        color: button.form.elements["pinColor"].value,
-                    };
-                },
-            },
-        });
-
-        if (result) {
-            this.#pushVectorState();
-            pin.name = result.name;
-            pin.description = result.description;
-            pin.icon = result.icon;
-            pin.scale = result.scale;
-            pin.color = result.color;
-
-            this.#repaintVectors();
-            this.render({ parts: ["context"] });
-            this.markDirty();
-        }
-    }
-
-    static async #onEditRegion(event, target) {
         this.activeRegionId = null;
-
-        const layerId = target.closest(".fwmb-accordion-group").dataset.layerId;
-        const regionId = target.closest(".fwmb-list-item").dataset.id;
-
-        const layer = this.regionLayers.find((l) => l.id === layerId);
-        if (!layer) return;
-
-        const region = layer.regions.find((r) => r.id === regionId);
-        if (!region) return;
-
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs", { region });
-
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditRegion") },
-            content: content,
-            ok: {
-                callback: (event, button, dialog) => {
-                    return {
-                        name: button.form.elements["regionName"].value,
-                        description: button.form.elements["regionDesc"].value,
-                        fillColor: button.form.elements["regionFillTransparent"].checked ? "transparent" : button.form.elements["regionFillColor"].value,
-                        fillStyle: button.form.elements["regionFillStyle"].value,
-                        lineColor: button.form.elements["regionLineColor"].value,
-                        lineThickness: Number(button.form.elements["regionLineThickness"].value),
-                        lineStyle: button.form.elements["regionLineStyle"].value,
-                        smoothing: button.form.elements["regionSmoothing"].value === "true",
-                    };
-                },
-            },
-        });
-
-        if (!result) return;
-
-        this.#pushVectorState();
-
-        region.name = result.name;
-        region.description = result.description;
-        region.fillColor = result.fillColor;
-        region.fillStyle = result.fillStyle;
-        region.lineColor = result.lineColor;
-        region.lineThickness = result.lineThickness;
-        region.lineStyle = result.lineStyle;
-        region.smoothing = result.smoothing;
-
-        this.#repaintVectors();
-        this.render({ parts: ["context"] });
-        this.markDirty();
     }
 
-    static async #onEditRegionLayer(event, target) {
-        const id = target.closest(".fwmb-accordion-group").dataset.layerId;
-        const layer = this.regionLayers.find((l) => l.id === id);
-        if (!layer) return;
+    async #deactivateEditMode() {
+        if (!this.uiState.isEditMode) return;
 
-        const newName = await foundry.applications.api.DialogV2.prompt({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditLayer") },
-            content: `<input type="text" id="fwmb-rename-layer" value="${layer.name}">`,
-            ok: { callback: (e, b) => b.form.elements["fwmb-rename-layer"].value },
-        });
+        this.uiState.isEditMode = false;
+        this.brushEngine?.endStroke();
+        if (this.canvasEngine) this.canvasEngine.setEditMode(false);
 
-        if (newName) {
-            layer.name = newName;
-            this.render({ parts: ["context"] });
-            this.markDirty();
-        }
+        await this.render({ parts: ["toolbar", "editToolbar", "context"] });
     }
 
-    static async #onEditRiver(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
-        const river = this.manualRivers.find((r) => r.id === id);
-        if (!river) return;
-
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-rivers.hbs", { river });
-
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditRiver") || "Edit River" },
-            content: content,
-            ok: {
-                callback: (event, button, dialog) => {
-                    return {
-                        name: button.form.elements["riverName"].value,
-                        width: Number(button.form.elements["riverWidth"].value),
-                    };
-                },
-            },
-        });
-
-        if (result) {
-            this.#pushVectorState();
-            river.name = result.name;
-            river.width = result.width;
-
-            if (this.activeRiverId === id) {
-                this.uiState.riverWidth = result.width;
-                this.#syncDOMToState();
-            }
-
-            this.#repaintVectors();
-            this.debouncedGenerateTerrain();
-            this.render({ parts: ["context"] });
-            this.markDirty();
-        }
-    }
-
-    static async #onEditRoute(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
-        const route = this.mapRoutes.find((r) => r.id === id);
-        if (!route) return;
-
-        // Ensure older routes map strictly to the custom fallback
-        const safeRoute = { ...route, quickStyle: route.quickStyle || "custom" };
-
-        const context = {
-            route: safeRoute,
-            customRouteStyles: this.uiState.customRouteStyles || [],
+    #ensureToolLayerVisible(newTool) {
+        const toolLayerMap = {
+            terrain: "topography",
+            biomes: "biomes",
+            features: "features",
+            infrastructure: "infrastructure",
+            regions: "regions",
+            labels: "labels",
         };
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs", context);
+        const layerId = toolLayerMap[newTool];
+        if (!layerId) return; // If the tool doesn't have an auto-layer, do nothing
 
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.EditRoute") },
-            content: content,
-            render: (event) => {
-                const app = event.target;
-                const html = app.element;
-
-                const quickStyleSelect = html.querySelector('select[name="routeQuickStyle"]');
-                const colorInput = html.querySelector('input[name="routeColor"]');
-                const thicknessInput = html.querySelector('input[name="routeThickness"]');
-                const styleSelect = html.querySelector('select[name="routeStyle"]');
-
-                // 1. If user selects a predefined style, automatically update the manual inputs
-                quickStyleSelect?.addEventListener("change", (e) => {
-                    const styleId = e.target.value;
-                    if (styleId !== "custom") {
-                        const styleData = this.uiState.customRouteStyles.find((s) => s.id === styleId);
-                        if (styleData) {
-                            colorInput.value = styleData.color;
-                            thicknessInput.value = styleData.thickness;
-                            styleSelect.value = styleData.style;
-                        }
-                    }
-                });
-
-                // 2. If user manually modifies an input, instantly revert dropdown to "custom"
-                const revertToCustom = () => {
-                    if (quickStyleSelect) quickStyleSelect.value = "custom";
-                };
-
-                colorInput?.addEventListener("input", revertToCustom);
-                thicknessInput?.addEventListener("input", revertToCustom);
-                styleSelect?.addEventListener("change", revertToCustom);
-            },
-            ok: {
-                callback: (event, button, dialog) => {
-                    return {
-                        name: button.form.elements["routeName"].value,
-                        description: button.form.elements["routeDesc"].value,
-                        quickStyle: button.form.elements["routeQuickStyle"].value,
-                        color: button.form.elements["routeColor"].value,
-                        thickness: Number(button.form.elements["routeThickness"].value),
-                        style: button.form.elements["routeStyle"].value,
-                    };
-                },
-            },
-        });
-
-        if (result) {
-            this.#pushVectorState();
-
-            route.name = result.name;
-            route.description = result.description;
-            route.quickStyle = result.quickStyle;
-            route.color = result.color;
-            route.thickness = result.thickness;
-            route.style = result.style;
-
-            // If the user happens to edit the exact route they are currently drawing,
-            // ensure the edit toolbar DOM syncs so the next node inherits the changes perfectly.
-            if (this.activeRouteId === id) {
-                this.uiState.activeRouteQuickStyle = result.quickStyle;
-                this.uiState.routeColor = result.color;
-                this.uiState.routeThickness = result.thickness;
-                this.uiState.routeStyle = result.style;
-                this.#syncDOMToState();
-            }
-
-            this.#repaintVectors();
-            this.render({ parts: ["context"] });
-            this.markDirty();
+        const btn = this.element.querySelector(`[data-layer="${layerId}"]`);
+        if (btn && !btn.classList.contains("active")) {
+            btn.classList.add("active");
+            this.canvasEngine?.toggleLayer(layerId, true);
         }
     }
 
-    static async #onEditRouteQuickStyle(event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
-        const style = this.uiState.customRouteStyles.find((s) => s.id === id);
-        if (!style) return;
+    #updateCanvasModes(newTool) {
+        if (!this.canvasEngine) return;
 
-        // Pass the existing style object to prepopulate the template
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs", { style });
-
-        const result = await foundry.applications.api.DialogV2.prompt({
-            classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Edit") || "Edit Quick Style" },
-            content: content,
-            ok: {
-                callback: (evt, button) => {
-                    return {
-                        name: button.form.elements["styleName"].value.trim() || style.name,
-                        color: button.form.elements["styleColor"].value,
-                        thickness: Number(button.form.elements["styleThickness"].value) || 3,
-                        style: button.form.elements["styleStyle"].value,
-                    };
-                },
-            },
-        });
-
-        if (result) {
-            this.#pushVectorState();
-
-            // 1. Update the style template
-            Object.assign(style, result);
-
-            // Dynamically update the option text in the toolbar
-            const select = this.element.querySelector('select[name="activeRouteQuickStyle"]');
-            if (select) {
-                const option = select.querySelector(`option[value="${id}"]`);
-                if (option) option.textContent = result.name;
-            }
-
-            // 2. Cascade changes to all routes utilizing this style
-            for (const route of this.mapRoutes) {
-                if (route.quickStyle === id) {
-                    route.color = result.color;
-                    route.thickness = result.thickness;
-                    route.style = result.style;
-                }
-            }
-
-            // 3. If this style is currently active in the UI, update the UI states
-            if (this.uiState.activeRouteQuickStyle === id) {
-                this.uiState.routeColor = result.color;
-                this.uiState.routeThickness = result.thickness;
-                this.uiState.routeStyle = result.style;
-                this.#syncDOMToState();
-            }
-
-            this.#repaintVectors();
-            this.markDirty();
-            this.render({ parts: ["context", "toolbar"] });
+        this.canvasEngine.setReferenceMode(newTool === "reference");
+        if (this.canvasEngine.setCropMode) {
+            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode);
         }
     }
 
     /**
      * Extracts the currently active canvas state to a PNG.
      */
-    static async #onExportPng(event, target) {
+    async _onExportPng(event, target) {
         if (!this.canvasEngine || !this.currentElevationData) {
             ui.notifications.warn("No map is currently generated to export.");
             return;
@@ -3087,7 +2405,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Prompts the user with the export configuration dialogue before triggering the async build pipeline.
      */
-    static async #onExportScene(event, target) {
+    async _onExportScene(event, target) {
         if (!this.canvasEngine || !this.currentElevationData) {
             ui.notifications.warn("No map is currently generated to export.");
             return;
@@ -3125,9 +2443,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * The background orchestrator for slicing the canvas and creating the Foundry Documents.
      */
     async #executeSceneExportPipeline(config) {
-        this.element.style.pointerEvents = "none";
-        this.element.style.filter = "brightness(0.7)";
-        this.element.style.cursor = "wait";
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.ExportingScene") || "Exporting Scene...");
 
         try {
             // Temporarily strip the camera transform so the PNG exports at a mathematically 1:1 scale with 0 offsets
@@ -3139,24 +2455,41 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.stage.position.set(0, 0);
             this.canvasEngine.stage.scale.set(1, 1);
 
-            ui.notifications.info(`FWMB | Extracting Player View...`);
+            const activeWindow = this.element.ownerDocument.defaultView || window;
+            const textEl = this.element.querySelector(".fwmb-processing-text");
+
+            // --- 1. PLAYER PASS ---
+            if (textEl) textEl.textContent = "Extracting Player View...";
+
             this.canvasEngine.setRenderPass("player");
-            this.#repaintVectors(); // Forces canvas to hide GM items
+            this._repaintVectors(); // Rebuilds the vectors based on player visibility
+
+            // YIELD to the browser so the newly created PIXI SVG Sprites can upload to the GPU
+            await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
+
             const playerBlob = await this.canvasEngine.extractCanvasBlob("player");
 
+            // --- 2. GM OVERLAY PASS ---
             let gmBlob = null;
             if (config.createGmOverlay) {
-                ui.notifications.info(`FWMB | Extracting GM Overlay...`);
+                if (textEl) textEl.textContent = "Extracting GM Overlay...";
+
                 this.canvasEngine.setRenderPass("gm");
-                this.#repaintVectors(); // Forces canvas to hide Player items
+                this._repaintVectors(); // Rebuilds the vectors based on GM visibility
+
+                // YIELD again for the new GM sprites
+                await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
+
                 gmBlob = await this.canvasEngine.extractCanvasBlob("gm");
             }
+
+            if (textEl) textEl.textContent = "Building Foundry Scene...";
 
             // Restore the normal view and the exact camera transform the user was looking at
             this.canvasEngine.stage.position.set(origX, origY);
             this.canvasEngine.stage.scale.set(origScaleX, origScaleY);
             this.canvasEngine.setRenderPass("normal");
-            this.#repaintVectors();
+            this._repaintVectors();
 
             // Hand off the physical Blobs to the server-side Exporter utility
             await SceneExporter.run(this, config, playerBlob, gmBlob);
@@ -3164,213 +2497,52 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             console.error("FWMB | Pipeline Error:", err);
             ui.notifications.error("Export pipeline failed. See console for details.");
         } finally {
-            this.element.style.pointerEvents = "auto";
-            this.element.style.filter = "none";
-            this.element.style.cursor = "default";
+            this.#endProcessing();
         }
     }
 
     /**
      * Executes the regional map extraction pipeline.
      */
-    static async #onGenerateRegionalMap(event, target) {
+    async _onGenerateRegionalMap(event, target) {
         if (!this.canvasEngine) return;
 
+        // 1. Validate Crop Box
         const cropBox = this.canvasEngine.getCropData();
         if (!cropBox || cropBox.width <= 0 || cropBox.height <= 0) {
             ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnInvalidCrop") || "Please draw a valid crop area first.");
             return;
         }
 
-        this.element.style.pointerEvents = "none";
-        this.element.style.filter = "brightness(0.7)";
-        this.element.style.cursor = "wait";
+        // 2. Prompt for save name
+        const mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), `${this.currentSaveName || "Map"} (Region)`);
+
+        if (!mapName) return;
+
+        // 3. Lock UI
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingRegion") || "Extracting Region...");
 
         try {
-            const baseTargetWidth = this.uiState.regionalTargetWidth;
-            const tempZoomScale = baseTargetWidth / cropBox.width;
+            // 4. Delegate heavy mathematical payload extraction
+            const payload = RegionalExtractor.createPayload(this, cropBox);
 
-            // Calculate the scaled grid size first
-            const targetGridSize = Math.max(10, Math.round(this.uiState.gridSize * tempZoomScale));
-
-            // Snap the map dimensions to be perfect multiples of the new grid size
-            const targetWidth = Math.max(targetGridSize, Math.round(baseTargetWidth / targetGridSize) * targetGridSize);
-
-            // Recalculate true mathematical scale using the grid-snapped width
-            const zoomScale = targetWidth / cropBox.width;
-            const rawHeight = cropBox.height * zoomScale;
-
-            // Snap the height
-            const targetHeight = Math.max(targetGridSize, Math.round(rawHeight / targetGridSize) * targetGridSize);
-
-            const mapName = await foundry.applications.api.DialogV2.prompt({
-                window: { title: game.i18n.localize("FILRODENSWMB.UI.SaveAs") || "Save Regional Map As" },
-                content: `<label>Map Name</label><input type="text" id="fwmb-save-name" value="${this.currentSaveName || "Map"} (Region)">`,
-                ok: { callback: (event, button, dialog) => button.form.elements["fwmb-save-name"].value },
-            });
-
-            if (!mapName) return;
-
-            this.#getMapParameters();
-            const state = foundry.utils.deepClone(this.uiState);
-
-            state.mapWidth = targetWidth;
-            state.mapHeight = targetHeight;
-
-            state["noise.offsetX"] = (state["noise.offsetX"] + cropBox.x) * zoomScale;
-            state["noise.offsetY"] = (state["noise.offsetY"] + cropBox.y) * zoomScale;
-
-            state["noise.moistureOffset"] = (state["noise.moistureOffset"] || 10000) * zoomScale;
-            state["noise.tempOffset"] = (state["noise.tempOffset"] || 20000) * zoomScale;
-            state.windDistance = (state.windDistance || 40) * zoomScale;
-
-            state["noise.elevation.scale"] = state["noise.elevation.scale"] * zoomScale;
-            state["noise.moisture.scale"] = state["noise.moisture.scale"] * zoomScale;
-            state["noise.temperature.scale"] = (state["noise.temperature.scale"] || FILRODENSWMB.NOISE.TEMPERATURE.SCALE) * zoomScale;
-
-            // Capture the original top latitude before mutating the state object
-            const originalLatTop = state.latTop;
-            const latRange = Math.abs(originalLatTop - state.latBottom);
-
-            state.latTop = originalLatTop - (cropBox.y / this.mapHeight) * latRange;
-            state.latBottom = originalLatTop - ((cropBox.y + cropBox.height) / this.mapHeight) * latRange;
-
-            state.gridSize = Math.max(10, Math.round(state.gridSize * zoomScale));
-
-            if (state.cartographyScaleEnable && state.cartographyScaleX !== undefined) {
-                const PADDING = 50;
-
-                state.cartographyScaleX = (state.cartographyScaleX - cropBox.x) * zoomScale;
-                state.cartographyScaleY = (state.cartographyScaleY - cropBox.y) * zoomScale;
-                state.cartographyScaleInterval = Math.round(state.cartographyScaleInterval * zoomScale);
-
-                state.cartographyScaleX = Math.max(PADDING, Math.min(state.cartographyScaleX, targetWidth - PADDING));
-                state.cartographyScaleY = Math.max(PADDING, Math.min(state.cartographyScaleY, targetHeight - PADDING));
-            }
-
-            const { currentSeed, params: newParams } = this.#getDerivedMapParameters(state);
-
-            // Translate Brush History
-            const newHistory = [];
-
-            for (const stroke of this.brushEngine.history) {
-                const translatedStroke = foundry.utils.deepClone(stroke);
-                translatedStroke.size *= zoomScale;
-
-                let isVisible = false;
-
-                for (const pt of translatedStroke.points) {
-                    pt.x = (pt.x - cropBox.x) * zoomScale;
-                    pt.y = (pt.y - cropBox.y) * zoomScale;
-
-                    // Lazy bounding box: retain if the stroke radius touches the new canvas
-                    if (pt.x + translatedStroke.size >= 0 && pt.x - translatedStroke.size <= targetWidth && pt.y + translatedStroke.size >= 0 && pt.y - translatedStroke.size <= targetHeight) {
-                        isVisible = true;
-                    }
-                }
-
-                if (isVisible) newHistory.push(translatedStroke);
-            }
-
-            const translateVectorList = (list) => {
-                const newList = [];
-                for (const item of list) {
-                    const translated = foundry.utils.deepClone(item);
-                    let isVisible = false;
-
-                    // Translate nested auto-label spatial coordinates only.
-                    // Do not scale the fontSize to maintain crisp typography.
-                    if (translated.label?.x !== undefined) {
-                        translated.label.x = (translated.label.x - cropBox.x) * zoomScale;
-                        translated.label.y = (translated.label.y - cropBox.y) * zoomScale;
-                    }
-
-                    // Standard spatial translation for point-based entities (Pins, Labels, Decorations)
-                    if (translated.x !== undefined && translated.y !== undefined) {
-                        translated.x = (translated.x - cropBox.x) * zoomScale;
-                        translated.y = (translated.y - cropBox.y) * zoomScale;
-
-                        // Generous 100px overflow buffer
-                        if (translated.x >= -100 && translated.x <= targetWidth + 100 && translated.y >= -100 && translated.y <= targetHeight + 100) {
-                            isVisible = true;
-                        }
-                    }
-                    // Standard spatial translation for node-based entities (Routes, Regions)
-                    else if (translated.points) {
-                        for (const pt of translated.points) {
-                            pt.x = (pt.x - cropBox.x) * zoomScale;
-                            pt.y = (pt.y - cropBox.y) * zoomScale;
-
-                            // Retain the entire vector if any single node is visible
-                            if (pt.x >= 0 && pt.x <= targetWidth && pt.y >= 0 && pt.y <= targetHeight) {
-                                isVisible = true;
-                            }
-                        }
-                    }
-
-                    if (isVisible) newList.push(translated);
-                }
-                return newList;
-            };
-
-            const newPins = translateVectorList(this.mapPins);
-            const newLabels = translateVectorList(this.mapLabels);
-            const newDecorations = translateVectorList(this.mapDecorations);
-            const newRoutes = translateVectorList(this.mapRoutes);
-            const newRivers = translateVectorList(this.manualRivers);
-            const newFaults = translateVectorList(this.tectonicFaults);
-
-            const newRegions = [];
-            for (const layer of this.regionLayers) {
-                const translatedLayer = foundry.utils.deepClone(layer);
-                translatedLayer.regions = translateVectorList(layer.regions);
-                if (translatedLayer.regions.length > 0) {
-                    newRegions.push(translatedLayer);
-                }
-            }
-
-            const payload = {
-                seed: currentSeed,
-                springsBaked: true,
-                mapWidth: targetWidth,
-                mapHeight: targetHeight,
-                gridType: state.gridType,
-                gridSize: state.gridSize,
-                params: newParams,
-                customBiomes: state.customBiomes,
-                customRouteStyles: state.customRouteStyles,
-                history: newHistory,
-                tectonicFaults: newFaults,
-                manualRivers: newRivers,
-                mapPins: newPins,
-                mapRoutes: newRoutes,
-                regionLayers: newRegions,
-                mapLabels: newLabels,
-                mapDecorations: newDecorations,
-                parentId: this.currentSaveId,
-            };
-
+            // 5. Save to database
             const journal = await saveMapData(mapName, payload, null);
             if (journal) ui.notifications.info(`Regional Map '${journal.name}' created successfully.`);
         } catch (err) {
             console.error("FWMB | Regional Map Generation Failed:", err);
             ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.RegionalGenerationError") || "Failed to generate regional map.");
         } finally {
-            this.element.style.pointerEvents = "auto";
-            this.element.style.filter = "none";
-            this.element.style.cursor = "default";
-
-            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
-            if (editBtn?.classList.contains("active")) {
-                editBtn.click();
-            }
+            // 6. Cleanup
+            this.#endProcessing();
+            this.#deactivateEditMode();
         }
     }
 
     /**
      * Opens a system file dialogue, validates the JSON payload, and imports it to the database.
      */
-    static async #onImportMapJson(event, target) {
+    async _onImportMapJson(event, target) {
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".json";
@@ -3378,6 +2550,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         input.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file) return;
+
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.ImportingMap") || "Importing Map...");
 
             try {
                 const text = await file.text();
@@ -3395,6 +2569,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             } catch (err) {
                 console.error("FWMB | Import Failed:", err);
                 ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.ImportError"));
+            } finally {
+                this.#endProcessing();
             }
         };
 
@@ -3404,130 +2580,117 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Unified router for the inline CRUD buttons on the Manage Maps cards.
      */
-    static async #onManageMapAction(event, target) {
+    async _onManageMapAction(event, target) {
         const action = target.dataset.actionType;
         const card = target.closest(".fwmb-map-card");
         if (!action || !card) return;
 
         const mapId = card.dataset.id;
 
-        switch (action) {
-            case "load": {
-                const canLoad = await this.#gateUnsavedChanges();
-                if (!canLoad) return;
+        // Dictionary Routing Pattern
+        const actionHandlers = {
+            load: () => this.#handleMapLoad(mapId, card),
+            delete: () => this.#handleMapDelete(mapId),
+            rename: () => this.#handleMapRename(mapId, card),
+            duplicate: () => this.#handleMapDuplicate(mapId),
+            promote: () => this.#handleMapPromote(mapId, card),
+            export: () => this.#handleMapExport(mapId, card),
+        };
 
-                const payload = await loadMapData(mapId);
-                if (payload) {
-                    this.currentSaveId = mapId;
-                    this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-                    await this.#ingestMapPayload(payload);
-                    ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
-
-                    this.render({ parts: ["toolbar", "context"] });
-                    this.isDirty = false;
-                }
-                break;
-            }
-
-            case "delete": {
-                const confirmed = await foundry.applications.api.DialogV2.confirm({
-                    window: { title: game.i18n.localize("FILRODENSWMB.UI.Delete") },
-                    content: `<p>${game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
-                    rejectClose: false,
-                    modal: true,
-                });
-                if (!confirmed) return;
-
-                await deleteSavedMap(mapId);
-                if (this.currentSaveId === mapId) this.currentSaveId = null;
-                this.render({ parts: ["context"] });
-                break;
-            }
-
-            case "rename": {
-                const currentName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-                const newName = await foundry.applications.api.DialogV2.prompt({
-                    window: { title: game.i18n.localize("FILRODENSWMB.UI.Rename") },
-                    content: `<input type="text" id="fwmb-rename" value="${currentName}">`,
-                    ok: { callback: (event, button, dialog) => button.form.elements["fwmb-rename"].value },
-                });
-
-                if (newName && newName !== currentName) {
-                    const updatedDoc = await renameSavedMap(mapId, newName);
-
-                    if (this.currentSaveId === mapId) {
-                        this.currentSaveName = newName;
-                        if (updatedDoc?.id && updatedDoc.id !== this.currentSaveId) {
-                            this.currentSaveId = updatedDoc.id;
-                        }
-                    }
-                    this.render({ parts: ["context"] });
-                }
-                break;
-            }
-
-            case "duplicate": {
-                await duplicateSavedMap(mapId);
-                this.render({ parts: ["context"] });
-                break;
-            }
-
-            case "promote": {
-                const confirmed = await foundry.applications.api.DialogV2.confirm({
-                    window: { title: game.i18n.localize("FILRODENSWMB.UI.Promote") || "Promote Map" },
-                    content: `<p>${game.i18n.localize("FILRODENSWMB.UI.PromoteConfirm") || "Create a standalone copy of this regional map? The new map will not be linked to the original parent."}</p>`,
-                    rejectClose: false,
-                    modal: true,
-                });
-                if (!confirmed) return;
-
-                const exportData = await loadMapData(mapId);
-                if (exportData) {
-                    // Strip the lineage
-                    delete exportData.parentId;
-
-                    const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-                    const newName = `${originalName} (Standalone)`;
-
-                    // Passing null forces the creation of a brand new database entry
-                    await saveMapData(newName, exportData, null);
-
-                    ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.PromoteSuccess") || "Standalone map created successfully.");
-                    this.render({ parts: ["context"] });
-                }
-                break;
-            }
-
-            case "export": {
-                const exportData = await loadMapData(mapId);
-                if (!exportData) return;
-
-                const rawName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-                const mapName = rawName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-
-                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = `fwmb_${mapName}.json`;
-                a.click();
-                URL.revokeObjectURL(a.href);
-                break;
-            }
+        if (actionHandlers[action]) {
+            await actionHandlers[action]();
         }
     }
 
-    static #onNudgeNoise(event, target) {
+    async #handleMapLoad(mapId, card) {
+        const canLoad = await this.#gateUnsavedChanges();
+        if (!canLoad) return;
+
+        const payload = await loadMapData(mapId);
+        if (payload) {
+            this.currentSaveId = mapId;
+            this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+            await this.#ingestMapPayload(payload);
+            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
+
+            this.render({ parts: ["toolbar", "context"] });
+            this.isDirty = false;
+        }
+    }
+
+    async #handleMapDelete(mapId) {
+        const confirmed = await MapDialogManager._confirmDialog();
+        if (!confirmed) return;
+
+        await deleteSavedMap(mapId);
+        if (this.currentSaveId === mapId) this.currentSaveId = null;
+        this.render({ parts: ["context"] });
+    }
+
+    async #handleMapRename(mapId, card) {
+        const currentName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+        const newName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.Rename"), game.i18n.localize("FILRODENSWMB.UI.Name") || "Name", currentName);
+
+        if (newName && newName !== currentName) {
+            const updatedDoc = await renameSavedMap(mapId, newName);
+
+            if (this.currentSaveId === mapId) {
+                this.currentSaveName = newName;
+                if (updatedDoc?.id && updatedDoc.id !== this.currentSaveId) {
+                    this.currentSaveId = updatedDoc.id;
+                }
+            }
+            this.render({ parts: ["context"] });
+        }
+    }
+
+    async #handleMapDuplicate(mapId) {
+        await duplicateSavedMap(mapId);
+        this.render({ parts: ["context"] });
+    }
+
+    async #handleMapPromote(mapId, card) {
+        const confirmed = await MapDialogManager._confirmDialog(
+            game.i18n.localize("FILRODENSWMB.UI.Promote") || "Promote Map",
+            game.i18n.localize("FILRODENSWMB.UI.PromoteConfirm") || "Create a standalone copy of this regional map?",
+        );
+        if (!confirmed) return;
+
+        const exportData = await loadMapData(mapId);
+        if (exportData) {
+            delete exportData.parentId;
+
+            const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+            const newName = `${originalName} (Standalone)`;
+
+            await saveMapData(newName, exportData, null);
+
+            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.PromoteSuccess") || "Standalone map created successfully.");
+            this.render({ parts: ["context"] });
+        }
+    }
+
+    async #handleMapExport(mapId, card) {
+        const exportData = await loadMapData(mapId);
+        if (!exportData) return;
+
+        const rawName = card.querySelector(".fwmb-map-card-info").textContent.trim();
+        const mapName = rawName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `fwmb_${mapName}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    _onNudgeNoise(event, target) {
         const dx = Number(target.dataset.dx);
         const dy = Number(target.dataset.dy);
 
-        const inputX = this.element.querySelector('input[name="noise.offsetX"]');
-        const inputY = this.element.querySelector('input[name="noise.offsetY"]');
-        if (!inputX || !inputY) return;
+        MapStateManager.pushVectorState(this);
 
-        // 1. Capture vector history before moving the world
-        this.#pushVectorState();
-
-        // 2. Translate all vector nodes and their associated label offsets
         const translatePoint = (pt) => {
             if (pt?.x !== undefined) {
                 pt.x -= dx;
@@ -3557,15 +2720,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.brushEngine.redoStack.forEach(translateStroke);
         }
 
-        // 3. Shift the procedural window
-        inputX.value = Number(inputX.value) + dx;
-        inputY.value = Number(inputY.value) + dy;
+        this.uiState["noise.offsetX"] += dx;
+        this.uiState["noise.offsetY"] += dy;
 
-        inputX.dispatchEvent(new Event("input", { bubbles: true }));
+        this.render({ parts: ["context"] });
         this.markDirty();
+        this.debouncedGenerateTerrain();
     }
 
-    static #onNudgeReference(event, target) {
+    _onNudgeReference(event, target) {
         const dx = Number(target.dataset.dx);
         const dy = Number(target.dataset.dy);
 
@@ -3574,93 +2737,58 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateReferenceLayer();
     }
 
-    static async #onRandomizeSeed(event, target) {
-        const input = this.element.querySelector('input[name="mapSeed"]');
-        if (!input) return;
-
-        input.value = Math.random().toString(36).substring(2, 8).toUpperCase();
+    async _onRandomizeSeed(event, target) {
+        this.uiState.mapSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
+        this.render({ parts: ["context"] });
     }
 
-    static #onRedoBrush(event, target) {
-        if (["features", "infrastructure", "regions", "labels"].includes(this.activeTool)) {
-            if (this.pinRedoStack.length === 0) return;
-
-            // Push the current state back to the undo history
-            this.pinHistory.push(this.#getVectorStateSnapshot());
-
-            // Pop the forward state and apply it
-            const state = this.pinRedoStack.pop();
-            this.#restoreVectorStateSnapshot(state);
-
-            if (this.activeTool === "features") {
-                this.#repaintCanvas();
-                this.debouncedGenerateClimate();
-                this.debouncedGenerateTerrain();
-            } else {
-                this.#repaintVectors();
-            }
-            this.render({ parts: ["context"] });
-        } else {
-            if (!this.baseElevationData || !this.brushEngine) return;
-            if (this.brushEngine.redo()) {
-                this.#rebuildFromHistory();
-                this.#repaintCanvas();
-                this.debouncedGenerateClimate();
-            }
-        }
-
-        this.markDirty();
+    async _onRedoBrush(event, target) {
+        await this.#processHistoryStep(false);
     }
 
-    static #onRemoveReferenceImage(event, target) {
+    _onRemoveReferenceImage(event, target) {
         this.uiState.referenceImage = "";
-
-        const filePicker = this.element.querySelector('file-picker[name="referenceImage"]');
-        if (filePicker) filePicker.value = "";
-
         this.#updateReferenceLayer();
+        this.render({ parts: ["context"] });
     }
 
-    static #onResetNoisePan(event, target) {
-        const inputX = this.element.querySelector('input[name="noise.offsetX"]');
-        const inputY = this.element.querySelector('input[name="noise.offsetY"]');
-        if (inputX && inputY) {
-            inputX.value = this.defaultUiState["noise.offsetX"];
-            inputY.value = this.defaultUiState["noise.offsetY"];
-            inputX.dispatchEvent(new Event("input", { bubbles: true }));
-        }
+    _onResetNoisePan(event, target) {
+        this.uiState["noise.offsetX"] = this.defaultUiState["noise.offsetX"];
+        this.uiState["noise.offsetY"] = this.defaultUiState["noise.offsetY"];
+        this.render({ parts: ["context"] });
+        this.markDirty();
+        this.debouncedGenerateTerrain();
     }
 
-    static #onResetNoiseScale(event, target) {
-        const input = this.element.querySelector('input[name="noise.elevation.scale"]');
-        if (input) {
-            input.value = this.defaultUiState["noise.elevation.scale"];
-            input.dispatchEvent(new Event("input", { bubbles: true }));
-        }
+    _onResetNoiseScale(event, target) {
+        this.uiState["noise.elevation.scale"] = this.defaultUiState["noise.elevation.scale"];
+        this.render({ parts: ["context"] });
+        this.markDirty();
+        this.debouncedGenerateTerrain();
     }
 
-    static #onResetReferencePan(event, target) {
+    _onResetReferencePan(event, target) {
         this.uiState.referenceX = this.mapWidth / 2;
         this.uiState.referenceY = this.mapHeight / 2;
         this.#updateReferenceLayer();
     }
 
-    static #onResetReferenceScale(event, target) {
+    _onResetReferenceScale(event, target) {
         this.uiState.referenceScale = 1;
         this.#updateReferenceLayer();
     }
 
-    static #onResetZoom(event, target) {
+    _onResetZoom(event, target) {
         this.canvasEngine?.resetCamera();
     }
 
-    static async #onSaveMap(event, target) {
+    async _onSaveMap(event, target) {
         if (target) target.disabled = true;
         await this.saveCurrentMap();
         if (target) target.disabled = false;
     }
 
-    static #onSelectRegionLayer(event, target) {
+    _onSelectRegionLayer(event, target) {
         const id = target.closest(".fwmb-accordion-group").dataset.layerId;
         this.activeRegionLayerId = id;
         this.activeRegionId = null;
@@ -3670,95 +2798,39 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Handles swapping between the Raise, Lower, and Smooth brush tools.
      */
-    static #onSetBrushTool(event, target) {
-        const toolContainer = target.closest(".fwmb-brush-tools");
-        if (!toolContainer) return;
-
-        for (const btn of toolContainer.querySelectorAll("button")) {
-            btn.classList.remove("active");
-        }
-
-        const activeBtn = target.closest("button");
-        if (activeBtn) activeBtn.classList.add("active");
-
-        if (toolContainer.querySelector('[data-tool="drawFault"]')) {
-            const isFaultActive = activeBtn.dataset.tool === "drawFault";
-            const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-
-            if (editToolbar) {
-                editToolbar.querySelectorAll("[data-tool-group~='features-fault']").forEach((el) => {
-                    el.classList.toggle("fwmb-hidden", !isFaultActive);
-                });
-            }
-        }
+    _onSetBrushTool(event, target) {
+        const stateKey = `${this.activeTool}BrushTool`;
+        this.uiState[stateKey] = target.dataset.tool;
+        this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
-    static #onSetFeatureMode(event, target) {
+    _onSetFeatureMode(event, target) {
         this.uiState.activeFeatureMode = target.dataset.mode;
         this.activeFaultId = null; // Ends the current fault line natively
-        this.#syncFeatureModeButtons();
-    }
-
-    #syncFeatureModeButtons() {
-        const mode = this.uiState.activeFeatureMode;
-        const modeBtns = this.element.querySelectorAll('.fwmb-edit-toolbar [data-action="setFeatureMode"]');
-        for (const btn of modeBtns) {
-            btn.classList.toggle("active", btn.dataset.mode === mode);
-        }
-
-        if (this.activeTool === "features") {
-            const toolGroups = this.element.querySelectorAll(".fwmb-edit-toolbar [data-tool-group]");
-            for (const group of toolGroups) {
-                const allowed = group.dataset.toolGroup.split(" ");
-                if (allowed.some((a) => a.startsWith("features-"))) {
-                    group.classList.toggle("fwmb-hidden", !allowed.includes(`features-${mode}`));
-                }
-            }
-        }
+        this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
     /**
      * Handles manual switching between Point and Route modes via the edit toolbar.
      */
-    static #onSetInfraMode(event, target) {
+    _onSetInfraMode(event, target) {
         this.uiState.activeInfraMode = target.dataset.mode;
         this.activeRouteId = null;
-        this.#syncInfraModeButtons();
+        this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
-    static #onSetInfrastructureIcon(event, target) {
+    _onSetInfrastructureIcon(event, target) {
         const newIcon = target.dataset.icon;
+
         this.uiState.activeIcon = newIcon;
         this.uiState.activeInfraMode = "pin";
         this.activeRouteId = null;
 
-        // Update the trigger icon so the UI shows the new selection
-        const triggerIcon = this.element.querySelector("#fwmb-pin-select .fwmb-select-trigger .fwmb-icon:first-child");
-        if (triggerIcon) {
-            triggerIcon.className = `fwmb-icon ${newIcon}`;
-        }
-
-        // Update the 'active' button state inside the dropdown grid
-        const dropdown = this.element.querySelector("#fwmb-pin-select .fwmb-select-options");
-        if (dropdown) {
-            for (const btn of dropdown.querySelectorAll("button")) {
-                btn.classList.toggle("active", btn.dataset.icon === newIcon);
-            }
-            // Hide the dropdown menu
-            dropdown.classList.add("fwmb-hidden");
-        }
-
-        this.#syncInfraModeButtons();
+        this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
-    static #onSetRegionMode(event, target) {
-        const toolContainer = target.closest(".fwmb-edit-toolbar");
-        if (!toolContainer) return;
-
-        for (const btn of toolContainer.querySelectorAll('[data-action="setRegionMode"]')) {
-            btn.classList.remove("active");
-        }
-        target.classList.add("active");
+    _onSetRegionMode(event, target) {
+        this.uiState.regionMode = target.dataset.mode;
 
         if (!this.activeRegionLayerId) {
             ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");
@@ -3792,16 +2864,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             visibility: "all",
         });
 
-        this.#repaintVectors();
-        this.render({ parts: ["context"] });
+        this._repaintVectors();
+        this.render({ parts: ["toolbar", "context", "editToolbar"] });
     }
 
-    static #onSetRegionPreset(event, target) {
+    _onSetRegionPreset(event, target) {
         const color = target.dataset.color;
         const targetProperty = target.dataset.target === "line" ? "regionLineColor" : "regionFillColor";
 
         this.uiState[targetProperty] = color;
-        this.#syncDOMToState();
+        this.render({ parts: ["toolbar", "editToolbar"] });
 
         if (this.activeRegionId && this.activeRegionLayerId) {
             const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
@@ -3809,7 +2881,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (region) {
                 if (targetProperty === "line") region.lineColor = color;
                 else region.fillColor = color;
-                this.#repaintVectors();
+                this._repaintVectors();
             }
         }
     }
@@ -3817,38 +2889,54 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Toggles the interactive 3D topography visualisation.
      */
-    static async #onThreeDView(event, target) {
+    async _onThreeDView(event, target) {
         const overlay = this.element.querySelector("#fwmb-3d-overlay");
-        const mapControls = this.element.querySelector(".fwmb-map-controls");
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-        const contextPanel = this.element.querySelector(".fwmb-context-panel");
 
         if (!overlay || !this.currentElevationData) return;
 
+        // 1. Exiting 3D Mode
         if (this.scene3D) {
             this.scene3D.destroy();
             this.scene3D = null;
+
             overlay.classList.add("fwmb-hidden");
-            target.classList.remove("active");
+
+            // Query the button safely to remove the active state
+            const btn = this.element.querySelector('[data-action="threeDView"]');
+            if (btn) btn.classList.remove("active");
+
+            // Restore the manual layout wrappers
+            const mapControls = this.element.querySelector(".fwmb-map-controls");
+            const contextPanel = this.element.querySelector(".fwmb-context-panel");
+            const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
 
             if (mapControls) mapControls.classList.remove("fwmb-hidden");
             if (contextPanel) contextPanel.style.display = "";
+            if (editToolbar) editToolbar.style.display = ""; // Restores standard CSS flow
 
-            const editBtn = this.element.querySelector('[data-action="toggleEditMode"]');
-            if (editToolbar && editBtn?.classList.contains("active")) {
-                editToolbar.classList.remove("fwmb-hidden");
-            }
             return;
         }
 
+        // 2. Entering 3D Mode: Teardown state
+        this.#clearActiveDrawingStates();
+        await this.#deactivateEditMode();
+
+        // 3. Setup 3D overlay UI
+        const mapControls = this.element.querySelector(".fwmb-map-controls");
+        const contextPanel = this.element.querySelector(".fwmb-context-panel");
+        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+        const freshTarget = this.element.querySelector('[data-action="threeDView"]');
+
         overlay.classList.remove("fwmb-hidden");
-        target.classList.add("active");
+        if (freshTarget) freshTarget.classList.add("active");
 
+        // Manually hide layout wrappers so the 3D canvas fills the entire screen
         if (mapControls) mapControls.classList.add("fwmb-hidden");
-        if (editToolbar) editToolbar.classList.add("fwmb-hidden");
         if (contextPanel) contextPanel.style.display = "none";
+        if (editToolbar) editToolbar.style.display = "none"; // Destroys the bottom margin bug!
 
-        const { currentSeed, params } = this.#getMapParameters();
+        // 4. Generate 3D Scene
+        const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
         const seaLevel = this.uiState["seaLevel"];
         const waterMask = this.currentRiverData ? this.currentRiverData.waterMask : null;
@@ -3868,71 +2956,61 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         );
 
         this.scene3D = new Scene3D(overlay);
-
         const riverVectors = this.currentRiverData ? this.currentRiverData.vectors : null;
 
         this.scene3D.render3DMap(this.currentElevationData, biomeBuffer, this.mapWidth, this.mapHeight, seaLevel, riverVectors, waterMask);
     }
 
-    static #onToggleEditMode(event, target) {
+    _onToggleEditMode(event, target) {
         const toolbar = this.element.querySelector(".fwmb-edit-toolbar");
         if (!toolbar) return;
 
-        const isActivating = toolbar.classList.toggle("fwmb-hidden") === false;
-        target.closest("button").classList.toggle("active", isActivating);
+        const isActivating = !this.uiState.isEditMode;
+        this.uiState.isEditMode = isActivating;
 
-        toolbar.querySelectorAll("[data-tool-group]").forEach((el) => {
-            const allowedTools = el.dataset.toolGroup.split(" ");
-            let isVisible = allowedTools.includes(this.activeTool);
-
-            if (this.activeTool === "infrastructure" && allowedTools.some((t) => t.startsWith("infrastructure-"))) {
-                isVisible = allowedTools.includes(`infrastructure-${this.uiState.activeInfraMode}`);
+        if (isActivating) {
+            const stillValid = this.regionLayers.some((l) => l.id === this.activeRegionLayerId);
+            if (!stillValid) {
+                this.activeRegionLayerId = this.regionLayers[0]?.id ?? null;
+            }
+        } else {
+            if (this.hasPendingFeatureMath) {
+                this.generateTerrain();
+                this.hasPendingFeatureMath = false;
             }
 
-            if (this.activeTool === "features" && allowedTools.some((t) => t.startsWith("features-"))) {
-                isVisible = allowedTools.includes(`features-${this.uiState.activeFeatureMode}`);
+            for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
+                this[config.activeKey] = null;
             }
-
-            el.classList.toggle("fwmb-hidden", !isVisible);
-        });
+            this.activeRegionId = null;
+        }
 
         if (this.canvasEngine) {
             this.canvasEngine.setEditMode(isActivating);
-
             if (this.canvasEngine.setCropMode) {
                 this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene");
             }
         }
 
-        // Only lock the sidebar for procedural raster tools
-        const isVectorTool = ["features", "infrastructure", "regions", "labels", "cartography"].includes(this.activeTool);
-
-        if (!isVectorTool) {
-            const panel = this.element.querySelector(".fwmb-context-panel");
-            if (panel) {
-                const controls = panel.querySelectorAll("fieldset input, fieldset button");
-                for (const control of controls) {
-                    control.disabled = isActivating;
-                }
-                panel.classList.toggle("fwmb-locked", isActivating);
-            }
+        if (FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool)) {
+            this._repaintVectors();
         }
 
-        if (["features", "infrastructure", "regions", "labels", "cartography"].includes(this.activeTool)) {
-            this.#repaintVectors();
-        }
+        this.render({ parts: ["context", "toolbar", "editToolbar"] });
     }
 
-    static #onToggleGrid(event, target) {
+    _onToggleGrid(event, target) {
         this.uiState.gridVisible = !this.uiState.gridVisible;
         target.classList.toggle("active", this.uiState.gridVisible);
         this.#updateGrid();
+
+        this.markDirty();
     }
 
     /**
      * Toggles visibility of the WebGL layers.
      */
-    static #onToggleLayer(event, target) {
+    _onToggleLayer(event, target) {
         const layerId = target.dataset.layer;
         if (!layerId || !this.canvasEngine) return;
 
@@ -3941,12 +3019,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.toggleLayer(layerId, isVisible);
     }
 
-    static #onTogglePinDropdown(event, target) {
+    _onToggleLiveFeatureUpdates(event, target) {
+        this.uiState.liveFeatureUpdates = !this.uiState.liveFeatureUpdates;
+
+        // If turned back on while changes are pending, immediately process them
+        if (this.uiState.liveFeatureUpdates && this.hasPendingFeatureMath) {
+            this.generateTerrain();
+            this.hasPendingFeatureMath = false;
+        }
+        this.render({ parts: ["editToolbar"] });
+    }
+
+    _onTogglePinDropdown(event, target) {
         const dropdown = target.closest(".fwmb-custom-select").querySelector(".fwmb-select-options");
         if (dropdown) dropdown.classList.toggle("fwmb-hidden");
     }
 
-    static #onToggleRegionSmoothing(event, target) {
+    _onToggleRegionSmoothing(event, target) {
         this.uiState.regionSmoothing = !this.uiState.regionSmoothing;
         target.classList.toggle("active", this.uiState.regionSmoothing);
 
@@ -3962,20 +3051,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const region = layer?.regions.find((r) => r.id === this.activeRegionId);
             if (region) {
                 region.smoothing = this.uiState.regionSmoothing;
-                this.#repaintVectors();
+                this._repaintVectors();
             }
         }
-    }
-
-    static #onToggleSnapping(event, target) {
-        this.uiState.snapToPoints = !this.uiState.snapToPoints;
-        target.classList.toggle("active", this.uiState.snapToPoints);
     }
 
     /**
      * Toggles live canvas filters for Player, GM, and Hidden vectors.
      */
-    static #onToggleViewFilter(event, target) {
+    _onToggleViewFilter(event, target) {
         if (!this.canvasEngine) return;
 
         const filter = target.dataset.filter; // "all", "gm", or "none"
@@ -3987,102 +3071,101 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Push to canvas and redraw
         this.canvasEngine.setViewFilters(this.viewFilters);
-        this.#repaintVectors();
+        this._repaintVectors();
     }
 
-    static #onToggleVisibility(event, target) {
+    _onToggleVisibility(event, target) {
         const targetType = target.dataset.target; // "layer", "feature", or "label"
-        const states = ["all", "gm", "none"];
+        let modified = false;
 
-        // 1. Handle Region Layers (Accordion Groups)
         if (targetType === "layer") {
-            const id = target.closest(".fwmb-accordion-group").dataset.layerId;
-            const layer = this.regionLayers.find((l) => l.id === id);
-            if (layer) {
-                this.#pushVectorState();
-                const currentIdx = states.indexOf(layer.visibility || "all");
-                layer.visibility = states[(currentIdx + 1) % states.length];
-            }
-        }
-        // 2. Handle Individual List Items
-        else {
-            const listItem = target.closest(".fwmb-list-item");
-            if (!listItem) return;
-
-            const id = listItem.dataset.id;
-            const type = listItem.dataset.type;
-
-            let obj = null;
-            if (type === "custom") obj = this.mapLabels.find((l) => l.id === id);
-            else if (type === "decoration") obj = this.mapDecorations.find((d) => d.id === id);
-            else if (type === "pin") obj = this.mapPins.find((p) => p.id === id);
-            else if (type === "route") obj = this.mapRoutes.find((r) => r.id === id);
-            else if (type === "region") {
-                const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);
-                obj = layer?.regions.find((r) => r.id === id);
-            } else if (type === "fault") obj = this.tectonicFaults.find((f) => f.id === id);
-
-            if (obj) {
-                this.#pushVectorState();
-
-                if (targetType === "label") {
-                    if (type === "custom") {
-                        const currentIdx = states.indexOf(obj.visibility || "all");
-                        obj.visibility = states[(currentIdx + 1) % states.length];
-                    } else {
-                        if (!obj.label) obj.label = { visibility: "all" };
-                        const currentIdx = states.indexOf(obj.label.visibility || "all");
-                        obj.label.visibility = states[(currentIdx + 1) % states.length];
-                    }
-                } else if (targetType === "feature") {
-                    const currentIdx = states.indexOf(obj.visibility || "all");
-                    obj.visibility = states[(currentIdx + 1) % states.length];
-                }
-            }
-        }
-
-        this.#repaintVectors();
-        this.render({ parts: ["context"] });
-        this.markDirty();
-    }
-
-    static #onUndoBrush(event, target) {
-        if (["features", "infrastructure", "regions", "labels"].includes(this.activeTool)) {
-            if (this.pinHistory.length === 0) return;
-
-            // Push the current state to the redo stack
-            this.pinRedoStack.push(this.#getVectorStateSnapshot());
-
-            // Pop the historical state and apply it
-            const state = this.pinHistory.pop();
-            this.#restoreVectorStateSnapshot(state);
-
-            if (this.activeTool === "features") {
-                this.#repaintCanvas();
-                this.debouncedGenerateClimate();
-                this.debouncedGenerateTerrain();
-            } else {
-                this.#repaintVectors();
-            }
-            this.render({ parts: ["context"] });
+            modified = this.#toggleLayerVisibility(target);
         } else {
-            if (!this.baseElevationData || !this.brushEngine) return;
-            if (this.brushEngine.undo()) {
-                this.#rebuildFromHistory();
-                this.#repaintCanvas();
-                this.debouncedGenerateClimate();
-            }
+            modified = this.#toggleEntityVisibility(target, targetType);
         }
 
-        this.markDirty();
+        if (modified) {
+            this._repaintVectors();
+            this.render({ parts: ["context"] });
+            this.markDirty();
+        }
     }
 
-    static #onZoomIn(event, target) {
-        this.canvasEngine?.zoomCamera(1.25);
+    #toggleLayerVisibility(target) {
+        const id = target.closest(".fwmb-accordion-group")?.dataset.layerId;
+        const layer = this.regionLayers.find((l) => l.id === id);
+
+        if (!layer) return false;
+
+        MapStateManager.pushVectorState(this);
+        layer.visibility = this.#cycleVisibilityState(layer.visibility);
+        return true;
     }
 
-    static #onZoomOut(event, target) {
-        this.canvasEngine?.zoomCamera(0.8);
+    #toggleEntityVisibility(target, targetType) {
+        const listItem = target.closest(".fwmb-list-item");
+        if (!listItem) return false;
+
+        const { id, type, layerId } = listItem.dataset;
+        const obj = this.#findEntityByType(type, id, layerId);
+
+        if (!obj) return false;
+
+        MapStateManager.pushVectorState(this);
+
+        if (targetType === "label") {
+            if (type === "custom") {
+                obj.visibility = this.#cycleVisibilityState(obj.visibility);
+            } else {
+                if (!obj.label) obj.label = { visibility: "all" };
+                obj.label.visibility = this.#cycleVisibilityState(obj.label.visibility);
+            }
+        } else if (targetType === "feature") {
+            obj.visibility = this.#cycleVisibilityState(obj.visibility);
+        }
+
+        return true;
+    }
+
+    #findEntityByType(type, id, layerId) {
+        // The Dictionary Routing Pattern applied to data arrays
+        const collections = {
+            custom: this.mapLabels,
+            decoration: this.mapDecorations,
+            pin: this.mapPins,
+            route: this.mapRoutes,
+            fault: this.tectonicFaults,
+        };
+
+        if (collections[type]) {
+            return collections[type].find((item) => item.id === id);
+        }
+
+        // Special handling for nested regions
+        if (type === "region") {
+            const layer = this.regionLayers.find((l) => l.id === layerId);
+            return layer?.regions.find((r) => r.id === id);
+        }
+
+        return null;
+    }
+
+    #cycleVisibilityState(currentState) {
+        const states = FILRODENSWMB.UI.VISIBILITY_STATES;
+        const currentIdx = states.indexOf(currentState || "all");
+        return states[(currentIdx + 1) % states.length];
+    }
+
+    async _onUndoBrush(event, target) {
+        await this.#processHistoryStep(true);
+    }
+
+    _onZoomIn(event, target) {
+        this.canvasEngine?.zoomCamera(FILRODENSWMB.UI.ZOOM.FACTOR);
+    }
+
+    _onZoomOut(event, target) {
+        this.canvasEngine?.zoomCamera(1 / FILRODENSWMB.UI.ZOOM.FACTOR);
     }
 
     #getZoomTargetPoints(listItem) {
@@ -4125,7 +3208,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    static #onZoomToFeature(event, target) {
+    _onZoomToFeature(event, target) {
         const listItem = target.closest(".fwmb-list-item");
         if (!listItem) return;
 

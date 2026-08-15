@@ -1,7 +1,21 @@
-<form>
+<div class="fwmb-dialog-content">
     <div class="form-group stacked">
         <label>{{localize "FILRODENSWMB.UI.LabelText"}}</label>
         <input type="text" name="labelName" value="{{label.name}}" required />
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
+        <select name="labelQuickStyle">
+            <option value="custom" {{#if (eq label.quickStyle "custom")}}selected{{/if}}>
+                {{localize "FILRODENSWMB.UI.Custom"}}
+            </option>
+            {{#each customLabelStyles}}
+                <option value="{{this.id}}" {{#if (eq ../label.quickStyle this.id)}}selected{{/if}}>
+                    {{this.name}}
+                </option>
+            {{/each}}
+        </select>
     </div>
 
     <div class="form-group">
@@ -23,13 +37,25 @@
 
     <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.FontColor"}}</label>
-        <div style="display: flex; flex-direction: column; gap: var(--fwmb-space-s);">
-            <div class="fwmb-color-row">
-                {{#each palette}}
-                    <button type="button" class="fwmb-swatch fwmb-preset-swatch fwmb-swatch-lg" style="background-color: {{this}};" data-color="{{this}}" title="{{this}}"></button>
-                {{/each}}
-            </div>
-            <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{label.fillColor}}" />
-        </div>
+        <datalist id="fwmb-standard-colors">
+            {{#each palette}}
+                <option value="{{this}}"></option>
+            {{/each}}
+        </datalist>
+        <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{label.fillColor}}" list="fwmb-standard-colors" />
     </div>
-</form>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.MaxWidth"}}</label>
+        <input type="number" name="labelMaxWidth" value="{{label.maxWidth}}" min="0" step="10" />
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.Justify"}}</label>
+        <select name="labelJustify">
+            <option value="left" {{#if (eq label.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
+            <option value="center" {{#if (eq label.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
+            <option value="right" {{#if (eq label.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
+        </select>
+    </div>
+</div>

@@ -136,4 +136,30 @@
         </div>
     </fieldset>
 
+    <fieldset class="fwmb-fieldset">
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.SettingsLabelQuickStyles"}}</span>
+            <a class="fwmb-legend-action" data-action="addLabelQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.AddLabelQuickStyle'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </legend>
+
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+            {{#each customLabelStyles}}
+                <div class="fwmb-list-item" data-id="{{this.id}}">
+                    <div class="fwmb-swatch" style="background-color: {{this.fillColor}}; border-radius: 50%;"></div>
+                    <span class="fwmb-name fwmb-flex-1" style="font-family: '{{this.fontFamily}}';">{{this.name}}</span>
+                    <button type="button" class="fwmb-btn small" data-action="editLabelQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                        <i class="fwmb-icon edit"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn small muted danger" data-action="deleteLabelQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <i class="fwmb-icon delete"></i>
+                    </button>
+                </div>
+            {{else}}
+                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
+            {{/each}}
+        </div>
+    </fieldset>
+
 </div>

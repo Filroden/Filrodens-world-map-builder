@@ -1,4 +1,10 @@
 <div class="fwmb-dialog-content">
+    <datalist id="fwmb-standard-colors">
+        {{#each palette}}
+            <option value="{{this}}"></option>
+        {{/each}}
+    </datalist>
+
     <div class="form-group stacked">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
         <input type="text" name="routeName" value="{{route.name}}" />
@@ -24,7 +30,7 @@
 
     <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
-        <input type="color" name="routeColor" value="{{route.color}}" />
+        <input type="color" name="routeColor" value="{{route.color}}" list="fwmb-standard-colors" />
     </div>
     <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
@@ -38,4 +44,61 @@
             <option value="dotted" {{#if (eq route.style "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
         </select>
     </div>
+
+    <fieldset class="fwmb-fieldset" style="margin-top: var(--fwmb-space-l);">
+        <legend>{{localize "FILRODENSWMB.UI.SettingsLabelQuickStyles"}}</legend>
+        <div class="fwmb-hint" style="margin-bottom: var(--fwmb-space-m);">
+            {{localize "FILRODENSWMB.UI.LabelEditHint"}}
+        </div>
+
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
+            <select name="labelQuickStyle">
+                <option value="custom" {{#if (eq route.label.quickStyle "custom")}}selected{{/if}}>
+                    {{localize "FILRODENSWMB.UI.Custom"}}
+                </option>
+                {{#each customLabelStyles}}
+                    <option value="{{this.id}}" {{#if (eq ../route.label.quickStyle this.id)}}selected{{/if}}>
+                        {{this.name}}
+                    </option>
+                {{/each}}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.FontFamily"}}</label>
+            <select name="labelFontFamily">
+                {{#each fonts}}
+                    <option value="{{this}}" {{#if (eq ../route.label.fontFamily this)}}selected{{/if}}>{{this}}</option>
+                {{/each}}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.FontSize"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="labelFontSize" value="{{route.label.fontSize}}" min="0.2" max="5.0" step="0.1" oninput="this.nextElementSibling.value = this.value" />
+                <output>{{route.label.fontSize}}</output>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.FontColor"}}</label>
+            <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{route.label.fillColor}}" list="fwmb-standard-colors" />
+        </div>
+
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.MaxWidth"}}</label>
+            <input type="number" class="fwmb-wide" name="labelMaxWidth" value="{{route.label.maxWidth}}" min="0" step="10" placeholder="0" />
+        </div>
+
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.Justify"}}</label>
+            <select name="labelJustify">
+                <option value="left" {{#if (eq route.label.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
+                <option value="center" {{#if (eq route.label.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
+                <option value="right" {{#if (eq route.label.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
+            </select>
+        </div>
+    </fieldset>
 </div>

@@ -5,13 +5,17 @@ export class StudioCanvas {
         this.container = htmlContainer;
 
         this.app = new PIXI.Application({
-            resizeTo: this.container,
+            autoDensity: true,
             backgroundColor: 0x1a4b84,
             antialias: true,
             resolution: window.devicePixelRatio || 1,
+            sharedTicker: false,
+            autoStart: false,
         });
 
         const canvasElement = this.app.canvas ?? this.app.view;
+        canvasElement.style.display = "block";
+
         this.container.appendChild(canvasElement);
 
         this.stage = new PIXI.Container();
@@ -31,7 +35,7 @@ export class StudioCanvas {
             cartography: new PIXI.Container(),
         };
 
-        this.layers.biomes.alpha = 0.65;
+        this.layers.biomes.alpha = FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
 
         // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
         this.haloGraphics = new PIXI.Graphics();
@@ -41,8 +45,14 @@ export class StudioCanvas {
         this.manualRiverGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.manualRiverGraphics);
 
-        this.vectorGraphics = new PIXI.Graphics();
-        this.layers.features.addChild(this.vectorGraphics);
+        this.faultGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.faultGraphics);
+
+        this.proceduralRiverGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.proceduralRiverGraphics);
+
+        this.featurePinGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.featurePinGraphics);
 
         // Setup Infrastructure Sub-containers
         this.routeGraphics = new PIXI.Graphics();
@@ -114,14 +124,36 @@ export class StudioCanvas {
 
         this.#setupInteractions(canvasElement);
 
-        this.resizeObserver = new ResizeObserver(() => {
-            this.app.resize();
-            if (!this.isInitialized && this.container.clientWidth > 0) {
-                this.resetCamera();
-                this.isInitialized = true;
+        let lastW = 0;
+        let lastH = 0;
+        this.resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const w = Math.floor(entry.contentRect.width);
+                const h = Math.floor(entry.contentRect.height);
+
+                if (w > 0 && h > 0 && (w !== lastW || h !== lastH)) {
+                    lastW = w;
+                    lastH = h;
+
+                    // Always update the WebGL renderer resolution to prevent pixel stretching
+                    this.app.renderer.resize(w, h);
+
+                    // Only reset the camera on the very first DOM render
+                    if (!this.isInitialized) {
+                        this.resetCamera();
+                        this.isInitialized = true;
+                    }
+                }
             }
         });
         this.resizeObserver.observe(this.container);
+        const renderLoop = (time) => {
+            const activeWindow = this.container.ownerDocument.defaultView || window;
+            this.app.ticker.update(time);
+            this.app.renderer.render(this.stage);
+            this.animationFrameId = activeWindow.requestAnimationFrame(renderLoop);
+        };
+        renderLoop();
 
         // Callbacks for brush tools
         this.onBrushStart = null;
@@ -136,9 +168,10 @@ export class StudioCanvas {
     }
 
     /**
-     * Mathematically checks if the mouse coordinates are hovering over a draggable node or pin.
+     * Mathematically checks if the mouse coordinates are hovering over an interactive target.
+     * Returns the full target data packet (including entityType and entityId).
      */
-    #getGrabbedInfrastructure(x, y) {
+    #getHitTarget(x, y) {
         let closest = null;
         let minDist = Infinity;
 
@@ -146,346 +179,301 @@ export class StudioCanvas {
             const dist = Math.hypot(item.x - x, item.y - y);
             if (dist <= item.radius && dist < minDist) {
                 minDist = dist;
-                closest = item.target;
+                closest = item;
             }
         }
         return closest;
     }
 
     #setupInteractions(canvasElement) {
-        // SCROLL TO ZOOM / SCALE
-        canvasElement.addEventListener("wheel", (e) => {
-            // --- Label & Decoration Transformation Intercept ---
-            if (this.activeDrag) {
-                const dragWrapper = this.interactiveTargets.find((t) => t.target === this.activeDrag.target);
-
-                if (dragWrapper?.isLabel || dragWrapper?.isDecoration) {
-                    e.preventDefault();
-
-                    if (dragWrapper.isDecoration) {
-                        // Shift + Scroll to Scale Decorations
-                        if (e.shiftKey) {
-                            const scaleDir = e.deltaY < 0 ? 1.05 : 0.95;
-                            this.activeDrag.target.scale = (this.activeDrag.target.scale || 1) * scaleDir;
-                        }
-                        // Standard Scroll to Rotate Decorations
-                        else {
-                            const dir = e.deltaY < 0 ? -5 : 5;
-                            this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
-                        }
-                    }
-                    // Standard Scroll to Rotate Labels
-                    else if (dragWrapper.isLabel) {
-                        const dir = e.deltaY < 0 ? -5 : 5;
-                        this.activeDrag.target.rotation = (this.activeDrag.target.rotation || 0) + dir;
-                    }
-
-                    // Force the immediate-mode redraw!
-                    if (this.onInfraDrag) this.onInfraDrag();
-                    return;
-                }
-            }
-
-            // --- Reference Image Scaling Intercept ---
-            if (this.isReferenceMode && e.shiftKey) {
-                const scaleDirection = e.deltaY < 0 ? 1.05 : 0.95;
-                if (this.onReferenceScale) this.onReferenceScale(scaleDirection);
-                return; // Abort standard camera zoom
-            }
-
-            e.preventDefault();
-            const zoomFactor = 1.1;
-            const scaleDirection = e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
-
-            // Dynamically allow deeper zooms on larger maps (e.g., 4000px allows up to 16x zoom)
-            const maxZoom = Math.max(5, this.mapWidth / 250);
-
-            const rect = canvasElement.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            const localX = (mouseX - this.stage.x) / this.stage.scale.x;
-            const localY = (mouseY - this.stage.y) / this.stage.scale.y;
-
-            this.stage.scale.x *= scaleDirection;
-            this.stage.scale.y *= scaleDirection;
-
-            this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x, maxZoom));
-            this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y, maxZoom));
-
-            this.stage.position.x = mouseX - localX * this.stage.scale.x;
-            this.stage.position.y = mouseY - localY * this.stage.scale.y;
-
-            this.#updateNodeScales(); // Trigger inverse scaling
-
-            if (this.isCropMode) this.#drawCropOverlay();
-        });
-
-        // PREVENT NATIVE CONTEXT MENU
+        canvasElement.addEventListener("wheel", (e) => this.#handleWheel(e, canvasElement));
         canvasElement.addEventListener("contextmenu", (e) => e.preventDefault());
+        canvasElement.addEventListener("pointerdown", (e) => this.#handlePointerDown(e, canvasElement));
+        canvasElement.addEventListener("pointermove", (e) => this.#handlePointerMove(e, canvasElement));
+        canvasElement.addEventListener("dblclick", (e) => this.#handleDoubleClick(e, canvasElement));
 
-        // MOUSE DOWN (Start Pan, Drag, or Paint/Place)
-        canvasElement.addEventListener("pointerdown", (e) => {
-            canvasElement.setPointerCapture(e.pointerId);
+        // Unified completion events prevent duplicate listener binds
+        const endInteraction = (e) => this.#handlePointerUp(e, canvasElement);
+        canvasElement.addEventListener("pointerup", endInteraction);
+        canvasElement.addEventListener("pointercancel", endInteraction);
+        canvasElement.addEventListener("pointerleave", (e) => this.#handlePointerLeave(e, canvasElement));
+    }
 
-            if (e.button === 2 || e.button === 1) {
-                this.isDragging = true;
-                this.dragStart = { x: e.clientX, y: e.clientY };
-                this.stageStart = { x: this.stage.position.x, y: this.stage.position.y };
-                canvasElement.style.cursor = "grabbing";
-                return;
+    #handleWheel(e, canvasElement) {
+        const isZoomIn = e.deltaY < 0;
+        const config = FILRODENSWMB.UI.WHEEL;
+
+        // --- Reference Image Scaling Intercept ---
+        if (this.isReferenceMode && e.shiftKey) {
+            const scale = isZoomIn ? FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_FACTOR : 1 / FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_FACTOR;
+            if (this.onReferenceScale) this.onReferenceScale(scale);
+            return;
+        }
+
+        // --- Label & Decoration Transformation Intercept ---
+        const dragWrapper = this.activeDrag ? this.interactiveTargets.find((t) => t.target === this.activeDrag.target) : null;
+        const isTransformable = dragWrapper?.isLabel || dragWrapper?.isDecoration;
+
+        if (isTransformable) {
+            e.preventDefault();
+            const target = this.activeDrag.target;
+
+            if (e.shiftKey && dragWrapper.isDecoration) {
+                const scale = isZoomIn ? config.SCALE_FACTOR : 1 / config.SCALE_FACTOR;
+                target.scale = (target.scale || 1) * scale;
+            } else if (!e.shiftKey) {
+                const rotation = isZoomIn ? -config.ROTATION_STEP : config.ROTATION_STEP;
+                target.rotation = (target.rotation || 0) + rotation;
             }
 
-            if (e.button === 0) {
-                const coords = this.#getMapCoordinates(e, canvasElement);
+            if (this.onInfraDrag) this.onInfraDrag();
+            return;
+        }
 
-                // --- Regional Crop Intercept ---
-                if (this.isCropMode) {
-                    const zone = this.#getCropHitZone(coords.x, coords.y);
-                    this.cropStart = { x: coords.x, y: coords.y };
+        // --- Standard Camera Zoom ---
+        e.preventDefault();
 
-                    if (zone) {
-                        this.activeCropAction = zone;
-                        this.cropOriginalBox = { ...this.cropBox };
-                    } else {
-                        this.activeCropAction = "draw";
-                        this.cropBox = { x: coords.x, y: coords.y, width: 0, height: 0 };
-                    }
+        const scaleDirection = isZoomIn ? config.CAMERA_FACTOR : 1 / config.CAMERA_FACTOR;
+        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
 
-                    canvasElement.style.cursor = "grabbing";
-                    e.preventDefault();
-                    e.stopPropagation();
-                    return;
-                }
+        const rect = canvasElement.getBoundingClientRect();
+        const localX = (e.clientX - rect.left - this.stage.x) / this.stage.scale.x;
+        const localY = (e.clientY - rect.top - this.stage.y) / this.stage.scale.y;
 
-                // --- Reference Image Drag Intercept ---
-                if (this.isReferenceMode) {
-                    this.isDraggingReference = true;
-                    this.dragStart = { x: coords.x, y: coords.y };
-                    canvasElement.style.cursor = "grabbing";
-                    return;
-                }
+        this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * scaleDirection, maxZoom));
+        this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * scaleDirection, maxZoom));
 
-                // --- Shift-Click Node Insertion Intercept ---
-                if (this.isEditMode && e.shiftKey && this.onInfraInsertNode) {
-                    e.preventDefault();
-                    e.stopPropagation();
+        this.stage.position.x = e.clientX - rect.left - localX * this.stage.scale.x;
+        this.stage.position.y = e.clientY - rect.top - localY * this.stage.scale.y;
 
-                    this.activeDrag = null;
-                    this.onInfraInsertNode(coords.x, coords.y);
-                    return;
-                }
+        this.#updateNodeScales();
+        if (this.isCropMode) this.#drawCropOverlay();
+    }
 
-                // 1. Try to grab an existing infrastructure node or pin
-                const grabbedTarget = this.#getGrabbedInfrastructure(coords.x, coords.y);
+    #handlePointerDown(e, canvasElement) {
+        canvasElement.setPointerCapture(e.pointerId);
 
-                // Ctrl-Click / Cmd-Click Node Deletion Intercept
-                if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
-                    e.preventDefault();
-                    e.stopPropagation();
+        // Right/Middle Click Drag Pan
+        if (e.button === 2 || e.button === 1) {
+            this.isDragging = true;
+            this.dragStart = { x: e.clientX, y: e.clientY };
+            this.stageStart = { x: this.stage.position.x, y: this.stage.position.y };
+            canvasElement.style.cursor = "grabbing";
+            return;
+        }
 
-                    this.activeDrag = null;
-                    this.onInfraDeleteNode(grabbedTarget);
-                    return;
-                }
+        if (e.button !== 0) return;
 
-                // Bypass drag grab if the UI is actively using the Eraser tool
-                const rootApp = this.container.closest(".fwmb-layout") || document;
-                const isEraserActive = !!rootApp.querySelector('.fwmb-brush-tools button.active[data-tool="erasePin"]');
+        const coords = this.#getMapCoordinates(e, canvasElement);
 
-                if (grabbedTarget && !isEraserActive) {
-                    e.preventDefault();
-                    e.stopPropagation();
+        if (this.isCropMode) return this.#handleCropPointerDown(e, coords, canvasElement);
 
-                    this.activeDrag = { target: grabbedTarget };
-                    canvasElement.style.cursor = "grabbing";
-                    if (this.onInfraDragStart) this.onInfraDragStart();
-                    return;
-                }
+        if (this.isReferenceMode) {
+            this.isDraggingReference = true;
+            this.dragStart = { x: coords.x, y: coords.y };
+            canvasElement.style.cursor = "grabbing";
+            return;
+        }
 
-                // 2. Otherwise, pass to brush engine
-                if (this.isEditMode && this.onBrushStart) {
-                    this.onBrushStart(coords.x, coords.y);
-                }
+        if (this.isEditMode && e.shiftKey && this.onInfraInsertNode) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.activeDrag = null;
+            this.onInfraInsertNode(coords.x, coords.y);
+            return;
+        }
+
+        const hit = this.#getHitTarget(coords.x, coords.y);
+        const grabbedTarget = hit ? hit.target : null;
+
+        if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.activeDrag = null;
+            this.onInfraDeleteNode(grabbedTarget);
+            return;
+        }
+
+        const rootApp = this.container.closest(".fwmb-layout") || document;
+        const isEraserActive = !!rootApp.querySelector('.fwmb-brush-tools button.active[data-tool="erasePin"]');
+
+        if (grabbedTarget && !isEraserActive) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.activeDrag = { target: grabbedTarget };
+            canvasElement.style.cursor = "grabbing";
+            if (this.onInfraDragStart) this.onInfraDragStart();
+            return;
+        }
+
+        if (this.isEditMode && this.onBrushStart) {
+            this.onBrushStart(coords.x, coords.y);
+        }
+    }
+
+    #handleCropPointerDown(e, coords, canvasElement) {
+        const zone = this.#getCropHitZone(coords.x, coords.y);
+        this.cropStart = { x: coords.x, y: coords.y };
+
+        if (zone) {
+            this.activeCropAction = zone;
+            this.cropOriginalBox = { ...this.cropBox };
+        } else {
+            this.activeCropAction = "draw";
+            this.cropBox = { x: coords.x, y: coords.y, width: 0, height: 0 };
+        }
+
+        canvasElement.style.cursor = "grabbing";
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    #handlePointerMove(e, canvasElement) {
+        const coords = this.#getMapCoordinates(e, canvasElement);
+
+        if (this.activeCropAction) return this.#processCropDrag(coords);
+
+        if (this.isCropMode && !this.activeCropAction) {
+            const zone = this.#getCropHitZone(coords.x, coords.y);
+            if (zone === "center") canvasElement.style.cursor = "move";
+            else if (zone === "tl" || zone === "br") canvasElement.style.cursor = "nwse-resize";
+            else if (zone === "tr" || zone === "bl") canvasElement.style.cursor = "nesw-resize";
+            else canvasElement.style.cursor = "crosshair";
+            return;
+        }
+
+        if (this.isDraggingReference) {
+            const dx = coords.x - this.dragStart.x;
+            const dy = coords.y - this.dragStart.y;
+            this.dragStart = { x: coords.x, y: coords.y };
+            if (this.onReferencePan) this.onReferencePan(dx, dy);
+            return;
+        }
+
+        if (this.isDragging) {
+            const dx = e.clientX - this.dragStart.x;
+            const dy = e.clientY - this.dragStart.y;
+            this.stage.position.x = this.stageStart.x + dx;
+            this.stage.position.y = this.stageStart.y + dy;
+            return;
+        }
+
+        if (this.activeDrag) {
+            this.activeDrag.target.x = Math.max(0, Math.min(coords.x, this.mapWidth));
+            this.activeDrag.target.y = Math.max(0, Math.min(coords.y, this.mapHeight));
+            if (this.onInfraDrag) this.onInfraDrag();
+            return;
+        }
+
+        if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
+            const now = performance.now();
+            if (now - this.lastBrushTime > 100) {
+                this.onBrushMove(coords.x, coords.y);
+                this.lastBrushTime = now;
             }
-        });
+            return;
+        }
 
-        // MOUSE MOVE (Pan, Drag Item, or Continuous Paint)
-        canvasElement.addEventListener("pointermove", (e) => {
-            const coords = this.#getMapCoordinates(e, canvasElement);
+        if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
 
-            // --- Regional Crop Movement Intercept ---
+        if (this.isEditMode && !this.isDragging && !this.activeDrag) {
+            const hit = this.#getHitTarget(coords.x, coords.y);
+            canvasElement.style.cursor = hit ? "grab" : "crosshair";
+        }
+    }
+
+    #processCropDrag(coords) {
+        const dx = coords.x - this.cropStart.x;
+        const dy = coords.y - this.cropStart.y;
+
+        if (this.activeCropAction === "draw") {
+            this.cropBox.x = Math.min(this.cropStart.x, coords.x);
+            this.cropBox.y = Math.min(this.cropStart.y, coords.y);
+            this.cropBox.width = Math.abs(coords.x - this.cropStart.x);
+            this.cropBox.height = Math.abs(coords.y - this.cropStart.y);
+        } else if (this.activeCropAction === "center") {
+            this.cropBox.x = this.cropOriginalBox.x + dx;
+            this.cropBox.y = this.cropOriginalBox.y + dy;
+        } else {
+            const MIN_SIZE = 10;
+            if (this.activeCropAction.includes("l")) {
+                this.cropBox.x = Math.min(this.cropOriginalBox.x + dx, this.cropOriginalBox.x + this.cropOriginalBox.width - MIN_SIZE);
+                this.cropBox.width = this.cropOriginalBox.x + this.cropOriginalBox.width - this.cropBox.x;
+            }
+            if (this.activeCropAction.includes("r")) {
+                this.cropBox.width = Math.max(MIN_SIZE, this.cropOriginalBox.width + dx);
+            }
+            if (this.activeCropAction.includes("t")) {
+                this.cropBox.y = Math.min(this.cropOriginalBox.y + dy, this.cropOriginalBox.y + this.cropOriginalBox.height - MIN_SIZE);
+                this.cropBox.height = this.cropOriginalBox.y + this.cropOriginalBox.height - this.cropBox.y;
+            }
+            if (this.activeCropAction.includes("b")) {
+                this.cropBox.height = Math.max(MIN_SIZE, this.cropOriginalBox.height + dy);
+            }
+        }
+
+        this.cropBox.x = Math.max(0, Math.min(this.cropBox.x, this.mapWidth - this.cropBox.width));
+        this.cropBox.y = Math.max(0, Math.min(this.cropBox.y, this.mapHeight - this.cropBox.height));
+
+        this.#drawCropOverlay();
+        if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+    }
+
+    #handleDoubleClick(e, canvasElement) {
+        if (!this.isEditMode) return;
+
+        const coords = this.#getMapCoordinates(e, canvasElement);
+        const hit = this.#getHitTarget(coords.x, coords.y);
+
+        if (hit && this.onDoubleClick) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.onDoubleClick(hit);
+        }
+    }
+
+    #handlePointerUp(e, canvasElement) {
+        if (canvasElement.hasPointerCapture(e.pointerId)) {
+            canvasElement.releasePointerCapture(e.pointerId);
+        }
+
+        if (e.button === 2 || e.button === 1) {
+            this.isDragging = false;
+            if (e.button === 2 && this.dragStart) {
+                const dist = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
+                if (dist < 5 && this.onRightClick) this.onRightClick();
+            }
+            canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
+            return;
+        }
+
+        if (e.button === 0) {
             if (this.activeCropAction) {
-                const dx = coords.x - this.cropStart.x;
-                const dy = coords.y - this.cropStart.y;
-
-                if (this.activeCropAction === "draw") {
-                    this.cropBox.x = Math.min(this.cropStart.x, coords.x);
-                    this.cropBox.y = Math.min(this.cropStart.y, coords.y);
-                    this.cropBox.width = Math.abs(coords.x - this.cropStart.x);
-                    this.cropBox.height = Math.abs(coords.y - this.cropStart.y);
-                } else if (this.activeCropAction === "center") {
-                    this.cropBox.x = this.cropOriginalBox.x + dx;
-                    this.cropBox.y = this.cropOriginalBox.y + dy;
-                } else {
-                    const MIN_SIZE = 10;
-                    if (this.activeCropAction.includes("l")) {
-                        this.cropBox.x = Math.min(this.cropOriginalBox.x + dx, this.cropOriginalBox.x + this.cropOriginalBox.width - MIN_SIZE);
-                        this.cropBox.width = this.cropOriginalBox.x + this.cropOriginalBox.width - this.cropBox.x;
-                    }
-                    if (this.activeCropAction.includes("r")) {
-                        this.cropBox.width = Math.max(MIN_SIZE, this.cropOriginalBox.width + dx);
-                    }
-                    if (this.activeCropAction.includes("t")) {
-                        this.cropBox.y = Math.min(this.cropOriginalBox.y + dy, this.cropOriginalBox.y + this.cropOriginalBox.height - MIN_SIZE);
-                        this.cropBox.height = this.cropOriginalBox.y + this.cropOriginalBox.height - this.cropBox.y;
-                    }
-                    if (this.activeCropAction.includes("b")) {
-                        this.cropBox.height = Math.max(MIN_SIZE, this.cropOriginalBox.height + dy);
-                    }
-                }
-
-                // Keep strictly within boundaries
-                this.cropBox.x = Math.max(0, Math.min(this.cropBox.x, this.mapWidth - this.cropBox.width));
-                this.cropBox.y = Math.max(0, Math.min(this.cropBox.y, this.mapHeight - this.cropBox.height));
-
-                this.#drawCropOverlay();
-                if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+                this.activeCropAction = null;
+                canvasElement.style.cursor = "crosshair";
                 return;
             }
-
-            // --- Regional Crop Hover States ---
-            if (this.isCropMode && !this.activeCropAction) {
-                const zone = this.#getCropHitZone(coords.x, coords.y);
-                if (zone === "center") canvasElement.style.cursor = "move";
-                else if (zone === "tl" || zone === "br") canvasElement.style.cursor = "nwse-resize";
-                else if (zone === "tr" || zone === "bl") canvasElement.style.cursor = "nesw-resize";
-                else canvasElement.style.cursor = "crosshair";
-                return;
-            }
-
             if (this.isDraggingReference) {
-                const coords = this.#getMapCoordinates(e, canvasElement);
-                const dx = coords.x - this.dragStart.x;
-                const dy = coords.y - this.dragStart.y;
-
-                // Reset start point for continuous relative movement
-                this.dragStart = { x: coords.x, y: coords.y };
-
-                if (this.onReferencePan) this.onReferencePan(dx, dy);
+                this.isDraggingReference = false;
+                canvasElement.style.cursor = "crosshair";
                 return;
             }
-
-            if (this.isDragging) {
-                const dx = e.clientX - this.dragStart.x;
-                const dy = e.clientY - this.dragStart.y;
-                this.stage.position.x = this.stageStart.x + dx;
-                this.stage.position.y = this.stageStart.y + dy;
-                return;
-            }
-
-            // Dragging an Infrastructure Item
             if (this.activeDrag) {
-                // Clamp coordinates to prevent dragging items off the map boundaries
-                this.activeDrag.target.x = Math.max(0, Math.min(coords.x, this.mapWidth));
-                this.activeDrag.target.y = Math.max(0, Math.min(coords.y, this.mapHeight));
-
-                if (this.onInfraDrag) this.onInfraDrag();
+                this.activeDrag = null;
+                canvasElement.style.cursor = "crosshair";
+                if (this.onInfraDragEnd) this.onInfraDragEnd();
                 return;
             }
-
-            // Continuous Painting
-            if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
-                const now = performance.now();
-                if (now - this.lastBrushTime > 100) {
-                    this.onBrushMove(coords.x, coords.y);
-                    this.lastBrushTime = now;
-                }
-                return;
+            if (this.isEditMode && this.onBrushEnd) {
+                this.onBrushEnd();
             }
+        }
+    }
 
-            // --- HOVER STATES ---
-            if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
-
-            if (this.isEditMode && !this.isDragging && !this.activeDrag) {
-                const hoverTarget = this.#getGrabbedInfrastructure(coords.x, coords.y);
-                canvasElement.style.cursor = hoverTarget ? "grab" : "crosshair";
-            }
-        });
-
-        // RELEASE MOUSE (End Pan, Drag, or Brush)
-        const endPointer = (e) => {
-            if (canvasElement.hasPointerCapture(e.pointerId)) {
-                canvasElement.releasePointerCapture(e.pointerId);
-            }
-
-            if (e.button === 2 || e.button === 1) {
-                this.isDragging = false;
-
-                // Evaluate Right-Click-to-Cancel
-                if (e.button === 2 && this.dragStart) {
-                    const dist = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
-                    if (dist < 5 && this.onRightClick) {
-                        this.onRightClick();
-                    }
-                }
-
-                canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
-                return;
-            }
-
-            if (e.button === 0) {
-                if (this.activeCropAction) {
-                    this.activeCropAction = null;
-                    canvasElement.style.cursor = "crosshair";
-                    return;
-                }
-
-                if (this.isDraggingReference) {
-                    this.isDraggingReference = false;
-                    canvasElement.style.cursor = "crosshair";
-                    return;
-                }
-
-                if (this.activeDrag) {
-                    this.activeDrag = null;
-                    canvasElement.style.cursor = "crosshair";
-                    if (this.onInfraDragEnd) this.onInfraDragEnd();
-                    return; // CRITICAL: Abort so we don't trigger brush end
-                }
-
-                if (this.isEditMode && this.onBrushEnd) {
-                    this.onBrushEnd();
-                }
-            }
-        };
-
-        canvasElement.addEventListener("pointerup", endPointer);
-        canvasElement.addEventListener("pointercancel", endPointer);
-
-        canvasElement.addEventListener("pointerleave", (e) => {
-            if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
-                this.onCanvasHover(null, null);
-            }
-        });
-
-        canvasElement.addEventListener("pointerup", (e) => {
-            if (e.button === 0) {
-                if (this.isDraggingReference) {
-                    this.isDraggingReference = false;
-                    canvasElement.style.cursor = "crosshair";
-                    return;
-                }
-            }
-        });
-
-        canvasElement.addEventListener("pointercancel", endPointer);
-
-        canvasElement.addEventListener("pointerleave", (e) => {
-            if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
-                this.onCanvasHover(null, null);
-            }
-        });
+    #handlePointerLeave(e, canvasElement) {
+        if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
+            this.onCanvasHover(null, null);
+        }
     }
 
     // --- Public API for the UI Buttons ---
@@ -495,7 +483,7 @@ export class StudioCanvas {
         const localX = (center.x - this.stage.x) / this.stage.scale.x;
         const localY = (center.y - this.stage.y) / this.stage.scale.y;
 
-        const maxZoom = Math.max(5, this.mapWidth / 250);
+        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
 
         this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * factor, maxZoom));
         this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * factor, maxZoom));
@@ -514,7 +502,7 @@ export class StudioCanvas {
         const scaleY = this.app.screen.height / paddedHeight;
         const optimalScale = Math.min(scaleX, scaleY);
 
-        const maxZoom = Math.max(5, this.mapWidth / 250);
+        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
         const finalScale = Math.max(0.1, Math.min(optimalScale, maxZoom));
 
         this.stage.scale.set(finalScale);
@@ -524,6 +512,10 @@ export class StudioCanvas {
     }
 
     destroy() {
+        if (this.animationFrameId) {
+            const activeWindow = this.container?.ownerDocument?.defaultView || window;
+            activeWindow.cancelAnimationFrame(this.animationFrameId);
+        }
         if (this.resizeObserver) this.resizeObserver.disconnect();
         if (this.app) this.app.destroy(true, { children: true, texture: true, baseTexture: true });
     }
@@ -571,14 +563,27 @@ export class StudioCanvas {
     }
 
     /**
-     * Renders an array of vector paths and POI pins.
+     * Renders procedural, non-interactive water vectors.
      */
-    renderRiverVectors(rivers, mapPins, isFeatureEdit, waterMask) {
-        this.vectorGraphics.clear();
+    renderProceduralRivers(rivers, waterMask) {
+        if (!this.proceduralRiverGraphics) return;
+
+        this.proceduralRiverGraphics.clear();
+        this.proceduralRiverGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
 
         if (rivers && rivers.length > 0) {
             this.#drawRivers(rivers, waterMask);
         }
+    }
+
+    /**
+     * Renders interactive feature pins (like Springs and Blockers).
+     */
+    renderFeaturePins(mapPins, isFeatureEdit) {
+        if (!this.featurePinGraphics) return;
+
+        this.featurePinGraphics.clear();
+        this.featurePinGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
 
         if (mapPins && mapPins.length > 0) {
             this.#drawMapPins(mapPins, isFeatureEdit);
@@ -599,8 +604,8 @@ export class StudioCanvas {
         if (!path || path.length === 0) return;
 
         let currentIsFrozen = path[0].isFrozen;
-        this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-        this.vectorGraphics.moveTo(path[0].x, path[0].y);
+        this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+        this.proceduralRiverGraphics.moveTo(path[0].x, path[0].y);
 
         for (let i = 1; i < path.length; i++) {
             const point = path[i];
@@ -608,10 +613,10 @@ export class StudioCanvas {
             // If the climate crosses the freezing threshold, snap the line and change colors
             if (point.isFrozen !== currentIsFrozen) {
                 currentIsFrozen = point.isFrozen;
-                this.vectorGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-                this.vectorGraphics.moveTo(point.x, point.y);
+                this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+                this.proceduralRiverGraphics.moveTo(point.x, point.y);
             } else {
-                this.vectorGraphics.lineTo(point.x, point.y);
+                this.proceduralRiverGraphics.lineTo(point.x, point.y);
             }
         }
     }
@@ -620,7 +625,7 @@ export class StudioCanvas {
      * Renders Vector Pins directly from the POI array using a flattened color map.
      */
     #drawMapPins(mapPins, isFeatureEdit) {
-        this.vectorGraphics.lineStyle(0);
+        this.featurePinGraphics.lineStyle(0);
 
         // Dictionary to completely eliminate if/else cognitive complexity
         const pinColors = {
@@ -637,13 +642,13 @@ export class StudioCanvas {
             const hexColor = pinColors[pin.type];
 
             if (hexColor !== undefined) {
-                const radius = pin.radius || 6;
-                this.vectorGraphics.beginFill(hexColor, 0.4);
-                this.vectorGraphics.drawCircle(pin.x, pin.y, radius);
-                this.vectorGraphics.endFill();
+                const radius = pin.radius || FILRODENSWMB.DISPLAY.PIN_RADIUS;
+                this.featurePinGraphics.beginFill(hexColor, FILRODENSWMB.DISPLAY.PIN_ALPHA);
+                this.featurePinGraphics.drawCircle(pin.x, pin.y, radius);
+                this.featurePinGraphics.endFill();
 
                 if (isFeatureEdit) {
-                    this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: Math.max(radius, 10) });
+                    this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: Math.max(radius, 10), entityType: "pin", entityId: pin.id });
                 }
             }
         }
@@ -720,7 +725,7 @@ export class StudioCanvas {
         this.gridLayer.mask = this.gridMask;
 
         // 3. Configure the drawing line styles
-        this.gridLayer.lineStyle(1, 0xffffff, 0.25);
+        this.gridLayer.lineStyle(1, 0xffffff, FILRODENSWMB.DISPLAY.GRID_ALPHA);
 
         const width = this.mapWidth;
         const height = this.mapHeight;
@@ -777,7 +782,33 @@ export class StudioCanvas {
     exportToPNG(filename = "world-map") {
         try {
             this.layers.reference.visible = false;
-            const canvas = this.app.renderer.extract.canvas(this.stage);
+
+            const optimalRes = 2000 / this.mapWidth;
+            const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
+
+            const renderTexture = PIXI.RenderTexture.create({
+                width: Math.round(this.mapWidth * dynamicRes),
+                height: Math.round(this.mapHeight * dynamicRes),
+                resolution: 1,
+            });
+
+            // Temporarily strip the camera transform for a clean, 0-offset export
+            const origX = this.stage.position.x;
+            const origY = this.stage.position.y;
+            const origScaleX = this.stage.scale.x;
+            const origScaleY = this.stage.scale.y;
+
+            this.stage.position.set(0, 0);
+            this.stage.scale.set(dynamicRes);
+
+            // Render to texture (instead of relying on the live monitor output)
+            this.app.renderer.render(this.stage, { renderTexture: renderTexture });
+            const canvas = this.app.renderer.extract.canvas(renderTexture);
+
+            // Restore camera
+            this.stage.position.set(origX, origY);
+            this.stage.scale.set(origScaleX, origScaleY);
+
             this.layers.reference.visible = true;
 
             const dataUrl = canvas.toDataURL("image/png");
@@ -800,6 +831,9 @@ export class StudioCanvas {
             a.click();
 
             URL.revokeObjectURL(blobUrl);
+
+            // Clean up the temporary texture from VRAM
+            renderTexture.destroy(true);
         } catch (err) {
             console.error("FWMB | Failed to export PNG:", err);
             ui.notifications.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
@@ -941,7 +975,7 @@ export class StudioCanvas {
             // 1a. Draw Edit Nodes FIRST (Guarantees the initial single click is visible)
             if (isEditMode) {
                 const isActive = route.id === activeRouteId;
-                this.#renderEditNodes(route.points, this.nodeContainer, isActive);
+                this.#renderEditNodes(route.points, this.nodeContainer, isActive, route, "route");
             }
 
             // 1b. Abort line geometry if there is no second point to connect to
@@ -972,7 +1006,7 @@ export class StudioCanvas {
         });
 
         // 2. Render Pins (Top Layer)
-        const resScale = Math.max(this.mapWidth, this.mapHeight) / 1000;
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
 
         pins.forEach((pin) => {
             if (!this.#isVisibleInCurrentPass(pin.visibility, "all", false)) return;
@@ -996,7 +1030,7 @@ export class StudioCanvas {
 
             if (isEditMode) {
                 // The hit radius must expand to match the new size
-                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2 });
+                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2, entityType: "pin", entityId: pin.id });
             } else if (!this.isEditMode && (pin.name || pin.description)) {
                 // Keep PIXI hover events for tooltips ONLY when the global canvas is not in ANY edit mode
                 sprite.eventMode = "static";
@@ -1090,7 +1124,7 @@ export class StudioCanvas {
                 // 3. Draw Edit Nodes
                 if (isEditMode) {
                     const isActive = region.id === activeRegionId;
-                    this.#renderEditNodes(region.points, layerContainer, isActive);
+                    this.#renderEditNodes(region.points, layerContainer, isActive, region, "region", layer.id);
                 }
             });
         });
@@ -1102,10 +1136,6 @@ export class StudioCanvas {
      */
     zoomToFeature(points) {
         if (!points || points.length === 0 || !this.stage) return;
-
-        const MIN_BOUNDS_SIZE = 400;
-        const PADDING_FACTOR = 1.2;
-        const MAX_ZOOM_SCALE = 2;
 
         let minX = points[0].x;
         let maxX = points[0].x;
@@ -1126,13 +1156,13 @@ export class StudioCanvas {
         const centerX = minX + trueWidth / 2;
         const centerY = minY + trueHeight / 2;
 
-        const zoomWidth = Math.max(trueWidth, MIN_BOUNDS_SIZE);
-        const zoomHeight = Math.max(trueHeight, MIN_BOUNDS_SIZE);
+        const zoomWidth = Math.max(trueWidth, FILRODENSWMB.UI.ZOOM.MIN_BOUNDS_SIZE);
+        const zoomHeight = Math.max(trueHeight, FILRODENSWMB.UI.ZOOM.MIN_BOUNDS_SIZE);
 
         // Calculate scale to fit with padding, constrained by maximum zoom limits
-        const scaleX = this.app.screen.width / (zoomWidth * PADDING_FACTOR);
-        const scaleY = this.app.screen.height / (zoomHeight * PADDING_FACTOR);
-        const targetScale = Math.min(scaleX, scaleY, MAX_ZOOM_SCALE);
+        const scaleX = this.app.screen.width / (zoomWidth * FILRODENSWMB.UI.ZOOM.PADDING_FACTOR);
+        const scaleY = this.app.screen.height / (zoomHeight * FILRODENSWMB.UI.ZOOM.PADDING_FACTOR);
+        const targetScale = Math.min(scaleX, scaleY, FILRODENSWMB.UI.ZOOM.MAX_ZOOM_SCALE);
 
         // Apply transforms directly to the PIXI stage
         this.stage.scale.set(targetScale);
@@ -1144,7 +1174,7 @@ export class StudioCanvas {
 
         // --- Animated Target Highlight ---
         const invScale = 1 / targetScale;
-        const pad = 30 * invScale; // Keeps the visual padding exactly 30px thick at any zoom
+        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale; // Maintain constant visual padding at any zoom
 
         const highlight = new PIXI.Graphics();
         highlight.lineStyle(4 * invScale, 0x00e5ff, 1);
@@ -1253,15 +1283,15 @@ export class StudioCanvas {
         // Extract native OS root font size to mimic CSS 'rem' behaviour
         const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 
-        // Dynamically scale vectors based on the canvas dimensions (1000px = baseline 1x)
-        const resScale = Math.max(this.mapWidth, this.mapHeight) / 1000;
+        // Dynamically scale vectors based on the canvas dimensions
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
 
         const ensureLabelData = (obj) => {
             if (!obj.label) obj.label = {};
             return obj.label;
         };
 
-        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all") => {
+        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all", parentId = null, parentType = "custom", layerId = null) => {
             if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name) return;
 
             const x = labelData.x ?? defaultX;
@@ -1273,7 +1303,8 @@ export class StudioCanvas {
             const fill = labelData.fillColor || "#ffffff";
             const stroke = this.#getAdaptiveStrokeColor(fill);
 
-            const style = new PIXI.TextStyle({
+            // 1. Setup Base Style
+            const styleConfig = {
                 fontFamily: font,
                 fontSize: size,
                 fill: fill,
@@ -1284,7 +1315,17 @@ export class StudioCanvas {
                 dropShadowColor: stroke,
                 dropShadowBlur: 2,
                 dropShadowDistance: 2,
-            });
+            };
+
+            // 2. Apply Word Wrapping & Justification
+            const rawMaxWidth = labelData.maxWidth || 0;
+            if (rawMaxWidth > 0) {
+                styleConfig.wordWrap = true;
+                styleConfig.wordWrapWidth = rawMaxWidth * resScale;
+                styleConfig.align = labelData.justify || "left";
+            }
+
+            const style = new PIXI.TextStyle(styleConfig);
 
             const text = new PIXI.Text(name, style);
             text.anchor.set(0.5);
@@ -1295,23 +1336,31 @@ export class StudioCanvas {
             this.layers.labels.addChild(text);
 
             if (isEditMode) {
-                // Ensure the initial coordinates are written to the object so they can be dragged
                 labelData.x = x;
                 labelData.y = y;
 
                 const hitRadius = Math.max(text.width, text.height) / 2;
-                this.interactiveTargets.push({ target: labelData, x: x, y: y, radius: hitRadius, isLabel: true });
+                this.interactiveTargets.push({
+                    target: labelData,
+                    x: x,
+                    y: y,
+                    radius: hitRadius,
+                    isLabel: true,
+                    entityType: "label",
+                    entityId: parentId || labelData.id,
+                    parentType: parentType,
+                    layerId: layerId,
+                });
             }
         };
 
         // Custom Labels
-        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all"));
+        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all", label.id, "custom"));
 
         // Auto-Labels: Pins (Offset Top Right)
         mapPins.forEach((pin) => {
             if (!pin.icon) return;
-            // NEW: Pass the pin's visibility to the label
-            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility);
+            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility, pin.id, "pin");
         });
 
         // Auto-Labels: Routes (Spline Midpoint)
@@ -1321,8 +1370,7 @@ export class StudioCanvas {
 
             const spline = this.#getSplinePoints(route.points);
             const mid = spline[Math.floor(spline.length / 2)];
-            // NEW: Pass the route's visibility to the label
-            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15, route.visibility);
+            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15, route.visibility, route.id, "route");
         });
 
         // Auto-Labels: Regions (Polygon Centroid)
@@ -1346,8 +1394,7 @@ export class StudioCanvas {
                     if (p.y > maxY) maxY = p.y;
                 });
 
-                // Pass the effective region visibility to the label
-                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, regionVis);
+                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, regionVis, region.id, "region", layer.id);
             });
         });
     }
@@ -1356,128 +1403,135 @@ export class StudioCanvas {
         if (!this.layers.cartography) return;
         this.layers.cartography.removeChildren().forEach((c) => c.destroy({ children: true }));
 
+        // Delegate to isolated drawing pipelines
+        this.#drawCartographyBorder(uiState, mapWidth, mapHeight);
+        this.#drawScaleBar(uiState, mapHeight, isEditMode);
+        this.#drawCartographyDecorations(decorations, isEditMode);
+    }
+
+    #drawCartographyBorder(uiState, mapWidth, mapHeight) {
+        if (!uiState.cartographyBorderEnable) return;
+
         const vectorLayer = new PIXI.Graphics();
         this.layers.cartography.addChild(vectorLayer);
 
         const borderColorHex = Number.parseInt((uiState.cartographyBorderColor || "#000000").replace("#", ""), 16);
+        const style = uiState.cartographyBorderStyle;
+        const margin = 20;
 
-        // 1. Draw Procedural Map Border
-        if (uiState.cartographyBorderEnable) {
-            const style = uiState.cartographyBorderStyle;
-            const margin = 20;
+        if (style === "solid") {
+            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+        } else if (style === "double") {
+            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+            vectorLayer.lineStyle(3, borderColorHex, 1, 0);
+            vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
+        } else if (style === "ornate") {
+            vectorLayer.lineStyle(12, borderColorHex, 1, 0);
+            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+            vectorLayer.lineStyle(4, borderColorHex, 1, 0);
+            vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
 
-            if (style === "solid") {
-                vectorLayer.lineStyle(10, borderColorHex, 1, 0);
-                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-            } else if (style === "double") {
-                vectorLayer.lineStyle(10, borderColorHex, 1, 0);
-                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-                vectorLayer.lineStyle(3, borderColorHex, 1, 0);
-                vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
-            } else if (style === "ornate") {
-                vectorLayer.lineStyle(12, borderColorHex, 1, 0);
-                vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-                vectorLayer.lineStyle(4, borderColorHex, 1, 0);
-                vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
-
-                const boxSize = 40;
-                vectorLayer.beginFill(borderColorHex);
-                vectorLayer.drawRect(0, 0, boxSize, boxSize);
-                vectorLayer.drawRect(mapWidth - boxSize, 0, boxSize, boxSize);
-                vectorLayer.drawRect(0, mapHeight - boxSize, boxSize, boxSize);
-                vectorLayer.drawRect(mapWidth - boxSize, mapHeight - boxSize, boxSize, boxSize);
-                vectorLayer.endFill();
-            }
+            const boxSize = 40;
+            vectorLayer.beginFill(borderColorHex);
+            vectorLayer.drawRect(0, 0, boxSize, boxSize);
+            vectorLayer.drawRect(mapWidth - boxSize, 0, boxSize, boxSize);
+            vectorLayer.drawRect(0, mapHeight - boxSize, boxSize, boxSize);
+            vectorLayer.drawRect(mapWidth - boxSize, mapHeight - boxSize, boxSize, boxSize);
+            vectorLayer.endFill();
         }
+    }
 
-        // 2. Draw Procedural Scale Bar (Inside a Movable Container)
-        if (uiState.cartographyScaleEnable) {
-            const scaleContainer = new PIXI.Container();
+    #drawScaleBar(uiState, mapHeight, isEditMode) {
+        if (!uiState.cartographyScaleEnable) return;
 
-            // Set position based on UI State
-            scaleContainer.x = uiState.cartographyScaleX ?? 50;
-            scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
+        const scaleContainer = new PIXI.Container();
 
-            const interval = uiState.cartographyScaleInterval || 100;
-            const majorTicks = uiState.cartographyScaleMajorTicks || 4;
-            const minorTicks = uiState.cartographyScaleMinorTicks || 4;
-            const scaleValue = uiState.cartographyScaleValue || 1;
-            const units = uiState.cartographyScaleUnits || "Miles";
+        // Set position based on UI State
+        scaleContainer.x = uiState.cartographyScaleX ?? 50;
+        scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
 
-            const height = 10;
-            const totalWidth = interval * majorTicks;
+        const interval = uiState.cartographyScaleInterval || 100;
+        const majorTicks = uiState.cartographyScaleMajorTicks || 4;
+        const minorTicks = uiState.cartographyScaleMinorTicks || 4;
+        const scaleValue = uiState.cartographyScaleValue || 1;
+        const units = uiState.cartographyScaleUnits || "Miles";
 
-            const scaleGraphics = new PIXI.Graphics();
+        const height = 10;
+        const totalWidth = interval * majorTicks;
 
-            // Base graphics are drawn relative to 0,0 inside the container
-            scaleGraphics.lineStyle(2, 0x000000, 1);
-            scaleGraphics.beginFill(0xffffff, 0.9);
-            scaleGraphics.drawRect(0, 0, totalWidth, height);
-            scaleGraphics.endFill();
+        const scaleGraphics = new PIXI.Graphics();
 
+        // Base graphics are drawn relative to 0,0 inside the container
+        scaleGraphics.lineStyle(2, 0x000000, 1);
+        scaleGraphics.beginFill(0xffffff, 0.9);
+        scaleGraphics.drawRect(0, 0, totalWidth, height);
+        scaleGraphics.endFill();
+
+        scaleGraphics.beginFill(0x000000, 0.9);
+        for (let i = 0; i < majorTicks; i++) {
+            if (i % 2 !== 0) scaleGraphics.drawRect(i * interval, 0, interval, height);
+        }
+        scaleGraphics.endFill();
+
+        if (minorTicks > 0) {
+            const minorInterval = interval / minorTicks;
             scaleGraphics.beginFill(0x000000, 0.9);
-            for (let i = 0; i < majorTicks; i++) {
-                if (i % 2 !== 0) scaleGraphics.drawRect(i * interval, 0, interval, height);
+            for (let i = 0; i < minorTicks; i++) {
+                if (i % 2 === 0) {
+                    scaleGraphics.drawRect(i * minorInterval, height / 2, minorInterval, height / 2);
+                } else {
+                    scaleGraphics.drawRect(i * minorInterval, 0, minorInterval, height / 2);
+                }
             }
             scaleGraphics.endFill();
-
-            if (minorTicks > 0) {
-                const minorInterval = interval / minorTicks;
-                scaleGraphics.beginFill(0x000000, 0.9);
-                for (let i = 0; i < minorTicks; i++) {
-                    if (i % 2 === 0) {
-                        scaleGraphics.drawRect(i * minorInterval, height / 2, minorInterval, height / 2);
-                    } else {
-                        scaleGraphics.drawRect(i * minorInterval, 0, minorInterval, height / 2);
-                    }
-                }
-                scaleGraphics.endFill();
-            }
-            scaleContainer.addChild(scaleGraphics);
-
-            const textStyle = new PIXI.TextStyle({ fontFamily: "Signika", fontSize: 16, fill: "#000000", stroke: "#ffffff", strokeThickness: 4, fontWeight: "bold" });
-            const text0 = new PIXI.Text("0", textStyle);
-            text0.anchor.set(0.5, 1);
-            text0.x = 0;
-            text0.y = -5;
-            scaleContainer.addChild(text0);
-
-            // Apply the multiplier mathematically
-            const textMax = new PIXI.Text(`${majorTicks * scaleValue} ${units}`, textStyle);
-            textMax.anchor.set(0.5, 1);
-            textMax.x = totalWidth;
-            textMax.y = -5;
-            scaleContainer.addChild(textMax);
-
-            this.layers.cartography.addChild(scaleContainer);
-
-            if (isEditMode) {
-                const scaleDataObj = {
-                    get x() {
-                        return uiState.cartographyScaleX;
-                    },
-                    set x(val) {
-                        uiState.cartographyScaleX = val;
-                    },
-                    get y() {
-                        return uiState.cartographyScaleY;
-                    },
-                    set y(val) {
-                        uiState.cartographyScaleY = val;
-                    },
-                };
-
-                this.interactiveTargets.push({
-                    target: scaleDataObj,
-                    x: scaleContainer.x + totalWidth / 2,
-                    y: scaleContainer.y,
-                    radius: totalWidth / 2,
-                    isDecoration: false,
-                });
-            }
         }
+        scaleContainer.addChild(scaleGraphics);
 
-        // 3. Draw Custom Decorations
+        const textStyle = new PIXI.TextStyle({ fontFamily: "Signika", fontSize: 16, fill: "#000000", stroke: "#ffffff", strokeThickness: 4, fontWeight: "bold" });
+        const text0 = new PIXI.Text("0", textStyle);
+        text0.anchor.set(0.5, 1);
+        text0.x = 0;
+        text0.y = -5;
+        scaleContainer.addChild(text0);
+
+        // Apply the multiplier mathematically
+        const textMax = new PIXI.Text(`${majorTicks * scaleValue} ${units}`, textStyle);
+        textMax.anchor.set(0.5, 1);
+        textMax.x = totalWidth;
+        textMax.y = -5;
+        scaleContainer.addChild(textMax);
+
+        this.layers.cartography.addChild(scaleContainer);
+
+        if (isEditMode) {
+            const scaleDataObj = {
+                get x() {
+                    return uiState.cartographyScaleX;
+                },
+                set x(val) {
+                    uiState.cartographyScaleX = val;
+                },
+                get y() {
+                    return uiState.cartographyScaleY;
+                },
+                set y(val) {
+                    uiState.cartographyScaleY = val;
+                },
+            };
+
+            this.interactiveTargets.push({
+                target: scaleDataObj,
+                x: scaleContainer.x + totalWidth / 2,
+                y: scaleContainer.y,
+                radius: totalWidth / 2,
+                isDecoration: false,
+            });
+        }
+    }
+
+    #drawCartographyDecorations(decorations, isEditMode) {
         decorations.forEach((dec) => {
             if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false) || !dec.src) return;
 
@@ -1499,6 +1553,8 @@ export class StudioCanvas {
                     y: dec.y,
                     radius: hitRadius,
                     isDecoration: true,
+                    entityType: "decoration",
+                    entityId: dec.id,
                 });
             }
         });
@@ -1528,15 +1584,27 @@ export class StudioCanvas {
             this.layers.cartography.visible = false;
         }
 
+        // Dynamically oversample small maps for vector crispness, capped at 2x.
+        const optimalRes = 2000 / this.mapWidth;
+        const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
+
+        // Physically multiply the pixel bounds rather than relying on PIXI's resolution flag
         const renderTexture = PIXI.RenderTexture.create({
-            width: this.mapWidth,
-            height: this.mapHeight,
+            width: Math.round(this.mapWidth * dynamicRes),
+            height: Math.round(this.mapHeight * dynamicRes),
             resolution: 1,
         });
 
-        this.app.renderer.render(this.stage, { renderTexture: renderTexture });
+        // Temporarily scale the stage up to draw into the larger texture
+        const origScaleX = this.stage.scale.x;
+        const origScaleY = this.stage.scale.y;
+        this.stage.scale.set(dynamicRes);
 
+        this.app.renderer.render(this.stage, { renderTexture: renderTexture });
         const canvas = this.app.renderer.extract.canvas(renderTexture);
+
+        // Restore the original scale
+        this.stage.scale.set(origScaleX, origScaleY);
 
         this.gridLayer.visible = originalVisibility.grid;
         this.layers.reference.visible = originalVisibility.reference;
@@ -1676,10 +1744,18 @@ export class StudioCanvas {
         this.mapMask.beginFill(0xffffff); // Color doesn't matter for masks
         this.mapMask.drawRect(0, 0, this.mapWidth, this.mapHeight);
         this.mapMask.endFill();
+
+        this.stage.hitArea = new PIXI.Rectangle(0, 0, this.mapWidth, this.mapHeight);
     }
 
     renderFaultLines(faults = [], isEditMode = false, activeFaultId = null) {
         if (this.haloGraphics) this.haloGraphics.clear();
+
+        if (this.faultGraphics) {
+            this.faultGraphics.clear();
+            this.faultGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
+        }
+
         if (!this.layers.features || !isEditMode) return;
 
         faults.forEach((fault) => {
@@ -1699,7 +1775,7 @@ export class StudioCanvas {
                 }
 
                 const colorHex = typeof fault.color === "string" ? Number.parseInt(fault.color.replace("#", ""), 16) : fault.color || 0xffffff;
-                const thickness = fault.thickness || 40;
+                const thickness = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
 
                 // Draw the Area of Effect Halo via circle stamping
                 this.haloGraphics.beginFill(colorHex, 1);
@@ -1720,7 +1796,7 @@ export class StudioCanvas {
                 this.haloGraphics.endFill();
 
                 // Draw the Core Vector Line
-                this.vectorGraphics.lineStyle({
+                this.faultGraphics.lineStyle({
                     width: 3,
                     color: colorHex,
                     alpha: 0.85,
@@ -1728,13 +1804,13 @@ export class StudioCanvas {
                     join: PIXI.LINE_JOIN.ROUND,
                     cap: PIXI.LINE_CAP.ROUND,
                 });
-                this.#drawVectorPath(this.vectorGraphics, spline, "solid", 3);
+                this.#drawVectorPath(this.faultGraphics, spline, "solid", 3);
             }
 
             // 2. Draw Edit Nodes LAST so they always render on top of the geometry
             if (isEditMode) {
                 const isActive = fault.id === activeFaultId;
-                this.#renderEditNodes(fault.points, this.vectorGraphics, isActive);
+                this.#renderEditNodes(fault.points, this.faultGraphics, isActive, fault, "fault");
             }
         });
     }
@@ -1754,7 +1830,7 @@ export class StudioCanvas {
             const isActive = river.id === activeRiverId;
             const lineColor = isActive ? 0x00e5ff : 0x78aad2;
 
-            this.manualRiverGraphics.lineStyle(2, lineColor, 0.8);
+            this.manualRiverGraphics.lineStyle(FILRODENSWMB.DISPLAY.RIVER_WIDTH, lineColor, 0.8);
 
             // Draw Catmull-Rom spline
             const points = river.points;
@@ -1767,7 +1843,7 @@ export class StudioCanvas {
             // Draw edit nodes
             if (isEditMode) {
                 const isActive = river.id === activeRiverId;
-                this.#renderEditNodes(points, this.manualRiverGraphics, isActive);
+                this.#renderEditNodes(points, this.manualRiverGraphics, isActive, river, "river");
             }
         }
     }
@@ -1796,7 +1872,7 @@ export class StudioCanvas {
     /**
      * Centralised helper to generate edit nodes and interactive hit targets for any vector array.
      */
-    #renderEditNodes(points, parentContainer, isActive) {
+    #renderEditNodes(points, parentContainer, isActive, parentEntity, entityType, layerId = null) {
         if (!points || points.length === 0) return;
 
         const hitRadius = 10 / (this.stage.scale.x || 1);
@@ -1804,7 +1880,15 @@ export class StudioCanvas {
         points.forEach((pt, index) => {
             const isLast = isActive && index === points.length - 1;
             this.#createEditNode(parentContainer, pt.x, pt.y, isLast, isActive);
-            this.interactiveTargets.push({ target: pt, x: pt.x, y: pt.y, radius: hitRadius });
+            this.interactiveTargets.push({
+                target: pt,
+                x: pt.x,
+                y: pt.y,
+                radius: hitRadius,
+                entityType: entityType,
+                entityId: parentEntity.id,
+                layerId: layerId,
+            });
         });
     }
 
@@ -1897,5 +1981,100 @@ export class StudioCanvas {
         };
 
         scaleNodes(this.stage);
+    }
+
+    /**
+     * Draws a persistently pulsing cyan bounding box and text label to preview an upcoming action.
+     */
+    showActionPreview(bounds, actionLabel = "") {
+        this.clearActionPreview();
+        if (!bounds || !this.stage) return;
+
+        const trueWidth = bounds.maxX - bounds.minX;
+        const trueHeight = bounds.maxY - bounds.minY;
+        const centerX = bounds.minX + trueWidth / 2;
+        const centerY = bounds.minY + trueHeight / 2;
+
+        this.actionPreview = new PIXI.Container();
+
+        const invScale = 1 / (this.stage.scale.x || 1);
+        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale;
+
+        const boxWidth = trueWidth + pad * 2;
+        const boxHeight = trueHeight + pad * 2;
+        const boxX = -trueWidth / 2 - pad;
+        const boxY = -trueHeight / 2 - pad;
+
+        // 1. Draw the bounding box
+        const graphics = new PIXI.Graphics();
+        graphics.lineStyle(4 * invScale, 0x00e5ff, 1);
+        graphics.beginFill(0x00e5ff, 0.15);
+        graphics.drawRoundedRect(boxX, boxY, boxWidth, boxHeight, 12 * invScale);
+        graphics.endFill();
+        this.actionPreview.addChild(graphics);
+
+        // 2. Add the dynamic text label
+        if (actionLabel) {
+            const textStyle = new PIXI.TextStyle({
+                fontFamily: "Signika",
+                fontSize: 16 * invScale,
+                fill: "#00e5ff",
+                fontWeight: "bold",
+                stroke: "#000000",
+                strokeThickness: 4 * invScale,
+                dropShadow: true,
+                dropShadowColor: "#000000",
+                dropShadowBlur: 2,
+                dropShadowDistance: 2 * invScale,
+            });
+
+            const text = new PIXI.Text(actionLabel, textStyle);
+            // Position slightly inside the top-left corner
+            text.x = boxX + 8 * invScale;
+            text.y = boxY - text.height - 4 * invScale;
+
+            // Safety fallback: if the box is hard against the top of the map, push the text inside the box
+            if (centerY + text.y < 0) {
+                text.y = boxY + 8 * invScale;
+            }
+
+            this.actionPreview.addChild(text);
+        }
+
+        this.actionPreview.x = centerX;
+        this.actionPreview.y = centerY;
+        this.stage.addChild(this.actionPreview);
+
+        // --- ACCESSIBILITY CHECK ---
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if (!prefersReducedMotion) {
+            // Standard smooth pulse for users who haven't opted out of motion
+            let elapsed = 0;
+            this.previewTick = () => {
+                if (this.actionPreview.destroyed) return;
+                elapsed += 0.05;
+                this.actionPreview.alpha = 0.55 + Math.sin(elapsed) * 0.25;
+            };
+            this.app.ticker.add(this.previewTick);
+        } else {
+            // Static, fixed state for users with accessibility preferences
+            this.actionPreview.alpha = 0.75;
+        }
+    }
+
+    /**
+     * Clears the action preview and halts its animation ticker.
+     */
+    clearActionPreview() {
+        if (this.previewTick) {
+            this.app.ticker.remove(this.previewTick);
+            this.previewTick = null;
+        }
+        if (this.actionPreview) {
+            // Must pass { children: true } so the text and graphics nodes are purged from VRAM
+            this.actionPreview.destroy({ children: true });
+            this.actionPreview = null;
+        }
     }
 }

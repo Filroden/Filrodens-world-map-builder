@@ -1,8 +1,9 @@
 <div class="fwmb-map-container">
 
-    {{> "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs" }}
-
     <div class="fwmb-map-preview">
+        <!-- The PIXI Canvas renders in here -->
+
+        <!-- ALL Overlays now live inside the preview container -->
         <div class="fwmb-canvas-readout fwmb-hidden">
             <div class="fwmb-readout-item"><i class="fwmb-icon elevation"></i> <span id="fwmb-readout-elev">--</span></div>
             <div class="fwmb-readout-item"><i class="fwmb-icon water-drop"></i> <span id="fwmb-readout-mois">--</span></div>
@@ -10,68 +11,86 @@
             <div class="fwmb-divider-vertical"></div>
             <div class="fwmb-readout-biome" id="fwmb-readout-biome">--</div>
         </div>
+
+        <div id="fwmb-infra-tooltip" class="fwmb-hidden"></div>
+
+        <!-- Top Right: History Controls -->
+        <div class="fwmb-map-history">
+            <button type="button" data-action="undoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}">
+                <i class="fwmb-icon undo"></i>
+            </button>
+            <button type="button" data-action="redoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Redo'}}">
+                <i class="fwmb-icon redo"></i>
+            </button>
+        </div>
+
+        <div id="fwmb-3d-overlay" class="fwmb-3d-overlay fwmb-hidden"></div>
+
+        <div class="fwmb-map-hint">{{localize "FILRODENSWMB.UI.CanvasHint"}}</div>
+
+        <div class="fwmb-map-controls">
+            <button type="button" class="active" data-action="toggleViewFilter" data-filter="all" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityPlayer'}}">
+                <i class="fwmb-icon visibility"></i>
+            </button>
+            <button type="button" class="active" data-action="toggleViewFilter" data-filter="gm" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityGM'}}">
+                <i class="fwmb-icon security"></i>
+            </button>
+            <button type="button" data-action="toggleViewFilter" data-filter="none" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityNone'}}">
+                <i class="fwmb-icon visibility-off"></i>
+            </button>
+            <div class="fwmb-divider-vertical"></div>
+            <button type="button" class="active" data-action="toggleLayer" data-layer="base" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerBase'}}">
+                <i class="fwmb-icon map"></i>
+            </button>
+            <button type="button" class="active" data-action="toggleLayer" data-layer="topography" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerTopography'}}">
+                <i class="fwmb-icon elevation"></i>
+            </button>
+            <button type="button" class="" data-action="toggleLayer" data-layer="biomes" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerBiomes'}}">
+                <i class="fwmb-icon forest"></i>
+            </button>
+            <button type="button" class="active" data-action="toggleLayer" data-layer="features" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerFeatures'}}">
+                <i class="fwmb-icon water-drop"></i>
+            </button>
+            <button type="button" class="active" data-action="toggleLayer" data-layer="infrastructure" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerInfrastructure'}}">
+                <i class="fwmb-icon location-city"></i>
+            </button>
+            <button type="button" class="active" data-action="toggleLayer" data-layer="regions" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerRegions'}}">
+                <i class="fwmb-icon layers"></i>
+            </button>
+            <button type="button" class="active" data-action="toggleLayer" data-layer="labels" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerLabels'}}">
+                <i class="fwmb-icon insert-text"></i>
+            </button>
+            <button type="button" class="active" data-action="toggleLayer" data-layer="cartography" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerCartography'}}">
+                <i class="fwmb-icon explore"></i>
+            </button>
+            <div class="fwmb-divider-vertical"></div>
+            <button type="button" class="active" data-action="toggleLayer" data-layer="contours" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerContours'}}">
+                <i class="fwmb-icon scatter-plot"></i>
+            </button>
+            <button type="button" data-action="toggleGrid" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleGrid'}}">
+                <i class="fwmb-icon grid-on"></i>
+            </button>
+            <button type="button" class="active" data-action="toggleLayer" data-layer="reference" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerReference'}}">
+                <i class="fwmb-icon image"></i>
+            </button>
+            <div class="fwmb-divider-vertical"></div>
+            <button type="button" data-action="zoomOut" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}">
+                <i class="fwmb-icon zoom-out"></i>
+            </button>
+            <button type="button" data-action="resetZoom" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetView'}}">
+                <i class="fwmb-icon center-focus"></i>
+            </button>
+            <button type="button" data-action="zoomIn" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}">
+                <i class="fwmb-icon zoom-in"></i>
+            </button>
+        </div>
     </div>
 
-    <div id="fwmb-infra-tooltip" class="fwmb-hidden"></div>
-        
-    <div id="fwmb-3d-overlay" class="fwmb-3d-overlay fwmb-hidden"></div>
-
-    <div class="fwmb-map-hint">{{localize "FILRODENSWMB.UI.CanvasHint"}}</div>
-
-    <div class="fwmb-map-controls">
-        <button type="button" class="active" data-action="toggleViewFilter" data-filter="all" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityPlayer'}}">
-            <i class="fwmb-icon visibility"></i>
-        </button>
-        <button type="button" class="active" data-action="toggleViewFilter" data-filter="gm" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityGM'}}">
-            <i class="fwmb-icon security"></i>
-        </button>
-        <button type="button" data-action="toggleViewFilter" data-filter="none" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityNone'}}">
-            <i class="fwmb-icon visibility-off"></i>
-        </button>
-        <div class="fwmb-divider-vertical"></div>
-        <button type="button" class="active" data-action="toggleLayer" data-layer="base" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerBase'}}">
-            <i class="fwmb-icon map"></i>
-        </button>
-        <button type="button" class="active" data-action="toggleLayer" data-layer="topography" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerTopography'}}">
-            <i class="fwmb-icon elevation"></i>
-        </button>
-        <button type="button" class="" data-action="toggleLayer" data-layer="biomes" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerBiomes'}}">
-            <i class="fwmb-icon forest"></i>
-        </button>
-        <button type="button" class="active" data-action="toggleLayer" data-layer="features" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerFeatures'}}">
-            <i class="fwmb-icon water-drop"></i>
-        </button>
-        <button type="button" class="active" data-action="toggleLayer" data-layer="infrastructure" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerInfrastructure'}}">
-            <i class="fwmb-icon location-city"></i>
-        </button>
-        <button type="button" class="active" data-action="toggleLayer" data-layer="regions" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerRegions'}}">
-            <i class="fwmb-icon layers"></i>
-        </button>
-        <button type="button" class="active" data-action="toggleLayer" data-layer="labels" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerLabels'}}">
-            <i class="fwmb-icon insert-text"></i>
-        </button>
-        <button type="button" class="active" data-action="toggleLayer" data-layer="cartography" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerCartography'}}">
-            <i class="fwmb-icon explore"></i>
-        </button>
-        <div class="fwmb-divider-vertical"></div>
-        <button type="button" class="active" data-action="toggleLayer" data-layer="contours" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerContours'}}">
-            <i class="fwmb-icon scatter-plot"></i>
-        </button>
-        <button type="button" data-action="toggleGrid" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleGrid'}}">
-            <i class="fwmb-icon grid-on"></i>
-        </button>
-        <button type="button" class="active" data-action="toggleLayer" data-layer="reference" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerReference'}}">
-            <i class="fwmb-icon image"></i>
-        </button>
-        <div class="fwmb-divider-vertical"></div>
-        <button type="button" data-action="zoomOut" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}">
-            <i class="fwmb-icon zoom-out"></i>
-        </button>
-        <button type="button" data-action="resetZoom" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetView'}}">
-            <i class="fwmb-icon center-focus"></i>
-        </button>
-        <button type="button" data-action="zoomIn" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}">
-            <i class="fwmb-icon zoom-in"></i>
-        </button>
+    <!-- Permanent Processing Overlay -->
+    <div class="fwmb-processing-overlay fwmb-hidden">
+        <div class="fwmb-processing-content">
+            <i class="fwmb-icon sync fwmb-spin"></i>
+            <span class="fwmb-processing-text"></span>
+        </div>
     </div>
 </div>

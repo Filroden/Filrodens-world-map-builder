@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-1.2.0-blue)
+![Latest Version](https://img.shields.io/badge/Version-2.0.0-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -62,7 +62,17 @@ The main window in the module shows the current map.
 
 Hold `Left Click` to drag the map, and use the `Scroll Wheel` to zoom in and out.
 
+#### Map Preview Information
+
 As you move the mouse pointer over the map, a display of the elevation, moisture, temperature values and biome type will show in the top left corner of the map.
+
+#### Undo / Redo History
+
+- There are undo and redo buttons in the top right corner of the map. These will step back or forward through the global edit history.
+- Hovering over the undo or redo button will show which area of the map and what type of feature will be changed if you press it.
+- Undo and redo can also be accessed through their standard keyboard shortcuts (for Windows undo is `Ctrl + Z` and redo is `Ctrl + Y` or `Ctrl + Shift + Z`).
+
+#### Map Controls
 
 There are map controls in the bottom right corner of the map (only visible when the mouse is inside the map canvas).
 
@@ -82,15 +92,16 @@ There are map controls in the bottom right corner of the map (only visible when 
 Many of the following tools offer an edit mode. This mode has certain common features:
 
 - If you click the "Toggle Edit [Tool]" button in the sidebar a new toolbar will appear above the map containing edit tools.
-- While in edit mode the tool sidebar is locked to prevent changes while you are editing.
-- All edit toolbars have an "Undo" and "Redo" action.
 - Either click the "Toggle Edit [Tool]" button again to exit edit mode, or switch to a different map tool.
 
-In edit mode, some layers allow features to be added, moved or removed with mouse actions. Only the features relating to the specific tool can be edited. Not every action is available for every tool.
+In edit mode, some layers allow features to be added, moved or removed with mouse actions. **Only the features relating to the specific selected tool can be edited.** Not every action is available for every tool.
 
-- **Move:** Pins, region nodes, labels and cartographic decorations can be moved by holding the `Left-click` and dragging.
-- **Add:** New region nodes can be added by using `SHIFT + left-click`.
-- **Remove**: Existing pins and region nodes can be removed by using `CTRL (or CMD) + left-click`.
+Interactable features include: infrastructure pins, nodes (custom rivers, tectonic faults, routes and region layers), labels and cartographic decorations.
+
+- **Move:** Interactable features can be moved by holding the `Left-click` and dragging.
+- **Add:** New nodes can be added by using `SHIFT + left-click` anywhere on the line or region.
+- **Remove**: Interactable features can be removed by using `CTRL (or CMD) + left-click`.
+- **Edit Properties**: Interactable features can be edited using the `Double Left-Click` to open their properties dialogue.
 - **Rotate:** Labels and cartographic decorations can be rotated by using the `Scroll Wheel` while holding `Left-click`.
 - **Re-size:** Cartographic decorations can be re-sized using the `SHIFT + Scroll Wheel` while holding `Left-click`.
 - **End Line/Region:** Using `Right-click` without dragging will end any active line or region being edited.
@@ -136,10 +147,18 @@ The terrain is generated automatically. Once generated, the terrain can be edite
 1. **Global Settings**
    - **Sea Level:** Set the sea level. This will update the map to show the new coastline.
 
-2. **Elevation Model** The terrain model is infinite in size. These controls determine which part of the model you see.
-   - **Map Transformation:** Use the zoom buttons and the nudge buttons to change your position in the model. Both groups have a reset button between them, to return you to the original positions.
-   - **Detail:** Determine how smooth or detailed the model will be.
-   - **Stretch:** Higher values result in mid-elevations being stretched and high/low elevations being compressed. This allows for larger plains to form.
+2. **Elevation Model:** The terrain model is infinite in size. These controls determine which part of the model you see.
+   - **Map Transformation:** Use the zoom and nudge buttons to change your position in the model. Both groups feature a central reset button to return you to the original coordinates.
+   - **Detail:** Determines how smooth or intricate the model will be. Because the results are deterministic, you can treat this as a balance between performance and detail.
+     > The higher the detail value, the longer it takes to generate the terrain. This is a linear relationship: a map with a detail of 10 will take ten times longer to generate than one with a detail of 1.
+
+     >**Note:** This performance scaling only applies to the base procedural generation. If a map contains many terrain edits, the history replay will still take time to render, brush stroke by brush stroke. This is an intentional design choice ensuring you can recreate complex, custom maps from a lightweight journal entry.
+
+     >**Tip:**
+     > - **For Prototyping:** Keep the detail slider at the default of 5 (or lower). This allows the map to render very quickly while you are actively making changes.
+     > - **For Final Export:** Increase the slider to 8 or 10 right before exporting the final image. This will lock up the UI and take significantly longer to render, but it will yield highly detailed terrain textures for the final map.
+
+   - **Stretch:** Higher values result in mid-elevations being stretched, whilst high and low elevations are compressed. This allows for larger plains to form.
 
 3. **Edit Terrain** Use the edit tools to adjust your terrain.
 
@@ -196,6 +215,10 @@ Biomes are generated automatically depending on the latitude, terrain, temperatu
    - **Fault Line Thickness:** Choose over how wide an area the effects will happen.
    - **Fault Line Strength:** Determine the strength of the effect.
 
+   For both rivers and fault lines:
+   - **Toggle Live Terrain Generation:** Toggles live terrain generation on or off.
+   - **Apply Changes:** When the toggle is off, if any changes are made that could affect the terrain, this button allows them to be manually applied. This helps you to create or edit the river or fault lines without constantly generating terrain changes.
+
 > Note: by default, no terrain feature automatically generates a label. If you want to add a label, e.g., to a river or fault line, you should add a custom label using the label tool.
 
 #### Infrastructure
@@ -215,8 +238,6 @@ Once created, they are shown in the sidebar as cards. Each card has four buttons
 - **Delete**
 
 Descriptions for Points of Interest will be shown as tooltips if you hover over its marker. Descriptions can be styled using `<HTML>` elements, including referencing images, etc.
-
-Both Points of Interest and Routes will show a label. The label can be edited seperately using the label tool.
 
 1. **Edit Infrastructure**
 
@@ -255,7 +276,7 @@ The *Regions* tool allows you to draw custom polygons to show political, economi
 
 #### Labels
 
-The *Labels* tool allows you to edit existing labels and add/delete custom labels.
+The *Labels* tool allows you to edit existing labels and add/delete custom labels. Note that if the label is associated to another feature then the label can also be edited in that feature's main edit dialogue. The label settings remain synchronised whether they are edited on the feature or the label.
 
 1. Labels are automatically created for any vector item created using other tools, e.g., Points of Interest, routes and regions. These labels can be renamed, their styles edited and have their visibility toggled. They cannot be deleted.
 
@@ -264,6 +285,8 @@ The *Labels* tool allows you to edit existing labels and add/delete custom label
 
 3. Individual labels can have their visibility toggled by clicking the visibility button before its name in the sidebar.
    > Hidden labels will not be exported. Use the visibility toggle to control what information you want to share, e.g., by creating a player map and a GM map.
+
+4. Custom labels appear in their own group below the automatically generated labels. These work indentically to regular labels, except they can also be deleted.
 
 #### Cartography
 
@@ -317,10 +340,12 @@ You can change some of the map configuration settings.
 4. **Biome Colours**
    - Click the colour swatch to edit the colour of each biome.
 
-5. **Route Quick Styles**
-   - Add, edit or delete Quick Styles for Routes (line colour, thickness and style)
-   - Changing an existing Quick Style will change the style of all routes using that style.
-   - Deleting a Quick Style will preserve the existing style on routes but they can no longer be changed in bulk.
+5. **Route and Label Quick Styles**
+   - Add, edit or delete Quick Styles for Routes (line colour, thickness and style) and Labels (font, size, colour, maximum width and justification)
+   - Changing an existing Quick Style will change the style of all routes or labels using that style.
+   - Deleting a Quick Style will preserve the existing style but they can no longer be changed in bulk.
+
+   ![Quick Styles](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/quick-styles.png)
 
 ### Map Management Tools
 
@@ -385,11 +410,52 @@ When you click "Confirm", the interface will lock to prevent changes during the 
 
 ## Important Note on Performance
 
-The generator can be computationally heavy when calculating new terrain, moisture, and temperature models, particularly at larger resolutions. Maps of 1000x1000 pixels process very quickly. Maps of 4000x4000 pixels look beautiful, but may take a few seconds to calculate even on powerful PCs. Once the initial calculation is complete, the application returns to being highly responsive.
+Version 2 introduced significant performance improvements to the terrain and biome brushes so you can see their changes more quickly (almost real time depending on the map resolution). Other performance optimisations were also added.
+
+However, there are times when the full procedural generation engine must run (loading a map, after completing an edit, etc). The generator can be computationally heavy when calculating new terrain, moisture, and temperature models, particularly at larger resolutions. Maps of 1000x1000 pixels process very quickly. Maps of 4000x4000 pixels look beautiful, but may take a few seconds to calculate even on powerful PCs.
+
+## FAQs
+
+### Why do my maps look different in v2+ compared to in v1
+
+What you are seeing is a difference in how biomes are being procedurally generated as a result of orographic lift (rain shadows caused by mountain ranges). In v1, there was a bug which cause orographic lift to only consider the procedurally-generated elevation model. If you used any tool to edit the terrain (terrain brushes, custom rivers or tectonic faults), these would not be taken into account. In addition, the original strength of the orographic lift was using a fixed value which did not change with the map's resolution or its scale. Both these were fixed in v2. This means procedurally generated biomes will look a little different (more realistic), particulaly on maps that have a lot of terrain edits.
+
+Note that because orographic lift is scaled, biomes in regional maps should still look the same as the original map from which they were created.
+
+### Can I import my own map?
+
+You can bring in any image as a reference, and it will be shown as a canvas overlay. You cannot bypass the procedurally generated terrain, but if you want to recreate an existing map, I have found the following workflows work well. Either:
+
+- Generate random maps until you find one that has most of the land and sea in roughly the right areas. Do not forget you can use the pan and scale buttons on the Scene tool if you think a specific area within the map might be better. Then, use the terrain edit tools to sculpt your terrain.
+- Use the first random map. In the terrain tool, use the Level brush with a very large radius and find a point that is at or just below sea level. Now "paint" over the entire map to create a flat plain. You can then use the terrain edit tools to sculpt your topography from scratch.
+
+### Will you add the ability to load a Digital Elevation Model (DEM) or a greyscale elevation map to generate the terrain?
+
+No. One of the key benefits of using a procedural engine is the ability to create a world map, and then extract regional maps from it. These regional maps inherit the exact same terrain, biomes, and features, but are mathematically recalculated to provide significantly more detail while retaining sharp cliffs and accurate coastlines. Because the environment is procedurally generated, you can infinitely zoom into the model and generate higher-resolution iterations.
+
+If the module imported an elevation model, which is just a static grid of pixels with height values, it would break this feature. The only way to upscale a raster model is to interpolate the pixels, which produces very smooth, "blurred" results rather than sharp, realistic topography.
+
+### Why is it taking longer and longer for the terrain to regenerate when I make a new edit?
+
+Version 2 introduced significant performance improvements to the terrain and biome brushes so you can see their changes more quickly (almost real time depending on the map resolution). However, once an edit is complete, all terrain edit brush strokes must be replayed in chronological order whenever the terrain must be recalculated. The more edits you make, the more history the engine must process in sequence. If you are just making a few changes to a map, this will not impact performance. However, if you are hand-drawing an entire map at a high resolution, you could easily generate thousands of brush strokes that must be reapplied after the edit is complete.
+
+### Do you have any tips for how to improve performance?
+
+1. Create your initial terrain map at a lower resolution, such as 1600 x 1200. This reduces the computational power required to calculate the terrain and biomes. Once you have your topography, custom rivers, and tectonic faults (which physically deform the terrain) in place, you can generate a high-resolution regional map from it. Instead of cropping a small area, expand the crop box to cover the entire map and increase the target resolution. The module will automatically upscale the map, calculating more granular detail while perfectly preserving your custom features. Please note: once you are working at this higher resolution, any further structural changes to the terrain, rivers, or faults will take proportionally longer to process.
+
+### Why did my custom river create a massive, unnatural canyon?
+
+The procedural hydrology engine mathematically forces water to flow monotonically downhill. If you draw a custom river route directly over a high mountain range, the engine will safely cut a gorge deep enough through that terrain to ensure the river never flows upwards. To avoid extreme canyons, try to route your rivers through natural valleys, or use the terrain Lower/Level brushes to flatten the path before drawing the river.
+
+### Why do my rivers suddenly change their path when I edit the terrain?
+
+Procedural rivers (those flowing from the automatically generated springs) calculate the path of least resistance downhill to the coast or a lake. If you use the terrain brushes to raise a hill, carve a valley, or smooth a slope anywhere near a river's path, you alter the underlying topography. The hydrology engine recalculates the most natural route based on your new landscape, which will sometimes divert the water down a new valley.
+
+> Tip: If you need a river to stay in an exact, permanent location regardless of how you sculpt the nearby terrain, use the Custom River tool instead. Custom rivers physically carve their own channels into the landscape, whereas procedural rivers simply adapt to the landscape as it currently exists.
 
 ## Roadmap
 
-- Add quick styles for labels (and possible for pins and regions).
+- Allow custom biomes to be renamed.
 - Bulk edit vector (pins, lines, regions and text) properties.
-- Scene tools to allow quicker toggling of the in-game map grid or map pins (which would otherwise take multiple clicks through Foundry's UI).
-- Multi-tile export support, allowing the GM to toggle distinct layers (like political borders or trade routes) on and off during live play.
+- Scene tools to allow quicker toggling of the in-game map grid, map pins and tiles (which would otherwise take multiple clicks through Foundry's UI).
+- Multi-tile export support, allowing the user to toggle distinct layers (like political borders or trade routes) on and off during live play.

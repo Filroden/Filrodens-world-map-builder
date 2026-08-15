@@ -90,6 +90,8 @@
 .fwmb-icon.crop                 { --fwmb-mask: url('../assets/icons/crop.svg'); }
 .fwmb-icon.water                { --fwmb-mask: url('../assets/icons/water.svg'); }
 .fwmb-icon.upgrade              { --fwmb-mask: url('../assets/icons/upgrade.svg'); }
+.fwmb-icon.sync                 { --fwmb-mask: url('../assets/icons/sync.svg'); }
+.fwmb-icon.sync_disabled        { --fwmb-mask: url('../assets/icons/sync_disabled.svg'); }
 
 /* --- PINHEAD ICONS --- */
 .fwmb-icon.anchor                         { --fwmb-mask: url('../assets/pinhead-icons/anchor.svg'); }
@@ -119,6 +121,29 @@
 .fwmb-icon.place_of_worship_building      { --fwmb-mask: url('../assets/pinhead-icons/place_of_worship_building.svg'); }
 .fwmb-icon.shipwreck_in_water             { --fwmb-mask: url('../assets/pinhead-icons/shipwreck_in_water.svg'); }
 .fwmb-icon.skull                          { --fwmb-mask: url('../assets/pinhead-icons/skull.svg'); }
+.fwmb-icon.broadleaved_tree               { --fwmb-mask: url('../assets/pinhead-icons/broadleaved_tree.svg'); }
+.fwmb-icon.campsite                       { --fwmb-mask: url('../assets/pinhead-icons/campsite.svg'); }
+.fwmb-icon.cannon                         { --fwmb-mask: url('../assets/pinhead-icons/cannon.svg'); }
+.fwmb-icon.classical_building             { --fwmb-mask: url('../assets/pinhead-icons/classical_building.svg'); }
+.fwmb-icon.conifer_tree                   { --fwmb-mask: url('../assets/pinhead-icons/conifer_tree.svg'); }
+.fwmb-icon.dagger                         { --fwmb-mask: url('../assets/pinhead-icons/dagger.svg'); }
+.fwmb-icon.dot_with_rays_down             { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_down.svg'); }
+.fwmb-icon.dot_with_rays_left             { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_left.svg'); }
+.fwmb-icon.dot_with_rays_right            { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_right.svg'); }
+.fwmb-icon.dot_with_rays_up               { --fwmb-mask: url('../assets/pinhead-icons/dot_with_rays_up.svg'); }
+.fwmb-icon.exclamation_point              { --fwmb-mask: url('../assets/pinhead-icons/exclamation_point.svg'); }
+.fwmb-icon.fence                          { --fwmb-mask: url('../assets/pinhead-icons/fence.svg'); }
+.fwmb-icon.flagstick_with_pennant         { --fwmb-mask: url('../assets/pinhead-icons/flagstick_with_pennant.svg'); }
+.fwmb-icon.gable_roofed_shelter           { --fwmb-mask: url('../assets/pinhead-icons/gable_roofed_shelter.svg'); }
+.fwmb-icon.gravestone                     { --fwmb-mask: url('../assets/pinhead-icons/gravestone.svg'); }
+.fwmb-icon.jp_landmark                    { --fwmb-mask: url('../assets/pinhead-icons/jp_landmark.svg'); }
+.fwmb-icon.lighthouse                     { --fwmb-mask: url('../assets/pinhead-icons/lighthouse.svg'); }
+.fwmb-icon.memorial_stone                 { --fwmb-mask: url('../assets/pinhead-icons/memorial_stone.svg'); }
+.fwmb-icon.mesoamerican_pyramid           { --fwmb-mask: url('../assets/pinhead-icons/mesoamerican_pyramid.svg'); }
+.fwmb-icon.observatory_dome               { --fwmb-mask: url('../assets/pinhead-icons/observatory_dome.svg'); }
+.fwmb-icon.palace                         { --fwmb-mask: url('../assets/pinhead-icons/palace.svg'); }
+.fwmb-icon.question_mark                  { --fwmb-mask: url('../assets/pinhead-icons/question_mark.svg'); }
+.fwmb-icon.wall_tent                      { --fwmb-mask: url('../assets/pinhead-icons/wall_tent.svg'); }
 
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
@@ -243,6 +268,18 @@
 }
 
 .fwmb .fwmb-btn.primary:hover {
+    color: var(--fwmb-text-inverse);
+}
+
+.fwmb .fwmb-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--fwmb-bg-muted);
+    color: var(--fwmb-text-muted);
+}
+
+.fwmb .fwmb-btn.active {
+    background: var(--fwmb-accent-main);
     color: var(--fwmb-text-inverse);
 }
 
@@ -750,17 +787,12 @@
 }
 
 /* 3. The Map Part */
-.fwmb .fwmb-map {
+.fwmb-map-preview {
     flex: 1; 
     position: relative;
-    min-width: 0;
-    height: 100%;
-}
-
-.fwmb-map-preview {
-    position: absolute;
-    inset: 0;
     overflow: hidden;
+    min-width: 0;
+    min-height: 0;
 }
 
 .fwmb-map-preview canvas {
@@ -782,7 +814,7 @@
     border-radius: var(--fwmb-radius-small);
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 20;
-    opacity: 0; /* Hidden by default, shown on hover */
+    opacity: 0;
     transition: opacity 0.2s ease;
 }
 
@@ -801,12 +833,29 @@
     transition: opacity 0.2s ease;
 }
 
+.fwmb-map-history {
+    position: absolute;
+    inset-block-start: var(--fwmb-space-m);
+    inset-inline-end: var(--fwmb-space-m);
+    display: flex;
+    gap: var(--fwmb-space-xs);
+    background: rgba(0, 0, 0, 0.5);
+    padding: var(--fwmb-space-xs);
+    border-radius: var(--fwmb-radius-small);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 20;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
 .fwmb-map:hover .fwmb-map-controls,
-.fwmb-map:hover .fwmb-map-hint {
+.fwmb-map:hover .fwmb-map-hint,
+.fwmb-map:hover .fwmb-map-history {
     opacity: 1;
 }
 
-.fwmb-map-controls button {
+.fwmb-map-controls button,
+.fwmb-map-history button {
     width: var(--fwmb-font-size-xxl);
     height: var(--fwmb-font-size-xxl);
     background: transparent;
@@ -818,13 +867,15 @@
     justify-content: center;
 }
 
-.fwmb-map-controls button:hover {
+.fwmb-map-controls button:hover,
+.fwmb-map-history button:hover {
     color: var(--fwmb-primary-200);
     background: rgba(0 , 0, 0, 0.2);
     border-color: var(--fwmb-accent-main);
 }
 
-.fwmb-map-controls button.active {
+.fwmb-map-controls button.active,
+.fwmb-map-history button.active {
     color: var(--fwmb-primary-100);
     background: rgba(0, 0, 0, 0.4);
     border-color: var(--fwmb-accent-main);
@@ -908,11 +959,14 @@
 
 /* --- MAP LAYOUT & EDIT TOOLBAR --- */
 .fwmb .fwmb-map-container {
+    background-color: #1a4b84;
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 100%;
     position: relative;
+    overflow: hidden;
+    -webkit-app-region: no-drag;
 }
 
 .fwmb .fwmb-map-preview {
@@ -929,11 +983,16 @@
     flex: 0 0 auto;
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     padding: var(--fwmb-space-s) var(--fwmb-space-m);
     background: var(--fwmb-bg-base);
     border-bottom: 1px solid var(--fwmb-border-main);
     gap: var(--fwmb-space-m);
+}
+
+.fwmb .fwmb-toolbar-content {
+    display: contents;
 }
 
 .fwmb .fwmb-brush-settings,
@@ -1000,7 +1059,7 @@
     height: var(--fwmb-font-size-l);
     padding: 0;
     flex-shrink: 0;
-    border-radius: 3px;
+    border-radius: var(--fwmb-radius-small);
     border: 1px solid var(--fwmb-border-main);
     box-shadow: var(--fwmb-shadow-popout);
     cursor: default;
@@ -1510,5 +1569,36 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-dialog-content {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-space-s);
+}
+
+/* --- PROCESSING OVERLAY --- */
+.fwmb-processing-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+}
+
+.fwmb-processing-content {
+    background: var(--fwmb-bg-panel);
+    padding: var(--fwmb-space-l) var(--fwmb-space-xl);
+    border-radius: var(--fwmb-radius-medium);
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-m);
+    color: var(--fwmb-text-primary);
+    font-size: var(--fwmb-font-size-l);
+    box-shadow: var(--fwmb-shadow-popout);
+}
+
+.fwmb-spin {
+    animation: fwmb-spin-anim 1s linear infinite;
+}
+
+@keyframes fwmb-spin-anim {
+    100% { transform: rotate(360deg); }
 }

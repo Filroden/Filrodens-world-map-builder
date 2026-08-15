@@ -1,3 +1,4 @@
+import { SpatialMath } from "../tools/SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
 
 /**
@@ -25,7 +26,7 @@ export class TectonicEngine {
     /**
      * Applies all tectonic deformations to the raw elevation buffer.
      */
-    static applyTectonicFaults(elevationData, width, height, faults, simplex) {
+    static applyTectonicFaults(elevationData, width, height, faults, simplex, activeBounds = null) {
         if (!faults || faults.length === 0) return;
 
         let readBuffer = null;
@@ -34,18 +35,18 @@ export class TectonicEngine {
             if (!fault.points || fault.points.length < 2) continue;
 
             if (fault.type === FILRODENSWMB.TECTONICS.TYPES.HOTSPOT) {
-                this.#applyHotspotChain(elevationData, width, height, fault, simplex);
+                this.#applyHotspotChain(elevationData, width, height, fault, simplex, activeBounds);
             } else if (fault.type === FILRODENSWMB.TECTONICS.TYPES.SLIP) {
-                // Take a fresh snapshot immediately before each slip fault to prevent smearing
-                readBuffer = new Float32Array(elevationData);
-                this.#applySlipFault(elevationData, readBuffer, width, height, fault, simplex);
+                if (!readBuffer) readBuffer = new Float32Array(elevationData);
+                else readBuffer.set(elevationData);
+                this.#applySlipFault(elevationData, readBuffer, width, height, fault, simplex, activeBounds);
             } else {
-                this.#applyStandardFault(elevationData, width, height, fault, simplex);
+                this.#applyStandardFault(elevationData, width, height, fault, simplex, activeBounds);
             }
         }
     }
 
-    static #applyStandardFault(elevationData, width, height, fault, simplex) {
+    static #applyStandardFault(elevationData, width, height, fault, simplex, activeBounds = null) {
         const thickness = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
         const strength = fault.strength || FILRODENSWMB.TECTONICS.DEFAULT_STRENGTH;
         const radiusSq = thickness * thickness;
@@ -54,7 +55,9 @@ export class TectonicEngine {
             const p1 = fault.points[i];
             const p2 = fault.points[i + 1];
 
-            const bounds = this.#calculateSegmentBounds(p1, p2, thickness, width, height);
+            const faultBounds = this.#calculateSegmentBounds(p1, p2, thickness, width, height);
+            const bounds = SpatialMath.intersectBounds(faultBounds, activeBounds);
+            if (!SpatialMath.isValidBounds(bounds)) continue;
 
             for (let y = bounds.minY; y <= bounds.maxY; y++) {
                 for (let x = bounds.minX; x <= bounds.maxX; x++) {
@@ -78,7 +81,7 @@ export class TectonicEngine {
         }
     }
 
-    static #applySlipFault(elevationData, readBuffer, width, height, fault, simplex) {
+    static #applySlipFault(elevationData, readBuffer, width, height, fault, simplex, activeBounds = null) {
         const thickness = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
         const strength = fault.strength || FILRODENSWMB.TECTONICS.DEFAULT_STRENGTH;
         const radiusSq = thickness * thickness;
@@ -87,7 +90,14 @@ export class TectonicEngine {
             const p1 = fault.points[i];
             const p2 = fault.points[i + 1];
 
-            const bounds = this.#calculateSegmentBounds(p1, p2, thickness, width, height);
+            // 1. Calculate the native physical footprint of the fault segment
+            const faultBounds = this.#calculateSegmentBounds(p1, p2, thickness, width, height);
+
+            // 2. Intersect it with the active processing zone
+            const bounds = SpatialMath.intersectBounds(faultBounds, activeBounds);
+
+            // 3. Skip the heavy math loop entirely if this segment is outside the rebuild zone
+            if (!SpatialMath.isValidBounds(bounds)) continue;
 
             for (let y = bounds.minY; y <= bounds.maxY; y++) {
                 for (let x = bounds.minX; x <= bounds.maxX; x++) {
@@ -148,7 +158,7 @@ export class TectonicEngine {
         elevationData[idx] = readBuffer[readY * width + readX];
     }
 
-    static #applyHotspotChain(elevationData, width, height, fault, simplex) {
+    static #applyHotspotChain(elevationData, width, height, fault, simplex, activeBounds = null) {
         const baseRadius = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
         const baseStrength = fault.strength || FILRODENSWMB.TECTONICS.DEFAULT_STRENGTH;
         const spacing = FILRODENSWMB.TECTONICS.HOTSPOT_SPACING;
@@ -175,7 +185,14 @@ export class TectonicEngine {
             const strength = baseStrength * ageRatio;
             const radiusSq = radius * radius;
 
-            const bounds = this.#calculatePointBounds(plume, radius, width, height);
+            // 1. Calculate the native physical footprint of the volcanic plume
+            const plumeBounds = this.#calculatePointBounds(plume, radius, width, height);
+
+            // 2. Intersect it with the active processing zone
+            const bounds = SpatialMath.intersectBounds(plumeBounds, activeBounds);
+
+            // 3. Skip the heavy math loop entirely if this plume is outside the rebuild zone
+            if (!SpatialMath.isValidBounds(bounds)) continue;
 
             for (let y = bounds.minY; y <= bounds.maxY; y++) {
                 for (let x = bounds.minX; x <= bounds.maxX; x++) {

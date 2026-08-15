@@ -2,7 +2,7 @@
 
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.AutoLabels"}}</legend>
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+        <div id="fwmb-scroll-auto-labels" class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
             
             {{#each autoLabels}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="{{this.dataType}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}}>
@@ -27,7 +27,7 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.CustomLabels"}}</legend>
 
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+        <div id="fwmb-scroll-custom-labels" class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
             {{#each mapLabels}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="custom">
                 <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
