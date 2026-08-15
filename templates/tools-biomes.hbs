@@ -35,15 +35,7 @@
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.MoistureScale"}}</label>
             <div class="fwmb-slider-group">
-                <input
-                    type="range"
-                    name="noise.moisture.scale"
-                    value="{{lookup uiState 'noise.moisture.scale'}}"
-                    min="100"
-                    max="8000"
-                    step="any"
-                    oninput="this.nextElementSibling.value = Number(this.value).toFixed(2)"
-                />
+                <input type="range" name="noise.moisture.scale" value="{{lookup uiState 'noise.moisture.scale'}}" min="100" max="8000" step="10" />
                 <output>{{numberFormat (lookup uiState "noise.moisture.scale") decimals=0}}</output>
             </div>
         </div>

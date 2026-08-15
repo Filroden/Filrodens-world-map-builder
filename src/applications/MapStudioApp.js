@@ -95,7 +95,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
             togglePinDropdown(e, t)         { this._onTogglePinDropdown(e, t); },
             toggleRegionSmoothing(e, t)     { this._onToggleRegionSmoothing(e, t); },
-            toggleSnapping(e, t)            { this._onToggleSnapping(e, t); },
             toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
             toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
             undoBrush(e, t)                 { this._onUndoBrush(e, t); },
@@ -2242,7 +2241,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     async _onApplyResolution(event, target) {
         // 1. Extract all uncommitted data natively (No DOM scraping)
-        const formData = new FormDataExtended(target.form).object;
+        const formData = new foundry.applications.ux.FormDataExtended(target.form).object;
 
         const newWidth = Number.parseInt(formData.mapWidth) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
         const newHeight = Number.parseInt(formData.mapHeight) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
@@ -3056,11 +3055,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this._repaintVectors();
             }
         }
-    }
-
-    _onToggleSnapping(event, target) {
-        this.uiState.snapToPoints = !this.uiState.snapToPoints;
-        target.classList.toggle("active", this.uiState.snapToPoints);
     }
 
     /**

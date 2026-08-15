@@ -88,7 +88,6 @@ export class MapStateManager {
             activeInfraMode: "pin",
             pinColor: "#ffffff",
             pinScale: 1,
-            snapToPoints: true,
             routeColor: "#ffffff",
             routeThickness: 3,
             routeStyle: "solid",
