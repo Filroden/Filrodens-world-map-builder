@@ -30,16 +30,18 @@ export class MapDialogManager {
      */
     static _withLabelDefaults(app, entity) {
         const safe = { ...entity };
-        if (!safe.label) {
-            safe.label = {
-                quickStyle: "custom",
-                fontFamily: app.uiState.labelFontFamily,
-                fontSize: app.uiState.labelFontSize,
-                fillColor: app.uiState.labelFillColor,
-                maxWidth: app.uiState.labelMaxWidth,
-                justify: app.uiState.labelJustify,
-            };
-        }
+
+        const defaults = {
+            quickStyle: "custom",
+            fontFamily: app.uiState.labelFontFamily || "Signika",
+            fontSize: app.uiState.labelFontSize || 1,
+            fillColor: app.uiState.labelFillColor || "#ffffff",
+            maxWidth: app.uiState.labelMaxWidth || 0,
+            justify: app.uiState.labelJustify || "left",
+        };
+
+        safe.label = { ...defaults, ...(safe.label || {}) };
+
         return safe;
     }
 
