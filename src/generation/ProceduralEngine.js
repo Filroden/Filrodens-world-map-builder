@@ -342,7 +342,7 @@ export class ProceduralEngine {
 
                 // B. Continental Masking (Low-Frequency Biasing)
                 const maskNoise = this.#fbm(sampleX, sampleY, 2, macroScale * 1.5);
-                const maskVal = this.#smoothstep(maskThreshold - 0.05, maskThreshold + 0.05, maskNoise);
+                const maskVal = this.#smoothstep(maskThreshold - 0.25, maskThreshold + 0.25, maskNoise);
 
                 // C. Tectonic Bilinear Upscaling
                 const mx = (x / width) * (meshW - 1);
@@ -364,10 +364,14 @@ export class ProceduralEngine {
                 let finalElev = oceanElev * (1.0 - maskVal) + landElev * maskVal;
 
                 // E. Continental Shelving (Terracing)
-                const shelfRange = 0.1;
+                const shelfRange = 0.15; // Doubled range for a visually distinct shelf zone
                 if (finalElev > seaLevel - shelfRange && finalElev < seaLevel + shelfRange) {
-                    const t = (finalElev - (seaLevel - shelfRange)) / (shelfRange * 2);
-                    finalElev = seaLevel - shelfRange + this.#easeInOutCubic(t) * (shelfRange * 2);
+                    let t = (finalElev - seaLevel) / shelfRange;
+
+                    // Cube the value to aggressively flatten the terrain near sea level
+                    t = t * t * t;
+
+                    finalElev = seaLevel + t * shelfRange;
                 }
 
                 elevationData[i] = Math.max(0, Math.min(1, finalElev));
