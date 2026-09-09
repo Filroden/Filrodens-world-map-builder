@@ -3,6 +3,17 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.CanvasSettings"}}</legend>
 
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.GenerationEngine"}}</label>
+            <select name="generationEngine">
+                <option value="standard" {{#if (eq uiState.generationEngine "standard")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StandardGeneration"}}</option>
+                <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.FlatCanvas"}}</option>
+                <!-- Advanced option hidden until v2.1.0 logic is complete -->
+                <!-- <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.TectonicGeneration"}}</option> -->
+            </select>
+        </div>
+
+        {{#unless (eq uiState.generationEngine "flat")}}
         <div class="form-group stacked">
             <label>{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
             <div class="fwmb-flex-row">
@@ -13,6 +24,7 @@
             </div>
             <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.SeedHint"}}</div>
         </div>
+        {{/unless}}
 
         <div class="form-group stacked">
             <label>{{localize "FILRODENSWMB.UI.MapResolution"}}</label>

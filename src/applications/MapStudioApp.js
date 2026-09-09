@@ -10,6 +10,7 @@ import { SpatialMath } from "../tools/SpatialMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
+import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -607,6 +608,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Skip marking dirty for temporary visual overlays
         if (!name.startsWith("reference")) this.markDirty();
+
+        // Save the state and update the UI, but do not generate terrain
+        if (name === "generationEngine") {
+            this.uiState.generationEngine = target.value;
+            this.render({ parts: ["context"] });
+            return;
+        }
 
         // 1. Route specific single-action updates
         if (name.startsWith("cartography")) return this.#updateCartography(target, name);
@@ -1346,29 +1354,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    async #rebuildFromHistory(showUI = false) {
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
-
-        // 1. Conditionally trigger the UI overlay
+    async #rebuildFromHistory(showUI = false, bounds = null) {
         if (showUI) {
             await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.RebuildingHistory"));
         }
 
         try {
-            // 2. Instant global array copy
-            this.currentElevationData.set(this.baseElevationData);
-            this.currentBiomeOverrides.fill(0);
-
-            // 3. Global history replay
-            this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel);
-
-            // 4. Global river carving
-            if (this.manualRivers && this.manualRivers.length > 0) {
-                HydrologyEngine.carveManualRivers(this.currentElevationData, this.mapWidth, this.mapHeight, this.manualRivers, engine.simplex, params.seaLevel);
-            }
+            // Hand off history processing to the Orchestrator
+            ProceduralOrchestrator.rebuildFromHistory(this, null, null, bounds);
         } finally {
-            // 5. Conditionally clear the UI overlay
             if (showUI) {
                 this.#endProcessing();
             }
@@ -1376,26 +1370,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async generateTerrain() {
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
-
-        // Clear the accumulator so it doesn't linger
+        // Enforce global array resets
         this.pendingTerrainBounds = null;
 
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
 
         try {
-            console.log("World Map Builder | Generating Topography...");
-            const t0 = performance.now();
+            // Hand off the mathematical heavy lifting to the Orchestrator
+            ProceduralOrchestrator.processTopographyPhase(this);
 
-            engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, [], null);
-            await this.#rebuildFromHistory();
-
-            this.currentSpringOverrides.fill(0);
-
-            const t1 = performance.now();
-            console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
-
+            // The App maintains control of the Climate and Canvas rendering pipelines
             await this.generateClimate(null);
         } finally {
             this.#endProcessing();
@@ -1458,18 +1442,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             // Bake procedural springs into permanent pins on first load or new map generation
             if (!this.uiState.springsBaked) {
-                const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
-                for (const s of newSprings) {
-                    this.mapPins.push({
-                        id: foundry.utils.randomID(),
-                        name: "River Source",
-                        x: s.x,
-                        y: s.y,
-                        type: "spring",
-                        radius: 6,
-                        visibility: "all",
-                    });
+                // Bypass procedural spring placement for flat canvases
+                if (this.uiState.generationEngine !== "flat") {
+                    const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
+                    for (const s of newSprings) {
+                        this.mapPins.push({
+                            id: foundry.utils.randomID(),
+                            name: "River Source",
+                            x: s.x,
+                            y: s.y,
+                            type: "spring",
+                            radius: 6,
+                            visibility: "all",
+                        });
+                    }
                 }
+
+                // Flag as baked regardless of engine mode to prevent endless retries
                 this.uiState.springsBaked = true;
                 this.markDirty();
             }
@@ -2246,6 +2235,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const newHeight = Number.parseInt(formData.mapHeight) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
         let newSeed = formData.mapSeed?.trim();
 
+        // Extract the dropdown choice
+        const newEngine = formData.generationEngine || "standard";
+
         // 2. If the user left the seed blank, generate a random one automatically
         if (!newSeed) {
             newSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -2271,6 +2263,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.defaultUiState = MapStateManager.buildDefaultUiState(newWidth, newHeight);
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
         this.uiState.mapSeed = newSeed;
+
+        // Inject the engine choice into the wiped state
+        this.uiState.generationEngine = newEngine;
 
         // Reset biome colors to defaults so the DOM sync catches them
         this.customBiomeColors = {};

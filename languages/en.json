@@ -447,5 +447,10 @@
     "FILRODENSWMB.UI.ActionRiverSpring": "River Spring",
     "FILRODENSWMB.UI.ActionInfrastructurePin": "Infrastructure Pin",
     "FILRODENSWMB.UI.ActionBiomeBrush": "Biome Brush",
-    "FILRODENSWMB.UI.ActionTerrainBrush": "Terrain Brush"
+    "FILRODENSWMB.UI.ActionTerrainBrush": "Terrain Brush",
+
+    "FILRODENSWMB.UI.GenerationEngine": "Generation Engine",
+    "FILRODENSWMB.UI.StandardGeneration": "Standard Generation",
+    "FILRODENSWMB.UI.FlatCanvas": "Flat Map Canvas",
+    "FILRODENSWMB.UI.TectonicGeneration": "Tectonic Generation"
 }

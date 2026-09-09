@@ -32,6 +32,8 @@ export class MapStateManager {
         const ratio = maxDim / baseline;
 
         return {
+            generationEngine: "standard",
+
             mapWidth: width,
             mapHeight: height,
             gridType: "square",
@@ -202,7 +204,7 @@ export class MapStateManager {
             const input = app.element.querySelector(`[name="${key}"]`);
             if (!input) continue;
 
-            if (key === "mapSeed" || key === "gridType") {
+            if (key === "mapSeed" || key === "gridType" || key === "generationEngine") {
                 app.uiState[key] = input.value;
             } else {
                 const parsed = Number.parseFloat(input.value);
