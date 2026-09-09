@@ -236,7 +236,7 @@ export class MapStateManager {
         }
 
         const params = {
-            seaLevel: state.seaLevel,
+            seaLevel: state.generationEngine === "advanced" ? 0.35 : state.seaLevel,
             tectonicPlates: state.tectonicPlates,
             coastlineFracture: state.coastlineFracture,
             continentalGrouping: state.continentalGrouping,

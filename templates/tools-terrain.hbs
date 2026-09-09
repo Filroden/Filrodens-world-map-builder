@@ -1,17 +1,19 @@
 <div class="fwmb-tool-content fwmb-scrollable">
 
-    <!-- 1. Global Settings (Visible in all modes) -->
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.GlobalSettings"}}</legend>
+    <!-- 1. Global Settings (Visible in Standard and Flat modes) -->
+    {{#unless (eq uiState.generationEngine "advanced")}}
+        <fieldset class="fwmb-fieldset">
+            <legend>{{localize "FILRODENSWMB.UI.GlobalSettings"}}</legend>
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.SeaLevel"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="seaLevel" value="{{uiState.seaLevel}}" min="0" max="1" step="0.01" oninput="this.nextElementSibling.value = this.value" />
-                <output>{{uiState.seaLevel}}</output>
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.SeaLevel"}}</label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="seaLevel" value="{{uiState.seaLevel}}" min="0" max="1" step="0.01" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{uiState.seaLevel}}</output>
+                </div>
             </div>
-        </div>
-    </fieldset>
+        </fieldset>
+    {{/unless}}
 
     <!-- 2. Standard Engine Settings -->
     {{#if (eq uiState.generationEngine "standard")}}

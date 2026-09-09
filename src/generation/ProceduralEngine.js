@@ -351,8 +351,17 @@ export class ProceduralEngine {
 
                 // D. Detail Composition
                 const detailNoise = this.#fbm(sampleX, sampleY, eOctaves, eScale);
+                const baseTexture = tectonicElevation * 0.55 + detailNoise * 0.45;
 
-                let finalElev = (tectonicElevation * 0.55 + detailNoise * 0.45) * maskVal;
+                // Model 1: Land generates upwards from the sea level to the maximum peak
+                const landElev = seaLevel + baseTexture * (1.0 - seaLevel);
+
+                // Model 2: Ocean generates downwards from just below sea level to the abyss
+                // Capping at seaLevel * 0.9 prevents underwater mountains from breaching the surface as islands
+                const oceanElev = baseTexture * (seaLevel * 0.9);
+
+                // Blend the two models using the continental mask
+                let finalElev = oceanElev * (1.0 - maskVal) + landElev * maskVal;
 
                 // E. Continental Shelving (Terracing)
                 const shelfRange = 0.1;
