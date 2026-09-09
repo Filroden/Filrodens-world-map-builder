@@ -67,6 +67,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             changeTool(e, t)                { this._onChangeTool(e, t); },
             exportPng(e, t)                 { this._onExportPng(e, t); },
             exportScene(e, t)               { this._onExportScene(e, t); },
+            forceGenerateTerrain(e, t)      { this.generateTerrain(); },
             generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
             importMapJson(e, t)             { this._onImportMapJson(e, t); },
             manageMap(e, t)                 { this._onManageMapAction(e, t); },
@@ -895,7 +896,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.markDirty();
 
-        if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
+        // Rebuild history if vector features exist so they re-carve and re-deform the newly painted terrain
+        const hasActiveFeatures = this.manualRivers?.length > 0 || this.tectonicFaults?.length > 0;
+        if (this.activeTool === "terrain" && hasActiveFeatures) {
             this.pendingTerrainBounds = null;
             this.debouncedHistoryRebuild();
         }
@@ -1424,6 +1427,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.mapSeed = payload.seed;
         this.currentParentId = payload.parentId || null;
 
+        this.uiState.generationEngine = payload.generationEngine || "standard";
+
         this.mapWidth = payload.mapWidth;
         this.mapHeight = payload.mapHeight;
 
@@ -1441,6 +1446,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const c = p.cartography || {};
 
         this.uiState.seaLevel = p.seaLevel;
+        this.uiState.tectonicPlates = p.tectonicPlates ?? 10;
+        this.uiState.coastlineFracture = p.coastlineFracture ?? 0.3;
+        this.uiState.continentalGrouping = p.continentalGrouping ?? 0.4;
         this.uiState.globalTemp = p.globalTemp;
         this.uiState.seasonOffset = p.seasonOffset;
         this.uiState.latTop = p.latTop;
@@ -1762,6 +1770,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const { currentSeed, params } = MapStateManager.getMapParameters(this);
             const payload = {
                 seed: currentSeed,
+                generationEngine: this.uiState.generationEngine,
                 springsBaked: this.uiState.springsBaked,
                 mapWidth: this.mapWidth,
                 mapHeight: this.mapHeight,

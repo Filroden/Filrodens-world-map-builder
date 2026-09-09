@@ -67,6 +67,10 @@ export class MapStateManager {
             "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
             "noise.temperature.scale": Math.min(Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.round(FILRODENSWMB.NOISE.TEMPERATURE.SCALE * ratio)), FILRODENSWMB.LIMITS.NOISE_SCALE_MAX),
 
+            tectonicPlates: 10,
+            coastlineFracture: 0.3,
+            continentalGrouping: 0.4,
+
             activeFeatureMode: "spring",
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
             springsBaked: false,
@@ -233,6 +237,9 @@ export class MapStateManager {
 
         const params = {
             seaLevel: state.seaLevel,
+            tectonicPlates: state.tectonicPlates,
+            coastlineFracture: state.coastlineFracture,
+            continentalGrouping: state.continentalGrouping,
             globalTemp: state.globalTemp,
             seasonOffset: state.seasonOffset,
             latTop: state.latTop,

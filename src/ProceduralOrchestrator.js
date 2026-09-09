@@ -1,7 +1,9 @@
 import { MapStateManager } from "./applications/MapStateManager.js";
 import { ProceduralEngine } from "./generation/ProceduralEngine.js";
 import { HydrologyEngine } from "./generation/HydrologyEngine.js";
+import { TectonicEngine } from "./generation/TectonicEngine.js";
 import { SpatialMath } from "./tools/SpatialMath.js";
+import { FILRODENSWMB } from "./config.js";
 
 export class ProceduralOrchestrator {
     /**
@@ -32,14 +34,11 @@ export class ProceduralOrchestrator {
         const t0 = performance.now();
 
         if (mode === "flat") {
-            // Bypass noise completely and create a flat canvas slightly above sea level
             app.baseElevationData.fill(params.seaLevel + 0.05);
         } else if (mode === "advanced") {
-            // v2.1.0 Tectonic pipeline placeholder
-            // engine.generateTectonicTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
+            engine.generateTectonicTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
         } else {
-            // Legacy v1 pipeline
-            engine.generateTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData, app.tectonicFaults, [], null);
+            engine.generateTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData, [], [], null);
         }
 
         const t1 = performance.now();
@@ -47,29 +46,35 @@ export class ProceduralOrchestrator {
     }
 
     /**
-     * Safely replays raster history and vector hydrology over the base topography.
-     * Designed to be called independently during active brush strokes.
+     * Reconstructs currentElevationData from baseElevationData, replaying
+     * raster brush strokes and applying vector deformations on top.
      */
-    static rebuildFromHistory(app, engine, params, bounds = null) {
-        // Instantiate engine/params if this was called independently by a brush stroke
-        if (!engine || !params) {
-            const mapParams = MapStateManager.getMapParameters(app);
-            engine = new ProceduralEngine(mapParams.currentSeed);
-            params = mapParams.params;
+    static rebuildFromHistory(app, engine = null, params = null, bounds = null) {
+        const activeEngine = engine ?? new ProceduralEngine(app.uiState.mapSeed);
+        const activeParams = params ?? MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors).params;
+        const activeBounds = ProceduralEngine.resolveBounds(bounds, app.mapWidth, app.mapHeight);
+
+        // 1. Reset current elevation from pristine base elevation within the target bounds
+        for (let y = activeBounds.minY; y <= activeBounds.maxY; y++) {
+            const rowOffset = y * app.mapWidth;
+            const start = rowOffset + activeBounds.minX;
+            const end = rowOffset + activeBounds.maxX + 1;
+            app.currentElevationData.set(app.baseElevationData.subarray(start, end), start);
         }
 
-        // Global array wipe
-        app.currentElevationData.set(app.baseElevationData);
-        app.currentBiomeOverrides.fill(0);
-
-        // Replay Raster History
-        if (app.brushEngine) {
-            app.brushEngine.replayHistory(app.currentElevationData, app.currentBiomeOverrides, params.seaLevel, bounds);
+        // 2. Replay all raster brush strokes
+        if (app.brushEngine?.history?.length > 0) {
+            app.brushEngine.replayHistory(app.currentElevationData, app.currentBiomeOverrides, activeBounds);
         }
 
-        // Carve Vector Hydrology
-        if (app.manualRivers && app.manualRivers.length > 0) {
-            HydrologyEngine.carveManualRivers(app.currentElevationData, app.mapWidth, app.mapHeight, app.manualRivers, engine.simplex, params.seaLevel, bounds);
+        // 3. Apply vector faults across both base and brushed terrain
+        if (app.tectonicFaults?.length > 0) {
+            TectonicEngine.applyTectonicFaults(app.currentElevationData, app.mapWidth, app.mapHeight, app.tectonicFaults, activeEngine.simplex, activeBounds);
+        }
+
+        // 4. Carve manual rivers into the final deformed topography
+        if (app.manualRivers?.length > 0) {
+            HydrologyEngine.carveManualRivers(app.currentElevationData, app.mapWidth, app.mapHeight, app.manualRivers, activeEngine.simplex, activeParams.seaLevel, activeBounds);
         }
     }
 

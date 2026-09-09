@@ -452,5 +452,11 @@
     "FILRODENSWMB.UI.GenerationEngine": "Generation Engine",
     "FILRODENSWMB.UI.StandardGeneration": "Standard Generation",
     "FILRODENSWMB.UI.FlatCanvas": "Flat Map Canvas",
-    "FILRODENSWMB.UI.TectonicGeneration": "Tectonic Generation"
+    "FILRODENSWMB.UI.TectonicGeneration": "Tectonic Generation",
+    "FILRODENSWMB.UI.TectonicPlates": "Tectonic Plates",
+    "FILRODENSWMB.UI.CoastlineFracture": "Coastline Fracture",
+    "FILRODENSWMB.UI.ContinentalGrouping": "Continental Grouping",
+    "FILRODENSWMB.UI.GenerateTectonicMap": "Update Tectonic Map",
+    "FILRODENSWMB.UI.SurfaceRoughness": "Surface Roughness",
+    "FILRODENSWMB.UI.ErosionScale": "Erosion Scale"
 }

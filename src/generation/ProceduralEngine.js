@@ -299,6 +299,161 @@ export class ProceduralEngine {
     }
 
     /**
+     * ADVANCED PASS (v2.1.0):
+     * Uses Voronoi vector math, low-frequency boolean masking, and domain warping
+     * to generate massive, realistic continental plates and tectonic mountain ridges.
+     */
+    generateTectonicTopography(width, height, params, outBuffer) {
+        const elevationData = outBuffer;
+        const panX = params.noise.offsetX || 0;
+        const panY = params.noise.offsetY || 0;
+        const seaLevel = params.seaLevel || 0.35;
+
+        // V2.1.0 Parameters (with safe defaults if UI is missing them)
+        const plateCount = params.tectonicPlates || 25;
+        const fracture = params.coastlineFracture || 0.6;
+        const maskThreshold = params.continentalGrouping || 0.45;
+
+        // 1. Generate Tectonic Base (Low-Res Voronoi Mesh)
+        // Calculated on a lightweight 100x100 grid to maintain 60FPS performance
+        const meshW = 100;
+        const meshH = 100;
+        const tectonicMesh = this.#generateTectonicMesh(meshW, meshH, plateCount);
+
+        const eScale = params.noise.elevation.scale;
+        const eOctaves = params.noise.elevation.octaves;
+
+        // A fixed spatial frequency anchored to the map's dimensions
+        const macroScale = 1 / Math.max(width, height);
+
+        // 2. High-Resolution Math Pass
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const worldX = x + panX;
+                const worldY = y + panY;
+                const i = y * width + x;
+
+                // A. Domain Warping (Fracture)
+                const warpX = (this.#fbm(worldX + 5321, worldY + 1234, 3, macroScale * 5) - 0.5) * fracture * 200;
+                const warpY = (this.#fbm(worldX + 8765, worldY + 4321, 3, macroScale * 5) - 0.5) * fracture * 200;
+
+                const sampleX = worldX + warpX;
+                const sampleY = worldY + warpY;
+
+                // B. Continental Masking (Low-Frequency Biasing)
+                const maskNoise = this.#fbm(sampleX, sampleY, 2, macroScale * 1.5);
+                const maskVal = this.#smoothstep(maskThreshold - 0.05, maskThreshold + 0.05, maskNoise);
+
+                // C. Tectonic Bilinear Upscaling
+                const mx = (x / width) * (meshW - 1);
+                const my = (y / height) * (meshH - 1);
+                const tectonicElevation = this.#bilinearSample(tectonicMesh, meshW, mx, my);
+
+                // D. Detail Composition
+                const detailNoise = this.#fbm(sampleX, sampleY, eOctaves, eScale);
+
+                let finalElev = (tectonicElevation * 0.55 + detailNoise * 0.45) * maskVal;
+
+                // E. Continental Shelving (Terracing)
+                const shelfRange = 0.1;
+                if (finalElev > seaLevel - shelfRange && finalElev < seaLevel + shelfRange) {
+                    const t = (finalElev - (seaLevel - shelfRange)) / (shelfRange * 2);
+                    finalElev = seaLevel - shelfRange + this.#easeInOutCubic(t) * (shelfRange * 2);
+                }
+
+                elevationData[i] = Math.max(0, Math.min(1, finalElev));
+            }
+        }
+        return elevationData;
+    }
+
+    /**
+     * Calculates continental plates and tectonic boundary elevations on a low-resolution array.
+     */
+    #generateTectonicMesh(width, height, plateCount) {
+        const mesh = new Float32Array(width * height);
+        const plates = [];
+        const cellMap = new Int32Array(width * height);
+
+        // 1. Seed Tectonic Plates with physical drift vectors
+        for (let i = 0; i < plateCount; i++) {
+            plates.push({
+                x: this.riverPrng() * width,
+                y: this.riverPrng() * height,
+                dx: (this.riverPrng() - 0.5) * 2, // Drift velocity X
+                dy: (this.riverPrng() - 0.5) * 2, // Drift velocity Y
+            });
+        }
+
+        // 2. Assign Voronoi Cells
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let minDist = Infinity;
+                let bestPlate = 0;
+                for (let p = 0; p < plateCount; p++) {
+                    // Fast euclidean distance to find plate ownership
+                    const dist = Math.hypot(x - plates[p].x, y - plates[p].y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestPlate = p;
+                    }
+                }
+                cellMap[y * width + x] = bestPlate;
+            }
+        }
+
+        // 3. Calculate Boundary Physics
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = y * width + x;
+                const myPlateId = cellMap[idx];
+                const myPlate = plates[myPlateId];
+                let boundaryModifier = 0;
+
+                let isBoundary = false;
+                let otherPlate = null;
+
+                // Check immediate neighbors for plate shifts
+                for (const dir of ProceduralEngine.ADJACENT_OFFSETS) {
+                    const nx = x + dir.dx;
+                    const ny = y + dir.dy;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        const nPlateId = cellMap[ny * width + nx];
+                        if (nPlateId !== myPlateId) {
+                            isBoundary = true;
+                            otherPlate = plates[nPlateId];
+                            break; // Stop at the first foreign border found
+                        }
+                    }
+                }
+
+                if (isBoundary) {
+                    // Calculate collision by evaluating relative velocity against relative position
+                    const relativePosX = otherPlate.x - myPlate.x;
+                    const relativePosY = otherPlate.y - myPlate.y;
+                    const relativeVelX = otherPlate.dx - myPlate.dx;
+                    const relativeVelY = otherPlate.dy - myPlate.dy;
+
+                    // Dot product: Negative result means plates are crashing together
+                    const collision = relativePosX * relativeVelX + relativePosY * relativeVelY;
+
+                    if (collision < 0) {
+                        boundaryModifier = 0.8; // Convergent (Mountain Ridge)
+                    } else {
+                        boundaryModifier = -0.4; // Divergent (Ocean Trench or Rift Valley)
+                    }
+                }
+
+                // Apply base elevation (0.5) modified by the boundary physics
+                mesh[idx] = 0.5 + boundaryModifier;
+            }
+        }
+
+        // 4. Box-blur the mesh to smooth the jagged mathematical Voronoi edges before upscaling
+        return this.#blurMesh(mesh, width, height, 2);
+    }
+
+    /**
      * Calculates moisture and temperature based on the final topography.
      * Applies globally deterministic Orographic Lift via Western Horizon sampling.
      */
@@ -686,6 +841,69 @@ export class ProceduralEngine {
         }
 
         return outBuffer;
+    }
+
+    /**
+     * A highly optimized box-blur used exclusively for smoothing the low-resolution Tectonic Mesh.
+     */
+    #blurMesh(mesh, width, height, radius) {
+        const result = new Float32Array(width * height);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                let sum = 0,
+                    count = 0;
+                for (let dy = -radius; dy <= radius; dy++) {
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            sum += mesh[ny * width + nx];
+                            count++;
+                        }
+                    }
+                }
+                result[y * width + x] = sum / count;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Bilinear interpolation for perfectly upscaling a low-resolution mesh into a high-resolution grid.
+     */
+    #bilinearSample(mesh, width, x, y) {
+        const x1 = Math.floor(x);
+        const y1 = Math.floor(y);
+        const x2 = Math.min(x1 + 1, width - 1);
+        const y2 = Math.min(y1 + 1, width - 1);
+
+        const dx = x - x1;
+        const dy = y - y1;
+
+        const p00 = mesh[y1 * width + x1];
+        const p10 = mesh[y1 * width + x2];
+        const p01 = mesh[y2 * width + x1];
+        const p11 = mesh[y2 * width + x2];
+
+        const bottom = p00 * (1 - dx) + p10 * dx;
+        const top = p01 * (1 - dx) + p11 * dx;
+
+        return bottom * (1 - dy) + top * dy;
+    }
+
+    /**
+     * GLSL-style smoothstep for clamping the Continental Mask.
+     */
+    #smoothstep(edge0, edge1, x) {
+        const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+        return t * t * (3 - 2 * t);
+    }
+
+    /**
+     * S-Curve for Continental Terracing at Sea Level.
+     */
+    #easeInOutCubic(x) {
+        return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
     }
 }
 

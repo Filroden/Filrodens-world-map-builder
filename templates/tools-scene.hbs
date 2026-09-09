@@ -8,22 +8,21 @@
             <select name="generationEngine">
                 <option value="standard" {{#if (eq uiState.generationEngine "standard")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StandardGeneration"}}</option>
                 <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.FlatCanvas"}}</option>
-                <!-- Advanced option hidden until v2.1.0 logic is complete -->
-                <!-- <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.TectonicGeneration"}}</option> -->
+                <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.TectonicGeneration"}}</option>
             </select>
         </div>
 
         {{#unless (eq uiState.generationEngine "flat")}}
-        <div class="form-group stacked">
-            <label>{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
-            <div class="fwmb-flex-row">
-                <input type="text" name="mapSeed" class="fwmb-flex-1" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" />
-                <button type="button" class="fwmb-btn" data-action="randomizeSeed" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
-                    <i class="fwmb-icon shuffle"></i>
-                </button>
+            <div class="form-group stacked">
+                <label>{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
+                <div class="fwmb-flex-row">
+                    <input type="text" name="mapSeed" class="fwmb-flex-1" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" />
+                    <button type="button" class="fwmb-btn" data-action="randomizeSeed" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
+                        <i class="fwmb-icon shuffle"></i>
+                    </button>
+                </div>
+                <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.SeedHint"}}</div>
             </div>
-            <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.SeedHint"}}</div>
-        </div>
         {{/unless}}
 
         <div class="form-group stacked">
@@ -82,10 +81,13 @@
     </fieldset>
 
     <div class="fwmb-flex-1"></div>
-    <div class="fwmb-divider"></div>
 
-    <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditCanvasHint'}}">
-        {{localize "FILRODENSWMB.UI.EditCanvas"}}
-    </button>
+    {{#unless (eq uiState.generationEngine "advanced")}}
+        <div class="fwmb-divider"></div>
+
+        <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditCanvasHint'}}">
+            {{localize "FILRODENSWMB.UI.EditCanvas"}}
+        </button>
+    {{/unless}}
 
 </div>

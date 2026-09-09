@@ -40,6 +40,7 @@ export class RegionalExtractor {
         // 5. Pack and Return the Payload
         return {
             seed: currentSeed,
+            generationEngine: state.generationEngine,
             springsBaked: true,
             mapWidth: targetWidth,
             mapHeight: targetHeight,
