@@ -1,7 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { StudioCanvas } from "../canvas/StudioCanvas.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
-import { HydrologyEngine } from "../generation/HydrologyEngine.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
 import { Scene3D } from "../canvas/Scene3D.js";
@@ -1388,26 +1387,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async generateClimate(bounds = null) {
         if (!this.currentElevationData) return;
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
 
-        let activeBounds = bounds || this.pendingTerrainBounds;
-
-        // Dynamically scale the wind distance relative to a baseline map resolution and map scale
-        if (activeBounds) {
-            const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
-            const widthScale = this.mapWidth / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
-
-            const latTop = params.latTop ?? 90;
-            const latBottom = params.latBottom ?? -90;
-            const latRange = Math.max(0.1, Math.abs(latTop - latBottom)); // Prevent Infinity
-            const latScale = 180 / latRange;
-
-            const dynamicWindDistance = Math.round(baseWind * widthScale * latScale);
-
-            activeBounds = SpatialMath.padBounds(activeBounds, dynamicWindDistance, 0, this.mapWidth, this.mapHeight);
-        }
-
+        // Resolve active bounds before clearing pending state
+        const activeBounds = bounds || this.pendingTerrainBounds;
         if (!bounds && this.pendingTerrainBounds) {
             this.pendingTerrainBounds = null;
         }
@@ -1415,14 +1397,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
 
         try {
-            console.log("World Map Builder | Generating Climate Data...");
-            const t0 = performance.now();
-
-            engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params, this.currentMoistureData, this.currentTemperatureData, activeBounds);
-
-            const t1 = performance.now();
-            console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
-
+            ProceduralOrchestrator.processClimatePhase(this, activeBounds);
             await this.generateFeatures(activeBounds);
         } finally {
             this.#endProcessing();
@@ -1431,60 +1406,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async generateFeatures(bounds = null) {
         if (!this.currentElevationData) return;
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
 
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
 
         try {
-            console.log("World Map Builder | Generating Features...");
-            const t0 = performance.now();
-
-            // Bake procedural springs into permanent pins on first load or new map generation
-            if (!this.uiState.springsBaked) {
-                // Bypass procedural spring placement for flat canvases
-                if (this.uiState.generationEngine !== "flat") {
-                    const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
-                    for (const s of newSprings) {
-                        this.mapPins.push({
-                            id: foundry.utils.randomID(),
-                            name: "River Source",
-                            x: s.x,
-                            y: s.y,
-                            type: "spring",
-                            radius: 6,
-                            visibility: "all",
-                        });
-                    }
-                }
-
-                // Flag as baked regardless of engine mode to prevent endless retries
-                this.uiState.springsBaked = true;
-                this.markDirty();
-            }
-
-            const dynamicPins = [...this.mapPins];
-
-            // Ensure procedural water spawns exactly at the highest point of our manual carve
-            const manualSprings = HydrologyEngine.getRiverSources(this.currentElevationData, this.mapWidth, this.manualRivers);
-            dynamicPins.push(...manualSprings);
-
-            this.currentRiverData = engine.generateRivers(
-                this.currentElevationData,
-                this.currentMoistureData,
-                this.currentTemperatureData,
-                dynamicPins,
-                this.mapWidth,
-                this.mapHeight,
-                params,
-                this.bufferRiverMap,
-                this.bufferWaterMask,
-            );
-
-            const t1 = performance.now();
-            console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
-
-            await this._repaintCanvas(bounds); // Cascade to final render
+            ProceduralOrchestrator.processFeaturePhase(this);
+            await this._repaintCanvas(bounds);
         } finally {
             this.#endProcessing();
         }
