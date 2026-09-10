@@ -10,12 +10,12 @@ export class ProceduralOrchestrator {
      * Executes the topography and history phases of map generation.
      * Note: Climate generation and Canvas rendering remain handled by the App controller.
      */
-    static processTopographyPhase(app) {
+    static async processTopographyPhase(app) {
         const { currentSeed, params } = MapStateManager.getMapParameters(app);
         const engine = new ProceduralEngine(currentSeed);
 
         // 1. Route Base Topography
-        this.#routeTopographyPass(app, engine, params);
+        await this.#routeTopographyPass(app, engine, params);
 
         // 2. Replay History & Features
         this.rebuildFromHistory(app, engine, params, null);
@@ -27,7 +27,7 @@ export class ProceduralOrchestrator {
     /**
      * Directs the topography generation based on the active engine mode.
      */
-    static #routeTopographyPass(app, engine, params) {
+    static async #routeTopographyPass(app, engine, params) {
         const mode = app.uiState.generationEngine || "standard";
 
         console.log(`World Map Builder | Generating Topography (${mode} mode)...`);
@@ -37,6 +37,8 @@ export class ProceduralOrchestrator {
             app.baseElevationData.fill(params.seaLevel + 0.05);
         } else if (mode === "advanced") {
             engine.generateTectonicTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
+        } else if (mode === "guided") {
+            await engine.generateGuidedTopography(app.mapWidth, app.mapHeight, params, app.landMasks, app.baseElevationData);
         } else {
             engine.generateTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData, [], [], null);
         }

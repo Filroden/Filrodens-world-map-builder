@@ -9,8 +9,16 @@
                 <option value="standard" {{#if (eq uiState.generationEngine "standard")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StandardGeneration"}}</option>
                 <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.FlatCanvas"}}</option>
                 <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.TectonicGeneration"}}</option>
+                <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GuidedGeneration"}}</option>
             </select>
         </div>
+
+        {{#if (eq uiState.generationEngine "guided")}}
+            <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLandMaskHint'}}">
+                {{localize "FILRODENSWMB.UI.EditLandMask"}}
+            </button>
+            <div class="fwmb-divider" style="margin: var(--fwmb-space-m) 0;"></div>
+        {{/if}}
 
         {{#unless (eq uiState.generationEngine "flat")}}
             <div class="form-group stacked">
@@ -80,14 +88,41 @@
         </div>
     </fieldset>
 
+    {{#if (eq uiState.generationEngine "guided")}}
+        <fieldset class="fwmb-fixed-lists fwmb-fieldset">
+            <legend>{{localize "FILRODENSWMB.UI.LandMasks"}}</legend>
+
+            <div id="fwmb-scroll-landMasks" class="fwmb-list-container fwmb-scrollable stable">
+                {{#each landMasks}}
+                    <div class="fwmb-list-item" data-id="{{this.id}}" data-type="landMask">
+                        <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+
+                        <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                            <i class="fwmb-icon center-focus"></i>
+                        </button>
+
+                        <button type="button" class="fwmb-btn small muted danger" data-action="deleteLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                            <i class="fwmb-icon delete"></i>
+                        </button>
+                    </div>
+                {{else}}
+                    <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLandMasks"}}</div>
+                {{/each}}
+            </div>
+        </fieldset>
+    {{/if}}
+
     <div class="fwmb-flex-1"></div>
 
-    {{#unless (eq uiState.generationEngine "advanced")}}
+    {{#if (eq uiState.generationEngine "advanced")}}
+        <!-- Hidden entirely in advanced mode -->
+    {{else if (eq uiState.generationEngine "guided")}}
+        <!-- Rendered inside the Canvas Settings fieldset above -->
+    {{else}}
         <div class="fwmb-divider"></div>
-
         <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditCanvasHint'}}">
             {{localize "FILRODENSWMB.UI.EditCanvas"}}
         </button>
-    {{/unless}}
+    {{/if}}
 
 </div>

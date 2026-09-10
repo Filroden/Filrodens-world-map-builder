@@ -151,6 +151,8 @@ export class MapStateManager {
             activeFaultId: app.activeFaultId,
             manualRivers: foundry.utils.deepClone(app.manualRivers),
             activeRiverId: app.activeRiverId,
+            landMasks: foundry.utils.deepClone(app.landMasks || []),
+            activeLandMaskId: app.activeLandMaskId,
             pins: foundry.utils.deepClone(app.mapPins),
             routes: foundry.utils.deepClone(app.mapRoutes),
             regionLayers: foundry.utils.deepClone(app.regionLayers),
@@ -191,6 +193,8 @@ export class MapStateManager {
         app.activeFaultId = state.activeFaultId || null;
         app.manualRivers = state.manualRivers || app.manualRivers;
         app.activeRiverId = state.activeRiverId || null;
+        app.landMasks = state.landMasks || app.landMasks || [];
+        app.activeLandMaskId = state.activeLandMaskId || null;
         app.mapPins = state.pins || app.mapPins;
         app.mapRoutes = state.routes || app.mapRoutes;
         app.regionLayers = state.regionLayers || app.regionLayers;

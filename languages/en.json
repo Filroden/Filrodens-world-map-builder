@@ -453,10 +453,19 @@
     "FILRODENSWMB.UI.StandardGeneration": "Standard Generation",
     "FILRODENSWMB.UI.FlatCanvas": "Flat Map Canvas",
     "FILRODENSWMB.UI.TectonicGeneration": "Tectonic Generation",
+    "FILRODENSWMB.UI.GuidedGeneration": "Guided Generation",
     "FILRODENSWMB.UI.TectonicPlates": "Tectonic Plates",
     "FILRODENSWMB.UI.CoastlineFracture": "Coastline Fracture",
     "FILRODENSWMB.UI.ContinentalGrouping": "Continental Grouping",
-    "FILRODENSWMB.UI.GenerateTectonicMap": "Update Tectonic Map",
     "FILRODENSWMB.UI.SurfaceRoughness": "Surface Roughness",
-    "FILRODENSWMB.UI.ErosionScale": "Erosion Scale"
+    "FILRODENSWMB.UI.ErosionScale": "Erosion Scale",
+    "FILRODENSWMB.UI.EditLandMask": "Edit Land Mask",
+    "FILRODENSWMB.UI.EditLandMaskHint": "Mark areas of the map that could be land. This will influence the tectonic generation algorithm to produce more realistic landmasses.",
+    "FILRODENSWMB.UI.DrawLandMask": "Draw Land Mask",
+    "FILRODENSWMB.UI.DrawLandMaskHint": "Draw areas of the map that could be land.",
+    "FILRODENSWMB.UI.DrawOceanMask": "Draw Ocean Mask",
+    "FILRODENSWMB.UI.DrawOceanMaskHint": "Draw areas of the map that could be ocean.",
+    "FILRODENSWMB.UI.LandMasks": "Land Masks",
+    "FILRODENSWMB.UI.NoLandMasks": "No land masks have been drawn yet.",
+    "FILRODENSWMB.UI.EndEdit": "Finish Editing"
 }

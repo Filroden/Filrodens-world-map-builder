@@ -27,6 +27,7 @@ export class StudioCanvas {
             topography: new PIXI.Container(),
             biomes: new PIXI.Container(),
             contours: new PIXI.Container(),
+            landMasks: new PIXI.Container(),
             features: new PIXI.Container(),
             infrastructure: new PIXI.Container(),
             regions: new PIXI.Container(),
@@ -39,7 +40,7 @@ export class StudioCanvas {
 
         // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
         this.haloGraphics = new PIXI.Graphics();
-        this.haloGraphics.filters = [new PIXI.filters.AlphaFilter(0.15)];
+        this.haloGraphics.filters = [new PIXI.AlphaFilter(0.15)];
         this.layers.features.addChild(this.haloGraphics);
 
         this.manualRiverGraphics = new PIXI.Graphics();
@@ -96,6 +97,7 @@ export class StudioCanvas {
             this.layers.topography,
             this.layers.biomes,
             this.layers.contours,
+            this.layers.landMasks,
             this.layers.features,
             this.layers.regions,
             this.layers.infrastructure,
@@ -350,11 +352,22 @@ export class StudioCanvas {
             return;
         }
 
+        // --- MAP PANNING ---
         if (this.isDragging) {
             const dx = e.clientX - this.dragStart.x;
             const dy = e.clientY - this.dragStart.y;
             this.stage.position.x = this.stageStart.x + dx;
             this.stage.position.y = this.stageStart.y + dy;
+            return;
+        }
+
+        // --- NODE DRAGGING ---
+        if (this.activeDrag) {
+            // Expand the clamp buffer so masks can span well outside the view
+            const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+            this.activeDrag.target.x = Math.max(-buffer, Math.min(coords.x, this.mapWidth + buffer));
+            this.activeDrag.target.y = Math.max(-buffer, Math.min(coords.y, this.mapHeight + buffer));
+            if (this.onInfraDrag) this.onInfraDrag();
             return;
         }
 
@@ -1068,6 +1081,51 @@ export class StudioCanvas {
         });
     }
 
+    renderLandMasks(masks = [], isEditMode = false, activeMaskId = null, isVisible = true) {
+        if (!this.landMaskGraphics) {
+            this.landMaskGraphics = new PIXI.Graphics();
+            this.layers.landMasks.addChild(this.landMaskGraphics);
+        }
+
+        const g = this.landMaskGraphics;
+        g.clear();
+        g.removeChildren().forEach((c) => c.destroy({ children: true }));
+
+        this.interactiveTargets = this.interactiveTargets.filter((t) => t.entityType !== "landMask");
+
+        if (!isVisible || !masks || masks.length === 0) return;
+
+        for (const mask of masks) {
+            if (!mask.points || mask.points.length === 0) continue;
+
+            const isActive = mask.id === activeMaskId;
+            const isSubtract = mask.operation === "subtract";
+
+            // Green for Add Land, Red for Subtract Land (Add Ocean)
+            const baseColor = isSubtract ? 0xf87171 : 0x4ade80;
+
+            g.lineStyle(2, baseColor, isActive ? 0.9 : 0.4);
+            g.beginFill(baseColor, isActive ? 0.3 : 0.1);
+
+            g.moveTo(mask.points[0].x, mask.points[0].y);
+            for (let i = 1; i < mask.points.length; i++) {
+                g.lineTo(mask.points[i].x, mask.points[i].y);
+            }
+
+            // Close the visual outline when the polygon has finished drawing
+            const isClosed = mask.points.length >= 3 && !isActive;
+            if (isClosed) {
+                g.closePath();
+            }
+            g.endFill();
+
+            // Render edit nodes and hit targets for ALL masks whenever edit mode is active
+            if (isEditMode) {
+                this.#renderEditNodes(mask.points, g, isActive, mask, "landMask");
+            }
+        }
+    }
+
     renderRegions(regionLayers = [], isEditMode = false, activeRegionId = null, globalOpacity = 0.5) {
         this.layers.regions.removeChildren().forEach((c) => c.destroy({ children: true }));
 
@@ -1137,17 +1195,16 @@ export class StudioCanvas {
     zoomToFeature(points) {
         if (!points || points.length === 0 || !this.stage) return;
 
-        let minX = points[0].x;
-        let maxX = points[0].x;
-        let minY = points[0].y;
-        let maxY = points[0].y;
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
 
-        // Flatten the boundaries
-        for (let i = 1; i < points.length; i++) {
-            if (points[i].x < minX) minX = points[i].x;
-            if (points[i].x > maxX) maxX = points[i].x;
-            if (points[i].y < minY) minY = points[i].y;
-            if (points[i].y > maxY) maxY = points[i].y;
+        for (const pt of points) {
+            if (pt.x < minX) minX = pt.x;
+            if (pt.x > maxX) maxX = pt.x;
+            if (pt.y < minY) minY = pt.y;
+            if (pt.y > maxY) maxY = pt.y;
         }
 
         // Separate the true visual dimensions from the padded camera bounding box
@@ -1735,17 +1792,18 @@ export class StudioCanvas {
     #updateGlobalMask() {
         if (!this.mapMask) {
             this.mapMask = new PIXI.Graphics();
-            // Add the mask to the stage, then assign it as the stage's official clipping mask
             this.stage.addChild(this.mapMask);
             this.stage.mask = this.mapMask;
         }
 
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER; // Sensible off-canvas boundary
+
         this.mapMask.clear();
-        this.mapMask.beginFill(0xffffff); // Color doesn't matter for masks
-        this.mapMask.drawRect(0, 0, this.mapWidth, this.mapHeight);
+        this.mapMask.beginFill(0xffffff);
+        this.mapMask.drawRect(-buffer, -buffer, this.mapWidth + buffer * 2, this.mapHeight + buffer * 2);
         this.mapMask.endFill();
 
-        this.stage.hitArea = new PIXI.Rectangle(0, 0, this.mapWidth, this.mapHeight);
+        this.stage.hitArea = new PIXI.Rectangle(-buffer, -buffer, this.mapWidth + buffer * 2, this.mapHeight + buffer * 2);
     }
 
     renderFaultLines(faults = [], isEditMode = false, activeFaultId = null) {

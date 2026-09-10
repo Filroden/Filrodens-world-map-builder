@@ -44,6 +44,24 @@ export class ProceduralEngine {
     }
 
     /**
+     * Determines if a given pixel coordinate falls within a vector polygon.
+     * Highly optimized Ray-Casting (Even-Odd) algorithm for tight generation loops.
+     */
+    static isPointInPolygon(x, y, points) {
+        let isInside = false;
+        for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+            const xi = points[i].x,
+                yi = points[i].y;
+            const xj = points[j].x,
+                yj = points[j].y;
+
+            const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+            if (intersect) isInside = !isInside;
+        }
+        return isInside;
+    }
+
+    /**
      * A highly performant, 32-bit Pseudo-Random Number Generator.
      */
     static #mulberry32(a) {
@@ -78,11 +96,11 @@ export class ProceduralEngine {
      */
     bakeProceduralSprings(elevationData, moistureData, width, height, params) {
         const springs = [];
-        const targetCount = params.riverDensity || 40;
+        const targetCount = params.riverDensity ?? FILRODENSWMB.HYDROLOGY.RIVER_DENSITY;
         const maxAttempts = targetCount * 50;
         let attempts = 0;
 
-        const seaLevel = params.seaLevel || 0.35;
+        const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
         const altOffset = params?.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
         const moistMin = params?.hydrology?.springMoistMin ?? FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN;
 
@@ -257,10 +275,10 @@ export class ProceduralEngine {
 
         const eScale = params.noise.elevation.scale;
         const eOctaves = params.noise.elevation.octaves;
-        const eStretch = params.noise.elevation.stretch || 1;
-        const panX = params.noise.offsetX || 0;
-        const panY = params.noise.offsetY || 0;
-        const seaLevel = params.seaLevel || 0.35;
+        const eStretch = params.noise.elevation.stretch ?? 1;
+        const panX = params.noise.offsetX ?? 0;
+        const panY = params.noise.offsetY ?? 0;
+        const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
 
         // 1. Generate Base Elevation Noise
         for (let y = activeBounds.minY; y <= activeBounds.maxY; y++) {
@@ -305,14 +323,13 @@ export class ProceduralEngine {
      */
     generateTectonicTopography(width, height, params, outBuffer) {
         const elevationData = outBuffer;
-        const panX = params.noise.offsetX || 0;
-        const panY = params.noise.offsetY || 0;
-        const seaLevel = params.seaLevel || 0.35;
+        const panX = params.noise.offsetX ?? 0;
+        const panY = params.noise.offsetY ?? 0;
+        const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
 
-        // V2.1.0 Parameters (with safe defaults if UI is missing them)
-        const plateCount = params.tectonicPlates || 25;
-        const fracture = params.coastlineFracture || 0.6;
-        const maskThreshold = params.continentalGrouping || 0.45;
+        const plateCount = params.tectonicPlates ?? 25;
+        const fracture = params.coastlineFracture ?? 0.6;
+        const maskThreshold = params.continentalGrouping ?? 0.45;
 
         // 1. Generate Tectonic Base (Low-Res Voronoi Mesh)
         // Calculated on a lightweight 100x100 grid to maintain 60FPS performance
@@ -360,19 +377,9 @@ export class ProceduralEngine {
                 // Capping at seaLevel * 0.9 prevents underwater mountains from breaching the surface as islands
                 const oceanElev = baseTexture * (seaLevel * 0.9);
 
-                // Blend the two models using the continental mask
-                let finalElev = oceanElev * (1.0 - maskVal) + landElev * maskVal;
-
-                // E. Continental Shelving (Terracing)
-                const shelfRange = 0.15; // Doubled range for a visually distinct shelf zone
-                if (finalElev > seaLevel - shelfRange && finalElev < seaLevel + shelfRange) {
-                    let t = (finalElev - seaLevel) / shelfRange;
-
-                    // Cube the value to aggressively flatten the terrain near sea level
-                    t = t * t * t;
-
-                    finalElev = seaLevel + t * shelfRange;
-                }
+                // Blend the two models based on the continental mask value
+                let finalElev = this.#blendElevations(oceanElev, landElev, maskVal);
+                finalElev = this.#applyContinentalShelf(finalElev, seaLevel);
 
                 elevationData[i] = Math.max(0, Math.min(1, finalElev));
             }
@@ -467,6 +474,154 @@ export class ProceduralEngine {
     }
 
     /**
+     * Orchestrates an asynchronous Web Worker to execute the Jump Flood Algorithm (JFA).
+     * Calculates exact boundary fidelity without locking the main rendering thread.
+     */
+    async generateGuidedTopography(width, height, params, landMasks, outBuffer) {
+        const elevationData = outBuffer;
+        const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= 3);
+
+        if (validMasks.length === 0) {
+            console.warn("ProceduralEngine: No valid masks provided for guided generation.");
+            return elevationData;
+        }
+
+        // 1. Await the asynchronous JFA Distance Field from the Web Worker
+        console.log("ProceduralEngine: Starting JFA distance-field generation.");
+
+        const distanceField = await this.#dispatchJFAWorker(width, height, validMasks);
+
+        console.log("ProceduralEngine: JFA distance field received.", distanceField?.length, "values.");
+
+        // 2. Process High-Resolution Math Pass synchronously once the field is returned
+        this.#applyGuidedDetail(width, height, params, distanceField, elevationData);
+
+        return elevationData;
+    }
+
+    /**
+     * Dispatches the distance calculation to a dedicated Web Worker.
+     * Uses Promise wrapper to allow the main thread to await the zero-copy buffer transfer.
+     */
+    #dispatchJFAWorker(width, height, validMasks) {
+        return new Promise((resolve, reject) => {
+            const workerPath = "/modules/filrodens-world-map-builder/workers/JFAWorker.js";
+            const jfaWorker = new Worker(workerPath);
+
+            jfaWorker.onmessage = (event) => {
+                if (event.data.error) {
+                    console.error("ProceduralEngine: JFA Worker returned an error.", event.data.error);
+                    reject(new Error(event.data.error));
+                } else {
+                    console.log("ProceduralEngine: JFA Worker completed.", event.data.distanceField?.length, "distance values received.");
+                    resolve(event.data.distanceField);
+                }
+                jfaWorker.terminate();
+            };
+
+            jfaWorker.onerror = (error) => {
+                console.error("ProceduralEngine: JFA Worker failed.", {
+                    message: error.message,
+                    filename: error.filename,
+                    lineno: error.lineno,
+                    colno: error.colno,
+                    error,
+                });
+                reject(error);
+                jfaWorker.terminate();
+            };
+
+            jfaWorker.postMessage({ width, height, validMasks });
+        });
+    }
+
+    /**
+     * Applies domain warping, noise suppression, and continuous elevation blending.
+     * Enforces Strict Ownership to prevent noise from creating islands outside mask boundaries.
+     */
+    #applyGuidedDetail(width, height, params, distanceField, elevationData) {
+        const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
+        const eScale = params.noise.elevation.scale;
+        const eOctaves = params.noise.elevation.octaves;
+        const eStretch = params.noise.elevation.stretch ?? 1.0;
+
+        const fracture = params.coastlineFracture ?? 0.6;
+        const coastalBand = params.coastalBand ?? 30.0;
+        const macroScale = 1 / Math.max(width, height);
+
+        // Defines how far inland/out to sea the macro structure reaches its peak depth/height
+        const CONTINENT_SCALE = 150.0;
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const worldX = x + (params.noise.offsetX ?? 0);
+                const worldY = y + (params.noise.offsetY ?? 0);
+                const index = y * width + x;
+
+                // 1. Apply Domain Warping
+                const warpX = (this.#fbm(worldX + 5321, worldY + 1234, 3, macroScale * 5) - 0.5) * fracture * 200;
+                const warpY = (this.#fbm(worldX + 8765, worldY + 4321, 3, macroScale * 5) - 0.5) * fracture * 200;
+
+                const warpedX = Math.max(0, Math.min(width - 1, Math.floor(x + warpX)));
+                const warpedY = Math.max(0, Math.min(height - 1, Math.floor(y + warpY)));
+                const rawDistance = distanceField[warpedY * width + warpedX];
+
+                // 2. Base Noise & Suppression
+                const detailNoise = this.#fbm(worldX + warpX, worldY + warpY, eOctaves, eScale);
+                const noiseWeight = this.#smoothstep(0, coastalBand, Math.abs(rawDistance));
+
+                // 3. Macro Structure (Ease-out curve mapped 0.0 to 1.0)
+                const normalizedDist = Math.min(1.0, Math.abs(rawDistance) / CONTINENT_SCALE);
+                const structure = 1.0 - Math.pow(1.0 - normalizedDist, 2);
+
+                // 4. Strict Ownership Composition
+                let finalElev;
+
+                if (rawDistance >= 0) {
+                    // LAND: Mathematically guaranteed to generate above seaLevel
+                    let baseTexture = structure * 0.5 + detailNoise * noiseWeight * 0.5;
+                    baseTexture = Math.pow(baseTexture, eStretch);
+                    finalElev = seaLevel + baseTexture * (1.0 - seaLevel);
+                } else {
+                    // OCEAN: Mathematically guaranteed to generate below seaLevel
+                    let baseTexture = structure * 0.5 + detailNoise * noiseWeight * 0.5;
+                    // Capped at 0.9 to prevent breaching the absolute abyss limit
+                    finalElev = seaLevel - baseTexture * (seaLevel * 0.9);
+                }
+
+                // 5. Continental Shelving
+                finalElev = this.#applyContinentalShelf(finalElev, seaLevel);
+                elevationData[index] = Math.max(0, Math.min(1, finalElev));
+            }
+        }
+    }
+
+    /**
+     * Shared blending logic for seamless interpolation across all generation modes.
+     */
+    #blendElevations(oceanElev, landElev, maskVal) {
+        return oceanElev * (1.0 - maskVal) + landElev * maskVal;
+    }
+
+    /**
+     * Applies terracing to the coastal shelf to flatten beaches.
+     * Declared as a private class method to resolve SonarQube scope errors.
+     */
+    #applyContinentalShelf(elevation, seaLevel) {
+        const SHELF_RANGE = 0.15;
+        const MIN_SHELF = seaLevel - SHELF_RANGE;
+        const MAX_SHELF = seaLevel + SHELF_RANGE;
+
+        if (elevation > MIN_SHELF && elevation < MAX_SHELF) {
+            let shelfLerp = (elevation - seaLevel) / SHELF_RANGE;
+            shelfLerp = shelfLerp * shelfLerp * shelfLerp;
+            return seaLevel + shelfLerp * SHELF_RANGE;
+        }
+
+        return elevation;
+    }
+
+    /**
      * Calculates moisture and temperature based on the final topography.
      * Applies globally deterministic Orographic Lift via Western Horizon sampling.
      */
@@ -479,23 +634,23 @@ export class ProceduralEngine {
         // Scale the mathematical wind distance to match the padded boundaries
         const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
         const widthScale = width / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
-        const latTop = params.latTop ?? 90;
-        const latBottom = params.latBottom ?? -90;
+        const latTop = params.latTop ?? FILRODENSWMB.DEFAULTS.LAT_TOP;
+        const latBottom = params.latBottom ?? FILRODENSWMB.DEFAULTS.LAT_BOTTOM;
         const latRange = Math.max(0.1, Math.abs(latTop - latBottom));
         const latScale = 180 / latRange;
         const dynamicWindDistance = Math.round(baseWind * widthScale * latScale);
 
-        const panX = params.noise.offsetX || 0;
-        const panY = params.noise.offsetY || 0;
+        const panX = params.noise.offsetX ?? 0;
+        const panY = params.noise.offsetY ?? 0;
         const mScale = params.noise.moisture.scale;
         const mOctaves = params.noise.moisture.octaves;
-        const globalMoisture = params.globalMoisture || 0.5;
-        const tScale = params.noise.temperature.scale || 1 / 250;
-        const tOctaves = params.noise.temperature.octaves || 3;
-        const globalTemp = params.globalTemp;
-        const seasonOffset = params.seasonOffset || 0;
-        const moistureOffset = params.noise.moistureOffset ?? 10000;
-        const tempOffset = params.noise.tempOffset ?? 20000;
+        const globalMoisture = params.globalMoisture ?? FILRODENSWMB.DEFAULTS.GLOBAL_MOISTURE;
+        const tScale = params.noise.temperature.scale ?? 1 / FILRODENSWMB.NOISE.TEMPERATURE.SCALE;
+        const tOctaves = params.noise.temperature.octaves ?? FILRODENSWMB.NOISE.TEMPERATURE.OCTAVES;
+        const globalTemp = params.globalTemp ?? FILRODENSWMB.DEFAULTS.GLOBAL_TEMP;
+        const seasonOffset = params.seasonOffset ?? 0;
+        const moistureOffset = params.noise.moistureOffset ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE;
+        const tempOffset = params.noise.tempOffset ?? FILRODENSWMB.NOISE.OFFSET_TEMP;
 
         for (let y = climateBounds.minY; y <= climateBounds.maxY; y++) {
             const currentLat = latTop - (y / height) * latRange;
@@ -749,7 +904,7 @@ export class ProceduralEngine {
                     continue;
                 }
 
-                const color = params?.biomePalette?.[lookupKey] || [0, 0, 0];
+                const color = params?.biomePalette?.[lookupKey] ?? FILRODENSWMB.BIOMES[lookupKey] ?? [0, 0, 0];
                 pixelBuffer[bufferIndex] = color[0];
                 pixelBuffer[bufferIndex + 1] = color[1];
                 pixelBuffer[bufferIndex + 2] = color[2];
@@ -760,7 +915,7 @@ export class ProceduralEngine {
     }
 
     generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params, outRiverMap, outWaterMask) {
-        const seaLevel = params.seaLevel || 0.3;
+        const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
 
         const rivers = [];
         const riverMap = outRiverMap;

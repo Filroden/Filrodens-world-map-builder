@@ -32,7 +32,7 @@ export const FILRODENSWMB = {
         RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
         VISIBILITY_STATES: ["all", "gm", "none"],
         EDITABLE_TOOLS: ["scene", "terrain", "biomes", "features", "infrastructure", "regions", "labels", "cartography"],
-        VECTOR_TOOLS: ["features", "infrastructure", "regions", "labels", "cartography"],
+        VECTOR_TOOLS: ["scene", "features", "infrastructure", "regions", "labels", "cartography"],
         WHEEL: {
             SCALE_FACTOR: 1.05,
             ROTATION_STEP: 5,
@@ -55,6 +55,7 @@ export const FILRODENSWMB = {
         REGIONAL_CROP: {
             PADDING: 50,
         },
+        CANVAS_BUFFER: 200,
         DEBOUNCE_MS: {
             TERRAIN: 800,
             CLIMATE: 800,

@@ -42,6 +42,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteRegionLayer(e, t) { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteRiver(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+            deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
 
             // --- DIALOG MANAGER: Entity Editing ---
             editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
@@ -67,7 +68,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             changeTool(e, t)                { this._onChangeTool(e, t); },
             exportPng(e, t)                 { this._onExportPng(e, t); },
             exportScene(e, t)               { this._onExportScene(e, t); },
-            forceGenerateTerrain(e, t)      { this.generateTerrain(); },
             generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
             importMapJson(e, t)             { this._onImportMapJson(e, t); },
             manageMap(e, t)                 { this._onManageMapAction(e, t); },
@@ -89,6 +89,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
             setRegionMode(e, t)             { this._onSetRegionMode(e, t); },
             setRegionPreset(e, t)           { this._onSetRegionPreset(e, t); },
+            setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
             threeDView(e, t)                { this._onThreeDView(e, t); },
             toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
             toggleGrid(e, t)                { this._onToggleGrid(e, t); },
@@ -156,6 +157,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.regionLayers = [];
         this.activeRegionLayerId = null;
         this.activeRegionId = null;
+        this.landMasks = [];
+        this.activeLandMaskId = null;
         this.mapLabels = [];
         this.mapDecorations = [];
         this.pinHistory = [];
@@ -310,6 +313,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort);
             context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort);
             context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
+            context.landMasks = [...(this.landMasks || [])].sort(alphaSort);
 
             const autoLabels = [];
 
@@ -604,15 +608,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return;
         }
 
+        if (target.type === "range" && event.type === "change") {
+            return;
+        }
+
         const name = target.name || "";
 
         // Skip marking dirty for temporary visual overlays
         if (!name.startsWith("reference")) this.markDirty();
 
-        // Save the state and update the UI, but do not generate terrain
         if (name === "generationEngine") {
-            this.uiState.generationEngine = target.value;
-            this.render({ parts: ["context"] });
+            if (event.type === "input") return;
+
+            this._onApplyResolution(event, target);
             return;
         }
 
@@ -682,7 +690,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #routeProceduralGenerators(target) {
-        if (target.matches('input[name="seaLevel"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]')) {
+        if (
+            target.matches(
+                'input[name="seaLevel"], input[name="tectonicPlates"],input[name="coastlineFracture"], input[name="continentalGrouping"],input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]',
+            )
+        ) {
             this.debouncedGenerateTerrain();
         } else if (
             target.matches(
@@ -818,6 +830,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             cleared = true;
         }
 
+        if (this.activeLandMaskId) {
+            this.activeLandMaskId = null;
+            cleared = true;
+            requiresTerrainUpdate = true;
+        }
+
         if (cleared) {
             this._repaintVectors();
             if (requiresTerrainUpdate) this.requestTerrainUpdate();
@@ -829,6 +847,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.canvasEngine.isEditMode) return;
 
         let layer = "terrain";
+        if (this.activeTool === "scene") layer = "scene";
         if (this.activeTool === "biomes") layer = "biome";
         if (this.activeTool === "features") layer = "features";
         if (this.activeTool === "infrastructure") layer = "infrastructure";
@@ -837,6 +856,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.activeTool === "cartography") layer = "cartography";
 
         // 1. Immediately intercept vector-mode tools to bypass all raster brush logic
+        if (layer === "scene") {
+            this.#handleSceneClick(x, y);
+            return;
+        }
+
         if (layer === "features") {
             this.#handleFeatureClick(x, y);
             return;
@@ -949,6 +973,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isEdit);
         }
 
+        if (this.activeTool === "scene" && this.canvasEngine.renderLandMasks) {
+            const isGuided = this.uiState.generationEngine === "guided";
+            this.canvasEngine.renderLandMasks(this.landMasks, isEdit, this.activeLandMaskId, isGuided);
+        }
+
         if (this.activeTool === "cartography" && this.canvasEngine.renderCartography) {
             this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isEdit, this.mapDecorations);
         }
@@ -958,14 +987,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.render({ parts: ["context"] });
         this.markDirty();
 
-        if (this.activeTool === "features") {
+        if (this.activeTool === "features" || this.activeTool === "scene") {
             this.requestTerrainUpdate();
         }
     }
 
     #handleInfraInsertNode(x, y) {
-        if (!["infrastructure", "regions", "features"].includes(this.activeTool)) return;
-        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+        if (!["infrastructure", "regions", "features", "scene"].includes(this.activeTool)) return;
+
+        // Allow the buffer for scene masks; keep strict 0 bounds for other tools
+        const buffer = this.activeTool === "scene" ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         // 1. Prevent inserting a node inside an existing marker/node
         if (this.#isNearExistingNode(x, y)) return;
@@ -1030,11 +1062,28 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
+        // Check Land Masks
+        if (this.activeTool === "scene") {
+            const mockLayer = [{ id: "mask_layer", regions: this.landMasks }];
+            const maskSegment = SpatialMath.getClosestRegionSegment(mockLayer, this.activeLandMaskId, x, y, this.currentSnapThreshold);
+
+            if (maskSegment && (!bestMatch || maskSegment.dist < bestMatch.dist)) {
+                bestMatch = {
+                    vector: maskSegment.region,
+                    insertIndex: maskSegment.insertIndex,
+                    projX: maskSegment.projX,
+                    projY: maskSegment.projY,
+                    dist: maskSegment.dist,
+                    triggersTerrain: true,
+                };
+            }
+        }
+
         return bestMatch;
     }
 
     #handleInfraDeleteNode(target) {
-        if (!["infrastructure", "regions", "features"].includes(this.activeTool)) return;
+        if (!["infrastructure", "regions", "features", "scene"].includes(this.activeTool)) return;
         if (target.icon && this.activeTool !== "infrastructure") return;
 
         // 1. Locate the target and its specific deletion instructions
@@ -1121,7 +1170,60 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
+        // 4. Check Land Masks
+        if (this.activeTool === "scene") {
+            const mIndex = this.landMasks.findIndex((m) => m.points.includes(target));
+            if (mIndex > -1) {
+                const mask = this.landMasks[mIndex];
+                return {
+                    array: mask.points,
+                    index: mask.points.indexOf(target),
+                    triggersTerrain: true,
+                    cleanup: () => {
+                        // Orphan cleanup: destroy mask if it has fewer than 3 points
+                        if (mask.points.length < 3 && this.activeLandMaskId !== mask.id) {
+                            this.landMasks.splice(mIndex, 1);
+                        }
+                    },
+                };
+            }
+        }
+
         return null;
+    }
+
+    #handleSceneClick(x, y) {
+        // Guard clause: Only process clicks if we are actively drawing a land/ocean masks
+        if (this.uiState.sceneMode !== "addMask" && this.uiState.sceneMode !== "subtractMask") return;
+
+        // Reject clicks outside the visual 200px buffer
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) {
+            return;
+        }
+
+        // If no mask is currently active, initialise a new one
+        if (!this.activeLandMaskId) {
+            const isSubtract = this.uiState.sceneMode === "subtractMask";
+
+            const newMask = {
+                id: foundry.utils.randomID(),
+                name: isSubtract ? `Ocean Hole ${this.landMasks.length + 1}` : `Landmass ${this.landMasks.length + 1}`,
+                operation: isSubtract ? "subtract" : "add",
+                points: [],
+            };
+            this.landMasks.push(newMask);
+            this.activeLandMaskId = newMask.id;
+        }
+
+        // Locate the active mask and append the new vertex
+        const mask = this.landMasks.find((m) => m.id === this.activeLandMaskId);
+        if (mask) {
+            mask.points.push({ x, y });
+            this.markDirty();
+            this._repaintVectors();
+            this.render({ parts: ["context"] });
+        }
     }
 
     #handleFeatureClick(x, y) {
@@ -1306,7 +1408,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
         this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isLabelEdit);
 
-        // 5. Render Cartography
+        // 5. Render Land Masks
+        if (this.canvasEngine.renderLandMasks) {
+            // Visible if in Guided Mode and on the Scene Tool, regardless of Edit Mode
+            const isGuidedScene = this.uiState.generationEngine === "guided" && this.activeTool === "scene";
+
+            this.canvasEngine.renderLandMasks(this.landMasks, isEditModeActive, this.activeLandMaskId, isGuidedScene);
+        }
+
+        // 6. Render Cartography
         const isCartographyEdit = this.activeTool === "cartography" && isEditModeActive;
         if (this.canvasEngine.renderCartography) {
             this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit, this.mapDecorations);
@@ -1379,7 +1489,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         try {
             // Hand off the mathematical heavy lifting to the Orchestrator
-            ProceduralOrchestrator.processTopographyPhase(this);
+            await ProceduralOrchestrator.processTopographyPhase(this);
 
             // The App maintains control of the Climate and Canvas rendering pipelines
             await this.generateClimate(null);
@@ -1459,9 +1569,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState["noise.offsetX"] = p.noise.offsetX;
         this.uiState["noise.offsetY"] = p.noise.offsetY;
-        this.uiState["noise.moistureOffset"] = p.noise.moistureOffset ?? 10000;
-        this.uiState["noise.tempOffset"] = p.noise.tempOffset ?? 20000;
-        this.uiState.windDistance = p.climate?.windDistance ?? 40;
+        this.uiState["noise.moistureOffset"] = p.noise.moistureOffset ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE;
+        this.uiState["noise.tempOffset"] = p.noise.tempOffset ?? FILRODENSWMB.NOISE.OFFSET_TEMP;
+        this.uiState.windDistance = p.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
         this.uiState["noise.elevation.scale"] = 1 / p.noise.elevation.scale;
         this.uiState["noise.elevation.octaves"] = p.noise.elevation.octaves;
         this.uiState["noise.elevation.stretch"] = p.noise.elevation.stretch;
@@ -1559,6 +1669,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.mapRoutes = payload.mapRoutes || [];
         this.regionLayers = payload.regionLayers || [];
+        this.landMasks = payload.landMasks || [];
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
 
@@ -1713,16 +1824,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async #gateUnsavedChanges() {
         if (!this.isDirty) return true;
 
-        const choice = await foundry.applications.api.DialogV2.wait({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
-            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
-            buttons: [
-                { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
-                { action: "discard", label: game.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
-                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
-            ],
-            close: () => "cancel",
-        });
+        const choice = await MapDialogManager.promptUnsavedChanges();
 
         if (choice === "cancel") return false;
 
@@ -1787,6 +1889,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 mapPins: this.mapPins,
                 mapRoutes: this.mapRoutes,
                 regionLayers: this.regionLayers,
+                landMasks: this.landMasks,
                 mapLabels: this.mapLabels,
                 mapDecorations: this.mapDecorations,
                 parentId: this.currentParentId,
@@ -2164,7 +2267,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Highly destructive action: Rebuilds the underlying webgl canvas and spatial arrays.
      */
     async _onApplyResolution(event, target) {
-        // 1. Extract all uncommitted data natively (No DOM scraping)
         const formData = new foundry.applications.ux.FormDataExtended(target.form).object;
 
         const newWidth = Number.parseInt(formData.mapWidth) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
@@ -2174,22 +2276,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Extract the dropdown choice
         const newEngine = formData.generationEngine || "standard";
 
-        // 2. If the user left the seed blank, generate a random one automatically
+        // If the user left the seed blank, generate a random one automatically
         if (!newSeed) {
             newSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
         }
 
-        const hasBrushEdits = this.brushEngine && this.brushEngine.history.length > 0;
-        const hasPinEdits = this.mapPins && this.mapPins.length > 0;
+        const canProceed = await this.#gateUnsavedChanges();
 
-        if (hasBrushEdits || hasPinEdits) {
-            const confirmed = await MapDialogManager._confirmDialog(game.i18n.localize("FILRODENSWMB.UI.Warning"), game.i18n.localize("FILRODENSWMB.UI.ResolutionWarningContent"));
-
-            if (!confirmed) {
-                this.render({ parts: ["context"] });
-                return;
+        if (!canProceed) {
+            // The user cancelled the action
+            if (target.name === "generationEngine") {
+                target.value = this.uiState.generationEngine;
             }
+            this.render({ parts: ["context"] });
+            return false;
         }
+
+        // Calculate the center-anchor offset
+        const dx = (newWidth - this.mapWidth) / 2;
+        const dy = (newHeight - this.mapHeight) / 2;
 
         this.mapWidth = newWidth;
         this.mapHeight = newHeight;
@@ -2211,7 +2316,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.render({ parts: ["toolbar", "context"] });
 
-        // 1. Reset all history and spatial arrays
+        // 1. Reset all history and spatial arrays except for the land masks, which are preserved if switching to Guided Mode
         this.markDirty();
         this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
         this.manualRivers = [];
@@ -2219,6 +2324,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapPins = [];
         this.mapRoutes = [];
         this.regionLayers = [];
+
+        // Apply the center offset to keep masks perfectly framed
+        this.landMasks =
+            newEngine === "guided"
+                ? this.landMasks.map((mask) => ({
+                      ...mask,
+                      points: mask.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+                  }))
+                : [];
+
         this.mapLabels = [];
         this.mapDecorations = [];
         this.pinHistory = [];
@@ -2232,17 +2347,33 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.activeRegionId = null;
         this.activeFaultId = null;
         this.activeRiverId = null;
+        this.activeLandMaskId = null;
 
         // 3. Wipe the save memory so the next save forces a "Save As" prompt
         this.currentSaveId = null;
         this.currentSaveName = null;
 
+        // 4. If switching to Guided Mode, auto-activate the drawing tools
+        if (newEngine === "guided") {
+            this.activeTool = "scene";
+            this.uiState.sceneMode = "addMask";
+            this.uiState.isEditMode = true;
+        } else {
+            this.uiState.isEditMode = false;
+        }
+
+        if (this.canvasEngine) {
+            this.canvasEngine.setEditMode(this.uiState.isEditMode);
+        }
+        this.#updateCanvasModes(this.activeTool);
+
         await this.generateTerrain();
         this.#updateGrid();
         this.canvasEngine.resetCamera();
 
-        // 4. Force UI to update
-        this.render({ parts: ["toolbar", "context"] });
+        // 5. Force UI to update
+        this.render({ parts: ["toolbar", "context", "editToolbar"] });
+        return true;
     }
 
     _onChangeTool(event, target) {
@@ -2277,6 +2408,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this[config.activeKey] = null;
         }
         this.activeRegionId = null;
+        this.activeLandMaskId = null;
     }
 
     async #deactivateEditMode() {
@@ -2284,7 +2416,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState.isEditMode = false;
         this.brushEngine?.endStroke();
-        if (this.canvasEngine) this.canvasEngine.setEditMode(false);
+        if (this.canvasEngine) {
+            this.canvasEngine.setEditMode(false);
+            if (this.canvasEngine.setCropMode) this.canvasEngine.setCropMode(false);
+        }
 
         await this.render({ parts: ["toolbar", "editToolbar", "context"] });
     }
@@ -2313,8 +2448,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.canvasEngine) return;
 
         this.canvasEngine.setReferenceMode(newTool === "reference");
+
         if (this.canvasEngine.setCropMode) {
-            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode);
+            const isCropAllowed = ["standard", "flat"].includes(this.uiState.generationEngine);
+            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode && isCropAllowed);
         }
     }
 
@@ -2817,6 +2954,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    _onSetSceneMode(event, target) {
+        this.uiState.sceneMode = target.dataset.mode;
+        this.render({ parts: ["toolbar", "editToolbar"] });
+    }
+
     /**
      * Toggles the interactive 3D topography visualisation.
      */
@@ -2900,6 +3042,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.isEditMode = isActivating;
 
         if (isActivating) {
+            // Auto-activate the mask drawing tool
+            if (this.uiState.generationEngine === "guided") {
+                this.uiState.sceneMode = "addMask";
+            }
+
             const stillValid = this.regionLayers.some((l) => l.id === this.activeRegionLayerId);
             if (!stillValid) {
                 this.activeRegionLayerId = this.regionLayers[0]?.id ?? null;
@@ -2914,12 +3061,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this[config.activeKey] = null;
             }
             this.activeRegionId = null;
+
+            if (this.activeLandMaskId) {
+                this.activeLandMaskId = null;
+                this.requestTerrainUpdate();
+            }
         }
 
         if (this.canvasEngine) {
             this.canvasEngine.setEditMode(isActivating);
+
             if (this.canvasEngine.setCropMode) {
-                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene");
+                // Only enable the crop tool for standard and flat maps
+                const isCropAllowed = ["standard", "flat"].includes(this.uiState.generationEngine);
+                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene" && isCropAllowed);
             }
         }
 
@@ -3119,6 +3274,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             case "pin": {
                 const pin = this.mapPins.find((p) => p.id === id);
                 return pin ? [pin] : [];
+            }
+            case "landMask": {
+                const mask = this.landMasks.find((m) => m.id === id);
+                return mask?.points || [];
             }
             case "region": {
                 const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);
