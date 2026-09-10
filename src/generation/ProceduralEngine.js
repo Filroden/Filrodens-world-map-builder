@@ -474,65 +474,256 @@ export class ProceduralEngine {
     }
 
     /**
-     * Orchestrates an asynchronous Web Worker to execute the Jump Flood Algorithm (JFA).
-     * Calculates exact boundary fidelity without locking the main rendering thread.
+     * GUIDED PASS:
+     * Generates a precise Signed Distance Field natively on the main thread.
+     * Falls back to a deep ocean generation if no land masks are provided.
      */
-    async generateGuidedTopography(width, height, params, landMasks, outBuffer) {
+    generateGuidedTopography(width, height, params, landMasks, outBuffer) {
         const elevationData = outBuffer;
         const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= 3);
 
+        let distanceField;
+
         if (validMasks.length === 0) {
-            console.warn("ProceduralEngine: No valid masks provided for guided generation.");
-            return elevationData;
+            // Bypass JFA and flood the field with a massive negative distance to force deep ocean
+            const deepOceanDistance = -Math.max(width, height);
+            distanceField = new Float32Array(width * height).fill(deepOceanDistance);
+        } else {
+            distanceField = this.#generateJFADistanceField(width, height, validMasks);
         }
 
-        // 1. Await the asynchronous JFA Distance Field from the Web Worker
-        console.log("ProceduralEngine: Starting JFA distance-field generation.");
-
-        const distanceField = await this.#dispatchJFAWorker(width, height, validMasks);
-
-        console.log("ProceduralEngine: JFA distance field received.", distanceField?.length, "values.");
-
-        // 2. Process High-Resolution Math Pass synchronously once the field is returned
         this.#applyGuidedDetail(width, height, params, distanceField, elevationData);
 
         return elevationData;
     }
 
     /**
-     * Dispatches the distance calculation to a dedicated Web Worker.
-     * Uses Promise wrapper to allow the main thread to await the zero-copy buffer transfer.
+     * Executes the Jump Flood Algorithm natively, eliminating Web Worker overhead.
      */
-    #dispatchJFAWorker(width, height, validMasks) {
-        return new Promise((resolve, reject) => {
-            const workerPath = "/modules/filrodens-world-map-builder/workers/JFAWorker.js";
-            const jfaWorker = new Worker(workerPath);
+    #generateJFADistanceField(width, height, validMasks) {
+        const totalPixels = width * height;
+        let seedGrid = new Int32Array(totalPixels * 2).fill(-1);
+        const distanceGrid = new Float32Array(totalPixels);
 
-            jfaWorker.onmessage = (event) => {
-                if (event.data.error) {
-                    console.error("ProceduralEngine: JFA Worker returned an error.", event.data.error);
-                    reject(new Error(event.data.error));
-                } else {
-                    console.log("ProceduralEngine: JFA Worker completed.", event.data.distanceField?.length, "distance values received.");
-                    resolve(event.data.distanceField);
+        const ownershipGrid = this.#generateOwnershipGrid(width, height, validMasks);
+
+        this.#initialiseJFABoundaries(seedGrid, ownershipGrid, width, height);
+
+        let step = Math.max(width, height) / 2;
+        while (step >= 1) {
+            step = Math.floor(step);
+            seedGrid = this.#executeJFAPass(seedGrid, width, height, step);
+            step /= 2;
+        }
+
+        seedGrid = this.#executeJFAPass(seedGrid, width, height, 1);
+        seedGrid = this.#executeJFAPass(seedGrid, width, height, 1);
+
+        this.#resolveAbsoluteDistances(seedGrid, distanceGrid, ownershipGrid, width, height);
+
+        return distanceGrid;
+    }
+
+    /**
+     * Creates a flat, memory-efficient binary map of land/ocean ownership.
+     */
+    #generateOwnershipGrid(width, height, validMasks) {
+        const grid = new Uint8Array(width * height);
+        const compiledMasks = this.#compileMaskData(validMasks);
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                grid[y * width + x] = this.#resolvePixelOwnership(x, y, compiledMasks);
+            }
+        }
+
+        return grid;
+    }
+
+    /**
+     * Converts an array of coordinate objects into a flat Float32Array and calculates bounding boxes.
+     */
+    #compileMaskData(validMasks) {
+        const compiledMasks = [];
+
+        for (const mask of validMasks) {
+            const vertexCount = mask.points.length;
+            const flatCoordinates = new Float32Array(vertexCount * 2);
+            const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+
+            for (let i = 0; i < vertexCount; i++) {
+                const ptX = mask.points[i].x;
+                const ptY = mask.points[i].y;
+
+                flatCoordinates[i * 2] = ptX;
+                flatCoordinates[i * 2 + 1] = ptY;
+
+                if (ptX < bounds.minX) bounds.minX = ptX;
+                if (ptY < bounds.minY) bounds.minY = ptY;
+                if (ptX > bounds.maxX) bounds.maxX = ptX;
+                if (ptY > bounds.maxY) bounds.maxY = ptY;
+            }
+
+            compiledMasks.push({
+                isAddOperation: mask.operation !== "subtract",
+                coordinates: flatCoordinates,
+                vertexCount: vertexCount,
+                bounds: bounds,
+            });
+        }
+
+        return compiledMasks;
+    }
+
+    /**
+     * Evaluates a single pixel against all compiled masks, returning 1 for land or 0 for ocean.
+     */
+    #resolvePixelOwnership(x, y, compiledMasks) {
+        let isInside = false;
+
+        for (const mask of compiledMasks) {
+            if (this.#isOutsideBounds(x, y, mask.bounds)) {
+                continue;
+            }
+
+            if (this.#isPointInCompiledPolygon(x, y, mask.coordinates, mask.vertexCount)) {
+                isInside = mask.isAddOperation;
+            }
+        }
+
+        return isInside ? 1 : 0;
+    }
+
+    #isOutsideBounds(x, y, bounds) {
+        return x < bounds.minX || x > bounds.maxX || y < bounds.minY || y > bounds.maxY;
+    }
+
+    /**
+     * Highly optimised ray-casting algorithm operating directly on a flat Float32Array.
+     */
+    #isPointInCompiledPolygon(x, y, coordinates, vertexCount) {
+        let isInside = false;
+
+        for (let i = 0, j = vertexCount - 1; i < vertexCount; j = i++) {
+            const indexI = i * 2;
+            const indexJ = j * 2;
+
+            const xi = coordinates[indexI];
+            const yi = coordinates[indexI + 1];
+            const xj = coordinates[indexJ];
+            const yj = coordinates[indexJ + 1];
+
+            const crossesY = yi > y !== yj > y;
+            if (!crossesY) {
+                continue;
+            }
+
+            const intersectX = ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+            if (x < intersectX) {
+                isInside = !isInside;
+            }
+        }
+
+        return isInside;
+    }
+
+    /**
+     * Identifies boundary pixels using O(1) lookups against the cached ownership grid.
+     */
+    #initialiseJFABoundaries(seedGrid, ownershipGrid, width, height) {
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+
+                const isInside = ownershipGrid[index] === 1;
+                const isRightInside = x < width - 1 ? ownershipGrid[index + 1] === 1 : isInside;
+                const isBelowInside = y < height - 1 ? ownershipGrid[index + width] === 1 : isInside;
+
+                if (isInside !== isRightInside || isInside !== isBelowInside) {
+                    const seedIndex = index * 2;
+                    seedGrid[seedIndex] = x;
+                    seedGrid[seedIndex + 1] = y;
                 }
-                jfaWorker.terminate();
-            };
+            }
+        }
+    }
 
-            jfaWorker.onerror = (error) => {
-                console.error("ProceduralEngine: JFA Worker failed.", {
-                    message: error.message,
-                    filename: error.filename,
-                    lineno: error.lineno,
-                    colno: error.colno,
-                    error,
-                });
-                reject(error);
-                jfaWorker.terminate();
-            };
+    #executeJFAPass(inputGrid, width, height, step) {
+        const outputGrid = new Int32Array(inputGrid.length);
+        outputGrid.set(inputGrid);
 
-            jfaWorker.postMessage({ width, height, validMasks });
-        });
+        const offsets = [
+            [-1, -1],
+            [0, -1],
+            [1, -1],
+            [-1, 0],
+            [1, 0],
+            [-1, 1],
+            [0, 1],
+            [1, 1],
+        ];
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                this.#processSingleJFAPixel(x, y, width, height, step, inputGrid, outputGrid, offsets);
+            }
+        }
+        return outputGrid;
+    }
+
+    #processSingleJFAPixel(x, y, width, height, step, inputGrid, outputGrid, offsets) {
+        const currentIndex = (y * width + x) * 2;
+        let bestDist = Infinity;
+        let bestX = inputGrid[currentIndex];
+        let bestY = inputGrid[currentIndex + 1];
+
+        if (bestX !== -1) {
+            bestDist = (x - bestX) ** 2 + (y - bestY) ** 2;
+        }
+
+        for (const [dx, dy] of offsets) {
+            const nx = x + dx * step;
+            const ny = y + dy * step;
+
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                const neighbourIndex = (ny * width + nx) * 2;
+                const seedX = inputGrid[neighbourIndex];
+                const seedY = inputGrid[neighbourIndex + 1];
+
+                if (seedX !== -1 && seedY !== -1) {
+                    const dist = (x - seedX) ** 2 + (y - seedY) ** 2;
+                    if (dist < bestDist) {
+                        bestDist = dist;
+                        bestX = seedX;
+                        bestY = seedY;
+                    }
+                }
+            }
+        }
+
+        outputGrid[currentIndex] = bestX;
+        outputGrid[currentIndex + 1] = bestY;
+    }
+
+    /**
+     * Resolves final signed distances using O(1) lookups against the cached ownership grid.
+     */
+    #resolveAbsoluteDistances(seedGrid, distanceGrid, ownershipGrid, width, height) {
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                const seedX = seedGrid[index * 2];
+                const seedY = seedGrid[index * 2 + 1];
+
+                let distance = 0;
+                if (seedX !== -1 && seedY !== -1) {
+                    distance = Math.hypot(x - seedX, y - seedY);
+                }
+
+                const isInside = ownershipGrid[index] === 1;
+                distanceGrid[index] = isInside ? distance : -distance;
+            }
+        }
     }
 
     /**

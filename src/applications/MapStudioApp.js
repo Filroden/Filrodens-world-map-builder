@@ -1489,7 +1489,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         try {
             // Hand off the mathematical heavy lifting to the Orchestrator
-            await ProceduralOrchestrator.processTopographyPhase(this);
+            ProceduralOrchestrator.processTopographyPhase(this);
 
             // The App maintains control of the Climate and Canvas rendering pipelines
             await this.generateClimate(null);

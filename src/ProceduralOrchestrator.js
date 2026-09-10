@@ -10,12 +10,12 @@ export class ProceduralOrchestrator {
      * Executes the topography and history phases of map generation.
      * Note: Climate generation and Canvas rendering remain handled by the App controller.
      */
-    static async processTopographyPhase(app) {
+    static processTopographyPhase(app) {
         const { currentSeed, params } = MapStateManager.getMapParameters(app);
         const engine = new ProceduralEngine(currentSeed);
 
         // 1. Route Base Topography
-        await this.#routeTopographyPass(app, engine, params);
+        this.#routeTopographyPass(app, engine, params);
 
         // 2. Replay History & Features
         this.rebuildFromHistory(app, engine, params, null);
