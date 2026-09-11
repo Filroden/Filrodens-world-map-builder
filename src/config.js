@@ -18,6 +18,40 @@ export const FILRODENSWMB = {
         MAP_WIDTH: 1000,
         MAP_HEIGHT: 1000,
     },
+    GENERATION: {
+        TECTONIC_PLATES: 10,
+        COASTLINE_FRACTURE: 0.3,
+        CONTINENTAL_GROUPING: 0.45,
+        COASTAL_BAND: 30,
+        CONTINENT_SCALE: 150,
+        SHELF_RANGE: 0.15,
+        OCEAN_DEPTH_CAP: 0.9,
+        MASK_BLEND_WIDTH: 0.25,
+        WARP: {
+            OCTAVES: 3,
+            FREQUENCY_MULT: 5,
+            AMPLITUDE: 200,
+            OFFSETS: {
+                X: { X: 5321, Y: 1234 },
+                Y: { X: 8765, Y: 4321 },
+            },
+        },
+        BLEND_WEIGHTS: {
+            TECTONIC_MACRO: 0.55,
+            TECTONIC_DETAIL: 0.45,
+            GUIDED_MACRO: 0.5,
+            GUIDED_DETAIL: 0.5,
+        },
+        TECTONIC_MESH: {
+            WIDTH: 100,
+            HEIGHT: 100,
+            BLUR_RADIUS: 2,
+        },
+        CONTINENTAL_MASKING: {
+            OCTAVES: 2,
+            FREQUENCY_MULT: 1.5,
+        },
+    },
     LIMITS: {
         HISTORY_MAX: 100,
         SNAP_THRESHOLD: 15,
@@ -86,6 +120,8 @@ export const FILRODENSWMB = {
             6: 0.035,
             8: 0.05,
         },
+        MAX_PATH_LENGTH: 5,
+        MAX_RIVER_LENGTH_MULT: 1.5,
     },
     CLIMATE: {
         WIND_DISTANCE: 40,

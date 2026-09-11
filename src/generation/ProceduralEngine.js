@@ -212,7 +212,7 @@ export class ProceduralEngine {
         let cx = startX;
         let cy = startY;
         let currentElev = elevationData[cy * width + cx];
-        const maxLength = width * 1.5;
+        const maxLength = width * FILRODENSWMB.HYDROLOGY.MAX_RIVER_LENGTH_MULT;
 
         while (path.length < maxLength) {
             const idx = cy * width + cx;
@@ -263,7 +263,7 @@ export class ProceduralEngine {
             currentElev = lowestNeighbor.elevation;
         }
 
-        return path.length > 5 ? path : null;
+        return path.length > FILRODENSWMB.HYDROLOGY.MAX_PATH_LENGTH ? path : null;
     }
 
     /**
@@ -317,7 +317,7 @@ export class ProceduralEngine {
     }
 
     /**
-     * ADVANCED PASS (v2.1.0):
+     * ADVANCED PASS:
      * Uses Voronoi vector math, low-frequency boolean masking, and domain warping
      * to generate massive, realistic continental plates and tectonic mountain ridges.
      */
@@ -327,14 +327,14 @@ export class ProceduralEngine {
         const panY = params.noise.offsetY ?? 0;
         const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
 
-        const plateCount = params.tectonicPlates ?? 25;
-        const fracture = params.coastlineFracture ?? 0.6;
-        const maskThreshold = params.continentalGrouping ?? 0.45;
+        const plateCount = params.tectonicPlates ?? FILRODENSWMB.GENERATION.TECTONIC_PLATES;
+        const fracture = params.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
+        const maskThreshold = params.continentalGrouping ?? FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING;
 
         // 1. Generate Tectonic Base (Low-Res Voronoi Mesh)
-        // Calculated on a lightweight 100x100 grid to maintain 60FPS performance
-        const meshW = 100;
-        const meshH = 100;
+        // Calculated on a lightweight grid to maintain 60FPS performance
+        const meshW = FILRODENSWMB.GENERATION.TECTONIC_MESH.WIDTH;
+        const meshH = FILRODENSWMB.GENERATION.TECTONIC_MESH.HEIGHT;
         const tectonicMesh = this.#generateTectonicMesh(meshW, meshH, plateCount);
 
         const eScale = params.noise.elevation.scale;
@@ -351,15 +351,33 @@ export class ProceduralEngine {
                 const i = y * width + x;
 
                 // A. Domain Warping (Fracture)
-                const warpX = (this.#fbm(worldX + 5321, worldY + 1234, 3, macroScale * 5) - 0.5) * fracture * 200;
-                const warpY = (this.#fbm(worldX + 8765, worldY + 4321, 3, macroScale * 5) - 0.5) * fracture * 200;
+                const warpX =
+                    (this.#fbm(
+                        worldX + FILRODENSWMB.GENERATION.WARP.OFFSETS.X.X,
+                        worldY + FILRODENSWMB.GENERATION.WARP.OFFSETS.X.Y,
+                        FILRODENSWMB.GENERATION.WARP.OCTAVES,
+                        macroScale * FILRODENSWMB.GENERATION.WARP.FREQUENCY_MULT,
+                    ) -
+                        0.5) *
+                    fracture *
+                    FILRODENSWMB.GENERATION.WARP.AMPLITUDE;
+                const warpY =
+                    (this.#fbm(
+                        worldX + FILRODENSWMB.GENERATION.WARP.OFFSETS.Y.X,
+                        worldY + FILRODENSWMB.GENERATION.WARP.OFFSETS.Y.Y,
+                        FILRODENSWMB.GENERATION.WARP.OCTAVES,
+                        macroScale * FILRODENSWMB.GENERATION.WARP.FREQUENCY_MULT,
+                    ) -
+                        0.5) *
+                    fracture *
+                    FILRODENSWMB.GENERATION.WARP.AMPLITUDE;
 
                 const sampleX = worldX + warpX;
                 const sampleY = worldY + warpY;
 
                 // B. Continental Masking (Low-Frequency Biasing)
-                const maskNoise = this.#fbm(sampleX, sampleY, 2, macroScale * 1.5);
-                const maskVal = this.#smoothstep(maskThreshold - 0.25, maskThreshold + 0.25, maskNoise);
+                const maskNoise = this.#fbm(sampleX, sampleY, FILRODENSWMB.GENERATION.CONTINENTAL_MASKING.OCTAVES, macroScale * FILRODENSWMB.GENERATION.CONTINENTAL_MASKING.FREQUENCY_MULT);
+                const maskVal = this.#smoothstep(maskThreshold - FILRODENSWMB.GENERATION.MASK_BLEND_WIDTH, maskThreshold + FILRODENSWMB.GENERATION.MASK_BLEND_WIDTH, maskNoise);
 
                 // C. Tectonic Bilinear Upscaling
                 const mx = (x / width) * (meshW - 1);
@@ -368,14 +386,14 @@ export class ProceduralEngine {
 
                 // D. Detail Composition
                 const detailNoise = this.#fbm(sampleX, sampleY, eOctaves, eScale);
-                const baseTexture = tectonicElevation * 0.55 + detailNoise * 0.45;
+                const baseTexture = tectonicElevation * FILRODENSWMB.GENERATION.BLEND_WEIGHTS.TECTONIC_MACRO + detailNoise * FILRODENSWMB.GENERATION.BLEND_WEIGHTS.TECTONIC_DETAIL;
 
                 // Model 1: Land generates upwards from the sea level to the maximum peak
                 const landElev = seaLevel + baseTexture * (1.0 - seaLevel);
 
                 // Model 2: Ocean generates downwards from just below sea level to the abyss
-                // Capping at seaLevel * 0.9 prevents underwater mountains from breaching the surface as islands
-                const oceanElev = baseTexture * (seaLevel * 0.9);
+                // Capping at to prevents underwater mountains from breaching the surface as islands
+                const oceanElev = baseTexture * (seaLevel * FILRODENSWMB.GENERATION.OCEAN_DEPTH_CAP);
 
                 // Blend the two models based on the continental mask value
                 let finalElev = this.#blendElevations(oceanElev, landElev, maskVal);
@@ -389,79 +407,98 @@ export class ProceduralEngine {
 
     /**
      * Calculates continental plates and tectonic boundary elevations on a low-resolution array.
+     * Refactored to eliminate object property lookups and expensive square root operations.
      */
     #generateTectonicMesh(width, height, plateCount) {
-        const mesh = new Float32Array(width * height);
-        const plates = [];
-        const cellMap = new Int32Array(width * height);
+        // 1. Seed plates into a flat Typed Array: [x, y, dx, dy, x, y, dx, dy...]
+        const plates = this.#seedTectonicPlates(width, height, plateCount);
 
-        // 1. Seed Tectonic Plates with physical drift vectors
+        // 2. Assign Voronoi Cells using high-speed squared distance
+        const cellMap = this.#mapTectonicCells(width, height, plateCount, plates);
+
+        // 3. Calculate Boundary Physics
+        const mesh = this.#calculateTectonicBoundaries(width, height, cellMap, plates);
+
+        // 4. Box-blur the mesh to smooth the jagged mathematical Voronoi edges before upscaling
+        return this.#blurMesh(mesh, width, height, FILRODENSWMB.GENERATION.TECTONIC_MESH.BLUR_RADIUS);
+    }
+
+    /**
+     * Generates random starting coordinates and drift vectors for tectonic plates.
+     */
+    #seedTectonicPlates(width, height, plateCount) {
+        const plates = new Float32Array(plateCount * 4);
+
         for (let i = 0; i < plateCount; i++) {
-            plates.push({
-                x: this.riverPrng() * width,
-                y: this.riverPrng() * height,
-                dx: (this.riverPrng() - 0.5) * 2, // Drift velocity X
-                dy: (this.riverPrng() - 0.5) * 2, // Drift velocity Y
-            });
+            const index = i * 4;
+            plates[index] = this.riverPrng() * width; // x
+            plates[index + 1] = this.riverPrng() * height; // y
+            plates[index + 2] = (this.riverPrng() - 0.5) * 2; // dx (Drift velocity X)
+            plates[index + 3] = (this.riverPrng() - 0.5) * 2; // dy (Drift velocity Y)
         }
 
-        // 2. Assign Voronoi Cells
+        return plates;
+    }
+
+    /**
+     * Determines plate ownership for each mesh coordinate.
+     * Uses squared distance to completely bypass Math.hypot overhead.
+     */
+    #mapTectonicCells(width, height, plateCount, plates) {
+        const cellMap = new Int32Array(width * height);
+
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                let minDist = Infinity;
+                let minSqDist = Infinity;
                 let bestPlate = 0;
+
                 for (let p = 0; p < plateCount; p++) {
-                    // Fast euclidean distance to find plate ownership
-                    const dist = Math.hypot(x - plates[p].x, y - plates[p].y);
-                    if (dist < minDist) {
-                        minDist = dist;
+                    const plateIndex = p * 4;
+                    const px = plates[plateIndex];
+                    const py = plates[plateIndex + 1];
+
+                    const distSq = (x - px) * (x - px) + (y - py) * (y - py);
+
+                    if (distSq < minSqDist) {
+                        minSqDist = distSq;
                         bestPlate = p;
                     }
                 }
+
                 cellMap[y * width + x] = bestPlate;
             }
         }
 
-        // 3. Calculate Boundary Physics
+        return cellMap;
+    }
+
+    /**
+     * Applies boundary elevations (convergent ridges or divergent trenches) where plates meet.
+     */
+    #calculateTectonicBoundaries(width, height, cellMap, plates) {
+        const mesh = new Float32Array(width * height);
+
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const idx = y * width + x;
                 const myPlateId = cellMap[idx];
-                const myPlate = plates[myPlateId];
+                const foreignPlateId = this.#findAdjacentForeignPlate(x, y, width, height, cellMap, myPlateId);
+
                 let boundaryModifier = 0;
 
-                let isBoundary = false;
-                let otherPlate = null;
+                if (foreignPlateId !== -1) {
+                    const myIndex = myPlateId * 4;
+                    const foreignIndex = foreignPlateId * 4;
 
-                // Check immediate neighbors for plate shifts
-                for (const dir of ProceduralEngine.ADJACENT_OFFSETS) {
-                    const nx = x + dir.dx;
-                    const ny = y + dir.dy;
-                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                        const nPlateId = cellMap[ny * width + nx];
-                        if (nPlateId !== myPlateId) {
-                            isBoundary = true;
-                            otherPlate = plates[nPlateId];
-                            break; // Stop at the first foreign border found
-                        }
-                    }
-                }
-
-                if (isBoundary) {
                     // Calculate collision by evaluating relative velocity against relative position
-                    const relativePosX = otherPlate.x - myPlate.x;
-                    const relativePosY = otherPlate.y - myPlate.y;
-                    const relativeVelX = otherPlate.dx - myPlate.dx;
-                    const relativeVelY = otherPlate.dy - myPlate.dy;
+                    const relativePosX = plates[foreignIndex] - plates[myIndex];
+                    const relativePosY = plates[foreignIndex + 1] - plates[myIndex + 1];
+                    const relativeVelX = plates[foreignIndex + 2] - plates[myIndex + 2];
+                    const relativeVelY = plates[foreignIndex + 3] - plates[myIndex + 3];
 
                     // Dot product: Negative result means plates are crashing together
                     const collision = relativePosX * relativeVelX + relativePosY * relativeVelY;
-
-                    if (collision < 0) {
-                        boundaryModifier = 0.8; // Convergent (Mountain Ridge)
-                    } else {
-                        boundaryModifier = -0.4; // Divergent (Ocean Trench or Rift Valley)
-                    }
+                    boundaryModifier = collision < 0 ? 0.8 : -0.4;
                 }
 
                 // Apply base elevation (0.5) modified by the boundary physics
@@ -469,8 +506,26 @@ export class ProceduralEngine {
             }
         }
 
-        // 4. Box-blur the mesh to smooth the jagged mathematical Voronoi edges before upscaling
-        return this.#blurMesh(mesh, width, height, 2);
+        return mesh;
+    }
+
+    /**
+     * Scans adjacent coordinates to identify the ID of an intersecting tectonic plate.
+     */
+    #findAdjacentForeignPlate(x, y, width, height, cellMap, myPlateId) {
+        for (const dir of ProceduralEngine.ADJACENT_OFFSETS) {
+            const nx = x + dir.dx;
+            const ny = y + dir.dy;
+
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                const neighbourPlateId = cellMap[ny * width + nx];
+                if (neighbourPlateId !== myPlateId) {
+                    return neighbourPlateId;
+                }
+            }
+        }
+
+        return -1;
     }
 
     /**
@@ -736,13 +791,11 @@ export class ProceduralEngine {
         const eOctaves = params.noise.elevation.octaves;
         const eStretch = params.noise.elevation.stretch ?? 1.0;
 
-        const fracture = params.coastlineFracture ?? 0.6;
-        const coastalBand = params.coastalBand ?? 30.0;
+        const fracture = params.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
+        const coastalBand = params.coastalBand ?? FILRODENSWMB.GENERATION.COASTAL_BAND;
         const macroScale = 1 / Math.max(width, height);
 
         // Defines how far inland/out to sea the macro structure reaches its peak depth/height
-        const CONTINENT_SCALE = 150.0;
-
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const worldX = x + (params.noise.offsetX ?? 0);
@@ -750,8 +803,26 @@ export class ProceduralEngine {
                 const index = y * width + x;
 
                 // 1. Apply Domain Warping
-                const warpX = (this.#fbm(worldX + 5321, worldY + 1234, 3, macroScale * 5) - 0.5) * fracture * 200;
-                const warpY = (this.#fbm(worldX + 8765, worldY + 4321, 3, macroScale * 5) - 0.5) * fracture * 200;
+                const warpX =
+                    (this.#fbm(
+                        worldX + FILRODENSWMB.GENERATION.WARP.OFFSETS.X.X,
+                        worldY + FILRODENSWMB.GENERATION.WARP.OFFSETS.X.Y,
+                        FILRODENSWMB.GENERATION.WARP.OCTAVES,
+                        macroScale * FILRODENSWMB.GENERATION.WARP.FREQUENCY_MULT,
+                    ) -
+                        0.5) *
+                    fracture *
+                    FILRODENSWMB.GENERATION.WARP.AMPLITUDE;
+                const warpY =
+                    (this.#fbm(
+                        worldX + FILRODENSWMB.GENERATION.WARP.OFFSETS.Y.X,
+                        worldY + FILRODENSWMB.GENERATION.WARP.OFFSETS.Y.Y,
+                        FILRODENSWMB.GENERATION.WARP.OCTAVES,
+                        macroScale * FILRODENSWMB.GENERATION.WARP.FREQUENCY_MULT,
+                    ) -
+                        0.5) *
+                    fracture *
+                    FILRODENSWMB.GENERATION.WARP.AMPLITUDE;
 
                 const warpedX = Math.max(0, Math.min(width - 1, Math.floor(x + warpX)));
                 const warpedY = Math.max(0, Math.min(height - 1, Math.floor(y + warpY)));
@@ -762,7 +833,7 @@ export class ProceduralEngine {
                 const noiseWeight = this.#smoothstep(0, coastalBand, Math.abs(rawDistance));
 
                 // 3. Macro Structure (Ease-out curve mapped 0.0 to 1.0)
-                const normalizedDist = Math.min(1.0, Math.abs(rawDistance) / CONTINENT_SCALE);
+                const normalizedDist = Math.min(1.0, Math.abs(rawDistance) / FILRODENSWMB.GENERATION.CONTINENT_SCALE);
                 const structure = 1.0 - Math.pow(1.0 - normalizedDist, 2);
 
                 // 4. Strict Ownership Composition
@@ -770,14 +841,14 @@ export class ProceduralEngine {
 
                 if (rawDistance >= 0) {
                     // LAND: Mathematically guaranteed to generate above seaLevel
-                    let baseTexture = structure * 0.5 + detailNoise * noiseWeight * 0.5;
+                    let baseTexture = structure * FILRODENSWMB.GENERATION.BLEND_WEIGHTS.GUIDED_MACRO + detailNoise * noiseWeight * FILRODENSWMB.GENERATION.BLEND_WEIGHTS.GUIDED_DETAIL;
                     baseTexture = Math.pow(baseTexture, eStretch);
                     finalElev = seaLevel + baseTexture * (1.0 - seaLevel);
                 } else {
                     // OCEAN: Mathematically guaranteed to generate below seaLevel
                     let baseTexture = structure * 0.5 + detailNoise * noiseWeight * 0.5;
-                    // Capped at 0.9 to prevent breaching the absolute abyss limit
-                    finalElev = seaLevel - baseTexture * (seaLevel * 0.9);
+                    // Capped to prevent breaching the absolute abyss limit
+                    finalElev = seaLevel - baseTexture * (seaLevel * FILRODENSWMB.GENERATION.OCEAN_DEPTH_CAP);
                 }
 
                 // 5. Continental Shelving
@@ -788,7 +859,7 @@ export class ProceduralEngine {
     }
 
     /**
-     * Shared blending logic for seamless interpolation across all generation modes.
+     * Blending logic for seamless interpolation across tectonic generation mode.
      */
     #blendElevations(oceanElev, landElev, maskVal) {
         return oceanElev * (1.0 - maskVal) + landElev * maskVal;
@@ -799,7 +870,7 @@ export class ProceduralEngine {
      * Declared as a private class method to resolve SonarQube scope errors.
      */
     #applyContinentalShelf(elevation, seaLevel) {
-        const SHELF_RANGE = 0.15;
+        const SHELF_RANGE = FILRODENSWMB.GENERATION.SHELF_RANGE;
         const MIN_SHELF = seaLevel - SHELF_RANGE;
         const MAX_SHELF = seaLevel + SHELF_RANGE;
 
@@ -1256,13 +1327,6 @@ export class ProceduralEngine {
     #smoothstep(edge0, edge1, x) {
         const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
         return t * t * (3 - 2 * t);
-    }
-
-    /**
-     * S-Curve for Continental Terracing at Sea Level.
-     */
-    #easeInOutCubic(x) {
-        return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
     }
 }
 
