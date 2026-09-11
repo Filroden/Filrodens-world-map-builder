@@ -692,7 +692,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #routeProceduralGenerators(target) {
         if (
             target.matches(
-                'input[name="seaLevel"], input[name="tectonicPlates"],input[name="coastlineFracture"], input[name="continentalGrouping"],input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]',
+                'input[name="seaLevel"], input[name="tectonicPlates"], input[name="coastlineFracture"], input[name="continentalGrouping"], input[name="shelfRange"], input[name="continentScale"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]',
             )
         ) {
             this.debouncedGenerateTerrain();
@@ -1556,9 +1556,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const c = p.cartography || {};
 
         this.uiState.seaLevel = p.seaLevel;
-        this.uiState.tectonicPlates = p.tectonicPlates ?? 10;
-        this.uiState.coastlineFracture = p.coastlineFracture ?? 0.3;
-        this.uiState.continentalGrouping = p.continentalGrouping ?? 0.4;
+        this.uiState.tectonicPlates = p.tectonicPlates ?? FILRODENSWMB.GENERATION.TECTONIC_PLATES;
+        this.uiState.coastlineFracture = p.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
+        this.uiState.continentalGrouping = p.continentalGrouping ?? FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING;
+        this.uiState.shelfRange = p.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
+        this.uiState.continentScale = p.continentScale ?? FILRODENSWMB.GENERATION.CONTINENT_SCALE;
         this.uiState.globalTemp = p.globalTemp;
         this.uiState.seasonOffset = p.seasonOffset;
         this.uiState.latTop = p.latTop;
@@ -1866,7 +1868,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
 
             // 2. Lock the UI and show the spinner
-            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.SavingMap") || "Saving Map...");
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.SavingMap"));
             this.currentSaveName = mapName;
 
             const { currentSeed, params } = MapStateManager.getMapParameters(this);

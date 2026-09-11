@@ -67,9 +67,11 @@ export class MapStateManager {
             "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
             "noise.temperature.scale": Math.min(Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.round(FILRODENSWMB.NOISE.TEMPERATURE.SCALE * ratio)), FILRODENSWMB.LIMITS.NOISE_SCALE_MAX),
 
-            tectonicPlates: 10,
-            coastlineFracture: 0.3,
-            continentalGrouping: 0.4,
+            tectonicPlates: FILRODENSWMB.GENERATION.TECTONIC_PLATES,
+            coastlineFracture: FILRODENSWMB.GENERATION.COASTLINE_FRACTURE,
+            continentalGrouping: FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING,
+            shelfRange: FILRODENSWMB.GENERATION.SHELF_RANGE,
+            continentScale: FILRODENSWMB.GENERATION.CONTINENT_SCALE,
 
             activeFeatureMode: "spring",
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
@@ -244,6 +246,8 @@ export class MapStateManager {
             tectonicPlates: state.tectonicPlates,
             coastlineFracture: state.coastlineFracture,
             continentalGrouping: state.continentalGrouping,
+            shelfRange: state.shelfRange,
+            continentScale: state.continentScale,
             globalTemp: state.globalTemp,
             seasonOffset: state.seasonOffset,
             latTop: state.latTop,

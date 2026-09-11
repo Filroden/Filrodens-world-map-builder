@@ -326,6 +326,7 @@ export class ProceduralEngine {
         const panX = params.noise.offsetX ?? 0;
         const panY = params.noise.offsetY ?? 0;
         const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
+        const shelfRange = params.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
 
         const plateCount = params.tectonicPlates ?? FILRODENSWMB.GENERATION.TECTONIC_PLATES;
         const fracture = params.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
@@ -397,7 +398,7 @@ export class ProceduralEngine {
 
                 // Blend the two models based on the continental mask value
                 let finalElev = this.#blendElevations(oceanElev, landElev, maskVal);
-                finalElev = this.#applyContinentalShelf(finalElev, seaLevel);
+                finalElev = this.#applyContinentalShelf(finalElev, seaLevel, shelfRange);
 
                 elevationData[i] = Math.max(0, Math.min(1, finalElev));
             }
@@ -793,6 +794,8 @@ export class ProceduralEngine {
 
         const fracture = params.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
         const coastalBand = params.coastalBand ?? FILRODENSWMB.GENERATION.COASTAL_BAND;
+        const continentScale = params.continentScale ?? FILRODENSWMB.GENERATION.CONTINENT_SCALE;
+        const shelfRange = params.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
         const macroScale = 1 / Math.max(width, height);
 
         // Defines how far inland/out to sea the macro structure reaches its peak depth/height
@@ -833,7 +836,7 @@ export class ProceduralEngine {
                 const noiseWeight = this.#smoothstep(0, coastalBand, Math.abs(rawDistance));
 
                 // 3. Macro Structure (Ease-out curve mapped 0.0 to 1.0)
-                const normalizedDist = Math.min(1.0, Math.abs(rawDistance) / FILRODENSWMB.GENERATION.CONTINENT_SCALE);
+                const normalizedDist = Math.min(1.0, Math.abs(rawDistance) / continentScale);
                 const structure = 1.0 - Math.pow(1.0 - normalizedDist, 2);
 
                 // 4. Strict Ownership Composition
@@ -852,7 +855,7 @@ export class ProceduralEngine {
                 }
 
                 // 5. Continental Shelving
-                finalElev = this.#applyContinentalShelf(finalElev, seaLevel);
+                finalElev = this.#applyContinentalShelf(finalElev, seaLevel, shelfRange);
                 elevationData[index] = Math.max(0, Math.min(1, finalElev));
             }
         }
@@ -869,15 +872,14 @@ export class ProceduralEngine {
      * Applies terracing to the coastal shelf to flatten beaches.
      * Declared as a private class method to resolve SonarQube scope errors.
      */
-    #applyContinentalShelf(elevation, seaLevel) {
-        const SHELF_RANGE = FILRODENSWMB.GENERATION.SHELF_RANGE;
-        const MIN_SHELF = seaLevel - SHELF_RANGE;
-        const MAX_SHELF = seaLevel + SHELF_RANGE;
+    #applyContinentalShelf(elevation, seaLevel, shelfRange) {
+        const MIN_SHELF = seaLevel - shelfRange;
+        const MAX_SHELF = seaLevel + shelfRange;
 
         if (elevation > MIN_SHELF && elevation < MAX_SHELF) {
-            let shelfLerp = (elevation - seaLevel) / SHELF_RANGE;
+            let shelfLerp = (elevation - seaLevel) / shelfRange;
             shelfLerp = shelfLerp * shelfLerp * shelfLerp;
-            return seaLevel + shelfLerp * SHELF_RANGE;
+            return seaLevel + shelfLerp * shelfRange;
         }
 
         return elevation;

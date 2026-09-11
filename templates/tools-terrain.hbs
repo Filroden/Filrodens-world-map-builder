@@ -99,7 +99,7 @@
             <legend>{{localize "FILRODENSWMB.UI.TectonicGeneration"}}</legend>
 
             <div class="form-group">
-                <label>{{localize "FILRODENSWMB.UI.TectonicPlates"}}</label>
+                <label>{{localize "FILRODENSWMB.UI.TectonicPlates"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.TectonicPlatesHint'}}"></i></label>
                 <div class="fwmb-slider-group">
                     <input type="range" name="tectonicPlates" value="{{lookup uiState 'tectonicPlates'}}" min="5" max="50" step="1" oninput="this.nextElementSibling.value = this.value" />
                     <output>{{lookup uiState "tectonicPlates"}}</output>
@@ -107,7 +107,7 @@
             </div>
 
             <div class="form-group">
-                <label>{{localize "FILRODENSWMB.UI.CoastlineFracture"}}</label>
+                <label>{{localize "FILRODENSWMB.UI.CoastlineFracture"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.CoastlineFractureHint'}}"></i></label>
                 <div class="fwmb-slider-group">
                     <input type="range" name="coastlineFracture" value="{{lookup uiState 'coastlineFracture'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
                     <output>{{lookup uiState "coastlineFracture"}}</output>
@@ -115,7 +115,15 @@
             </div>
 
             <div class="form-group">
-                <label>{{localize "FILRODENSWMB.UI.ContinentalGrouping"}}</label>
+                <label>{{localize "FILRODENSWMB.UI.ContinentalShelf"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ShelfRangeHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="shelfRange" value="{{lookup uiState 'shelfRange'}}" min="0" max="0.5" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "shelfRange"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.ContinentalGrouping"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ContinentalGroupingHint'}}"></i></label>
                 <div class="fwmb-slider-group">
                     <input
                         type="range"
@@ -131,7 +139,7 @@
             </div>
 
             <div class="form-group">
-                <label>{{localize "FILRODENSWMB.UI.SurfaceRoughness"}}</label>
+                <label>{{localize "FILRODENSWMB.UI.SurfaceRoughness"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.SurfaceRoughnessHint'}}"></i></label>
                 <div class="fwmb-slider-group">
                     <input
                         type="range"
@@ -147,7 +155,7 @@
             </div>
 
             <div class="form-group">
-                <label>{{localize "FILRODENSWMB.UI.ErosionScale"}}</label>
+                <label>{{localize "FILRODENSWMB.UI.ErosionScale"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ErosionScaleHint'}}"></i></label>
                 <div class="fwmb-slider-group">
                     <input
                         type="range"
@@ -170,7 +178,7 @@
             <legend>{{localize "FILRODENSWMB.UI.GuidedGeneration"}}</legend>
 
             <div class="form-group">
-                <label>{{localize "FILRODENSWMB.UI.CoastlineFracture"}}</label>
+                <label>{{localize "FILRODENSWMB.UI.CoastlineFracture"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.CoastlineFractureHint'}}"></i></label>
                 <div class="fwmb-slider-group">
                     <input type="range" name="coastlineFracture" value="{{lookup uiState 'coastlineFracture'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
                     <output>{{lookup uiState "coastlineFracture"}}</output>
@@ -178,7 +186,23 @@
             </div>
 
             <div class="form-group">
-                <label>{{localize "FILRODENSWMB.UI.SurfaceRoughness"}}</label>
+                <label>{{localize "FILRODENSWMB.UI.ContinentalShelf"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ShelfRangeHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="shelfRange" value="{{lookup uiState 'shelfRange'}}" min="0" max="0.5" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "shelfRange"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.ContinentScale"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ContinentScaleHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="continentScale" value="{{lookup uiState 'continentScale'}}" min="0" max="500" step="50" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "continentScale"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.SurfaceRoughness"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.SurfaceRoughnessHint'}}"></i></label>
                 <div class="fwmb-slider-group">
                     <input
                         type="range"
@@ -194,7 +218,7 @@
             </div>
 
             <div class="form-group">
-                <label>{{localize "FILRODENSWMB.UI.ErosionScale"}}</label>
+                <label>{{localize "FILRODENSWMB.UI.ErosionScale"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ErosionScaleHint'}}"></i></label>
                 <div class="fwmb-slider-group">
                     <input
                         type="range"

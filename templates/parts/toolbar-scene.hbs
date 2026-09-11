@@ -1,6 +1,7 @@
 <div class="fwmb-toolbar-content">
 
     {{#if (eq uiState.generationEngine "guided")}}
+        <label>{{localize "FILRODENSWMB.UI.LandMaskHint"}}</label>
         <div class="fwmb-mask-settings">
             <button type="button" class="fwmb-btn {{#if (eq uiState.sceneMode 'addMask')}}active{{/if}}" data-action="setSceneMode" data-mode="addMask" data-tooltip="{{localize 'FILRODENSWMB.UI.DrawLandMaskHint'}}">
                 <i class="fwmb-icon add"></i>

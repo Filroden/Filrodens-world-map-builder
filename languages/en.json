@@ -455,10 +455,11 @@
     "FILRODENSWMB.UI.TectonicGeneration": "Tectonic Generation",
     "FILRODENSWMB.UI.GuidedGeneration": "Guided Generation",
     "FILRODENSWMB.UI.TectonicPlates": "Tectonic Plates",
-    "FILRODENSWMB.UI.CoastlineFracture": "Coastline Fracture",
-    "FILRODENSWMB.UI.ContinentalGrouping": "Continental Grouping",
-    "FILRODENSWMB.UI.SurfaceRoughness": "Surface Roughness",
-    "FILRODENSWMB.UI.ErosionScale": "Erosion Scale",
+    "FILRODENSWMB.UI.CoastlineFracture": "Coastal Fracture",
+    "FILRODENSWMB.UI.ContinentalGrouping": "Grouping",
+    "FILRODENSWMB.UI.SurfaceRoughness": "Detail",
+    "FILRODENSWMB.UI.ErosionScale": "Erosion",
+    "FILRODENSWMB.UI.LandMaskHint": "Draw polygons: Select '+' to add land and '-' to add ocean.",
     "FILRODENSWMB.UI.EditLandMask": "Edit Land Mask",
     "FILRODENSWMB.UI.EditLandMaskHint": "Mark areas of the map that could be land. This will influence the tectonic generation algorithm to produce more realistic landmasses.",
     "FILRODENSWMB.UI.DrawLandMask": "Draw Land Mask",
@@ -467,5 +468,21 @@
     "FILRODENSWMB.UI.DrawOceanMaskHint": "Draw areas of the map that could be ocean.",
     "FILRODENSWMB.UI.LandMasks": "Land Masks",
     "FILRODENSWMB.UI.NoLandMasks": "No land masks have been drawn yet.",
-    "FILRODENSWMB.UI.EndEdit": "Finish Editing"
+    "FILRODENSWMB.UI.EndEdit": "Finish Editing",
+
+    "FILRODENSWMB.UI.EngineStandardHint": "Uses standard noise generation to create quick, randomised terrain.",
+    "FILRODENSWMB.UI.EngineFlatHint": "Creates a completely flat landmass at sea level, acting as a blank canvas for manual terrain brushing.",
+    "FILRODENSWMB.UI.EngineAdvancedHint": "Simulates tectonic plate collisions to build realistic continents, deep trenches, and mountain ridges.",
+    "FILRODENSWMB.UI.EngineGuidedHint": "Uses your hand-drawn vector masks to dictate exact landmass and ocean placements.",
+
+    "FILRODENSWMB.UI.TectonicPlatesHint": "Controls the number of shifting plates. Higher values create more frequent mountain ridges and fault-line valleys across the landmass, but will not significantly alter the global coastline.",
+    "FILRODENSWMB.UI.CoastlineFractureHint": "Bends and distorts the edges of the continents. Higher values create undulating bays and  peninsulas, while lower values keep landmasses rounder and smoother.",
+    "FILRODENSWMB.UI.ContinentalGroupingHint": "Adjusts the baseline grouping of land. Higher values flood the map; lower values merge landmasses together.",
+    "FILRODENSWMB.UI.SurfaceRoughnessHint": "Adds high-frequency detail. Low values create rolling hills; high values create jagged, rocky peaks.",
+    "FILRODENSWMB.UI.ErosionScaleHint": "Zooms the detail noise. Lower values cluster mountains tightly; higher values stretch features across broader areas.",
+
+    "FILRODENSWMB.UI.ContinentScale": "Continent Scale",
+    "FILRODENSWMB.UI.ContinentScaleHint": "Defines the gradient slope. Lower values create steep coastal mountains; higher values create sprawling, flat coastal plains.",
+    "FILRODENSWMB.UI.ContinentalShelf": "Continental Shelf",
+    "FILRODENSWMB.UI.ShelfRangeHint": "Controls the width of the shallow water transition zone before dropping into deep ocean."
 }

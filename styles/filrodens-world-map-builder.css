@@ -94,6 +94,7 @@
 .fwmb-icon.upgrade              { --fwmb-mask: url('../assets/icons/upgrade.svg'); }
 .fwmb-icon.sync                 { --fwmb-mask: url('../assets/icons/sync.svg'); }
 .fwmb-icon.sync_disabled        { --fwmb-mask: url('../assets/icons/sync_disabled.svg'); }
+.fwmb-icon.info                 { --fwmb-mask: url('../assets/icons/info.svg'); }
 
 /* --- PINHEAD ICONS --- */
 .fwmb-icon.anchor                         { --fwmb-mask: url('../assets/pinhead-icons/anchor.svg'); }
