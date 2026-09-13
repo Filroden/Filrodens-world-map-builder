@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-2.0.0-blue)
+![Latest Version](https://img.shields.io/badge/Version-2.1.0-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -108,17 +108,33 @@ Interactable features include: infrastructure pins, nodes (custom rivers, tecton
 
 #### Generating a New Map
 
-1. On the "Create New Map" tool, to generate a new map either enter a map seed or generate a random seed, set the map resolution and the latitude range it represets and click "Create New Map".
+1. On the "Create New Map" tool, select your preferred Generation Engine.
+
+   > Important: The generation engine is only responsible for creating the initial base terrain. Once the base map is generated, all other tools (terrain brushes, biomes, hydrology, regions, infrastructure, and labels) function identically across all models. The only tool restricted by your choice of engine is the "Generate Regional Map" feature, which is only supported by the Standard and Flat engines.
+
+2. Enter a map seed or generate a random seed, set the map resolution and the latitude range it represents, and click "Create New Map".
 
    > Note: If you have an unsaved changes on the existing map you will be prompted to save or discard them.
 
-2. [Optional] Select a grid to display. By default, the grid layer is disabled in the map canvas controls. To see the grid, simply toggle the grid icon in the map controls.
+3. [Optional] Select a grid to display. By default, the grid layer is disabled in the map canvas controls. To see the grid, simply toggle the grid icon in the map controls.
 
-Creating a new map will procedurally generate a terrain, moisture and temperature model for the world, and calculate appropriate biomes.
-
-It is recommended that you work through each map tool in turn to edit the map.
+Creating a new map will procedurally generate a terrain, moisture and temperature model for the world, and calculate appropriate biomes. It is recommended that you work through each map tool in turn to edit the map.
 
 ![Map Tools](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/map-tools.png)
+
+#### Choosing a Generation Engine
+
+- **Standard:** Creates endless, classic procedural terrain.
+  - When to use: Best for rapid prototyping, infinite panning/scrolling to find the perfect landmass, and when you intend to zoom in and extract high-resolution Regional Maps.
+
+- **Advanced (Tectonic):** Simulates tectonic plates that  crash together to form supercontinents, ocean trenches, and mountain ridges, before upscaling and fracturing the coastlines.
+  - When to use: Best for creating realistic, massive world-scale maps with natural geological formations. Does not support Regional Map extraction or infinite panning.
+
+- **Guided:** Allows you to draw vector shapes using the "Add Land" and "Remove Land" (lakes/atolls) tools. The engine generates procedural terrain inside your vector boundaries, resulting in landmasses where you drew them, but with highly organic, domain-warped coastlines.
+  - When to use: Best when you have a specific world shape in mind (e.g., recreating an existing campaign map or drawing a specific archipelago) but want the engine to handle the realistic texturing and coastal erosion. Does not support Regional Map extraction or infinite panning.
+
+- **Flat:** Generates a blank canvas just above sea level.
+  - When to use: Best when you want to hand-paint the entire world from scratch using the terrain brushes.
 
 #### Generating Regional Maps
 
@@ -142,31 +158,36 @@ It is possible to create new, high-resolution maps based on a cropped area of ex
 
 #### Terrain
 
-The terrain is generated automatically. Once generated, the terrain can be edited by the user.
+The terrain is generated automatically based on your chosen Generation Engine. Once the base topography is established, it can be freely sculpted using the terrain brushes.
 
-1. **Global Settings**
-   - **Sea Level:** Set the sea level. This will update the map to show the new coastline.
+1. **Engine Parameters:** Depending on your selected engine, different sliders will be available to tune the procedural generation:
 
-2. **Elevation Model:** The terrain model is infinite in size. These controls determine which part of the model you see.
-   - **Map Transformation:** Use the zoom and nudge buttons to change your position in the model. Both groups feature a central reset button to return you to the original coordinates.
-   - **Detail:** Determines how smooth or intricate the model will be. Because the results are deterministic, you can treat this as a balance between performance and detail.
-     > The higher the detail value, the longer it takes to generate the terrain. This is a linear relationship: a map with a detail of 10 will take ten times longer to generate than one with a detail of 1.
+   - **Global Settings (Standard / Flat only)**
+     - Sea Level: Set the baseline sea level. This updates the map to show the new coastline. (Note: Advanced and Guided engines handle sea level mathematically to preserve tectonic and vector boundaries).
 
-     >**Note:** This performance scaling only applies to the base procedural generation. If a map contains many terrain edits, the history replay will still take time to render, brush stroke by brush stroke. This is an intentional design choice ensuring you can recreate complex, custom maps from a lightweight journal entry.
+   - **Map Transform (Standard only)**
+     - Use the zoom and nudge buttons to change your position in the infinite procedural model. Both groups feature a central reset button to return you to the original coordinates.
 
-     >**Tip:**
-     > - **For Prototyping:** Keep the detail slider at the default of 5 (or lower). This allows the map to render very quickly while you are actively making changes.
-     > - **For Final Export:** Increase the slider to 8 or 10 right before exporting the final image. This will lock up the UI and take significantly longer to render, but it will yield highly detailed terrain textures for the final map.
+   - **Topographical Detail**
+     - **Detail (all except Flat):** Determines how smooth or intricate the rocky detail of the model will be. Higher values take longer to generate but yield highly detailed textures.
+     - **Stretch (Standard only):** Higher values stretch mid-elevations while compressing high and low elevations, allowing for larger, flatter plains.
 
-   - **Stretch:** Higher values result in mid-elevations being stretched, whilst high and low elevations are compressed. This allows for larger plains to form.
+   - **Macro Structure (Advanced / Guided only)**
+     - **Tectonic Plates (Advanced):** Controls the underlying tectonic model. Higher values create more frequent mountain ridges and valleys, but will not significantly alter the global coastline.
+     - **Coastline Fracture:** Bends and distorts the edges of the continents. Higher values create undulating bays and peninsulas, while lower values keep landmasses rounder.
+     - **Continental Shelf:** Dictates the steepness of the coastal drop-off into the ocean. Increase for shallow tropical waters; decrease for sheer cliffs plunging into deep ocean.
+     - **Continental Grouping (Advanced):** Adjusts the global threshold for land vs. water, dictating whether the world forms large continents or archipelagos.
+     - **Continent Scale (Guided):** Controls how far inland the terrain must travel before reaching its maximum peak height.
+     - **Erosion:** Determines the physical size of the features. Low values give rugged features while high values create smoother, eroded terrain.
 
-3. **Edit Terrain** Use the edit tools to adjust your terrain.
+   **Tip on Performance:** For the Standard engine, keep the Roughness/Octaves slider at the default (or lower) for rapid prototyping. Increase it to 8 or 10 right before exporting the final image to yield highly detailed textures. For the Advanced and Guided engines, the heavy macro-math means generation will always take a few seconds, but the results are highly realistic.
 
-   Brush tools work similar to brush tools in graphics packages.
+2. **Edit Terrain**: Regardless of the engine used to generate the base map, you can always use the non-destructive edit tools to manually sculpt the topography. Brush tools work similarly to those in standard graphics packages:
    - **Brush Size:** The radius of the brush tool.
    - **Brush Strength:** How quickly the brush is applied.
    - **Brush Feather:** How much the brush is blended with the surrounding terrain. Feathering increases towards the edges of the brush.
 
+   **Brush Modes:**
    - **Raise Terrain:** This brush increases the elevation of the terrain beneath it.
    - **Lower Terrain:** This brush reduces the elevation of the terrain beneath it.
    - **Smooth Terrain**: This brush "averages" the terrain elevations under it.

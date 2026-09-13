@@ -69,6 +69,7 @@
 .fwmb-icon.scatter-plot         { --fwmb-mask: url('../assets/icons/scatter_plot.svg'); }
 .fwmb-icon.content-copy         { --fwmb-mask: url('../assets/icons/content_copy.svg'); }
 .fwmb-icon.edit                 { --fwmb-mask: url('../assets/icons/edit.svg'); }
+.fwmb-icon.edit-off             { --fwmb-mask: url('../assets/icons/edit_off.svg'); }
 .fwmb-icon.file-export          { --fwmb-mask: url('../assets/icons/file_export.svg'); }
 .fwmb-icon.upload-file          { --fwmb-mask: url('../assets/icons/upload_file.svg'); }
 .fwmb-icon.more-vert            { --fwmb-mask: url('../assets/icons/more_vert.svg'); }
@@ -83,6 +84,7 @@
 .fwmb-icon.explore              { --fwmb-mask: url('../assets/icons/explore.svg'); }
 .fwmb-icon.png                  { --fwmb-mask: url('../assets/icons/file_png.svg'); }
 .fwmb-icon.add                  { --fwmb-mask: url('../assets/icons/add.svg'); }
+.fwmb-icon.remove               { --fwmb-mask: url('../assets/icons/remove.svg'); }
 .fwmb-icon.gesture              { --fwmb-mask: url('../assets/icons/gesture.svg'); }
 .fwmb-icon.slope                { --fwmb-mask: url('../assets/icons/signal_cellular_null.svg'); }
 .fwmb-icon.plateau              { --fwmb-mask: url('../assets/icons/rectangle.svg'); }
@@ -92,6 +94,7 @@
 .fwmb-icon.upgrade              { --fwmb-mask: url('../assets/icons/upgrade.svg'); }
 .fwmb-icon.sync                 { --fwmb-mask: url('../assets/icons/sync.svg'); }
 .fwmb-icon.sync_disabled        { --fwmb-mask: url('../assets/icons/sync_disabled.svg'); }
+.fwmb-icon.info                 { --fwmb-mask: url('../assets/icons/info.svg'); }
 
 /* --- PINHEAD ICONS --- */
 .fwmb-icon.anchor                         { --fwmb-mask: url('../assets/pinhead-icons/anchor.svg'); }
@@ -651,11 +654,11 @@
     min-height: 0;
 }
 
-.fwmb-tool-content.fwmb-fixed-lists {
+.fwmb-fixed-lists {
     overflow-y: hidden;
 }
 
-.fwmb-tool-content.fwmb-fixed-lists fieldset.fwmb-fieldset {
+.fwmb-fixed-lists fieldset.fwmb-fieldset {
     flex: 1;
     min-height: 5rem;
     margin: 0;
@@ -750,7 +753,7 @@
     gap: var(--fwmb-space-s);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools, .fwmb-brush-history) button {
+.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button {
     width: 36px;
     height: 36px;
     display: flex;
@@ -760,19 +763,19 @@
     color: var(--fwmb-text-secondary);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools, .fwmb-brush-history) button:hover {
+.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button:hover {
     color: var(--fwmb-text-primary);
     background: var(--fwmb-bg-hover);
     border-color: var(--fwmb-border-focus);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools, .fwmb-brush-history) button.active {
+.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button.active {
     color: var(--fwmb-text-inverse);
     background: var(--fwmb-accent-main);
     border-color: var(--fwmb-border-main);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-brush-tools, .fwmb-brush-history) button .fwmb-icon {
+.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button .fwmb-icon {
     width: var(--fwmb-font-size-xl);
     height: var(--fwmb-font-size-xl);
 }
@@ -998,7 +1001,8 @@
 .fwmb .fwmb-brush-settings,
 .fwmb .fwmb-brush-setting,
 .fwmb .fwmb-brush-tools,
-.fwmb .fwmb-brush-history {
+.fwmb .fwmb-brush-history,
+.fwmb .fwmb-mask-settings {
     display: flex;
     flex-direction: row;
     align-items: center;

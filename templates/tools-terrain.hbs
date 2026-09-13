@@ -1,96 +1,244 @@
 <div class="fwmb-tool-content fwmb-scrollable">
 
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.GlobalSettings"}}</legend>
+    <!-- 1. Global Settings (Visible in Standard and Flat modes) -->
+    {{#unless (or (eq uiState.generationEngine "advanced") (eq uiState.generationEngine "guided"))}}
+        <fieldset class="fwmb-fieldset">
+            <legend>{{localize "FILRODENSWMB.UI.GlobalSettings"}}</legend>
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.SeaLevel"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="seaLevel" value="{{uiState.seaLevel}}" min="0" max="1" step="0.01" oninput="this.nextElementSibling.value = this.value" />
-                <output>{{uiState.seaLevel}}</output>
-            </div>
-        </div>
-
-    </fieldset>
-
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.ElevationNoise"}}</legend>
-
-        <input type="hidden" name="noise.elevation.scale" value="{{lookup uiState 'noise.elevation.scale'}}" />
-        <input type="hidden" name="noise.offsetX" value="{{lookup uiState 'noise.offsetX'}}" />
-        <input type="hidden" name="noise.offsetY" value="{{lookup uiState 'noise.offsetY'}}" />
-
-        <div class="form-group stacked">
-            <label>{{localize "FILRODENSWMB.UI.MapTransform"}}</label>
-            <div class="fwmb-transform-controls">
-
-                <div class="fwmb-transform-zoom">
-                    <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomIn'}}">
-                        <i class="fwmb-icon zoom-in"></i>
-                    </button>
-                    <button type="button" class="fwmb-btn" data-action="resetNoiseScale" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseReset'}}">
-                        <i class="fwmb-icon center-focus"></i>
-                    </button>
-                    <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomOut'}}">
-                        <i class="fwmb-icon zoom-out"></i>
-                    </button>
-                </div>
-
-                <div class="fwmb-transform-dpad">
-                    <button type="button" class="dpad-up" data-action="nudgeNoise" data-dx="0" data-dy="-50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
-                            class="fwmb-icon edit-arrow-up"
-                        ></i></button>
-                    <button type="button" class="dpad-left" data-action="nudgeNoise" data-dx="-50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
-                            class="fwmb-icon edit-arrow-up fwmb-rotate-270"
-                        ></i></button>
-                    <button type="button" class="dpad-center" data-action="resetNoisePan" data-tooltip="{{localize 'FILRODENSWMB.UI.PanReset'}}"><i class="fwmb-icon center-focus"></i></button>
-                    <button type="button" class="dpad-right" data-action="nudgeNoise" data-dx="50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
-                            class="fwmb-icon edit-arrow-up fwmb-rotate-90"
-                        ></i></button>
-                    <button type="button" class="dpad-down" data-action="nudgeNoise" data-dx="0" data-dy="50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
-                            class="fwmb-icon edit-arrow-down"
-                        ></i></button>
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.SeaLevel"}}</label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="seaLevel" value="{{uiState.seaLevel}}" min="0" max="1" step="0.01" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{uiState.seaLevel}}</output>
                 </div>
             </div>
-            <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.MapTransformHint"}}</div>
-        </div>
+        </fieldset>
+    {{/unless}}
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.TopographicalDetail"}}</label>
-            <div class="fwmb-slider-group">
-                <input
-                    type="range"
-                    name="noise.elevation.octaves"
-                    value="{{lookup uiState 'noise.elevation.octaves'}}"
-                    min="1"
-                    max="10"
-                    step="1"
-                    oninput="this.nextElementSibling.value = this.value"
-                />
-                <output>{{lookup uiState "noise.elevation.octaves"}}</output>
-            </div>
-        </div>
+    <!-- 2. Standard Engine Settings -->
+    {{#if (eq uiState.generationEngine "standard")}}
+        <fieldset class="fwmb-fieldset">
+            <legend>{{localize "FILRODENSWMB.UI.MapTransform"}}</legend>
+            <input type="hidden" name="noise.elevation.scale" value="{{lookup uiState 'noise.elevation.scale'}}" />
+            <input type="hidden" name="noise.offsetX" value="{{lookup uiState 'noise.offsetX'}}" />
+            <input type="hidden" name="noise.offsetY" value="{{lookup uiState 'noise.offsetY'}}" />
 
-        <div class="form-group">
-            <label data-tooltip="{{localize 'FILRODENSWMB.UI.StretchTooltip'}}">{{localize "FILRODENSWMB.UI.LandmassStretch"}}</label>
-            <div class="fwmb-slider-group">
-                <input
-                    type="range"
-                    name="noise.elevation.stretch"
-                    value="{{lookup uiState 'noise.elevation.stretch'}}"
-                    min="0.5"
-                    max="3.0"
-                    step="0.1"
-                    oninput="this.nextElementSibling.value = this.value"
-                />
-                <output>{{lookup uiState "noise.elevation.stretch"}}</output>
+            <div class="form-group stacked">
+                <div class="fwmb-transform-controls">
+                    <div class="fwmb-transform-zoom">
+                        <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomIn'}}">
+                            <i class="fwmb-icon zoom-in"></i>
+                        </button>
+                        <button type="button" class="fwmb-btn" data-action="resetNoiseScale" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseReset'}}">
+                            <i class="fwmb-icon center-focus"></i>
+                        </button>
+                        <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomOut'}}">
+                            <i class="fwmb-icon zoom-out"></i>
+                        </button>
+                    </div>
+
+                    <div class="fwmb-transform-dpad">
+                        <button type="button" class="dpad-up" data-action="nudgeNoise" data-dx="0" data-dy="-50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
+                                class="fwmb-icon edit-arrow-up"
+                            ></i></button>
+                        <button type="button" class="dpad-left" data-action="nudgeNoise" data-dx="-50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
+                                class="fwmb-icon edit-arrow-up fwmb-rotate-270"
+                            ></i></button>
+                        <button type="button" class="dpad-center" data-action="resetNoisePan" data-tooltip="{{localize 'FILRODENSWMB.UI.PanReset'}}"><i class="fwmb-icon center-focus"></i></button>
+                        <button type="button" class="dpad-right" data-action="nudgeNoise" data-dx="50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
+                                class="fwmb-icon edit-arrow-up fwmb-rotate-90"
+                            ></i></button>
+                        <button type="button" class="dpad-down" data-action="nudgeNoise" data-dx="0" data-dy="50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
+                                class="fwmb-icon edit-arrow-down"
+                            ></i></button>
+                    </div>
+                </div>
+                <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.MapTransformHint"}}</div>
             </div>
-        </div>
-    </fieldset>
+        </fieldset>
+
+        <fieldset class="fwmb-fieldset">
+            <legend>{{localize "FILRODENSWMB.UI.TopographicalDetail"}}</legend>
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.TopographicalDetail"}}</label>
+                <div class="fwmb-slider-group">
+                    <input
+                        type="range"
+                        name="noise.elevation.octaves"
+                        value="{{lookup uiState 'noise.elevation.octaves'}}"
+                        min="1"
+                        max="10"
+                        step="1"
+                        oninput="this.nextElementSibling.value = this.value"
+                    />
+                    <output>{{lookup uiState "noise.elevation.octaves"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label data-tooltip="{{localize 'FILRODENSWMB.UI.StretchTooltip'}}">{{localize "FILRODENSWMB.UI.LandmassStretch"}}</label>
+                <div class="fwmb-slider-group">
+                    <input
+                        type="range"
+                        name="noise.elevation.stretch"
+                        value="{{lookup uiState 'noise.elevation.stretch'}}"
+                        min="0.5"
+                        max="3.0"
+                        step="0.1"
+                        oninput="this.nextElementSibling.value = this.value"
+                    />
+                    <output>{{lookup uiState "noise.elevation.stretch"}}</output>
+                </div>
+            </div>
+        </fieldset>
+    {{/if}}
+
+    <!-- 3. Advanced Engine Settings -->
+    {{#if (eq uiState.generationEngine "advanced")}}
+        <fieldset class="fwmb-fieldset">
+            <legend>{{localize "FILRODENSWMB.UI.TectonicGeneration"}}</legend>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.TectonicPlates"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.TectonicPlatesHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="tectonicPlates" value="{{lookup uiState 'tectonicPlates'}}" min="5" max="50" step="1" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "tectonicPlates"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.CoastlineFracture"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.CoastlineFractureHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="coastlineFracture" value="{{lookup uiState 'coastlineFracture'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "coastlineFracture"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.ContinentalShelf"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ShelfRangeHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="shelfRange" value="{{lookup uiState 'shelfRange'}}" min="0" max="0.5" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "shelfRange"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.ContinentalGrouping"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ContinentalGroupingHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input
+                        type="range"
+                        name="continentalGrouping"
+                        value="{{lookup uiState 'continentalGrouping'}}"
+                        min="0.1"
+                        max="0.9"
+                        step="0.05"
+                        oninput="this.nextElementSibling.value = this.value"
+                    />
+                    <output>{{lookup uiState "continentalGrouping"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.SurfaceRoughness"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.SurfaceRoughnessHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input
+                        type="range"
+                        name="noise.elevation.octaves"
+                        value="{{lookup uiState 'noise.elevation.octaves'}}"
+                        min="1"
+                        max="10"
+                        step="1"
+                        oninput="this.nextElementSibling.value = this.value"
+                    />
+                    <output>{{lookup uiState "noise.elevation.octaves"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.ErosionScale"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ErosionScaleHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input
+                        type="range"
+                        name="noise.elevation.scale"
+                        value="{{lookup uiState 'noise.elevation.scale'}}"
+                        min="50"
+                        max="2000"
+                        step="10"
+                        oninput="this.nextElementSibling.value = this.value"
+                    />
+                    <output>{{lookup uiState "noise.elevation.scale"}}</output>
+                </div>
+            </div>
+        </fieldset>
+    {{/if}}
+
+    <!-- 4. Guided Engine Settings -->
+    {{#if (eq uiState.generationEngine "guided")}}
+        <fieldset class="fwmb-fieldset">
+            <legend>{{localize "FILRODENSWMB.UI.GuidedGeneration"}}</legend>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.CoastlineFracture"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.CoastlineFractureHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="coastlineFracture" value="{{lookup uiState 'coastlineFracture'}}" min="0" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "coastlineFracture"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.ContinentalShelf"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ShelfRangeHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="shelfRange" value="{{lookup uiState 'shelfRange'}}" min="0" max="0.5" step="0.05" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "shelfRange"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.ContinentScale"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ContinentScaleHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="continentScale" value="{{lookup uiState 'continentScale'}}" min="0" max="500" step="50" oninput="this.nextElementSibling.value = this.value" />
+                    <output>{{lookup uiState "continentScale"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.SurfaceRoughness"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.SurfaceRoughnessHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input
+                        type="range"
+                        name="noise.elevation.octaves"
+                        value="{{lookup uiState 'noise.elevation.octaves'}}"
+                        min="1"
+                        max="10"
+                        step="1"
+                        oninput="this.nextElementSibling.value = this.value"
+                    />
+                    <output>{{lookup uiState "noise.elevation.octaves"}}</output>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>{{localize "FILRODENSWMB.UI.ErosionScale"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.ErosionScaleHint'}}"></i></label>
+                <div class="fwmb-slider-group">
+                    <input
+                        type="range"
+                        name="noise.elevation.scale"
+                        value="{{lookup uiState 'noise.elevation.scale'}}"
+                        min="50"
+                        max="2000"
+                        step="10"
+                        oninput="this.nextElementSibling.value = this.value"
+                    />
+                    <output>{{lookup uiState "noise.elevation.scale"}}</output>
+                </div>
+            </div>
+        </fieldset>
+    {{/if}}
 
     <div class="fwmb-flex-1"></div>
     <div class="fwmb-divider"></div>
 
+    <!-- The brush tool activation button remains globally available -->
     <button type="button" class="fwmb-btn primary" data-action="toggleEditMode">
         <i class="fwmb-icon brush"></i>
         {{localize "FILRODENSWMB.UI.EditTerrain"}}

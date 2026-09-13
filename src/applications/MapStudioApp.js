@@ -1,7 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { StudioCanvas } from "../canvas/StudioCanvas.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
-import { HydrologyEngine } from "../generation/HydrologyEngine.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
 import { Scene3D } from "../canvas/Scene3D.js";
@@ -10,6 +9,7 @@ import { SpatialMath } from "../tools/SpatialMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
+import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -42,6 +42,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteRegionLayer(e, t) { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteRiver(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+            deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
 
             // --- DIALOG MANAGER: Entity Editing ---
             editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
@@ -88,6 +89,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
             setRegionMode(e, t)             { this._onSetRegionMode(e, t); },
             setRegionPreset(e, t)           { this._onSetRegionPreset(e, t); },
+            setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
             threeDView(e, t)                { this._onThreeDView(e, t); },
             toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
             toggleGrid(e, t)                { this._onToggleGrid(e, t); },
@@ -155,6 +157,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.regionLayers = [];
         this.activeRegionLayerId = null;
         this.activeRegionId = null;
+        this.landMasks = [];
+        this.activeLandMaskId = null;
         this.mapLabels = [];
         this.mapDecorations = [];
         this.pinHistory = [];
@@ -309,6 +313,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort);
             context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort);
             context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
+            context.landMasks = [...(this.landMasks || [])].sort(alphaSort);
 
             const autoLabels = [];
 
@@ -603,10 +608,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return;
         }
 
+        if (target.type === "range" && event.type === "change") {
+            return;
+        }
+
         const name = target.name || "";
 
         // Skip marking dirty for temporary visual overlays
         if (!name.startsWith("reference")) this.markDirty();
+
+        if (name === "generationEngine") {
+            if (event.type === "input") return;
+
+            this._onApplyResolution(event, target);
+            return;
+        }
 
         // 1. Route specific single-action updates
         if (name.startsWith("cartography")) return this.#updateCartography(target, name);
@@ -674,7 +690,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #routeProceduralGenerators(target) {
-        if (target.matches('input[name="seaLevel"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]')) {
+        if (
+            target.matches(
+                'input[name="seaLevel"], input[name="tectonicPlates"], input[name="coastlineFracture"], input[name="continentalGrouping"], input[name="shelfRange"], input[name="continentScale"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]',
+            )
+        ) {
             this.debouncedGenerateTerrain();
         } else if (
             target.matches(
@@ -810,6 +830,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             cleared = true;
         }
 
+        if (this.activeLandMaskId) {
+            this.activeLandMaskId = null;
+            cleared = true;
+            requiresTerrainUpdate = true;
+        }
+
         if (cleared) {
             this._repaintVectors();
             if (requiresTerrainUpdate) this.requestTerrainUpdate();
@@ -821,6 +847,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.canvasEngine.isEditMode) return;
 
         let layer = "terrain";
+        if (this.activeTool === "scene") layer = "scene";
         if (this.activeTool === "biomes") layer = "biome";
         if (this.activeTool === "features") layer = "features";
         if (this.activeTool === "infrastructure") layer = "infrastructure";
@@ -829,6 +856,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.activeTool === "cartography") layer = "cartography";
 
         // 1. Immediately intercept vector-mode tools to bypass all raster brush logic
+        if (layer === "scene") {
+            this.#handleSceneClick(x, y);
+            return;
+        }
+
         if (layer === "features") {
             this.#handleFeatureClick(x, y);
             return;
@@ -888,7 +920,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.markDirty();
 
-        if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
+        // Rebuild history if vector features exist so they re-carve and re-deform the newly painted terrain
+        const hasActiveFeatures = this.manualRivers?.length > 0 || this.tectonicFaults?.length > 0;
+        if (this.activeTool === "terrain" && hasActiveFeatures) {
             this.pendingTerrainBounds = null;
             this.debouncedHistoryRebuild();
         }
@@ -939,6 +973,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isEdit);
         }
 
+        if (this.activeTool === "scene" && this.canvasEngine.renderLandMasks) {
+            const isGuided = this.uiState.generationEngine === "guided";
+            this.canvasEngine.renderLandMasks(this.landMasks, isEdit, this.activeLandMaskId, isGuided);
+        }
+
         if (this.activeTool === "cartography" && this.canvasEngine.renderCartography) {
             this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isEdit, this.mapDecorations);
         }
@@ -948,14 +987,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.render({ parts: ["context"] });
         this.markDirty();
 
-        if (this.activeTool === "features") {
+        if (this.activeTool === "features" || this.activeTool === "scene") {
             this.requestTerrainUpdate();
         }
     }
 
     #handleInfraInsertNode(x, y) {
-        if (!["infrastructure", "regions", "features"].includes(this.activeTool)) return;
-        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+        if (!["infrastructure", "regions", "features", "scene"].includes(this.activeTool)) return;
+
+        // This only ever splits an existing line/polygon segment (scene masks, infrastructure routes,
+        // regions, fault lines, manual rivers) - pins have no segments and never reach this path -
+        // so all four tools may extend into the buffer here
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         // 1. Prevent inserting a node inside an existing marker/node
         if (this.#isNearExistingNode(x, y)) return;
@@ -992,7 +1036,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             if (config.toolCategory !== this.activeTool) continue;
 
-            const segment = SpatialMath.getClosestVectorSegment(this[config.stateKey], x, y, this.currentSnapThreshold);
+            const segment = SpatialMath.getClosestVectorSegment(this[config.stateKey], x, y, this.currentSnapThreshold, !!config.smoothed);
             if (segment && (!bestMatch || segment.dist < bestMatch.dist)) {
                 bestMatch = {
                     vector: segment.vector,
@@ -1020,11 +1064,28 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
+        // Check Land Masks
+        if (this.activeTool === "scene") {
+            const mockLayer = [{ id: "mask_layer", regions: this.landMasks }];
+            const maskSegment = SpatialMath.getClosestRegionSegment(mockLayer, this.activeLandMaskId, x, y, this.currentSnapThreshold);
+
+            if (maskSegment && (!bestMatch || maskSegment.dist < bestMatch.dist)) {
+                bestMatch = {
+                    vector: maskSegment.region,
+                    insertIndex: maskSegment.insertIndex,
+                    projX: maskSegment.projX,
+                    projY: maskSegment.projY,
+                    dist: maskSegment.dist,
+                    triggersTerrain: true,
+                };
+            }
+        }
+
         return bestMatch;
     }
 
     #handleInfraDeleteNode(target) {
-        if (!["infrastructure", "regions", "features"].includes(this.activeTool)) return;
+        if (!["infrastructure", "regions", "features", "scene"].includes(this.activeTool)) return;
         if (target.icon && this.activeTool !== "infrastructure") return;
 
         // 1. Locate the target and its specific deletion instructions
@@ -1111,11 +1172,71 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
+        // 4. Check Land Masks
+        if (this.activeTool === "scene") {
+            const mIndex = this.landMasks.findIndex((m) => m.points.includes(target));
+            if (mIndex > -1) {
+                const mask = this.landMasks[mIndex];
+                return {
+                    array: mask.points,
+                    index: mask.points.indexOf(target),
+                    triggersTerrain: true,
+                    cleanup: () => {
+                        // Orphan cleanup: destroy mask if it has fewer than 3 points
+                        if (mask.points.length < 3 && this.activeLandMaskId !== mask.id) {
+                            this.landMasks.splice(mIndex, 1);
+                        }
+                    },
+                };
+            }
+        }
+
         return null;
     }
 
+    #handleSceneClick(x, y) {
+        // Guard clause: Only process clicks if we are actively drawing a land/ocean masks
+        if (this.uiState.sceneMode !== "addMask" && this.uiState.sceneMode !== "subtractMask") return;
+
+        // Reject clicks outside the visual 200px buffer
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) {
+            return;
+        }
+
+        // If no mask is currently active, initialise a new one
+        if (!this.activeLandMaskId) {
+            const isSubtract = this.uiState.sceneMode === "subtractMask";
+
+            const newMask = {
+                id: foundry.utils.randomID(),
+                name: isSubtract ? `Ocean Hole ${this.landMasks.length + 1}` : `Landmass ${this.landMasks.length + 1}`,
+                operation: isSubtract ? "subtract" : "add",
+                points: [],
+            };
+            this.landMasks.push(newMask);
+            this.activeLandMaskId = newMask.id;
+        }
+
+        // Locate the active mask and append the new vertex
+        const mask = this.landMasks.find((m) => m.id === this.activeLandMaskId);
+        if (mask) {
+            mask.points.push({ x, y });
+            this.markDirty();
+            this._repaintVectors();
+            this.render({ parts: ["context"] });
+        }
+    }
+
     #handleFeatureClick(x, y) {
-        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+        // River sources are single-point markers and stay confined to the map.
+        // Manual rivers also stay strictly on-map: HydrologyEngine derives flow direction and the
+        // carve depth from the elevation sampled at each node, and there is no elevation data (nor
+        // any well-defined "off-map elevation") outside the actual terrain grid - see #sampleElevation.
+        // Fault lines have no such dependency (TectonicEngine works purely off clamped pixel bounds
+        // per segment) so they alone may extend into the buffer.
+        const buffer = this.uiState.activeFeatureMode === "fault" ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         MapStateManager.pushVectorState(this);
         const finalPos = { x, y };
@@ -1296,7 +1417,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
         this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isLabelEdit);
 
-        // 5. Render Cartography
+        // 5. Render Land Masks
+        if (this.canvasEngine.renderLandMasks) {
+            // Visible if in Guided Mode and on the Scene Tool, regardless of Edit Mode
+            const isGuidedScene = this.uiState.generationEngine === "guided" && this.activeTool === "scene";
+
+            this.canvasEngine.renderLandMasks(this.landMasks, isEditModeActive, this.activeLandMaskId, isGuidedScene);
+        }
+
+        // 6. Render Cartography
         const isCartographyEdit = this.activeTool === "cartography" && isEditModeActive;
         if (this.canvasEngine.renderCartography) {
             this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit, this.mapDecorations);
@@ -1346,29 +1475,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    async #rebuildFromHistory(showUI = false) {
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
-
-        // 1. Conditionally trigger the UI overlay
+    async #rebuildFromHistory(showUI = false, bounds = null) {
         if (showUI) {
             await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.RebuildingHistory"));
         }
 
         try {
-            // 2. Instant global array copy
-            this.currentElevationData.set(this.baseElevationData);
-            this.currentBiomeOverrides.fill(0);
-
-            // 3. Global history replay
-            this.brushEngine.replayHistory(this.currentElevationData, this.currentBiomeOverrides, params.seaLevel);
-
-            // 4. Global river carving
-            if (this.manualRivers && this.manualRivers.length > 0) {
-                HydrologyEngine.carveManualRivers(this.currentElevationData, this.mapWidth, this.mapHeight, this.manualRivers, engine.simplex, params.seaLevel);
-            }
+            // Hand off history processing to the Orchestrator
+            ProceduralOrchestrator.rebuildFromHistory(this, null, null, bounds);
         } finally {
-            // 5. Conditionally clear the UI overlay
             if (showUI) {
                 this.#endProcessing();
             }
@@ -1376,26 +1491,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async generateTerrain() {
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
-
-        // Clear the accumulator so it doesn't linger
+        // Enforce global array resets
         this.pendingTerrainBounds = null;
 
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
 
         try {
-            console.log("World Map Builder | Generating Topography...");
-            const t0 = performance.now();
+            // Hand off the mathematical heavy lifting to the Orchestrator
+            ProceduralOrchestrator.processTopographyPhase(this);
 
-            engine.generateTopography(this.mapWidth, this.mapHeight, params, this.baseElevationData, this.tectonicFaults, [], null);
-            await this.#rebuildFromHistory();
-
-            this.currentSpringOverrides.fill(0);
-
-            const t1 = performance.now();
-            console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
-
+            // The App maintains control of the Climate and Canvas rendering pipelines
             await this.generateClimate(null);
         } finally {
             this.#endProcessing();
@@ -1404,26 +1509,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async generateClimate(bounds = null) {
         if (!this.currentElevationData) return;
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
 
-        let activeBounds = bounds || this.pendingTerrainBounds;
-
-        // Dynamically scale the wind distance relative to a baseline map resolution and map scale
-        if (activeBounds) {
-            const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
-            const widthScale = this.mapWidth / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
-
-            const latTop = params.latTop ?? 90;
-            const latBottom = params.latBottom ?? -90;
-            const latRange = Math.max(0.1, Math.abs(latTop - latBottom)); // Prevent Infinity
-            const latScale = 180 / latRange;
-
-            const dynamicWindDistance = Math.round(baseWind * widthScale * latScale);
-
-            activeBounds = SpatialMath.padBounds(activeBounds, dynamicWindDistance, 0, this.mapWidth, this.mapHeight);
-        }
-
+        // Resolve active bounds before clearing pending state
+        const activeBounds = bounds || this.pendingTerrainBounds;
         if (!bounds && this.pendingTerrainBounds) {
             this.pendingTerrainBounds = null;
         }
@@ -1431,14 +1519,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
 
         try {
-            console.log("World Map Builder | Generating Climate Data...");
-            const t0 = performance.now();
-
-            engine.generateClimateData(this.currentElevationData, this.mapWidth, this.mapHeight, params, this.currentMoistureData, this.currentTemperatureData, activeBounds);
-
-            const t1 = performance.now();
-            console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
-
+            ProceduralOrchestrator.processClimatePhase(this, activeBounds);
             await this.generateFeatures(activeBounds);
         } finally {
             this.#endProcessing();
@@ -1447,55 +1528,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async generateFeatures(bounds = null) {
         if (!this.currentElevationData) return;
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
 
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
 
         try {
-            console.log("World Map Builder | Generating Features...");
-            const t0 = performance.now();
-
-            // Bake procedural springs into permanent pins on first load or new map generation
-            if (!this.uiState.springsBaked) {
-                const newSprings = engine.bakeProceduralSprings(this.currentElevationData, this.currentMoistureData, this.mapWidth, this.mapHeight, params);
-                for (const s of newSprings) {
-                    this.mapPins.push({
-                        id: foundry.utils.randomID(),
-                        name: "River Source",
-                        x: s.x,
-                        y: s.y,
-                        type: "spring",
-                        radius: 6,
-                        visibility: "all",
-                    });
-                }
-                this.uiState.springsBaked = true;
-                this.markDirty();
-            }
-
-            const dynamicPins = [...this.mapPins];
-
-            // Ensure procedural water spawns exactly at the highest point of our manual carve
-            const manualSprings = HydrologyEngine.getRiverSources(this.currentElevationData, this.mapWidth, this.manualRivers);
-            dynamicPins.push(...manualSprings);
-
-            this.currentRiverData = engine.generateRivers(
-                this.currentElevationData,
-                this.currentMoistureData,
-                this.currentTemperatureData,
-                dynamicPins,
-                this.mapWidth,
-                this.mapHeight,
-                params,
-                this.bufferRiverMap,
-                this.bufferWaterMask,
-            );
-
-            const t1 = performance.now();
-            console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
-
-            await this._repaintCanvas(bounds); // Cascade to final render
+            ProceduralOrchestrator.processFeaturePhase(this);
+            await this._repaintCanvas(bounds);
         } finally {
             this.#endProcessing();
         }
@@ -1507,6 +1545,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState.mapSeed = payload.seed;
         this.currentParentId = payload.parentId || null;
+
+        this.uiState.generationEngine = payload.generationEngine || "standard";
 
         this.mapWidth = payload.mapWidth;
         this.mapHeight = payload.mapHeight;
@@ -1525,6 +1565,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const c = p.cartography || {};
 
         this.uiState.seaLevel = p.seaLevel;
+        this.uiState.tectonicPlates = p.tectonicPlates ?? FILRODENSWMB.GENERATION.TECTONIC_PLATES;
+        this.uiState.coastlineFracture = p.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
+        this.uiState.continentalGrouping = p.continentalGrouping ?? FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING;
+        this.uiState.shelfRange = p.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
+        this.uiState.continentScale = p.continentScale ?? FILRODENSWMB.GENERATION.CONTINENT_SCALE;
         this.uiState.globalTemp = p.globalTemp;
         this.uiState.seasonOffset = p.seasonOffset;
         this.uiState.latTop = p.latTop;
@@ -1535,9 +1580,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState["noise.offsetX"] = p.noise.offsetX;
         this.uiState["noise.offsetY"] = p.noise.offsetY;
-        this.uiState["noise.moistureOffset"] = p.noise.moistureOffset ?? 10000;
-        this.uiState["noise.tempOffset"] = p.noise.tempOffset ?? 20000;
-        this.uiState.windDistance = p.climate?.windDistance ?? 40;
+        this.uiState["noise.moistureOffset"] = p.noise.moistureOffset ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE;
+        this.uiState["noise.tempOffset"] = p.noise.tempOffset ?? FILRODENSWMB.NOISE.OFFSET_TEMP;
+        this.uiState.windDistance = p.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
         this.uiState["noise.elevation.scale"] = 1 / p.noise.elevation.scale;
         this.uiState["noise.elevation.octaves"] = p.noise.elevation.octaves;
         this.uiState["noise.elevation.stretch"] = p.noise.elevation.stretch;
@@ -1635,6 +1680,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.mapRoutes = payload.mapRoutes || [];
         this.regionLayers = payload.regionLayers || [];
+        this.landMasks = payload.landMasks || [];
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
 
@@ -1654,7 +1700,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #handleInfrastructureClick(x, y) {
-        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+        // Route nodes may extend into the buffer so lines can run off the visible map;
+        // pins are single-point markers and stay confined to the map itself
+        const buffer = this.uiState.activeInfraMode === "route" ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         MapStateManager.pushVectorState(this);
 
@@ -1735,7 +1784,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #handleRegionClick(x, y) {
-        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+        // Region nodes may extend into the buffer, matching scene masks and infrastructure routes
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         if (!this.activeRegionLayerId) {
             ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");
@@ -1789,16 +1840,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async #gateUnsavedChanges() {
         if (!this.isDirty) return true;
 
-        const choice = await foundry.applications.api.DialogV2.wait({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
-            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
-            buttons: [
-                { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
-                { action: "discard", label: game.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
-                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
-            ],
-            close: () => "cancel",
-        });
+        const choice = await MapDialogManager.promptUnsavedChanges();
 
         if (choice === "cancel") return false;
 
@@ -1840,12 +1882,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
 
             // 2. Lock the UI and show the spinner
-            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.SavingMap") || "Saving Map...");
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.SavingMap"));
             this.currentSaveName = mapName;
 
             const { currentSeed, params } = MapStateManager.getMapParameters(this);
             const payload = {
                 seed: currentSeed,
+                generationEngine: this.uiState.generationEngine,
                 springsBaked: this.uiState.springsBaked,
                 mapWidth: this.mapWidth,
                 mapHeight: this.mapHeight,
@@ -1862,6 +1905,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 mapPins: this.mapPins,
                 mapRoutes: this.mapRoutes,
                 regionLayers: this.regionLayers,
+                landMasks: this.landMasks,
                 mapLabels: this.mapLabels,
                 mapDecorations: this.mapDecorations,
                 parentId: this.currentParentId,
@@ -2239,29 +2283,34 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Highly destructive action: Rebuilds the underlying webgl canvas and spatial arrays.
      */
     async _onApplyResolution(event, target) {
-        // 1. Extract all uncommitted data natively (No DOM scraping)
         const formData = new foundry.applications.ux.FormDataExtended(target.form).object;
 
         const newWidth = Number.parseInt(formData.mapWidth) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
         const newHeight = Number.parseInt(formData.mapHeight) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
         let newSeed = formData.mapSeed?.trim();
 
-        // 2. If the user left the seed blank, generate a random one automatically
+        // Extract the dropdown choice
+        const newEngine = formData.generationEngine || "standard";
+
+        // If the user left the seed blank, generate a random one automatically
         if (!newSeed) {
             newSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
         }
 
-        const hasBrushEdits = this.brushEngine && this.brushEngine.history.length > 0;
-        const hasPinEdits = this.mapPins && this.mapPins.length > 0;
+        const canProceed = await this.#gateUnsavedChanges();
 
-        if (hasBrushEdits || hasPinEdits) {
-            const confirmed = await MapDialogManager._confirmDialog(game.i18n.localize("FILRODENSWMB.UI.Warning"), game.i18n.localize("FILRODENSWMB.UI.ResolutionWarningContent"));
-
-            if (!confirmed) {
-                this.render({ parts: ["context"] });
-                return;
+        if (!canProceed) {
+            // The user cancelled the action
+            if (target.name === "generationEngine") {
+                target.value = this.uiState.generationEngine;
             }
+            this.render({ parts: ["context"] });
+            return false;
         }
+
+        // Calculate the center-anchor offset
+        const dx = (newWidth - this.mapWidth) / 2;
+        const dy = (newHeight - this.mapHeight) / 2;
 
         this.mapWidth = newWidth;
         this.mapHeight = newHeight;
@@ -2272,6 +2321,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
         this.uiState.mapSeed = newSeed;
 
+        // Inject the engine choice into the wiped state
+        this.uiState.generationEngine = newEngine;
+
         // Reset biome colors to defaults so the DOM sync catches them
         this.customBiomeColors = {};
         Object.entries(FILRODENSWMB.BIOMES).forEach(([key, rgb]) => {
@@ -2280,7 +2332,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.render({ parts: ["toolbar", "context"] });
 
-        // 1. Reset all history and spatial arrays
+        // 1. Reset all history and spatial arrays except for the land masks, which are preserved if switching to Guided Mode
         this.markDirty();
         this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
         this.manualRivers = [];
@@ -2288,6 +2340,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapPins = [];
         this.mapRoutes = [];
         this.regionLayers = [];
+
+        // Apply the center offset to keep masks perfectly framed
+        this.landMasks =
+            newEngine === "guided"
+                ? this.landMasks.map((mask) => ({
+                      ...mask,
+                      points: mask.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+                  }))
+                : [];
+
         this.mapLabels = [];
         this.mapDecorations = [];
         this.pinHistory = [];
@@ -2301,17 +2363,33 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.activeRegionId = null;
         this.activeFaultId = null;
         this.activeRiverId = null;
+        this.activeLandMaskId = null;
 
         // 3. Wipe the save memory so the next save forces a "Save As" prompt
         this.currentSaveId = null;
         this.currentSaveName = null;
 
+        // 4. If switching to Guided Mode, auto-activate the drawing tools
+        if (newEngine === "guided") {
+            this.activeTool = "scene";
+            this.uiState.sceneMode = "addMask";
+            this.uiState.isEditMode = true;
+        } else {
+            this.uiState.isEditMode = false;
+        }
+
+        if (this.canvasEngine) {
+            this.canvasEngine.setEditMode(this.uiState.isEditMode);
+        }
+        this.#updateCanvasModes(this.activeTool);
+
         await this.generateTerrain();
         this.#updateGrid();
         this.canvasEngine.resetCamera();
 
-        // 4. Force UI to update
-        this.render({ parts: ["toolbar", "context"] });
+        // 5. Force UI to update
+        this.render({ parts: ["toolbar", "context", "editToolbar"] });
+        return true;
     }
 
     _onChangeTool(event, target) {
@@ -2346,6 +2424,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this[config.activeKey] = null;
         }
         this.activeRegionId = null;
+        this.activeLandMaskId = null;
     }
 
     async #deactivateEditMode() {
@@ -2353,7 +2432,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState.isEditMode = false;
         this.brushEngine?.endStroke();
-        if (this.canvasEngine) this.canvasEngine.setEditMode(false);
+        if (this.canvasEngine) {
+            this.canvasEngine.setEditMode(false);
+            if (this.canvasEngine.setCropMode) this.canvasEngine.setCropMode(false);
+        }
 
         await this.render({ parts: ["toolbar", "editToolbar", "context"] });
     }
@@ -2382,8 +2464,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.canvasEngine) return;
 
         this.canvasEngine.setReferenceMode(newTool === "reference");
+
         if (this.canvasEngine.setCropMode) {
-            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode);
+            const isCropAllowed = ["standard", "flat"].includes(this.uiState.generationEngine);
+            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode && isCropAllowed);
         }
     }
 
@@ -2886,6 +2970,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    _onSetSceneMode(event, target) {
+        this.uiState.sceneMode = target.dataset.mode;
+        this.render({ parts: ["toolbar", "editToolbar"] });
+    }
+
     /**
      * Toggles the interactive 3D topography visualisation.
      */
@@ -2969,6 +3058,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.isEditMode = isActivating;
 
         if (isActivating) {
+            // Auto-activate the mask drawing tool
+            if (this.uiState.generationEngine === "guided") {
+                this.uiState.sceneMode = "addMask";
+            }
+
             const stillValid = this.regionLayers.some((l) => l.id === this.activeRegionLayerId);
             if (!stillValid) {
                 this.activeRegionLayerId = this.regionLayers[0]?.id ?? null;
@@ -2983,12 +3077,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this[config.activeKey] = null;
             }
             this.activeRegionId = null;
+
+            if (this.activeLandMaskId) {
+                this.activeLandMaskId = null;
+                this.requestTerrainUpdate();
+            }
         }
 
         if (this.canvasEngine) {
             this.canvasEngine.setEditMode(isActivating);
+
             if (this.canvasEngine.setCropMode) {
-                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene");
+                // Only enable the crop tool for standard and flat maps
+                const isCropAllowed = ["standard", "flat"].includes(this.uiState.generationEngine);
+                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene" && isCropAllowed);
             }
         }
 
@@ -3188,6 +3290,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             case "pin": {
                 const pin = this.mapPins.find((p) => p.id === id);
                 return pin ? [pin] : [];
+            }
+            case "landMask": {
+                const mask = this.landMasks.find((m) => m.id === id);
+                return mask?.points || [];
             }
             case "region": {
                 const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);

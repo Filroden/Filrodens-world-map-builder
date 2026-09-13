@@ -32,6 +32,8 @@ export class MapStateManager {
         const ratio = maxDim / baseline;
 
         return {
+            generationEngine: "standard",
+
             mapWidth: width,
             mapHeight: height,
             gridType: "square",
@@ -64,6 +66,12 @@ export class MapStateManager {
             "noise.moisture.scale": Math.min(Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.round(FILRODENSWMB.NOISE.MOISTURE.SCALE * ratio)), FILRODENSWMB.LIMITS.NOISE_SCALE_MAX),
             "noise.moisture.octaves": FILRODENSWMB.NOISE.MOISTURE.OCTAVES,
             "noise.temperature.scale": Math.min(Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.round(FILRODENSWMB.NOISE.TEMPERATURE.SCALE * ratio)), FILRODENSWMB.LIMITS.NOISE_SCALE_MAX),
+
+            tectonicPlates: FILRODENSWMB.GENERATION.TECTONIC_PLATES,
+            coastlineFracture: FILRODENSWMB.GENERATION.COASTLINE_FRACTURE,
+            continentalGrouping: FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING,
+            shelfRange: FILRODENSWMB.GENERATION.SHELF_RANGE,
+            continentScale: FILRODENSWMB.GENERATION.CONTINENT_SCALE,
 
             activeFeatureMode: "spring",
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
@@ -145,6 +153,8 @@ export class MapStateManager {
             activeFaultId: app.activeFaultId,
             manualRivers: foundry.utils.deepClone(app.manualRivers),
             activeRiverId: app.activeRiverId,
+            landMasks: foundry.utils.deepClone(app.landMasks || []),
+            activeLandMaskId: app.activeLandMaskId,
             pins: foundry.utils.deepClone(app.mapPins),
             routes: foundry.utils.deepClone(app.mapRoutes),
             regionLayers: foundry.utils.deepClone(app.regionLayers),
@@ -185,6 +195,8 @@ export class MapStateManager {
         app.activeFaultId = state.activeFaultId || null;
         app.manualRivers = state.manualRivers || app.manualRivers;
         app.activeRiverId = state.activeRiverId || null;
+        app.landMasks = state.landMasks || app.landMasks || [];
+        app.activeLandMaskId = state.activeLandMaskId || null;
         app.mapPins = state.pins || app.mapPins;
         app.mapRoutes = state.routes || app.mapRoutes;
         app.regionLayers = state.regionLayers || app.regionLayers;
@@ -202,7 +214,7 @@ export class MapStateManager {
             const input = app.element.querySelector(`[name="${key}"]`);
             if (!input) continue;
 
-            if (key === "mapSeed" || key === "gridType") {
+            if (key === "mapSeed" || key === "gridType" || key === "generationEngine") {
                 app.uiState[key] = input.value;
             } else {
                 const parsed = Number.parseFloat(input.value);
@@ -230,7 +242,12 @@ export class MapStateManager {
         }
 
         const params = {
-            seaLevel: state.seaLevel,
+            seaLevel: state.generationEngine === "advanced" ? 0.35 : state.seaLevel,
+            tectonicPlates: state.tectonicPlates,
+            coastlineFracture: state.coastlineFracture,
+            continentalGrouping: state.continentalGrouping,
+            shelfRange: state.shelfRange,
+            continentScale: state.continentScale,
             globalTemp: state.globalTemp,
             seasonOffset: state.seasonOffset,
             latTop: state.latTop,

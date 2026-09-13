@@ -26,6 +26,23 @@ export class MapDialogManager {
     }
 
     /**
+     * Prompts the user with a 3-way choice for unsaved changes (Save, Discard, Cancel).
+     * Returns the chosen action as a string.
+     */
+    static async promptUnsavedChanges() {
+        return foundry.applications.api.DialogV2.wait({
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
+            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
+            buttons: [
+                { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
+                { action: "discard", label: game.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
+                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+            ],
+            close: () => "cancel",
+        });
+    }
+
+    /**
      * Builds a safe copy of an entity inheriting the current global label defaults.
      */
     static _withLabelDefaults(app, entity) {
@@ -408,6 +425,26 @@ export class MapDialogManager {
         app._repaintVectors();
         if (config.triggersTerrain) app.debouncedGenerateTerrain();
 
+        app.render({ parts: ["context"] });
+        app.markDirty();
+    }
+
+    static async onDeleteLandMask(app, event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+
+        const confirmed = await this._confirmDialog();
+        if (!confirmed) return;
+
+        MapStateManager.pushVectorState(app);
+
+        app.landMasks = app.landMasks.filter((m) => m.id !== id);
+
+        if (app.activeLandMaskId === id) {
+            app.activeLandMaskId = null;
+        }
+
+        app._repaintVectors();
+        app.requestTerrainUpdate();
         app.render({ parts: ["context"] });
         app.markDirty();
     }
