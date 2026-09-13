@@ -294,11 +294,15 @@ export const FILRODENSWMB = {
     },
     ENTITY_CONFIG: {
         decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },
-        fault: { stateKey: "tectonicFaults", activeKey: "activeFaultId", triggersTerrain: true, toolCategory: "features" },
+        // `smoothed: true` marks entities StudioCanvas always renders as a Catmull-Rom curve
+        // (see #getSplinePoints), so node-insertion hit-testing must test against that curve too
+        // rather than the straight chords between control points. Manual rivers render as a plain
+        // straight polyline despite their name, so they are deliberately left un-smoothed here.
+        fault: { stateKey: "tectonicFaults", activeKey: "activeFaultId", triggersTerrain: true, toolCategory: "features", smoothed: true },
         label: { stateKey: "mapLabels", activeKey: null, triggersTerrain: false },
         pin: { stateKey: "mapPins", activeKey: null, triggersTerrain: false },
         regionLayer: { stateKey: "regionLayers", activeKey: "activeRegionLayerId", triggersTerrain: false, isLayer: true },
         river: { stateKey: "manualRivers", activeKey: "activeRiverId", triggersTerrain: true, toolCategory: "features" },
-        route: { stateKey: "mapRoutes", activeKey: "activeRouteId", triggersTerrain: false, toolCategory: "infrastructure" },
+        route: { stateKey: "mapRoutes", activeKey: "activeRouteId", triggersTerrain: false, toolCategory: "infrastructure", smoothed: true },
     },
 };

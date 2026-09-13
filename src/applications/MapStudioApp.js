@@ -995,8 +995,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #handleInfraInsertNode(x, y) {
         if (!["infrastructure", "regions", "features", "scene"].includes(this.activeTool)) return;
 
-        // Allow the buffer for scene masks; keep strict 0 bounds for other tools
-        const buffer = this.activeTool === "scene" ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
+        // This only ever splits an existing line/polygon segment (scene masks, infrastructure routes,
+        // regions, fault lines, manual rivers) - pins have no segments and never reach this path -
+        // so all four tools may extend into the buffer here
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
         if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         // 1. Prevent inserting a node inside an existing marker/node
@@ -1034,7 +1036,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             if (config.toolCategory !== this.activeTool) continue;
 
-            const segment = SpatialMath.getClosestVectorSegment(this[config.stateKey], x, y, this.currentSnapThreshold);
+            const segment = SpatialMath.getClosestVectorSegment(this[config.stateKey], x, y, this.currentSnapThreshold, !!config.smoothed);
             if (segment && (!bestMatch || segment.dist < bestMatch.dist)) {
                 bestMatch = {
                     vector: segment.vector,
@@ -1227,7 +1229,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #handleFeatureClick(x, y) {
-        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+        // River sources are single-point markers and stay confined to the map.
+        // Manual rivers also stay strictly on-map: HydrologyEngine derives flow direction and the
+        // carve depth from the elevation sampled at each node, and there is no elevation data (nor
+        // any well-defined "off-map elevation") outside the actual terrain grid - see #sampleElevation.
+        // Fault lines have no such dependency (TectonicEngine works purely off clamped pixel bounds
+        // per segment) so they alone may extend into the buffer.
+        const buffer = this.uiState.activeFeatureMode === "fault" ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         MapStateManager.pushVectorState(this);
         const finalPos = { x, y };
@@ -1691,7 +1700,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #handleInfrastructureClick(x, y) {
-        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+        // Route nodes may extend into the buffer so lines can run off the visible map;
+        // pins are single-point markers and stay confined to the map itself
+        const buffer = this.uiState.activeInfraMode === "route" ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         MapStateManager.pushVectorState(this);
 
@@ -1772,7 +1784,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #handleRegionClick(x, y) {
-        if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
+        // Region nodes may extend into the buffer, matching scene masks and infrastructure routes
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         if (!this.activeRegionLayerId) {
             ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");

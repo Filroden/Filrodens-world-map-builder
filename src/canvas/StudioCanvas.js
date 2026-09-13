@@ -302,7 +302,7 @@ export class StudioCanvas {
         if (grabbedTarget && !isEraserActive) {
             e.preventDefault();
             e.stopPropagation();
-            this.activeDrag = { target: grabbedTarget };
+            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType };
             canvasElement.style.cursor = "grabbing";
             if (this.onInfraDragStart) this.onInfraDragStart();
             return;
@@ -363,17 +363,14 @@ export class StudioCanvas {
 
         // --- NODE DRAGGING ---
         if (this.activeDrag) {
-            // Expand the clamp buffer so masks can span well outside the view
-            const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+            // Line/polygon nodes (routes, regions, land masks, fault lines) may be dragged into the
+            // buffer so they can span well outside the visible map. Single-point markers (pins,
+            // labels, decorations) and manual river nodes stay confined to the map itself - the same
+            // rule applied when these nodes are first created (see MapStudioApp's click handlers).
+            const bufferedTypes = ["route", "region", "landMask", "fault"];
+            const buffer = bufferedTypes.includes(this.activeDrag.entityType) ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
             this.activeDrag.target.x = Math.max(-buffer, Math.min(coords.x, this.mapWidth + buffer));
             this.activeDrag.target.y = Math.max(-buffer, Math.min(coords.y, this.mapHeight + buffer));
-            if (this.onInfraDrag) this.onInfraDrag();
-            return;
-        }
-
-        if (this.activeDrag) {
-            this.activeDrag.target.x = Math.max(0, Math.min(coords.x, this.mapWidth));
-            this.activeDrag.target.y = Math.max(0, Math.min(coords.y, this.mapHeight));
             if (this.onInfraDrag) this.onInfraDrag();
             return;
         }
@@ -699,6 +696,10 @@ export class StudioCanvas {
         this.isEditMode = isActive;
         const canvasElement = this.app.canvas ?? this.app.view;
         canvasElement.style.cursor = isActive ? "crosshair" : "default";
+
+        // Reveal/hide the buffer area immediately on toggle, rather than waiting for the next
+        // render pass to catch up with the new mode.
+        this.#updateGlobalMask();
     }
 
     /**
@@ -1798,9 +1799,14 @@ export class StudioCanvas {
 
         const buffer = FILRODENSWMB.UI.CANVAS_BUFFER; // Sensible off-canvas boundary
 
+        // Cosmetic only: the buffer is visible while editing (so nodes dragged/placed out there
+        // stay visible) and hidden outside edit mode, when it's just simulation headroom the
+        // viewer shouldn't see. Interaction (hitArea below) is unaffected by this either way.
+        const visualPad = this.isEditMode ? buffer : 0;
+
         this.mapMask.clear();
         this.mapMask.beginFill(0xffffff);
-        this.mapMask.drawRect(-buffer, -buffer, this.mapWidth + buffer * 2, this.mapHeight + buffer * 2);
+        this.mapMask.drawRect(-visualPad, -visualPad, this.mapWidth + visualPad * 2, this.mapHeight + visualPad * 2);
         this.mapMask.endFill();
 
         this.stage.hitArea = new PIXI.Rectangle(-buffer, -buffer, this.mapWidth + buffer * 2, this.mapHeight + buffer * 2);
