@@ -332,6 +332,64 @@ export class MapDialogManager {
                     app.uiState.routeStyle = result.style;
                 },
             },
+            Region: {
+                registryKey: "customRegionStyles",
+                activeStateKey: "activeRegionQuickStyle",
+                template: "modules/filrodens-world-map-builder/templates/dialogs/edit-region-quick-style.hbs",
+                getDefaults: () => ({
+                    name: "New Region Style",
+                    fillColor: "#c6af53",
+                    fillStyle: "solid",
+                    lineColor: "#ffffff",
+                    lineThickness: 2,
+                    lineStyle: "solid",
+                    smoothing: true,
+                }),
+                getContext: (app, style) => ({
+                    style,
+                    palette: FILRODENSWMB.LABELS?.PRESETS || [],
+                }),
+                onExtract: (form, fallbackName) => ({
+                    name: form.elements["styleName"].value.trim() || fallbackName,
+                    fillColor: form.elements["styleFillTransparent"].checked ? "transparent" : form.elements["styleFillColor"].value,
+                    fillStyle: form.elements["styleFillStyle"].value,
+                    lineColor: form.elements["styleLineColor"].value,
+                    lineThickness: Number(form.elements["styleLineThickness"].value) || 2,
+                    lineStyle: form.elements["styleLineStyle"].value,
+                    smoothing: form.elements["styleSmoothing"].value === "true",
+                }),
+                onCascade: (app, id, result) => {
+                    const aestheticProperties = {
+                        fillColor: result.fillColor,
+                        fillStyle: result.fillStyle,
+                        lineColor: result.lineColor,
+                        lineThickness: result.lineThickness,
+                        lineStyle: result.lineStyle,
+                        smoothing: result.smoothing,
+                    };
+
+                    app.regionLayers.forEach((layer) => {
+                        layer.regions.forEach((region) => {
+                            if (region.quickStyle === id) foundry.utils.mergeObject(region, aestheticProperties);
+                        });
+                    });
+                },
+                onDisconnect: (app, id) => {
+                    app.regionLayers.forEach((layer) => {
+                        layer.regions.forEach((region) => {
+                            if (region.quickStyle === id) region.quickStyle = "custom";
+                        });
+                    });
+                },
+                onUpdateActiveUI: (app, result) => {
+                    app.uiState.regionFillColor = result.fillColor;
+                    app.uiState.regionFillStyle = result.fillStyle;
+                    app.uiState.regionLineColor = result.lineColor;
+                    app.uiState.regionLineThickness = result.lineThickness;
+                    app.uiState.regionLineStyle = result.lineStyle;
+                    app.uiState.regionSmoothing = result.smoothing;
+                },
+            },
         };
     }
 
@@ -856,13 +914,52 @@ export class MapDialogManager {
                 fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 customLabelStyles: app.uiState.customLabelStyles || [],
+                customRegionStyles: app.uiState.customRegionStyles || [],
             },
             onRender: (dialogApp, html) => {
+                const quickStyleSelect = html.querySelector('select[name="regionQuickStyle"]');
+                const fillTransparentCheckbox = html.querySelector('input[name="regionFillTransparent"]');
+                const fillColorInput = html.querySelector('input[name="regionFillColor"]');
+                const fillStyleSelect = html.querySelector('select[name="regionFillStyle"]');
+                const lineColorInput = html.querySelector('input[name="regionLineColor"]');
+                const lineThicknessInput = html.querySelector('input[name="regionLineThickness"]');
+                const lineStyleSelect = html.querySelector('select[name="regionLineStyle"]');
+                const smoothingSelect = html.querySelector('select[name="regionSmoothing"]');
+
+                quickStyleSelect?.addEventListener("change", (e) => {
+                    const styleId = e.target.value;
+                    if (styleId !== "custom") {
+                        const styleData = app.uiState.customRegionStyles.find((s) => s.id === styleId);
+                        if (styleData) {
+                            const isTransparent = styleData.fillColor === "transparent";
+                            if (fillTransparentCheckbox) fillTransparentCheckbox.checked = isTransparent;
+                            if (fillColorInput) fillColorInput.value = isTransparent ? "#000000" : styleData.fillColor;
+                            if (fillStyleSelect) fillStyleSelect.value = styleData.fillStyle;
+                            if (lineColorInput) lineColorInput.value = styleData.lineColor;
+                            if (lineThicknessInput) lineThicknessInput.value = styleData.lineThickness;
+                            if (lineStyleSelect) lineStyleSelect.value = styleData.lineStyle;
+                            if (smoothingSelect) smoothingSelect.value = String(styleData.smoothing);
+                        }
+                    }
+                });
+
+                const revertToCustom = () => {
+                    if (quickStyleSelect) quickStyleSelect.value = "custom";
+                };
+                fillTransparentCheckbox?.addEventListener("change", revertToCustom);
+                fillColorInput?.addEventListener("input", revertToCustom);
+                fillStyleSelect?.addEventListener("change", revertToCustom);
+                lineColorInput?.addEventListener("input", revertToCustom);
+                lineThicknessInput?.addEventListener("input", revertToCustom);
+                lineStyleSelect?.addEventListener("change", revertToCustom);
+                smoothingSelect?.addEventListener("change", revertToCustom);
+
                 this.bindLabelPropertiesDialog(html, app.uiState);
             },
             onExtract: (form, fallbackName) => ({
                 name: form.elements["regionName"]?.value.trim() || fallbackName,
                 description: form.elements["regionDesc"].value,
+                quickStyle: form.elements["regionQuickStyle"].value,
                 fillColor: form.elements["regionFillTransparent"].checked ? "transparent" : form.elements["regionFillColor"].value,
                 fillStyle: form.elements["regionFillStyle"].value,
                 lineColor: form.elements["regionLineColor"].value,

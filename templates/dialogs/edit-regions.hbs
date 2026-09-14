@@ -12,6 +12,20 @@
     <div class="fwmb-divider"></div>
 
     <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
+        <select name="regionQuickStyle">
+            <option value="custom" {{#if (eq region.quickStyle "custom")}}selected{{/if}}>
+                {{localize "FILRODENSWMB.UI.Custom"}}
+            </option>
+            {{#each customRegionStyles}}
+                <option value="{{this.id}}" {{#if (eq ../region.quickStyle this.id)}}selected{{/if}}>
+                    {{this.name}}
+                </option>
+            {{/each}}
+        </select>
+    </div>
+
+    <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.Smoothing"}}</label>
         <select name="regionSmoothing">
             <option value="false" {{#unless region.smoothing}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.StyleStraight"}}</option>

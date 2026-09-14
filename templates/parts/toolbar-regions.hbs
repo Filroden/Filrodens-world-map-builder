@@ -7,6 +7,15 @@
 
     <div class="fwmb-brush-settings">
         <div class="fwmb-brush-setting">
+            <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
+            <select name="activeRegionQuickStyle">
+                <option value="custom" {{#if (eq uiState.activeRegionQuickStyle "custom")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.Custom"}}</option>
+                {{#each regionStyles}}
+                    <option value="{{this.id}}" {{#if (eq ../uiState.activeRegionQuickStyle this.id)}}selected{{/if}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+        <div class="fwmb-brush-setting">
             <label>{{localize "FILRODENSWMB.UI.FillColor"}}</label>
             <div class="fwmb-setting-row">
                 <button type="button" class="fwmb-swatch fwmb-transparent" data-action="setRegionPreset" data-color="transparent" data-target="fill" title="{{localize 'FILRODENSWMB.UI.NoFill'}}"></button>

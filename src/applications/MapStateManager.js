@@ -117,6 +117,8 @@ export class MapStateManager {
             regionLineStyle: "solid",
             regionSmoothing: true,
             regionOpacity: 0.5,
+            activeRegionQuickStyle: "custom",
+            customRegionStyles: [],
 
             labelFontFamily: FILRODENSWMB.LABELS?.DEFAULT_FONT,
             labelFontSize: FILRODENSWMB.LABELS?.DEFAULT_SIZE,

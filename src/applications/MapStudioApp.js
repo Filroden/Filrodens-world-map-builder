@@ -27,12 +27,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // prettier-ignore
         actions: {
             // --- DIALOG MANAGER: Quick Styles ---
-            addLabelQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
-            addRouteQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
-            editLabelQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
-            editRouteQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
-            deleteLabelQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
-            deleteRouteQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+            addLabelQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
+            addRouteQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
+            addRegionQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
+            editLabelQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
+            editRouteQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
+            editRegionQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
+            deleteLabelQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+            deleteRouteQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+            deleteRegionQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
 
             // --- DIALOG MANAGER: Entity Deletion ---
             deleteDecoration(e, t)  { MapDialogManager.onDeleteEntity(this, e, t); },
@@ -318,8 +321,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             isCustom: true,
         }));
 
+        context.regionStyles = (this.uiState.customRegionStyles || []).map((style) => ({
+            id: style.id,
+            label: style.name,
+            isCustom: true,
+        }));
+
         context.customRouteStyles = [...(this.uiState.customRouteStyles || [])].sort(alphaSort);
         context.customLabelStyles = [...(this.uiState.customLabelStyles || [])].sort(alphaSort);
+        context.customRegionStyles = [...(this.uiState.customRegionStyles || [])].sort(alphaSort);
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
@@ -568,17 +578,43 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #syncRegionLiveEdits(name) {
-        if (!name.startsWith("region") || !this.activeRegionId || !this.activeRegionLayerId) return;
+        // Fallback to custom if a manual property is changed
+        if (["regionFillColor", "regionFillStyle", "regionLineColor", "regionLineThickness", "regionLineStyle"].includes(name)) {
+            this.uiState.activeRegionQuickStyle = "custom";
+            this.render({ parts: ["toolbar", "editToolbar"] });
+        }
+
+        // Apply preset if dropdown is changed
+        if (name === "activeRegionQuickStyle") {
+            const styleId = this.uiState.activeRegionQuickStyle;
+            if (styleId !== "custom") {
+                const styleData = this.uiState.customRegionStyles.find((s) => s.id === styleId);
+                if (styleData) {
+                    this.uiState.regionFillColor = styleData.fillColor;
+                    this.uiState.regionFillStyle = styleData.fillStyle;
+                    this.uiState.regionLineColor = styleData.lineColor;
+                    this.uiState.regionLineThickness = styleData.lineThickness;
+                    this.uiState.regionLineStyle = styleData.lineStyle;
+                    this.uiState.regionSmoothing = styleData.smoothing;
+                    this.render({ parts: ["toolbar", "editToolbar"] });
+                }
+            }
+        }
+
+        if (!this.activeRegionId || !this.activeRegionLayerId) return;
+        if (name !== "activeRegionQuickStyle" && !name.startsWith("region")) return;
 
         const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
         const region = layer?.regions.find((r) => r.id === this.activeRegionId);
 
         if (region) {
+            region.quickStyle = this.uiState.activeRegionQuickStyle;
             region.fillColor = this.uiState.regionFillColor;
             region.fillStyle = this.uiState.regionFillStyle;
             region.lineColor = this.uiState.regionLineColor;
             region.lineThickness = this.uiState.regionLineThickness;
             region.lineStyle = this.uiState.regionLineStyle;
+            region.smoothing = this.uiState.regionSmoothing;
             this._repaintVectors();
         }
     }
@@ -1688,7 +1724,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     layer.visibility = layer.hidden ? "none" : "all";
                     delete layer.hidden;
                 }
-                if (layer.regions) migrateVisibility(layer.regions);
+                if (layer.regions) {
+                    migrateVisibility(layer.regions);
+                    layer.regions.forEach((region) => {
+                        if (!region.quickStyle) region.quickStyle = "custom"; // Flag old regions as custom overrides
+                    });
+                }
             });
         }
 
@@ -1861,6 +1902,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 name: `Region ${layer.regions.length + 1}`,
                 description: "",
                 points: [finalPos],
+                quickStyle: this.uiState.activeRegionQuickStyle,
                 fillColor: this.uiState.regionFillColor,
                 fillStyle: this.uiState.regionFillStyle,
                 lineColor: this.uiState.regionLineColor,
@@ -2991,6 +3033,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             name: `Region ${layer.regions.length + 1}`,
             description: "",
             points: [], // Starts empty until the user clicks the canvas
+            quickStyle: this.uiState.activeRegionQuickStyle,
             fillColor: this.uiState.regionFillColor,
             fillStyle: this.uiState.regionFillStyle,
             lineColor: this.uiState.regionLineColor,
@@ -3009,12 +3052,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const targetProperty = target.dataset.target === "line" ? "regionLineColor" : "regionFillColor";
 
         this.uiState[targetProperty] = color;
+        this.uiState.activeRegionQuickStyle = "custom";
         this.render({ parts: ["toolbar", "editToolbar"] });
 
         if (this.activeRegionId && this.activeRegionLayerId) {
             const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
             const region = layer?.regions.find((r) => r.id === this.activeRegionId);
             if (region) {
+                region.quickStyle = "custom";
                 if (targetProperty === "line") region.lineColor = color;
                 else region.fillColor = color;
                 this._repaintVectors();
@@ -3191,6 +3236,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _onToggleRegionSmoothing(event, target) {
         this.uiState.regionSmoothing = !this.uiState.regionSmoothing;
+        this.uiState.activeRegionQuickStyle = "custom";
         target.classList.toggle("active", this.uiState.regionSmoothing);
 
         // Manually update the icon DOM for instant visual feedback
@@ -3204,6 +3250,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
             const region = layer?.regions.find((r) => r.id === this.activeRegionId);
             if (region) {
+                region.quickStyle = "custom";
                 region.smoothing = this.uiState.regionSmoothing;
                 this._repaintVectors();
             }

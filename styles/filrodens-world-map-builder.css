@@ -70,6 +70,7 @@
 .fwmb-icon.content-copy         { --fwmb-mask: url('../assets/icons/content_copy.svg'); }
 .fwmb-icon.edit                 { --fwmb-mask: url('../assets/icons/edit.svg'); }
 .fwmb-icon.edit-off             { --fwmb-mask: url('../assets/icons/edit_off.svg'); }
+.fwmb-icon.edit-square          { --fwmb-mask: url('../assets/icons/edit_square.svg'); }
 .fwmb-icon.file-export          { --fwmb-mask: url('../assets/icons/file_export.svg'); }
 .fwmb-icon.upload-file          { --fwmb-mask: url('../assets/icons/upload_file.svg'); }
 .fwmb-icon.more-vert            { --fwmb-mask: url('../assets/icons/more_vert.svg'); }

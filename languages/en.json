@@ -123,6 +123,8 @@
     "FILRODENSWMB.UI.ContourInterval": "Contour Interval",
     "FILRODENSWMB.UI.SettingsRouteQuickStyles": "Route Quick Styles",
     "FILRODENSWMB.UI.AddRouteQuickStyle": "Add Quick Style",
+    "FILRODENSWMB.UI.SettingsRegionQuickStyles": "Region Quick Styles",
+    "FILRODENSWMB.UI.AddRegionQuickStyle": "Add Region Style",
     "FILRODENSWMB.UI.Custom": "Custom",
     "FILRODENSWMB.UI.NoCustomStyles": "No custom styles configured.",
 

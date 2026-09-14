@@ -1,0 +1,64 @@
+<div class="fwmb-dialog-content">
+    <datalist id="fwmb-standard-colors">
+        {{#each palette}}
+            <option value="{{this}}"></option>
+        {{/each}}
+    </datalist>
+
+    <div class="form-group fwmb-dialog-content">
+        <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <input type="text" name="styleName" value="{{style.name}}" autofocus>
+    </div>
+
+    <div class="fwmb-divider"></div>
+
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.FillColor"}}</label>
+        <div class="fwmb-setting-row">
+            <label style="font-size: 0.8em; display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                <input type="checkbox" class="fwmb-checkbox" name="styleFillTransparent" {{#if (eq style.fillColor "transparent")}}checked{{/if}} />
+                {{localize "FILRODENSWMB.UI.NoFill"}}
+            </label>
+            <input type="color" class="fwmb-swatch fwmb-wide" name="styleFillColor" value="{{#if (eq style.fillColor 'transparent')}}#000000{{else}}{{style.fillColor}}{{/if}}" list="fwmb-standard-colors" />
+        </div>
+    </div>
+
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.FillStyle"}}</label>
+        <select name="styleFillStyle">
+            <option value="solid" {{#if (eq style.fillStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+            <option value="diagonal" {{#if (eq style.fillStyle "diagonal")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDiagonalHatch"}}</option>
+            <option value="crosshatch" {{#if (eq style.fillStyle "crosshatch")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleCrossHatch"}}</option>
+        </select>
+    </div>
+
+    <div class="fwmb-divider"></div>
+
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
+        <input type="color" name="styleLineColor" value="{{style.lineColor}}" list="fwmb-standard-colors" class="fwmb-swatch fwmb-wide" style="height: 24px; padding: 0;">
+    </div>
+
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
+        <input type="number" name="styleLineThickness" value="{{style.lineThickness}}" min="0" max="10">
+    </div>
+
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.LineStyle"}}</label>
+        <select name="styleLineStyle">
+            <option value="solid" {{#if (eq style.lineStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+            <option value="dashed" {{#if (eq style.lineStyle "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
+            <option value="dotted" {{#if (eq style.lineStyle "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
+            <option value="dashdot" {{#if (eq style.lineStyle "dashdot")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashDot"}}</option>
+        </select>
+    </div>
+
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+        <label>{{localize "FILRODENSWMB.UI.Smoothing"}}</label>
+        <select name="styleSmoothing">
+            <option value="false" {{#unless style.smoothing}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.StyleStraight"}}</option>
+            <option value="true" {{#if style.smoothing}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSmooth"}}</option>
+        </select>
+    </div>
+</div>
