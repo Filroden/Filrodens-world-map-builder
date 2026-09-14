@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "./src/config.js";
 import { registerSidebarInjection } from "./src/hooks/sidebar-injection.js";
 import { initializeCompendium } from "./src/data/compendium.js";
+import { registerPinIconSettings } from "./src/data/pinIcons.js";
 
 Hooks.once("init", async () => {
     game.filrodenswmb = {
@@ -20,6 +21,8 @@ Hooks.once("init", async () => {
         default: "gold",
         onChange: (value) => applyThemeHue(value),
     });
+
+    registerPinIconSettings();
 
     // Fetch the saved setting and apply the CSS class on startup
     const savedHue = game.settings.get("filrodens-world-map-builder", "themeHue");
@@ -47,6 +50,7 @@ Hooks.once("init", async () => {
 
         "modules/filrodens-world-map-builder/templates/dialogs/add-decoration.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/edit-pin-icon.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-rivers.hbs",

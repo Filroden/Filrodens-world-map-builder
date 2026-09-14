@@ -8,6 +8,7 @@ import { SceneExporter } from "./SceneExporter.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
+import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 
@@ -59,6 +60,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
             addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
             addRegionLayer(e, t)    { MapDialogManager.onAddRegionLayer(this, e, t); },
+
+            // --- DIALOG MANAGER: Pin Icons ---
+            addCustomPinIcon(e, t)     { MapDialogManager.onAddCustomPinIcon(this, e, t); },
+            editCustomPinIcon(e, t)    { MapDialogManager.onEditCustomPinIcon(this, e, t); },
+            removeCustomPinIcon(e, t)  { MapDialogManager.onRemoveCustomPinIcon(this, e, t); },
+            toggleBuiltinPinIcon(e, t) { MapDialogManager.onToggleBuiltinPinIcon(this, e, t); },
+            hideAllBuiltinPinIcons(e, t)   { MapDialogManager.onHideAllBuiltinPinIcons(this, e, t); },
+            revealAllBuiltinPinIcons(e, t) { MapDialogManager.onRevealAllBuiltinPinIcons(this, e, t); },
 
             // --- MAP STUDIO APP: Internal Tooling & States ---
             adjustNoiseScale(e, t)          { this._onAdjustNoiseScale(e, t); },
@@ -152,6 +161,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.manualRivers = [];
         this.activeRiverId = null;
         this.mapPins = [];
+        // Studio-session UI state, not map data - deliberately not part of uiState (which is
+        // cloned into saved map payloads) since whether this panel is expanded has nothing to
+        // do with any particular map.
+        this._builtinPinIconsExpanded = false;
         this.mapRoutes = [];
         this.activeRouteId = null;
         this.regionLayers = [];
@@ -290,13 +303,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context.uiState = this.uiState;
         context.currentSaveName = this.currentSaveName;
 
-        context.infrastructureIcons = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS)
-            .map(([id, label]) => ({
-                id: id,
-                label: label,
-                _localized: game.i18n.localize(label),
-            }))
-            .sort((a, b) => a._localized.localeCompare(b._localized));
+        context.infrastructureIcons = getPinIconPickerList(this.uiState.activeIcon);
+        context.builtinPinIcons = getBuiltinPinIconList();
+        context.builtinPinIconsExpanded = this._builtinPinIconsExpanded;
+        context.customPinIcons = getCustomPinIconList();
+
+        const activeIconEntry = context.infrastructureIcons.find((icon) => icon.key === this.uiState.activeIcon);
+        context.activeIconPath = activeIconEntry?.path || "";
+        context.activeIconIsCustom = activeIconEntry?.isCustom || false;
 
         context.routeStyles = (this.uiState.customRouteStyles || []).map((style) => ({
             id: style.id,
@@ -362,6 +376,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#initCanvasAndEngines();
         this.#bindToolbarListeners();
         this.#bindContextPanelListeners();
+        this.#bindCollapsibleFieldsets();
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
 
@@ -580,6 +595,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
             if (heightInput) heightInput.value = calcHeight;
         }
+    }
+
+    /**
+     * A `<details>`-based fieldset re-renders as closed on every render (its `open` attribute
+     * only ever reflects whatever the last-rendered context said), which would otherwise slam
+     * it shut the moment any action inside it - a checkbox, Hide/Reveal all - triggers a
+     * context re-render. Tracking `open` in JS and feeding it back through the render context
+     * (see `builtinPinIconsExpanded` in _preparePartContext) keeps it open until the GM
+     * actually collapses it themselves. Assigning `ontoggle` (rather than addEventListener)
+     * is deliberate: re-running this after every render always replaces any previous handler,
+     * so the same element never ends up with duplicate listeners.
+     */
+    #bindCollapsibleFieldsets() {
+        const builtinIconsDetails = this.element.querySelector("#fwmb-builtin-pin-icons");
+        if (!builtinIconsDetails) return;
+
+        builtinIconsDetails.ontoggle = () => {
+            this._builtinPinIconsExpanded = builtinIconsDetails.open;
+        };
     }
 
     #bindContextPanelListeners() {
@@ -1678,6 +1712,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return pin;
         });
 
+        // Custom pin icons are a world-local registry (see pinIcons.js) - a map authored in a
+        // different world, then shared as a JSON import or a copied compendium entry, can
+        // reference icon ids this world never registered. They still render (as the protected
+        // default), so this is a heads-up rather than a blocker.
+        const { affectedPinCount } = findUnresolvedPinIcons(this.mapPins);
+        if (affectedPinCount > 0) {
+            ui.notifications.warn(game.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
+        }
+
         this.mapRoutes = payload.mapRoutes || [];
         this.regionLayers = payload.regionLayers || [];
         this.landMasks = payload.landMasks || [];
@@ -1712,7 +1755,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.uiState.activeInfraMode === "pin") {
             const newPin = {
                 id: foundry.utils.randomID(),
-                name: game.i18n.localize(FILRODENSWMB.INFRASTRUCTURE_ICONS[this.uiState.activeIcon] || "Pin"),
+                name: getPinIconLabel(this.uiState.activeIcon),
                 icon: this.uiState.activeIcon,
                 x: finalPos.x,
                 y: finalPos.y,
@@ -2649,6 +2692,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 await saveMapData(`${cleanName} (Imported)`, parsedData);
 
                 ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ImportSuccess"));
+
+                // Flag now, at import time, rather than waiting for the GM to load the map -
+                // custom pin icons are world-local (see pinIcons.js), so a JSON export from a
+                // different world commonly won't resolve here.
+                const { affectedPinCount } = findUnresolvedPinIcons(parsedData.mapPins);
+                if (affectedPinCount > 0) {
+                    ui.notifications.warn(game.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
+                }
+
                 this.render({ parts: ["toolbar", "context"] });
             } catch (err) {
                 console.error("FWMB | Import Failed:", err);

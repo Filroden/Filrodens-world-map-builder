@@ -162,4 +162,69 @@
         </div>
     </fieldset>
 
+    <details id="fwmb-builtin-pin-icons" class="fwmb-fieldset" {{#if builtinPinIconsExpanded}}open{{/if}}>
+        <summary>{{localize "FILRODENSWMB.UI.SettingsBuiltinPinIcons"}}</summary>
+        <div class="fwmb-hint fwmb-long">{{localize "FILRODENSWMB.UI.BuiltinPinIconsHint"}}</div>
+
+        <div class="fwmb-bulk-actions">
+            <a data-action="hideAllBuiltinPinIcons">{{localize "FILRODENSWMB.UI.HideAllPinIcons"}}</a>
+            <a data-action="revealAllBuiltinPinIcons">{{localize "FILRODENSWMB.UI.RevealAllPinIcons"}}</a>
+        </div>
+
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+            {{#each builtinPinIcons}}
+                <div class="fwmb-list-item">
+                    <div class="fwmb-list-item-content">
+                        <i class="fwmb-icon fwmb-list-icon {{this.key}}"></i>
+                        <span class="fwmb-name fwmb-flex-1">{{this.label}}</span>
+                    </div>
+                    <div class="fwmb-list-item-actions">
+                        {{#if this.isProtected}}
+                            <input type="checkbox" class="fwmb-checkbox" disabled data-tooltip="{{localize 'FILRODENSWMB.UI.PinIconProtected'}}" />
+                        {{else}}
+                            <input
+                                type="checkbox"
+                                class="fwmb-checkbox"
+                                data-action="toggleBuiltinPinIcon"
+                                data-key="{{this.key}}"
+                                {{#if this.isDisabled}}checked{{/if}}
+                                data-tooltip="{{localize 'FILRODENSWMB.UI.DisablePinIcon'}}"
+                            />
+                        {{/if}}
+                    </div>
+                </div>
+            {{/each}}
+        </div>
+    </details>
+
+    <fieldset class="fwmb-fieldset">
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.SettingsCustomPinIcons"}}</span>
+            <a class="fwmb-legend-action" data-action="addCustomPinIcon" data-tooltip="{{localize 'FILRODENSWMB.UI.AddCustomPinIcon'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </legend>
+
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+            {{#each customPinIcons}}
+                <div class="fwmb-list-item" data-id="{{this.id}}">
+                    <div class="fwmb-list-item-content">
+                        <i class="fwmb-icon fwmb-list-icon" style="--fwmb-mask: url('{{this.path}}');"></i>
+                        <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                    </div>
+                    <div class="fwmb-list-item-actions">
+                        <button type="button" class="fwmb-btn small" data-action="editCustomPinIcon" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                            <i class="fwmb-icon edit"></i>
+                        </button>
+                        <button type="button" class="fwmb-btn small muted danger" data-action="removeCustomPinIcon" data-tooltip="{{localize 'FILRODENSWMB.UI.RemovePinIcon'}}">
+                            <i class="fwmb-icon variable-remove"></i>
+                        </button>
+                    </div>
+                </div>
+            {{else}}
+                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoCustomPinIcons"}}</div>
+            {{/each}}
+        </div>
+    </fieldset>
+
 </div>

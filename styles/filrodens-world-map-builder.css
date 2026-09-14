@@ -85,6 +85,7 @@
 .fwmb-icon.png                  { --fwmb-mask: url('../assets/icons/file_png.svg'); }
 .fwmb-icon.add                  { --fwmb-mask: url('../assets/icons/add.svg'); }
 .fwmb-icon.remove               { --fwmb-mask: url('../assets/icons/remove.svg'); }
+.fwmb-icon.variable-remove      { --fwmb-mask: url('../assets/icons/variable_remove.svg'); }
 .fwmb-icon.gesture              { --fwmb-mask: url('../assets/icons/gesture.svg'); }
 .fwmb-icon.slope                { --fwmb-mask: url('../assets/icons/signal_cellular_null.svg'); }
 .fwmb-icon.plateau              { --fwmb-mask: url('../assets/icons/rectangle.svg'); }
@@ -501,7 +502,8 @@
 
 
 /* --- STRUCTURED FORMS --- */
-.fwmb fieldset.fwmb-fieldset {
+.fwmb fieldset.fwmb-fieldset,
+.fwmb details.fwmb-fieldset {
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-medium);
     padding: var(--fwmb-space-m);
@@ -511,11 +513,71 @@
     flex-direction: column;
 }
 
-.fwmb fieldset.fwmb-fieldset legend {
+.fwmb fieldset.fwmb-fieldset legend,
+.fwmb details.fwmb-fieldset > summary {
     font-weight: bold;
     color: var(--fwmb-accent-main);
     padding-inline: var(--fwmb-space-xs);
     font-size: var(--fwmb-font-size-s);
+}
+
+/* A <details>-based fieldset (collapsible - used where a list is reviewed only occasionally,
+   e.g. the built-in pin icon list) swaps <legend> for a clickable <summary> instead. */
+.fwmb details.fwmb-fieldset {
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-small);
+    margin-block-end: var(--fwmb-space-s);
+    background: var(--fwmb-bg-base);
+    transition: background-color 0.2s;
+}
+
+.fwmb details.fwmb-fieldset > summary {
+    padding: var(--fwmb-space-s) var(--fwmb-space-m);
+    font-weight: bold;
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-accent-main);
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    user-select: none;
+}
+
+/* Custom Chevron for the Summary */
+.fwmb details.fwmb-fieldset > summary::before {
+    content: "▶";
+    display: inline-block;
+    margin-inline-end: var(--fwmb-space-s);
+    font-size: var(--fwmb-font-size-xs);
+    transition: transform 0.2s ease;
+    color: var(--fwmb-text-primary);
+}
+
+.fwmb details.fwmb-fieldset[open] > summary::before {
+    transform: rotate(90deg);
+    color: var(--fwmb-accent-main);
+}
+
+/* Hide the default webkit arrow */
+.fwmb details.fwmb-fieldset > summary::-webkit-details-marker {
+    display: none;
+}
+
+.fwmb-bulk-actions {
+    display: flex;
+    gap: var(--fwmb-space-l);
+    margin-block-start: var(--fwmb-space-xs);
+}
+
+.fwmb-bulk-actions a {
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-text-secondary);
+    cursor: pointer;
+}
+
+.fwmb-bulk-actions a:hover {
+    color: var(--fwmb-accent-main);
+    text-decoration: underline;
 }
 
 .fwmb .form-group {
@@ -1387,6 +1449,25 @@ input.fwmb-swatch {
 .fwmb-list-item .fwmb-list-icon {
     width: var(--fwmb-font-size-m);
     height: var(--fwmb-font-size-m);
+}
+
+/* Deliberately fixed black, not a theme token - this is a raw, unmasked render of a
+   custom icon's actual SVG so a GM can confirm it's genuinely solid white before
+   accepting it, independent of whatever theme colour the picker itself uses. */
+.fwmb-pin-icon-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 96px;
+    height: 96px;
+    background-color: #000;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-medium);
+}
+
+.fwmb-pin-icon-preview img {
+    max-width: 70%;
+    max-height: 70%;
 }
 
 .fwmb-route-swatch {

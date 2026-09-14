@@ -14,13 +14,13 @@
                 <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
                 <div class="fwmb-custom-select" id="fwmb-pin-select">
                     <div class="fwmb-select-trigger" data-action="togglePinDropdown">
-                        <i class="fwmb-icon {{uiState.activeIcon}}"></i>
+                        <i class="fwmb-icon {{#unless activeIconIsCustom}}{{uiState.activeIcon}}{{/unless}}" {{#if activeIconIsCustom}}style="--fwmb-mask: url('{{activeIconPath}}');"{{/if}}></i>
                         <i class="fwmb-icon arrow-drop-down"></i>
                     </div>
                     <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
                         {{#each infrastructureIcons}}
-                            <button type="button" class="fwmb-btn {{#if (eq ../uiState.activeIcon this.id)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.id}}" data-tooltip="{{localize this.label}}">
-                                <i class="fwmb-icon {{this.id}}" alt="{{localize this.label}}"></i>
+                            <button type="button" class="fwmb-btn {{#if (eq ../uiState.activeIcon this.key)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.key}}" data-tooltip="{{this.label}}">
+                                <i class="fwmb-icon {{#unless this.isCustom}}{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} alt="{{this.label}}"></i>
                             </button>
                         {{/each}}
                     </div>

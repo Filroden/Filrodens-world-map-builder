@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { resolvePinIconPath } from "../data/pinIcons.js";
 
 export class SceneExporter {
     /**
@@ -246,7 +247,7 @@ export class SceneExporter {
                             x: pin.x,
                             y: pin.y,
                             iconSize: calculatedSize,
-                            texture: { src: `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg` },
+                            texture: { src: resolvePinIconPath(pin.icon) },
                         });
                     }
                 });

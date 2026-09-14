@@ -1,5 +1,16 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
+import {
+    getCustomPinIconById,
+    getPinIconPickerList,
+    addCustomPinIcon,
+    updateCustomPinIcon,
+    removeCustomPinIconEntry,
+    setBuiltinPinIconDisabled,
+    setAllBuiltinPinIconsDisabled,
+    findPinIconUsage,
+    revertPinIconUsage,
+} from "../data/pinIcons.js";
 
 export class MapDialogManager {
     /**
@@ -119,6 +130,62 @@ export class MapDialogManager {
         labelColorInput?.addEventListener("input", revertLabelToCustom);
         labelMaxWidthInput?.addEventListener("input", revertLabelToCustom);
         labelJustifySelect?.addEventListener("change", revertLabelToCustom);
+    }
+
+    /**
+     * Sets an `.fwmb-icon` glyph element to render a given pin icon key correctly, whether
+     * it's a built-in (a compiled `.fwmb-icon.<key>` CSS class already exists for it) or a
+     * custom icon (no compiled class exists for runtime-registered data, so its mask is set
+     * inline instead, straight from its resolved path).
+     */
+    static _applyIconGlyph(element, key, path, isCustom) {
+        if (!element) return;
+
+        if (isCustom) {
+            element.className = "fwmb-icon";
+            element.style.setProperty("--fwmb-mask", `url('${path}')`);
+        } else {
+            element.className = `fwmb-icon ${key}`;
+            element.style.removeProperty("--fwmb-mask");
+        }
+    }
+
+    /**
+     * Shared Add/Edit dialog for a single custom pin icon: name, a native file-picker path,
+     * and a live preview of the raw SVG against a black background so the GM can confirm
+     * it's genuinely solid white before accepting (see the "why custom icons must be solid
+     * white" design note - this is a self-check, not an automated one).
+     */
+    static async _promptPinIconDialog(icon, titleKey) {
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pin-icon.hbs", { icon });
+
+        return foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize(titleKey) },
+            content,
+            render: (event) => {
+                const html = event.target.element;
+                const pathInput = html.querySelector('[name="iconPath"]');
+                const previewImg = html.querySelector("#fwmb-pin-icon-preview-img");
+                if (!pathInput || !previewImg) return;
+
+                const updatePreview = () => {
+                    const path = pathInput.value.trim();
+                    previewImg.src = path;
+                    previewImg.hidden = !path;
+                };
+
+                pathInput.addEventListener("input", updatePreview);
+                pathInput.addEventListener("change", updatePreview);
+            },
+            ok: {
+                callback: (evt, button) => {
+                    const name = button.form.elements["iconName"].value.trim();
+                    const path = button.form.elements["iconPath"].value.trim();
+                    return name && path ? { name, path } : null;
+                },
+            },
+        });
     }
 
     /**
@@ -288,6 +355,32 @@ export class MapDialogManager {
         app.markDirty();
     }
 
+    static async onAddCustomPinIcon(app, event, target) {
+        const result = await this._promptPinIconDialog({ name: "", path: "" }, "FILRODENSWMB.UI.AddCustomPinIcon");
+        if (!result) return;
+
+        await addCustomPinIcon(result);
+        app.render({ parts: ["context"] });
+    }
+
+    static async onToggleBuiltinPinIcon(app, event, target) {
+        const key = target.dataset.key;
+        if (!key) return;
+
+        await setBuiltinPinIconDisabled(key, target.checked);
+        app.render({ parts: ["context"] });
+    }
+
+    static async onHideAllBuiltinPinIcons(app, event, target) {
+        await setAllBuiltinPinIconsDisabled(true);
+        app.render({ parts: ["context"] });
+    }
+
+    static async onRevealAllBuiltinPinIcons(app, event, target) {
+        await setAllBuiltinPinIconsDisabled(false);
+        app.render({ parts: ["context"] });
+    }
+
     static async onAddDecoration(app, event, target) {
         if (!app.canvasEngine?.isEditMode) return;
 
@@ -397,7 +490,36 @@ export class MapDialogManager {
 
         app._repaintCanvas();
         app.render({ parts: ["toolbar", "context"] });
-        app.markDirty();
+    }
+
+    static async onRemoveCustomPinIcon(app, event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const icon = getCustomPinIconById(id);
+        if (!icon) return;
+
+        const usage = await findPinIconUsage(id, app.mapPins);
+
+        const content =
+            usage.totalCount > 0
+                ? game.i18n.format("FILRODENSWMB.UI.RemovePinIconInUseWarning", { name: icon.name, count: usage.totalCount })
+                : game.i18n.format("FILRODENSWMB.UI.RemovePinIconConfirm", { name: icon.name });
+
+        const confirmed = await this._confirmDialog(game.i18n.localize("FILRODENSWMB.UI.RemovePinIcon"), content);
+        if (!confirmed) return;
+
+        if (usage.totalCount > 0) {
+            if (usage.liveCount > 0) MapStateManager.pushVectorState(app);
+            await revertPinIconUsage(id, app.mapPins);
+        }
+
+        await removeCustomPinIconEntry(id);
+
+        if (usage.liveCount > 0) {
+            app._repaintVectors();
+            app.markDirty();
+        }
+
+        app.render({ parts: ["context"] });
     }
 
     static async onDeleteEntity(app, event, target) {
@@ -610,15 +732,32 @@ export class MapDialogManager {
         });
     }
 
+    static async onEditCustomPinIcon(app, event, target) {
+        const id = target.closest(".fwmb-list-item").dataset.id;
+        const icon = getCustomPinIconById(id);
+        if (!icon) return;
+
+        const result = await this._promptPinIconDialog(icon, "FILRODENSWMB.UI.Edit");
+        if (!result) return;
+
+        await updateCustomPinIcon(id, result);
+        app.render({ parts: ["context"] });
+    }
+
     static async onEditPin(app, event, target, explicitId = null) {
         const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
         const pin = app.mapPins.find((p) => p.id === id);
         if (!pin) return;
 
         const safePin = this._withLabelDefaults(app, pin);
-        const icons = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS)
-            .map(([key, label]) => ({ key, localized: game.i18n.localize(label), selected: key === pin.icon }))
-            .sort((a, b) => a.localized.localeCompare(b.localized));
+        const icons = getPinIconPickerList(pin.icon).map((entry) => ({
+            key: entry.key,
+            localized: entry.label,
+            path: entry.path,
+            isCustom: entry.isCustom,
+            selected: entry.key === pin.icon,
+        }));
+        const currentIcon = icons.find((entry) => entry.selected);
 
         await this._processEditDialog(app, pin, {
             titleKey: "FILRODENSWMB.UI.EditPin",
@@ -626,6 +765,8 @@ export class MapDialogManager {
             context: {
                 pin: safePin,
                 icons,
+                pinIconPath: currentIcon?.path || "",
+                pinIconIsCustom: currentIcon?.isCustom || false,
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
                 customLabelStyles: app.uiState.customLabelStyles || [],
@@ -644,10 +785,10 @@ export class MapDialogManager {
                     trigger.addEventListener("click", () => optionsMenu.classList.toggle("fwmb-hidden"));
                     const optionBtns = optionsMenu.querySelectorAll("button");
                     optionBtns.forEach((btn) => {
-                        btn.addEventListener("click", (e) => {
+                        btn.addEventListener("click", () => {
                             const newIcon = btn.dataset.icon;
                             hiddenInput.value = newIcon;
-                            triggerIcon.className = `fwmb-icon ${newIcon}`;
+                            this._applyIconGlyph(triggerIcon, newIcon, btn.dataset.path, btn.dataset.custom === "true");
                             optionBtns.forEach((b) => b.classList.remove("active"));
                             btn.classList.add("active");
                             optionsMenu.classList.add("fwmb-hidden");
