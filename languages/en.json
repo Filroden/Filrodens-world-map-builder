@@ -128,6 +128,16 @@
     "FILRODENSWMB.UI.Custom": "Custom",
     "FILRODENSWMB.UI.NoCustomStyles": "No custom styles configured.",
 
+    "FILRODENSWMB.UI.MassEditSelect": "Select items for Mass Edit",
+    "FILRODENSWMB.UI.MassEditSelectAll": "Select All",
+    "FILRODENSWMB.UI.MassEditSelectNone": "Select None",
+    "FILRODENSWMB.UI.MassEdit": "Mass Edit",
+    "FILRODENSWMB.UI.MassEditHint": "Tick a field to apply it to every selected item. Fields left unticked keep each item's current value.",
+    "FILRODENSWMB.UI.MassEditPinsTitle": "Mass Edit Points of Interest ({count})",
+    "FILRODENSWMB.UI.MassEditRoutesTitle": "Mass Edit Routes ({count})",
+    "FILRODENSWMB.UI.MassEditRegionsTitle": "Mass Edit Regions ({count})",
+    "FILRODENSWMB.UI.MassEditLabelsTitle": "Mass Edit Labels ({count})",
+
     "FILRODENSWMB.UI.SettingsBuiltinPinIcons": "Built-in Pin Icons",
     "FILRODENSWMB.UI.BuiltinPinIconsHint": "Hide icons you don't use to keep the picker tidy. The default pin icon can't be hidden.",
     "FILRODENSWMB.UI.DisablePinIcon": "Hide from pin picker",

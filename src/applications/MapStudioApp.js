@@ -37,6 +37,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteRouteQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
             deleteRegionQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
 
+            // --- MASS EDIT ---
+            toggleMassEditMode(e, t)   { this._onToggleMassEditMode(e, t); },
+            toggleMassEditItem(e, t)   { this._onToggleMassEditItem(e, t); },
+            massEditSelectAll(e, t)    { this._onMassEditSelectAll(e, t); },
+            massEditSelectNone(e, t)   { this._onMassEditSelectNone(e, t); },
+            openMassEdit(e, t)         { MapDialogManager.onMassEdit(this, e, t); },
+
             // --- DIALOG MANAGER: Entity Deletion ---
             deleteDecoration(e, t)  { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteFault(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
@@ -138,6 +145,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         },
     };
 
+    /**
+     * Mass Edit item types whose "Select" toggle lives in the same context panel fieldset
+     * group. Pins and Routes both live in the Infrastructure panel - having Select mode active
+     * for both at once wouldn't collide (their selections and dialogs are independent), but it
+     * would leave a GM unable to tell at a glance which list an eventual Mass Edit applies to.
+     * Add further arrays here if another panel ever splits into multiple mass-editable lists.
+     */
+    static MASS_EDIT_EXCLUSIVE_GROUPS = [["pin", "route"]];
+
     constructor(options) {
         options.position = foundry.utils.mergeObject(options.position || {}, {
             width: window.innerWidth * 0.7,
@@ -168,6 +184,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // cloned into saved map payloads) since whether this panel is expanded has nothing to
         // do with any particular map.
         this._builtinPinIconsExpanded = false;
+        // Mass Edit selection tool state - also Studio-session UI state, not map data, for the
+        // same reason: which items are checked for a batch edit has nothing to do with the map
+        // itself, and should reset (not persist) whenever the Studio app is reopened.
+        this.massEditMode = { pin: false, route: false, region: false, label: false };
+        this.massEditSelection = { pin: new Set(), route: new Set(), region: new Set(), label: new Set() };
         this.mapRoutes = [];
         this.activeRouteId = null;
         this.regionLayers = [];
@@ -333,9 +354,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
-            context.mapPins = (this.mapPins || []).filter((p) => !!p.icon).sort(alphaSort);
-            context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort);
-            context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort);
+
+            context.massEditMode = { ...this.massEditMode };
+            context.massEditCount = {
+                pin: this.massEditSelection.pin.size,
+                route: this.massEditSelection.route.size,
+                region: this.massEditSelection.region.size,
+                label: this.massEditSelection.label.size,
+            };
+            context.massEditBlocked = Object.fromEntries(Object.keys(this.massEditMode).map((type) => [type, this.#isMassEditBlocked(type)]));
+
+            context.mapPins = (this.mapPins || [])
+                .filter((p) => !!p.icon)
+                .sort(alphaSort)
+                .map((p) => ({ ...p, massEditSelected: this.massEditSelection.pin.has(p.id) }));
+            context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort).map((r) => ({ ...r, massEditSelected: this.massEditSelection.route.has(r.id) }));
+            context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort).map((l) => ({ ...l, massEditSelected: this.massEditSelection.label.has(l.id) }));
             context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
             context.landMasks = [...(this.landMasks || [])].sort(alphaSort);
 
@@ -367,7 +401,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             context.regionLayers = [...(this.regionLayers || [])].sort(alphaSort).map((layer) => ({
                 ...layer,
                 isActive: layer.id === this.activeRegionLayerId,
-                regions: [...(layer.regions || [])].sort(alphaSort),
+                regions: [...(layer.regions || [])].sort(alphaSort).map((r) => ({ ...r, massEditSelected: this.massEditSelection.region.has(r.id) })),
             }));
 
             if (this.activeTool === "manage") {
@@ -1664,6 +1698,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.customBiomes = payload.customBiomes || [];
         this.uiState.customRouteStyles = payload.customRouteStyles || [];
         this.uiState.customLabelStyles = payload.customLabelStyles || [];
+        this.uiState.customRegionStyles = payload.customRegionStyles || [];
 
         this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
@@ -1984,6 +2019,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 customBiomes: this.uiState.customBiomes,
                 customRouteStyles: this.uiState.customRouteStyles,
                 customLabelStyles: this.uiState.customLabelStyles,
+                customRegionStyles: this.uiState.customRegionStyles,
                 history: this.brushEngine?.history || [],
                 tectonicFaults: this.tectonicFaults,
                 manualRivers: this.manualRivers,
@@ -2489,6 +2525,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 1. Teardown current state
         this.#clearActiveDrawingStates();
         this.#deactivateEditMode();
+        this.#clearMassEditState();
 
         // 2. Setup new state
         MapStateManager.getMapParameters(this);
@@ -2510,6 +2547,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
         this.activeRegionId = null;
         this.activeLandMaskId = null;
+    }
+
+    /**
+     * Ends Mass Edit Select mode for every item type when the active tool changes. Select mode
+     * is scoped to the tool panel it was turned on in - a GM who switches tools has left that
+     * panel behind, so leaving the selection active (and the checkboxes it would need to keep
+     * showing) would be confusing when they come back. Discards the selection with no side
+     * effects, same as toggling Select off directly - nothing has been edited yet.
+     */
+    #clearMassEditState() {
+        for (const type of Object.keys(this.massEditMode)) {
+            this.massEditMode[type] = false;
+            this.massEditSelection[type].clear();
+        }
+    }
+
+    /**
+     * Whether `type`'s Select toggle should be greyed out and inert because a sibling type in
+     * the same MASS_EDIT_EXCLUSIVE_GROUPS entry already has Select mode active. See that
+     * constant's comment for why this matters.
+     */
+    #isMassEditBlocked(type) {
+        const group = MapStudioApp.MASS_EDIT_EXCLUSIVE_GROUPS.find((siblings) => siblings.includes(type));
+        return !!group && group.some((sibling) => sibling !== type && this.massEditMode[sibling]);
     }
 
     async #deactivateEditMode() {
@@ -3273,6 +3334,81 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Push to canvas and redraw
         this.canvasEngine.setViewFilters(this.viewFilters);
         this._repaintVectors();
+    }
+
+    /**
+     * Returns the ids of every entity of a given type that Mass Edit can currently offer for
+     * selection. Regions are flattened out of their layers since selection is per-type, not
+     * per-layer - a GM mass-editing "regions" expects to pick from all of them at once.
+     */
+    _getMassEditableIds(type) {
+        switch (type) {
+            case "pin":
+                return (this.mapPins || []).filter((p) => !!p.icon).map((p) => p.id);
+            case "route":
+                return (this.mapRoutes || []).map((r) => r.id);
+            case "label":
+                return (this.mapLabels || []).map((l) => l.id);
+            case "region":
+                return (this.regionLayers || []).flatMap((layer) => (layer.regions || []).map((r) => r.id));
+            default:
+                return [];
+        }
+    }
+
+    /**
+     * Toggles Mass Edit "Select" mode for one item type. Turning it off discards whatever was
+     * selected for that type without applying anything - selecting items is a transient UI
+     * action, not an edit, so there is nothing to undo.
+     */
+    _onToggleMassEditMode(event, target) {
+        const type = target.dataset.type;
+        if (!type || !(type in this.massEditMode)) return;
+        // Belt-and-braces: the template already greys out and disables this toggle while a
+        // sibling type is active, but guard the handler too in case a click still reaches it.
+        if (!this.massEditMode[type] && this.#isMassEditBlocked(type)) return;
+
+        this.massEditMode[type] = !this.massEditMode[type];
+        if (!this.massEditMode[type]) this.massEditSelection[type].clear();
+
+        this.render({ parts: ["context"] });
+    }
+
+    /**
+     * Handles a single item card's Mass Edit checkbox being ticked or unticked. The checkbox
+     * carries its own `data-mass-type` rather than reading the list item's `data-type`,
+     * because `data-type` is already overloaded for other purposes on some cards (Custom
+     * Labels' list items use `data-type="custom"` to route editLabel/deleteLabel, not
+     * "label"), so Mass Edit needs its own unambiguous attribute to pick the right selection.
+     */
+    _onToggleMassEditItem(event, target) {
+        const type = target.dataset.massType;
+        const id = target.closest(".fwmb-list-item")?.dataset.id;
+        const selection = type && this.massEditSelection[type];
+        if (!selection || !id) return;
+
+        if (target.checked) selection.add(id);
+        else selection.delete(id);
+
+        this.render({ parts: ["context"] });
+    }
+
+    _onMassEditSelectAll(event, target) {
+        const type = target.dataset.type;
+        const selection = this.massEditSelection[type];
+        if (!selection) return;
+
+        this._getMassEditableIds(type).forEach((id) => selection.add(id));
+        this.render({ parts: ["context"] });
+    }
+
+    _onMassEditSelectNone(event, target) {
+        const type = target.dataset.type;
+        const selection = this.massEditSelection[type];
+        if (!selection) return;
+
+        selection.clear();
+        this.render({ parts: ["context"] });
     }
 
     _onToggleVisibility(event, target) {

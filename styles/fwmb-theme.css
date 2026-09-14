@@ -46,6 +46,8 @@
     
     /* Neutrals */
     --fwmb-neutral-000: hsl(0, 0%, 100%);
+    --fwmb-neutral-400: hsl(0, 0%, 60%);
+    --fwmb-neutral-500: hsl(0, 0%, 50%);
     --fwmb-neutral-999: hsl(0, 0%, 0%);
 
     /* Other colours */

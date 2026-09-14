@@ -393,6 +393,275 @@ export class MapDialogManager {
         };
     }
 
+    /**
+     * Unified configuration for Mass Edit: applying visual properties to every entity
+     * currently selected via a type's Select checkboxes, in one batch. Mirrors the shape of
+     * QUICK_STYLE_CONFIG above so the two systems stay easy to read side-by-side, but each
+     * entry describes an opt-in FIELD LIST instead of a single style object - only fields the
+     * GM ticks in the Mass Edit dialog are applied, everything else is left untouched on every
+     * selected entity (a deliberate design choice: mass edit never overwrites a property the
+     * GM didn't explicitly opt into). The "quickStyle" field, where present, is a bundle:
+     * ticking it applies both the chosen style's id and its resolved aesthetic properties
+     * together, exactly as picking a Quick Style does in the single-item edit dialogs. Any
+     * other checked field is extracted and merged in afterwards (see _extractMassEditPatch),
+     * so an explicit per-field value always wins over whatever the quick style would have set.
+     */
+    static get MASS_EDIT_CONFIG() {
+        // Small helper factory: given a customXStyles registry key, returns a lookup function
+        // for "find the style with this id", shared by every type's quickStyle field below.
+        const resolveStyle = (registryKey) => (app, id) => (app.uiState[registryKey] || []).find((s) => s.id === id);
+
+        // Pins, Routes, and Regions each carry an attached label (the same `label{...}`
+        // sub-object their single-item edit dialogs expose as a second "Label Properties"
+        // fieldset) - Mass Edit should be able to batch those fields too, not just the
+        // entity's own visual properties. Shared here since the field list and its dialog
+        // context are identical for all three owning types; only the entity type they get
+        // attached to differs. Every extract() returns a nested `{ label: {...} }` object,
+        // the same shape `_extractLabelResultFields` already produces for the single-item
+        // dialogs, so `foundry.utils.mergeObject(entity, patch)` merges it straight into
+        // `entity.label` with no special-casing needed in onMassEdit. _extractMassEditPatch
+        // accumulates ticked fields with mergeObject too (not a shallow Object.assign), so
+        // two different label fields ticked together both land under the same `label` key
+        // instead of one overwriting the other.
+        const labelFields = () => [
+            {
+                checkboxName: "applyLabelQuickStyle",
+                extract: (form, app) => {
+                    const id = form.elements["labelQuickStyle"].value;
+                    const style = id !== "custom" ? resolveStyle("customLabelStyles")(app, id) : null;
+                    return style
+                        ? {
+                              label: {
+                                  quickStyle: id,
+                                  fontFamily: style.fontFamily,
+                                  fontSize: style.fontSize,
+                                  fillColor: style.fillColor,
+                                  maxWidth: style.maxWidth,
+                                  justify: style.justify,
+                              },
+                          }
+                        : { label: { quickStyle: "custom" } };
+                },
+            },
+            { checkboxName: "applyLabelFontFamily", extract: (form) => ({ label: { fontFamily: form.elements["labelFontFamily"].value } }) },
+            { checkboxName: "applyLabelFontSize", extract: (form) => ({ label: { fontSize: Number(form.elements["labelFontSize"].value) || 1 } }) },
+            { checkboxName: "applyLabelFillColor", extract: (form) => ({ label: { fillColor: form.elements["labelFillColor"].value } }) },
+            { checkboxName: "applyLabelMaxWidth", extract: (form) => ({ label: { maxWidth: Number(form.elements["labelMaxWidth"].value) || 0 } }) },
+            { checkboxName: "applyLabelJustify", extract: (form) => ({ label: { justify: form.elements["labelJustify"].value } }) },
+        ];
+
+        // The dialog context (fonts, the Label Quick Style registry, and starting field
+        // values) needed to render that shared fieldset - merged into each owning type's own
+        // getContext() result below.
+        const getLabelContext = (app) => ({
+            fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
+            customLabelStyles: app.uiState.customLabelStyles || [],
+            labelDefaults: this.QUICK_STYLE_CONFIG.Label.getDefaults(app),
+        });
+
+        return {
+            pin: {
+                titleKey: "FILRODENSWMB.UI.MassEditPinsTitle",
+                template: "modules/filrodens-world-map-builder/templates/dialogs/mass-edit-pins.hbs",
+                getEntities: (app, ids) => app.mapPins.filter((p) => ids.has(p.id)),
+                getContext: (app) => {
+                    const icons = getPinIconPickerList().map((entry) => ({ key: entry.key, localized: entry.label, path: entry.path, isCustom: entry.isCustom }));
+                    return {
+                        icons,
+                        defaultIcon: icons[0] || null,
+                        palette: FILRODENSWMB.LABELS?.PRESETS || [],
+                        ...getLabelContext(app),
+                    };
+                },
+                onRender: (html, app) => {
+                    const trigger = html.querySelector("#fwmb-mass-edit-pin-select .fwmb-select-trigger");
+                    const optionsMenu = html.querySelector("#fwmb-mass-edit-pin-select .fwmb-select-options");
+                    const hiddenInput = html.querySelector("#fwmb-mass-edit-pin-icon-input");
+                    const triggerIcon = html.querySelector("#fwmb-mass-edit-pin-trigger-icon");
+
+                    if (trigger && optionsMenu) {
+                        trigger.addEventListener("click", () => optionsMenu.classList.toggle("fwmb-hidden"));
+                        optionsMenu.querySelectorAll("button").forEach((btn) => {
+                            btn.addEventListener("click", () => {
+                                hiddenInput.value = btn.dataset.icon;
+                                this._applyIconGlyph(triggerIcon, btn.dataset.icon, btn.dataset.path, btn.dataset.custom === "true");
+                                optionsMenu.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+                                btn.classList.add("active");
+                                optionsMenu.classList.add("fwmb-hidden");
+                            });
+                        });
+                    }
+                    this.bindLabelPropertiesDialog(html, app.uiState);
+                },
+                fields: [
+                    { checkboxName: "applyIcon", extract: (form) => ({ icon: form.elements["massIcon"].value }) },
+                    { checkboxName: "applyColor", extract: (form) => ({ color: form.elements["massColor"].value }) },
+                    { checkboxName: "applyScale", extract: (form) => ({ scale: Number(form.elements["massScale"].value) || 1 }) },
+                    ...labelFields(),
+                ],
+            },
+            route: {
+                titleKey: "FILRODENSWMB.UI.MassEditRoutesTitle",
+                template: "modules/filrodens-world-map-builder/templates/dialogs/mass-edit-routes.hbs",
+                getEntities: (app, ids) => app.mapRoutes.filter((r) => ids.has(r.id)),
+                getContext: (app) => ({
+                    customRouteStyles: app.uiState.customRouteStyles || [],
+                    palette: FILRODENSWMB.LABELS?.PRESETS || [],
+                    defaults: this.QUICK_STYLE_CONFIG.Route.getDefaults(),
+                    ...getLabelContext(app),
+                }),
+                onRender: (html, app) => {
+                    const quickStyleSelect = html.querySelector('select[name="massQuickStyle"]');
+                    const colorInput = html.querySelector('input[name="massColor"]');
+                    const thicknessInput = html.querySelector('input[name="massThickness"]');
+                    const styleSelect = html.querySelector('select[name="massStyle"]');
+
+                    quickStyleSelect?.addEventListener("change", (e) => {
+                        const style = resolveStyle("customRouteStyles")(app, e.target.value);
+                        if (!style) return;
+                        if (colorInput) colorInput.value = style.color;
+                        if (thicknessInput) thicknessInput.value = style.thickness;
+                        if (styleSelect) styleSelect.value = style.style;
+                    });
+                    this.bindLabelPropertiesDialog(html, app.uiState);
+                },
+                fields: [
+                    {
+                        checkboxName: "applyQuickStyle",
+                        extract: (form, app) => {
+                            const id = form.elements["massQuickStyle"].value;
+                            const style = id !== "custom" ? resolveStyle("customRouteStyles")(app, id) : null;
+                            return style ? { quickStyle: id, color: style.color, thickness: style.thickness, style: style.style } : { quickStyle: "custom" };
+                        },
+                    },
+                    { checkboxName: "applyColor", extract: (form) => ({ color: form.elements["massColor"].value }) },
+                    { checkboxName: "applyThickness", extract: (form) => ({ thickness: Number(form.elements["massThickness"].value) || 3 }) },
+                    { checkboxName: "applyStyle", extract: (form) => ({ style: form.elements["massStyle"].value }) },
+                    ...labelFields(),
+                ],
+            },
+            region: {
+                titleKey: "FILRODENSWMB.UI.MassEditRegionsTitle",
+                template: "modules/filrodens-world-map-builder/templates/dialogs/mass-edit-regions.hbs",
+                getEntities: (app, ids) => app.regionLayers.flatMap((layer) => layer.regions).filter((r) => ids.has(r.id)),
+                getContext: (app) => ({
+                    customRegionStyles: app.uiState.customRegionStyles || [],
+                    palette: FILRODENSWMB.LABELS?.PRESETS || [],
+                    defaults: this.QUICK_STYLE_CONFIG.Region.getDefaults(),
+                    ...getLabelContext(app),
+                }),
+                onRender: (html, app) => {
+                    const quickStyleSelect = html.querySelector('select[name="massQuickStyle"]');
+                    const fillTransparentCheckbox = html.querySelector('input[name="massFillTransparent"]');
+                    const fillColorInput = html.querySelector('input[name="massFillColor"]');
+                    const fillStyleSelect = html.querySelector('select[name="massFillStyle"]');
+                    const lineColorInput = html.querySelector('input[name="massLineColor"]');
+                    const lineThicknessInput = html.querySelector('input[name="massLineThickness"]');
+                    const lineStyleSelect = html.querySelector('select[name="massLineStyle"]');
+                    const smoothingSelect = html.querySelector('select[name="massSmoothing"]');
+
+                    quickStyleSelect?.addEventListener("change", (e) => {
+                        const style = resolveStyle("customRegionStyles")(app, e.target.value);
+                        if (!style) return;
+                        const isTransparent = style.fillColor === "transparent";
+                        if (fillTransparentCheckbox) fillTransparentCheckbox.checked = isTransparent;
+                        if (fillColorInput) fillColorInput.value = isTransparent ? "#000000" : style.fillColor;
+                        if (fillStyleSelect) fillStyleSelect.value = style.fillStyle;
+                        if (lineColorInput) lineColorInput.value = style.lineColor;
+                        if (lineThicknessInput) lineThicknessInput.value = style.lineThickness;
+                        if (lineStyleSelect) lineStyleSelect.value = style.lineStyle;
+                        if (smoothingSelect) smoothingSelect.value = String(style.smoothing);
+                    });
+                    this.bindLabelPropertiesDialog(html, app.uiState);
+                },
+                fields: [
+                    {
+                        checkboxName: "applyQuickStyle",
+                        extract: (form, app) => {
+                            const id = form.elements["massQuickStyle"].value;
+                            const style = id !== "custom" ? resolveStyle("customRegionStyles")(app, id) : null;
+                            return style
+                                ? {
+                                      quickStyle: id,
+                                      fillColor: style.fillColor,
+                                      fillStyle: style.fillStyle,
+                                      lineColor: style.lineColor,
+                                      lineThickness: style.lineThickness,
+                                      lineStyle: style.lineStyle,
+                                      smoothing: style.smoothing,
+                                  }
+                                : { quickStyle: "custom" };
+                        },
+                    },
+                    {
+                        checkboxName: "applyFillColor",
+                        extract: (form) => ({ fillColor: form.elements["massFillTransparent"].checked ? "transparent" : form.elements["massFillColor"].value }),
+                    },
+                    { checkboxName: "applyFillStyle", extract: (form) => ({ fillStyle: form.elements["massFillStyle"].value }) },
+                    { checkboxName: "applyLineColor", extract: (form) => ({ lineColor: form.elements["massLineColor"].value }) },
+                    { checkboxName: "applyLineThickness", extract: (form) => ({ lineThickness: Number(form.elements["massLineThickness"].value) || 2 }) },
+                    { checkboxName: "applyLineStyle", extract: (form) => ({ lineStyle: form.elements["massLineStyle"].value }) },
+                    { checkboxName: "applySmoothing", extract: (form) => ({ smoothing: form.elements["massSmoothing"].value === "true" }) },
+                    ...labelFields(),
+                ],
+            },
+            label: {
+                titleKey: "FILRODENSWMB.UI.MassEditLabelsTitle",
+                template: "modules/filrodens-world-map-builder/templates/dialogs/mass-edit-labels.hbs",
+                getEntities: (app, ids) => app.mapLabels.filter((l) => ids.has(l.id)),
+                getContext: (app) => ({
+                    customLabelStyles: app.uiState.customLabelStyles || [],
+                    fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
+                    palette: FILRODENSWMB.LABELS?.PRESETS || [],
+                    defaults: this.QUICK_STYLE_CONFIG.Label.getDefaults(app),
+                }),
+                onRender: (html, app) => {
+                    const quickStyleSelect = html.querySelector('select[name="massQuickStyle"]');
+                    const fontFamilySelect = html.querySelector('select[name="massFontFamily"]');
+                    const fontSizeInput = html.querySelector('input[name="massFontSize"]');
+                    const fontSizeOutput = html.querySelector('input[name="massFontSize"] + output');
+                    const colorInput = html.querySelector('input[name="massFillColor"]');
+                    const maxWidthInput = html.querySelector('input[name="massMaxWidth"]');
+                    const justifySelect = html.querySelector('select[name="massJustify"]');
+
+                    quickStyleSelect?.addEventListener("change", (e) => {
+                        const style = resolveStyle("customLabelStyles")(app, e.target.value);
+                        if (!style) return;
+                        if (fontFamilySelect) fontFamilySelect.value = style.fontFamily;
+                        if (colorInput) colorInput.value = style.fillColor;
+                        if (maxWidthInput) maxWidthInput.value = style.maxWidth;
+                        if (justifySelect) justifySelect.value = style.justify;
+                        if (fontSizeInput) {
+                            fontSizeInput.value = style.fontSize;
+                            if (fontSizeOutput) fontSizeOutput.value = style.fontSize;
+                        }
+                    });
+
+                    fontSizeInput?.addEventListener("input", (e) => {
+                        if (fontSizeOutput) fontSizeOutput.value = e.target.value;
+                    });
+                },
+                fields: [
+                    {
+                        checkboxName: "applyQuickStyle",
+                        extract: (form, app) => {
+                            const id = form.elements["massQuickStyle"].value;
+                            const style = id !== "custom" ? resolveStyle("customLabelStyles")(app, id) : null;
+                            return style
+                                ? { quickStyle: id, fontFamily: style.fontFamily, fontSize: style.fontSize, fillColor: style.fillColor, maxWidth: style.maxWidth, justify: style.justify }
+                                : { quickStyle: "custom" };
+                        },
+                    },
+                    { checkboxName: "applyFontFamily", extract: (form) => ({ fontFamily: form.elements["massFontFamily"].value }) },
+                    { checkboxName: "applyFontSize", extract: (form) => ({ fontSize: Number(form.elements["massFontSize"].value) || 1 }) },
+                    { checkboxName: "applyFillColor", extract: (form) => ({ fillColor: form.elements["massFillColor"].value }) },
+                    { checkboxName: "applyMaxWidth", extract: (form) => ({ maxWidth: Number(form.elements["massMaxWidth"].value) || 0 }) },
+                    { checkboxName: "applyJustify", extract: (form) => ({ justify: form.elements["massJustify"].value }) },
+                ],
+            },
+        };
+    }
+
     // --- ADD ACTIONS ---
 
     static async onAddCustomBiome(app, event, target) {
@@ -671,6 +940,106 @@ export class MapDialogManager {
         app._repaintVectors();
         app.render({ parts: ["context"] });
         app.markDirty();
+    }
+
+    // --- MASS EDIT ---
+
+    /**
+     * Wires up the opt-in checkboxes in a Mass Edit dialog. Every field row is a `.form-group`
+     * containing one gate checkbox (name starting "apply...") plus the field(s) it controls;
+     * this leaves every other control in that row disabled until its checkbox is ticked, which
+     * both prevents an accidental submit of a field the GM never meant to touch and gives free
+     * "this field is inactive" styling from the existing global `:disabled` rules. The custom
+     * pin-icon picker in the Pins dialog isn't a native input, so it can't be disabled the same
+     * way - it's instead toggled via the `.fwmb-mass-edit-locked` CSS class (pointer-events
+     * off, dimmed), applied to any `.fwmb-custom-select` found in the same row.
+     */
+    static bindMassEditToggles(html) {
+        html.querySelectorAll('input[type="checkbox"][name^="apply"]').forEach((gate) => {
+            const row = gate.closest(".form-group");
+            if (!row) return;
+
+            const controls = Array.from(row.querySelectorAll("input, select, textarea")).filter((el) => el !== gate);
+            const customSelect = row.querySelector(".fwmb-custom-select");
+
+            const syncLockState = () => {
+                controls.forEach((el) => (el.disabled = !gate.checked));
+                if (customSelect) customSelect.classList.toggle("fwmb-mass-edit-locked", !gate.checked);
+            };
+
+            gate.addEventListener("change", syncLockState);
+            syncLockState();
+        });
+    }
+
+    /**
+     * Builds the patch object to merge into every selected entity from a submitted Mass Edit
+     * form: walks the type's declared field list in order and, for each one whose checkbox is
+     * ticked, merges in whatever that field's `extract` returns. Fields are declared with the
+     * "quickStyle" bundle first and individual properties after, so an explicitly ticked
+     * property always overwrites the value the quick style would otherwise have set - see
+     * MASS_EDIT_CONFIG's doc comment for the reasoning.
+     */
+    static _extractMassEditPatch(form, fields, app) {
+        const patch = {};
+        for (const field of fields) {
+            const gate = form.elements[field.checkboxName];
+            if (!gate?.checked) continue;
+            // A recursive merge, not a shallow Object.assign: two different ticked fields can
+            // both contribute to the same nested key (e.g. two label fields both writing into
+            // `patch.label`), and a shallow assign would let the second one silently wipe out
+            // whatever the first had already set there.
+            foundry.utils.mergeObject(patch, field.extract(form, app));
+        }
+        return patch;
+    }
+
+    /**
+     * Opens the Mass Edit dialog for one entity type and applies whatever the GM confirms to
+     * every currently-selected entity of that type in a single batch. Cancelling the dialog
+     * leaves the selection and every entity untouched - Select mode stays active so the GM can
+     * adjust their selection and try again. Confirming it (even with nothing ticked) always
+     * exits Select mode and clears the selection: per the agreed design, completing the Mass
+     * Edit dialog is the second way out of Select mode, alongside toggling Select off directly.
+     */
+    static async onMassEdit(app, event, target) {
+        const type = target.dataset.type;
+        const config = this.MASS_EDIT_CONFIG[type];
+        if (!config) return;
+
+        const selection = app.massEditSelection[type];
+        const entities = config.getEntities(app, selection);
+        if (entities.length === 0) return;
+
+        const context = { count: entities.length, ...config.getContext(app) };
+        const content = await foundry.applications.handlebars.renderTemplate(config.template, context);
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.format(config.titleKey, { count: entities.length }) },
+            content: content,
+            render: (event) => {
+                const dialogHtml = event.target.element;
+                this.bindMassEditToggles(dialogHtml);
+                if (config.onRender) config.onRender(dialogHtml, app);
+            },
+            ok: {
+                callback: (evt, button) => this._extractMassEditPatch(button.form, config.fields, app),
+            },
+        });
+
+        if (!result) return;
+
+        if (Object.keys(result).length > 0) {
+            MapStateManager.pushVectorState(app);
+            entities.forEach((entity) => foundry.utils.mergeObject(entity, result));
+            app._repaintVectors();
+            app.markDirty();
+        }
+
+        app.massEditMode[type] = false;
+        app.massEditSelection[type].clear();
+        app.render({ parts: ["context"] });
     }
 
     // --- EDIT ACTIONS ---

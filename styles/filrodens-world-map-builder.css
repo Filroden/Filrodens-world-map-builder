@@ -199,7 +199,7 @@
     line-height: var(--fwmb-line-height-body);
     text-align: start;
     z-index: var(--z-index-tooltip, 9999);
-    margin-top: var(--fwmb-space-m);
+    margin-block-start: var(--fwmb-space-m);
 }
 
 
@@ -570,15 +570,32 @@
     margin-block-start: var(--fwmb-space-xs);
 }
 
-.fwmb-bulk-actions a {
+.fwmb-mass-edit-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-l);
+    margin-block-end: var(--fwmb-space-s);
+}
+
+.fwmb-bulk-action-button {
     font-size: var(--fwmb-font-size-xs);
-    color: var(--fwmb-text-secondary);
+    background: var(--fwmb-bg-muted);
+    color: var(--fwmb-text-inverse);
+    border-radius: var(--fwmb-radius-small);
+    padding: var(--fwmb-space-xs) var(--fwmb-space-m);
     cursor: pointer;
 }
 
-.fwmb-bulk-actions a:hover {
-    color: var(--fwmb-accent-main);
-    text-decoration: underline;
+.fwmb-bulk-action-button:hover {
+    background: var(--fwmb-accent-hover);
+}
+
+/* The checkbox + field-name label pairing used for every opt-in row in a Mass Edit dialog. */
+.fwmb-mass-edit-label {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-xs);
+    cursor: pointer;
 }
 
 .fwmb .form-group {
@@ -892,7 +909,7 @@
     font-size: var(--fwmb-font-size-xs);
     background: rgba(0, 0, 0, 0.3);
     padding: var(--fwmb-space-xxs) var(--fwmb-space-s);
-    border-radius: 4px;
+    border-radius: var(--fwmb-radius-small);
     pointer-events: none;
     z-index: 10;
     opacity: 0;
@@ -1053,7 +1070,7 @@
     align-items: center;
     padding: var(--fwmb-space-s) var(--fwmb-space-m);
     background: var(--fwmb-bg-base);
-    border-bottom: 1px solid var(--fwmb-border-main);
+    border-block-end: 1px solid var(--fwmb-border-main);
     gap: var(--fwmb-space-m);
 }
 
@@ -1075,7 +1092,7 @@
 .fwmb .fwmb-brush-settings label {
     font-size: var(--fwmb-font-size-xs);
     color: var(--fwmb-text-secondary);
-    margin-right: var(--fwmb-space-xs);
+    margin-inline-end: var(--fwmb-space-xs);
     white-space: nowrap;
 }
 
@@ -1085,7 +1102,7 @@
 
 .fwmb .fwmb-brush-setting .fwmb-slider-group output {
     width: 4ch;
-    margin-left: 0;
+    margin-inline-start: 0;
 }
 
 /* --- CONTEXT PANEL LOCK STATE --- */
@@ -1142,12 +1159,12 @@ input.fwmb-swatch {
 
 .fwmb-swatch::-webkit-color-swatch {
     border: none;
-    border-radius: 2px; 
+    border-radius: var(--fwmb-radius-small); 
 }
 
 .fwmb-swatch::-moz-color-swatch {
     border: none;
-    border-radius: 2px;
+    border-radius: var(--fwmb-radius-small);
 }
 
 .fwmb-pin {
@@ -1181,6 +1198,23 @@ input.fwmb-swatch {
     text-shadow: var(--fwmb-shadow-focus);
 }
 
+/* Marks the Mass Edit "Select" toggle as currently active, so a GM mid-selection can tell
+   at a glance which item type's checkboxes are showing. */
+.fwmb-legend-action.active {
+    background-color: var(--fwmb-accent-main);
+    color: var(--fwmb-text-inverse);
+}
+
+/* Greys out and disables a Mass Edit "Select" toggle when a sibling type sharing the same
+   panel already has Select mode active (see MapStudioApp.MASS_EDIT_EXCLUSIVE_GROUPS) - only
+   one type in a shared panel can be mass-edited at a time, so it stays unambiguous which list
+   an eventual Mass Edit applies to. */
+.fwmb-legend-action.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 /* --- TRANSFORMATION CONTROLS (D-PAD & ZOOM) --- */
 .fwmb-transform-controls {
     display: flex;
@@ -1201,7 +1235,7 @@ input.fwmb-swatch {
     display: grid;
     grid-template-columns: repeat(3, 36px);
     grid-template-rows: repeat(3, 36px);
-    gap: 4px;
+    gap: var(--fwmb-space-xs);
 }
 
 .fwmb-transform-dpad button {
@@ -1226,29 +1260,29 @@ input.fwmb-swatch {
 }
 
 .fwmb-summary-title {
-    margin-top: 1.5rem;
-    border-bottom: 1px solid var(--fwmb-border-main);
-    padding-bottom: 4px;
+    margin-block-start: 1.5rem;
+    border-block-end: 1px solid var(--fwmb-border-main);
+    padding-block-end: var(--fwmb-space-xs);
     color: var(--fwmb-text-primary);
 }
 
 .fwmb-summary-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 1rem;
+    margin-block-end: 1rem;
 }
 
 .fwmb-summary-table th {
     color: var(--fwmb-text-primary);
     background-color: var(--fwmb-bg-panel);
-    border-bottom: 2px solid var(--fwmb-border-main);
-    padding: 8px;
+    border-block-end: 2px solid var(--fwmb-border-main);
+    padding: var(--fwmb-space-s);
     text-align: left;
 }
 
 .fwmb-summary-table td {
-    padding: 8px;
-    border-bottom: 1px solid var(--fwmb-border-subtle);
+    padding: var(--fwmb-space-s);
+    border-block-end: 1px solid var(--fwmb-border-subtle);
 }
 
 .fwmb-summary-table tr:hover {
@@ -1346,11 +1380,11 @@ input.fwmb-swatch {
     position: absolute;
     right: 0;
     top: 100%;
-    margin-top: var(--fwmb-space-s);
+    margin-block-start: var(--fwmb-space-s);
     background: var(--fwmb-bg-base);
     color: var(--fwmb-text-primary);
     border: 1px solid var(--fwmb-border-main);
-    border-radius: 4px;
+    border-radius: var(--fwmb-radius-small);
     box-shadow: var(--fwmb-shadow-window);
     flex-direction: column;
     min-width: 160px;
@@ -1430,7 +1464,7 @@ input.fwmb-swatch {
     display: flex;
     flex-direction: column;
     gap: var(--fwmb-space-s);
-    padding-right: var(--fwmb-space-xs);
+    padding-inline-end: var(--fwmb-space-xs);
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -1522,6 +1556,14 @@ input.fwmb-swatch {
     position: relative;
 }
 
+/* Mass Edit's opt-in field gating (see bindMassEditToggles) can't use the native `disabled`
+   attribute on this widget since it's a div-based picker, not a form control - this class is
+   toggled instead to give it the same "inactive until ticked" look and behaviour. */
+.fwmb-custom-select.fwmb-mass-edit-locked {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
 .fwmb-select-trigger {
     display: flex;
     align-items: center;
@@ -1529,7 +1571,7 @@ input.fwmb-swatch {
     padding: var(--fwmb-space-xs) var(--fwmb-space-s);
     background: var(--fwmb-bg-base);
     border: 1px solid var(--fwmb-border-main);
-    border-radius: 4px;
+    border-radius: var(--fwmb-radius-small);
     cursor: pointer;
     min-width: 60px;
     height: 32px;
@@ -1553,10 +1595,10 @@ input.fwmb-swatch {
     top: 100%;
     left: 0;
     z-index: 100;
-    margin-top: 4px;
+    margin-block-start: var(--fwmb-space-xs);
     background: var(--fwmb-bg-base);
     border: 1px solid var(--fwmb-border-focus);
-    border-radius: 4px;
+    border-radius: var(--fwmb-radius-small);
     box-shadow: var(--fwmb-shadow-popout);
     width: 260px; /* Expands to hold the grid */
     padding: var(--fwmb-space-s);
@@ -1570,6 +1612,15 @@ input.fwmb-swatch {
     justify-content: space-between;
     align-items: center;
     margin-block-end: var(--fwmb-space-s);
+}
+
+/* Groups the Regions panel's Select toggle alongside its "New Layer" button on the right of
+   the header row - the Regions panel has no <fieldset>/<legend> to host the toggle the way
+   the other tool panels do, so it needs its own action cluster instead. */
+.fwmb-panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-s);
 }
 
 .fwmb-layer-header {
@@ -1617,7 +1668,7 @@ input.fwmb-swatch {
 /* --- REGION & TOOLBAR UTILITIES --- */
 .fwmb-color-row {
     display: flex;
-    gap: 4px;
+    gap: var(--fwmb-space-xs);
     align-items: center;
 }
 

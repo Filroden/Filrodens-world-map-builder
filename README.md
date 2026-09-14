@@ -291,7 +291,7 @@ The *Regions* tool allows you to draw custom polygons to show political, economi
 
 3. The edit toolbar allows you to:
    - Add a new region within the selected layer (which will automatically close any existing region being drawn).
-   - Set the style of the polygon fill (including a no fill option) and border.
+   - Set any of your custom Quick Styles or set custom styles for the polygon fill (including a no fill option) and border.
    - Toggle polygon smoothing.
 
 4. Click the canvas to create a node. To close a region, either add a node close to the starting node, click the "Add New Region" button, or exit Edit mode.
@@ -362,9 +362,9 @@ You can change some of the map configuration settings.
 4. **Biome Colours**
    - Click the colour swatch to edit the colour of each biome.
 
-5. **Route and Label Quick Styles**
-   - Add, edit or delete Quick Styles for Routes (line colour, thickness and style) and Labels (font, size, colour, maximum width and justification)
-   - Changing an existing Quick Style will change the style of all routes or labels using that style.
+5. **Route, Region and Label Quick Styles**
+   - Add, edit or delete Quick Styles for Routes, Regions and Labels.
+   - Changing an existing Quick Style will change the style of all routes, regions or labels using that style.
    - Deleting a Quick Style will preserve the existing style but they can no longer be changed in bulk.
 
    ![Quick Styles](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/quick-styles.png)
@@ -434,6 +434,14 @@ When you click "Confirm", the interface will lock to prevent changes during the 
 - **Duplicate:** Create a copy of the map. This is useful if you want to create versions of the map for winter and summer.
 - **Export JSON:** Export the map data into a JSON file. This allows you to share maps with others.
 - **Delete:** Delete the map. This can also be done inside the normal Foundry compendium.
+
+### Mass Edit Visual Properties
+
+Points of interest, routes, regions and custom labels can be batch-edited. Mass editing any of these also allows you to mass edit their labels at the same time.
+
+- Enable "Select" in a panel's header inside the relevant tool. Disabling "Select" or changing tool will leave Mass Edit mode without making any changes.
+- Tick the items you want to change.
+- Use Mass Edit to apply visual changes to all of them at once, including assigning a Quick Style. Only the properties you tick are changed; everything else is left as it was.
 
 ## Important Note on Performance
 

@@ -1,11 +1,30 @@
 <div class="fwmb-tool-content fwmb-fixed-lists">
 
     <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.PointsOfInterest"}}</legend>
-        
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.PointsOfInterest"}}</span>
+            <a class="fwmb-legend-action {{#if massEditMode.pin}}active{{/if}} {{#if massEditBlocked.pin}}disabled{{/if}}" data-action="toggleMassEditMode" data-type="pin" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon edit-square"></i>
+            </a>
+        </legend>
+
+        {{#if massEditMode.pin}}
+        <div class="fwmb-mass-edit-bar">
+            <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="pin">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
+            <a class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="pin">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
+            <span class="fwmb-flex-1"></span>
+            <button type="button" class="fwmb-btn primary" data-action="openMassEdit" data-type="pin" {{#unless massEditCount.pin}}disabled{{/unless}}>
+                {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.pin}})
+            </button>
+        </div>
+        {{/if}}
+
         <div id="fwmb-scroll-pins" class="fwmb-list-container fwmb-scrollable stable">
             {{#each mapPins}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="pin">
+                {{#if ../massEditMode.pin}}
+                    <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="pin" {{#if this.massEditSelected}}checked{{/if}} />
+                {{/if}}
                 <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>
@@ -31,11 +50,30 @@
     </fieldset>
 
     <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.Routes"}}</legend>
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.Routes"}}</span>
+            <a class="fwmb-legend-action {{#if massEditMode.route}}active{{/if}} {{#if massEditBlocked.route}}disabled{{/if}}" data-action="toggleMassEditMode" data-type="route" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon edit-square"></i>
+            </a>
+        </legend>
+
+        {{#if massEditMode.route}}
+        <div class="fwmb-mass-edit-bar">
+            <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="route">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
+            <a class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="route">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
+            <span class="fwmb-flex-1"></span>
+            <button type="button" class="fwmb-btn primary" data-action="openMassEdit" data-type="route" {{#unless massEditCount.route}}disabled{{/unless}}>
+                {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.route}})
+            </button>
+        </div>
+        {{/if}}
 
         <div id="fwmb-scroll-routes" class="fwmb-list-container fwmb-scrollable stable">
             {{#each mapRoutes}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="route">
+                {{#if ../massEditMode.route}}
+                    <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="route" {{#if this.massEditSelected}}checked{{/if}} />
+                {{/if}}
                 <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>
