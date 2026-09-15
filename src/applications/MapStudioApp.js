@@ -368,9 +368,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             isCustom: true,
         }));
 
-        context.customRouteStyles = [...(this.uiState.customRouteStyles || [])].sort(alphaSort);
-        context.customLabelStyles = [...(this.uiState.customLabelStyles || [])].sort(alphaSort);
-        context.customRegionStyles = [...(this.uiState.customRegionStyles || [])].sort(alphaSort);
+        // Decorates a sorted quick-style list with how many features on this map are currently
+        // using each entry, via that type's QUICK_STYLE_CONFIG.getUsageCount - the same
+        // traversal onDisconnect uses when a style is deleted, just counting instead of resetting.
+        const withUsageCount = (config) => (style) => ({ ...style, usageCount: config.getUsageCount(this, style.id) });
+
+        context.customRouteStyles = [...(this.uiState.customRouteStyles || [])]
+            .sort(alphaSort)
+            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Route));
+        context.customLabelStyles = [...(this.uiState.customLabelStyles || [])]
+            .sort(alphaSort)
+            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Label));
+        context.customRegionStyles = [...(this.uiState.customRegionStyles || [])]
+            .sort(alphaSort)
+            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Region));
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;

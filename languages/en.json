@@ -141,6 +141,7 @@
     "FILRODENSWMB.UI.AddRegionQuickStyle": "Add Region Style",
     "FILRODENSWMB.UI.Custom": "Custom",
     "FILRODENSWMB.UI.NoCustomStyles": "No custom styles configured.",
+    "FILRODENSWMB.UI.QuickStyleUsageTooltip": "Used by {count} feature(s) on this map.",
 
     "FILRODENSWMB.UI.MassEditSelect": "Select items for Mass Edit",
     "FILRODENSWMB.UI.MassEditSelectAll": "Select All",

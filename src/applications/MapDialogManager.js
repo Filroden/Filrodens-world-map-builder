@@ -284,6 +284,17 @@ export class MapDialogManager {
                     app.mapRoutes.forEach(disconnectAttached);
                     app.regionLayers.forEach((layer) => layer.regions.forEach(disconnectAttached));
                 },
+                // Mirrors onDisconnect's traversal (standalone Custom Labels, plus the attached
+                // `.label` sub-object every pin/route/region carries) but tallies matches instead
+                // of resetting them - powers the usage count shown on this style's card.
+                getUsageCount: (app, id) => {
+                    let count = app.mapLabels.filter((lbl) => lbl.quickStyle === id).length;
+                    const isAttachedMatch = (ent) => ent.label && ent.label.quickStyle === id;
+                    count += app.mapPins.filter(isAttachedMatch).length;
+                    count += app.mapRoutes.filter(isAttachedMatch).length;
+                    for (const layer of app.regionLayers) count += layer.regions.filter(isAttachedMatch).length;
+                    return count;
+                },
                 onUpdateActiveUI: (app, result) => {
                     app.uiState.labelFontFamily = result.fontFamily;
                     app.uiState.labelFontSize = result.fontSize;
@@ -326,6 +337,7 @@ export class MapDialogManager {
                 onDisconnect: (app, id) => {
                     for (const route of app.mapRoutes) if (route.quickStyle === id) route.quickStyle = "custom";
                 },
+                getUsageCount: (app, id) => app.mapRoutes.filter((route) => route.quickStyle === id).length,
                 onUpdateActiveUI: (app, result) => {
                     app.uiState.routeColor = result.color;
                     app.uiState.routeThickness = result.thickness;
@@ -381,6 +393,8 @@ export class MapDialogManager {
                         });
                     });
                 },
+                getUsageCount: (app, id) =>
+                    app.regionLayers.reduce((sum, layer) => sum + layer.regions.filter((region) => region.quickStyle === id).length, 0),
                 onUpdateActiveUI: (app, result) => {
                     app.uiState.regionFillColor = result.fillColor;
                     app.uiState.regionFillStyle = result.fillStyle;

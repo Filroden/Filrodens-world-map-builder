@@ -52,6 +52,7 @@
                 <div class="fwmb-list-item" data-id="{{this.id}}">
                     <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: {{this.thickness}}px; border-style: {{this.style}};"></div>
                     <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                    <span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
                     <button type="button" class="fwmb-btn small" data-action="editRouteQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                         <i class="fwmb-icon edit"></i>
                     </button>
@@ -78,6 +79,7 @@
                 <div class="fwmb-list-item" data-id="{{this.id}}">
                     <div class="fwmb-swatch small" style="background-color: {{this.fillColor}}; border-color: {{this.lineColor}};"></div>
                     <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                    <span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
                     <button type="button" class="fwmb-btn small" data-action="editRegionQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                         <i class="fwmb-icon edit"></i>
                     </button>
@@ -104,6 +106,7 @@
                 <div class="fwmb-list-item" data-id="{{this.id}}">
                     <div class="fwmb-swatch" style="background-color: {{this.fillColor}}; border-radius: 50%;"></div>
                     <span class="fwmb-name fwmb-flex-1" style="font-family: '{{this.fontFamily}}';">{{this.name}}</span>
+                    <span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
                     <button type="button" class="fwmb-btn small" data-action="editLabelQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                         <i class="fwmb-icon edit"></i>
                     </button>
