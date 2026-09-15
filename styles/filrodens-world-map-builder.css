@@ -509,7 +509,6 @@
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-medium);
     padding: var(--fwmb-space-m);
-    margin: var(--fwmb-space-m);
     gap: var(--fwmb-space-xs);
     display: flex;
     flex-direction: column;

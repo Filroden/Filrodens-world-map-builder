@@ -87,8 +87,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             changeTool(e, t)                { this._onChangeTool(e, t); },
             exportPng(e, t)                 { this._onExportPng(e, t); },
             exportScene(e, t)               { this._onExportScene(e, t); },
+            exportSettings(e, t)            { this._onExportSettings(e, t); },
             generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
             importMapJson(e, t)             { this._onImportMapJson(e, t); },
+            importSettings(e, t)            { this._onImportSettings(e, t); },
             manageMap(e, t)                 { this._onManageMapAction(e, t); },
             nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
             nudgeReference(e, t)            { this._onNudgeReference(e, t); },
@@ -153,6 +155,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Add further arrays here if another panel ever splits into multiple mass-editable lists.
      */
     static MASS_EDIT_EXCLUSIVE_GROUPS = [["pin", "route"]];
+
+    /**
+     * The four Style Library registries a GM can bundle into a shareable settings file, in
+     * export/import order. Each maps its uiState array key to the existing legend/fieldset
+     * localisation key already shown in tools-library.hbs, so the export dialog's checkboxes
+     * reuse those labels rather than duplicating them under new keys. Custom Pin Icons are
+     * deliberately not included - they're a world-scoped Foundry setting referencing a live
+     * file path rather than a per-map uiState array, so a portable export needs to embed the
+     * actual image data. That's backlogged as its own follow-up (see the v2.2.0 Settings
+     * Export/Import scoping doc); this set covers every registry that's already plain,
+     * self-contained JSON.
+     */
+    static STYLE_LIBRARY_CATEGORIES = [
+        { key: "customBiomes", labelKey: "FILRODENSWMB.UI.SettingsBiomeColors" },
+        { key: "customRouteStyles", labelKey: "FILRODENSWMB.UI.SettingsRouteQuickStyles" },
+        { key: "customRegionStyles", labelKey: "FILRODENSWMB.UI.SettingsRegionQuickStyles" },
+        { key: "customLabelStyles", labelKey: "FILRODENSWMB.UI.SettingsLabelQuickStyles" },
+    ];
 
     constructor(options) {
         options.position = foundry.utils.mergeObject(options.position || {}, {
@@ -2814,6 +2834,198 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         };
 
         input.click();
+    }
+
+    /**
+     * Prompts the GM to choose which Style Library registries to bundle into a shareable JSON
+     * file, then downloads the result. Mirrors #handleMapExport's Blob-download pattern - a
+     * client-side file save, no server round trip.
+     */
+    async _onExportSettings(event, target) {
+        const categories = MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key, labelKey }) => {
+            const count = (this.uiState[key] || []).length;
+
+            return {
+                key,
+                labelKey,
+                count,
+                countLabel:
+                    count > 0
+                        ? game.i18n.format("FILRODENSWMB.UI.ExportSettingsCount", { count })
+                        : game.i18n.localize("FILRODENSWMB.UI.ExportSettingsCountEmpty"),
+            };
+        });
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs", { categories });
+
+        const selectedKeys = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.ExportSettings") },
+            content: content,
+            ok: {
+                callback: (event, button) => MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key }) => key).filter((key) => button.form.elements[key]?.checked),
+            },
+        });
+
+        if (!selectedKeys) return; // User cancelled
+
+        if (selectedKeys.length === 0) {
+            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.ExportSettingsNoneSelected"));
+            return;
+        }
+
+        this.#downloadStyleLibraryExport(selectedKeys);
+    }
+
+    /**
+     * Builds the export payload for the chosen categories and triggers the browser download.
+     * IDs are deliberately stripped from every entry - Custom Biome IDs are sequential per-map
+     * integers and Quick Style IDs are random strings, and both get freshly assigned on import
+     * (see #importStyleLibraryCategories) rather than trusting whatever the source map had, to
+     * avoid colliding with IDs already in use on the importing map.
+     */
+    #downloadStyleLibraryExport(selectedKeys) {
+        const categories = {};
+        for (const key of selectedKeys) {
+            categories[key] = (this.uiState[key] || []).map(({ id, ...rest }) => rest);
+        }
+
+        const exportData = {
+            schemaVersion: 1,
+            fwmbVersion: game.modules.get(FILRODENSWMB.ID)?.version || "unknown",
+            categories,
+        };
+
+        const fileName = (this.currentSaveName || "fwmb-styles").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `fwmb_styles_${fileName}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    /**
+     * Opens a system file dialogue, validates a Style Library export, and appends every entry
+     * that isn't already on this map into the current map's registries. Additive only - never
+     * replaces or renames anything already present - but an entry whose full content already
+     * matches one already on the map (see #styleEntrySignature) is recognised as a duplicate
+     * and silently skipped, so re-importing the same file (or two files that overlap) doesn't
+     * pile up repeat copies of every style.
+     */
+    async _onImportSettings(event, target) {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const parsedData = JSON.parse(text);
+
+                if (!parsedData.categories || typeof parsedData.categories !== "object") {
+                    throw new Error("Invalid FWMB Style Library Schema");
+                }
+
+                const { importedCount, duplicateCount } = this.#importStyleLibraryCategories(parsedData.categories);
+
+                if (importedCount === 0) {
+                    const emptyKey = duplicateCount > 0 ? "FILRODENSWMB.UI.ImportSettingsAllDuplicates" : "FILRODENSWMB.UI.ImportSettingsEmpty";
+                    ui.notifications.warn(game.i18n.localize(emptyKey));
+                    return;
+                }
+
+                this.markDirty();
+                this.render({ parts: ["context"] });
+
+                const successMessage =
+                    duplicateCount > 0
+                        ? game.i18n.format("FILRODENSWMB.UI.ImportSettingsSuccessWithDuplicates", { count: importedCount, duplicates: duplicateCount })
+                        : game.i18n.format("FILRODENSWMB.UI.ImportSettingsSuccess", { count: importedCount });
+                ui.notifications.info(successMessage);
+            } catch (err) {
+                console.error("FWMB | Style Library Import Failed:", err);
+                ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.ImportSettingsError"));
+            }
+        };
+
+        input.click();
+    }
+
+    /**
+     * Builds a canonical signature for a Style Library entry's content, ignoring `id` (which is
+     * always reassigned on import - see #importStyleLibraryCategories - so it must never affect
+     * whether two entries count as "the same"). Every field across all four categories (Custom
+     * Biomes and the three Quick Style registries) is a primitive, a string, or a flat array
+     * (Custom Biome `color`), so sorting the remaining keys and stringifying them is enough;
+     * there's no nested structure here that would need a real deep-equality check.
+     */
+    #styleEntrySignature(entry) {
+        const { id, ...rest } = entry;
+        return JSON.stringify(Object.keys(rest).sort().map((key) => [key, rest[key]]));
+    }
+
+    /**
+     * Appends every recognised category's entries into the current map's uiState, assigning
+     * each a fresh ID rather than trusting the file's own (see the ID-collision note on
+     * #downloadStyleLibraryExport). A category missing from the file, or whose value isn't an
+     * array, is simply skipped; an entry without a string `name` is dropped rather than failing
+     * the whole import, since one malformed row shouldn't block every valid one alongside it.
+     * An entry whose content already matches one already on the map - or an earlier entry in
+     * this same file - is recognised as a duplicate and skipped rather than appended again, so
+     * importing the same file twice (or two files sharing some styles) can't duplicate a style.
+     * @returns {{importedCount: number, duplicateCount: number}} How many entries were actually
+     * appended, and how many were recognised as duplicates and skipped, across all categories.
+     */
+    #importStyleLibraryCategories(categories) {
+        let importedCount = 0;
+        let duplicateCount = 0;
+
+        for (const { key } of MapStudioApp.STYLE_LIBRARY_CATEGORIES) {
+            const entries = categories[key];
+            if (!Array.isArray(entries) || entries.length === 0) continue;
+
+            const validEntries = entries.filter((entry) => entry && typeof entry === "object" && typeof entry.name === "string");
+            if (validEntries.length === 0) continue;
+
+            const existing = this.uiState[key] || [];
+            const knownSignatures = new Set(existing.map((entry) => this.#styleEntrySignature(entry)));
+
+            const newEntries = [];
+            for (const entry of validEntries) {
+                const signature = this.#styleEntrySignature(entry);
+                if (knownSignatures.has(signature)) {
+                    duplicateCount++;
+                    continue;
+                }
+                knownSignatures.add(signature); // also catches duplicates within this same file, not just against the map
+                newEntries.push(entry);
+            }
+            if (newEntries.length === 0) continue;
+
+            const idAssigned = key === "customBiomes" ? this.#assignSequentialBiomeIds(newEntries) : newEntries.map((entry) => ({ ...entry, id: foundry.utils.randomID() }));
+
+            this.uiState[key] = [...existing, ...idAssigned];
+            importedCount += idAssigned.length;
+        }
+
+        return { importedCount, duplicateCount };
+    }
+
+    /**
+     * Assigns sequential Custom Biome IDs to a batch of imported biomes, continuing from the
+     * map's current highest ID so every entry in the batch gets a distinct ID - not just
+     * distinct from the map's existing biomes, but from each other too (MapStateManager's
+     * helper alone would hand out the same next ID to every entry in the batch, since it only
+     * looks at the map's current list, not the batch being assigned).
+     */
+    #assignSequentialBiomeIds(entries) {
+        let nextId = MapStateManager.getNextCustomBiomeId(this.uiState.customBiomes);
+        return entries.map((entry) => ({ ...entry, id: nextId++ }));
     }
 
     /**

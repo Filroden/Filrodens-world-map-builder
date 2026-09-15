@@ -1,0 +1,13 @@
+<div class="fwmb-dialog-content">
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.ExportSettingsHint"}}</p>
+
+    {{#each categories}}
+        <div class="form-group stacked">
+            <label class="fwmb-setting-row">
+                <input type="checkbox" name="{{this.key}}" class="fwmb-checkbox" {{#if this.count}}checked{{else}}disabled{{/if}} />
+                <strong>{{localize this.labelKey}}</strong>
+            </label>
+            <p class="fwmb-hint indent">{{this.countLabel}}</p>
+        </div>
+    {{/each}}
+</div>

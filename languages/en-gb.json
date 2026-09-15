@@ -9,5 +9,6 @@
     "FILRODENSWMB.JOURNAL.Seed": "Initialisation Seed",
     "FILRODENSWMB.UI.FontColor": "Font Colour",
     "FILRODENSWMB.JOURNAL.StandardPalette": "No custom biome colours applied. Standard palette active.",
-    "FILRODENSWMB.UI.EngineStandardHint": "Uses standard noise generation to create quick, randomised terrain."
+    "FILRODENSWMB.UI.EngineStandardHint": "Uses standard noise generation to create quick, randomised terrain.",
+    "FILRODENSWMB.UI.ImportSettingsEmpty": "That file didn't contain any recognised custom biomes or quick styles."
 }

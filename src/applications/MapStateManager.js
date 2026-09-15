@@ -24,6 +24,18 @@ export class MapStateManager {
     }
 
     /**
+     * Computes the next sequential ID for a new custom biome. Custom biome IDs are plain
+     * integers rather than GUIDs (unlike Quick Styles) because they're written directly into
+     * the currentBiomeOverrides raster buffer as pixel values.
+     * @param {Array<{id: number}>} existingBiomes - The map's current uiState.customBiomes.
+     * @returns {number} The next available ID.
+     */
+    static getNextCustomBiomeId(existingBiomes = []) {
+        const currentIds = existingBiomes.map((biome) => biome.id);
+        return currentIds.length > 0 ? Math.max(...currentIds) + 1 : FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID;
+    }
+
+    /**
      * Builds the baseline state for a new map based on its resolution.
      */
     static buildDefaultUiState(width, height) {

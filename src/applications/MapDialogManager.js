@@ -669,8 +669,7 @@ export class MapDialogManager {
         const name = await this._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.AddCustomBiome"), game.i18n.localize("FILRODENSWMB.UI.Name"), defaultName);
         if (!name) return;
 
-        const currentIds = app.uiState.customBiomes.map((c) => c.id);
-        const nextId = currentIds.length > 0 ? Math.max(...currentIds) + 1 : FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID;
+        const nextId = MapStateManager.getNextCustomBiomeId(app.uiState.customBiomes);
 
         app.uiState.customBiomes.push({
             id: nextId,

@@ -44,6 +44,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/tools-labels.hbs",
         "modules/filrodens-world-map-builder/templates/tools-reference.hbs",
         "modules/filrodens-world-map-builder/templates/tools-settings.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-library.hbs",
         "modules/filrodens-world-map-builder/templates/tools-manage.hbs",
 
         "modules/filrodens-world-map-builder/templates/journal-summary.hbs",
@@ -59,6 +60,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-label-quick-style.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs",
 
         "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
         "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs",
