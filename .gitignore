@@ -2,5 +2,6 @@
 /packs
 /dist
 /unpacked
+/wiki
 
 *.iml
