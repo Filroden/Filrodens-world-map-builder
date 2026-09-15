@@ -5,5 +5,10 @@
     "FILRODENSWMB.UI.FillColor": "Fill Colour",
     "FILRODENSWMB.Settings.ThemeHue.Name": "Colour Theme",
     "FILRODENSWMB.UI.PinColor": "Pin Colour",
-    "FILRODENSWMB.UI.JustifyCenter": "Centre"
+    "FILRODENSWMB.UI.JustifyCenter": "Centre",
+    "FILRODENSWMB.JOURNAL.Seed": "Initialisation Seed",
+    "FILRODENSWMB.UI.FontColor": "Font Colour",
+    "FILRODENSWMB.JOURNAL.StandardPalette": "No custom biome colours applied. Standard palette active.",
+    "FILRODENSWMB.UI.EngineStandardHint": "Uses standard noise generation to create quick, randomised terrain.",
+    "FILRODENSWMB.UI.ImportSettingsEmpty": "That file didn't contain any recognised custom biomes or quick styles."
 }

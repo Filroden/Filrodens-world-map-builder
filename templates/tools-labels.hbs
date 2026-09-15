@@ -25,11 +25,30 @@
     </fieldset>
 
     <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.CustomLabels"}}</legend>
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.CustomLabels"}}</span>
+            <a class="fwmb-legend-action {{#if massEditMode.label}}active{{/if}}" data-action="toggleMassEditMode" data-type="label" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon edit-square"></i>
+            </a>
+        </legend>
+
+        {{#if massEditMode.label}}
+        <div class="fwmb-mass-edit-bar">
+            <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
+            <a class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
+            <span class="fwmb-flex-1"></span>
+            <button type="button" class="fwmb-btn primary" data-action="openMassEdit" data-type="label" {{#unless massEditCount.label}}disabled{{/unless}}>
+                {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.label}})
+            </button>
+        </div>
+        {{/if}}
 
         <div id="fwmb-scroll-custom-labels" class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
             {{#each mapLabels}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="custom">
+                {{#if ../massEditMode.label}}
+                    <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="label" {{#if this.massEditSelected}}checked{{/if}} />
+                {{/if}}
                 <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>

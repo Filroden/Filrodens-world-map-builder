@@ -36,25 +36,96 @@
         </thead>
         <tbody>
             <tr>
-                <td><strong>{{localize "FILRODENSWMB.JOURNAL.SeaLevel"}}</strong></td>
-                <td>{{params.seaLevel}}</td>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.GenerationEngine"}}</strong></td>
+                <td>
+                    {{#if (eq generationEngine "standard")}}{{localize "FILRODENSWMB.UI.StandardGeneration"}}
+                    {{else if (eq generationEngine "flat")}}{{localize "FILRODENSWMB.UI.FlatCanvas"}}
+                    {{else if (eq generationEngine "advanced")}}{{localize "FILRODENSWMB.UI.TectonicGeneration"}}
+                    {{else if (eq generationEngine "guided")}}{{localize "FILRODENSWMB.UI.GuidedGeneration"}}
+                    {{else}}{{generationEngine}}
+                    {{/if}}
+                </td>
             </tr>
-            <tr>
-                <td><strong>{{localize "FILRODENSWMB.JOURNAL.NoiseOffset"}}</strong></td>
-                <td>{{params.noise.offsetX}}px, {{params.noise.offsetY}}px</td>
-            </tr>
-            <tr>
-                <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevScale"}}</strong></td>
-                <td>{{params.noise.elevation.scale}}</td>
-            </tr>
-            <tr>
-                <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevOctaves"}}</strong></td>
-                <td>{{params.noise.elevation.octaves}}</td>
-            </tr>
-            <tr>
-                <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevStretch"}}</strong></td>
-                <td>{{params.noise.elevation.stretch}}</td>
-            </tr>
+
+            {{! Standard and Flat both generate around a user-set sea level; Advanced fixes it internally and Guided leaves it unused, so neither shows it here. }}
+            {{#if (or (eq generationEngine "standard") (eq generationEngine "flat"))}}
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.SeaLevel"}}</strong></td>
+                    <td>{{params.seaLevel}}</td>
+                </tr>
+            {{/if}}
+
+            {{! Standard is the only engine with a pannable/zoomable noise field, so these five rows are Standard-only. }}
+            {{#if (eq generationEngine "standard")}}
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.NoiseOffset"}}</strong></td>
+                    <td>{{params.noise.offsetX}}px, {{params.noise.offsetY}}px</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevScale"}}</strong></td>
+                    <td>{{params.noise.elevation.scale}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevOctaves"}}</strong></td>
+                    <td>{{params.noise.elevation.octaves}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevStretch"}}</strong></td>
+                    <td>{{params.noise.elevation.stretch}}</td>
+                </tr>
+            {{/if}}
+
+            {{! Advanced (Tectonic) generation's own plate/coastline/shelf/grouping parameters, plus the shared elevation noise fields under their Advanced-mode labels. }}
+            {{#if (eq generationEngine "advanced")}}
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.TectonicPlates"}}</strong></td>
+                    <td>{{params.tectonicPlates}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.CoastlineFracture"}}</strong></td>
+                    <td>{{params.coastlineFracture}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.ShelfRange"}}</strong></td>
+                    <td>{{params.shelfRange}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.ContinentalGrouping"}}</strong></td>
+                    <td>{{params.continentalGrouping}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.SurfaceRoughness"}}</strong></td>
+                    <td>{{params.noise.elevation.octaves}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.ErosionScale"}}</strong></td>
+                    <td>{{params.noise.elevation.scale}}</td>
+                </tr>
+            {{/if}}
+
+            {{! Guided generation's own coastline/shelf/scale parameters, plus the shared elevation noise fields under their Guided-mode labels. }}
+            {{#if (eq generationEngine "guided")}}
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.CoastlineFracture"}}</strong></td>
+                    <td>{{params.coastlineFracture}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.ShelfRange"}}</strong></td>
+                    <td>{{params.shelfRange}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.ContinentScale"}}</strong></td>
+                    <td>{{params.continentScale}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.SurfaceRoughness"}}</strong></td>
+                    <td>{{params.noise.elevation.octaves}}</td>
+                </tr>
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.ErosionScale"}}</strong></td>
+                    <td>{{params.noise.elevation.scale}}</td>
+                </tr>
+            {{/if}}
         </tbody>
     </table>
 

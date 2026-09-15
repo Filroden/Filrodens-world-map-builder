@@ -1,0 +1,188 @@
+<div class="fwmb-tool-content fwmb-scrollable">
+
+    <div class="fwmb-panel-header-actions">
+        <button type="button" class="fwmb-btn wide" data-action="exportSettings" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportSettingsHint'}}">
+            <i class="fwmb-icon file-export"></i>
+            {{localize "FILRODENSWMB.UI.ExportSettings"}}
+        </button>
+        <button type="button" class="fwmb-btn wide" data-action="importSettings" data-tooltip="{{localize 'FILRODENSWMB.UI.ImportSettingsHint'}}">
+            <i class="fwmb-icon upload-file"></i>
+            {{localize "FILRODENSWMB.UI.ImportSettings"}}
+        </button>
+    </div>
+
+    <fieldset class="fwmb-fieldset">
+
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.SettingsBiomeColors"}}</span>
+            <a class="fwmb-legend-action" data-action="addCustomBiome" data-tooltip="{{localize 'FILRODENSWMB.UI.AddCustomBiome'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </legend>
+
+        <div class="fwmb-biome-legend">
+            {{#each biomeList}}
+                <div class="fwmb-biome-item">
+                    <input type="color" class="fwmb-swatch" name="color_{{this.key}}" value="{{this.hex}}" data-biome="{{this.key}}" />
+
+                    {{#if this.isCustom}}
+                        <label class="fwmb-biome-label">{{this.label}}</label>
+                        <button type="button" class="fwmb-btn muted small danger" data-action="deleteCustomBiome" data-id="{{this.id}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}">
+                            <i class="fwmb-icon delete"></i>
+                        </button>
+                    {{else}}
+                        <label class="fwmb-biome-label">{{localize this.label}}</label>
+                    {{/if}}
+                </div>
+            {{/each}}
+        </div>
+
+    </fieldset>
+
+    <fieldset class="fwmb-fieldset">
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.SettingsRouteQuickStyles"}}</span>
+            <a class="fwmb-legend-action" data-action="addRouteQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.AddRouteQuickStyle'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </legend>
+
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+            {{#each customRouteStyles}}
+                <div class="fwmb-list-item" data-id="{{this.id}}">
+                    <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: {{this.thickness}}px; border-style: {{this.style}};"></div>
+                    <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                    <span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
+                    <button type="button" class="fwmb-btn small" data-action="editRouteQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                        <i class="fwmb-icon edit"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn small muted danger" data-action="deleteRouteQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <i class="fwmb-icon delete"></i>
+                    </button>
+                </div>
+            {{else}}
+                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
+            {{/each}}
+        </div>
+    </fieldset>
+
+    <fieldset class="fwmb-fieldset">
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.SettingsRegionQuickStyles"}}</span>
+            <a class="fwmb-legend-action" data-action="addRegionQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.AddRegionQuickStyle'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </legend>
+
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+            {{#each customRegionStyles}}
+                <div class="fwmb-list-item" data-id="{{this.id}}">
+                    <div class="fwmb-swatch small" style="background-color: {{this.fillColor}}; border-color: {{this.lineColor}};"></div>
+                    <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                    <span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
+                    <button type="button" class="fwmb-btn small" data-action="editRegionQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                        <i class="fwmb-icon edit"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn small muted danger" data-action="deleteRegionQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <i class="fwmb-icon delete"></i>
+                    </button>
+                </div>
+            {{else}}
+                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
+            {{/each}}
+        </div>
+    </fieldset>
+
+    <fieldset class="fwmb-fieldset">
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.SettingsLabelQuickStyles"}}</span>
+            <a class="fwmb-legend-action" data-action="addLabelQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.AddLabelQuickStyle'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </legend>
+
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+            {{#each customLabelStyles}}
+                <div class="fwmb-list-item" data-id="{{this.id}}">
+                    <div class="fwmb-swatch" style="background-color: {{this.fillColor}}; border-radius: 50%;"></div>
+                    <span class="fwmb-name fwmb-flex-1" style="font-family: '{{this.fontFamily}}';">{{this.name}}</span>
+                    <span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
+                    <button type="button" class="fwmb-btn small" data-action="editLabelQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                        <i class="fwmb-icon edit"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn small muted danger" data-action="deleteLabelQuickStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <i class="fwmb-icon delete"></i>
+                    </button>
+                </div>
+            {{else}}
+                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
+            {{/each}}
+        </div>
+    </fieldset>
+
+    <details id="fwmb-builtin-pin-icons" class="fwmb-fieldset" {{#if builtinPinIconsExpanded}}open{{/if}}>
+        <summary>{{localize "FILRODENSWMB.UI.SettingsBuiltinPinIcons"}}</summary>
+        <div class="fwmb-hint fwmb-long">{{localize "FILRODENSWMB.UI.BuiltinPinIconsHint"}}</div>
+
+        <div class="fwmb-bulk-actions">
+            <a class="fwmb-bulk-action-button" data-action="hideAllBuiltinPinIcons">{{localize "FILRODENSWMB.UI.HideAllPinIcons"}}</a>
+            <a class="fwmb-bulk-action-button" data-action="revealAllBuiltinPinIcons">{{localize "FILRODENSWMB.UI.RevealAllPinIcons"}}</a>
+        </div>
+
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+            {{#each builtinPinIcons}}
+                <div class="fwmb-list-item">
+                    <div class="fwmb-list-item-content">
+                        <i class="fwmb-icon fwmb-list-icon {{this.key}}"></i>
+                        <span class="fwmb-name fwmb-flex-1">{{this.label}}</span>
+                    </div>
+                    <div class="fwmb-list-item-actions">
+                        {{#if this.isProtected}}
+                            <input type="checkbox" class="fwmb-checkbox" disabled data-tooltip="{{localize 'FILRODENSWMB.UI.PinIconProtected'}}" />
+                        {{else}}
+                            <input
+                                type="checkbox"
+                                class="fwmb-checkbox"
+                                data-action="toggleBuiltinPinIcon"
+                                data-key="{{this.key}}"
+                                {{#if this.isDisabled}}checked{{/if}}
+                                data-tooltip="{{localize 'FILRODENSWMB.UI.DisablePinIcon'}}"
+                            />
+                        {{/if}}
+                    </div>
+                </div>
+            {{/each}}
+        </div>
+    </details>
+
+    <fieldset class="fwmb-fieldset">
+        <legend class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.SettingsCustomPinIcons"}}</span>
+            <a class="fwmb-legend-action" data-action="addCustomPinIcon" data-tooltip="{{localize 'FILRODENSWMB.UI.AddCustomPinIcon'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </legend>
+
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+            {{#each customPinIcons}}
+                <div class="fwmb-list-item" data-id="{{this.id}}">
+                    <div class="fwmb-list-item-content">
+                        <i class="fwmb-icon fwmb-list-icon" style="--fwmb-mask: url('{{this.path}}');"></i>
+                        <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                    </div>
+                    <div class="fwmb-list-item-actions">
+                        <button type="button" class="fwmb-btn small" data-action="editCustomPinIcon" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                            <i class="fwmb-icon edit"></i>
+                        </button>
+                        <button type="button" class="fwmb-btn small muted danger" data-action="removeCustomPinIcon" data-tooltip="{{localize 'FILRODENSWMB.UI.RemovePinIcon'}}">
+                            <i class="fwmb-icon variable-remove"></i>
+                        </button>
+                    </div>
+                </div>
+            {{else}}
+                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoCustomPinIcons"}}</div>
+            {{/each}}
+        </div>
+    </fieldset>
+
+</div>

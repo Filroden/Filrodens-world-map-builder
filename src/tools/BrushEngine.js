@@ -102,7 +102,7 @@ export class BrushEngine {
 
             if (shouldRecord) this.#recordControlPoint(x, y);
 
-            const stampBounds = this.#stampBrush(x, y, elevationData, biomeOverrideData, seaLevel);
+            const stampBounds = this.#stampBrush(x, y, elevationData, biomeOverrideData, seaLevel, activeBounds);
             dirtyBounds = SpatialMath.mergeBounds(dirtyBounds, stampBounds);
 
             this.lastX = x;
@@ -139,7 +139,7 @@ export class BrushEngine {
                 this.activeSlopeElevation = Math.max(0, this.activeSlopeElevation);
             }
 
-            const stampBounds = this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel);
+            const stampBounds = this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel, activeBounds);
             dirtyBounds = SpatialMath.mergeBounds(dirtyBounds, stampBounds);
         }
 

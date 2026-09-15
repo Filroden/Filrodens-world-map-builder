@@ -1,10 +1,26 @@
 <div class="fwmb-tool-content fwmb-fixed-lists">
     <div class="fwmb-panel-header-row">
         <label class="fwmb-title">{{localize "FILRODENSWMB.UI.LayerRegions"}}</label>
-        <button type="button" class="fwmb-btn" data-action="addRegionLayer">
-            <i class="fwmb-icon add"></i> {{localize "FILRODENSWMB.UI.NewLayer"}}
+        <div class="fwmb-panel-header-actions">
+            <a class="fwmb-legend-action {{#if massEditMode.region}}active{{/if}}" data-action="toggleMassEditMode" data-type="region" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon edit-square"></i>
+            </a>
+            <button type="button" class="fwmb-btn" data-action="addRegionLayer">
+                <i class="fwmb-icon add"></i> {{localize "FILRODENSWMB.UI.NewLayer"}}
+            </button>
+        </div>
+    </div>
+
+    {{#if massEditMode.region}}
+    <div class="fwmb-mass-edit-bar">
+        <a class="fwmb-bulk-action-button" class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="region">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
+        <a class="fwmb-bulk-action-button" class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="region">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
+        <span class="fwmb-flex-1"></span>
+        <button type="button" class="fwmb-btn primary" data-action="openMassEdit" data-type="region" {{#unless massEditCount.region}}disabled{{/unless}}>
+            {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.region}})
         </button>
     </div>
+    {{/if}}
 
     {{#each regionLayers}}
     <div class="fwmb-accordion-group fwmb-scrollable" data-layer-id="{{this.id}}">
@@ -34,6 +50,9 @@
                 {{#each this.regions}}
                 <div class="fwmb-list-item" data-id="{{this.id}}" data-layer-id="{{../id}}" data-type="region">
                     <div class="fwmb-list-item-content">
+                        {{#if @root.massEditMode.region}}
+                            <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="region" {{#if this.massEditSelected}}checked{{/if}} />
+                        {{/if}}
                         <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature">
                             <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                         </button>

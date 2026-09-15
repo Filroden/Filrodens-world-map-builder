@@ -254,6 +254,16 @@ export const FILRODENSWMB = {
         skull: "FILRODENSWMB.ICONS.Skull",
         wall_tent: "FILRODENSWMB.ICONS.WallTent",
     },
+    PIN_ICONS: {
+        // The one icon that can never be disabled or removed - pins reverted away from a
+        // removed custom icon fall back to this, and it's the default icon for new pins
+        // (see MapStateManager.buildDefaultUiState's `activeIcon`).
+        DEFAULT: "map_pin",
+        SETTINGS: {
+            DISABLED: "disabledPinIcons",
+            CUSTOM: "customPinIcons",
+        },
+    },
     REGIONS: {
         PRESETS: ["#C84B31", "#E28743", "#E8B851", "#4F7942", "#8A9A5B", "#3B8388", "#2D70B3", "#4A4E69", "#7A5C9B", "#B56576", "#A0522D", "#CC7161", "#6C7A89", "#A89F91", "#E08E79"],
     },

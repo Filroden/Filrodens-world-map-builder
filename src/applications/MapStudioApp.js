@@ -8,6 +8,7 @@ import { SceneExporter } from "./SceneExporter.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
+import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 
@@ -26,12 +27,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // prettier-ignore
         actions: {
             // --- DIALOG MANAGER: Quick Styles ---
-            addLabelQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
-            addRouteQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
-            editLabelQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
-            editRouteQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
-            deleteLabelQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
-            deleteRouteQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+            addLabelQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
+            addRouteQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
+            addRegionQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
+            editLabelQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
+            editRouteQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
+            editRegionQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
+            deleteLabelQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+            deleteRouteQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+            deleteRegionQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+
+            // --- MASS EDIT ---
+            toggleMassEditMode(e, t)   { this._onToggleMassEditMode(e, t); },
+            toggleMassEditItem(e, t)   { this._onToggleMassEditItem(e, t); },
+            massEditSelectAll(e, t)    { this._onMassEditSelectAll(e, t); },
+            massEditSelectNone(e, t)   { this._onMassEditSelectNone(e, t); },
+            openMassEdit(e, t)         { MapDialogManager.onMassEdit(this, e, t); },
 
             // --- DIALOG MANAGER: Entity Deletion ---
             deleteDecoration(e, t)  { MapDialogManager.onDeleteEntity(this, e, t); },
@@ -60,6 +71,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
             addRegionLayer(e, t)    { MapDialogManager.onAddRegionLayer(this, e, t); },
 
+            // --- DIALOG MANAGER: Pin Icons ---
+            addCustomPinIcon(e, t)     { MapDialogManager.onAddCustomPinIcon(this, e, t); },
+            editCustomPinIcon(e, t)    { MapDialogManager.onEditCustomPinIcon(this, e, t); },
+            removeCustomPinIcon(e, t)  { MapDialogManager.onRemoveCustomPinIcon(this, e, t); },
+            toggleBuiltinPinIcon(e, t) { MapDialogManager.onToggleBuiltinPinIcon(this, e, t); },
+            hideAllBuiltinPinIcons(e, t)   { MapDialogManager.onHideAllBuiltinPinIcons(this, e, t); },
+            revealAllBuiltinPinIcons(e, t) { MapDialogManager.onRevealAllBuiltinPinIcons(this, e, t); },
+
             // --- MAP STUDIO APP: Internal Tooling & States ---
             adjustNoiseScale(e, t)          { this._onAdjustNoiseScale(e, t); },
             adjustReferenceScale(e, t)      { this._onAdjustReferenceScale(e, t); },
@@ -68,8 +87,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             changeTool(e, t)                { this._onChangeTool(e, t); },
             exportPng(e, t)                 { this._onExportPng(e, t); },
             exportScene(e, t)               { this._onExportScene(e, t); },
+            exportSettings(e, t)            { this._onExportSettings(e, t); },
             generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
             importMapJson(e, t)             { this._onImportMapJson(e, t); },
+            importSettings(e, t)            { this._onImportSettings(e, t); },
             manageMap(e, t)                 { this._onManageMapAction(e, t); },
             nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
             nudgeReference(e, t)            { this._onNudgeReference(e, t); },
@@ -126,6 +147,33 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         },
     };
 
+    /**
+     * Mass Edit item types whose "Select" toggle lives in the same context panel fieldset
+     * group. Pins and Routes both live in the Infrastructure panel - having Select mode active
+     * for both at once wouldn't collide (their selections and dialogs are independent), but it
+     * would leave a GM unable to tell at a glance which list an eventual Mass Edit applies to.
+     * Add further arrays here if another panel ever splits into multiple mass-editable lists.
+     */
+    static MASS_EDIT_EXCLUSIVE_GROUPS = [["pin", "route"]];
+
+    /**
+     * The four Style Library registries a GM can bundle into a shareable settings file, in
+     * export/import order. Each maps its uiState array key to the existing legend/fieldset
+     * localisation key already shown in tools-library.hbs, so the export dialog's checkboxes
+     * reuse those labels rather than duplicating them under new keys. Custom Pin Icons are
+     * deliberately not included - they're a world-scoped Foundry setting referencing a live
+     * file path rather than a per-map uiState array, so a portable export needs to embed the
+     * actual image data. That's backlogged as its own follow-up (see the v2.2.0 Settings
+     * Export/Import scoping doc); this set covers every registry that's already plain,
+     * self-contained JSON.
+     */
+    static STYLE_LIBRARY_CATEGORIES = [
+        { key: "customBiomes", labelKey: "FILRODENSWMB.UI.SettingsBiomeColors" },
+        { key: "customRouteStyles", labelKey: "FILRODENSWMB.UI.SettingsRouteQuickStyles" },
+        { key: "customRegionStyles", labelKey: "FILRODENSWMB.UI.SettingsRegionQuickStyles" },
+        { key: "customLabelStyles", labelKey: "FILRODENSWMB.UI.SettingsLabelQuickStyles" },
+    ];
+
     constructor(options) {
         options.position = foundry.utils.mergeObject(options.position || {}, {
             width: window.innerWidth * 0.7,
@@ -152,6 +200,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.manualRivers = [];
         this.activeRiverId = null;
         this.mapPins = [];
+        // Studio-session UI state, not map data - deliberately not part of uiState (which is
+        // cloned into saved map payloads) since whether this panel is expanded has nothing to
+        // do with any particular map.
+        this._builtinPinIconsExpanded = false;
+        // Mass Edit selection tool state - also Studio-session UI state, not map data, for the
+        // same reason: which items are checked for a batch edit has nothing to do with the map
+        // itself, and should reset (not persist) whenever the Studio app is reopened.
+        this.massEditMode = { pin: false, route: false, region: false, label: false };
+        this.massEditSelection = { pin: new Set(), route: new Set(), region: new Set(), label: new Set() };
         this.mapRoutes = [];
         this.activeRouteId = null;
         this.regionLayers = [];
@@ -290,13 +347,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context.uiState = this.uiState;
         context.currentSaveName = this.currentSaveName;
 
-        context.infrastructureIcons = Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS)
-            .map(([id, label]) => ({
-                id: id,
-                label: label,
-                _localized: game.i18n.localize(label),
-            }))
-            .sort((a, b) => a._localized.localeCompare(b._localized));
+        context.infrastructureIcons = getPinIconPickerList(this.uiState.activeIcon);
+        context.builtinPinIcons = getBuiltinPinIconList();
+        context.builtinPinIconsExpanded = this._builtinPinIconsExpanded;
+        context.customPinIcons = getCustomPinIconList();
+
+        const activeIconEntry = context.infrastructureIcons.find((icon) => icon.key === this.uiState.activeIcon);
+        context.activeIconPath = activeIconEntry?.path || "";
+        context.activeIconIsCustom = activeIconEntry?.isCustom || false;
 
         context.routeStyles = (this.uiState.customRouteStyles || []).map((style) => ({
             id: style.id,
@@ -304,14 +362,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             isCustom: true,
         }));
 
-        context.customRouteStyles = [...(this.uiState.customRouteStyles || [])].sort(alphaSort);
-        context.customLabelStyles = [...(this.uiState.customLabelStyles || [])].sort(alphaSort);
+        context.regionStyles = (this.uiState.customRegionStyles || []).map((style) => ({
+            id: style.id,
+            label: style.name,
+            isCustom: true,
+        }));
+
+        // Decorates a sorted quick-style list with how many features on this map are currently
+        // using each entry, via that type's QUICK_STYLE_CONFIG.getUsageCount - the same
+        // traversal onDisconnect uses when a style is deleted, just counting instead of resetting.
+        const withUsageCount = (config) => (style) => ({ ...style, usageCount: config.getUsageCount(this, style.id) });
+
+        context.customRouteStyles = [...(this.uiState.customRouteStyles || [])]
+            .sort(alphaSort)
+            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Route));
+        context.customLabelStyles = [...(this.uiState.customLabelStyles || [])]
+            .sort(alphaSort)
+            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Label));
+        context.customRegionStyles = [...(this.uiState.customRegionStyles || [])]
+            .sort(alphaSort)
+            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Region));
 
         if (partId === "context") {
             context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
-            context.mapPins = (this.mapPins || []).filter((p) => !!p.icon).sort(alphaSort);
-            context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort);
-            context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort);
+
+            context.massEditMode = { ...this.massEditMode };
+            context.massEditCount = {
+                pin: this.massEditSelection.pin.size,
+                route: this.massEditSelection.route.size,
+                region: this.massEditSelection.region.size,
+                label: this.massEditSelection.label.size,
+            };
+            context.massEditBlocked = Object.fromEntries(Object.keys(this.massEditMode).map((type) => [type, this.#isMassEditBlocked(type)]));
+
+            context.mapPins = (this.mapPins || [])
+                .filter((p) => !!p.icon)
+                .sort(alphaSort)
+                .map((p) => ({ ...p, massEditSelected: this.massEditSelection.pin.has(p.id) }));
+            context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort).map((r) => ({ ...r, massEditSelected: this.massEditSelection.route.has(r.id) }));
+            context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort).map((l) => ({ ...l, massEditSelected: this.massEditSelection.label.has(l.id) }));
             context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
             context.landMasks = [...(this.landMasks || [])].sort(alphaSort);
 
@@ -343,7 +432,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             context.regionLayers = [...(this.regionLayers || [])].sort(alphaSort).map((layer) => ({
                 ...layer,
                 isActive: layer.id === this.activeRegionLayerId,
-                regions: [...(layer.regions || [])].sort(alphaSort),
+                regions: [...(layer.regions || [])].sort(alphaSort).map((r) => ({ ...r, massEditSelected: this.massEditSelection.region.has(r.id) })),
             }));
 
             if (this.activeTool === "manage") {
@@ -362,6 +451,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#initCanvasAndEngines();
         this.#bindToolbarListeners();
         this.#bindContextPanelListeners();
+        this.#bindCollapsibleFieldsets();
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
 
@@ -553,17 +643,43 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #syncRegionLiveEdits(name) {
-        if (!name.startsWith("region") || !this.activeRegionId || !this.activeRegionLayerId) return;
+        // Fallback to custom if a manual property is changed
+        if (["regionFillColor", "regionFillStyle", "regionLineColor", "regionLineThickness", "regionLineStyle"].includes(name)) {
+            this.uiState.activeRegionQuickStyle = "custom";
+            this.render({ parts: ["toolbar", "editToolbar"] });
+        }
+
+        // Apply preset if dropdown is changed
+        if (name === "activeRegionQuickStyle") {
+            const styleId = this.uiState.activeRegionQuickStyle;
+            if (styleId !== "custom") {
+                const styleData = this.uiState.customRegionStyles.find((s) => s.id === styleId);
+                if (styleData) {
+                    this.uiState.regionFillColor = styleData.fillColor;
+                    this.uiState.regionFillStyle = styleData.fillStyle;
+                    this.uiState.regionLineColor = styleData.lineColor;
+                    this.uiState.regionLineThickness = styleData.lineThickness;
+                    this.uiState.regionLineStyle = styleData.lineStyle;
+                    this.uiState.regionSmoothing = styleData.smoothing;
+                    this.render({ parts: ["toolbar", "editToolbar"] });
+                }
+            }
+        }
+
+        if (!this.activeRegionId || !this.activeRegionLayerId) return;
+        if (name !== "activeRegionQuickStyle" && !name.startsWith("region")) return;
 
         const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
         const region = layer?.regions.find((r) => r.id === this.activeRegionId);
 
         if (region) {
+            region.quickStyle = this.uiState.activeRegionQuickStyle;
             region.fillColor = this.uiState.regionFillColor;
             region.fillStyle = this.uiState.regionFillStyle;
             region.lineColor = this.uiState.regionLineColor;
             region.lineThickness = this.uiState.regionLineThickness;
             region.lineStyle = this.uiState.regionLineStyle;
+            region.smoothing = this.uiState.regionSmoothing;
             this._repaintVectors();
         }
     }
@@ -580,6 +696,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
             if (heightInput) heightInput.value = calcHeight;
         }
+    }
+
+    /**
+     * A `<details>`-based fieldset re-renders as closed on every render (its `open` attribute
+     * only ever reflects whatever the last-rendered context said), which would otherwise slam
+     * it shut the moment any action inside it - a checkbox, Hide/Reveal all - triggers a
+     * context re-render. Tracking `open` in JS and feeding it back through the render context
+     * (see `builtinPinIconsExpanded` in _preparePartContext) keeps it open until the GM
+     * actually collapses it themselves. Assigning `ontoggle` (rather than addEventListener)
+     * is deliberate: re-running this after every render always replaces any previous handler,
+     * so the same element never ends up with duplicate listeners.
+     */
+    #bindCollapsibleFieldsets() {
+        const builtinIconsDetails = this.element.querySelector("#fwmb-builtin-pin-icons");
+        if (!builtinIconsDetails) return;
+
+        builtinIconsDetails.ontoggle = () => {
+            this._builtinPinIconsExpanded = builtinIconsDetails.open;
+        };
     }
 
     #bindContextPanelListeners() {
@@ -1594,6 +1729,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.customBiomes = payload.customBiomes || [];
         this.uiState.customRouteStyles = payload.customRouteStyles || [];
         this.uiState.customLabelStyles = payload.customLabelStyles || [];
+        this.uiState.customRegionStyles = payload.customRegionStyles || [];
 
         this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
@@ -1654,7 +1790,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     layer.visibility = layer.hidden ? "none" : "all";
                     delete layer.hidden;
                 }
-                if (layer.regions) migrateVisibility(layer.regions);
+                if (layer.regions) {
+                    migrateVisibility(layer.regions);
+                    layer.regions.forEach((region) => {
+                        if (!region.quickStyle) region.quickStyle = "custom"; // Flag old regions as custom overrides
+                    });
+                }
             });
         }
 
@@ -1677,6 +1818,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             pin.color = pin.color || "#ffffff";
             return pin;
         });
+
+        // Custom pin icons are a world-local registry (see pinIcons.js) - a map authored in a
+        // different world, then shared as a JSON import or a copied compendium entry, can
+        // reference icon ids this world never registered. They still render (as the protected
+        // default), so this is a heads-up rather than a blocker.
+        const { affectedPinCount } = findUnresolvedPinIcons(this.mapPins);
+        if (affectedPinCount > 0) {
+            ui.notifications.warn(game.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
+        }
 
         this.mapRoutes = payload.mapRoutes || [];
         this.regionLayers = payload.regionLayers || [];
@@ -1712,7 +1862,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.uiState.activeInfraMode === "pin") {
             const newPin = {
                 id: foundry.utils.randomID(),
-                name: game.i18n.localize(FILRODENSWMB.INFRASTRUCTURE_ICONS[this.uiState.activeIcon] || "Pin"),
+                name: getPinIconLabel(this.uiState.activeIcon),
                 icon: this.uiState.activeIcon,
                 x: finalPos.x,
                 y: finalPos.y,
@@ -1818,6 +1968,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 name: `Region ${layer.regions.length + 1}`,
                 description: "",
                 points: [finalPos],
+                quickStyle: this.uiState.activeRegionQuickStyle,
                 fillColor: this.uiState.regionFillColor,
                 fillStyle: this.uiState.regionFillStyle,
                 lineColor: this.uiState.regionLineColor,
@@ -1899,6 +2050,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 customBiomes: this.uiState.customBiomes,
                 customRouteStyles: this.uiState.customRouteStyles,
                 customLabelStyles: this.uiState.customLabelStyles,
+                customRegionStyles: this.uiState.customRegionStyles,
                 history: this.brushEngine?.history || [],
                 tectonicFaults: this.tectonicFaults,
                 manualRivers: this.manualRivers,
@@ -2404,6 +2556,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 1. Teardown current state
         this.#clearActiveDrawingStates();
         this.#deactivateEditMode();
+        this.#clearMassEditState();
 
         // 2. Setup new state
         MapStateManager.getMapParameters(this);
@@ -2425,6 +2578,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
         this.activeRegionId = null;
         this.activeLandMaskId = null;
+    }
+
+    /**
+     * Ends Mass Edit Select mode for every item type when the active tool changes. Select mode
+     * is scoped to the tool panel it was turned on in - a GM who switches tools has left that
+     * panel behind, so leaving the selection active (and the checkboxes it would need to keep
+     * showing) would be confusing when they come back. Discards the selection with no side
+     * effects, same as toggling Select off directly - nothing has been edited yet.
+     */
+    #clearMassEditState() {
+        for (const type of Object.keys(this.massEditMode)) {
+            this.massEditMode[type] = false;
+            this.massEditSelection[type].clear();
+        }
+    }
+
+    /**
+     * Whether `type`'s Select toggle should be greyed out and inert because a sibling type in
+     * the same MASS_EDIT_EXCLUSIVE_GROUPS entry already has Select mode active. See that
+     * constant's comment for why this matters.
+     */
+    #isMassEditBlocked(type) {
+        const group = MapStudioApp.MASS_EDIT_EXCLUSIVE_GROUPS.find((siblings) => siblings.includes(type));
+        return !!group && group.some((sibling) => sibling !== type && this.massEditMode[sibling]);
     }
 
     async #deactivateEditMode() {
@@ -2649,6 +2826,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 await saveMapData(`${cleanName} (Imported)`, parsedData);
 
                 ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ImportSuccess"));
+
+                // Flag now, at import time, rather than waiting for the GM to load the map -
+                // custom pin icons are world-local (see pinIcons.js), so a JSON export from a
+                // different world commonly won't resolve here.
+                const { affectedPinCount } = findUnresolvedPinIcons(parsedData.mapPins);
+                if (affectedPinCount > 0) {
+                    ui.notifications.warn(game.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
+                }
+
                 this.render({ parts: ["toolbar", "context"] });
             } catch (err) {
                 console.error("FWMB | Import Failed:", err);
@@ -2659,6 +2845,198 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         };
 
         input.click();
+    }
+
+    /**
+     * Prompts the GM to choose which Style Library registries to bundle into a shareable JSON
+     * file, then downloads the result. Mirrors #handleMapExport's Blob-download pattern - a
+     * client-side file save, no server round trip.
+     */
+    async _onExportSettings(event, target) {
+        const categories = MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key, labelKey }) => {
+            const count = (this.uiState[key] || []).length;
+
+            return {
+                key,
+                labelKey,
+                count,
+                countLabel:
+                    count > 0
+                        ? game.i18n.format("FILRODENSWMB.UI.ExportSettingsCount", { count })
+                        : game.i18n.localize("FILRODENSWMB.UI.ExportSettingsCountEmpty"),
+            };
+        });
+
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs", { categories });
+
+        const selectedKeys = await foundry.applications.api.DialogV2.prompt({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.ExportSettings") },
+            content: content,
+            ok: {
+                callback: (event, button) => MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key }) => key).filter((key) => button.form.elements[key]?.checked),
+            },
+        });
+
+        if (!selectedKeys) return; // User cancelled
+
+        if (selectedKeys.length === 0) {
+            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.ExportSettingsNoneSelected"));
+            return;
+        }
+
+        this.#downloadStyleLibraryExport(selectedKeys);
+    }
+
+    /**
+     * Builds the export payload for the chosen categories and triggers the browser download.
+     * IDs are deliberately stripped from every entry - Custom Biome IDs are sequential per-map
+     * integers and Quick Style IDs are random strings, and both get freshly assigned on import
+     * (see #importStyleLibraryCategories) rather than trusting whatever the source map had, to
+     * avoid colliding with IDs already in use on the importing map.
+     */
+    #downloadStyleLibraryExport(selectedKeys) {
+        const categories = {};
+        for (const key of selectedKeys) {
+            categories[key] = (this.uiState[key] || []).map(({ id, ...rest }) => rest);
+        }
+
+        const exportData = {
+            schemaVersion: 1,
+            fwmbVersion: game.modules.get(FILRODENSWMB.ID)?.version || "unknown",
+            categories,
+        };
+
+        const fileName = (this.currentSaveName || "fwmb-styles").replace(/[^a-z0-9]/gi, "_").toLowerCase();
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `fwmb_styles_${fileName}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    /**
+     * Opens a system file dialogue, validates a Style Library export, and appends every entry
+     * that isn't already on this map into the current map's registries. Additive only - never
+     * replaces or renames anything already present - but an entry whose full content already
+     * matches one already on the map (see #styleEntrySignature) is recognised as a duplicate
+     * and silently skipped, so re-importing the same file (or two files that overlap) doesn't
+     * pile up repeat copies of every style.
+     */
+    async _onImportSettings(event, target) {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const parsedData = JSON.parse(text);
+
+                if (!parsedData.categories || typeof parsedData.categories !== "object") {
+                    throw new Error("Invalid FWMB Style Library Schema");
+                }
+
+                const { importedCount, duplicateCount } = this.#importStyleLibraryCategories(parsedData.categories);
+
+                if (importedCount === 0) {
+                    const emptyKey = duplicateCount > 0 ? "FILRODENSWMB.UI.ImportSettingsAllDuplicates" : "FILRODENSWMB.UI.ImportSettingsEmpty";
+                    ui.notifications.warn(game.i18n.localize(emptyKey));
+                    return;
+                }
+
+                this.markDirty();
+                this.render({ parts: ["context"] });
+
+                const successMessage =
+                    duplicateCount > 0
+                        ? game.i18n.format("FILRODENSWMB.UI.ImportSettingsSuccessWithDuplicates", { count: importedCount, duplicates: duplicateCount })
+                        : game.i18n.format("FILRODENSWMB.UI.ImportSettingsSuccess", { count: importedCount });
+                ui.notifications.info(successMessage);
+            } catch (err) {
+                console.error("FWMB | Style Library Import Failed:", err);
+                ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.ImportSettingsError"));
+            }
+        };
+
+        input.click();
+    }
+
+    /**
+     * Builds a canonical signature for a Style Library entry's content, ignoring `id` (which is
+     * always reassigned on import - see #importStyleLibraryCategories - so it must never affect
+     * whether two entries count as "the same"). Every field across all four categories (Custom
+     * Biomes and the three Quick Style registries) is a primitive, a string, or a flat array
+     * (Custom Biome `color`), so sorting the remaining keys and stringifying them is enough;
+     * there's no nested structure here that would need a real deep-equality check.
+     */
+    #styleEntrySignature(entry) {
+        const { id, ...rest } = entry;
+        return JSON.stringify(Object.keys(rest).sort().map((key) => [key, rest[key]]));
+    }
+
+    /**
+     * Appends every recognised category's entries into the current map's uiState, assigning
+     * each a fresh ID rather than trusting the file's own (see the ID-collision note on
+     * #downloadStyleLibraryExport). A category missing from the file, or whose value isn't an
+     * array, is simply skipped; an entry without a string `name` is dropped rather than failing
+     * the whole import, since one malformed row shouldn't block every valid one alongside it.
+     * An entry whose content already matches one already on the map - or an earlier entry in
+     * this same file - is recognised as a duplicate and skipped rather than appended again, so
+     * importing the same file twice (or two files sharing some styles) can't duplicate a style.
+     * @returns {{importedCount: number, duplicateCount: number}} How many entries were actually
+     * appended, and how many were recognised as duplicates and skipped, across all categories.
+     */
+    #importStyleLibraryCategories(categories) {
+        let importedCount = 0;
+        let duplicateCount = 0;
+
+        for (const { key } of MapStudioApp.STYLE_LIBRARY_CATEGORIES) {
+            const entries = categories[key];
+            if (!Array.isArray(entries) || entries.length === 0) continue;
+
+            const validEntries = entries.filter((entry) => entry && typeof entry === "object" && typeof entry.name === "string");
+            if (validEntries.length === 0) continue;
+
+            const existing = this.uiState[key] || [];
+            const knownSignatures = new Set(existing.map((entry) => this.#styleEntrySignature(entry)));
+
+            const newEntries = [];
+            for (const entry of validEntries) {
+                const signature = this.#styleEntrySignature(entry);
+                if (knownSignatures.has(signature)) {
+                    duplicateCount++;
+                    continue;
+                }
+                knownSignatures.add(signature); // also catches duplicates within this same file, not just against the map
+                newEntries.push(entry);
+            }
+            if (newEntries.length === 0) continue;
+
+            const idAssigned = key === "customBiomes" ? this.#assignSequentialBiomeIds(newEntries) : newEntries.map((entry) => ({ ...entry, id: foundry.utils.randomID() }));
+
+            this.uiState[key] = [...existing, ...idAssigned];
+            importedCount += idAssigned.length;
+        }
+
+        return { importedCount, duplicateCount };
+    }
+
+    /**
+     * Assigns sequential Custom Biome IDs to a batch of imported biomes, continuing from the
+     * map's current highest ID so every entry in the batch gets a distinct ID - not just
+     * distinct from the map's existing biomes, but from each other too (MapStateManager's
+     * helper alone would hand out the same next ID to every entry in the batch, since it only
+     * looks at the map's current list, not the batch being assigned).
+     */
+    #assignSequentialBiomeIds(entries) {
+        let nextId = MapStateManager.getNextCustomBiomeId(this.uiState.customBiomes);
+        return entries.map((entry) => ({ ...entry, id: nextId++ }));
     }
 
     /**
@@ -2939,6 +3317,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             name: `Region ${layer.regions.length + 1}`,
             description: "",
             points: [], // Starts empty until the user clicks the canvas
+            quickStyle: this.uiState.activeRegionQuickStyle,
             fillColor: this.uiState.regionFillColor,
             fillStyle: this.uiState.regionFillStyle,
             lineColor: this.uiState.regionLineColor,
@@ -2957,12 +3336,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const targetProperty = target.dataset.target === "line" ? "regionLineColor" : "regionFillColor";
 
         this.uiState[targetProperty] = color;
+        this.uiState.activeRegionQuickStyle = "custom";
         this.render({ parts: ["toolbar", "editToolbar"] });
 
         if (this.activeRegionId && this.activeRegionLayerId) {
             const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
             const region = layer?.regions.find((r) => r.id === this.activeRegionId);
             if (region) {
+                region.quickStyle = "custom";
                 if (targetProperty === "line") region.lineColor = color;
                 else region.fillColor = color;
                 this._repaintVectors();
@@ -3139,6 +3520,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _onToggleRegionSmoothing(event, target) {
         this.uiState.regionSmoothing = !this.uiState.regionSmoothing;
+        this.uiState.activeRegionQuickStyle = "custom";
         target.classList.toggle("active", this.uiState.regionSmoothing);
 
         // Manually update the icon DOM for instant visual feedback
@@ -3152,6 +3534,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
             const region = layer?.regions.find((r) => r.id === this.activeRegionId);
             if (region) {
+                region.quickStyle = "custom";
                 region.smoothing = this.uiState.regionSmoothing;
                 this._repaintVectors();
             }
@@ -3174,6 +3557,81 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Push to canvas and redraw
         this.canvasEngine.setViewFilters(this.viewFilters);
         this._repaintVectors();
+    }
+
+    /**
+     * Returns the ids of every entity of a given type that Mass Edit can currently offer for
+     * selection. Regions are flattened out of their layers since selection is per-type, not
+     * per-layer - a GM mass-editing "regions" expects to pick from all of them at once.
+     */
+    _getMassEditableIds(type) {
+        switch (type) {
+            case "pin":
+                return (this.mapPins || []).filter((p) => !!p.icon).map((p) => p.id);
+            case "route":
+                return (this.mapRoutes || []).map((r) => r.id);
+            case "label":
+                return (this.mapLabels || []).map((l) => l.id);
+            case "region":
+                return (this.regionLayers || []).flatMap((layer) => (layer.regions || []).map((r) => r.id));
+            default:
+                return [];
+        }
+    }
+
+    /**
+     * Toggles Mass Edit "Select" mode for one item type. Turning it off discards whatever was
+     * selected for that type without applying anything - selecting items is a transient UI
+     * action, not an edit, so there is nothing to undo.
+     */
+    _onToggleMassEditMode(event, target) {
+        const type = target.dataset.type;
+        if (!type || !(type in this.massEditMode)) return;
+        // Belt-and-braces: the template already greys out and disables this toggle while a
+        // sibling type is active, but guard the handler too in case a click still reaches it.
+        if (!this.massEditMode[type] && this.#isMassEditBlocked(type)) return;
+
+        this.massEditMode[type] = !this.massEditMode[type];
+        if (!this.massEditMode[type]) this.massEditSelection[type].clear();
+
+        this.render({ parts: ["context"] });
+    }
+
+    /**
+     * Handles a single item card's Mass Edit checkbox being ticked or unticked. The checkbox
+     * carries its own `data-mass-type` rather than reading the list item's `data-type`,
+     * because `data-type` is already overloaded for other purposes on some cards (Custom
+     * Labels' list items use `data-type="custom"` to route editLabel/deleteLabel, not
+     * "label"), so Mass Edit needs its own unambiguous attribute to pick the right selection.
+     */
+    _onToggleMassEditItem(event, target) {
+        const type = target.dataset.massType;
+        const id = target.closest(".fwmb-list-item")?.dataset.id;
+        const selection = type && this.massEditSelection[type];
+        if (!selection || !id) return;
+
+        if (target.checked) selection.add(id);
+        else selection.delete(id);
+
+        this.render({ parts: ["context"] });
+    }
+
+    _onMassEditSelectAll(event, target) {
+        const type = target.dataset.type;
+        const selection = this.massEditSelection[type];
+        if (!selection) return;
+
+        this._getMassEditableIds(type).forEach((id) => selection.add(id));
+        this.render({ parts: ["context"] });
+    }
+
+    _onMassEditSelectNone(event, target) {
+        const type = target.dataset.type;
+        const selection = this.massEditSelection[type];
+        if (!selection) return;
+
+        selection.clear();
+        this.render({ parts: ["context"] });
     }
 
     _onToggleVisibility(event, target) {

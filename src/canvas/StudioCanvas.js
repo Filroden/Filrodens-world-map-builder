@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { resolvePinIconPath } from "../data/pinIcons.js";
 
 export class StudioCanvas {
     constructor(htmlContainer) {
@@ -1025,7 +1026,7 @@ export class StudioCanvas {
         pins.forEach((pin) => {
             if (!this.#isVisibleInCurrentPass(pin.visibility, "all", false)) return;
 
-            const texturePath = `modules/filrodens-world-map-builder/assets/pinhead-icons/${pin.icon}.svg`;
+            const texturePath = resolvePinIconPath(pin.icon);
             const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
 
             // Apply multiplicative tinting (defaults to white if missing)
