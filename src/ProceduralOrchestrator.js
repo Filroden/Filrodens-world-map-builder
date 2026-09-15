@@ -66,7 +66,7 @@ export class ProceduralOrchestrator {
 
         // 2. Replay all raster brush strokes
         if (app.brushEngine?.history?.length > 0) {
-            app.brushEngine.replayHistory(app.currentElevationData, app.currentBiomeOverrides, activeBounds);
+            app.brushEngine.replayHistory(app.currentElevationData, app.currentBiomeOverrides, activeParams.seaLevel, activeBounds);
         }
 
         // 3. Apply vector faults across both base and brushed terrain
