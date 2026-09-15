@@ -2,5 +2,7 @@
 /packs
 /dist
 /unpacked
+/wiki
+/design
 
 *.iml
