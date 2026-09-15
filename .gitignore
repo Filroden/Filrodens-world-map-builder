@@ -3,5 +3,9 @@
 /dist
 /unpacked
 /wiki
+<<<<<<< Updated upstream
+=======
+/design
+>>>>>>> Stashed changes
 
 *.iml

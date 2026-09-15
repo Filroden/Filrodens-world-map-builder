@@ -50,12 +50,11 @@ Link to map JSON file: [<https://github.com/Filroden/Filrodens-world-map-builder
 
 ---
 
-## How to Use
-
-### How to Open the Module
+## How to Open the Module
 
 Filroden's World Map Builder can be opened from the *Scenes* sidebar. A new button has been added at the top of the sidebar called *Map Builder*.
 
+<<<<<<< Updated upstream
 ### The Map Canvas
 
 The main window in the module shows the current map.
@@ -473,10 +472,11 @@ The procedural hydrology engine mathematically forces water to flow monotonicall
 Procedural rivers (those flowing from the automatically generated springs) calculate the path of least resistance downhill to the coast or a lake. If you use the terrain brushes to raise a hill, carve a valley, or smooth a slope anywhere near a river's path, you alter the underlying topography. The hydrology engine recalculates the most natural route based on your new landscape, which will sometimes divert the water down a new valley.
 
 > Tip: If you need a river to stay in an exact, permanent location regardless of how you sculpt the nearby terrain, use the Custom River tool instead. Custom rivers physically carve their own channels into the landscape, whereas procedural rivers simply adapt to the landscape as it currently exists.
+=======
+Please see the [Wiki](https://github.com/Filroden/Filrodens-world-map-builder/wiki) for more details on how to use the module.
+>>>>>>> Stashed changes
 
 ## Roadmap
 
 - Allow custom biomes to be renamed.
-- Bulk edit vector (pins, lines, regions and text) properties.
-- Scene tools to allow quicker toggling of the in-game map grid, map pins and tiles (which would otherwise take multiple clicks through Foundry's UI).
-- Multi-tile export support, allowing the user to toggle distinct layers (like political borders or trade routes) on and off during live play.
+- Export map meta-data through scene flags linked grid coordinates which could be used by game systems and other modules.
