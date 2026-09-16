@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { RuleEditorDialog } from "./RuleEditorDialog.js";
 import {
     getCustomPinIconById,
     getPinIconPickerList,
@@ -701,7 +702,10 @@ export class MapDialogManager {
             onExtract: (form) => config.onExtract(form, newBiome.name),
             onSave: (entity, result) => {
                 const id = MapStateManager.getNextCustomBiomeId(app.uiState.customBiomes);
-                app.uiState.customBiomes.push({ id, ...result });
+                // rules starts empty - a freshly created biome has no auto-generation rules
+                // yet, so it simply never matches and falls straight through to the built-in
+                // defaults until the rule editor is used to add some.
+                app.uiState.customBiomes.push({ id, ...result, rules: [] });
             },
         });
     }
@@ -720,6 +724,17 @@ export class MapDialogManager {
             renderParts: ["context", "toolbar"],
             onExtract: (form) => config.onExtract(form, biome.name),
         });
+    }
+
+    /**
+     * Opens the Biome Rule Stacker (see RuleEditorDialog) - a dedicated large dialog for
+     * reviewing and (from sub-phase 4b-ii onward) editing custom biomes' auto-generation
+     * rules against the built-in defaults. Delegates entirely to RuleEditorDialog, which is
+     * kept in its own file rather than grown here given how large this feature is expected
+     * to become - see that file's own doc comment.
+     */
+    static async onOpenBiomeRuleEditor(app, event, target) {
+        await RuleEditorDialog.open(app);
     }
 
     static async onAddCustomPinIcon(app, event, target) {

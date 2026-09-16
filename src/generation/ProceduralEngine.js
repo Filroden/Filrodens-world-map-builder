@@ -1,6 +1,7 @@
 import { SimplexNoise } from "../../vendor/simplex-noise/simplex-noise.js";
 import { TectonicEngine } from "./TectonicEngine.js";
 import { HydrologyEngine } from "./HydrologyEngine.js";
+import { BiomeRuleEngine } from "./BiomeRuleEngine.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
 
@@ -1130,6 +1131,32 @@ export class ProceduralEngine {
     }
 
     /**
+     * Decides which biome a pixel resolves to and whether it should render as water, in
+     * priority order: a hand-painted override always wins; failing that, a matching custom
+     * auto-generation rule (see BiomeRuleEngine); failing that, the built-in default via
+     * getBiomeKey(). BrushEngine's own paint guard (#applyBiomeMath) never lets a custom
+     * biome be hand-painted below sea level in the first place, so a custom biome only ever
+     * ends up there via a rule match here - in which case it still counts as water, exactly
+     * like DEEP_OCEAN/SHALLOW_OCEAN below, so the biome layer stays transparent and the
+     * topography layer's own elevation-based water rendering (ProceduralEngine.colorize)
+     * shows through underneath, rather than the custom biome's flat colour hiding it.
+     */
+    static #resolveBiomeLookup(overrideId, elevation, moisture, temp, seaLevel, waterMask, pixelIndex, customBiomeRules) {
+        if (overrideId > 0) {
+            return { lookupKey: overrideId, isWater: overrideId === 1 || overrideId === 2 };
+        }
+
+        const customId = customBiomeRules ? BiomeRuleEngine.matchBiomeId(customBiomeRules, elevation, moisture, temp) : 0;
+        if (customId > 0) {
+            return { lookupKey: customId, isWater: elevation < seaLevel };
+        }
+
+        const lookupKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
+        const isWater = lookupKey === "DEEP_OCEAN" || lookupKey === "SHALLOW_OCEAN" || (waterMask && waterMask[pixelIndex] > 0);
+        return { lookupKey, isWater };
+    }
+
+    /**
      * VISUAL PASS: Evaluates Temp and Moisture to paint a climate biome map.
      */
     createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null) {
@@ -1144,21 +1171,9 @@ export class ProceduralEngine {
                 const elevation = elevationData[i];
 
                 const overrideId = biomeOverrideData ? biomeOverrideData[i] : 0;
-                let lookupKey;
-                let isWater = false;
-
-                if (overrideId > 0) {
-                    lookupKey = overrideId;
-                    if (overrideId === 1 || overrideId === 2) isWater = true;
-                } else {
-                    const temp = temperatureData[i];
-                    const moisture = moistureData[i];
-                    lookupKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
-
-                    if (lookupKey === "DEEP_OCEAN" || lookupKey === "SHALLOW_OCEAN" || (waterMask && waterMask[i] > 0)) {
-                        isWater = true;
-                    }
-                }
+                const { lookupKey, isWater } = ProceduralEngine.#resolveBiomeLookup(
+                    overrideId, elevation, moistureData[i], temperatureData[i], seaLevel, waterMask, i, params?.customBiomeRules,
+                );
 
                 if (isWater) {
                     pixelBuffer[bufferIndex] = 0;

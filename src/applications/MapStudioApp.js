@@ -70,6 +70,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
             editCustomBiome(e, t)   { MapDialogManager.onEditCustomBiome(this, e, t); },
             deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
+            openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
             addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
             addRegionLayer(e, t)    { MapDialogManager.onAddRegionLayer(this, e, t); },
 

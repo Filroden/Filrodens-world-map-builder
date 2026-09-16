@@ -40,6 +40,7 @@
 .fwmb-icon.travel-explore       { --fwmb-mask: url('../assets/icons/travel_explore.svg'); }
 .fwmb-icon.file-open            { --fwmb-mask: url('../assets/icons/file_open.svg'); }
 .fwmb-icon.save                 { --fwmb-mask: url('../assets/icons/save.svg'); }
+.fwmb-icon.accept               { --fwmb-mask: url('../assets/icons/check.svg'); }
 .fwmb-icon.delete               { --fwmb-mask: url('../assets/icons/delete.svg'); }
 .fwmb-icon.cancel               { --fwmb-mask: url('../assets/icons/cancel.svg'); }
 .fwmb-icon.brush                { --fwmb-mask: url('../assets/icons/brush.svg'); }
@@ -1744,4 +1745,296 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 @keyframes fwmb-spin-anim {
     100% { transform: rotate(360deg); }
+}
+
+/* ===================================================================
+   BIOME RULE EDITOR
+=================================================================== */
+
+.fwmb-rule-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-space-m);
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-inline-end: var(--fwmb-space-l);
+    margin: 0 var(--fwmb-space-m);
+}
+
+.fwmb-rule-editor-intro {
+    margin: 0;
+}
+
+.fwmb-rule-editor-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fwmb-space-l);
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-text-muted);
+    padding: var(--fwmb-space-s) var(--fwmb-space-m);
+    background: var(--fwmb-bg-base);
+    border: 2px solid var(--fwmb-border-subtle);
+    border-radius: var(--fwmb-radius-medium);
+}
+
+.fwmb-rule-editor-legend-item {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-s);
+}
+
+.fwmb-rule-editor-swatch {
+    width: var(--fwmb-font-size-xl);
+    height: var(--fwmb-font-size-xxs);
+    border-radius: var(--fwmb-radius-small);
+    flex-shrink: 0;
+}
+.fwmb-rule-editor-swatch.active { background: var(--fwmb-accent-main); }
+.fwmb-rule-editor-swatch.locked { background: var(--fwmb-bg-muted); border: 1px solid var(--fwmb-text-muted); }
+
+.fwmb-rule-editor-section-heading {
+    display: flex;
+    align-items: baseline;
+    gap: var(--fwmb-space-s);
+    flex-wrap: wrap;
+}
+.fwmb-rule-editor-section-heading h3 {
+    margin: 0;
+    font-size: var(--fwmb-font-size-m);
+}
+.fwmb-rule-editor-section-heading h3.muted {
+    color: var(--fwmb-text-muted);
+}
+.fwmb-rule-editor-count {
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-text-muted);
+}
+
+.fwmb-rule-editor-flow {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-space-s);
+}
+
+.fwmb-rule-editor-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-s);
+    color: var(--fwmb-text-muted);
+    font-size: var(--fwmb-font-size-xs);
+}
+.fwmb-rule-editor-divider::before,
+.fwmb-rule-editor-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--fwmb-border-subtle);
+}
+
+/* --- Biome group card --- */
+
+.fwmb-rule-group {
+    background: var(--fwmb-bg-panel);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-large);
+    box-shadow: var(--fwmb-shadow-popout);
+    overflow: hidden;
+}
+.fwmb-rule-group.locked {
+    box-shadow: none;
+    background: var(--fwmb-bg-base);
+    border-color: var(--fwmb-border-subtle);
+}
+
+/* --- Rule row: label + three axis tracks, one line --- */
+
+.fwmb-rule-row {
+    display: grid;
+    grid-template-columns: 200px repeat(3, minmax(0, 1fr));
+    gap: var(--fwmb-space-m);
+    align-items: center;
+    padding: var(--fwmb-space-xs) var(--fwmb-space-m);
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+    min-height: 52px;
+}
+.fwmb-rule-group > .fwmb-rule-row:last-child {
+    border-bottom: none;
+}
+
+.fwmb-rule-row-empty {
+    grid-template-columns: 200px 1fr;
+}
+.fwmb-rule-row-empty-hint {
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-text-muted);
+    font-style: italic;
+}
+
+.fwmb-rule-row-label {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-xs);
+    min-width: 0;
+}
+
+.fwmb-rule-continuation {
+    width: var(--fwmb-font-size-m);
+    text-align: center;
+    color: var(--fwmb-border-main);
+    flex-shrink: 0;
+}
+
+.fwmb-rule-label-content {
+    display: flex;
+    align-items: baseline;
+    gap: var(--fwmb-space-s);
+    min-width: 0;
+}
+
+.fwmb-rule-swatch {
+    width: var(--fwmb-font-size-m);
+    height: var(--fwmb-font-size-m);
+    border-radius: var(--fwmb-radius-small);
+    border: 1px solid var(--fwmb-border-main);
+    flex-shrink: 0;
+    align-self: center;
+}
+
+.fwmb-rule-name {
+    font-weight: 600;
+    font-size: var(--fwmb-font-size-s);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--fwmb-text-primary);
+}
+.locked .fwmb-rule-name {
+    color: var(--fwmb-text-muted);
+}
+
+.fwmb-rule-code {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-accent-hover);
+    background: color-mix(in srgb, var(--fwmb-accent-main) 16%, transparent);
+    border-radius: var(--fwmb-radius-small);
+    padding: 1px 5px;
+    flex-shrink: 0;
+}
+
+/* --- Axis track --- */
+
+.fwmb-rule-axis {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-space-xxs);
+    min-width: 0;
+}
+
+.fwmb-rule-axis-top {
+    display: flex;
+    align-items: baseline;
+    gap: var(--fwmb-space-xs);
+    flex-wrap: wrap;
+}
+
+.fwmb-rule-axis-label {
+    font-size: var(--fwmb-font-size-xxs);
+    text-transform: uppercase;
+    letter-spacing: var(--fwmb-letter-spacing-wide);
+    color: var(--fwmb-text-muted);
+    flex-shrink: 0;
+}
+
+.fwmb-rule-chip-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-xxs);
+    flex-wrap: wrap;
+}
+
+.fwmb-rule-chip {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: var(--fwmb-font-size-xxs);
+    color: var(--fwmb-text-secondary);
+    white-space: nowrap;
+    background: var(--fwmb-bg-hover);
+    border: 1px solid var(--fwmb-border-subtle);
+    border-radius: 999px;
+    padding: var(--fwmb-space-xxxs) 6px;
+}
+.locked .fwmb-rule-chip {
+    background: transparent;
+    border-color: transparent;
+    color: var(--fwmb-text-muted);
+}
+.fwmb-rule-chip-edge {
+    color: var(--fwmb-accent-hover);
+    font-weight: 600;
+}
+.locked .fwmb-rule-chip-edge {
+    color: var(--fwmb-bg-muted);
+    font-weight: 500;
+}
+
+.fwmb-rule-track {
+    position: relative;
+    height: 18px;
+    background: var(--fwmb-bg-hover);
+    border-radius: 999px;
+    border: 1px solid var(--fwmb-border-subtle);
+}
+.locked .fwmb-rule-track {
+    background: var(--fwmb-bg-base);
+}
+
+.fwmb-rule-fill {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    background: color-mix(in srgb, var(--fwmb-accent-main) 20%, transparent);
+    border-block-start: 1px solid var(--fwmb-accent-main);
+    border-block-end: 1px solid var(--fwmb-accent-main);
+    border-radius: 999px;
+}
+.locked .fwmb-rule-fill {
+    background: color-mix(in srgb, var(--fwmb-bg-muted) 30%, transparent);
+    border-color: var(--fwmb-bg-muted);
+}
+
+.fwmb-rule-handle {
+    position: absolute;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    background: var(--fwmb-accent-hover);
+    border: 2px solid var(--fwmb-bg-base);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: var(--fwmb-shadow-focus);
+}
+.locked .fwmb-rule-handle {
+    background: var(--fwmb-bg-muted);
+    width: 8px;
+    height: 8px;
+    box-shadow: none;
+}
+
+.fwmb-rule-sea-level-line {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 2px;
+    background: repeating-linear-gradient(var(--fwmb-accent-hover) 0 3px, transparent 3px 6px);
+}
+.locked .fwmb-rule-sea-level-line {
+    background: repeating-linear-gradient(var(--fwmb-text-muted) 0 3px, transparent 3px 6px);
+}
+
+@media (max-width: 640px) {
+    .fwmb-rule-row,
+    .fwmb-rule-row-empty {
+        grid-template-columns: 1fr;
+        gap: var(--fwmb-space-xs);
+    }
 }

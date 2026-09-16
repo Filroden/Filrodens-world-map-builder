@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 
 export class MapStateManager {
     /**
@@ -300,6 +301,10 @@ export class MapStateManager {
             },
             biomePalette: compiledPalette,
             customColors: customBiomeColors,
+            // Compiled once per generation, not per pixel - see BiomeRuleEngine's own doc
+            // comment for why. Custom biomes with no rules yet (rules: [] or undefined)
+            // simply contribute zero rows, so this is a no-op until rules actually exist.
+            customBiomeRules: BiomeRuleEngine.compile(state.customBiomes || []),
             display: {
                 contourInterval: state.contourInterval,
                 biomeAlphaActive: state.biomeAlphaActive,

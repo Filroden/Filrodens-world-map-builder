@@ -75,6 +75,7 @@
     --fwmb-font-size-xl: 1.5rem;
     --fwmb-font-size-xxl: 2rem;
 
+    --fwmb-space-xxxs: 0.063rem;     /* 1px */
     --fwmb-space-xxs: 0.125rem;     /* 2px */
     --fwmb-space-xs: 0.25rem;       /* 4px */
     --fwmb-space-s: 0.5rem;         /* 8px */
