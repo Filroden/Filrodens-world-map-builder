@@ -42,16 +42,22 @@ export class RuleEditorDialog {
 
         const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/biome-rule-editor.hbs", {});
 
-        await foundry.applications.api.DialogV2.prompt({
+        // A formal two-button Accept/Cancel pair (DialogV2.wait, not the single-button
+        // .prompt) rather than one ambiguous "Close" - matching promptUnsavedChanges's own
+        // multi-button pattern above. Both currently do the same thing (nothing is editable
+        // yet in this pass), but the distinction is what 4b-iii's real Save/discard wiring
+        // will hook into, so it's worth settling the chrome now rather than swapping it
+        // again later. The window's own close (X) button is treated the same as Cancel.
+        await foundry.applications.api.DialogV2.wait({
             classes: ["fwmb", "fwmb-rule-editor-dialog"],
             window: { title: game.i18n.localize("FILRODENSWMB.UI.RuleEditorTitle"), icon: "fwmb-icon tune" },
             position: { width: 1040 },
             content,
-            ok: {
-                label: game.i18n.localize("FILRODENSWMB.UI.Close"),
-                icon: "fwmb-icon accept",
-                callback: () => true,
-            },
+            buttons: [
+                { action: "accept", label: game.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon accept", default: true },
+                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+            ],
+            close: () => "cancel",
             render: (event) => RuleEditorDialog.#renderContent(event.target.element, customBiomes, defaultBiomes, seaLevel),
         });
     }

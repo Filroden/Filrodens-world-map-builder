@@ -179,6 +179,7 @@
     "FILRODENSWMB.UI.Save": "Save",
     "FILRODENSWMB.UI.Discard": "Discard",
     "FILRODENSWMB.UI.Cancel": "Cancel",
+    "FILRODENSWMB.UI.Accept": "Accept",
 
     "FILRODENSWMB.UI.SaveMap": "Quick Save Map",
     "FILRODENSWMB.UI.SaveAs": "Save As...",
@@ -426,7 +427,6 @@
     "FILRODENSWMB.UI.RuleEditorMoisture": "Moisture",
     "FILRODENSWMB.UI.RuleEditorTemperature": "Temperature",
     "FILRODENSWMB.UI.RuleEditorSeaLevelTooltip": "Sea level (reference only - ranges aren't restricted by it)",
-    "FILRODENSWMB.UI.Close": "Close",
 
     "FILRODENSWMB.UI.EditCanvas": "Create Regional Map from Existing Map",
     "FILRODENSWMB.UI.EditCanvasHint": "Creates a regional map based on a crop of the existing map, preserving all edits. This provided enhanced detail in the terrain and biome layers.",
