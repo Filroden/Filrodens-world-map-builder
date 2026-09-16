@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { resolvePinIconPath } from "../data/pinIcons.js";
+import { ColorMath } from "../tools/ColorMath.js";
 
 export class StudioCanvas {
     constructor(htmlContainer) {
@@ -907,7 +908,7 @@ export class StudioCanvas {
         const ctx = canvas.getContext("2d");
 
         // Convert strict hex integer back to #RRGGBB string for the canvas context
-        ctx.strokeStyle = "#" + colorHex.toString(16).padStart(6, "0");
+        ctx.strokeStyle = ColorMath.packedIntToHex(colorHex);
         ctx.lineWidth = 2;
 
         if (style === "diagonal" || style === "crosshatch") {
@@ -996,7 +997,7 @@ export class StudioCanvas {
             // 1b. Abort line geometry if there is no second point to connect to
             if (route.points.length < 2) return;
 
-            const colorHex = Number.parseInt(route.color.replace("#", ""), 16);
+            const colorHex = ColorMath.hexToPackedInt(route.color);
             const splinePoints = this.#getSplinePoints(route.points);
 
             // Pass 1: Draw the 1px black outline shadow
@@ -1031,7 +1032,7 @@ export class StudioCanvas {
 
             // Apply multiplicative tinting (defaults to white if missing)
             if (pin.color) {
-                sprite.tint = Number(pin.color.replace("#", "0x"));
+                sprite.tint = ColorMath.hexToPackedInt(pin.color);
             }
 
             // Apply resolution scaling * user override scale
@@ -1144,8 +1145,8 @@ export class StudioCanvas {
                 const g = new PIXI.Graphics();
                 layerContainer.addChild(g);
 
-                const fillColorHex = region.fillColor === "transparent" ? null : Number.parseInt(region.fillColor.replace("#", ""), 16);
-                const lineColorHex = Number.parseInt(region.lineColor.replace("#", ""), 16);
+                const fillColorHex = region.fillColor === "transparent" ? null : ColorMath.hexToPackedInt(region.fillColor);
+                const lineColorHex = ColorMath.hexToPackedInt(region.lineColor);
 
                 // A polygon is "closed" if it has 3+ points and the user isn't actively currently drawing it
                 const isClosed = region.points.length >= 3 && region.id !== activeRegionId;
@@ -1319,23 +1320,6 @@ export class StudioCanvas {
         this.brushCursor.drawCircle(x, y, radius);
     }
 
-    /**
-     * Calculates relative luminance to guarantee text readability against any biome.
-     */
-    #getAdaptiveStrokeColor(hexColor) {
-        const cleanHex = String(hexColor).replace("#", "");
-        if (cleanHex.length !== 6) return "#000000";
-
-        const r = Number.parseInt(cleanHex.substring(0, 2), 16);
-        const g = Number.parseInt(cleanHex.substring(2, 4), 16);
-        const b = Number.parseInt(cleanHex.substring(4, 6), 16);
-
-        // Standard perceived luminance calculation
-        const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-        return luma < 128 ? "#ffffff" : "#000000";
-    }
-
     renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], regionLayers = [], isEditMode = false) {
         this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
 
@@ -1360,7 +1344,7 @@ export class StudioCanvas {
             const font = labelData.fontFamily || "Signika";
             const size = (labelData.fontSize || 1) * rootFontSize * resScale;
             const fill = labelData.fillColor || "#ffffff";
-            const stroke = this.#getAdaptiveStrokeColor(fill);
+            const stroke = ColorMath.getContrastColor(fill);
 
             // 1. Setup Base Style
             const styleConfig = {
@@ -1474,7 +1458,7 @@ export class StudioCanvas {
         const vectorLayer = new PIXI.Graphics();
         this.layers.cartography.addChild(vectorLayer);
 
-        const borderColorHex = Number.parseInt((uiState.cartographyBorderColor || "#000000").replace("#", ""), 16);
+        const borderColorHex = ColorMath.hexToPackedInt(uiState.cartographyBorderColor || "#000000");
         const style = uiState.cartographyBorderStyle;
         const margin = 20;
 
@@ -1839,7 +1823,7 @@ export class StudioCanvas {
                     }
                 }
 
-                const colorHex = typeof fault.color === "string" ? Number.parseInt(fault.color.replace("#", ""), 16) : fault.color || 0xffffff;
+                const colorHex = typeof fault.color === "string" ? ColorMath.hexToPackedInt(fault.color) : fault.color || 0xffffff;
                 const thickness = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
 
                 // Draw the Area of Effect Halo via circle stamping

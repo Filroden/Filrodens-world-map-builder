@@ -133,6 +133,7 @@
     "FILRODENSWMB.UI.ImportSettingsError": "Failed to import settings. Please check the file and try again.",
 
     "FILRODENSWMB.UI.SettingsBiomeColors": "Biome Colors",
+    "FILRODENSWMB.UI.SettingsCustomBiomes": "Custom Biomes",
     "FILRODENSWMB.UI.LayerContours": "Toggle Contour Lines",
     "FILRODENSWMB.UI.ContourInterval": "Contour Interval",
     "FILRODENSWMB.UI.SettingsRouteQuickStyles": "Route Quick Styles",
@@ -401,7 +402,12 @@
     "FILRODENSWMB.Settings.ThemeHue.Teal": "Teal",
 
     "FILRODENSWMB.UI.AddCustomBiome": "Add Custom Biome",
-    "FILRODENSWMB.UI.DeleteBiome": "Are you sure you want to delete this custom biome? Any existing areas on the map will return to their original biomes.",
+    "FILRODENSWMB.UI.DeleteBiome": "Delete Custom Biome",
+    "FILRODENSWMB.UI.DeleteBiomeConfirm": "Are you sure you want to delete this custom biome? Any existing areas on the map will return to their original biomes.",
+    "FILRODENSWMB.UI.BiomeCode": "Code",
+    "FILRODENSWMB.UI.BiomeCodeHint": "Optional, e.g. a system's terrain code",
+    "FILRODENSWMB.UI.BiomeCodeTooltip": "This biome's code: {code}",
+    "FILRODENSWMB.UI.BiomeColor": "Color",
 
     "FILRODENSWMB.UI.EditCanvas": "Create Regional Map from Existing Map",
     "FILRODENSWMB.UI.EditCanvasHint": "Creates a regional map based on a crop of the existing map, preserving all edits. This provided enhanced detail in the terrain and biome layers.",

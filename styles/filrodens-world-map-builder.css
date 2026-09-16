@@ -365,6 +365,9 @@
 }
 
 .fwmb option {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-s);
     background: var(--fwmb-bg-panel);
     color: var(--fwmb-text-primary);
     padding: var(--fwmb-space-xs) var(--fwmb-space-s);
@@ -510,6 +513,7 @@
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-medium);
     padding: var(--fwmb-space-m);
+    margin: var(--fwmb-space-m) 0;
     gap: var(--fwmb-space-xs);
     display: flex;
     flex-direction: column;
@@ -793,13 +797,13 @@
 /* Main window header styles */
 .fwmb .window-header {
     background-image: unset;
-    background-color: var(--fwmb-primary-900);
+    background-color: var(--fwmb-main-900);
     border: none;
-    color: var(--fwmb-primary-100);
+    color: var(--fwmb-main-100);
 }
 
 .fwmb .window-header .window-title {
-    color: var(--fwmb-primary-100);
+    color: var(--fwmb-main-100);
     font-size: var(--fwmb-font-size-s);
     line-height: var(--fwmb-line-height-heading);
     text-align: start; 
@@ -863,8 +867,8 @@
 
 /* 2. The Context Panel Part */
 .fwmb .fwmb-context-panel {
-    flex: 0 0 20rem; 
-    background: var(--fwmb-bg-main);
+    flex: 0 0 22rem; 
+    background: var(--fwmb-bg-base);
     border-inline-end: 1px solid var(--fwmb-border-main);
     display: flex;
     flex-direction: column;
@@ -906,7 +910,7 @@
     position: absolute;
     inset-block-end: var(--fwmb-space-m);
     inset-inline-start: var(--fwmb-space-m);
-    color: var(--fwmb-primary-200);
+    color: var(--fwmb-main-200);
     font-size: var(--fwmb-font-size-xs);
     background: rgba(0, 0, 0, 0.3);
     padding: var(--fwmb-space-xxs) var(--fwmb-space-s);
@@ -944,7 +948,7 @@
     height: var(--fwmb-font-size-xxl);
     background: transparent;
     border: 1px solid transparent;
-    color: var(--fwmb-primary-300);
+    color: var(--fwmb-main-300);
     padding: 0;
     display: flex;
     align-items: center;
@@ -953,14 +957,14 @@
 
 .fwmb-map-controls button:hover,
 .fwmb-map-history button:hover {
-    color: var(--fwmb-primary-200);
+    color: var(--fwmb-main-200);
     background: rgba(0 , 0, 0, 0.2);
     border-color: var(--fwmb-accent-main);
 }
 
 .fwmb-map-controls button.active,
 .fwmb-map-history button.active {
-    color: var(--fwmb-primary-100);
+    color: var(--fwmb-main-100);
     background: rgba(0, 0, 0, 0.4);
     border-color: var(--fwmb-accent-main);
 }
@@ -973,7 +977,7 @@
     padding: var(--fwmb-space-xs) var(--fwmb-space-s);
     border-radius: var(--fwmb-radius-small);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--fwmb-primary-200);
+    color: var(--fwmb-main-200);
     font-size: var(--fwmb-font-size-xs);
     display: flex;
     align-items: center;
@@ -1622,6 +1626,7 @@ input.fwmb-swatch {
     display: flex;
     align-items: center;
     gap: var(--fwmb-space-s);
+    justify-content: space-evenly;
 }
 
 .fwmb-layer-header {

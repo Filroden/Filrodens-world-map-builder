@@ -57,26 +57,47 @@ export class ProceduralOrchestrator {
         const activeBounds = ProceduralEngine.resolveBounds(bounds, app.mapWidth, app.mapHeight);
 
         // 1. Reset current elevation from pristine base elevation within the target bounds
-        for (let y = activeBounds.minY; y <= activeBounds.maxY; y++) {
-            const rowOffset = y * app.mapWidth;
-            const start = rowOffset + activeBounds.minX;
-            const end = rowOffset + activeBounds.maxX + 1;
+        this.#forEachBoundsRow(activeBounds, app.mapWidth, (start, end) => {
             app.currentElevationData.set(app.baseElevationData.subarray(start, end), start);
+        });
+
+        // 2. Clear biome overrides within the target bounds. Unlike elevation, painted biomes
+        // have no separate "base" layer to reset from - 0 is the sentinel createBiomesMap()
+        // already treats as "no override, compute the biome normally" - so replaying brush
+        // history must start from that clean slate. Without this, undoing a paint stroke would
+        // leave its override sitting on pixels no remaining stroke touches.
+        if (app.currentBiomeOverrides) {
+            this.#forEachBoundsRow(activeBounds, app.mapWidth, (start, end) => {
+                app.currentBiomeOverrides.fill(0, start, end);
+            });
         }
 
-        // 2. Replay all raster brush strokes
+        // 3. Replay all raster brush strokes
         if (app.brushEngine?.history?.length > 0) {
             app.brushEngine.replayHistory(app.currentElevationData, app.currentBiomeOverrides, activeParams.seaLevel, activeBounds);
         }
 
-        // 3. Apply vector faults across both base and brushed terrain
+        // 4. Apply vector faults across both base and brushed terrain
         if (app.tectonicFaults?.length > 0) {
             TectonicEngine.applyTectonicFaults(app.currentElevationData, app.mapWidth, app.mapHeight, app.tectonicFaults, activeEngine.simplex, activeBounds);
         }
 
-        // 4. Carve manual rivers into the final deformed topography
+        // 5. Carve manual rivers into the final deformed topography
         if (app.manualRivers?.length > 0) {
             HydrologyEngine.carveManualRivers(app.currentElevationData, app.mapWidth, app.mapHeight, app.manualRivers, activeEngine.simplex, activeParams.seaLevel, activeBounds);
+        }
+    }
+
+    /**
+     * Walks each row of a rectangular bounds region on a flattened 1D raster buffer, invoking
+     * `rowFn(rowStart, rowEndExclusive)` with the touched span of that row. Shared by the
+     * elevation and biome-override reset passes above, which both need to walk the same
+     * region of their respective same-sized buffers.
+     */
+    static #forEachBoundsRow(bounds, mapWidth, rowFn) {
+        for (let y = bounds.minY; y <= bounds.maxY; y++) {
+            const rowOffset = y * mapWidth;
+            rowFn(rowOffset + bounds.minX, rowOffset + bounds.maxX + 1);
         }
     }
 

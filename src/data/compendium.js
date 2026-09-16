@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { ColorMath } from "../tools/ColorMath.js";
 
 /**
  * Ensures the world compendium exists, creating it natively if it does not.
@@ -81,14 +82,14 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null) {
     const cleanPayload = foundry.utils.deepClone(mapDataPayload);
 
     cleanPayload.journalColors = Object.entries(cleanPayload.params.customColors || {}).map(([key, rgb]) => {
-        const hex = "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
+        const hex = ColorMath.rgbToHex(rgb);
         return { label: `FILRODENSWMB.BIOMES.${key}`, hex: hex };
     });
 
     if (cleanPayload.customBiomes) {
         const customColors = cleanPayload.customBiomes.map((cb) => ({
             label: cb.name, // Passed as a raw string, bypassing the {{localize}} helper
-            hex: "#" + cb.color.map((x) => x.toString(16).padStart(2, "0")).join(""),
+            hex: ColorMath.rgbToHex(cb.color),
         }));
         cleanPayload.journalColors.push(...customColors);
     }

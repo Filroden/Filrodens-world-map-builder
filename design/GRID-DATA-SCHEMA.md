@@ -1,8 +1,8 @@
 # Grid Exploration Data — Proposed Schema (Draft for Feedback)
 
-**Status:** Draft. Four of the original open questions have been settled by Ken (see "Resolved by Ken" below), with two rounds of correction to the land terrain-band math along the way; two questions remain open for the system developer — see "Still open" at the end.
+**Status:** Draft. Four of the original open questions have been settled by Ken (see "Resolved by Ken" below), with two rounds of correction to the land terrain-band math along the way; two questions remain open for the system developer — see "Still open" at the end. **Pushed back to v2.4.0** (2026-09-15): Custom Biomes improvements now landed v2.3.0, which is expected to add a user-defined `code` field (and possibly other identity changes) to custom biomes — this schema's `biome` object should reflect whatever that work settles on rather than being finalised first and retrofitted afterward. Still fine to share this draft with the system developer for feedback in the meantime; nothing here is expected to change shape, just possibly gain a field on `biome`.
 
-**Target release:** v2.3.0 (after the in-progress v2.2.0)
+**Target release:** v2.4.0 (after v2.3.0, Custom Biomes improvements)
 
 ## What this is
 
@@ -62,7 +62,7 @@ In JSON, a cell's offset is written as the object key `"i,j"` (e.g. `"3,7"` for 
 ```
 
 | Field | Type | Notes |
-| --- | --- | --- |
+|---|---|---|
 | `biome.id` | string | Stable identifier for the dominant biome in this cell (majority of the cell's area). Built-in biomes use a fixed set of keys (e.g. `GRASSLAND`, `DECIDUOUS_FOREST`, `DEEP_OCEAN`); a GM-defined custom biome gets its own id. Always present. |
 | `biome.name` | string | Human-readable display name — always present, even for custom biomes. |
 | `terrainBand` | string | One of `deepOcean`, `shallowOcean`, `lowland`, `upland`, `highland`, `mountain`. Always present — no raw elevation value is exposed (see "Resolved by Ken" #1). The ocean bands are intended to always agree with `biome.id` (a `DEEP_OCEAN`-biome cell is always `deepOcean`, `SHALLOW_OCEAN` always `shallowOcean`), rather than using an independently-computed elevation cutoff that could disagree with the biome. The land bands are fixed elevation distances above this map's own sea level, clamped — see "Resolved by Ken" #5 and the formula below. On some maps, one or more of the higher land bands may simply have zero cells (e.g. no `mountain` on a very-high-sea-level map); that's expected, not an error. |
@@ -92,7 +92,7 @@ In JSON, a cell's offset is written as the object key `"i,j"` (e.g. `"3,7"` for 
   Instead, each band is a **fixed elevation distance above sea level**, the same absolute distance on every map, with each band simply absent if its starting point would fall above the maximum possible elevation (1.0):
 
   | Band | Starts at (elevation) | Ends at (elevation) |
-  | --- | --- | --- |
+  |---|---|---|
   | `lowland` | `seaLevel` | `seaLevel + 0.10` |
   | `upland` | `seaLevel + 0.10` | `seaLevel + 0.22` |
   | `highland` | `seaLevel + 0.22` | `seaLevel + 0.38` |

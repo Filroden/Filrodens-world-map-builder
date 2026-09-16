@@ -6,6 +6,7 @@ import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap,
 import { Scene3D } from "../canvas/Scene3D.js";
 import { SceneExporter } from "./SceneExporter.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
+import { ColorMath } from "../tools/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
@@ -67,6 +68,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             // --- DIALOG MANAGER: Custom Biomes & Misc ---
             addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
+            editCustomBiome(e, t)   { MapDialogManager.onEditCustomBiome(this, e, t); },
             deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
             addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
             addRegionLayer(e, t)    { MapDialogManager.onAddRegionLayer(this, e, t); },
@@ -306,8 +308,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        const rgbToHex = (rgb) => "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
-
         context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS)
             .filter(([key, id]) => id !== 1 && id !== 2 && !key.toLowerCase().startsWith("custom"))
             .map(([key, id]) => {
@@ -318,7 +318,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     id: id,
                     key: key,
                     label: `FILRODENSWMB.BIOMES.${key}`,
-                    hex: rgbToHex(currentRgb),
+                    hex: ColorMath.rgbToHex(currentRgb),
                     isCustom: false,
                 };
             });
@@ -328,7 +328,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             id: cb.id,
             key: `custom_${cb.id}`,
             label: cb.name,
-            hex: rgbToHex(cb.color),
+            hex: ColorMath.rgbToHex(cb.color),
             isCustom: true,
         }));
 
@@ -372,6 +372,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // using each entry, via that type's QUICK_STYLE_CONFIG.getUsageCount - the same
         // traversal onDisconnect uses when a style is deleted, just counting instead of resetting.
         const withUsageCount = (config) => (style) => ({ ...style, usageCount: config.getUsageCount(this, style.id) });
+
+        // Custom Biomes get no usageCount badge yet (unlike the three below) - "in use" for a
+        // biome would mean scanning the full currentBiomeOverrides raster rather than a small
+        // vector array, a different enough cost profile that it's deliberately left for later.
+        context.customBiomes = [...(this.uiState.customBiomes || [])].sort(alphaSort).map((cb) => ({ ...cb, hex: ColorMath.rgbToHex(cb.color) }));
 
         context.customRouteStyles = [...(this.uiState.customRouteStyles || [])]
             .sort(alphaSort)
@@ -811,7 +816,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #updateBiomeColor(target) {
         const biomeKey = target.dataset.biome;
         const hex = target.value;
-        const rgb = [Number.parseInt(hex.slice(1, 3), 16), Number.parseInt(hex.slice(3, 5), 16), Number.parseInt(hex.slice(5, 7), 16)];
+        const rgb = ColorMath.hexToRgb(hex);
 
         if (biomeKey.startsWith("custom_")) {
             const id = Number.parseInt(biomeKey.split("_")[1]);
@@ -2024,7 +2029,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             // 1. Prompt the user BEFORE locking the UI
             if (!this.currentSaveId) {
                 const { currentSeed } = MapStateManager.getMapParameters(this);
-                const hash = currentSeed || Math.random().toString(36).substring(2, 8).toUpperCase();
+                const hash = currentSeed || this.#generateRandomSeed();
                 const defaultName = `Terrain Map (${hash})`;
 
                 mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), defaultName);
@@ -2446,7 +2451,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // If the user left the seed blank, generate a random one automatically
         if (!newSeed) {
-            newSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
+            newSeed = this.#generateRandomSeed();
         }
 
         const canProceed = await this.#gateUnsavedChanges();
@@ -3200,8 +3205,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async _onRandomizeSeed(event, target) {
-        this.uiState.mapSeed = Math.random().toString(36).substring(2, 8).toUpperCase();
+        this.uiState.mapSeed = this.#generateRandomSeed();
         this.render({ parts: ["context"] });
+    }
+
+    /**
+     * Generates a random 6-character alphanumeric seed (uppercased) - the one place this logic
+     * lives, so anywhere a blank or randomised map seed is needed (this button, an auto-generated
+     * default map name, a blank seed left on the Create/Convert Map dialog) goes through the same
+     * approach rather than each call site inventing its own.
+     */
+    #generateRandomSeed() {
+        return Math.random().toString(36).substring(2, 8).toUpperCase();
     }
 
     async _onRedoBrush(event, target) {
