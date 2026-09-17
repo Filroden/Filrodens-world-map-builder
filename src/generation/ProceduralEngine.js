@@ -1,6 +1,7 @@
 import { SimplexNoise } from "../../vendor/simplex-noise/simplex-noise.js";
 import { TectonicEngine } from "./TectonicEngine.js";
 import { HydrologyEngine } from "./HydrologyEngine.js";
+import { BiomeRuleEngine } from "./BiomeRuleEngine.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
 
@@ -1130,12 +1131,84 @@ export class ProceduralEngine {
     }
 
     /**
-     * VISUAL PASS: Evaluates Temp and Moisture to paint a climate biome map.
+     * Decides which biome a pixel resolves to and whether it should render as water, in
+     * priority order: a hand-painted override always wins; failing that, a matching custom
+     * auto-generation rule (see BiomeRuleEngine); failing that, the built-in default via
+     * getBiomeKey(). BrushEngine's own paint guard (#applyBiomeMath) never lets a custom
+     * biome be hand-painted below sea level in the first place, so a custom biome only ever
+     * ends up there via a rule match here.
+     *
+     * By default a rule-matched custom biome below sea level still counts as water, exactly
+     * like DEEP_OCEAN/SHALLOW_OCEAN below, so the biome layer stays transparent and the
+     * topography layer's own elevation-based water rendering (ProceduralEngine.colorize)
+     * shows through underneath, rather than the custom biome's flat colour hiding it. A biome
+     * can opt out of that via its own `solidOverWater` flag (the Add/Edit Custom Biome dialog's
+     * checkbox, compiled into the sparse `solidOverWater` id->true map below by
+     * MapStateManager.getDerivedMapParameters) - exactly like the built-in PACK_ICE biome,
+     * which has always rendered as a solid colour over water rather than transparently. This
+     * matters for a biome meant to represent something visible on top of water, like pack ice
+     * or a floating landmass, rather than the water itself.
+     *
+     * An override only wins if `biomePalette` can still resolve it to a colour. Deleting a
+     * custom biome (MapDialogManager#onDeleteCustomBiome) deliberately leaves its old ID sitting
+     * in painted pixels and brush strokes rather than scrubbing it out everywhere, so undo/redo
+     * only ever has to snapshot uiState.customBiomes and never needs to touch raster data at all
+     * - bringing the biome back (by undo, or a fresh biome that happens to reuse the ID) makes
+     * the old paint reappear on its own. The other side of that deal is here: an override ID
+     * that doesn't currently resolve to anything is treated exactly like "never painted" and
+     * falls through to a custom rule match or the built-in default, instead of the caller
+     * falling back to a solid black square (params?.biomePalette?.[lookupKey] ?? ... ?? [0,0,0]
+     * in createBiomesMap) for a colour that will never exist. Built-in water IDs (1/2) are
+     * checked before consulting the palette at all, since they're never user-deletable and
+     * render transparently regardless of colour (see the `isWater` short-circuit below).
+     * @param {object} [biomePalette] - id/name -> RGB map for the map's current biomes (built-in
+     * plus custom), as compiled fresh every repaint by MapStateManager.getDerivedMapParameters.
+     * @param {object} [solidOverWater] - sparse custom-biome-id -> true map of biomes that render
+     * solid rather than transparent below sea level, compiled the same way as biomePalette.
+     * @returns {{lookupKey: (string|number), isWater: boolean, isFallback: boolean}} `isFallback`
+     * is true only for the last branch below (getBiomeKey()'s built-in default) - a hand-painted
+     * override or a matching custom rule both count as "covered" and set it false, even when the
+     * matched custom biome turns out to render as water. This is what sub-phase 4c's "preview
+     * rule coverage" highlight (MapStudioApp's hover button, see createBiomesMap's optional
+     * `outFallbackBuffer` below) tints: exactly the pixels a GM's custom rule set doesn't reach.
      */
-    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null) {
+    static resolveBiomeLookup(overrideId, elevation, moisture, temp, seaLevel, waterMask, pixelIndex, customBiomeRules, biomePalette, solidOverWater) {
+        if (overrideId === 1 || overrideId === 2) {
+            return { lookupKey: overrideId, isWater: true, isFallback: false };
+        }
+        if (overrideId > 0 && biomePalette?.[overrideId]) {
+            return { lookupKey: overrideId, isWater: false, isFallback: false };
+        }
+
+        const customId = customBiomeRules ? BiomeRuleEngine.matchBiomeId(customBiomeRules, elevation, moisture, temp) : 0;
+        if (customId > 0) {
+            return { lookupKey: customId, isWater: solidOverWater?.[customId] ? false : elevation < seaLevel, isFallback: false };
+        }
+
+        const lookupKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
+        const isWater = lookupKey === "DEEP_OCEAN" || lookupKey === "SHALLOW_OCEAN" || (waterMask && waterMask[pixelIndex] > 0);
+        return { lookupKey, isWater, isFallback: true };
+    }
+
+    /**
+     * VISUAL PASS: Evaluates Temp and Moisture to paint a climate biome map.
+     *
+     * @param {Uint8Array} [outFallbackBuffer] - optional companion RGBA buffer, same dimensions
+     * as `outBuffer`. When supplied, every pixel visited also gets tagged here: fully opaque in
+     * FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR/ALPHA where resolveBiomeLookup's `isFallback`
+     * came back true (no override, no custom rule - the built-in default did the work), fully
+     * transparent everywhere else. This is a free byproduct of the same per-pixel loop below, not
+     * a second pass - see MapStudioApp's "preview rule coverage" hover button (sub-phase 4c),
+     * which just toggles this buffer's own canvas layer visible/hidden rather than recomputing
+     * anything. Left `null` (the default) for callers that don't need the preview - the 3D view
+     * generation, for one - and costs nothing extra when omitted beyond the one `if` check.
+     */
+    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, outFallbackBuffer = null) {
         const pixelBuffer = outBuffer;
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const renderBounds = SpatialMath.padBounds(baseBounds, 1, 1, width, height);
+        const [fbR, fbG, fbB] = FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR;
+        const fbAlpha = Math.round(FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_ALPHA * 255);
 
         for (let y = renderBounds.minY; y <= renderBounds.maxY; y++) {
             for (let x = renderBounds.minX; x <= renderBounds.maxX; x++) {
@@ -1144,20 +1217,16 @@ export class ProceduralEngine {
                 const elevation = elevationData[i];
 
                 const overrideId = biomeOverrideData ? biomeOverrideData[i] : 0;
-                let lookupKey;
-                let isWater = false;
+                const { lookupKey, isWater, isFallback } = ProceduralEngine.resolveBiomeLookup(
+                    overrideId, elevation, moistureData[i], temperatureData[i], seaLevel, waterMask, i, params?.customBiomeRules, params?.biomePalette,
+                    params?.solidOverWater,
+                );
 
-                if (overrideId > 0) {
-                    lookupKey = overrideId;
-                    if (overrideId === 1 || overrideId === 2) isWater = true;
-                } else {
-                    const temp = temperatureData[i];
-                    const moisture = moistureData[i];
-                    lookupKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
-
-                    if (lookupKey === "DEEP_OCEAN" || lookupKey === "SHALLOW_OCEAN" || (waterMask && waterMask[i] > 0)) {
-                        isWater = true;
-                    }
+                if (outFallbackBuffer) {
+                    outFallbackBuffer[bufferIndex] = isFallback ? fbR : 0;
+                    outFallbackBuffer[bufferIndex + 1] = isFallback ? fbG : 0;
+                    outFallbackBuffer[bufferIndex + 2] = isFallback ? fbB : 0;
+                    outFallbackBuffer[bufferIndex + 3] = isFallback ? fbAlpha : 0;
                 }
 
                 if (isWater) {

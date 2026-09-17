@@ -1,5 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { ColorMath } from "../tools/ColorMath.js";
+import { RuleEditorDialog } from "./RuleEditorDialog.js";
 import {
     getCustomPinIconById,
     getPinIconPickerList,
@@ -192,7 +194,7 @@ export class MapDialogManager {
      * Unified pipeline for editing vector entities to remove boilerplate.
      */
     static async _processEditDialog(app, entity, options = {}) {
-        const { titleKey, template, htmlContent, context = {}, onRender, onExtract, onSave, triggersTerrain = false, renderParts = ["context"] } = options;
+        const { titleKey, template, htmlContent, context = {}, onRender, onExtract, onSave, triggersTerrain = false, repaintCanvas = false, renderParts = ["context"] } = options;
 
         const content = template ? await foundry.applications.handlebars.renderTemplate(template, context) : htmlContent;
 
@@ -213,8 +215,8 @@ export class MapDialogManager {
 
             foundry.utils.mergeObject(entity, result);
             if (onSave) onSave(entity, result);
-
-            app._repaintVectors();
+            if (repaintCanvas) app._repaintCanvas();
+            else app._repaintVectors();
             if (triggersTerrain) app.requestTerrainUpdate();
             app.render({ parts: renderParts });
             app.markDirty();
@@ -393,8 +395,7 @@ export class MapDialogManager {
                         });
                     });
                 },
-                getUsageCount: (app, id) =>
-                    app.regionLayers.reduce((sum, layer) => sum + layer.regions.filter((region) => region.quickStyle === id).length, 0),
+                getUsageCount: (app, id) => app.regionLayers.reduce((sum, layer) => sum + layer.regions.filter((region) => region.quickStyle === id).length, 0),
                 onUpdateActiveUI: (app, result) => {
                     app.uiState.regionFillColor = result.fillColor;
                     app.uiState.regionFillStyle = result.fillStyle;
@@ -403,6 +404,26 @@ export class MapDialogManager {
                     app.uiState.regionLineStyle = result.lineStyle;
                     app.uiState.regionSmoothing = result.smoothing;
                 },
+            },
+            Biome: {
+                registryKey: "customBiomes",
+                template: "modules/filrodens-world-map-builder/templates/dialogs/edit-biome.hbs",
+                getDefaults: (app) => ({
+                    name: `Custom Biome ${app.uiState.customBiomes.length + 1}`,
+                    code: null,
+                    color: [128, 128, 128],
+                    solidOverWater: false,
+                }),
+                getContext: (app, biome) => ({
+                    biome: { ...biome, hex: ColorMath.rgbToHex(biome.color) },
+                    palette: FILRODENSWMB.LABELS?.PRESETS || [],
+                }),
+                onExtract: (form, fallbackName) => ({
+                    name: form.elements["biomeName"].value.trim() || fallbackName,
+                    code: form.elements["biomeCode"].value.trim() || null,
+                    color: ColorMath.hexToRgb(form.elements["biomeColor"].value),
+                    solidOverWater: form.elements["biomeSolidOverWater"].checked,
+                }),
             },
         };
     }
@@ -428,15 +449,7 @@ export class MapDialogManager {
         // Pins, Routes, and Regions each carry an attached label (the same `label{...}`
         // sub-object their single-item edit dialogs expose as a second "Label Properties"
         // fieldset) - Mass Edit should be able to batch those fields too, not just the
-        // entity's own visual properties. Shared here since the field list and its dialog
-        // context are identical for all three owning types; only the entity type they get
-        // attached to differs. Every extract() returns a nested `{ label: {...} }` object,
-        // the same shape `_extractLabelResultFields` already produces for the single-item
-        // dialogs, so `foundry.utils.mergeObject(entity, patch)` merges it straight into
-        // `entity.label` with no special-casing needed in onMassEdit. _extractMassEditPatch
-        // accumulates ticked fields with mergeObject too (not a shallow Object.assign), so
-        // two different label fields ticked together both land under the same `label` key
-        // instead of one overwriting the other.
+        // entity's own visual properties.
         const labelFields = () => [
             {
                 checkboxName: "applyLabelQuickStyle",
@@ -679,20 +692,51 @@ export class MapDialogManager {
     // --- ADD ACTIONS ---
 
     static async onAddCustomBiome(app, event, target) {
-        const defaultName = `Custom Biome ${app.uiState.customBiomes.length + 1}`;
-        const name = await this._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.AddCustomBiome"), game.i18n.localize("FILRODENSWMB.UI.Name"), defaultName);
-        if (!name) return;
+        const config = this.QUICK_STYLE_CONFIG.Biome;
+        const newBiome = config.getDefaults(app);
 
-        const nextId = MapStateManager.getNextCustomBiomeId(app.uiState.customBiomes);
-
-        app.uiState.customBiomes.push({
-            id: nextId,
-            name: name,
-            color: [128, 128, 128],
+        await this._processEditDialog(app, newBiome, {
+            titleKey: "FILRODENSWMB.UI.AddCustomBiome",
+            template: config.template,
+            context: config.getContext(app, newBiome),
+            repaintCanvas: true,
+            renderParts: ["context", "toolbar"],
+            onExtract: (form) => config.onExtract(form, newBiome.name),
+            onSave: (entity, result) => {
+                const id = MapStateManager.getNextCustomBiomeId(app.uiState);
+                // rules starts empty - a freshly created biome has no auto-generation rules
+                // yet, so it simply never matches and falls straight through to the built-in
+                // defaults until the rule editor is used to add some.
+                app.uiState.customBiomes.push({ id, ...result, rules: [] });
+            },
         });
+    }
 
-        app.render({ parts: ["context"] });
-        app.markDirty();
+    static async onEditCustomBiome(app, event, target) {
+        const config = this.QUICK_STYLE_CONFIG.Biome;
+        const id = Number(target.closest(".fwmb-list-item").dataset.id);
+        const biome = app.uiState.customBiomes.find((b) => b.id === id);
+        if (!biome) return;
+
+        await this._processEditDialog(app, biome, {
+            titleKey: "FILRODENSWMB.UI.Edit",
+            template: config.template,
+            context: config.getContext(app, biome),
+            repaintCanvas: true,
+            renderParts: ["context", "toolbar"],
+            onExtract: (form) => config.onExtract(form, biome.name),
+        });
+    }
+
+    /**
+     * Opens the Biome Rule Stacker (see RuleEditorDialog) - a dedicated large dialog for
+     * reviewing and (from sub-phase 4b-ii onward) editing custom biomes' auto-generation
+     * rules against the built-in defaults. Delegates entirely to RuleEditorDialog, which is
+     * kept in its own file rather than grown here given how large this feature is expected
+     * to become - see that file's own doc comment.
+     */
+    static async onOpenBiomeRuleEditor(app, event, target) {
+        await RuleEditorDialog.open(app);
     }
 
     static async onAddCustomPinIcon(app, event, target) {
@@ -798,10 +842,28 @@ export class MapDialogManager {
 
     // --- DELETE ACTIONS ---
 
+    /**
+     * Deleting a custom biome only ever touches `uiState.customBiomes` - it deliberately does
+     * NOT zero out `currentBiomeOverrides` or scrub the biome's id out of `brushEngine.history`/
+     * `redoStack`, even though painted pixels and strokes referencing this id are left behind.
+     * An earlier version of this method did that scrubbing, but it was a direct, permanent
+     * mutation of raster data that the undo/redo system has no way to know about or reverse
+     * (see MapStateManager.getVectorStateSnapshot/restoreVectorStateSnapshot - only the vector
+     * `uiState.customBiomes` array is snapshotted, never the raster buffers or brush strokes),
+     * so undoing a delete brought the biome back in the list while its paint stayed lost, and a
+     * later redo could leave a stale, no-longer-existent id sitting in the raster data with
+     * nothing to render it. ProceduralEngine.resolveBiomeLookup now treats exactly that case -
+     * an override id that doesn't resolve to any current biome - as if the pixel had never been
+     * painted, so leaving the old id in place is safe: it just falls through to the map's normal
+     * auto-generated biome for as long as the id stays deleted, and paints itself back in for
+     * free (no restore code needed here) if the biome ever comes back, whether via undo or by
+     * being recreated. This also means the id itself must stay "spent" rather than being reused -
+     * see MapStateManager.getNextCustomBiomeId.
+     */
     static async onDeleteCustomBiome(app, event, target) {
-        const id = Number(target.dataset.id);
+        const id = Number(target.closest(".fwmb-list-item").dataset.id);
 
-        const confirmed = await this._confirmDialog(undefined, game.i18n.localize("FILRODENSWMB.UI.DeleteBiome"));
+        const confirmed = await this._confirmDialog(undefined, game.i18n.localize("FILRODENSWMB.UI.DeleteBiomeConfirm"));
         if (!confirmed) return;
 
         MapStateManager.pushVectorState(app);
@@ -812,24 +874,9 @@ export class MapDialogManager {
             app.render({ parts: ["toolbar"] });
         }
 
-        if (app.currentBiomeOverrides) {
-            const len = app.currentBiomeOverrides.length;
-            for (let i = 0; i < len; i++) {
-                if (app.currentBiomeOverrides[i] === id) app.currentBiomeOverrides[i] = 0;
-            }
-        }
-
-        if (app.brushEngine) {
-            const scrubHistory = (stroke) => {
-                if (stroke.layer !== "biome" || stroke.paintValue !== id) return;
-                stroke.paintValue = 0;
-            };
-            app.brushEngine.history.forEach(scrubHistory);
-            app.brushEngine.redoStack.forEach(scrubHistory);
-        }
-
         app._repaintCanvas();
         app.render({ parts: ["toolbar", "context"] });
+        app.markDirty();
     }
 
     static async onRemoveCustomPinIcon(app, event, target) {
@@ -1067,7 +1114,7 @@ export class MapDialogManager {
                     <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
                     <input type="text" id="fwmb-dec-name" value="${dec.name}">
                 </div>
-                <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+                <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-10);">
                     <label>${game.i18n.localize("FILRODENSWMB.UI.Opacity")}</label>
                     <div class="fwmb-slider-group">
                         <input type="range" id="fwmb-dec-alpha" value="${dec.opacity ?? 1}" min="0.1" max="1" step="0.1" />

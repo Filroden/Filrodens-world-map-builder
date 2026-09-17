@@ -107,6 +107,8 @@ export const FILRODENSWMB = {
         PIN_RADIUS: 6,
         PIN_ALPHA: 0.4,
         CONTOUR_INTERVAL: 0.1,
+        FALLBACK_HIGHLIGHT_COLOR: [255, 32, 200],
+        FALLBACK_HIGHLIGHT_ALPHA: 0.55,
     },
     HYDROLOGY: {
         RIVER_DENSITY: 40,

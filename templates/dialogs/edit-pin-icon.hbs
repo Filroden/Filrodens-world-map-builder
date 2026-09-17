@@ -4,12 +4,12 @@
         <input type="text" name="iconName" value="{{icon.name}}" required />
     </div>
 
-    <div class="form-group stacked" style="margin-top: var(--fwmb-space-m);">
+    <div class="form-group stacked" style="margin-top: var(--fwmb-space-10);">
         <label>{{localize "FILRODENSWMB.UI.PinIconPath"}}</label>
         <file-picker name="iconPath" type="image" value="{{icon.path}}"></file-picker>
     </div>
 
-    <div class="form-group stacked" style="margin-top: var(--fwmb-space-m);">
+    <div class="form-group stacked" style="margin-top: var(--fwmb-space-10);">
         <label>{{localize "FILRODENSWMB.UI.Preview"}}</label>
         <div class="fwmb-pin-icon-preview" id="fwmb-pin-icon-preview">
             <img id="fwmb-pin-icon-preview-img" src="{{icon.path}}" alt="" {{#unless icon.path}}hidden{{/unless}} />

@@ -75,13 +75,15 @@
     --fwmb-font-size-xl: 1.5rem;
     --fwmb-font-size-xxl: 2rem;
 
-    --fwmb-space-xxs: 0.125rem;     /* 2px */
-    --fwmb-space-xs: 0.25rem;       /* 4px */
-    --fwmb-space-s: 0.5rem;         /* 8px */
-    --fwmb-space-m: 0.625rem;       /* 10px */
-    --fwmb-space-l: 1rem;           /* 16px */
-    --fwmb-space-xl: 1.5rem;        /* 24px */
-    --fwmb-space-xxl: 2rem;         /* 32px */
+    --fwmb-space-1: 0.063rem;     /* 1px */
+    --fwmb-space-2: 0.125rem;     /* 2px */
+    --fwmb-space-4: 0.25rem;      /* 4px */
+    --fwmb-space-6: 0.375rem;     /* 6px */
+    --fwmb-space-8: 0.5rem;       /* 8px */
+    --fwmb-space-10: 0.625rem;    /* 10px */
+    --fwmb-space-16: 1rem;        /* 16px */
+    --fwmb-space-24: 1.5rem;      /* 24px */
+    --fwmb-space-32: 2rem;        /* 32px */
 
     /* Line Heights */
     --fwmb-line-height-heading: 1.2; /* For window titles, tight lists, and badges */
@@ -104,35 +106,63 @@
 
 :root,
 .fwmb-hue-gold {
-    --fwmb-primary-100: var(--fwmb-gold-100);
-    --fwmb-primary-200: var(--fwmb-gold-200);
-    --fwmb-primary-300: var(--fwmb-gold-300);
-    --fwmb-primary-400: var(--fwmb-gold-400);
-    --fwmb-primary-500: var(--fwmb-gold-500);
-    --fwmb-primary-600: var(--fwmb-gold-600);
-    --fwmb-primary-700: var(--fwmb-gold-700);
-    --fwmb-primary-800: var(--fwmb-gold-800);
-    --fwmb-primary-900: var(--fwmb-gold-900);
+    --fwmb-main-100: var(--fwmb-gold-100);
+    --fwmb-main-200: var(--fwmb-gold-200);
+    --fwmb-main-300: var(--fwmb-gold-300);
+    --fwmb-main-400: var(--fwmb-gold-400);
+    --fwmb-main-500: var(--fwmb-gold-500);
+    --fwmb-main-600: var(--fwmb-gold-600);
+    --fwmb-main-700: var(--fwmb-gold-700);
+    --fwmb-main-800: var(--fwmb-gold-800);
+    --fwmb-main-900: var(--fwmb-gold-900);
 
-    --fwmb-primary-accent: var(--fwmb-gold-accent);
-    --fwmb-primary-accent-bright: var(--fwmb-gold-accent-bright);
-    --fwmb-primary-accent-dark: var(--fwmb-gold-accent-dark);
+    --fwmb-main-accent: var(--fwmb-gold-accent);
+    --fwmb-main-accent-bright: var(--fwmb-gold-accent-bright);
+    --fwmb-main-accent-dark: var(--fwmb-gold-accent-dark);
+
+    --fwmb-alternative-100: var(--fwmb-teal-100);
+    --fwmb-alternative-200: var(--fwmb-teal-200);
+    --fwmb-alternative-300: var(--fwmb-teal-300);
+    --fwmb-alternative-400: var(--fwmb-teal-400);
+    --fwmb-alternative-500: var(--fwmb-teal-500);
+    --fwmb-alternative-600: var(--fwmb-teal-600);
+    --fwmb-alternative-700: var(--fwmb-teal-700);
+    --fwmb-alternative-800: var(--fwmb-teal-800);
+    --fwmb-alternative-900: var(--fwmb-teal-900);
+
+    --fwmb-alternative-accent:        var(--fwmb-teal-accent);
+    --fwmb-alternative-accent-bright: var(--fwmb-teal-accent-bright);
+    --fwmb-alternative-accent-dark:   var(--fwmb-teal-accent-dark);
 }
 
 .fwmb-hue-teal {
-    --fwmb-primary-100: var(--fwmb-teal-100);
-    --fwmb-primary-200: var(--fwmb-teal-200);
-    --fwmb-primary-300: var(--fwmb-teal-300);
-    --fwmb-primary-400: var(--fwmb-teal-400);
-    --fwmb-primary-500: var(--fwmb-teal-500);
-    --fwmb-primary-600: var(--fwmb-teal-600);
-    --fwmb-primary-700: var(--fwmb-teal-700);
-    --fwmb-primary-800: var(--fwmb-teal-800);
-    --fwmb-primary-900: var(--fwmb-teal-900);
+    --fwmb-main-100: var(--fwmb-teal-100);
+    --fwmb-main-200: var(--fwmb-teal-200);
+    --fwmb-main-300: var(--fwmb-teal-300);
+    --fwmb-main-400: var(--fwmb-teal-400);
+    --fwmb-main-500: var(--fwmb-teal-500);
+    --fwmb-main-600: var(--fwmb-teal-600);
+    --fwmb-main-700: var(--fwmb-teal-700);
+    --fwmb-main-800: var(--fwmb-teal-800);
+    --fwmb-main-900: var(--fwmb-teal-900);
 
-    --fwmb-primary-accent: var(--fwmb-teal-accent);
-    --fwmb-primary-accent-bright: var(--fwmb-teal-accent-bright);
-    --fwmb-primary-accent-dark: var(--fwmb-teal-accent-dark);
+    --fwmb-main-accent: var(--fwmb-teal-accent);
+    --fwmb-main-accent-bright: var(--fwmb-teal-accent-bright);
+    --fwmb-main-accent-dark: var(--fwmb-teal-accent-dark);
+
+    --fwmb-alternative-100: var(--fwmb-gold-100);
+    --fwmb-alternative-200: var(--fwmb-gold-200);
+    --fwmb-alternative-300: var(--fwmb-gold-300);
+    --fwmb-alternative-400: var(--fwmb-gold-400);
+    --fwmb-alternative-500: var(--fwmb-gold-500);
+    --fwmb-alternative-600: var(--fwmb-gold-600);
+    --fwmb-alternative-700: var(--fwmb-gold-700);
+    --fwmb-alternative-800: var(--fwmb-gold-800);
+    --fwmb-alternative-900: var(--fwmb-gold-900);
+
+    --fwmb-alternative-accent:        var(--fwmb-gold-accent);
+    --fwmb-alternative-accent-bright: var(--fwmb-gold-accent-bright);
+    --fwmb-alternative-accent-dark:   var(--fwmb-gold-accent-dark);
 }
 
 /* ==========================================
@@ -141,26 +171,29 @@
 
 .theme-dark {
     /* --- Backgrounds --- */
-    --fwmb-bg-base:          var(--fwmb-primary-900); /* Deepest background (App Window) */
-    --fwmb-bg-panel:         var(--fwmb-primary-800); /* Elevated elements (Cards, Inputs, Sidebars) */
+    --fwmb-bg-base:          var(--fwmb-main-900); /* Deepest background (App Window) */
+    --fwmb-bg-panel:         var(--fwmb-main-800); /* Elevated elements (Cards, Inputs, Sidebars) */
     --fwmb-bg-muted:         var(--fwmb-neutral-500); /* Disabled elements*/
-    --fwmb-bg-hover:         var(--fwmb-primary-700); /* Interactive hover states */
-    --fwmb-bg-highlight:     var(--fwmb-primary-600); /* Selected/Active states */
+    --fwmb-bg-hover:         var(--fwmb-main-700); /* Interactive hover states */
+    --fwmb-bg-highlight:     var(--fwmb-main-600); /* Selected/Active states */
 
     /* --- Text --- */
-    --fwmb-text-primary:     var(--fwmb-primary-100); /* Main readable text */
-    --fwmb-text-secondary:   var(--fwmb-primary-200); /* Slightly dimmed text */
-    --fwmb-text-muted:       var(--fwmb-primary-400); /* Placeholders, hints, disabled text */
-    --fwmb-text-inverse:     var(--fwmb-primary-900); /* Text placed on top of the accent color */
+    --fwmb-text-primary:     var(--fwmb-main-100); /* Main readable text */
+    --fwmb-text-secondary:   var(--fwmb-main-200); /* Slightly dimmed text */
+    --fwmb-text-muted:       var(--fwmb-main-400); /* Placeholders, hints, disabled text */
+    --fwmb-text-inverse:     var(--fwmb-main-900); /* Text placed on top of the accent color */
 
     /* --- Borders & Outlines --- */
-    --fwmb-border-main:      var(--fwmb-primary-700); /* Standard structural borders */
-    --fwmb-border-subtle:    var(--fwmb-primary-800); /* Dividers inside panels */
-    --fwmb-border-focus:     var(--fwmb-primary-accent); /* Focus rings (Accent) */
+    --fwmb-border-main:      var(--fwmb-main-700); /* Standard structural borders */
+    --fwmb-border-subtle:    var(--fwmb-main-800); /* Dividers inside panels */
+    --fwmb-border-focus:     var(--fwmb-main-accent); /* Focus rings (Accent) */
 
     /* --- Accents & Status --- */
-    --fwmb-accent-main:      var(--fwmb-primary-accent);
-    --fwmb-accent-hover:     var(--fwmb-primary-accent-bright);
+    --fwmb-accent-main:      var(--fwmb-main-accent);
+    --fwmb-accent-hover:     var(--fwmb-main-accent-bright);
+
+    --fwmb-accent-alternative-main:   var(--fwmb-alternative-accent);
+    --fwmb-accent-alternative-hover:  var(--fwmb-alternative-accent-bright);
 
     --fwmb-color-success:    var(--fwmb-success);
     --fwmb-color-warning:    var(--fwmb-warning);
@@ -170,6 +203,7 @@
     --fwmb-shadow-window:    0 0 10px rgba(0, 0, 0, 0.85);
     --fwmb-shadow-popout:    0 4px 10px rgba(0, 0, 0, 0.5);
     --fwmb-shadow-focus:     0 0 5px var(--fwmb-accent-main);
+    --fwmb-shadow-alternative-focus:     0 0 5px var(--fwmb-accent-alternative-main);
 }
 
 /* ==========================================
@@ -178,26 +212,29 @@
 
 .theme-light {
     /* --- Backgrounds --- */
-    --fwmb-bg-base:          var(--fwmb-primary-100);
+    --fwmb-bg-base:          var(--fwmb-main-100);
     --fwmb-bg-panel:         var(--fwmb-neutral-000);
     --fwmb-bg-muted:         var(--fwmb-neutral-400);
-    --fwmb-bg-hover:         var(--fwmb-primary-200);
-    --fwmb-bg-highlight:     var(--fwmb-primary-300);
+    --fwmb-bg-hover:         var(--fwmb-main-200);
+    --fwmb-bg-highlight:     var(--fwmb-main-300);
 
     /* --- Text --- */
-    --fwmb-text-primary:     var(--fwmb-primary-900);
-    --fwmb-text-secondary:   var(--fwmb-primary-800);
-    --fwmb-text-muted:       var(--fwmb-primary-600);
+    --fwmb-text-primary:     var(--fwmb-main-900);
+    --fwmb-text-secondary:   var(--fwmb-main-800);
+    --fwmb-text-muted:       var(--fwmb-main-600);
     --fwmb-text-inverse:     var(--fwmb-neutral-000);
 
     /* --- Borders & Outlines --- */
-    --fwmb-border-main:      var(--fwmb-primary-300);
-    --fwmb-border-subtle:    var(--fwmb-primary-200);
-    --fwmb-border-focus:     var(--fwmb-primary-accent-dark);
+    --fwmb-border-main:      var(--fwmb-main-300);
+    --fwmb-border-subtle:    var(--fwmb-main-200);
+    --fwmb-border-focus:     var(--fwmb-main-accent-dark);
 
     /* --- Accents & Status --- */
-    --fwmb-accent-main:      var(--fwmb-primary-accent-dark);
-    --fwmb-accent-hover:     var(--fwmb-primary-accent);
+    --fwmb-accent-main:      var(--fwmb-main-accent-dark);
+    --fwmb-accent-hover:     var(--fwmb-main-accent);
+
+    --fwmb-accent-alternative-main:   var(--fwmb-alternative-accent-dark);
+    --fwmb-accent-alternative-hover:  var(--fwmb-alternative-accent);
 
     --fwmb-color-success:    hsl(130, 60%, 35%);
     --fwmb-color-warning:    hsl(33, 100%, 35%);
@@ -207,4 +244,5 @@
     --fwmb-shadow-window:    0 8px 24px rgba(0, 0, 0, 0.15);
     --fwmb-shadow-popout:    0 4px 12px rgba(0, 0, 0, 0.1);
     --fwmb-shadow-focus:     0 0 5px var(--fwmb-accent-main);
+    --fwmb-shadow-alternative-focus:     0 0 5px var(--fwmb-accent-alternative-main);
 }

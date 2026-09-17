@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 
 export class MapStateManager {
     /**
@@ -21,18 +22,38 @@ export class MapStateManager {
         app.bufferTopography = new Uint8Array(totalPixels * 4);
         app.bufferBiomes = new Uint8Array(totalPixels * 4);
         app.bufferContours = new Uint8Array(totalPixels * 4);
+        // Kept in sync alongside bufferBiomes on every biome repaint (see MapStudioApp's
+        // _repaintCanvas/#applyBrushStroke), but its own canvas layer stays hidden until the
+        // "Preview Rule Coverage" button (sub-phase 4c) is hovered - see ProceduralEngine.
+        // createBiomesMap's outFallbackBuffer parameter for what actually gets written into it.
+        app.bufferBiomeFallback = new Uint8Array(totalPixels * 4);
     }
 
     /**
-     * Computes the next sequential ID for a new custom biome. Custom biome IDs are plain
-     * integers rather than GUIDs (unlike Quick Styles) because they're written directly into
-     * the currentBiomeOverrides raster buffer as pixel values.
-     * @param {Array<{id: number}>} existingBiomes - The map's current uiState.customBiomes.
-     * @returns {number} The next available ID.
+     * Computes the next sequential ID for a new custom biome, and permanently reserves it by
+     * advancing `state.nextCustomBiomeId` - the returned ID is never handed out again, even
+     * once the biome that used it is deleted. Custom biome IDs are plain integers rather than
+     * GUIDs (unlike Quick Styles) because they're written directly into the currentBiomeOverrides
+     * raster buffer as pixel values, and reusing one isn't safe: onDeleteCustomBiome
+     * (MapDialogManager) deliberately leaves a deleted biome's old ID sitting in painted pixels
+     * and brush strokes rather than scrubbing it out, so undo/redo can restore the paint just by
+     * bringing the biome back (see ProceduralEngine.resolveBiomeLookup's doc comment) - handing
+     * that same ID to an unrelated new biome would make it silently inherit that leftover paint.
+     *
+     * `state.nextCustomBiomeId` is absent on maps saved before this counter existed; those fall
+     * back to the old highest-existing-ID scheme, which is exactly as safe as it always was for
+     * a map that has no already-deleted biome IDs to collide with yet.
+     * @param {object} state - The map's uiState (read customBiomes, written back with the new counter).
+     * @returns {number} The ID to assign to the new biome.
      */
-    static getNextCustomBiomeId(existingBiomes = []) {
-        const currentIds = existingBiomes.map((biome) => biome.id);
-        return currentIds.length > 0 ? Math.max(...currentIds) + 1 : FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID;
+    static getNextCustomBiomeId(state) {
+        if (state.nextCustomBiomeId) {
+            return state.nextCustomBiomeId++;
+        }
+        const currentIds = (state.customBiomes || []).map((biome) => biome.id);
+        const id = currentIds.length > 0 ? Math.max(...currentIds) + 1 : FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID;
+        state.nextCustomBiomeId = id + 1;
+        return id;
     }
 
     /**
@@ -61,6 +82,7 @@ export class MapStateManager {
             brushFeather: 0.4,
             brushBiome: FILRODENSWMB.BIOME_IDS.GRASSLAND,
             customBiomes: [],
+            nextCustomBiomeId: FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID,
 
             mapSeed: FILRODENSWMB.DEFAULTS.SEED,
             seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
@@ -160,6 +182,14 @@ export class MapStateManager {
 
     /**
      * Generates a deep-cloned snapshot of the current vector state.
+     *
+     * Custom Biomes (`uiState.customBiomes` - name/code/colour/rules) are included here too,
+     * even though they're `uiState` rather than a `MapStudioApp` vector array like the rest of
+     * this snapshot - every biome-add/edit/delete action already calls `pushVectorState` before
+     * applying its change (see MapDialogManager), which only makes sense if a biome change is
+     * actually part of what gets undone. Previously it wasn't: this snapshot silently omitted
+     * `customBiomes`, so Ctrl+Z after renaming or recolouring a custom biome (or - once 4b-iii
+     * lands - editing its auto-generation rules) had no effect on it at all.
      */
     static getVectorStateSnapshot(app) {
         return {
@@ -176,6 +206,7 @@ export class MapStateManager {
             mapDecorations: foundry.utils.deepClone(app.mapDecorations),
             activeRouteId: app.activeRouteId,
             activeRegionId: app.activeRegionId,
+            customBiomes: foundry.utils.deepClone(app.uiState?.customBiomes || []),
         };
     }
 
@@ -218,6 +249,7 @@ export class MapStateManager {
         app.mapDecorations = state.mapDecorations || app.mapDecorations;
         app.activeRouteId = state.activeRouteId || null;
         app.activeRegionId = state.activeRegionId || null;
+        app.uiState.customBiomes = state.customBiomes || app.uiState.customBiomes;
     }
 
     /**
@@ -253,6 +285,17 @@ export class MapStateManager {
         }
         for (const cb of state.customBiomes || []) {
             compiledPalette[cb.id] = cb.color;
+        }
+
+        // Custom biomes default to rendering transparent below sea level, exactly like the
+        // map's own auto-generated biomes there - but a biome meant to represent something
+        // like pack ice or a floating landmass needs to stay visible over water instead, the
+        // way the built-in PACK_ICE biome always has. This map only lists the biomes that
+        // opted into that (a sparse id -> true lookup), so ProceduralEngine.resolveBiomeLookup
+        // can check it in O(1) per pixel without touching the ones that didn't.
+        const solidOverWater = {};
+        for (const cb of state.customBiomes || []) {
+            if (cb.solidOverWater) solidOverWater[cb.id] = true;
         }
 
         const params = {
@@ -299,7 +342,12 @@ export class MapStateManager {
                 windDistance: state.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE,
             },
             biomePalette: compiledPalette,
+            solidOverWater,
             customColors: customBiomeColors,
+            // Compiled once per generation, not per pixel - see BiomeRuleEngine's own doc
+            // comment for why. Custom biomes with no rules yet (rules: [] or undefined)
+            // simply contribute zero rows, so this is a no-op until rules actually exist.
+            customBiomeRules: BiomeRuleEngine.compile(state.customBiomes || []),
             display: {
                 contourInterval: state.contourInterval,
                 biomeAlphaActive: state.biomeAlphaActive,
