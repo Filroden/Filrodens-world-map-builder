@@ -21,6 +21,7 @@ Maps are saved in Journals and stored in a Journal Compendium. The procedural pl
 ### Main Features
 
 - **Advanced Procedural Generation**: The underlying engine calculates authentic topography using layered noise and geological stretch parameters. It dynamically simulates climate by mapping global temperature gradients and tracking geographical orographic lift (rain shadows) to accurately determine Whittaker biomes.
+- **Custom Biome Auto-Generation**: Define your own biomes and give them auto-generation rules - ranges of elevation, moisture and temperature - so they appear automatically wherever the procedural generator produces a matching climate, with the built-in defaults always available as a guaranteed fallback. A hover preview shows exactly where a map is still relying on those defaults, so gaps in your rule coverage are easy to spot.
 - **Four procedural terrain models**: Choose from standard, flat, advanced (tectonic) or guided procedural terrain models. Each provide different benefits.
 - **Dynamic Hydrology Systems**: Rivers are carved procedurally using greedy downhill algorithms, naturally pooling into lakes until they overflow their basins, and freezing intelligently based on altitude and regional climate thresholds. Additional river sources can be placed manually, and procedurally generated sources can be removed.
 - **Non-Destructive Vector Brush Engine**: Edit the terrain (raising, lowering, and smoothing) or paint custom biomes with a responsive freehand brush tool. Under the hood, edits are saved as a spatial vector history rather than static pixels, preserving your exact strokes for future map scaling and regional zooming.
@@ -59,5 +60,4 @@ Please see the [Wiki](https://github.com/Filroden/Filrodens-world-map-builder/wi
 
 ## Roadmap
 
-- Allow custom biomes to be renamed.
 - Export map meta-data through scene flags linked grid coordinates which could be used by game systems and other modules.
