@@ -1165,32 +1165,50 @@ export class ProceduralEngine {
      * plus custom), as compiled fresh every repaint by MapStateManager.getDerivedMapParameters.
      * @param {object} [solidOverWater] - sparse custom-biome-id -> true map of biomes that render
      * solid rather than transparent below sea level, compiled the same way as biomePalette.
+     * @returns {{lookupKey: (string|number), isWater: boolean, isFallback: boolean}} `isFallback`
+     * is true only for the last branch below (getBiomeKey()'s built-in default) - a hand-painted
+     * override or a matching custom rule both count as "covered" and set it false, even when the
+     * matched custom biome turns out to render as water. This is what sub-phase 4c's "preview
+     * rule coverage" highlight (MapStudioApp's hover button, see createBiomesMap's optional
+     * `outFallbackBuffer` below) tints: exactly the pixels a GM's custom rule set doesn't reach.
      */
     static resolveBiomeLookup(overrideId, elevation, moisture, temp, seaLevel, waterMask, pixelIndex, customBiomeRules, biomePalette, solidOverWater) {
         if (overrideId === 1 || overrideId === 2) {
-            return { lookupKey: overrideId, isWater: true };
+            return { lookupKey: overrideId, isWater: true, isFallback: false };
         }
         if (overrideId > 0 && biomePalette?.[overrideId]) {
-            return { lookupKey: overrideId, isWater: false };
+            return { lookupKey: overrideId, isWater: false, isFallback: false };
         }
 
         const customId = customBiomeRules ? BiomeRuleEngine.matchBiomeId(customBiomeRules, elevation, moisture, temp) : 0;
         if (customId > 0) {
-            return { lookupKey: customId, isWater: solidOverWater?.[customId] ? false : elevation < seaLevel };
+            return { lookupKey: customId, isWater: solidOverWater?.[customId] ? false : elevation < seaLevel, isFallback: false };
         }
 
         const lookupKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
         const isWater = lookupKey === "DEEP_OCEAN" || lookupKey === "SHALLOW_OCEAN" || (waterMask && waterMask[pixelIndex] > 0);
-        return { lookupKey, isWater };
+        return { lookupKey, isWater, isFallback: true };
     }
 
     /**
      * VISUAL PASS: Evaluates Temp and Moisture to paint a climate biome map.
+     *
+     * @param {Uint8Array} [outFallbackBuffer] - optional companion RGBA buffer, same dimensions
+     * as `outBuffer`. When supplied, every pixel visited also gets tagged here: fully opaque in
+     * FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR/ALPHA where resolveBiomeLookup's `isFallback`
+     * came back true (no override, no custom rule - the built-in default did the work), fully
+     * transparent everywhere else. This is a free byproduct of the same per-pixel loop below, not
+     * a second pass - see MapStudioApp's "preview rule coverage" hover button (sub-phase 4c),
+     * which just toggles this buffer's own canvas layer visible/hidden rather than recomputing
+     * anything. Left `null` (the default) for callers that don't need the preview - the 3D view
+     * generation, for one - and costs nothing extra when omitted beyond the one `if` check.
      */
-    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null) {
+    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, outFallbackBuffer = null) {
         const pixelBuffer = outBuffer;
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const renderBounds = SpatialMath.padBounds(baseBounds, 1, 1, width, height);
+        const [fbR, fbG, fbB] = FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR;
+        const fbAlpha = Math.round(FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_ALPHA * 255);
 
         for (let y = renderBounds.minY; y <= renderBounds.maxY; y++) {
             for (let x = renderBounds.minX; x <= renderBounds.maxX; x++) {
@@ -1199,10 +1217,17 @@ export class ProceduralEngine {
                 const elevation = elevationData[i];
 
                 const overrideId = biomeOverrideData ? biomeOverrideData[i] : 0;
-                const { lookupKey, isWater } = ProceduralEngine.resolveBiomeLookup(
+                const { lookupKey, isWater, isFallback } = ProceduralEngine.resolveBiomeLookup(
                     overrideId, elevation, moistureData[i], temperatureData[i], seaLevel, waterMask, i, params?.customBiomeRules, params?.biomePalette,
                     params?.solidOverWater,
                 );
+
+                if (outFallbackBuffer) {
+                    outFallbackBuffer[bufferIndex] = isFallback ? fbR : 0;
+                    outFallbackBuffer[bufferIndex + 1] = isFallback ? fbG : 0;
+                    outFallbackBuffer[bufferIndex + 2] = isFallback ? fbB : 0;
+                    outFallbackBuffer[bufferIndex + 3] = isFallback ? fbAlpha : 0;
+                }
 
                 if (isWater) {
                     pixelBuffer[bufferIndex] = 0;

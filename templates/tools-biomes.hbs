@@ -53,10 +53,16 @@
         </div>
     </fieldset>
 
-    <button type="button" class="fwmb-btn" data-action="openBiomeRuleEditor">
-        <i class="fwmb-icon tune"></i>
-        {{localize "FILRODENSWMB.UI.OpenRuleEditor"}}
-    </button>
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn" data-action="openBiomeRuleEditor">
+            <i class="fwmb-icon tune"></i>
+            {{localize "FILRODENSWMB.UI.OpenRuleEditor"}}
+        </button>
+
+        <button type="button" class="fwmb-btn small subtle" id="fwmb-preview-fallback-btn" data-tooltip="{{localize 'FILRODENSWMB.UI.PreviewFallbackCoverageHint'}}">
+            <i class="fwmb-icon visibility"></i>
+        </button>
+    </div>
 
     <div class="fwmb-flex-1"></div>
     <div class="fwmb-divider"></div>

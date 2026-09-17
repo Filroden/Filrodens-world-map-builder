@@ -569,6 +569,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 redoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
             }
         }
+
+        // Lives in tools-biomes.hbs, a per-tool-tab template part that gets torn down and
+        // rebuilt on context re-renders - unlike the persistent .fwmb-edit-toolbar above, a
+        // root-level "bind once ever" guard would go stale after the first rebuild. Guard on
+        // the button's own dataset instead, so each fresh DOM node gets bound exactly once.
+        const fallbackBtn = this.element.querySelector("#fwmb-preview-fallback-btn");
+        if (fallbackBtn && !fallbackBtn.dataset.hasListeners) {
+            fallbackBtn.dataset.hasListeners = "true";
+            fallbackBtn.addEventListener("pointerenter", () => this.canvasEngine?.toggleLayer("biomeFallback", true));
+            fallbackBtn.addEventListener("pointerleave", () => this.canvasEngine?.toggleLayer("biomeFallback", false));
+        }
     }
 
     #handleToolbarInput(event) {
@@ -1535,8 +1546,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 params,
                 this.bufferBiomes,
                 bounds,
+                this.bufferBiomeFallback,
             );
             this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
+            // Kept current every repaint, but its layer stays hidden until the "Preview Rule
+            // Coverage" button is hovered (see #bindToolbarListeners) - no visibility toggle here.
+            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight);
 
             const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
             this.canvasEngine.toggleLayer("biomes", biomesBtn ? biomesBtn.classList.contains("active") : true);
@@ -1633,9 +1648,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 params,
                 this.bufferBiomes,
                 this.pendingTerrainBounds,
+                this.bufferBiomeFallback,
             );
 
             this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
+            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight);
             this.pendingTerrainBounds = null;
             return;
         }
@@ -2995,7 +3012,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     throw new Error("Invalid FWMB Style Library Schema");
                 }
 
-                const { importedCount, duplicateCount } = this.#importStyleLibraryCategories(parsedData.categories);
+                const { importedCount, duplicateCount, customBiomesImported } = this.#importStyleLibraryCategories(parsedData.categories);
 
                 if (importedCount === 0) {
                     const emptyKey = duplicateCount > 0 ? "FILRODENSWMB.UI.ImportSettingsAllDuplicates" : "FILRODENSWMB.UI.ImportSettingsEmpty";
@@ -3005,6 +3022,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 this.markDirty();
                 this.render({ parts: ["context"] });
+
+                // Unlike Route/Region/Label quick styles - which only affect the map once a user
+                // explicitly selects one to paint or create something new with - an imported custom
+                // biome's `rules` apply themselves immediately, against terrain that's already been
+                // generated. Without this, an imported biome with rules silently doesn't show up
+                // until something else happens to trigger a repaint (e.g. opening the Rule Editor
+                // and clicking Accept unchanged).
+                if (customBiomesImported) this._repaintCanvas();
 
                 const successMessage =
                     duplicateCount > 0
@@ -3046,12 +3071,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * An entry whose content already matches one already on the map - or an earlier entry in
      * this same file - is recognised as a duplicate and skipped rather than appended again, so
      * importing the same file twice (or two files sharing some styles) can't duplicate a style.
-     * @returns {{importedCount: number, duplicateCount: number}} How many entries were actually
-     * appended, and how many were recognised as duplicates and skipped, across all categories.
+     * @returns {{importedCount: number, duplicateCount: number, customBiomesImported: boolean}}
+     * How many entries were actually appended, how many were recognised as duplicates and
+     * skipped, across all categories, and whether the `customBiomes` category specifically got
+     * any new entries - the caller uses that last flag to know whether a biome-layer repaint is
+     * needed (see _onImportSettings), since an imported biome's `rules` can immediately claim
+     * pixels on the already-generated map, unlike a Route/Region/Label quick style, which only
+     * affects the map once a user actually selects it to paint or create something new with.
      */
     #importStyleLibraryCategories(categories) {
         let importedCount = 0;
         let duplicateCount = 0;
+        let customBiomesImported = false;
 
         for (const { key } of MapStudioApp.STYLE_LIBRARY_CATEGORIES) {
             const entries = categories[key];
@@ -3079,9 +3110,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             this.uiState[key] = [...existing, ...idAssigned];
             importedCount += idAssigned.length;
+            if (key === "customBiomes") customBiomesImported = true;
         }
 
-        return { importedCount, duplicateCount };
+        return { importedCount, duplicateCount, customBiomesImported };
     }
 
     /**

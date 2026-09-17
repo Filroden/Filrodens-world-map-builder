@@ -28,6 +28,9 @@ export class StudioCanvas {
             base: new PIXI.Container(),
             topography: new PIXI.Container(),
             biomes: new PIXI.Container(),
+            // Companion highlight layer for the "Preview Rule Coverage" hover button (sub-phase
+            // 4c) - painted alongside `biomes` on every repaint, but hidden until hovered.
+            biomeFallback: new PIXI.Container(),
             contours: new PIXI.Container(),
             landMasks: new PIXI.Container(),
             features: new PIXI.Container(),
@@ -39,6 +42,7 @@ export class StudioCanvas {
         };
 
         this.layers.biomes.alpha = FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
+        this.layers.biomeFallback.visible = false;
 
         // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
         this.haloGraphics = new PIXI.Graphics();
@@ -98,6 +102,7 @@ export class StudioCanvas {
             this.layers.base,
             this.layers.topography,
             this.layers.biomes,
+            this.layers.biomeFallback,
             this.layers.contours,
             this.layers.landMasks,
             this.layers.features,

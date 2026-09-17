@@ -414,6 +414,7 @@
     "FILRODENSWMB.UI.BiomeSolidOverWaterHint": "By default, an auto-generated area of this biome below sea level stays transparent, like the map's own water. Enable this for a biome that should stay visible on top of water instead, such as pack ice or a floating landmass.",
 
     "FILRODENSWMB.UI.OpenRuleEditor": "Biome Rule Editor",
+    "FILRODENSWMB.UI.PreviewFallbackCoverageHint": "Preview Rule Coverage: hover to highlight every area currently using a default biome rather than one of your custom rules.",
     "FILRODENSWMB.UI.RuleEditorTitle": "Biome Rule Stacker",
     "FILRODENSWMB.UI.RuleEditorIntro": "Rules run top to bottom - the first range a pixel's elevation, moisture, and temperature all fall inside wins. Defaults sit permanently at the bottom as a guaranteed fallback and can't be reordered or edited.",
     "FILRODENSWMB.UI.RuleEditorLegendActive": "Editable custom range",

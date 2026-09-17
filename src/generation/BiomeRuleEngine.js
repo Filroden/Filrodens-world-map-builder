@@ -12,8 +12,10 @@ import { FILRODENSWMB } from "../config.js";
  * matches a pixel if ANY of its rows match. Biomes themselves are evaluated in their
  * stored array order (index 0 = highest priority), so the very first matching row, in the
  * first matching biome, wins. Segment ranges are plain numbers already resolved to their
- * true boundary (0/1, or wherever a handle was dragged) - there is no separate "open ended"
- * state to interpret here, that distinction only matters to the rule editor UI.
+ * true boundary (0/1, or wherever a handle was dragged) - the rule editor UI's own separate
+ * openMin/openMax flags are never read here. #axisMatches does still give the true-edge
+ * boundary values themselves (a literal 0 or 1) one small piece of matching-time meaning:
+ * see that method's own doc comment for why.
  *
  * Defaults are NOT represented here - ProceduralEngine.getBiomeKey remains the guaranteed
  * fallback for any pixel no custom rule claims, so total climate-space coverage is
@@ -147,11 +149,31 @@ export class BiomeRuleEngine {
         };
     }
 
-    /** True if `value` falls within any of the `count` [min, max] segments starting at `start`. */
+    /**
+     * True if `value` falls within any of the `count` [min, max] segments starting at `start`.
+     *
+     * A segment's min/max are normally clamped to [0, 1] by the rule editor's drag handles, so a
+     * literal 0 or 1 boundary always means "dragged all the way to the true edge of this axis" -
+     * see the RuleSegment typedef's openMin/openMax note above. Terrain generation itself isn't
+     * actually clamped to [0, 1] though (elevation/moisture/temperature noise can legitimately
+     * overshoot slightly past either end), and ProceduralEngine.getBiomeKey()'s own default
+     * branches are effectively unbounded at their outer edges (e.g. its highest elevation/
+     * temperature/moisture band is checked with `>=`, not a `<= 1` upper bound) - so a default
+     * rule already catches an overshoot value a custom rule's literal `<= 1` comparison would
+     * miss, even when that custom rule was deliberately built to replace that exact default.
+     * Treating a true-edge boundary as unbounded here closes that gap: a segment whose min is
+     * already 0 matches any value below 0 too, and one whose max is already 1 matches any value
+     * above 1 too - interior boundaries (anything not touching 0 or 1) are completely unaffected.
+     * This is a matching-only fix; the rule editor UI still always displays and drags the real
+     * 0/1 numbers, never "unbounded" - see custom-biomes-v2.3-scoping.md's "Sub-phase 4c
+     * follow-up" section for why this was chosen over changing the terrain engine itself.
+     */
     static #axisMatches(segments, start, count, value) {
         const end = start + count * SEGMENT_STRIDE;
         for (let i = start; i < end; i += SEGMENT_STRIDE) {
-            if (value >= segments[i] && value <= segments[i + 1]) return true;
+            const min = segments[i] <= 0 ? -Infinity : segments[i];
+            const max = segments[i + 1] >= 1 ? Infinity : segments[i + 1];
+            if (value >= min && value <= max) return true;
         }
         return false;
     }

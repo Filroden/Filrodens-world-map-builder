@@ -40,7 +40,7 @@
             {{#each customBiomes}}
                 <div class="fwmb-list-item" data-id="{{this.id}}">
                     <div class="fwmb-swatch" style="background-color: {{this.hex}};"></div>
-                    {{#if this.hasRules}}<i class="fwmb-icon forest fwmb-rule-indicator" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeHasRulesTooltip'}}"></i>{{/if}}
+                    {{#if this.hasRules}}<i class="fwmb-icon tune fwmb-rule-indicator" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeHasRulesTooltip'}}"></i>{{/if}}
                     <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
                     {{#if this.code}}<span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeCodeTooltip' code=this.code}}">{{this.code}}</span>{{/if}}
                     <button type="button" class="fwmb-btn small" data-action="editCustomBiome" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">

@@ -256,16 +256,23 @@
 .fwmb .fwmb-btn.danger {
     color: var(--fwmb-color-danger);
 }
-
 .fwmb .fwmb-btn.danger:hover {
     color: var(--fwmb-color-danger);
+}
+
+.fwmb .fwmb-btn.subtle {
+    background: transparent;
+    border: 1px solid var(--fwmb-accent-main);
+    color: var(--fwmb-text-secondary);
+}
+.fwmb .fwmb-btn.subtle:hover {
+    background: var(--fwmb-bg-hover);
 }
 
 .fwmb .fwmb-btn.muted {
     background: inherit;
     border-color: transparent;
 }
-
 .fwmb .fwmb-btn.muted:hover {
     background: var(--fwmb-bg-hover);
     border-color: var(--fwmb-border-subtle);
@@ -274,7 +281,6 @@
 .fwmb .fwmb-btn.primary {
     color: var(--fwmb-text-inverse);
 }
-
 .fwmb .fwmb-btn.primary:hover {
     color: var(--fwmb-text-inverse);
 }
@@ -289,6 +295,24 @@
 .fwmb .fwmb-btn.active {
     background: var(--fwmb-accent-main);
     color: var(--fwmb-text-inverse);
+}
+
+/* A full-width button paired with a small icon-only companion action (e.g. the Biome Rule
+   Editor button plus the "Preview Rule Coverage" hover-trigger beside it) - the first child
+   grows to fill the row, later children keep their own natural (usually .small) size. */
+.fwmb .fwmb-btn-row {
+    display: flex;
+    flex-direction: row;
+    gap: var(--fwmb-space-8);
+}
+
+.fwmb .fwmb-btn-row > .fwmb-btn:first-child {
+    flex: 1;
+    min-width: 0;
+}
+
+.fwmb .fwmb-btn-row > .fwmb-btn.small {
+    flex: 0 0 auto;
 }
 
 
