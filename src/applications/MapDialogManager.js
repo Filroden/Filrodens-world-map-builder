@@ -412,6 +412,7 @@ export class MapDialogManager {
                     name: `Custom Biome ${app.uiState.customBiomes.length + 1}`,
                     code: null,
                     color: [128, 128, 128],
+                    solidOverWater: false,
                 }),
                 getContext: (app, biome) => ({
                     biome: { ...biome, hex: ColorMath.rgbToHex(biome.color) },
@@ -421,6 +422,7 @@ export class MapDialogManager {
                     name: form.elements["biomeName"].value.trim() || fallbackName,
                     code: form.elements["biomeCode"].value.trim() || null,
                     color: ColorMath.hexToRgb(form.elements["biomeColor"].value),
+                    solidOverWater: form.elements["biomeSolidOverWater"].checked,
                 }),
             },
         };
@@ -701,7 +703,7 @@ export class MapDialogManager {
             renderParts: ["context", "toolbar"],
             onExtract: (form) => config.onExtract(form, newBiome.name),
             onSave: (entity, result) => {
-                const id = MapStateManager.getNextCustomBiomeId(app.uiState.customBiomes);
+                const id = MapStateManager.getNextCustomBiomeId(app.uiState);
                 // rules starts empty - a freshly created biome has no auto-generation rules
                 // yet, so it simply never matches and falls straight through to the built-in
                 // defaults until the rule editor is used to add some.
@@ -840,6 +842,24 @@ export class MapDialogManager {
 
     // --- DELETE ACTIONS ---
 
+    /**
+     * Deleting a custom biome only ever touches `uiState.customBiomes` - it deliberately does
+     * NOT zero out `currentBiomeOverrides` or scrub the biome's id out of `brushEngine.history`/
+     * `redoStack`, even though painted pixels and strokes referencing this id are left behind.
+     * An earlier version of this method did that scrubbing, but it was a direct, permanent
+     * mutation of raster data that the undo/redo system has no way to know about or reverse
+     * (see MapStateManager.getVectorStateSnapshot/restoreVectorStateSnapshot - only the vector
+     * `uiState.customBiomes` array is snapshotted, never the raster buffers or brush strokes),
+     * so undoing a delete brought the biome back in the list while its paint stayed lost, and a
+     * later redo could leave a stale, no-longer-existent id sitting in the raster data with
+     * nothing to render it. ProceduralEngine.resolveBiomeLookup now treats exactly that case -
+     * an override id that doesn't resolve to any current biome - as if the pixel had never been
+     * painted, so leaving the old id in place is safe: it just falls through to the map's normal
+     * auto-generated biome for as long as the id stays deleted, and paints itself back in for
+     * free (no restore code needed here) if the biome ever comes back, whether via undo or by
+     * being recreated. This also means the id itself must stay "spent" rather than being reused -
+     * see MapStateManager.getNextCustomBiomeId.
+     */
     static async onDeleteCustomBiome(app, event, target) {
         const id = Number(target.closest(".fwmb-list-item").dataset.id);
 
@@ -854,24 +874,9 @@ export class MapDialogManager {
             app.render({ parts: ["toolbar"] });
         }
 
-        if (app.currentBiomeOverrides) {
-            const len = app.currentBiomeOverrides.length;
-            for (let i = 0; i < len; i++) {
-                if (app.currentBiomeOverrides[i] === id) app.currentBiomeOverrides[i] = 0;
-            }
-        }
-
-        if (app.brushEngine) {
-            const scrubHistory = (stroke) => {
-                if (stroke.layer !== "biome" || stroke.paintValue !== id) return;
-                stroke.paintValue = 0;
-            };
-            app.brushEngine.history.forEach(scrubHistory);
-            app.brushEngine.redoStack.forEach(scrubHistory);
-        }
-
         app._repaintCanvas();
         app.render({ parts: ["toolbar", "context"] });
+        app.markDirty();
     }
 
     static async onRemoveCustomPinIcon(app, event, target) {
@@ -1109,7 +1114,7 @@ export class MapDialogManager {
                     <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
                     <input type="text" id="fwmb-dec-name" value="${dec.name}">
                 </div>
-                <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-m);">
+                <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-10);">
                     <label>${game.i18n.localize("FILRODENSWMB.UI.Opacity")}</label>
                     <div class="fwmb-slider-group">
                         <input type="range" id="fwmb-dec-alpha" value="${dec.opacity ?? 1}" min="0.1" max="1" step="0.1" />

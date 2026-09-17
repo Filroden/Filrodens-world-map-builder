@@ -160,7 +160,7 @@ export class BiomeRuleEngine {
      * Builds a read-only reference table describing the 13 built-in biomes' coverage in the
      * exact same {elevation, moisture, temperature} row/segment shape a custom biome's own
      * `rules` use - for the Rule Editor's "Default biomes" section only. This is NEVER
-     * consulted for actual pixel matching (ProceduralEngine.getBiomeKey / #resolveBiomeLookup
+     * consulted for actual pixel matching (ProceduralEngine.getBiomeKey / resolveBiomeLookup
      * don't call it and are completely unaffected by it); it exists purely so the Rule Editor
      * can show a GM where their custom ranges sit relative to the defaults.
      *

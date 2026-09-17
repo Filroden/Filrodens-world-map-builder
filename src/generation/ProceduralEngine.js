@@ -1136,19 +1136,47 @@ export class ProceduralEngine {
      * auto-generation rule (see BiomeRuleEngine); failing that, the built-in default via
      * getBiomeKey(). BrushEngine's own paint guard (#applyBiomeMath) never lets a custom
      * biome be hand-painted below sea level in the first place, so a custom biome only ever
-     * ends up there via a rule match here - in which case it still counts as water, exactly
+     * ends up there via a rule match here.
+     *
+     * By default a rule-matched custom biome below sea level still counts as water, exactly
      * like DEEP_OCEAN/SHALLOW_OCEAN below, so the biome layer stays transparent and the
      * topography layer's own elevation-based water rendering (ProceduralEngine.colorize)
-     * shows through underneath, rather than the custom biome's flat colour hiding it.
+     * shows through underneath, rather than the custom biome's flat colour hiding it. A biome
+     * can opt out of that via its own `solidOverWater` flag (the Add/Edit Custom Biome dialog's
+     * checkbox, compiled into the sparse `solidOverWater` id->true map below by
+     * MapStateManager.getDerivedMapParameters) - exactly like the built-in PACK_ICE biome,
+     * which has always rendered as a solid colour over water rather than transparently. This
+     * matters for a biome meant to represent something visible on top of water, like pack ice
+     * or a floating landmass, rather than the water itself.
+     *
+     * An override only wins if `biomePalette` can still resolve it to a colour. Deleting a
+     * custom biome (MapDialogManager#onDeleteCustomBiome) deliberately leaves its old ID sitting
+     * in painted pixels and brush strokes rather than scrubbing it out everywhere, so undo/redo
+     * only ever has to snapshot uiState.customBiomes and never needs to touch raster data at all
+     * - bringing the biome back (by undo, or a fresh biome that happens to reuse the ID) makes
+     * the old paint reappear on its own. The other side of that deal is here: an override ID
+     * that doesn't currently resolve to anything is treated exactly like "never painted" and
+     * falls through to a custom rule match or the built-in default, instead of the caller
+     * falling back to a solid black square (params?.biomePalette?.[lookupKey] ?? ... ?? [0,0,0]
+     * in createBiomesMap) for a colour that will never exist. Built-in water IDs (1/2) are
+     * checked before consulting the palette at all, since they're never user-deletable and
+     * render transparently regardless of colour (see the `isWater` short-circuit below).
+     * @param {object} [biomePalette] - id/name -> RGB map for the map's current biomes (built-in
+     * plus custom), as compiled fresh every repaint by MapStateManager.getDerivedMapParameters.
+     * @param {object} [solidOverWater] - sparse custom-biome-id -> true map of biomes that render
+     * solid rather than transparent below sea level, compiled the same way as biomePalette.
      */
-    static #resolveBiomeLookup(overrideId, elevation, moisture, temp, seaLevel, waterMask, pixelIndex, customBiomeRules) {
-        if (overrideId > 0) {
-            return { lookupKey: overrideId, isWater: overrideId === 1 || overrideId === 2 };
+    static resolveBiomeLookup(overrideId, elevation, moisture, temp, seaLevel, waterMask, pixelIndex, customBiomeRules, biomePalette, solidOverWater) {
+        if (overrideId === 1 || overrideId === 2) {
+            return { lookupKey: overrideId, isWater: true };
+        }
+        if (overrideId > 0 && biomePalette?.[overrideId]) {
+            return { lookupKey: overrideId, isWater: false };
         }
 
         const customId = customBiomeRules ? BiomeRuleEngine.matchBiomeId(customBiomeRules, elevation, moisture, temp) : 0;
         if (customId > 0) {
-            return { lookupKey: customId, isWater: elevation < seaLevel };
+            return { lookupKey: customId, isWater: solidOverWater?.[customId] ? false : elevation < seaLevel };
         }
 
         const lookupKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
@@ -1171,8 +1199,9 @@ export class ProceduralEngine {
                 const elevation = elevationData[i];
 
                 const overrideId = biomeOverrideData ? biomeOverrideData[i] : 0;
-                const { lookupKey, isWater } = ProceduralEngine.#resolveBiomeLookup(
-                    overrideId, elevation, moistureData[i], temperatureData[i], seaLevel, waterMask, i, params?.customBiomeRules,
+                const { lookupKey, isWater } = ProceduralEngine.resolveBiomeLookup(
+                    overrideId, elevation, moistureData[i], temperatureData[i], seaLevel, waterMask, i, params?.customBiomeRules, params?.biomePalette,
+                    params?.solidOverWater,
                 );
 
                 if (isWater) {

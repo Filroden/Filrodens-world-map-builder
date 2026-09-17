@@ -75,14 +75,15 @@
     --fwmb-font-size-xl: 1.5rem;
     --fwmb-font-size-xxl: 2rem;
 
-    --fwmb-space-xxxs: 0.063rem;     /* 1px */
-    --fwmb-space-xxs: 0.125rem;     /* 2px */
-    --fwmb-space-xs: 0.25rem;       /* 4px */
-    --fwmb-space-s: 0.5rem;         /* 8px */
-    --fwmb-space-m: 0.625rem;       /* 10px */
-    --fwmb-space-l: 1rem;           /* 16px */
-    --fwmb-space-xl: 1.5rem;        /* 24px */
-    --fwmb-space-xxl: 2rem;         /* 32px */
+    --fwmb-space-1: 0.063rem;     /* 1px */
+    --fwmb-space-2: 0.125rem;     /* 2px */
+    --fwmb-space-4: 0.25rem;      /* 4px */
+    --fwmb-space-6: 0.375rem;     /* 6px */
+    --fwmb-space-8: 0.5rem;       /* 8px */
+    --fwmb-space-10: 0.625rem;    /* 10px */
+    --fwmb-space-16: 1rem;        /* 16px */
+    --fwmb-space-24: 1.5rem;      /* 24px */
+    --fwmb-space-32: 2rem;        /* 32px */
 
     /* Line Heights */
     --fwmb-line-height-heading: 1.2; /* For window titles, tight lists, and badges */
@@ -202,6 +203,7 @@
     --fwmb-shadow-window:    0 0 10px rgba(0, 0, 0, 0.85);
     --fwmb-shadow-popout:    0 4px 10px rgba(0, 0, 0, 0.5);
     --fwmb-shadow-focus:     0 0 5px var(--fwmb-accent-main);
+    --fwmb-shadow-alternative-focus:     0 0 5px var(--fwmb-accent-alternative-main);
 }
 
 /* ==========================================
@@ -242,4 +244,5 @@
     --fwmb-shadow-window:    0 8px 24px rgba(0, 0, 0, 0.15);
     --fwmb-shadow-popout:    0 4px 12px rgba(0, 0, 0, 0.1);
     --fwmb-shadow-focus:     0 0 5px var(--fwmb-accent-main);
+    --fwmb-shadow-alternative-focus:     0 0 5px var(--fwmb-accent-alternative-main);
 }

@@ -377,7 +377,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Custom Biomes get no usageCount badge yet (unlike the three below) - "in use" for a
         // biome would mean scanning the full currentBiomeOverrides raster rather than a small
         // vector array, a different enough cost profile that it's deliberately left for later.
-        context.customBiomes = [...(this.uiState.customBiomes || [])].sort(alphaSort).map((cb) => ({ ...cb, hex: ColorMath.rgbToHex(cb.color) }));
+        context.customBiomes = [...(this.uiState.customBiomes || [])].sort(alphaSort).map((cb) => ({ ...cb, hex: ColorMath.rgbToHex(cb.color), hasRules: !!cb.rules?.length }));
 
         context.customRouteStyles = [...(this.uiState.customRouteStyles || [])]
             .sort(alphaSort)
@@ -872,13 +872,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const temp = this.currentTemperatureData ? this.currentTemperatureData[index] : 0;
             const seaLevel = this.uiState["seaLevel"];
 
-            const biomeKey = ProceduralEngine.getBiomeKey(elev, mois, temp, seaLevel);
+            // Mirrors the same priority-chain lookup the biome layer itself paints with
+            // (ProceduralEngine.createBiomesMap) - getBiomeKey() alone only ever computes the
+            // built-in default, silently ignoring a hand-painted override or a matching custom
+            // auto-generation rule, which used to make this readout lie about anything painted
+            // or rule-generated. Uses getDerivedMapParameters() directly rather than the
+            // DOM-syncing getMapParameters(), since this fires on every mouse move over the
+            // canvas and doesn't need to re-read every input's current value to answer "what
+            // biome is under the cursor right now".
+            const overrideId = this.currentBiomeOverrides ? this.currentBiomeOverrides[index] : 0;
+            const { params } = MapStateManager.getDerivedMapParameters(this.uiState, this.customBiomeColors);
+            const { lookupKey } = ProceduralEngine.resolveBiomeLookup(
+                overrideId, elev, mois, temp, seaLevel, this.bufferWaterMask, index, params.customBiomeRules, params.biomePalette,
+                params.solidOverWater,
+            );
 
             this.element.querySelector("#fwmb-readout-elev").textContent = Math.round(elev * 100) + "%";
             this.element.querySelector("#fwmb-readout-mois").textContent = Math.round(mois * 100) + "%";
             this.element.querySelector("#fwmb-readout-temp").textContent = Math.round(temp * 100) + "%";
-            this.element.querySelector("#fwmb-readout-biome").textContent = game.i18n.localize(`FILRODENSWMB.BIOMES.${biomeKey}`);
+            this.element.querySelector("#fwmb-readout-biome").textContent = this.#getBiomeDisplayName(lookupKey);
         };
+    }
+
+    /**
+     * Resolves a ProceduralEngine.resolveBiomeLookup() `lookupKey` to the text a person should
+     * see. A built-in default comes back as its i18n key name (e.g. "GRASSLAND", from
+     * getBiomeKey()) and localizes directly. A hand-painted or rule-matched override comes back
+     * as a numeric id instead, which can name either a built-in biome (still an i18n key, just
+     * addressed by number rather than name here) or a custom biome (a plain name the GM typed
+     * in, never localized).
+     */
+    #getBiomeDisplayName(lookupKey) {
+        if (typeof lookupKey === "number") {
+            const custom = this.uiState.customBiomes?.find((c) => c.id === lookupKey);
+            if (custom) return custom.name;
+
+            const builtInKey = Object.keys(FILRODENSWMB.BIOME_IDS).find((key) => FILRODENSWMB.BIOME_IDS[key] === lookupKey);
+            return builtInKey ? game.i18n.localize(`FILRODENSWMB.BIOMES.${builtInKey}`) : "";
+        }
+        return game.i18n.localize(`FILRODENSWMB.BIOMES.${lookupKey}`);
     }
 
     #applyInitialBootState() {
@@ -1733,6 +1765,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState["noise.temperature.scale"] = p.noise.temperature?.scale ? 1 / p.noise.temperature.scale : FILRODENSWMB.NOISE.TEMPERATURE.SCALE;
 
         this.uiState.customBiomes = payload.customBiomes || [];
+        // Falls back to undefined on a map saved before this counter existed, which
+        // MapStateManager.getNextCustomBiomeId already treats as "derive it from the biomes
+        // that came back above" - see that method's own doc comment for why a deleted biome's
+        // ID must never come back into circulation, on a freshly loaded map any more than on
+        // one that's stayed open the whole time.
+        this.uiState.nextCustomBiomeId = payload.nextCustomBiomeId;
         this.uiState.customRouteStyles = payload.customRouteStyles || [];
         this.uiState.customLabelStyles = payload.customLabelStyles || [];
         this.uiState.customRegionStyles = payload.customRegionStyles || [];
@@ -2054,6 +2092,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 gridVisible: this.uiState.gridVisible,
                 params: params,
                 customBiomes: this.uiState.customBiomes,
+                nextCustomBiomeId: this.uiState.nextCustomBiomeId,
                 customRouteStyles: this.uiState.customRouteStyles,
                 customLabelStyles: this.uiState.customLabelStyles,
                 customRegionStyles: this.uiState.customRegionStyles,
@@ -2324,6 +2363,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     const previousFaults = JSON.stringify(this.tectonicFaults);
                     const previousRivers = JSON.stringify(this.manualRivers);
                     const previousFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
+                    const previousCustomBiomes = JSON.stringify(this.uiState.customBiomes);
 
                     targetPinStack.push(MapStateManager.getVectorStateSnapshot(this));
                     const state = sourcePinStack.pop();
@@ -2339,6 +2379,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     } else if (previousFeaturePins !== currentFeaturePins) {
                         this._repaintCanvas();
                         this.debouncedGenerateClimate();
+                    } else if (previousCustomBiomes !== JSON.stringify(this.uiState.customBiomes)) {
+                        // A custom biome's name/colour/rules changing affects only how the biome
+                        // layer paints (ProceduralEngine reads uiState.customBiomes fresh every
+                        // repaint via MapStateManager.getMapParameters) - no elevation/moisture/
+                        // temperature data changed, so a full terrain/climate regenerate would be
+                        // wasted work, unlike the fault/river/pin branches above.
+                        this._repaintCanvas();
                     } else {
                         this._repaintVectors();
                     }
@@ -2976,10 +3023,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Builds a canonical signature for a Style Library entry's content, ignoring `id` (which is
      * always reassigned on import - see #importStyleLibraryCategories - so it must never affect
-     * whether two entries count as "the same"). Every field across all four categories (Custom
-     * Biomes and the three Quick Style registries) is a primitive, a string, or a flat array
-     * (Custom Biome `color`), so sorting the remaining keys and stringifying them is enough;
-     * there's no nested structure here that would need a real deep-equality check.
+     * whether two entries count as "the same"). Most fields across all four categories (Custom
+     * Biomes and the three Quick Style registries) are a primitive, a string, or a flat array
+     * (Custom Biome `color`); the exception is Custom Biomes' `rules` (a nested array of rows,
+     * each holding per-axis arrays of `[min, max, openMin, openMax]` segments - see
+     * BiomeRuleEngine), which `JSON.stringify` still serialises correctly here since two equal
+     * rule sets are always produced by the same code paths (RuleEditorDialog's row/segment
+     * builders), so key order stays consistent between them - no separate deep-equality check
+     * is needed for it.
      */
     #styleEntrySignature(entry) {
         const { id, ...rest } = entry;
@@ -3034,15 +3085,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Assigns sequential Custom Biome IDs to a batch of imported biomes, continuing from the
-     * map's current highest ID so every entry in the batch gets a distinct ID - not just
-     * distinct from the map's existing biomes, but from each other too (MapStateManager's
-     * helper alone would hand out the same next ID to every entry in the batch, since it only
-     * looks at the map's current list, not the batch being assigned).
+     * Assigns sequential Custom Biome IDs to a batch of imported biomes. MapStateManager's
+     * helper now reserves each ID by advancing uiState.nextCustomBiomeId as it hands it out, so
+     * calling it once per entry (rather than once for the whole batch) is what gives every entry
+     * a distinct ID - both from the map's existing biomes and from each other - and leaves the
+     * counter correctly advanced for whatever's created or imported next.
      */
     #assignSequentialBiomeIds(entries) {
-        let nextId = MapStateManager.getNextCustomBiomeId(this.uiState.customBiomes);
-        return entries.map((entry) => ({ ...entry, id: nextId++ }));
+        return entries.map((entry) => ({ ...entry, id: MapStateManager.getNextCustomBiomeId(this.uiState) }));
     }
 
     /**

@@ -36,10 +36,11 @@
             </a>
         </legend>
 
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
             {{#each customBiomes}}
                 <div class="fwmb-list-item" data-id="{{this.id}}">
                     <div class="fwmb-swatch" style="background-color: {{this.hex}};"></div>
+                    {{#if this.hasRules}}<i class="fwmb-icon forest fwmb-rule-indicator" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeHasRulesTooltip'}}"></i>{{/if}}
                     <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
                     {{#if this.code}}<span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeCodeTooltip' code=this.code}}">{{this.code}}</span>{{/if}}
                     <button type="button" class="fwmb-btn small" data-action="editCustomBiome" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
@@ -62,7 +63,7 @@
             </a>
         </legend>
 
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
             {{#each customRouteStyles}}
                 <div class="fwmb-list-item" data-id="{{this.id}}">
                     <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: {{this.thickness}}px; border-style: {{this.style}};"></div>
@@ -89,7 +90,7 @@
             </a>
         </legend>
 
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
             {{#each customRegionStyles}}
                 <div class="fwmb-list-item" data-id="{{this.id}}">
                     <div class="fwmb-swatch small" style="background-color: {{this.fillColor}}; border-color: {{this.lineColor}};"></div>
@@ -116,7 +117,7 @@
             </a>
         </legend>
 
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
             {{#each customLabelStyles}}
                 <div class="fwmb-list-item" data-id="{{this.id}}">
                     <div class="fwmb-swatch" style="background-color: {{this.fillColor}}; border-radius: 50%;"></div>
@@ -144,7 +145,7 @@
             <a class="fwmb-bulk-action-button" data-action="revealAllBuiltinPinIcons">{{localize "FILRODENSWMB.UI.RevealAllPinIcons"}}</a>
         </div>
 
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
             {{#each builtinPinIcons}}
                 <div class="fwmb-list-item">
                     <div class="fwmb-list-item-content">
@@ -178,7 +179,7 @@
             </a>
         </legend>
 
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-m);">
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
             {{#each customPinIcons}}
                 <div class="fwmb-list-item" data-id="{{this.id}}">
                     <div class="fwmb-list-item-content">

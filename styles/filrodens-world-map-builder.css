@@ -192,7 +192,7 @@
     max-width: 300px !important;
     border: 1px solid var(--fwmb-accent-main);
     border-radius: var(--fwmb-radius-small);
-    padding: var(--fwmb-space-s);
+    padding: var(--fwmb-space-8);
     background: var(--fwmb-bg-base);
     color: var(--fwmb-text-primary);
     box-shadow: var(--fwmb-shadow-popout);
@@ -201,7 +201,7 @@
     line-height: var(--fwmb-line-height-body);
     text-align: start;
     z-index: var(--z-index-tooltip, 9999);
-    margin-block-start: var(--fwmb-space-m);
+    margin-block-start: var(--fwmb-space-10);
 }
 
 
@@ -238,8 +238,8 @@
     font-family: inherit;
     font-size: var(--fwmb-font-size-s);
     font-weight: bold;
-    gap: var(--fwmb-space-s);
-    padding: var(--fwmb-space-s) var(--fwmb-space-m);
+    gap: var(--fwmb-space-8);
+    padding: var(--fwmb-space-8) var(--fwmb-space-10);
 }
 
 .fwmb .fwmb-btn.wide {
@@ -303,7 +303,7 @@
     color: var(--fwmb-text-primary);
     border-radius: var(--fwmb-radius-small);
     min-height: var(--fwmb-font-size-xl);
-    padding-inline: var(--fwmb-space-s);
+    padding-inline: var(--fwmb-space-8);
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -358,7 +358,7 @@
 
 .fwmb select::picker(select) {
     position-area: top;
-    margin-block-end: var(--fwmb-space-xs);
+    margin-block-end: var(--fwmb-space-4);
     border: 1px solid var(--fwmb-border-focus);
 
     scrollbar-width: thin;
@@ -368,10 +368,10 @@
 .fwmb option {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
     background: var(--fwmb-bg-panel);
     color: var(--fwmb-text-primary);
-    padding: var(--fwmb-space-xs) var(--fwmb-space-s);
+    padding: var(--fwmb-space-4) var(--fwmb-space-8);
 }
 
 .fwmb option:hover,
@@ -406,7 +406,7 @@
     accent-color: var(--fwmb-accent-main);
     width: var(--fwmb-font-size-m) !important;
     height: var(--fwmb-font-size-m);
-    margin: var(--fwmb-space-xs);
+    margin: var(--fwmb-space-4);
     cursor: pointer;
     display: inline-block;
     align-content: center;
@@ -448,8 +448,8 @@
     flex: 0 0 18rem; /* Default width, easily overridden */
     display: flex;
     flex-direction: column;
-    padding: var(--fwmb-space-m);
-    gap: var(--fwmb-space-m);
+    padding: var(--fwmb-space-10);
+    gap: var(--fwmb-space-10);
     background-color: var(--fwmb-name-bg-panel);
     border-inline-end: 1px solid var(--fwmb-name-border-main);
     overflow-y: hidden;
@@ -460,7 +460,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: var(--fwmb-space-l);
+    padding: var(--fwmb-space-16);
     overflow-y: auto;
     min-width: 0; /* Prevents flexbox text overflow issues */
 }
@@ -472,7 +472,7 @@
     display: flex;
     flex: 0 0 auto;
     gap: 0;
-    padding-inline-start: var(--fwmb-space-xs);
+    padding-inline-start: var(--fwmb-space-4);
     border-block-end: 1px solid var(--fwmb-border-main);
     background: var(--fwmb-bg-panel);
 }
@@ -483,9 +483,9 @@
     flex: 1;
     align-items: center;
     justify-content: center;
-    gap: var(--fwmb-space-m);
+    gap: var(--fwmb-space-10);
     text-align: center;
-    padding: var(--fwmb-space-s);
+    padding: var(--fwmb-space-8);
     color: var(--fwmb-text-secondary);
     font-weight: bold;
     cursor: pointer;
@@ -513,9 +513,9 @@
 .fwmb details.fwmb-fieldset {
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-medium);
-    padding: var(--fwmb-space-m);
-    margin: var(--fwmb-space-m) 0;
-    gap: var(--fwmb-space-xs);
+    padding: var(--fwmb-space-10);
+    margin: var(--fwmb-space-10) 0;
+    gap: var(--fwmb-space-4);
     display: flex;
     flex-direction: column;
 }
@@ -524,7 +524,7 @@
 .fwmb details.fwmb-fieldset > summary {
     font-weight: bold;
     color: var(--fwmb-accent-main);
-    padding-inline: var(--fwmb-space-xs);
+    padding-inline: var(--fwmb-space-4);
     font-size: var(--fwmb-font-size-s);
 }
 
@@ -533,13 +533,13 @@
 .fwmb details.fwmb-fieldset {
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-small);
-    margin-block-end: var(--fwmb-space-s);
+    margin-block-end: var(--fwmb-space-8);
     background: var(--fwmb-bg-base);
     transition: background-color 0.2s;
 }
 
 .fwmb details.fwmb-fieldset > summary {
-    padding: var(--fwmb-space-s) var(--fwmb-space-m);
+    padding: var(--fwmb-space-8) var(--fwmb-space-10);
     font-weight: bold;
     background: var(--fwmb-bg-base);
     color: var(--fwmb-accent-main);
@@ -554,7 +554,7 @@
 .fwmb details.fwmb-fieldset > summary::before {
     content: "▶";
     display: inline-block;
-    margin-inline-end: var(--fwmb-space-s);
+    margin-inline-end: var(--fwmb-space-8);
     font-size: var(--fwmb-font-size-xs);
     transition: transform 0.2s ease;
     color: var(--fwmb-text-primary);
@@ -572,15 +572,15 @@
 
 .fwmb-bulk-actions {
     display: flex;
-    gap: var(--fwmb-space-l);
-    margin-block-start: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-16);
+    margin-block-start: var(--fwmb-space-4);
 }
 
 .fwmb-mass-edit-bar {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-l);
-    margin-block-end: var(--fwmb-space-s);
+    gap: var(--fwmb-space-16);
+    margin-block-end: var(--fwmb-space-8);
 }
 
 .fwmb-bulk-action-button {
@@ -588,7 +588,7 @@
     background: var(--fwmb-bg-muted);
     color: var(--fwmb-text-inverse);
     border-radius: var(--fwmb-radius-small);
-    padding: var(--fwmb-space-xs) var(--fwmb-space-m);
+    padding: var(--fwmb-space-4) var(--fwmb-space-10);
     cursor: pointer;
 }
 
@@ -600,7 +600,7 @@
 .fwmb-mass-edit-label {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
     cursor: pointer;
 }
 
@@ -608,8 +608,8 @@
     display: grid;
     grid-template-columns: auto minmax(0, max-content);
     align-items: center;
-    gap: var(--fwmb-space-l);
-    margin-block-end: var(--fwmb-space-s);
+    gap: var(--fwmb-space-16);
+    margin-block-end: var(--fwmb-space-8);
 }
 
 .fwmb label {
@@ -620,19 +620,19 @@
 
 .fwmb .fwmb-title {
     font-weight: bold;
-    margin-block-start: var(--fwmb-space-m);
-    margin-block-end: var(--fwmb-space-m);
+    margin-block-start: var(--fwmb-space-10);
+    margin-block-end: var(--fwmb-space-10);
 }
 
 .fwmb .fwmb-stacked-group {
     border: 1px solid var(--fwmb-border-main);
-    padding: var(--fwmb-space-m);
-    margin-block-start: var(--fwmb-space-m);
+    padding: var(--fwmb-space-10);
+    margin-block-start: var(--fwmb-space-10);
     border-radius: var(--fwmb-radius-small);
 
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
 }
 
 
@@ -642,18 +642,18 @@
 .fwmb .fwmb-notes {
     font-size: var(--fwmb-font-size-xs);
     color: var(--fwmb-text-secondary);
-    margin-block-start: var(--fwmb-space-xxs);
+    margin-block-start: var(--fwmb-space-2);
     line-height: var(--fwmb-line-height-body);
 }
 
 .fwmb .fwmb-hint.fwmb-long,
 .fwmb .fwmb-notes.fwmb-long {
     text-align: start;
-    margin-block-end: var(--fwmb-space-m);
+    margin-block-end: var(--fwmb-space-10);
 }
 
 .fwmb .fwmb-hint.indent {
-    margin-inline-start: var(--fwmb-space-xxl);
+    margin-inline-start: var(--fwmb-space-32);
 }
 
 /* Empty or missing data states */
@@ -665,7 +665,7 @@
     text-align: center;
     color: var(--fwmb-text-muted);
     font-style: italic;
-    padding: var(--fwmb-space-xl);
+    padding: var(--fwmb-space-24);
     background-color: var(--fwmb-bg-panel);
     border-radius: var(--fwmb-radius-medium);
     border: 1px solid var(--fwmb-border-main);
@@ -679,13 +679,13 @@
 .fwmb .fwmb-divider {
     border-block-end: 2px solid var(--fwmb-border-main);
     width: 100%;
-    margin-block: var(--fwmb-space-m);
+    margin-block: var(--fwmb-space-10);
 }
 
 .fwmb .fwmb-divider-vertical {
     border-inline-end: 2px solid var(--fwmb-border-main);
     height: 100%;
-    margin-inline: var(--fwmb-space-xs);
+    margin-inline: var(--fwmb-space-4);
 }
 
 
@@ -694,14 +694,14 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
     background-color: var(--fwmb-bg-base);
     color: var(--fwmb-text-secondary);
     border: 1px solid var(--fwmb-border-focus);
     border-radius: var(--fwmb-radius-large);
     font-size: var(--fwmb-font-size-xs);
     font-weight: bold;
-    padding: var(--fwmb-space-xxs) var(--fwmb-space-s);
+    padding: var(--fwmb-space-2) var(--fwmb-space-8);
     line-height: var(--fwmb-line-height-heading);
     white-space: nowrap;
 }
@@ -718,7 +718,7 @@
 
 .fwmb .fwmb-flex-row {
     display: flex;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
     width: 100%;
 }
 
@@ -733,8 +733,8 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: var(--fwmb-space-m);
-    gap: var(--fwmb-space-xs);
+    padding: var(--fwmb-space-10);
+    gap: var(--fwmb-space-4);
     overflow-x: hidden;
     overflow-y: auto; /* Required to trigger fwmb-scrollable mechanics */
     min-height: 0;
@@ -808,13 +808,13 @@
     font-size: var(--fwmb-font-size-s);
     line-height: var(--fwmb-line-height-heading);
     text-align: start; 
-    padding-inline-start: var(--fwmb-space-s);
+    padding-inline-start: var(--fwmb-space-8);
     padding-inline-end: 0;
     flex: 1;
 }
 
 .fwmb .window-header .window-icon {
-    margin-inline-start: var(--fwmb-space-xxs);
+    margin-inline-start: var(--fwmb-space-2);
     margin-inline-end: 0;
 }
 
@@ -835,8 +835,8 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-block: var(--fwmb-space-s);
-    gap: var(--fwmb-space-s);
+    padding-block: var(--fwmb-space-8);
+    gap: var(--fwmb-space-8);
 }
 
 .fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button {
@@ -894,12 +894,12 @@
 
 .fwmb-map-controls {
     position: absolute;
-    inset-block-end: var(--fwmb-space-m);
-    inset-inline-end: var(--fwmb-space-m);
+    inset-block-end: var(--fwmb-space-10);
+    inset-inline-end: var(--fwmb-space-10);
     display: flex;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
     background: rgba(0, 0, 0, 0.5);
-    padding: var(--fwmb-space-xs);
+    padding: var(--fwmb-space-4);
     border-radius: var(--fwmb-radius-small);
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 20;
@@ -909,12 +909,12 @@
 
 .fwmb-map-hint {
     position: absolute;
-    inset-block-end: var(--fwmb-space-m);
-    inset-inline-start: var(--fwmb-space-m);
+    inset-block-end: var(--fwmb-space-10);
+    inset-inline-start: var(--fwmb-space-10);
     color: var(--fwmb-main-200);
     font-size: var(--fwmb-font-size-xs);
     background: rgba(0, 0, 0, 0.3);
-    padding: var(--fwmb-space-xxs) var(--fwmb-space-s);
+    padding: var(--fwmb-space-2) var(--fwmb-space-8);
     border-radius: var(--fwmb-radius-small);
     pointer-events: none;
     z-index: 10;
@@ -924,12 +924,12 @@
 
 .fwmb-map-history {
     position: absolute;
-    inset-block-start: var(--fwmb-space-m);
-    inset-inline-end: var(--fwmb-space-m);
+    inset-block-start: var(--fwmb-space-10);
+    inset-inline-end: var(--fwmb-space-10);
     display: flex;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
     background: rgba(0, 0, 0, 0.5);
-    padding: var(--fwmb-space-xs);
+    padding: var(--fwmb-space-4);
     border-radius: var(--fwmb-radius-small);
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 20;
@@ -972,17 +972,17 @@
 
 .fwmb-canvas-readout {
     position: absolute;
-    inset-block-start: var(--fwmb-space-m);
-    inset-inline-start: var(--fwmb-space-m);
+    inset-block-start: var(--fwmb-space-10);
+    inset-inline-start: var(--fwmb-space-10);
     background: rgba(0, 0, 0, 0.7);
-    padding: var(--fwmb-space-xs) var(--fwmb-space-s);
+    padding: var(--fwmb-space-4) var(--fwmb-space-8);
     border-radius: var(--fwmb-radius-small);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--fwmb-main-200);
     font-size: var(--fwmb-font-size-xs);
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-m);
+    gap: var(--fwmb-space-10);
     z-index: 20;
     pointer-events: none; /* Crucial: Prevents the readout from blocking brush clicks! */
 }
@@ -995,7 +995,7 @@
 .fwmb-readout-item {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-xxs);
+    gap: var(--fwmb-space-2);
     font-family: monospace;
 }
 
@@ -1016,7 +1016,7 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
 }
 
 .fwmb .fwmb-slider-group input[type="range"] {
@@ -1038,7 +1038,7 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
 }
 
 .fwmb .form-group.stacked input[type="range"] {
@@ -1074,10 +1074,10 @@
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    padding: var(--fwmb-space-s) var(--fwmb-space-m);
+    padding: var(--fwmb-space-8) var(--fwmb-space-10);
     background: var(--fwmb-bg-base);
     border-block-end: 1px solid var(--fwmb-border-main);
-    gap: var(--fwmb-space-m);
+    gap: var(--fwmb-space-10);
 }
 
 .fwmb .fwmb-toolbar-content {
@@ -1092,13 +1092,13 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: var(--fwmb-space-m);
+    gap: var(--fwmb-space-10);
 }
 
 .fwmb .fwmb-brush-settings label {
     font-size: var(--fwmb-font-size-xs);
     color: var(--fwmb-text-secondary);
-    margin-inline-end: var(--fwmb-space-xs);
+    margin-inline-end: var(--fwmb-space-4);
     white-space: nowrap;
 }
 
@@ -1126,14 +1126,14 @@
 .fwmb-biome-legend {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
     font-size: var(--fwmb-font-size-xs);
 }
 
 .fwmb-biome-item {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-m);
+    gap: var(--fwmb-space-10);
     color: var(--fwmb-text-primary);
 }
 
@@ -1194,7 +1194,7 @@ input.fwmb-swatch {
     cursor: pointer;
     color: var(--fwmb-text-secondary);
     transition: color 0.1s, text-shadow 0.1s;
-    margin-inline: var(--fwmb-space-s);
+    margin-inline: var(--fwmb-space-8);
     border: 1px solid var(--fwmb-border-main);
 }
 
@@ -1226,7 +1226,7 @@ input.fwmb-swatch {
     display: flex;
     justify-content: space-evenly;
     align-items: center;
-    padding: var(--fwmb-space-m);
+    padding: var(--fwmb-space-10);
     border-radius: var(--fwmb-radius-medium);
     border: 1px solid var(--fwmb-border-main);
 }
@@ -1234,14 +1234,14 @@ input.fwmb-swatch {
 .fwmb-transform-zoom {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
 }
 
 .fwmb-transform-dpad {
     display: grid;
     grid-template-columns: repeat(3, 36px);
     grid-template-rows: repeat(3, 36px);
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
 }
 
 .fwmb-transform-dpad button {
@@ -1262,13 +1262,13 @@ input.fwmb-swatch {
 
 /* Map Studio Log Presentation Table Layers */
 .fwmb-journal-summary {
-    padding: var(--fwmb-space-m);
+    padding: var(--fwmb-space-10);
 }
 
 .fwmb-summary-title {
     margin-block-start: 1.5rem;
     border-block-end: 1px solid var(--fwmb-border-main);
-    padding-block-end: var(--fwmb-space-xs);
+    padding-block-end: var(--fwmb-space-4);
     color: var(--fwmb-text-primary);
 }
 
@@ -1282,12 +1282,12 @@ input.fwmb-swatch {
     color: var(--fwmb-text-primary);
     background-color: var(--fwmb-bg-panel);
     border-block-end: 2px solid var(--fwmb-border-main);
-    padding: var(--fwmb-space-s);
+    padding: var(--fwmb-space-8);
     text-align: left;
 }
 
 .fwmb-summary-table td {
-    padding: var(--fwmb-space-s);
+    padding: var(--fwmb-space-8);
     border-block-end: 1px solid var(--fwmb-border-subtle);
 }
 
@@ -1320,14 +1320,14 @@ input.fwmb-swatch {
     font-weight: bold;
     color: var(--fwmb-accent-main);
     font-size: var(--fwmb-font-size-s);
-    margin: var(--fwmb-space-l) var(--fwmb-space-m);
+    margin: var(--fwmb-space-16) var(--fwmb-space-10);
 }
 
 .fwmb-map-list {
     display: flex;
     flex-direction: column;
     flex: 1;
-    gap: var(--fwmb-space-l);
+    gap: var(--fwmb-space-16);
     overflow-y: auto;
 }
 
@@ -1335,7 +1335,7 @@ input.fwmb-swatch {
     background: var(--fwmb-bg-panel);
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-medium);
-    padding: var(--fwmb-space-m);
+    padding: var(--fwmb-space-10);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1350,14 +1350,14 @@ input.fwmb-swatch {
 
 .fwmb-map-card-actions {
     display: flex;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
 }
 
 /* Base button styling for Load and Kebab */
 .fwmb-map-card-actions > button,
 .fwmb-dropdown > button {
-    width: var(--fwmb-space-xxl);
-    height: var(--fwmb-space-xxl);
+    width: var(--fwmb-space-32);
+    height: var(--fwmb-space-32);
     padding: 0;
     display: flex;
     justify-content: inline-start;
@@ -1386,7 +1386,7 @@ input.fwmb-swatch {
     position: absolute;
     right: 0;
     top: 100%;
-    margin-block-start: var(--fwmb-space-s);
+    margin-block-start: var(--fwmb-space-8);
     background: var(--fwmb-bg-base);
     color: var(--fwmb-text-primary);
     border: 1px solid var(--fwmb-border-main);
@@ -1407,8 +1407,8 @@ input.fwmb-swatch {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: var(--fwmb-space-s);
-    padding: var(--fwmb-space-m) var(--fwmb-space-l);
+    gap: var(--fwmb-space-8);
+    padding: var(--fwmb-space-10) var(--fwmb-space-16);
     background: transparent;
     border: none;
     color: var(--fwmb-text-primary);
@@ -1437,10 +1437,10 @@ input.fwmb-swatch {
 .fwmb-icon-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--fwmb-font-size-xxl), 1fr));
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
     max-height: 200px;
     overflow-y: auto;
-    padding: var(--fwmb-space-s);
+    padding: var(--fwmb-space-8);
     background: var(--fwmb-bg-muted);
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-medium);
@@ -1449,7 +1449,7 @@ input.fwmb-swatch {
 .fwmb-icon-grid .fwmb-icon-btn {
     width: var(--fwmb-font-size-xxl);
     height: var(--fwmb-font-size-xxl);
-    padding: var(--fwmb-space-xs);
+    padding: var(--fwmb-space-4);
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--fwmb-radius-medium);
@@ -1469,8 +1469,8 @@ input.fwmb-swatch {
 .fwmb-list-container {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-space-s);
-    padding-inline-end: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-8);
+    padding-inline-end: var(--fwmb-space-4);
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -1479,8 +1479,8 @@ input.fwmb-swatch {
 .fwmb-list-item {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-m);
-    padding: var(--fwmb-space-s);
+    gap: var(--fwmb-space-10);
+    padding: var(--fwmb-space-8);
     background: var(--fwmb-bg-panel);
     border: 1px solid var(--fwmb-border-focus);
     border-radius: var(--fwmb-radius-medium);
@@ -1490,6 +1490,14 @@ input.fwmb-swatch {
 .fwmb-list-item .fwmb-list-icon {
     width: var(--fwmb-font-size-m);
     height: var(--fwmb-font-size-m);
+}
+
+/* Marks a Custom Biome list-item as having auto-generation rules attached (Rule Editor) - a
+   first-pass style only, flagged for Ken's own visual polish like the rest of this file. */
+.fwmb-list-item .fwmb-rule-indicator {
+    flex-shrink: 0;
+    font-size: var(--fwmb-font-size-m);
+    color: var(--fwmb-accent-main);
 }
 
 /* Deliberately fixed black, not a theme token - this is a raw, unmasked render of a
@@ -1522,7 +1530,7 @@ input.fwmb-swatch {
     pointer-events: none;
     background: var(--fwmb-bg-base);
     color: var(--fwmb-text-primary);
-    padding: var(--fwmb-space-s) var(--fwmb-space-m);
+    padding: var(--fwmb-space-8) var(--fwmb-space-10);
     border-radius: var(--fwmb-radius-medium);
     border: 1px solid var(--fwmb-border-focus);
     font-size: var(--fwmb-font-size-xs);
@@ -1537,9 +1545,9 @@ input.fwmb-swatch {
     display: block;
     font-size: var(--fwmb-font-size-s);
     font-weight: bold;
-    margin-block-end: var(--fwmb-space-xs);
+    margin-block-end: var(--fwmb-space-4);
     border-block-end: var(--fwmb-border-accent);
-    padding-block-end: var(--fwmb-space-xxs);
+    padding-block-end: var(--fwmb-space-2);
 }
 
 .fwmb .fwmb-name {
@@ -1574,7 +1582,7 @@ input.fwmb-swatch {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--fwmb-space-xs) var(--fwmb-space-s);
+    padding: var(--fwmb-space-4) var(--fwmb-space-8);
     background: var(--fwmb-bg-base);
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-small);
@@ -1601,13 +1609,13 @@ input.fwmb-swatch {
     top: 100%;
     left: 0;
     z-index: 100;
-    margin-block-start: var(--fwmb-space-xs);
+    margin-block-start: var(--fwmb-space-4);
     background: var(--fwmb-bg-base);
     border: 1px solid var(--fwmb-border-focus);
     border-radius: var(--fwmb-radius-small);
     box-shadow: var(--fwmb-shadow-popout);
     width: 260px; /* Expands to hold the grid */
-    padding: var(--fwmb-space-s);
+    padding: var(--fwmb-space-8);
 }
 
 /* ==========================================
@@ -1617,7 +1625,7 @@ input.fwmb-swatch {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-block-end: var(--fwmb-space-s);
+    margin-block-end: var(--fwmb-space-8);
 }
 
 /* Groups the Regions panel's Select toggle alongside its "New Layer" button on the right of
@@ -1626,25 +1634,25 @@ input.fwmb-swatch {
 .fwmb-panel-header-actions {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
     justify-content: space-evenly;
 }
 
 .fwmb-layer-header {
-    padding: var(--fwmb-space-xs) var(--fwmb-space-s);
+    padding: var(--fwmb-space-4) var(--fwmb-space-8);
 }
 
 .fwmb-list-item-content {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
     flex: 1;
     min-width: 0; /* Ensures the text truncation child doesn't break the flex boundary */
 }
 
 .fwmb-list-item-actions {
     display: flex;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
 }
 
 .fwmb-layer-title {
@@ -1653,16 +1661,16 @@ input.fwmb-swatch {
 }
 
 .fwmb-accordion-content {
-    margin-block-start: var(--fwmb-space-s);
-    padding-inline-start: var(--fwmb-space-l);
+    margin-block-start: var(--fwmb-space-8);
+    padding-inline-start: var(--fwmb-space-16);
     border-inline-start: 2px solid var(--fwmb-border-main);
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
 }
 
 .fwmb-hint.small {
-    padding: var(--fwmb-space-xs);
+    padding: var(--fwmb-space-4);
     opacity: 0.7;
     font-size: 0.9em;
 }
@@ -1675,13 +1683,13 @@ input.fwmb-swatch {
 /* --- REGION & TOOLBAR UTILITIES --- */
 .fwmb-color-row {
     display: flex;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
     align-items: center;
 }
 
 .fwmb-setting-row {
     display: flex;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
     align-items: center;
 }
 
@@ -1729,11 +1737,11 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 .fwmb-processing-content {
     background: var(--fwmb-bg-panel);
-    padding: var(--fwmb-space-l) var(--fwmb-space-xl);
+    padding: var(--fwmb-space-16) var(--fwmb-space-24);
     border-radius: var(--fwmb-radius-medium);
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-m);
+    gap: var(--fwmb-space-10);
     color: var(--fwmb-text-primary);
     font-size: var(--fwmb-font-size-l);
     box-shadow: var(--fwmb-shadow-popout);
@@ -1751,14 +1759,31 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
    BIOME RULE EDITOR
 =================================================================== */
 
+.fwmb-rule-editor-dialog {
+    width: 65rem;
+}
+
+.fwmb-rule-editor-dialog .window-content,
+.fwmb-rule-editor-dialog form.dialog-form,
+.fwmb-rule-editor-dialog .dialog-content.standard-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .fwmb-rule-editor {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-space-m);
-    max-height: 65vh;
+    gap: var(--fwmb-space-10);
+    /* min-height:0 is required for a flex child to shrink below its content size and
+       actually scroll instead of overflowing its now-bounded .dialog-content parent above. */
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
-    padding-inline-end: var(--fwmb-space-l);
-    margin: 0 var(--fwmb-space-m);
+    padding-inline-end: var(--fwmb-space-16);
+    margin: 0 var(--fwmb-space-10);
 }
 
 .fwmb-rule-editor-intro {
@@ -1768,10 +1793,10 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-rule-editor-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--fwmb-space-l);
+    gap: var(--fwmb-space-16);
     font-size: var(--fwmb-font-size-xs);
     color: var(--fwmb-text-muted);
-    padding: var(--fwmb-space-s) var(--fwmb-space-m);
+    padding: var(--fwmb-space-8) var(--fwmb-space-10);
     background: var(--fwmb-bg-base);
     border: 2px solid var(--fwmb-border-subtle);
     border-radius: var(--fwmb-radius-medium);
@@ -1780,7 +1805,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-rule-editor-legend-item {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
 }
 
 .fwmb-rule-editor-swatch {
@@ -1789,13 +1814,13 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     border-radius: var(--fwmb-radius-small);
     flex-shrink: 0;
 }
-.fwmb-rule-editor-swatch.active { background: var(--fwmb-accent-main); }
+.fwmb-rule-editor-swatch.active { background: var(--fwmb-accent-alternative-main); }
 .fwmb-rule-editor-swatch.locked { background: var(--fwmb-bg-muted); border: 1px solid var(--fwmb-text-muted); }
 
 .fwmb-rule-editor-section-heading {
     display: flex;
     align-items: baseline;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
     flex-wrap: wrap;
 }
 .fwmb-rule-editor-section-heading h3 {
@@ -1813,13 +1838,13 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-rule-editor-flow {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
 }
 
 .fwmb-rule-editor-divider {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-s);
+    gap: var(--fwmb-space-8);
     color: var(--fwmb-text-muted);
     font-size: var(--fwmb-font-size-xs);
 }
@@ -1848,12 +1873,20 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 /* --- Rule row: label + three axis tracks, one line --- */
 
+/* Three row-tracks per rule row, shared across every axis column: a flexible zone above the
+   track that grows to fit however many chips wrap in the tallest axis, the track itself
+   (always the same row, so it lands on the same horizontal line in every column), and a
+   flexible zone below for the elevation zone-picker. Because grid row-tracks are computed
+   once for the whole row (not independently per column the way flex children would), all
+   three axes' tracks stay pinned to that shared middle line regardless of which axis's chips
+   happen to wrap - the surrounding space grows up or down instead of pushing the track. */
 .fwmb-rule-row {
     display: grid;
     grid-template-columns: 200px repeat(3, minmax(0, 1fr));
-    gap: var(--fwmb-space-m);
+    grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+    column-gap: var(--fwmb-space-24);
     align-items: center;
-    padding: var(--fwmb-space-xs) var(--fwmb-space-m);
+    padding: var(--fwmb-space-4) var(--fwmb-space-10);
     border-bottom: 1px solid var(--fwmb-border-subtle);
     min-height: 52px;
 }
@@ -1861,8 +1894,28 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     border-bottom: none;
 }
 
+/* The label and remove-row button don't participate in the 3-row split - they just sit
+   centred on the track's own row so they line up with it regardless of how tall row 1/3 end
+   up being for the axis columns beside them. Pinning both row AND column explicitly here
+   (rather than leaving column to auto-placement) keeps the three .fwmb-rule-axis columns'
+   own auto-placement simple and unambiguous: with these two out of the way, the axes just
+   fill columns 2-4 left to right in DOM order. .fwmb-rule-remove-row only ever appears
+   inside the 5-column .fwmb-rule-row-custom (see below), so column 5 is safe to fix here. */
+.fwmb-rule-row-label {
+    grid-row: 2;
+    grid-column: 1;
+}
+.fwmb-rule-remove-row {
+    grid-row: 2;
+    grid-column: 5;
+}
+
 .fwmb-rule-row-empty {
     grid-template-columns: 200px 1fr;
+    grid-template-rows: auto;
+}
+.fwmb-rule-row-empty .fwmb-rule-row-label {
+    grid-row: 1;
 }
 .fwmb-rule-row-empty-hint {
     font-size: var(--fwmb-font-size-xs);
@@ -1873,7 +1926,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-rule-row-label {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
     min-width: 0;
 }
 
@@ -1886,8 +1939,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 .fwmb-rule-label-content {
     display: flex;
-    align-items: baseline;
-    gap: var(--fwmb-space-s);
+    align-items: center;
+    gap: var(--fwmb-space-8);
     min-width: 0;
 }
 
@@ -1915,26 +1968,37 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-rule-code {
     font-family: "Consolas", "Courier New", monospace;
     font-size: var(--fwmb-font-size-xs);
-    color: var(--fwmb-accent-hover);
-    background: color-mix(in srgb, var(--fwmb-accent-main) 16%, transparent);
+    color: var(--fwmb-accent-alternative-hover);
+    background: color-mix(in srgb, var(--fwmb-accent-alternative-main) 16%, transparent);
     border-radius: var(--fwmb-radius-small);
     padding: 1px 5px;
     flex-shrink: 0;
 }
 
-/* --- Axis track --- */
+/* --- Axis track ---
+   Each axis column reuses the parent .fwmb-rule-row's own three row-tracks via `subgrid`
+   (span 1/3) rather than laying its top/track/zone-picker out as an independent flex column -
+   that's what lets the track line up across all three axes (see .fwmb-rule-row above). Needs
+   a browser new enough for CSS subgrid (Chromium 117+ / Foundry's own color-mix() usage
+   already assumes a similar baseline). align-self:stretch overrides the row's own
+   align-items:center so this item actually fills its full 3-row span instead of shrinking to
+   its content and breaking the subgrid. */
 
 .fwmb-rule-axis {
-    display: flex;
-    flex-direction: column;
-    gap: var(--fwmb-space-xxs);
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-row: 1 / span 3;
+    align-self: stretch;
+    row-gap: var(--fwmb-space-2);
     min-width: 0;
 }
 
 .fwmb-rule-axis-top {
+    grid-row: 1;
+    align-self: end;
     display: flex;
     align-items: baseline;
-    gap: var(--fwmb-space-xs);
+    gap: var(--fwmb-space-4);
     flex-wrap: wrap;
 }
 
@@ -1949,7 +2013,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-rule-chip-row {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-space-xxs);
+    gap: var(--fwmb-space-4);
     flex-wrap: wrap;
 }
 
@@ -1961,7 +2025,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     background: var(--fwmb-bg-hover);
     border: 1px solid var(--fwmb-border-subtle);
     border-radius: 999px;
-    padding: var(--fwmb-space-xxxs) 6px;
+    padding: var(--fwmb-space-1) var(--fwmb-space-6);
 }
 .locked .fwmb-rule-chip {
     background: transparent;
@@ -1969,7 +2033,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     color: var(--fwmb-text-muted);
 }
 .fwmb-rule-chip-edge {
-    color: var(--fwmb-accent-hover);
+    color: var(--fwmb-accent-alternative-hover);
     font-weight: 600;
 }
 .locked .fwmb-rule-chip-edge {
@@ -1978,6 +2042,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 .fwmb-rule-track {
+    grid-row: 2;
     position: relative;
     height: 18px;
     background: var(--fwmb-bg-hover);
@@ -1992,9 +2057,9 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     position: absolute;
     top: 3px;
     bottom: 3px;
-    background: color-mix(in srgb, var(--fwmb-accent-main) 20%, transparent);
-    border-block-start: 1px solid var(--fwmb-accent-main);
-    border-block-end: 1px solid var(--fwmb-accent-main);
+    background: color-mix(in srgb, var(--fwmb-accent-alternative-main) 20%, transparent);
+    border-block-start: 1px solid var(--fwmb-accent-alternative-main);
+    border-block-end: 1px solid var(--fwmb-accent-alternative-main);
     border-radius: 999px;
 }
 .locked .fwmb-rule-fill {
@@ -2007,17 +2072,21 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     top: 50%;
     width: 12px;
     height: 12px;
-    background: var(--fwmb-accent-hover);
+    background: var(--fwmb-accent-alternative-hover);
     border: 2px solid var(--fwmb-bg-base);
     border-radius: 50%;
     transform: translate(-50%, -50%);
-    box-shadow: var(--fwmb-shadow-focus);
+    box-shadow: var(--fwmb-shadow-alternative-focus);
+    cursor: grab;
+    touch-action: none;
 }
 .locked .fwmb-rule-handle {
     background: var(--fwmb-bg-muted);
     width: 8px;
     height: 8px;
     box-shadow: none;
+    cursor: default;
+    touch-action: auto;
 }
 
 .fwmb-rule-sea-level-line {
@@ -2032,9 +2101,181 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 @media (max-width: 640px) {
+    /* Below this width everything stacks into one column, so the shared-row-track alignment
+       trick above no longer applies (there's nothing left to line up across) - revert the
+       label/remove-row/axis grid-row pins and let every child fall into its own row via
+       normal auto-flow, and turn each axis back into a plain flex column. */
     .fwmb-rule-row,
     .fwmb-rule-row-empty {
         grid-template-columns: 1fr;
-        gap: var(--fwmb-space-xs);
+        grid-template-rows: none;
+        gap: var(--fwmb-space-4);
+    }
+    .fwmb-rule-row-label,
+    .fwmb-rule-remove-row {
+        grid-row: auto;
+        grid-column: auto;
+    }
+    .fwmb-rule-axis {
+        display: flex;
+        flex-direction: column;
+        grid-row: auto;
+    }
+    .fwmb-rule-axis-top,
+    .fwmb-rule-track,
+    .fwmb-rule-zone-picker {
+        grid-row: auto;
+        align-self: auto;
+    }
+}
+
+/* --- Custom-row interactive controls (4b-ii: priority stepper, add/remove row,
+   add/remove range, elevation zone quick-picks). The defaults section above never
+   uses any of these - it stays fully static. --- */
+
+.fwmb-rule-stepper {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-space-2);
+    flex-shrink: 0;
+}
+
+.fwmb button.fwmb-rule-step-btn {
+    width: var(--fwmb-font-size-m);
+    height: calc(var(--fwmb-font-size-m) / 1.8);
+    min-height: 0;
+    line-height: 1;
+    font-size: var(--fwmb-font-size-xxs);
+    padding: 0;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-small);
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-secondary);
+    cursor: pointer;
+}
+.fwmb button.fwmb-rule-step-btn:hover:not(:disabled) {
+    background: var(--fwmb-accent-main);
+    color: var(--fwmb-bg-base);
+}
+.fwmb button.fwmb-rule-step-btn:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.fwmb-rule-rank {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: var(--fwmb-font-size-xxs);
+    color: var(--fwmb-text-muted);
+    flex-shrink: 0;
+}
+
+/* Custom rows get a trailing column for the remove-row button the defaults rows don't have. */
+.fwmb-rule-row-custom {
+    grid-template-columns: 200px repeat(3, minmax(0, 1fr)) 28px;
+}
+
+.fwmb button.fwmb-rule-remove-row {
+    justify-self: center;
+    width: var(--fwmb-font-size-m);
+    height: var(--fwmb-font-size-m);
+    min-height: 0;
+    line-height: 1;
+    border: 1px solid var(--fwmb-border-subtle);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--fwmb-text-muted);
+    cursor: pointer;
+}
+.fwmb button.fwmb-rule-remove-row:hover:not(:disabled) {
+    border-color: var(--fwmb-color-danger);
+    color: var(--fwmb-color-danger);
+}
+
+.fwmb-rule-row-empty-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fwmb-space-8);
+    flex-wrap: wrap;
+}
+
+.fwmb-rule-add-strip {
+    display: flex;
+    justify-content: flex-start;
+    padding: var(--fwmb-space-4) var(--fwmb-space-10);
+}
+
+.fwmb button.fwmb-rule-add-row-btn {
+    height: auto;
+    min-height: 0;
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-accent-hover);
+    background: transparent;
+    border: 1px dashed var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-small);
+    padding: var(--fwmb-space-1) var(--fwmb-space-8);
+    cursor: pointer;
+}
+.fwmb button.fwmb-rule-add-row-btn:hover {
+    background: color-mix(in srgb, var(--fwmb-accent-main) 12%, transparent);
+    border-color: var(--fwmb-accent-main);
+}
+
+.fwmb-rule-chip-remove {
+    margin-inline-start: var(--fwmb-space-1);
+    color: var(--fwmb-text-muted);
+    cursor: pointer;
+}
+.fwmb-rule-chip-remove:hover {
+    color: var(--fwmb-color-danger);
+}
+
+.fwmb button.fwmb-rule-seg-add {
+    width: var(--fwmb-font-size-s);
+    height: var(--fwmb-font-size-s);
+    min-height: 0;
+    line-height: 1;
+    font-size: var(--fwmb-font-size-xxs);
+    padding: 0;
+    border: 1px dashed var(--fwmb-border-main);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--fwmb-text-secondary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.fwmb button.fwmb-rule-seg-add:hover {
+    border-color: var(--fwmb-accent-main);
+    color: var(--fwmb-accent-hover);
+}
+
+.fwmb-rule-zone-picker {
+    grid-row: 3;
+    align-self: start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--fwmb-space-2);
+    margin-block-start: var(--fwmb-space-2);
+}
+
+.fwmb button.fwmb-rule-zone-chip {
+    height: auto;
+    min-height: 0;
+    font-size: var(--fwmb-font-size-xxs);
+    color: var(--fwmb-text-secondary);
+    background: var(--fwmb-bg-hover);
+    border: 1px solid var(--fwmb-border-subtle);
+    border-radius: 999px;
+    padding: var(--fwmb-space-1) var(--fwmb-space-4);
+    cursor: pointer;
+}
+.fwmb button.fwmb-rule-zone-chip:hover {
+    border-color: var(--fwmb-accent-main);
+    color: var(--fwmb-accent-hover);
+}
+
+@media (max-width: 640px) {
+    .fwmb-rule-row-custom {
+        grid-template-columns: 1fr;
     }
 }
