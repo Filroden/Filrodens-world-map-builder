@@ -168,9 +168,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * reuse those labels rather than duplicating them under new keys. Custom Pin Icons are
      * deliberately not included - they're a world-scoped Foundry setting referencing a live
      * file path rather than a per-map uiState array, so a portable export needs to embed the
-     * actual image data. That's backlogged as its own follow-up (see the v2.2.0 Settings
-     * Export/Import scoping doc); this set covers every registry that's already plain,
-     * self-contained JSON.
+     * actual image data. That's left for a future follow-up; this set covers every registry
+     * that's already plain, self-contained JSON.
      */
     static STYLE_LIBRARY_CATEGORIES = [
         { key: "customBiomes", labelKey: "FILRODENSWMB.UI.SettingsBiomeColors" },

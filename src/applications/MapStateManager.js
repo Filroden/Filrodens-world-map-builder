@@ -24,8 +24,8 @@ export class MapStateManager {
         app.bufferContours = new Uint8Array(totalPixels * 4);
         // Kept in sync alongside bufferBiomes on every biome repaint (see MapStudioApp's
         // _repaintCanvas/#applyBrushStroke), but its own canvas layer stays hidden until the
-        // "Preview Rule Coverage" button (sub-phase 4c) is hovered - see ProceduralEngine.
-        // createBiomesMap's outFallbackBuffer parameter for what actually gets written into it.
+        // "Preview Rule Coverage" button is hovered - see ProceduralEngine.createBiomesMap's
+        // outFallbackBuffer parameter for what actually gets written into it.
         app.bufferBiomeFallback = new Uint8Array(totalPixels * 4);
     }
 

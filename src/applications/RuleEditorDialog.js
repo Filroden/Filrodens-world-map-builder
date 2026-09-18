@@ -5,31 +5,20 @@ import { ColorMath } from "../tools/ColorMath.js";
 /**
  * The "Biome Rule Stacker" - a dedicated, large DialogV2 window (not one of the module's
  * usual small single-purpose dialogs) where a GM builds up auto-generation rules for their
- * custom biomes against the built-in defaults. Ported from the agreed mockup at
- * https://claude.ai/artifact/UxXan2t7gAGdPxPjfVpBZ6 (see custom-biomes-v2.3-scoping.md,
- * "UI design" section) - the row/track/chip DOM-building methods below are close to a
- * direct port of that mockup's own vanilla JS, just reading real customBiomes data instead
- * of illustrative samples, and computing the "Default biomes" table live from
+ * custom biomes against the built-in defaults. Fully interactive: dragging a segment's
+ * ends, adding/removing a range on one axis, adding/removing a whole rule row, reordering
+ * a biome's priority, and the elevation zone quick-picks. All of it mutates a
+ * `customBiomes` array `open()` deep-clones from `app.uiState.customBiomes` - a working
+ * copy that lives only for the dialog's lifetime, and is only committed back to
+ * `app.uiState.customBiomes` if the GM clicks Accept (see `open()`); Cancel, and the
+ * window's own close button (mapped to the same action), discard it untouched. The
+ * "Default biomes" table is read-only and never re-rendered, computed live from
  * BiomeRuleEngine.getDefaultBiomeReferenceRows() instead of hand-copied numbers.
  *
  * Kept in its own file (rather than folded into MapDialogManager.js, already the module's
  * largest file) because this is the single largest piece of interactive UI in the module,
  * matching how RegionalExtractor.js and SceneExporter.js already carve substantial
  * single-feature logic out of MapStudioApp.js.
- *
- * SUB-PHASE 4b-i (shipped): a read-only, data-driven snapshot - no interactivity.
- *
- * SUB-PHASE 4b-ii (shipped): the custom-biome half of the dialog is now fully
- * interactive - dragging a segment's ends, adding/removing a range on one axis, adding/
- * removing a whole rule row, reordering a biome's priority, and the elevation zone
- * quick-picks. All of it mutates the `customBiomes` array `open()` deep-cloned from
- * `app.uiState.customBiomes` - a working copy that lived only for the dialog's lifetime
- * in this pass. The "Default biomes" section stays exactly as it was in 4b-i: read-only,
- * never re-rendered, no listeners.
- *
- * SUB-PHASE 4b-iii (this pass): Accept now actually commits the working copy - see
- * `open()`. Cancel (and the window's own close button, mapped to the same action) still
- * just discards it, leaving `app.uiState.customBiomes` untouched.
  */
 export class RuleEditorDialog {
     /** How close a dragged handle has to get to 0 or 1 before it's treated as touching that true edge (see RuleSegment's openMin/openMax). */
@@ -86,14 +75,14 @@ export class RuleEditorDialog {
 
         // Deliberately NOT MapStateManager.pushVectorState(app) here (an earlier version of
         // this method did push one, so Ctrl+Z would undo a rule edit like a manual map edit).
-        // Ken's call after using it in practice: rules aren't a manual edit to the map the way
-        // painting or placing a pin is - they're a generation SETTING, changing what the
-        // engines produce, exactly like the terrain/climate sliders in tools-context.hbs
-        // (#handleContextPanelInput calls markDirty() for those too, but never
-        // pushVectorState() - see #routeProceduralGenerators). Leaving the push in here made
-        // a rule edit accidentally consume a step in the same undo stack as paint strokes and
-        // vector edits, which is confusing when the two are unrelated actions. Rules still
-        // mark the map dirty (a save is still needed), they just don't occupy an undo slot.
+        // Rules aren't a manual edit to the map the way painting or placing a pin is - they're
+        // a generation SETTING, changing what the engines produce, exactly like the
+        // terrain/climate sliders in tools-context.hbs (#handleContextPanelInput calls
+        // markDirty() for those too, but never pushVectorState() - see
+        // #routeProceduralGenerators). Leaving the push in here made a rule edit accidentally
+        // consume a step in the same undo stack as paint strokes and vector edits, which is
+        // confusing when the two are unrelated actions. Rules still mark the map dirty (a
+        // save is still needed), they just don't occupy an undo slot.
         app.uiState.customBiomes = customBiomes;
         app._repaintCanvas(); // customBiomeRules is recompiled fresh from uiState.customBiomes on every repaint (see MapStateManager.getDerivedMapParameters) - no separate cache to invalidate.
         app.render({ parts: ["context"] });
@@ -475,8 +464,8 @@ export class RuleEditorDialog {
      * (including "Underwater", for custom water biomes) instead of dragging it by hand.
      * Overwrites the range when there's just one (the common case); adds a new one
      * alongside existing ranges otherwise, same as the per-axis "+" control, so it never
-     * silently clobbers a range the user kept. Not an enforcement mechanism - see
-     * custom-biomes-v2.3-scoping.md, "Elevation and sea level".
+     * silently clobbers a range the user kept. Not an enforcement mechanism - a GM remains
+     * free to set any elevation range by hand regardless of these presets.
      */
     static #buildZonePicker(segments, seaLevel, rerender) {
         const picker = document.createElement("div");
@@ -510,9 +499,8 @@ export class RuleEditorDialog {
     /**
      * The five named sea-level-relative bands (Underwater, then the land above sea level
      * split into four equal quarters) for the elevation zone quick-picks. Illustrative
-     * bands only, not tuned thresholds - see custom-biomes-v2.3-scoping.md, "Elevation and
-     * sea level", which also notes these boundaries are expected to be revisited once
-     * sea-level rebasing lands.
+     * bands only, not tuned thresholds - expected to be revisited once sea-level rebasing
+     * lands as its own feature.
      */
     static #elevationZones(seaLevel) {
         const span = (1 - seaLevel) / 4;
@@ -705,9 +693,10 @@ export class RuleEditorDialog {
 
     /**
      * The three axes every rule row tracks, in display order. Elevation intentionally has
-     * no "floor" or restriction tied to sea level - see custom-biomes-v2.3-scoping.md,
-     * "Elevation and sea level". A getter (not a static field) so localize() only ever runs
-     * once i18n is actually ready, not at module-import time.
+     * no "floor" or restriction tied to sea level - a rule can validly target any part of
+     * the 0-1 elevation range regardless of where sea level currently sits. A getter (not a
+     * static field) so localize() only ever runs once i18n is actually ready, not at
+     * module-import time.
      */
     static get #AXES() {
         return [

@@ -730,8 +730,8 @@ export class MapDialogManager {
 
     /**
      * Opens the Biome Rule Stacker (see RuleEditorDialog) - a dedicated large dialog for
-     * reviewing and (from sub-phase 4b-ii onward) editing custom biomes' auto-generation
-     * rules against the built-in defaults. Delegates entirely to RuleEditorDialog, which is
+     * reviewing and editing custom biomes' auto-generation rules against the built-in
+     * defaults. Delegates entirely to RuleEditorDialog, which is
      * kept in its own file rather than grown here given how large this feature is expected
      * to become - see that file's own doc comment.
      */
@@ -1087,8 +1087,8 @@ export class MapDialogManager {
      * every currently-selected entity of that type in a single batch. Cancelling the dialog
      * leaves the selection and every entity untouched - Select mode stays active so the GM can
      * adjust their selection and try again. Confirming it (even with nothing ticked) always
-     * exits Select mode and clears the selection: per the agreed design, completing the Mass
-     * Edit dialog is the second way out of Select mode, alongside toggling Select off directly.
+     * exits Select mode and clears the selection: by design, completing the Mass Edit dialog
+     * is the second way out of Select mode, alongside toggling Select off directly.
      */
     static async onMassEdit(app, event, target) {
         const type = target.dataset.type;

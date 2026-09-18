@@ -1206,8 +1206,8 @@ export class ProceduralEngine {
      * @returns {{lookupKey: (string|number), isWater: boolean, isFallback: boolean}} `isFallback`
      * is true only for the last branch below (getBiomeKey()'s built-in default) - a hand-painted
      * override or a matching custom rule both count as "covered" and set it false, even when the
-     * matched custom biome turns out to render as water. This is what sub-phase 4c's "preview
-     * rule coverage" highlight (MapStudioApp's hover button, see createBiomesMap's optional
+     * matched custom biome turns out to render as water. This is what the "Preview Rule
+     * Coverage" highlight (MapStudioApp's hover button, see createBiomesMap's optional
      * `outFallbackBuffer` below) tints: exactly the pixels a GM's custom rule set doesn't reach.
      */
     static resolveBiomeLookup(overrideId, elevation, moisture, temp, seaLevel, waterMask, pixelIndex, customBiomeRules, biomePalette, solidOverWater) {
@@ -1236,9 +1236,9 @@ export class ProceduralEngine {
      * FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR/ALPHA where resolveBiomeLookup's `isFallback`
      * came back true (no override, no custom rule - the built-in default did the work), fully
      * transparent everywhere else. This is a free byproduct of the same per-pixel loop below, not
-     * a second pass - see MapStudioApp's "preview rule coverage" hover button (sub-phase 4c),
-     * which just toggles this buffer's own canvas layer visible/hidden rather than recomputing
-     * anything. Left `null` (the default) for callers that don't need the preview - the 3D view
+     * a second pass - see MapStudioApp's "Preview Rule Coverage" hover button, which just
+     * toggles this buffer's own canvas layer visible/hidden rather than recomputing anything.
+     * Left `null` (the default) for callers that don't need the preview - the 3D view
      * generation, for one - and costs nothing extra when omitted beyond the one `if` check.
      */
     createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, outFallbackBuffer = null) {

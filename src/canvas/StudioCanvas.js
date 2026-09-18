@@ -28,8 +28,8 @@ export class StudioCanvas {
             base: new PIXI.Container(),
             topography: new PIXI.Container(),
             biomes: new PIXI.Container(),
-            // Companion highlight layer for the "Preview Rule Coverage" hover button (sub-phase
-            // 4c) - painted alongside `biomes` on every repaint, but hidden until hovered.
+            // Companion highlight layer for the "Preview Rule Coverage" hover button - painted
+            // alongside `biomes` on every repaint, but hidden until hovered.
             biomeFallback: new PIXI.Container(),
             contours: new PIXI.Container(),
             landMasks: new PIXI.Container(),
