@@ -110,6 +110,10 @@
                 {{/each}}
             </div>
         </fieldset>
+
+        <button type="button" class="fwmb-btn wide subtle danger" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
+            <i class="fwmb-icon delete"></i> {{localize "FILRODENSWMB.UI.DeleteAllLandMasksTitle"}}
+        </button>
     {{/if}}
 
     <div class="fwmb-flex-1"></div>

@@ -3561,8 +3561,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    /**
+     * Handles switching between Add Land and Remove Land while editing guided-mode land masks.
+     * Genuinely switching mode should finish whatever mask is currently being drawn first - the
+     * same way _onSetFeatureMode ends the active fault and _onSetInfraMode ends the active route
+     * when their own mode toggles change - otherwise clicks after switching kept extending the
+     * mask already in progress under its original Add/Remove type instead of starting a new one.
+     * Mirrors exactly what #handleRightClick already does to finish a land mask, since switching
+     * mode is meant to have the same "I'm done with this shape" effect a right-click would.
+     */
     _onSetSceneMode(event, target) {
         this.uiState.sceneMode = target.dataset.mode;
+
+        if (this.activeLandMaskId) {
+            this.activeLandMaskId = null;
+            this._repaintVectors();
+            this.requestTerrainUpdate();
+        }
+
         this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
