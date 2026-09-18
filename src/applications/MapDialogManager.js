@@ -730,8 +730,8 @@ export class MapDialogManager {
 
     /**
      * Opens the Biome Rule Stacker (see RuleEditorDialog) - a dedicated large dialog for
-     * reviewing and (from sub-phase 4b-ii onward) editing custom biomes' auto-generation
-     * rules against the built-in defaults. Delegates entirely to RuleEditorDialog, which is
+     * reviewing and editing custom biomes' auto-generation rules against the built-in
+     * defaults. Delegates entirely to RuleEditorDialog, which is
      * kept in its own file rather than grown here given how large this feature is expected
      * to become - see that file's own doc comment.
      */
@@ -958,6 +958,34 @@ export class MapDialogManager {
         app.markDirty();
     }
 
+    /**
+     * Bulk-deletes every land mask on the current map (both "add" landmass masks and
+     * "subtract" ocean-hole masks) after a single confirmation, instead of requiring one
+     * onDeleteLandMask call per shape. Mirrors that method's undo tracking and repaint/terrain/
+     * dirty sequence exactly - just clears the whole array at once rather than filtering out a
+     * single id. A no-op when there's nothing to delete (the toolbar button is also disabled in
+     * that case, but this guards direct calls too).
+     */
+    static async onDeleteAllLandMasks(app, event, target) {
+        if (app.landMasks.length === 0) return;
+
+        const confirmed = await this._confirmDialog(
+            game.i18n.localize("FILRODENSWMB.UI.DeleteAllLandMasksTitle"),
+            game.i18n.format("FILRODENSWMB.UI.DeleteAllLandMasksConfirm", { count: app.landMasks.length }),
+        );
+        if (!confirmed) return;
+
+        MapStateManager.pushVectorState(app);
+
+        app.landMasks = [];
+        app.activeLandMaskId = null;
+
+        app._repaintVectors();
+        app.requestTerrainUpdate();
+        app.render({ parts: ["context"] });
+        app.markDirty();
+    }
+
     static async onDeleteQuickStyle(app, event, target) {
         const type = target.dataset.action.replace("delete", "").replace("QuickStyle", "");
         const config = this.QUICK_STYLE_CONFIG[type];
@@ -1059,8 +1087,8 @@ export class MapDialogManager {
      * every currently-selected entity of that type in a single batch. Cancelling the dialog
      * leaves the selection and every entity untouched - Select mode stays active so the GM can
      * adjust their selection and try again. Confirming it (even with nothing ticked) always
-     * exits Select mode and clears the selection: per the agreed design, completing the Mass
-     * Edit dialog is the second way out of Select mode, alongside toggling Select off directly.
+     * exits Select mode and clears the selection: by design, completing the Mass Edit dialog
+     * is the second way out of Select mode, alongside toggling Select off directly.
      */
     static async onMassEdit(app, event, target) {
         const type = target.dataset.type;

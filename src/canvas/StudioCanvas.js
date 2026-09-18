@@ -28,8 +28,8 @@ export class StudioCanvas {
             base: new PIXI.Container(),
             topography: new PIXI.Container(),
             biomes: new PIXI.Container(),
-            // Companion highlight layer for the "Preview Rule Coverage" hover button (sub-phase
-            // 4c) - painted alongside `biomes` on every repaint, but hidden until hovered.
+            // Companion highlight layer for the "Preview Rule Coverage" hover button - painted
+            // alongside `biomes` on every repaint, but hidden until hovered.
             biomeFallback: new PIXI.Container(),
             contours: new PIXI.Container(),
             landMasks: new PIXI.Container(),
@@ -1616,9 +1616,14 @@ export class StudioCanvas {
             grid: this.gridLayer.visible,
             reference: this.layers.reference.visible,
             cartography: this.layers.cartography.visible,
+            landMasks: this.layers.landMasks.visible,
         };
 
         this.layers.reference.visible = false;
+        // Guided mode's land mask editing polygons are an in-Studio authoring aid only, never
+        // part of the finished map, so they're kept out of every export pass regardless of
+        // whether they happened to be left visible from the Scene tool.
+        this.layers.landMasks.visible = false;
 
         if (passType === "player") {
             this.gridLayer.visible = false;
@@ -1657,6 +1662,7 @@ export class StudioCanvas {
         this.gridLayer.visible = originalVisibility.grid;
         this.layers.reference.visible = originalVisibility.reference;
         this.layers.cartography.visible = originalVisibility.cartography;
+        this.layers.landMasks.visible = originalVisibility.landMasks;
         this.layers.base.visible = true;
         this.layers.topography.visible = true;
         this.layers.biomes.visible = true;

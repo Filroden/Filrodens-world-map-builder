@@ -55,6 +55,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteRiver(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
+            deleteAllLandMasks(e, t) { MapDialogManager.onDeleteAllLandMasks(this, e, t); },
 
             // --- DIALOG MANAGER: Entity Editing ---
             editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
@@ -107,6 +108,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             resetZoom(e, t)                 { this._onResetZoom(e, t); },
             saveMap(e, t)                   { this._onSaveMap(e, t); },
             selectRegionLayer(e, t)         { this._onSelectRegionLayer(e, t); },
+            setBrushBiome(e, t)             { this._onSetBrushBiome(e, t); },
             setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
             setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
             setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
@@ -166,9 +168,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * reuse those labels rather than duplicating them under new keys. Custom Pin Icons are
      * deliberately not included - they're a world-scoped Foundry setting referencing a live
      * file path rather than a per-map uiState array, so a portable export needs to embed the
-     * actual image data. That's backlogged as its own follow-up (see the v2.2.0 Settings
-     * Export/Import scoping doc); this set covers every registry that's already plain,
-     * self-contained JSON.
+     * actual image data. That's left for a future follow-up; this set covers every registry
+     * that's already plain, self-contained JSON.
      */
     static STYLE_LIBRARY_CATEGORIES = [
         { key: "customBiomes", labelKey: "FILRODENSWMB.UI.SettingsBiomeColors" },
@@ -221,6 +222,27 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.activeLandMaskId = null;
         this.mapLabels = [];
         this.mapDecorations = [];
+        // pinHistory/pinRedoStack and globalHistoryLedger/globalRedoLedger are session-only
+        // undo/redo bookkeeping, not permanent data. pinHistory holds full vector-state
+        // snapshots (see MapStateManager.getVectorStateSnapshot) taken immediately before a
+        // vector edit - these are never saved with the map, since a saved map only stores each
+        // vector feature's final current state, not a history of how it got there. They're
+        // capped at FILRODENSWMB.LIMITS.HISTORY_MAX (see MapStateManager.pushVectorState) and
+        // reset to empty whenever a map loads (see #handleMapLoad), so undo/redo only ever
+        // covers edits made in the current session.
+        //
+        // globalHistoryLedger/globalRedoLedger is the single combined, ordered view across both
+        // raster ("brush stroke") and vector actions that the Undo/Redo buttons actually read
+        // (see #processHistoryStep, #previewActionBounds, #updateHistoryButtons) - it's what
+        // decides which of the two type-specific stacks above (or brushEngine.history/
+        // .redoStack) to pop next, and in what order. It's a view over recent session activity,
+        // not a data store in its own right, and is deliberately treated the same as
+        // pinHistory/pinRedoStack: capped at HISTORY_MAX, reset to empty on map load. Don't
+        // confuse this with brushEngine.history (see BrushEngine.js) - that's the actual,
+        // uncapped, permanently-saved record of every brush stroke ever painted, needed to
+        // rebuild a map's terrain/biomes from its seed on load. This ledger only tracks how many
+        // of the *current session's* actions are currently undoable; it says nothing about how
+        // much paint history a map actually contains.
         this.pinHistory = [];
         this.pinRedoStack = [];
         this.globalHistoryLedger = [];
@@ -310,7 +332,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS)
-            .filter(([key, id]) => id !== 1 && id !== 2 && !key.toLowerCase().startsWith("custom"))
+            .filter(([key, id]) => id !== FILRODENSWMB.BIOME_IDS.ERASER && id !== 1 && id !== 2 && !key.toLowerCase().startsWith("custom"))
             .map(([key, id]) => {
                 const defaultRgb = FILRODENSWMB.BIOMES[key] || [0, 0, 0];
                 const currentRgb = this.customBiomeColors[key] || defaultRgb;
@@ -460,6 +482,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#bindCollapsibleFieldsets();
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
+        this.#updateHistoryButtons();
 
         const mapContainer = this.element.querySelector(".fwmb-map-container");
         const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
@@ -582,6 +605,37 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    /**
+     * Keeps the Undo/Redo buttons' disabled state and step-count tooltip in sync with
+     * globalHistoryLedger/globalRedoLedger. Deliberately DOM-only rather than routed through
+     * template context and a "map" part re-render: the PIXI canvas is mounted into
+     * .fwmb-map-preview once by #initCanvasAndEngines and never re-attached, so re-rendering
+     * the "map" part would rebuild that container from the template and orphan the canvas.
+     * Called from _onRender, which covers every render() call across the app (tool switches,
+     * vector edits via MapStateManager.pushVectorState, undo/redo itself), plus directly from
+     * #handleBrushEnd, since ending a paint/terrain stroke changes the ledger without
+     * triggering a render of its own.
+     */
+    #updateHistoryButtons() {
+        const undoBtn = this.element.querySelector('[data-action="undoBrush"]');
+        const redoBtn = this.element.querySelector('[data-action="redoBrush"]');
+
+        const undoCount = this.globalHistoryLedger?.length ?? 0;
+        const redoCount = this.globalRedoLedger?.length ?? 0;
+
+        if (undoBtn) {
+            undoBtn.disabled = undoCount === 0;
+            undoBtn.dataset.tooltip =
+                undoCount > 0 ? game.i18n.format("FILRODENSWMB.UI.UndoCount", { count: undoCount }) : game.i18n.localize("FILRODENSWMB.UI.Undo");
+        }
+
+        if (redoBtn) {
+            redoBtn.disabled = redoCount === 0;
+            redoBtn.dataset.tooltip =
+                redoCount > 0 ? game.i18n.format("FILRODENSWMB.UI.RedoCount", { count: redoCount }) : game.i18n.localize("FILRODENSWMB.UI.Redo");
+        }
+    }
+
     #handleToolbarInput(event) {
         const target = event.target;
 
@@ -598,6 +652,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 1. Assign Value
         if (target.type === "checkbox") this.uiState[name] = target.checked;
         else if (target.type === "number" || target.type === "range") this.uiState[name] = Number(target.value);
+        // brushBiome's options are always numeric biome ids, never free text - and BrushEngine's
+        // paint guards (and the Eraser's own active-state matching) compare it with strict
+        // equality, so it has to come out of here as a real Number, not the string every other
+        // <select> in this method is deliberately left as.
+        else if (name === "brushBiome") this.uiState[name] = Number(target.value);
         else this.uiState[name] = target.value;
 
         // 2. Delegate to Sub-Systems
@@ -1074,7 +1133,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const size = this.uiState.brushSize || 20;
         const strength = this.uiState.brushStrength || 0.02;
         const feather = this.uiState.brushFeather || 0.4;
-        const paintValue = layer === "biome" ? this.uiState.brushBiome || 6 : null;
+        // Strict nullish check, not `||`: the Eraser Biome's paint value is a genuine 0, which
+        // `||` would silently coerce back to the default Grassland fallback below.
+        const paintValue = layer === "biome" ? (this.uiState.brushBiome ?? FILRODENSWMB.BIOME_IDS.GRASSLAND) : null;
 
         this.brushEngine.startStroke(layer, tool, size, strength, feather, paintValue);
         this.#applyBrushStroke(x, y);
@@ -1095,11 +1156,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.brushEngine.endStroke();
 
         if (this.brushEngine?.history?.length > prevLength) {
+            // Only globalHistoryLedger (the session undo/redo view) is capped here -
+            // brushEngine.history itself is deliberately left to grow without limit, since it's
+            // the permanent stroke record the map gets rebuilt from on load, not undo data (see
+            // the constructor and #handleMapLoad for the full explanation).
             this.globalHistoryLedger.push("raster");
             this.globalRedoLedger = [];
             if (this.globalHistoryLedger.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
                 this.globalHistoryLedger.shift();
             }
+            // No render() follows a brush stroke ending (painting stays lightweight), so the
+            // Undo/Redo buttons need their own direct refresh here rather than waiting on _onRender.
+            this.#updateHistoryButtons();
         }
 
         this.markDirty();
@@ -1895,11 +1963,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
 
+        // brushEngine.history is loaded in full, uncapped: it's the permanent replay log this
+        // map's terrain/biomes get rebuilt from (see generateTerrain() below and
+        // BrushEngine#replayHistory), not session undo/redo data, so it can't be trimmed without
+        // permanently losing real painted terrain/biome edits the next time this map is saved.
+        //
+        // globalHistoryLedger, by contrast, IS session undo/redo bookkeeping (see its
+        // declaration in the constructor above for the full explanation), so it's reset to empty
+        // here rather than rebuilt from brushEngine.history's length - exactly like pinHistory/
+        // pinRedoStack below, which reset to empty for the same reason on the vector side.
+        // Loading a map, however much paint history it carries, always starts a fresh undo
+        // session: nothing is undoable until an edit is made after this load.
         this.brushEngine.history = payload.history || [];
         this.brushEngine.redoStack = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
-        this.globalHistoryLedger = this.brushEngine.history.map(() => "raster");
+        this.globalHistoryLedger = [];
         this.globalRedoLedger = [];
 
         this.defaultUiState = foundry.utils.deepClone(this.uiState);
@@ -3356,11 +3435,43 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Handles swapping between the Raise, Lower, and Smooth brush tools.
+     * Handles swapping between the Raise, Lower, and Smooth brush tools - and, for the Biomes
+     * tool specifically, doubles as the "stop erasing" side of the Paint/Eraser pair. Biomes
+     * only ever has the one real tool ("paint"), so clicking it while the Eraser Biome is
+     * active isn't a genuine tool switch; it's the natural place for a GM to expect painting a
+     * real biome to resume, so it restores whatever biome was selected before Erase was clicked
+     * (see _onSetBrushBiome) instead of silently leaving the brush still set to erase.
      */
     _onSetBrushTool(event, target) {
         const stateKey = `${this.activeTool}BrushTool`;
         this.uiState[stateKey] = target.dataset.tool;
+
+        if (this.activeTool === "biomes" && this.uiState.brushBiome === FILRODENSWMB.BIOME_IDS.ERASER) {
+            this.uiState.brushBiome = this.uiState.lastPaintBiome ?? FILRODENSWMB.BIOME_IDS.GRASSLAND;
+        }
+
+        this.render({ parts: ["toolbar", "editToolbar"] });
+    }
+
+    /**
+     * Sets which biome id the Biomes brush paints, from a toolbar icon rather than the
+     * `brushBiome` dropdown - currently only used for the Eraser Biome (id 0), which is
+     * deliberately excluded from that dropdown's list. Reads target.dataset.biome as a real
+     * Number rather than leaving it as the string the dropdown's own change handler stores,
+     * since BrushEngine's paint guards compare paintValue with strict equality.
+     *
+     * Remembers the real biome that was selected before switching to Erase, in `lastPaintBiome`,
+     * so _onSetBrushTool can restore it if the GM clicks back to Paint rather than picking a new
+     * biome from the dropdown themselves.
+     */
+    _onSetBrushBiome(event, target) {
+        const biome = Number(target.dataset.biome);
+
+        if (biome === FILRODENSWMB.BIOME_IDS.ERASER && this.uiState.brushBiome !== FILRODENSWMB.BIOME_IDS.ERASER) {
+            this.uiState.lastPaintBiome = this.uiState.brushBiome;
+        }
+
+        this.uiState.brushBiome = biome;
         this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
@@ -3449,8 +3560,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    /**
+     * Handles switching between Add Land and Remove Land while editing guided-mode land masks.
+     * Genuinely switching mode should finish whatever mask is currently being drawn first - the
+     * same way _onSetFeatureMode ends the active fault and _onSetInfraMode ends the active route
+     * when their own mode toggles change - otherwise clicks after switching kept extending the
+     * mask already in progress under its original Add/Remove type instead of starting a new one.
+     * Mirrors exactly what #handleRightClick already does to finish a land mask, since switching
+     * mode is meant to have the same "I'm done with this shape" effect a right-click would.
+     */
     _onSetSceneMode(event, target) {
         this.uiState.sceneMode = target.dataset.mode;
+
+        if (this.activeLandMaskId) {
+            this.activeLandMaskId = null;
+            this._repaintVectors();
+            this.requestTerrainUpdate();
+        }
+
         this.render({ parts: ["toolbar", "editToolbar"] });
     }
 

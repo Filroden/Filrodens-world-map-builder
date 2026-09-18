@@ -19,7 +19,7 @@ import { FILRODENSWMB } from "../config.js";
  *
  * Defaults are NOT represented here - ProceduralEngine.getBiomeKey remains the guaranteed
  * fallback for any pixel no custom rule claims, so total climate-space coverage is
- * unaffected by whatever custom rules do or don't exist (see custom-biomes-v2.3-scoping.md).
+ * unaffected by whatever custom rules do or don't exist.
  *
  * createBiomesMap() runs the matcher below for every pixel in the generated buffer, so the
  * compiled form is a set of flat typed arrays (struct-of-arrays) built ONCE per generation
@@ -165,8 +165,9 @@ export class BiomeRuleEngine {
      * already 0 matches any value below 0 too, and one whose max is already 1 matches any value
      * above 1 too - interior boundaries (anything not touching 0 or 1) are completely unaffected.
      * This is a matching-only fix; the rule editor UI still always displays and drags the real
-     * 0/1 numbers, never "unbounded" - see custom-biomes-v2.3-scoping.md's "Sub-phase 4c
-     * follow-up" section for why this was chosen over changing the terrain engine itself.
+     * 0/1 numbers, never "unbounded". Chosen over changing the terrain engine itself so the
+     * engine's own output range stays exactly as documented elsewhere - only rule *matching*
+     * gets more permissive at the true edges.
      */
     static #axisMatches(segments, start, count, value) {
         const end = start + count * SEGMENT_STRIDE;

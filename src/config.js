@@ -51,6 +51,20 @@ export const FILRODENSWMB = {
             OCTAVES: 2,
             FREQUENCY_MULT: 1.5,
         },
+        // Lets tapered, independent noise perturb the guided-mode coastline itself (see
+        // ProceduralEngine#computeEffectiveCoastDistance), instead of noise being suppressed to
+        // zero exactly at the drawn edge. BAND_RATIO/AMPLITUDE_RATIO are expressed relative to
+        // CONTINENT_SCALE rather than fixed pixel values, so the effect scales sensibly if that
+        // slider is retuned - calibrated against CONTINENT_SCALE's default of 150.
+        COASTAL_VARIANCE: {
+            BAND_RATIO: 0.53,
+            AMPLITUDE_RATIO: 1.33,
+            OCTAVES: 5,
+            FREQUENCY_MULT: 16.7,
+            // Arbitrary large offsets, matching the pattern of WARP.OFFSETS above, so this noise
+            // field samples a different region of the simplex field than the domain warp does.
+            NOISE_OFFSET: { X: 4000, Y: 4000 },
+        },
     },
     LIMITS: {
         HISTORY_MAX: 100,
@@ -186,6 +200,13 @@ export const FILRODENSWMB = {
         SUBTROPICAL_DESERT: [214, 198, 137],
     },
     BIOME_IDS: {
+        // Sentinel: "erase to the computed biome" - never a real painted colour.
+        // ProceduralEngine.resolveBiomeLookup already treats any override <= 0 as "no override,
+        // compute the biome normally" (its `overrideId > 0` check); this just gives that existing
+        // sentinel a name instead of a bare literal 0. Deliberately excluded from
+        // MapStudioApp's context.biomeList, since it's offered as its own toolbar icon rather
+        // than a dropdown option.
+        ERASER: 0,
         DEEP_OCEAN: 1,
         SHALLOW_OCEAN: 2,
         SNOW: 3,

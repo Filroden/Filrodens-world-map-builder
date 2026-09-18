@@ -384,7 +384,7 @@ export class ProceduralEngine {
                 // C. Tectonic Bilinear Upscaling
                 const mx = (x / width) * (meshW - 1);
                 const my = (y / height) * (meshH - 1);
-                const tectonicElevation = this.#bilinearSample(tectonicMesh, meshW, mx, my);
+                const tectonicElevation = this.#bilinearSample(tectonicMesh, meshW, meshH, mx, my);
 
                 // D. Detail Composition
                 const detailNoise = this.#fbm(sampleX, sampleY, eOctaves, eScale);
@@ -784,8 +784,13 @@ export class ProceduralEngine {
     }
 
     /**
-     * Applies domain warping, noise suppression, and continuous elevation blending.
-     * Enforces Strict Ownership to prevent noise from creating islands outside mask boundaries.
+     * Applies domain warping, tapered coastal noise, and continuous elevation blending.
+     * Land/ocean ownership is guaranteed correct in the far field - no stray islands can appear
+     * away from the drawn mask - but unlike the coastline itself, that guarantee is no longer
+     * "noise is suppressed to zero exactly at the drawn edge". Instead, noise is allowed to move
+     * the coastline within a tapered band either side of the edge (see
+     * #computeEffectiveCoastDistance), so coastlineFracture actually shapes the coastline rather
+     * than only bending a line that still traces the mask's own polygon.
      */
     #applyGuidedDetail(width, height, params, distanceField, elevationData) {
         const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
@@ -798,6 +803,14 @@ export class ProceduralEngine {
         const continentScale = params.continentScale ?? FILRODENSWMB.GENERATION.CONTINENT_SCALE;
         const shelfRange = params.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
         const macroScale = 1 / Math.max(width, height);
+
+        // How far, in pixels, either side of the drawn edge the coastline may wander - and how
+        // strongly - before tapering back to the mask's own shape. Kept once here, outside the
+        // per-pixel loop below, since none of these depend on x/y.
+        const coastalVariance = FILRODENSWMB.GENERATION.COASTAL_VARIANCE;
+        const boundaryVarianceBand = continentScale * coastalVariance.BAND_RATIO;
+        const boundaryVarianceAmplitude = continentScale * coastalVariance.AMPLITUDE_RATIO * fracture;
+        const boundaryNoiseScale = macroScale * coastalVariance.FREQUENCY_MULT;
 
         // Defines how far inland/out to sea the macro structure reaches its peak depth/height
         for (let y = 0; y < height; y++) {
@@ -828,22 +841,31 @@ export class ProceduralEngine {
                     fracture *
                     FILRODENSWMB.GENERATION.WARP.AMPLITUDE;
 
-                const warpedX = Math.max(0, Math.min(width - 1, Math.floor(x + warpX)));
-                const warpedY = Math.max(0, Math.min(height - 1, Math.floor(y + warpY)));
-                const rawDistance = distanceField[warpedY * width + warpedX];
+                // 2. Sample the macro distance field at the warped position with true sub-pixel
+                // (bilinear) precision, rather than snapping to the nearest whole pixel - this
+                // keeps coastlineFracture's effect smooth instead of quantised to a single pixel.
+                const sampleX = Math.max(0, Math.min(width - 1, x + warpX));
+                const sampleY = Math.max(0, Math.min(height - 1, y + warpY));
+                const macroDistance = this.#bilinearSample(distanceField, width, height, sampleX, sampleY);
 
-                // 2. Base Noise & Suppression
+                // 3. Let tapered, independent noise perturb that macro distance, so the actual
+                // coastline can move organically near the drawn edge instead of only following
+                // the (warped) shape of the mask itself.
+                const effectiveDistance = this.#computeEffectiveCoastDistance(worldX, worldY, macroDistance, boundaryVarianceBand, boundaryVarianceAmplitude, boundaryNoiseScale);
+
+                // 4. Base Noise & Suppression
                 const detailNoise = this.#fbm(worldX + warpX, worldY + warpY, eOctaves, eScale);
-                const noiseWeight = this.#smoothstep(0, coastalBand, Math.abs(rawDistance));
+                const noiseWeight = this.#smoothstep(0, coastalBand, Math.abs(effectiveDistance));
 
-                // 3. Macro Structure (Ease-out curve mapped 0.0 to 1.0)
-                const normalizedDist = Math.min(1.0, Math.abs(rawDistance) / continentScale);
+                // 5. Macro Structure (Ease-out curve mapped 0.0 to 1.0)
+                const normalizedDist = Math.min(1.0, Math.abs(effectiveDistance) / continentScale);
                 const structure = 1.0 - Math.pow(1.0 - normalizedDist, 2);
 
-                // 4. Strict Ownership Composition
+                // 6. Tapered Ownership Composition - effectiveDistance already carries the
+                // boundary noise, so this crossing is the actual (organic) coastline.
                 let finalElev;
 
-                if (rawDistance >= 0) {
+                if (effectiveDistance >= 0) {
                     // LAND: Mathematically guaranteed to generate above seaLevel
                     let baseTexture = structure * FILRODENSWMB.GENERATION.BLEND_WEIGHTS.GUIDED_MACRO + detailNoise * noiseWeight * FILRODENSWMB.GENERATION.BLEND_WEIGHTS.GUIDED_DETAIL;
                     baseTexture = Math.pow(baseTexture, eStretch);
@@ -855,11 +877,27 @@ export class ProceduralEngine {
                     finalElev = seaLevel - baseTexture * (seaLevel * FILRODENSWMB.GENERATION.OCEAN_DEPTH_CAP);
                 }
 
-                // 5. Continental Shelving
+                // 7. Continental Shelving
                 finalElev = this.#applyContinentalShelf(finalElev, seaLevel, shelfRange);
                 elevationData[index] = Math.max(0, Math.min(1, finalElev));
             }
         }
+    }
+
+    /**
+     * Perturbs a macro coastline distance (from the guided-mode JFA distance field) with
+     * independent, tapered noise. The perturbation is strongest exactly at the drawn edge and
+     * fades to zero over `boundaryVarianceBand`, via the same smoothstep-based taper used
+     * elsewhere in this file - so land/ocean ownership, and the coastal shelving maths that
+     * depends on a stable far-field crossing, are completely unaffected beyond that band. Only
+     * the zone immediately around the drawn edge, inside and out, can actually move.
+     */
+    #computeEffectiveCoastDistance(worldX, worldY, macroDistance, boundaryVarianceBand, boundaryVarianceAmplitude, boundaryNoiseScale) {
+        const coastalVariance = FILRODENSWMB.GENERATION.COASTAL_VARIANCE;
+        const boundaryNoise = this.#fbm(worldX + coastalVariance.NOISE_OFFSET.X, worldY + coastalVariance.NOISE_OFFSET.Y, coastalVariance.OCTAVES, boundaryNoiseScale);
+        const boundaryTaper = 1.0 - this.#smoothstep(0, boundaryVarianceBand, Math.abs(macroDistance));
+
+        return macroDistance + (boundaryNoise - 0.5) * 2 * boundaryVarianceAmplitude * boundaryTaper;
     }
 
     /**
@@ -1168,8 +1206,8 @@ export class ProceduralEngine {
      * @returns {{lookupKey: (string|number), isWater: boolean, isFallback: boolean}} `isFallback`
      * is true only for the last branch below (getBiomeKey()'s built-in default) - a hand-painted
      * override or a matching custom rule both count as "covered" and set it false, even when the
-     * matched custom biome turns out to render as water. This is what sub-phase 4c's "preview
-     * rule coverage" highlight (MapStudioApp's hover button, see createBiomesMap's optional
+     * matched custom biome turns out to render as water. This is what the "Preview Rule
+     * Coverage" highlight (MapStudioApp's hover button, see createBiomesMap's optional
      * `outFallbackBuffer` below) tints: exactly the pixels a GM's custom rule set doesn't reach.
      */
     static resolveBiomeLookup(overrideId, elevation, moisture, temp, seaLevel, waterMask, pixelIndex, customBiomeRules, biomePalette, solidOverWater) {
@@ -1198,9 +1236,9 @@ export class ProceduralEngine {
      * FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR/ALPHA where resolveBiomeLookup's `isFallback`
      * came back true (no override, no custom rule - the built-in default did the work), fully
      * transparent everywhere else. This is a free byproduct of the same per-pixel loop below, not
-     * a second pass - see MapStudioApp's "preview rule coverage" hover button (sub-phase 4c),
-     * which just toggles this buffer's own canvas layer visible/hidden rather than recomputing
-     * anything. Left `null` (the default) for callers that don't need the preview - the 3D view
+     * a second pass - see MapStudioApp's "Preview Rule Coverage" hover button, which just
+     * toggles this buffer's own canvas layer visible/hidden rather than recomputing anything.
+     * Left `null` (the default) for callers that don't need the preview - the 3D view
      * generation, for one - and costs nothing extra when omitted beyond the one `if` check.
      */
     createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, outFallbackBuffer = null) {
@@ -1370,13 +1408,14 @@ export class ProceduralEngine {
     }
 
     /**
-     * Bilinear interpolation for perfectly upscaling a low-resolution mesh into a high-resolution grid.
+     * Bilinear interpolation for perfectly upscaling a low-resolution mesh into a high-resolution
+     * grid, or for reading any full-resolution field at a continuous (sub-pixel) position.
      */
-    #bilinearSample(mesh, width, x, y) {
+    #bilinearSample(mesh, width, height, x, y) {
         const x1 = Math.floor(x);
         const y1 = Math.floor(y);
         const x2 = Math.min(x1 + 1, width - 1);
-        const y2 = Math.min(y1 + 1, width - 1);
+        const y2 = Math.min(y1 + 1, height - 1);
 
         const dx = x - x1;
         const dy = y - y1;

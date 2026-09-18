@@ -253,13 +253,6 @@
     width: var(--fwmb-font-size-xxs);
 }
 
-.fwmb .fwmb-btn.danger {
-    color: var(--fwmb-color-danger);
-}
-.fwmb .fwmb-btn.danger:hover {
-    color: var(--fwmb-color-danger);
-}
-
 .fwmb .fwmb-btn.subtle {
     background: transparent;
     border: 1px solid var(--fwmb-accent-main);
@@ -295,6 +288,13 @@
 .fwmb .fwmb-btn.active {
     background: var(--fwmb-accent-main);
     color: var(--fwmb-text-inverse);
+}
+
+.fwmb .fwmb-btn.danger {
+    color: var(--fwmb-color-danger);
+}
+.fwmb .fwmb-btn.danger:hover {
+    color: var(--fwmb-color-danger);
 }
 
 /* A full-width button paired with a small icon-only companion action (e.g. the Biome Rule
@@ -994,6 +994,12 @@
     border-color: var(--fwmb-accent-main);
 }
 
+.fwmb-map-history button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .fwmb-canvas-readout {
     position: absolute;
     inset-block-start: var(--fwmb-space-10);
@@ -1516,17 +1522,12 @@ input.fwmb-swatch {
     height: var(--fwmb-font-size-m);
 }
 
-/* Marks a Custom Biome list-item as having auto-generation rules attached (Rule Editor) - a
-   first-pass style only, flagged for Ken's own visual polish like the rest of this file. */
 .fwmb-list-item .fwmb-rule-indicator {
     flex-shrink: 0;
     font-size: var(--fwmb-font-size-m);
     color: var(--fwmb-accent-main);
 }
 
-/* Deliberately fixed black, not a theme token - this is a raw, unmasked render of a
-   custom icon's actual SVG so a GM can confirm it's genuinely solid white before
-   accepting it, independent of whatever theme colour the picker itself uses. */
 .fwmb-pin-icon-preview {
     display: flex;
     align-items: center;
@@ -1652,9 +1653,6 @@ input.fwmb-swatch {
     margin-block-end: var(--fwmb-space-8);
 }
 
-/* Groups the Regions panel's Select toggle alongside its "New Layer" button on the right of
-   the header row - the Regions panel has no <fieldset>/<legend> to host the toggle the way
-   the other tool panels do, so it needs its own action cluster instead. */
 .fwmb-panel-header-actions {
     display: flex;
     align-items: center;

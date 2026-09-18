@@ -1,10 +1,19 @@
 import { SpatialMath } from "./SpatialMath.js";
+import { FILRODENSWMB } from "../config.js";
 
 export class BrushEngine {
     constructor(mapWidth, mapHeight) {
         this.mapWidth = mapWidth;
         this.mapHeight = mapHeight;
 
+        // The permanent, uncapped record of every completed brush stroke (terrain or biome).
+        // MapStudioApp saves this array in full with the map and never trims it - it's not undo
+        // data, it's the replay log a map's terrain/biomes get rebuilt from on load (regenerate
+        // procedurally from the saved seed/params, then replayHistory() re-paints every stroke
+        // here back on top). Session-scoped undo/redo bookkeeping for the Undo/Redo buttons lives
+        // separately, in MapStudioApp's globalHistoryLedger/globalRedoLedger - see that class's
+        // constructor for the full explanation of the split. Don't add capping logic here; it
+        // belongs nowhere near this array.
         this.history = [];
         this.redoStack = [];
 
@@ -233,13 +242,24 @@ export class BrushEngine {
         elevationData[index] = Math.max(0, elevationData[index]);
     }
 
+    /**
+     * Writes a biome override, but only where the paint value makes sense for the tile
+     * underneath - a land biome can't be hand-painted onto water and vice versa. That guard
+     * stays symmetric with ProceduralEngine.resolveBiomeLookup, which never lets a custom biome
+     * reach water except via an auto-generation rule match (see that method's own doc comment).
+     * Two built-in values are deliberate exceptions, both allowed to write onto water: Pack Ice,
+     * which has always rendered solid over water, and the Eraser (id 0), which needs to be able
+     * to clear a previous Pack-Ice-style override sitting on a water tile - otherwise that
+     * override could never be erased again.
+     */
     #applyBiomeMath(index, x, y, influence, elevationData, biomeOverrideData, seaLevel) {
         const { paintValue } = this.currentStroke;
 
         const isLand = elevationData[index] >= seaLevel;
-        const isWaterBiome = paintValue === 1 || paintValue === 2;
+        const isWaterBiome = paintValue === FILRODENSWMB.BIOME_IDS.DEEP_OCEAN || paintValue === FILRODENSWMB.BIOME_IDS.SHALLOW_OCEAN;
+        const canPaintOverWater = paintValue === FILRODENSWMB.BIOME_IDS.PACK_ICE || paintValue === FILRODENSWMB.BIOME_IDS.ERASER;
 
-        if (paintValue === 13 || isLand !== isWaterBiome) {
+        if (canPaintOverWater || isLand !== isWaterBiome) {
             biomeOverrideData[index] = paintValue;
         }
     }
