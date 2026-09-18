@@ -65,6 +65,8 @@
     "FILRODENSWMB.UI.ToolLevel": "Level Terrain",
     "FILRODENSWMB.UI.Undo": "Undo",
     "FILRODENSWMB.UI.Redo": "Redo",
+    "FILRODENSWMB.UI.UndoCount": "Undo ({count})",
+    "FILRODENSWMB.UI.RedoCount": "Redo ({count})",
 
     "FILRODENSWMB.UI.LayerBase": "Toggle Base Map",
     "FILRODENSWMB.UI.LayerTopography": "Toggle Topography",

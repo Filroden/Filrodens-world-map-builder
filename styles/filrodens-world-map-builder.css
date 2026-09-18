@@ -994,6 +994,12 @@
     border-color: var(--fwmb-accent-main);
 }
 
+.fwmb-map-history button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .fwmb-canvas-readout {
     position: absolute;
     inset-block-start: var(--fwmb-space-10);

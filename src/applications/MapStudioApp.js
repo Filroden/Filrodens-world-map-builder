@@ -223,6 +223,27 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.activeLandMaskId = null;
         this.mapLabels = [];
         this.mapDecorations = [];
+        // pinHistory/pinRedoStack and globalHistoryLedger/globalRedoLedger are session-only
+        // undo/redo bookkeeping, not permanent data. pinHistory holds full vector-state
+        // snapshots (see MapStateManager.getVectorStateSnapshot) taken immediately before a
+        // vector edit - these are never saved with the map, since a saved map only stores each
+        // vector feature's final current state, not a history of how it got there. They're
+        // capped at FILRODENSWMB.LIMITS.HISTORY_MAX (see MapStateManager.pushVectorState) and
+        // reset to empty whenever a map loads (see #handleMapLoad), so undo/redo only ever
+        // covers edits made in the current session.
+        //
+        // globalHistoryLedger/globalRedoLedger is the single combined, ordered view across both
+        // raster ("brush stroke") and vector actions that the Undo/Redo buttons actually read
+        // (see #processHistoryStep, #previewActionBounds, #updateHistoryButtons) - it's what
+        // decides which of the two type-specific stacks above (or brushEngine.history/
+        // .redoStack) to pop next, and in what order. It's a view over recent session activity,
+        // not a data store in its own right, and is deliberately treated the same as
+        // pinHistory/pinRedoStack: capped at HISTORY_MAX, reset to empty on map load. Don't
+        // confuse this with brushEngine.history (see BrushEngine.js) - that's the actual,
+        // uncapped, permanently-saved record of every brush stroke ever painted, needed to
+        // rebuild a map's terrain/biomes from its seed on load. This ledger only tracks how many
+        // of the *current session's* actions are currently undoable; it says nothing about how
+        // much paint history a map actually contains.
         this.pinHistory = [];
         this.pinRedoStack = [];
         this.globalHistoryLedger = [];
@@ -462,6 +483,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#bindCollapsibleFieldsets();
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
+        this.#updateHistoryButtons();
 
         const mapContainer = this.element.querySelector(".fwmb-map-container");
         const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
@@ -581,6 +603,37 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             fallbackBtn.dataset.hasListeners = "true";
             fallbackBtn.addEventListener("pointerenter", () => this.canvasEngine?.toggleLayer("biomeFallback", true));
             fallbackBtn.addEventListener("pointerleave", () => this.canvasEngine?.toggleLayer("biomeFallback", false));
+        }
+    }
+
+    /**
+     * Keeps the Undo/Redo buttons' disabled state and step-count tooltip in sync with
+     * globalHistoryLedger/globalRedoLedger. Deliberately DOM-only rather than routed through
+     * template context and a "map" part re-render: the PIXI canvas is mounted into
+     * .fwmb-map-preview once by #initCanvasAndEngines and never re-attached, so re-rendering
+     * the "map" part would rebuild that container from the template and orphan the canvas.
+     * Called from _onRender, which covers every render() call across the app (tool switches,
+     * vector edits via MapStateManager.pushVectorState, undo/redo itself), plus directly from
+     * #handleBrushEnd, since ending a paint/terrain stroke changes the ledger without
+     * triggering a render of its own.
+     */
+    #updateHistoryButtons() {
+        const undoBtn = this.element.querySelector('[data-action="undoBrush"]');
+        const redoBtn = this.element.querySelector('[data-action="redoBrush"]');
+
+        const undoCount = this.globalHistoryLedger?.length ?? 0;
+        const redoCount = this.globalRedoLedger?.length ?? 0;
+
+        if (undoBtn) {
+            undoBtn.disabled = undoCount === 0;
+            undoBtn.dataset.tooltip =
+                undoCount > 0 ? game.i18n.format("FILRODENSWMB.UI.UndoCount", { count: undoCount }) : game.i18n.localize("FILRODENSWMB.UI.Undo");
+        }
+
+        if (redoBtn) {
+            redoBtn.disabled = redoCount === 0;
+            redoBtn.dataset.tooltip =
+                redoCount > 0 ? game.i18n.format("FILRODENSWMB.UI.RedoCount", { count: redoCount }) : game.i18n.localize("FILRODENSWMB.UI.Redo");
         }
     }
 
@@ -1104,11 +1157,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.brushEngine.endStroke();
 
         if (this.brushEngine?.history?.length > prevLength) {
+            // Only globalHistoryLedger (the session undo/redo view) is capped here -
+            // brushEngine.history itself is deliberately left to grow without limit, since it's
+            // the permanent stroke record the map gets rebuilt from on load, not undo data (see
+            // the constructor and #handleMapLoad for the full explanation).
             this.globalHistoryLedger.push("raster");
             this.globalRedoLedger = [];
             if (this.globalHistoryLedger.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
                 this.globalHistoryLedger.shift();
             }
+            // No render() follows a brush stroke ending (painting stays lightweight), so the
+            // Undo/Redo buttons need their own direct refresh here rather than waiting on _onRender.
+            this.#updateHistoryButtons();
         }
 
         this.markDirty();
@@ -1904,11 +1964,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
 
+        // brushEngine.history is loaded in full, uncapped: it's the permanent replay log this
+        // map's terrain/biomes get rebuilt from (see generateTerrain() below and
+        // BrushEngine#replayHistory), not session undo/redo data, so it can't be trimmed without
+        // permanently losing real painted terrain/biome edits the next time this map is saved.
+        //
+        // globalHistoryLedger, by contrast, IS session undo/redo bookkeeping (see its
+        // declaration in the constructor above for the full explanation), so it's reset to empty
+        // here rather than rebuilt from brushEngine.history's length - exactly like pinHistory/
+        // pinRedoStack below, which reset to empty for the same reason on the vector side.
+        // Loading a map, however much paint history it carries, always starts a fresh undo
+        // session: nothing is undoable until an edit is made after this load.
         this.brushEngine.history = payload.history || [];
         this.brushEngine.redoStack = [];
         this.pinHistory = [];
         this.pinRedoStack = [];
-        this.globalHistoryLedger = this.brushEngine.history.map(() => "raster");
+        this.globalHistoryLedger = [];
         this.globalRedoLedger = [];
 
         this.defaultUiState = foundry.utils.deepClone(this.uiState);

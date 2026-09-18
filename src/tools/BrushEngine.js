@@ -6,6 +6,14 @@ export class BrushEngine {
         this.mapWidth = mapWidth;
         this.mapHeight = mapHeight;
 
+        // The permanent, uncapped record of every completed brush stroke (terrain or biome).
+        // MapStudioApp saves this array in full with the map and never trims it - it's not undo
+        // data, it's the replay log a map's terrain/biomes get rebuilt from on load (regenerate
+        // procedurally from the saved seed/params, then replayHistory() re-paints every stroke
+        // here back on top). Session-scoped undo/redo bookkeeping for the Undo/Redo buttons lives
+        // separately, in MapStudioApp's globalHistoryLedger/globalRedoLedger - see that class's
+        // constructor for the full explanation of the split. Don't add capping logic here; it
+        // belongs nowhere near this array.
         this.history = [];
         this.redoStack = [];
 
