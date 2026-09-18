@@ -14,6 +14,12 @@
 
         <div class="fwmb-divider-vertical"></div>
 
+        <button type="button" class="fwmb-btn subtle danger" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
+            <i class="fwmb-icon delete"></i>
+        </button>
+
+        <div class="fwmb-divider-vertical"></div>
+
         <button type="button" class="fwmb-btn primary" data-action="toggleEditMode">
             <i class="fwmb-icon edit-off"></i> {{localize "FILRODENSWMB.UI.EndEdit"}}
         </button>

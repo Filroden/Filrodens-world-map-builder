@@ -55,6 +55,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteRiver(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
+            deleteAllLandMasks(e, t) { MapDialogManager.onDeleteAllLandMasks(this, e, t); },
 
             // --- DIALOG MANAGER: Entity Editing ---
             editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
