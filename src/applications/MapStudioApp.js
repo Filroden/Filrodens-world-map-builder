@@ -108,6 +108,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             resetZoom(e, t)                 { this._onResetZoom(e, t); },
             saveMap(e, t)                   { this._onSaveMap(e, t); },
             selectRegionLayer(e, t)         { this._onSelectRegionLayer(e, t); },
+            setBrushBiome(e, t)             { this._onSetBrushBiome(e, t); },
             setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
             setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
             setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
@@ -311,7 +312,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS)
-            .filter(([key, id]) => id !== 1 && id !== 2 && !key.toLowerCase().startsWith("custom"))
+            .filter(([key, id]) => id !== FILRODENSWMB.BIOME_IDS.ERASER && id !== 1 && id !== 2 && !key.toLowerCase().startsWith("custom"))
             .map(([key, id]) => {
                 const defaultRgb = FILRODENSWMB.BIOMES[key] || [0, 0, 0];
                 const currentRgb = this.customBiomeColors[key] || defaultRgb;
@@ -599,6 +600,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 1. Assign Value
         if (target.type === "checkbox") this.uiState[name] = target.checked;
         else if (target.type === "number" || target.type === "range") this.uiState[name] = Number(target.value);
+        // brushBiome's options are always numeric biome ids, never free text - and BrushEngine's
+        // paint guards (and the Eraser's own active-state matching) compare it with strict
+        // equality, so it has to come out of here as a real Number, not the string every other
+        // <select> in this method is deliberately left as.
+        else if (name === "brushBiome") this.uiState[name] = Number(target.value);
         else this.uiState[name] = target.value;
 
         // 2. Delegate to Sub-Systems
@@ -1075,7 +1081,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const size = this.uiState.brushSize || 20;
         const strength = this.uiState.brushStrength || 0.02;
         const feather = this.uiState.brushFeather || 0.4;
-        const paintValue = layer === "biome" ? this.uiState.brushBiome || 6 : null;
+        // Strict nullish check, not `||`: the Eraser Biome's paint value is a genuine 0, which
+        // `||` would silently coerce back to the default Grassland fallback below.
+        const paintValue = layer === "biome" ? (this.uiState.brushBiome ?? FILRODENSWMB.BIOME_IDS.GRASSLAND) : null;
 
         this.brushEngine.startStroke(layer, tool, size, strength, feather, paintValue);
         this.#applyBrushStroke(x, y);
@@ -3357,11 +3365,43 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Handles swapping between the Raise, Lower, and Smooth brush tools.
+     * Handles swapping between the Raise, Lower, and Smooth brush tools - and, for the Biomes
+     * tool specifically, doubles as the "stop erasing" side of the Paint/Eraser pair. Biomes
+     * only ever has the one real tool ("paint"), so clicking it while the Eraser Biome is
+     * active isn't a genuine tool switch; it's the natural place for a GM to expect painting a
+     * real biome to resume, so it restores whatever biome was selected before Erase was clicked
+     * (see _onSetBrushBiome) instead of silently leaving the brush still set to erase.
      */
     _onSetBrushTool(event, target) {
         const stateKey = `${this.activeTool}BrushTool`;
         this.uiState[stateKey] = target.dataset.tool;
+
+        if (this.activeTool === "biomes" && this.uiState.brushBiome === FILRODENSWMB.BIOME_IDS.ERASER) {
+            this.uiState.brushBiome = this.uiState.lastPaintBiome ?? FILRODENSWMB.BIOME_IDS.GRASSLAND;
+        }
+
+        this.render({ parts: ["toolbar", "editToolbar"] });
+    }
+
+    /**
+     * Sets which biome id the Biomes brush paints, from a toolbar icon rather than the
+     * `brushBiome` dropdown - currently only used for the Eraser Biome (id 0), which is
+     * deliberately excluded from that dropdown's list. Reads target.dataset.biome as a real
+     * Number rather than leaving it as the string the dropdown's own change handler stores,
+     * since BrushEngine's paint guards compare paintValue with strict equality.
+     *
+     * Remembers the real biome that was selected before switching to Erase, in `lastPaintBiome`,
+     * so _onSetBrushTool can restore it if the GM clicks back to Paint rather than picking a new
+     * biome from the dropdown themselves.
+     */
+    _onSetBrushBiome(event, target) {
+        const biome = Number(target.dataset.biome);
+
+        if (biome === FILRODENSWMB.BIOME_IDS.ERASER && this.uiState.brushBiome !== FILRODENSWMB.BIOME_IDS.ERASER) {
+            this.uiState.lastPaintBiome = this.uiState.brushBiome;
+        }
+
+        this.uiState.brushBiome = biome;
         this.render({ parts: ["toolbar", "editToolbar"] });
     }
 

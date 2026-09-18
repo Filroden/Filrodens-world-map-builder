@@ -253,13 +253,6 @@
     width: var(--fwmb-font-size-xxs);
 }
 
-.fwmb .fwmb-btn.danger {
-    color: var(--fwmb-color-danger);
-}
-.fwmb .fwmb-btn.danger:hover {
-    color: var(--fwmb-color-danger);
-}
-
 .fwmb .fwmb-btn.subtle {
     background: transparent;
     border: 1px solid var(--fwmb-accent-main);
@@ -295,6 +288,13 @@
 .fwmb .fwmb-btn.active {
     background: var(--fwmb-accent-main);
     color: var(--fwmb-text-inverse);
+}
+
+.fwmb .fwmb-btn.danger {
+    color: var(--fwmb-color-danger);
+}
+.fwmb .fwmb-btn.danger:hover {
+    color: var(--fwmb-color-danger);
 }
 
 /* A full-width button paired with a small icon-only companion action (e.g. the Biome Rule

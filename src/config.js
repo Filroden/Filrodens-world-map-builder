@@ -200,6 +200,13 @@ export const FILRODENSWMB = {
         SUBTROPICAL_DESERT: [214, 198, 137],
     },
     BIOME_IDS: {
+        // Sentinel: "erase to the computed biome" - never a real painted colour.
+        // ProceduralEngine.resolveBiomeLookup already treats any override <= 0 as "no override,
+        // compute the biome normally" (its `overrideId > 0` check); this just gives that existing
+        // sentinel a name instead of a bare literal 0. Deliberately excluded from
+        // MapStudioApp's context.biomeList, since it's offered as its own toolbar icon rather
+        // than a dropdown option.
+        ERASER: 0,
         DEEP_OCEAN: 1,
         SHALLOW_OCEAN: 2,
         SNOW: 3,

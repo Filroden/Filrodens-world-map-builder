@@ -1,7 +1,11 @@
 <div class="fwmb-toolbar-content">
     <div class="fwmb-brush-tools">
-        <button type="button" data-action="setBrushTool" data-tool="paint" class="fwmb-btn {{#if (eq uiState.biomesBrushTool 'paint')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolPaint'}}">
+        <button type="button" data-action="setBrushTool" data-tool="paint" class="fwmb-btn {{#unless (eq uiState.brushBiome 0)}}active{{/unless}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolPaint'}}">
             <i class="fwmb-icon format-paint"></i>
+        </button>
+
+        <button type="button" data-action="setBrushBiome" data-biome="0" class="fwmb-btn {{#if (eq uiState.brushBiome 0)}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolEraseBiome'}}">
+            <i class="fwmb-icon ink-eraser"></i>
         </button>
     </div>
 
@@ -11,6 +15,13 @@
         <div class="fwmb-brush-setting">
             <label>{{localize "FILRODENSWMB.UI.BrushBiome"}}</label>
             <select name="brushBiome">
+                {{!-- Hidden placeholder for the Eraser sentinel (id 0), which is deliberately not
+                     a real choice in this list. Without a matching option, the browser falls back
+                     to displaying whichever biome happens to be first in the list below while
+                     erasing - misleading, since nothing is actually selected. disabled+hidden
+                     keeps it out of the dropdown itself; it only ever appears as the current
+                     value, set programmatically by the Eraser toolbar icon. --}}
+                <option value="0" disabled hidden {{#if (eq uiState.brushBiome 0)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ToolEraseBiome"}}</option>
                 {{#each biomeList}}
                     <option value="{{this.id}}" {{#if (eq ../uiState.brushBiome this.id)}}selected{{/if}}>
                         <div class="fwmb-swatch small" style="background-color: {{this.hex}};"></div>
