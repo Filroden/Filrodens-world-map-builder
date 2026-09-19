@@ -932,7 +932,7 @@ export class MapDialogManager {
         }
 
         app._repaintVectors();
-        if (config.triggersTerrain) app.debouncedGenerateTerrain();
+        if (config.triggersTerrain) app.requestTerrainUpdate(null, app.debouncedGenerateTerrain);
 
         app.render({ parts: ["context"] });
         app.markDirty();

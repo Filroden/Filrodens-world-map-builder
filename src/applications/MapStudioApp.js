@@ -1833,6 +1833,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Enforce global array resets
         this.pendingTerrainBounds = null;
 
+        // Any full generation, whichever path triggered it, satisfies changes deferred by the
+        // pause toggle. Clearing before the generation reads state means an edit made while it
+        // runs re-flags itself instead of being lost.
+        this.#clearPendingFeatureMath();
+
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
 
         try {
@@ -2336,15 +2341,51 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Intercepts all terrain modifications. Evaluates if the math should be generated
      * live, or deferred to the manual Apply button.
+     *
+     * Undo/redo and list deletions pass their own, shorter debounce as `generate` so the
+     * deferral rule stays in this one place without slowing them down.
+     *
+     * @param {object|null} bounds - Spatial bounds of the change, merged into any pending bounds.
+     * @param {Function} generate - The debounced generator to run when updates are live.
      */
-    requestTerrainUpdate(bounds = null) {
+    requestTerrainUpdate(bounds = null, generate = this.debouncedCanvasTerrain) {
         this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, bounds);
         if (this.uiState.liveFeatureUpdates) {
-            this.debouncedCanvasTerrain();
+            generate();
         } else {
             this.hasPendingFeatureMath = true;
             this.render({ parts: ["editToolbar"] });
         }
+    }
+
+    /**
+     * Turns automatic terrain generation back on and reports whether changes were deferred
+     * while it was paused.
+     *
+     * Pausing is scoped to a single tool and edit session: the Apply button lives in that
+     * tool's edit toolbar, which is unreachable once the tool changes or edit mode ends, so
+     * anything deferred would otherwise stay stale with no visible way to apply it. Callers
+     * must call this before finishing any in-progress drawing so that a land mask completed by
+     * leaving the tool is queued through requestTerrainUpdate() rather than deferred again.
+     *
+     * @returns {boolean} True if deferred changes exist and the terrain needs regenerating.
+     */
+    #restoreLiveGeneration() {
+        const hadDeferredChanges = this.hasPendingFeatureMath;
+        this.uiState.liveFeatureUpdates = true;
+        this.hasPendingFeatureMath = false;
+        return hadDeferredChanges;
+    }
+
+    /**
+     * Clears the deferred-changes flag and refreshes the Apply button, but only when the flag
+     * was actually set so ordinary generations do not re-render the toolbar.
+     */
+    #clearPendingFeatureMath() {
+        if (!this.hasPendingFeatureMath) return;
+
+        this.hasPendingFeatureMath = false;
+        this.render({ parts: ["editToolbar"] });
     }
 
     /**
@@ -2577,7 +2618,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     // regeneration, not just a repaint.
                     if (previousTerrainInputs !== this.#serialiseTerrainInputs()) {
                         this._repaintCanvas();
-                        this.debouncedGenerateTerrain();
+                        this.requestTerrainUpdate(null, this.debouncedGenerateTerrain);
                     } else if (previousFeaturePins !== currentFeaturePins) {
                         this._repaintCanvas();
                         this.debouncedGenerateClimate();
@@ -2681,9 +2722,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async _onApplyFeatureMath(event, target) {
         if (!this.hasPendingFeatureMath) return;
 
+        // generateTerrain clears the pending flag itself, before it reads any state
         await this.generateTerrain();
-        this.hasPendingFeatureMath = false;
-        this.render({ parts: ["editToolbar"] });
     }
 
     /**
@@ -2800,16 +2840,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     _onChangeTool(event, target) {
-        if (this.hasPendingFeatureMath) {
-            this.generateTerrain();
-            this.hasPendingFeatureMath = false;
-        }
-
         const newTool = target.dataset.tool;
         if (!newTool || this.activeTool === newTool) return;
 
-        // 1. Teardown current state
-        if (this.#clearActiveDrawingStates()) this.requestTerrainUpdate();
+        // 1. Teardown current state. Automatic generation always comes back on when the tool
+        // changes; changes deferred by the pause toggle are generated now (which also covers a
+        // land mask completed below), otherwise a completed mask is queued as usual.
+        const hadDeferredChanges = this.#restoreLiveGeneration();
+        const maskCompleted = this.#clearActiveDrawingStates();
+        if (hadDeferredChanges) this.generateTerrain();
+        else if (maskCompleted) this.requestTerrainUpdate();
         this.#deactivateEditMode();
         this.#clearMassEditState();
 
@@ -3726,7 +3766,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // 2. Entering 3D Mode: Teardown state. A land mask completed by leaving the tool has to be
         // generated now, otherwise the 3D scene below would be built from the previous terrain.
-        if (this.#clearActiveDrawingStates()) await this.generateTerrain();
+        // Changes deferred by the pause toggle need generating for the same reason.
+        const hadDeferredChanges = this.#restoreLiveGeneration();
+        if (this.#clearActiveDrawingStates() || hadDeferredChanges) await this.generateTerrain();
         await this.#deactivateEditMode();
 
         // 3. Setup 3D overlay UI
@@ -3787,19 +3829,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.activeRegionLayerId = this.regionLayers[0]?.id ?? null;
             }
         } else {
-            if (this.hasPendingFeatureMath) {
-                this.generateTerrain();
-                this.hasPendingFeatureMath = false;
-            }
+            // Leaving edit mode ends the pause: the Apply button is hidden with the toolbar, so
+            // deferred changes are generated now (covering a mask completed below) and the next
+            // edit session starts with automatic generation on.
+            const hadDeferredChanges = this.#restoreLiveGeneration();
+            const maskCompleted = this.#clearActiveDrawingStates();
 
-            for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
-                this[config.activeKey] = null;
-            }
-            this._finishActiveRegion();
-
-            if (this.activeLandMaskId && this._finishActiveLandMask()) {
-                this.requestTerrainUpdate();
-            }
+            if (hadDeferredChanges) this.generateTerrain();
+            else if (maskCompleted) this.requestTerrainUpdate();
         }
 
         if (this.canvasEngine) {
@@ -3843,9 +3880,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.liveFeatureUpdates = !this.uiState.liveFeatureUpdates;
 
         // If turned back on while changes are pending, immediately process them
+        // (generateTerrain clears the pending flag itself)
         if (this.uiState.liveFeatureUpdates && this.hasPendingFeatureMath) {
             this.generateTerrain();
-            this.hasPendingFeatureMath = false;
         }
         this.render({ parts: ["editToolbar"] });
     }

@@ -531,7 +531,8 @@
     "FILRODENSWMB.UI.LabelEditHint": "Label properties can also be edited directly from the Labels tool.",
 
     "FILRODENSWMB.UI.ApplyChanges": "Apply Changes",
-    "FILRODENSWMB.UI.ToggleLiveTerrainGeneration": "Toggle Live Terrain Generation",
+    "FILRODENSWMB.UI.PauseTerrainGeneration": "Pause automatic Terrain Generation (use the Apply button to manually regenerate the terrain)",
+    "FILRODENSWMB.UI.ResumeTerrainGeneration": "Turn automatic Terrain Generation on",
 
     "FILRODENSWMB.UI.ActionUndo": "Undo: ",
     "FILRODENSWMB.UI.ActionRedo": "Redo: ",
