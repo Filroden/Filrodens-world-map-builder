@@ -225,6 +225,7 @@ export class StudioCanvas {
 
         if (isTransformable) {
             e.preventDefault();
+            this.#beginDragOnce();
             const target = this.activeDrag.target;
 
             if (e.shiftKey && dragWrapper.isDecoration) {
@@ -309,9 +310,11 @@ export class StudioCanvas {
         if (grabbedTarget && !isEraserActive) {
             e.preventDefault();
             e.stopPropagation();
-            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType };
+            // The drag is only "armed" here. It becomes a real drag - recording its undo snapshot
+            // and moving the item - once the pointer has travelled past the drag threshold (see
+            // #beginDragOnce), so a plain click or double-click on an item changes nothing.
+            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType, originX: e.clientX, originY: e.clientY, started: false };
             canvasElement.style.cursor = "grabbing";
-            if (this.onInfraDragStart) this.onInfraDragStart();
             return;
         }
 
@@ -370,6 +373,9 @@ export class StudioCanvas {
 
         // --- NODE DRAGGING ---
         if (this.activeDrag) {
+            if (!this.activeDrag.started && !this.#hasExceededDragThreshold(e)) return;
+            this.#beginDragOnce();
+
             // Line/polygon nodes (routes, regions, land masks, fault lines) may be dragged into the
             // buffer so they can span well outside the visible map. Single-point markers (pins,
             // labels, decorations) and manual river nodes stay confined to the map itself - the same
@@ -397,6 +403,26 @@ export class StudioCanvas {
             const hit = this.#getHitTarget(coords.x, coords.y);
             canvasElement.style.cursor = hit ? "grab" : "crosshair";
         }
+    }
+
+    /**
+     * True once the pointer has moved far enough from where it pressed on an item to count as a drag.
+     */
+    #hasExceededDragThreshold(e) {
+        const { originX, originY } = this.activeDrag;
+        return Math.hypot(e.clientX - originX, e.clientY - originY) >= FILRODENSWMB.UI.NODE_DRAG_THRESHOLD_PX;
+    }
+
+    /**
+     * Marks the active drag as genuinely started, notifying the app the first time only so it can
+     * snapshot the state before anything has changed. Called before the item is first modified,
+     * whether by moving it or by rotating/scaling it with the mouse wheel while it is held.
+     */
+    #beginDragOnce() {
+        if (this.activeDrag.started) return;
+
+        this.activeDrag.started = true;
+        if (this.onInfraDragStart) this.onInfraDragStart();
     }
 
     #processCropDrag(coords) {
@@ -476,9 +502,10 @@ export class StudioCanvas {
                 return;
             }
             if (this.activeDrag) {
+                const wasDragged = this.activeDrag.started;
                 this.activeDrag = null;
                 canvasElement.style.cursor = "crosshair";
-                if (this.onInfraDragEnd) this.onInfraDragEnd();
+                if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
                 return;
             }
             if (this.isEditMode && this.onBrushEnd) {
@@ -942,6 +969,10 @@ export class StudioCanvas {
      * A variation of the spline generator that wraps the array to create a perfectly closed, seamless loop.
      */
     #getClosedSplinePoints(points, resolution = 20) {
+        // This 3 is a geometric requirement, not the polygon rule (FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES):
+        // a wrapped Catmull-Rom loop needs at least three control points, because with two the
+        // neighbour points either side of each segment coincide and the "loop" collapses onto a
+        // straight line. It must not follow that constant if the polygon minimum is ever changed.
         if (!points || points.length < 3) return points;
         const curve = [];
 
@@ -1109,8 +1140,10 @@ export class StudioCanvas {
             const isActive = mask.id === activeMaskId;
             const isSubtract = mask.operation === "subtract";
 
-            // Green for Add Land, Red for Subtract Land (Add Ocean)
-            const baseColor = isSubtract ? 0xf87171 : 0x4ade80;
+            // Green for Add Land, Red for Subtract Land (Add Ocean). The same hex values drive the
+            // swatch on the Land Masks list, so the two stay in step.
+            const { ADD, SUBTRACT } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
+            const baseColor = ColorMath.hexToPackedInt(isSubtract ? SUBTRACT : ADD);
 
             g.lineStyle(2, baseColor, isActive ? 0.9 : 0.4);
             g.beginFill(baseColor, isActive ? 0.3 : 0.1);
@@ -1121,7 +1154,7 @@ export class StudioCanvas {
             }
 
             // Close the visual outline when the polygon has finished drawing
-            const isClosed = mask.points.length >= 3 && !isActive;
+            const isClosed = mask.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && !isActive;
             if (isClosed) {
                 g.closePath();
             }
@@ -1154,7 +1187,7 @@ export class StudioCanvas {
                 const lineColorHex = ColorMath.hexToPackedInt(region.lineColor);
 
                 // A polygon is "closed" if it has 3+ points and the user isn't actively currently drawing it
-                const isClosed = region.points.length >= 3 && region.id !== activeRegionId;
+                const isClosed = region.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && region.id !== activeRegionId;
                 const pts = region.smoothing && isClosed ? this.#getClosedSplinePoints(region.points) : region.points;
 
                 // 1. Draw Fill
@@ -1429,7 +1462,7 @@ export class StudioCanvas {
                 let regionVis = region.visibility || "all";
                 if (regionVis !== "none" && layer.visibility === "gm") regionVis = "gm";
 
-                if (!this.#isVisibleInCurrentPass(regionVis, layer.visibility, true) || !region.points || region.points.length < 3) return;
+                if (!this.#isVisibleInCurrentPass(regionVis, layer.visibility, true) || !region.points || region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) return;
 
                 let minX = Infinity,
                     maxX = -Infinity,

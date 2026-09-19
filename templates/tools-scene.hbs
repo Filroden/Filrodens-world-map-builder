@@ -95,10 +95,16 @@
             <div id="fwmb-scroll-landMasks" class="fwmb-list-container fwmb-scrollable stable">
                 {{#each landMasks}}
                     <div class="fwmb-list-item" data-id="{{this.id}}" data-type="landMask">
+                        <div class="fwmb-route-swatch" style="background-color: {{this.swatchColor}}; height: 5px; border-style: solid;" data-tooltip="{{#if (eq this.operation 'subtract')}}{{localize 'FILRODENSWMB.UI.LandMaskTypeOcean'}}{{else}}{{localize 'FILRODENSWMB.UI.LandMaskTypeLand'}}{{/if}}"></div>
+
                         <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
 
                         <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                             <i class="fwmb-icon center-focus"></i>
+                        </button>
+
+                        <button type="button" class="fwmb-btn small" data-action="editLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                            <i class="fwmb-icon edit"></i>
                         </button>
 
                         <button type="button" class="fwmb-btn small muted danger" data-action="deleteLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">

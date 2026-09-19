@@ -537,7 +537,7 @@ export class ProceduralEngine {
      */
     generateGuidedTopography(width, height, params, landMasks, outBuffer) {
         const elevationData = outBuffer;
-        const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= 3);
+        const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES);
 
         let distanceField;
 

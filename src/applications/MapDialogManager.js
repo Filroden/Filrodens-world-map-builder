@@ -1350,7 +1350,7 @@ export class MapDialogManager {
     }
 
     static async onEditRegion(app, event, target, explicitData = null) {
-        app.activeRegionId = null;
+        app._finishActiveRegion();
 
         const layerId = explicitData ? explicitData.layerId : target.closest(".fwmb-accordion-group").dataset.layerId;
         const regionId = explicitData ? explicitData.regionId : target.closest(".fwmb-list-item").dataset.id;
@@ -1461,6 +1461,40 @@ export class MapDialogManager {
                 }
             },
             triggersTerrain: true,
+        });
+    }
+
+    /**
+     * Opens the edit dialogue for a guided-mode land mask: its name, and whether it marks land
+     * ("add") or an ocean hole ("subtract").
+     *
+     * The name is only a label, so renaming never touches the terrain. Changing the type does
+     * change what the guided generator produces, so that alone requests a terrain update.
+     */
+    static async onEditLandMask(app, event, target, explicitId = null) {
+        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
+
+        // Finish any mask still being drawn first (discarding it if it never became a shape), as
+        // that shape may be the one being opened, and its nodes must not keep growing underneath
+        // the dialogue.
+        if (app._finishActiveLandMask()) app.requestTerrainUpdate();
+
+        const mask = app.landMasks.find((m) => m.id === id);
+        if (!mask) return;
+
+        const previousOperation = mask.operation === "subtract" ? "subtract" : "add";
+
+        await this._processEditDialog(app, mask, {
+            titleKey: "FILRODENSWMB.UI.EditLandMaskDetails",
+            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-land-masks.hbs",
+            context: { mask },
+            onExtract: (form, fallbackName) => ({
+                name: form.elements["maskName"].value.trim() || fallbackName,
+                operation: form.elements["maskOperation"].value === "subtract" ? "subtract" : "add",
+            }),
+            onSave: (entity, result) => {
+                if (result.operation !== previousOperation) app.requestTerrainUpdate();
+            },
         });
     }
 

@@ -56,6 +56,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
             deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
             deleteAllLandMasks(e, t) { MapDialogManager.onDeleteAllLandMasks(this, e, t); },
+            editLandMask(e, t)      { MapDialogManager.onEditLandMask(this, e, t); },
 
             // --- DIALOG MANAGER: Entity Editing ---
             editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
@@ -430,7 +431,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort).map((r) => ({ ...r, massEditSelected: this.massEditSelection.route.has(r.id) }));
             context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort).map((l) => ({ ...l, massEditSelected: this.massEditSelection.label.has(l.id) }));
             context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
-            context.landMasks = [...(this.landMasks || [])].sort(alphaSort);
+            const { ADD: landColor, SUBTRACT: oceanColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
+            context.landMasks = [...(this.landMasks || [])]
+                .sort(alphaSort)
+                .map((m) => ({ ...m, swatchColor: m.operation === "subtract" ? oceanColor : landColor }));
 
             const autoLabels = [];
 
@@ -1040,6 +1044,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             case "region":
                 MapDialogManager.onEditRegion(this, null, null, { regionId: entityId, layerId });
                 break;
+            case "landMask":
+                MapDialogManager.onEditLandMask(this, null, null, entityId);
+                break;
             case "fault":
                 MapDialogManager.onEditFault(this, null, null, entityId);
                 break;
@@ -1069,14 +1076,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         if (this.activeRegionId) {
-            this.activeRegionId = null;
+            this._finishActiveRegion();
             cleared = true;
         }
 
         if (this.activeLandMaskId) {
-            this.activeLandMaskId = null;
             cleared = true;
-            requiresTerrainUpdate = true;
+            if (this._finishActiveLandMask()) requiresTerrainUpdate = true;
         }
 
         if (cleared) {
@@ -1414,8 +1420,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                         array: region.points,
                         index: region.points.indexOf(target),
                         cleanup: () => {
-                            // Orphan cleanup: destroy region if it has fewer than 3 points (unless actively drawing)
-                            if (region.points.length < 3 && this.activeRegionId !== region.id) {
+                            // Orphan cleanup: destroy region if it can no longer enclose an area (unless actively drawing)
+                            if (region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && this.activeRegionId !== region.id) {
                                 layer.regions.splice(rIndex, 1);
                             }
                         },
@@ -1434,8 +1440,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     index: mask.points.indexOf(target),
                     triggersTerrain: true,
                     cleanup: () => {
-                        // Orphan cleanup: destroy mask if it has fewer than 3 points
-                        if (mask.points.length < 3 && this.activeLandMaskId !== mask.id) {
+                        // Orphan cleanup: destroy mask if it can no longer enclose an area (unless actively drawing)
+                        if (mask.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && this.activeLandMaskId !== mask.id) {
                             this.landMasks.splice(mIndex, 1);
                         }
                     },
@@ -1444,6 +1450,76 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         return null;
+    }
+
+    /**
+     * Removes a polygon that was abandoned before it had enough nodes to enclose an area.
+     *
+     * Such a shape can never be turned into a real polygon from the canvas - the only nodes it
+     * offers to insert between are its own - so leaving it behind would just strand an unusable
+     * entry in its list until the user deleted it by hand.
+     *
+     * Undo/redo history is deliberately left completely untouched: discarding neither records a
+     * step of its own nor removes the polygon's earlier node-by-node steps. A polygon can end up
+     * with too few nodes by being undone back from a complete shape; if finishing it then wiped
+     * history, or recorded a new step (which clears the redo stack), the complete shape could no
+     * longer be recovered with Redo. The cost of leaving history alone is that Undo can bring back
+     * a one- or two-node fragment, which the user can delete node by node or from its list.
+     *
+     * @param {Array} polygons - The array the polygon lives in (this.landMasks or a region layer's regions).
+     * @param {object} polygon - The incomplete polygon to remove.
+     */
+    #discardIncompletePolygon(polygons, polygon) {
+        polygons.splice(polygons.indexOf(polygon), 1);
+
+        this._repaintVectors();
+        this.render({ parts: ["context"] });
+    }
+
+    /**
+     * Ends the land mask currently being drawn (if any), discarding it if it never became a shape,
+     * and reports whether the terrain now needs regenerating.
+     *
+     * Terrain is regenerated when a shape is finished rather than on every node, so this is the
+     * moment a completed mask has to be applied. A mask with fewer than
+     * FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES nodes encloses no area and is ignored by the guided
+     * generator, so discarding it changes nothing and must not trigger a regeneration.
+     *
+     * Not private because the Land Masks edit dialogue (MapDialogManager) also has to finish an
+     * in-progress mask before opening.
+     *
+     * @returns {boolean} True if the finished mask contributes to terrain and a regeneration is needed.
+     */
+    _finishActiveLandMask() {
+        const mask = this.landMasks.find((m) => m.id === this.activeLandMaskId);
+        const isComplete = (mask?.points.length ?? 0) >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES;
+
+        this.activeLandMaskId = null;
+        if (mask && !isComplete) this.#discardIncompletePolygon(this.landMasks, mask);
+
+        return isComplete;
+    }
+
+    /**
+     * Ends the region currently being drawn (if any), discarding it if it never became a shape.
+     * Every path that stops a region being drawn - right-click, changing tool or region layer,
+     * leaving edit mode, opening an edit dialogue - goes through here so none of them can leave an
+     * unusable one- or two-node region behind.
+     *
+     * Not private because the region edit dialogue (MapDialogManager) also has to finish an
+     * in-progress region before opening.
+     */
+    _finishActiveRegion() {
+        const activeId = this.activeRegionId;
+        if (!activeId) return;
+
+        const layer = this.regionLayers.find((l) => l.regions.some((r) => r.id === activeId));
+        const region = layer?.regions.find((r) => r.id === activeId);
+
+        this.activeRegionId = null;
+        if (region && region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) {
+            this.#discardIncompletePolygon(layer.regions, region);
+        }
     }
 
     #handleSceneClick(x, y) {
@@ -1455,6 +1531,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) {
             return;
         }
+
+        // Snapshot before mutating so every node - including the one that starts a new mask - is
+        // its own undo step, exactly as it is for regions, routes and fault lines. Without this,
+        // undo skips straight past the nodes to whichever earlier action last recorded a snapshot.
+        MapStateManager.pushVectorState(this);
 
         // If no mask is currently active, initialise a new one
         if (!this.activeLandMaskId) {
@@ -2093,7 +2174,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.activeRegionId) {
             const region = layer.regions.find((r) => r.id === this.activeRegionId);
             if (region) {
-                const isNearStart = region.points.length > 2 && Math.hypot(region.points[0].x - finalPos.x, region.points[0].y - finalPos.y) < this.currentSnapThreshold;
+                const isNearStart = region.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES &&Math.hypot(region.points[0].x - finalPos.x, region.points[0].y - finalPos.y) < this.currentSnapThreshold;
 
                 if (isNearStart) {
                     this.activeRegionId = null;
@@ -2410,6 +2491,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             manualRivers: ["FILRODENSWMB.UI.ActionCustomRiver", "Custom River"],
             routes: ["FILRODENSWMB.UI.ActionRoute", "Route"],
             regionLayers: ["FILRODENSWMB.UI.ActionRegion", "Region"],
+            landMasks: ["FILRODENSWMB.UI.ActionLandMask", "Land Mask"],
             mapLabels: ["FILRODENSWMB.UI.ActionLabel", "Label"],
             mapDecorations: ["FILRODENSWMB.UI.ActionDecoration", "Decoration"],
         };
@@ -2444,6 +2526,28 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         };
     }
 
+    /**
+     * Serialises every vector input that feeds terrain (elevation) generation, so an undo/redo
+     * step can tell whether restoring a snapshot changed anything that requires the terrain to be
+     * regenerated rather than merely repainted.
+     *
+     * Land masks are only read by the guided engine, and there only masks that enclose an area
+     * (see FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) contribute. Just each mask's operation
+     * and vertices are captured: renaming a mask, or undoing the first two nodes of a shape that
+     * is still being drawn, does not alter the terrain and must not trigger a regeneration.
+     *
+     * @returns {string} A string that differs between two states exactly when their terrain differs.
+     */
+    #serialiseTerrainInputs() {
+        const minVertices = FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES;
+        const guidedMasks =
+            this.uiState.generationEngine === "guided"
+                ? this.landMasks.filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points])
+                : [];
+
+        return JSON.stringify([this.tectonicFaults, this.manualRivers, guidedMasks]);
+    }
+
     async #processHistoryStep(isUndo) {
         // Dynamically assign the source and target stacks based on the direction
         const sourceLedger = isUndo ? this.globalHistoryLedger : this.globalRedoLedger;
@@ -2456,8 +2560,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         while (action) {
             if (action === "vector") {
                 if (sourcePinStack.length > 0) {
-                    const previousFaults = JSON.stringify(this.tectonicFaults);
-                    const previousRivers = JSON.stringify(this.manualRivers);
+                    const previousTerrainInputs = this.#serialiseTerrainInputs();
                     const previousFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
                     const previousCustomBiomes = JSON.stringify(this.uiState.customBiomes);
 
@@ -2469,7 +2572,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                     const currentFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
 
-                    if (previousFaults !== JSON.stringify(this.tectonicFaults) || previousRivers !== JSON.stringify(this.manualRivers)) {
+                    // Faults, manual rivers and (in guided mode) land masks all change the
+                    // elevation data, so an undo/redo that alters any of them needs a terrain
+                    // regeneration, not just a repaint.
+                    if (previousTerrainInputs !== this.#serialiseTerrainInputs()) {
                         this._repaintCanvas();
                         this.debouncedGenerateTerrain();
                     } else if (previousFeaturePins !== currentFeaturePins) {
@@ -2703,7 +2809,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!newTool || this.activeTool === newTool) return;
 
         // 1. Teardown current state
-        this.#clearActiveDrawingStates();
+        if (this.#clearActiveDrawingStates()) this.requestTerrainUpdate();
         this.#deactivateEditMode();
         this.#clearMassEditState();
 
@@ -2721,12 +2827,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.render({ parts: ["toolbar", "context", "editToolbar"] });
     }
 
+    /**
+     * Ends whichever line or polygon is currently being drawn, e.g. because the user is leaving
+     * the tool. Unfinished regions and land masks that never became a shape are discarded.
+     *
+     * Regenerating terrain is left to the caller because the right moment differs: changing tool
+     * can queue it as usual, but entering 3D view must finish generating before it reads the
+     * elevation data.
+     *
+     * @returns {boolean} True if a land mask was completed and the terrain needs regenerating.
+     */
     #clearActiveDrawingStates() {
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             this[config.activeKey] = null;
         }
-        this.activeRegionId = null;
-        this.activeLandMaskId = null;
+        this._finishActiveRegion();
+
+        return this._finishActiveLandMask();
     }
 
     /**
@@ -3429,8 +3546,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _onSelectRegionLayer(event, target) {
         const id = target.closest(".fwmb-accordion-group").dataset.layerId;
+        this._finishActiveRegion();
         this.activeRegionLayerId = id;
-        this.activeRegionId = null;
         this.render({ parts: ["context"] });
     }
 
@@ -3511,13 +3628,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
         if (!layer) return;
 
-        // Garbage collect the previous active region if it was left unfinished (less than 3 points)
-        if (this.activeRegionId) {
-            const activeRegion = layer.regions.find((r) => r.id === this.activeRegionId);
-            if (activeRegion && activeRegion.points.length < 3) {
-                layer.regions = layer.regions.filter((r) => r.id !== this.activeRegionId);
-            }
-        }
+        // Finish the previous region first; one left with too few points to be a shape is discarded
+        this._finishActiveRegion();
 
         // Explicitly create the new region object so it immediately appears in the sidebar accordion
         this.activeRegionId = foundry.utils.randomID();
@@ -3573,9 +3685,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.sceneMode = target.dataset.mode;
 
         if (this.activeLandMaskId) {
-            this.activeLandMaskId = null;
+            const needsTerrain = this._finishActiveLandMask();
             this._repaintVectors();
-            this.requestTerrainUpdate();
+            if (needsTerrain) this.requestTerrainUpdate();
         }
 
         this.render({ parts: ["toolbar", "editToolbar"] });
@@ -3612,8 +3724,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return;
         }
 
-        // 2. Entering 3D Mode: Teardown state
-        this.#clearActiveDrawingStates();
+        // 2. Entering 3D Mode: Teardown state. A land mask completed by leaving the tool has to be
+        // generated now, otherwise the 3D scene below would be built from the previous terrain.
+        if (this.#clearActiveDrawingStates()) await this.generateTerrain();
         await this.#deactivateEditMode();
 
         // 3. Setup 3D overlay UI
@@ -3682,10 +3795,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
                 this[config.activeKey] = null;
             }
-            this.activeRegionId = null;
+            this._finishActiveRegion();
 
-            if (this.activeLandMaskId) {
-                this.activeLandMaskId = null;
+            if (this.activeLandMaskId && this._finishActiveLandMask()) {
                 this.requestTerrainUpdate();
             }
         }

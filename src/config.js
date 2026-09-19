@@ -75,12 +75,21 @@ export const FILRODENSWMB = {
         OVERFLOW_BUFFER: 100,
         BASELINE_DIMENSION: 1000,
         CUSTOM_BIOME_START_ID: 14,
+        // The fewest nodes a polygon (region or guided-mode land mask) needs to enclose an area.
+        // A shape still below this when the user finishes drawing it is discarded, since it could
+        // never be selected or edited as a shape, and terrain generation ignores land masks below it.
+        MIN_POLYGON_VERTICES: 3,
     },
     UI: {
         RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
         VISIBILITY_STATES: ["all", "gm", "none"],
         EDITABLE_TOOLS: ["scene", "terrain", "biomes", "features", "infrastructure", "regions", "labels", "cartography"],
         VECTOR_TOOLS: ["scene", "features", "infrastructure", "regions", "labels", "cartography"],
+        // How far (in screen pixels) the pointer must travel after pressing on a node, pin, label or
+        // decoration before it counts as a drag. A press-and-release below this - such as either
+        // half of a double-click - is a click and must not move the item, record an undo step or
+        // trigger a terrain regeneration.
+        NODE_DRAG_THRESHOLD_PX: 4,
         WHEEL: {
             SCALE_FACTOR: 1.05,
             ROTATION_STEP: 5,
@@ -123,6 +132,12 @@ export const FILRODENSWMB = {
         CONTOUR_INTERVAL: 0.1,
         FALLBACK_HIGHLIGHT_COLOR: [255, 32, 200],
         FALLBACK_HIGHLIGHT_ALPHA: 0.55,
+        // Guided-mode land mask colours, shared by the canvas outline and the Land Masks list swatch
+        // so the two always agree: "add" shapes mark land, "subtract" shapes mark ocean holes.
+        LAND_MASK_COLORS: {
+            ADD: "#4ade80",
+            SUBTRACT: "#f87171",
+        },
     },
     HYDROLOGY: {
         RIVER_DENSITY: 40,
