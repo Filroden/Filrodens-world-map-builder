@@ -925,6 +925,30 @@ export class ProceduralEngine {
     }
 
     /**
+     * How far, in pixels, the climate pass looks upwind along a row for the elevation that
+     * decides how much rain a pixel gets (the "Western Horizon" sampling below). It is the wind
+     * distance setting scaled to the map's width and to how much of the globe the map spans.
+     *
+     * The distance is also how far from a changed pixel the moisture can change: a pixel reads
+     * the elevation at most this many columns away on its own row, so a bounded climate refresh
+     * has to recompute that many columns beyond the edited area on either side.
+     *
+     * @param {number} width - Map width in pixels.
+     * @param {object} params - Derived map parameters.
+     * @returns {number} Maximum upwind sampling distance, in whole pixels.
+     */
+    static getWindDistance(width, params) {
+        const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
+        const widthScale = width / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        const latTop = params.latTop ?? FILRODENSWMB.DEFAULTS.LAT_TOP;
+        const latBottom = params.latBottom ?? FILRODENSWMB.DEFAULTS.LAT_BOTTOM;
+        const latRange = Math.max(0.1, Math.abs(latTop - latBottom));
+        const latScale = 180 / latRange;
+
+        return Math.round(baseWind * widthScale * latScale);
+    }
+
+    /**
      * Calculates moisture and temperature based on the final topography.
      * Applies globally deterministic Orographic Lift via Western Horizon sampling.
      */
@@ -934,14 +958,10 @@ export class ProceduralEngine {
 
         const climateBounds = ProceduralEngine.resolveBounds(bounds, width, height);
 
-        // Scale the mathematical wind distance to match the padded boundaries
-        const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
-        const widthScale = width / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        const dynamicWindDistance = ProceduralEngine.getWindDistance(width, params);
         const latTop = params.latTop ?? FILRODENSWMB.DEFAULTS.LAT_TOP;
         const latBottom = params.latBottom ?? FILRODENSWMB.DEFAULTS.LAT_BOTTOM;
         const latRange = Math.max(0.1, Math.abs(latTop - latBottom));
-        const latScale = 180 / latRange;
-        const dynamicWindDistance = Math.round(baseWind * widthScale * latScale);
 
         const panX = params.noise.offsetX ?? 0;
         const panY = params.noise.offsetY ?? 0;

@@ -278,13 +278,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedCanvasTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
         this.debouncedCanvasClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
-        this.debouncedHistoryRebuild = foundry.utils.debounce(() => {
-            this.#runTimed("Brush stroke rebuild", async () => {
-                await this.#rebuildFromHistory(true);
-                await this._repaintCanvas(null);
-                await this.generateClimate(null);
-            });
-        }, FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedHistoryRebuild = foundry.utils.debounce(() => this.#refreshFromBrushHistory("Brush stroke rebuild"), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
     }
 
     markDirty() {
@@ -1183,12 +1177,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.markDirty();
 
-        // Rebuild history if vector features exist so they re-carve and re-deform the newly painted terrain
-        const hasActiveFeatures = this.manualRivers?.length > 0 || this.tectonicFaults?.length > 0;
-        if (this.activeTool === "terrain" && hasActiveFeatures) {
-            this.pendingTerrainBounds = null;
+        // Rebuild history if vector features exist so they re-carve and re-deform the newly painted
+        // terrain. The area painted so far stays in pendingTerrainBounds for that rebuild to pick up.
+        if (this.activeTool === "terrain" && this.#hasVectorTerrainFeatures()) {
             this.debouncedHistoryRebuild();
         }
+    }
+
+    /**
+     * Whether faults or manual rivers exist. They are carved into the terrain after the brush
+     * strokes, so a stroke painted live on top of them is only correct once the terrain has been
+     * rebuilt (see #refreshFromBrushHistory).
+     */
+    #hasVectorTerrainFeatures() {
+        return this.manualRivers?.length > 0 || this.tectonicFaults?.length > 0;
     }
 
     #handleReferencePan(dx, dy) {
@@ -1655,7 +1657,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.drawGrid(this.uiState.gridType, this.uiState.gridSize, this.uiState.gridVisible);
     }
 
-    async _repaintCanvas(bounds = null) {
+    /**
+     * Repaints the map's pixel layers and redraws the vector layers.
+     *
+     * @param {object|null} requestedBounds - Area to repaint, or null for the whole map.
+     * @param {object} [options] - Repaint options.
+     * @param {boolean} [options.verifyPeak] - For an area-limited repaint that must leave the
+     *   whole canvas correct: checks the map's highest point first and repaints the whole map if
+     *   it moved, because land is shaded relative to it. The live brush leaves this off and
+     *   repaints just the stamp area on every pointer move, where reading every elevation each
+     *   time would be wasted work.
+     */
+    async _repaintCanvas(requestedBounds = null, { verifyPeak = false } = {}) {
         if (!this.currentElevationData) return;
 
         // Each stage is timed for the full-render summary (see RenderTimer)
@@ -1663,13 +1676,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         let mark = performance.now();
 
         // If repainting the FULL map, recalculate the true peak for accurate contrast
-        if (!bounds || !this.cachedMaxElevation) {
-            this.cachedMaxElevation = 0;
-            for (let i = 0; i < this.mapWidth * this.mapHeight; i++) {
-                if (this.currentElevationData[i] > this.cachedMaxElevation) {
-                    this.cachedMaxElevation = this.currentElevationData[i];
-                }
-            }
+        let bounds = requestedBounds;
+        if (verifyPeak || !bounds || !this.cachedMaxElevation) {
+            const plan = ProceduralOrchestrator.planRepaint(this.currentElevationData, this.cachedMaxElevation, bounds);
+            if (verifyPeak) bounds = plan.bounds;
+            this.cachedMaxElevation = plan.peak;
         }
         mark = timer.lap("Canvas repaint: peak scan", mark);
 
@@ -1792,10 +1803,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (!strokeBounds) return;
 
-        // Accumulate the bounds for the deferred procedural generation
-        this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, strokeBounds);
-
-        // Biome overrides do not alter topography or climate math.
+        // Biome overrides do not alter topography or climate math, so a biome stroke only has to
+        // repaint the biome layer where it painted. It must not touch pendingTerrainBounds: that
+        // records terrain painted live that the deferred generation still has to catch up with.
         if (this.activeTool === "biomes") {
             const { currentSeed, params } = MapStateManager.getMapParameters(this);
             const engine = new ProceduralEngine(currentSeed);
@@ -1811,37 +1821,56 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.bufferWaterMask,
                 params,
                 this.bufferBiomes,
-                this.pendingTerrainBounds,
+                strokeBounds,
                 this.bufferBiomeFallback,
             );
 
             this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
             this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight);
-            this.pendingTerrainBounds = null;
             return;
         }
 
+        // Accumulate the bounds for the deferred procedural generation
+        this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, strokeBounds);
         this._repaintCanvas(strokeBounds);
-        if (this.activeTool === "terrain" && this.manualRivers.length > 0) {
+        if (this.activeTool === "terrain" && this.#hasVectorTerrainFeatures()) {
             this.debouncedHistoryRebuild();
         } else {
             this.debouncedCanvasClimate();
         }
     }
 
-    async #rebuildFromHistory(showUI = false, bounds = null) {
-        if (showUI) {
+    /**
+     * Brings the terrain and everything derived from it in line with the brush history after a
+     * stroke was finished, undone or redone, limited to the area that actually changed.
+     *
+     * The working terrain is rebuilt from the brush engine's brushed layer (see
+     * ProceduralOrchestrator.rebuildChangedTerrain), which reports where it ended up different.
+     * That area, together with any area painted live since the last refresh, then goes through the
+     * bounded climate, river and repaint stages instead of a whole-map refresh.
+     *
+     * The live-painted area has to be added because painting writes straight into the working
+     * terrain: those pixels have already changed by the time of the rebuild, so a rebuild that
+     * happens to give them the same value does not report them, yet the moisture, rivers and canvas
+     * layers derived from them have not been updated. pendingTerrainBounds is where the live brush
+     * records every area it has painted.
+     *
+     * @param {string} title - Names the run in the console timing summary.
+     */
+    async #refreshFromBrushHistory(title) {
+        await this.#runTimed(title, async () => {
             await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.RebuildingHistory"));
-        }
 
-        try {
-            // Hand off history processing to the Orchestrator
-            ProceduralOrchestrator.rebuildFromHistory(this, null, null, bounds);
-        } finally {
-            if (showUI) {
+            try {
+                const rebuiltArea = ProceduralOrchestrator.rebuildChangedTerrain(this);
+                const staleArea = SpatialMath.mergeBounds(rebuiltArea, this.pendingTerrainBounds);
+                this.pendingTerrainBounds = null;
+
+                if (SpatialMath.isValidBounds(staleArea)) await this.generateClimate(staleArea);
+            } finally {
                 this.#endProcessing();
             }
-        }
+        });
     }
 
     async generateTerrain() {
@@ -1873,8 +1902,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async generateClimate(bounds = null) {
         if (!this.currentElevationData) return;
 
-        // Resolve active bounds before clearing pending state
-        const activeBounds = bounds || this.pendingTerrainBounds;
+        // Resolve active bounds before clearing pending state. Bounds that cover nothing (as
+        // merging two empty areas produces) mean a whole-map refresh.
+        const requestedBounds = bounds || this.pendingTerrainBounds;
+        const activeBounds = SpatialMath.isValidBounds(requestedBounds) ? requestedBounds : null;
         if (!bounds && this.pendingTerrainBounds) {
             this.pendingTerrainBounds = null;
         }
@@ -1883,23 +1914,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
 
             try {
-                ProceduralOrchestrator.processClimatePhase(this, activeBounds);
-                await this.generateFeatures(activeBounds);
+                // The climate is recomputed over a wider area than the one that changed, and the
+                // canvas has to be repainted over all of it
+                const climateBounds = ProceduralOrchestrator.processClimatePhase(this, activeBounds);
+                await this.generateFeatures(climateBounds);
             } finally {
                 this.#endProcessing();
             }
         });
     }
 
-    async generateFeatures(bounds = null) {
+    async generateFeatures(requestedBounds = null) {
         if (!this.currentElevationData) return;
+
+        const bounds = SpatialMath.isValidBounds(requestedBounds) ? requestedBounds : null;
 
         await this.#runTimed(`Features refresh (${bounds ? "bounded" : "whole map"})`, async () => {
             await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
 
             try {
-                ProceduralOrchestrator.processFeaturePhase(this);
-                await this._repaintCanvas(bounds);
+                // Rivers are traced over the whole map, so the water can change well outside the
+                // area being refreshed and the repaint has to cover that too
+                const waterBounds = ProceduralOrchestrator.processFeaturePhase(this, !!bounds);
+                const repaintBounds = bounds && waterBounds ? SpatialMath.mergeBounds(bounds, waterBounds) : bounds;
+                await this._repaintCanvas(repaintBounds, { verifyPeak: !!bounds });
             } finally {
                 this.#endProcessing();
             }
@@ -2678,11 +2716,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 if (this.baseElevationData && brushAction) {
                     targetLedger.push("raster");
-                    await this.#runTimed(isUndo ? "Brush undo rebuild" : "Brush redo rebuild", async () => {
-                        await this.#rebuildFromHistory(true);
-                        await this._repaintCanvas();
-                    });
-                    this.debouncedGenerateClimate();
+                    await this.#refreshFromBrushHistory(isUndo ? "Brush undo" : "Brush redo");
                     break;
                 }
             }
