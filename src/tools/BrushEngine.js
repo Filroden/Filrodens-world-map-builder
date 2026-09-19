@@ -1,7 +1,55 @@
 import { SpatialMath } from "./SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
 
+/** Brush feather is capped just below 1 so the falloff band never collapses to zero width. */
+const MAX_FEATHER = 0.99;
+
+/** The slope tools blend towards their anchored elevation by the brush influence raised to this power. */
+const SLOPE_INFLUENCE_POWER = 4;
+
+/** Smooth moves each pixel this fraction of the way towards the elevation under the stamp centre, scaled by strength and influence. */
+const SMOOTH_BLEND_FACTOR = 0.5;
+
+/**
+ * Slack, in pixels, added to each row's circle chord when working out which pixels to test. See
+ * BrushEngine#computeRowSpans for why it is needed.
+ */
+const CHORD_MARGIN_PX = 1e-3;
+
+/** How a terrain stamp updates elevation. NONE means the stamp cannot change anything. */
+const TERRAIN_MODE = Object.freeze({ NONE: 0, RAISE: 1, LOWER: 2, SMOOTH: 3, SLOPE: 4, CLAMP_ONLY: 5 });
+
+/**
+ * Two-argument Math.hypot, reproducing the algorithm V8 (Chromium, and so Foundry) implements it
+ * with: divide both values by the larger, add their squares, take the square root and scale back
+ * up. (V8 sums with Kahan compensation, which cannot change the result with only two terms.)
+ *
+ * Math.hypot is by far the most expensive call in the stamp loop, and this inline copy costs
+ * about half as much. Plain sqrt(dx*dx + dy*dy) would be cheaper still, but it rounds differently
+ * in roughly a third of pixels; that is invisible in the stored 32-bit elevation almost
+ * everywhere, yet it is not guaranteed to be, and replayed terrain would no longer match what
+ * earlier versions produced from the same strokes. This copy returns exactly what Math.hypot
+ * returns in V8. Other engines may differ from it in the last bit, as they already may differ
+ * from V8's own Math.hypot, which never mattered because the difference is far below the
+ * precision of the stored elevation.
+ */
+function exactHypot(dx, dy) {
+    const ax = Math.abs(dx);
+    const ay = Math.abs(dy);
+    const max = ax > ay ? ax : ay;
+    if (max === 0) return 0;
+
+    const nx = ax / max;
+    const ny = ay / max;
+    return Math.sqrt(nx * nx + ny * ny) * max;
+}
+
 export class BrushEngine {
+    // Per-row first and last column a stamp needs to test; reused across stamps to avoid
+    // allocating for every row of every stamp. See #computeRowSpans.
+    #spanStart = new Int32Array(0);
+    #spanEnd = new Int32Array(0);
+
     constructor(mapWidth, mapHeight) {
         this.mapWidth = mapWidth;
         this.mapHeight = mapHeight;
@@ -171,8 +219,23 @@ export class BrushEngine {
 
     // --- Private Rasterisation & Math ---
 
+    /**
+     * Applies one brush stamp centred on (cx, cy) and returns the raw footprint it covered.
+     *
+     * This is the innermost loop of every replay - a large map can replay millions of stamps -
+     * so it is written to do as little per pixel as possible while producing exactly the same
+     * values, bit for bit, as the straightforward formulation (distance, influence, then a
+     * per-tool update through a helper call for every pixel):
+     *
+     * - Stroke fields, the feather falloff band and the tool are resolved once per stamp, not
+     *   once per pixel.
+     * - The pixels each row can touch are narrowed to the chord of the brush circle, so pixels
+     *   outside the circle are never visited (see #computeRowSpans).
+     * - Distances come from exactHypot rather than Math.hypot, which is several times slower.
+     */
     #stampBrush(cx, cy, elevationData, biomeOverrideData, seaLevel, activeBounds = null) {
-        const { layer, size } = this.currentStroke;
+        const stroke = this.currentStroke;
+        const { layer, size } = stroke;
 
         // Calculate the raw, physical footprint of the brush
         const minX = Math.max(0, Math.floor(cx - size));
@@ -184,83 +247,214 @@ export class BrushEngine {
         const b = SpatialMath.intersectBounds({ minX, maxX, minY, maxY }, activeBounds);
 
         // Safety Check: If the brush stroke is entirely outside the rebuild zone, abort early
-        if (!SpatialMath.isValidBounds(b)) {
-            return { minX, maxX, minY, maxY };
-        }
-
-        // Run the mathematical loops strictly within the intersected bounds 'b'
-        for (let y = b.minY; y <= b.maxY; y++) {
-            for (let x = b.minX; x <= b.maxX; x++) {
-                const distance = Math.hypot(x - cx, y - cy);
-                if (distance > size) continue;
-
-                const index = y * this.mapWidth + x;
-                const influence = this.#calculateInfluence(distance, size, this.currentStroke.feather);
-
-                if (layer === "terrain") {
-                    this.#applyTerrainMath(index, cx, cy, influence, elevationData);
-                } else if (layer === "biome" && this.currentStroke.tool === "paint" && biomeOverrideData) {
-                    this.#applyBiomeMath(index, x, y, influence, elevationData, biomeOverrideData, seaLevel);
-                }
-            }
+        if (SpatialMath.isValidBounds(b)) {
+            const shape = this.#buildStampShape(stroke, b, cx, cy);
+            this.#rasteriseStamp(stroke, shape, elevationData, biomeOverrideData, seaLevel);
         }
 
         // Return the true footprint so the accumulator knows what was touched
         return { minX, maxX, minY, maxY };
     }
 
-    #calculateInfluence(distance, size, feather) {
-        const safeFeather = Math.min(feather, 0.99);
-        const coreSize = size * safeFeather;
-        return distance > coreSize ? 1 - (distance - coreSize) / (size - coreSize) : 1;
-    }
+    /**
+     * Resolves everything about a stamp's geometry that stays constant across its pixels, and
+     * fills the per-row pixel spans. The influence falloff is 1 out to `coreSize` (the feather
+     * setting is the solid fraction of the radius, capped so the falloff band never collapses to
+     * zero width), then drops linearly to 0 at the brush edge across `falloff` pixels.
+     */
+    #buildStampShape(stroke, b, cx, cy) {
+        const coreSize = stroke.size * Math.min(stroke.feather, MAX_FEATHER);
 
-    #applyTerrainMath(index, cx, cy, influence, elevationData) {
-        const { tool, strength } = this.currentStroke;
-        const currentElevation = elevationData[index];
-        const modification = strength * influence;
+        this.#computeRowSpans(b, cx, cy, stroke.size);
 
-        if (tool === "raise") {
-            elevationData[index] = Math.min(1, currentElevation + modification);
-        } else if (tool === "lower") {
-            elevationData[index] = Math.max(0, currentElevation - modification);
-        } else if (tool === "smooth") {
-            const targetX = Math.round(cx);
-            const targetY = Math.round(cy);
-
-            if (targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight) return;
-
-            const targetElevation = elevationData[targetY * this.mapWidth + targetX];
-            elevationData[index] += (targetElevation - currentElevation) * (modification * 0.5);
-        } else if (tool === "slopeUp" || tool === "slopeDown" || tool === "level") {
-            if (this.activeSlopeElevation === null) return;
-
-            const slopeInfluence = Math.pow(influence, 4);
-            elevationData[index] = currentElevation * (1 - slopeInfluence) + this.activeSlopeElevation * slopeInfluence;
-        }
-
-        elevationData[index] = Math.max(0, elevationData[index]);
+        return {
+            cx,
+            cy,
+            size: stroke.size,
+            coreSize,
+            falloff: stroke.size - coreSize,
+            minY: b.minY,
+            rows: b.maxY - b.minY + 1,
+        };
     }
 
     /**
-     * Writes a biome override, but only where the paint value makes sense for the tile
-     * underneath - a land biome can't be hand-painted onto water and vice versa. That guard
-     * stays symmetric with ProceduralEngine.resolveBiomeLookup, which never lets a custom biome
-     * reach water except via an auto-generation rule match (see that method's own doc comment).
-     * Two built-in values are deliberate exceptions, both allowed to write onto water: Pack Ice,
-     * which has always rendered solid over water, and the Eraser (id 0), which needs to be able
-     * to clear a previous Pack-Ice-style override sitting on a water tile - otherwise that
-     * override could never be erased again.
+     * Records, for each row of the stamp's bounding box, the first and last column that can lie
+     * inside the brush circle, so the pixel loops never test pixels far outside it (about a fifth
+     * of the box).
+     *
+     * The spans are deliberately generous: each chord is widened by CHORD_MARGIN_PX, and every
+     * pixel loop still applies the exact `distance > size` rejection itself, so the spans only
+     * decide which pixels are worth testing and can never change which are painted. The margin
+     * matters because the chord half-width is a square root, and near the top and bottom of the
+     * circle it is extremely sensitive to rounding in `size * size - dy * dy`. A row is only skipped
+     * outright when |dy| exceeds the radius, in which case every pixel in it is farther away
+     * than the radius no matter what dx is.
+     *
+     * Results go into reusable typed arrays rather than a fresh object per row. An empty row is
+     * stored as start 0, end -1.
      */
-    #applyBiomeMath(index, x, y, influence, elevationData, biomeOverrideData, seaLevel) {
-        const { paintValue } = this.currentStroke;
+    #computeRowSpans(b, cx, cy, size) {
+        const rows = b.maxY - b.minY + 1;
+        if (this.#spanStart.length < rows) {
+            this.#spanStart = new Int32Array(rows);
+            this.#spanEnd = new Int32Array(rows);
+        }
 
-        const isLand = elevationData[index] >= seaLevel;
+        const sizeSq = size * size;
+        for (let row = 0; row < rows; row++) {
+            const dy = b.minY + row - cy;
+            const chordSq = sizeSq - dy * dy;
+
+            if (chordSq < 0) {
+                this.#spanStart[row] = 0;
+                this.#spanEnd[row] = -1;
+                continue;
+            }
+
+            const halfWidth = Math.sqrt(chordSq) + CHORD_MARGIN_PX;
+            this.#spanStart[row] = Math.max(b.minX, Math.ceil(cx - halfWidth));
+            this.#spanEnd[row] = Math.min(b.maxX, Math.floor(cx + halfWidth));
+        }
+    }
+
+    /**
+     * Routes a stamp to the loop for its layer: terrain strokes edit elevation, biome paint
+     * strokes edit the override map, and any other layer has no raster effect.
+     */
+    #rasteriseStamp(stroke, shape, elevationData, biomeOverrideData, seaLevel) {
+        if (stroke.layer === "terrain") {
+            this.#stampTerrain(stroke, shape, elevationData);
+        } else if (stroke.layer === "biome" && stroke.tool === "paint" && biomeOverrideData) {
+            this.#stampBiome(stroke, shape, elevationData, biomeOverrideData, seaLevel);
+        }
+    }
+
+    /**
+     * Chooses the terrain update for a stroke's tool. Returns TERRAIN_MODE.NONE when the stamp
+     * can have no effect at all: smooth pulls every pixel towards the elevation under the stamp
+     * centre, which does nothing if that centre is off the map, and the slope tools do nothing
+     * until the stroke's first click has anchored an elevation. An unrecognised tool still
+     * clamps the elevation of every pixel it covers to be non-negative, like every other tool.
+     */
+    #resolveTerrainMode(tool, targetIndex) {
+        if (tool === "raise") return TERRAIN_MODE.RAISE;
+        if (tool === "lower") return TERRAIN_MODE.LOWER;
+        if (tool === "smooth") return targetIndex === null ? TERRAIN_MODE.NONE : TERRAIN_MODE.SMOOTH;
+        if (tool === "slopeUp" || tool === "slopeDown" || tool === "level") {
+            return this.activeSlopeElevation === null ? TERRAIN_MODE.NONE : TERRAIN_MODE.SLOPE;
+        }
+        return TERRAIN_MODE.CLAMP_ONLY;
+    }
+
+    /**
+     * Index of the pixel under the stamp centre, or null if that centre is off the map. Smooth
+     * pulls every pixel in the stamp towards this pixel's elevation.
+     */
+    #getStampCentreIndex(cx, cy) {
+        const targetX = Math.round(cx);
+        const targetY = Math.round(cy);
+
+        if (targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight) return null;
+        return targetY * this.mapWidth + targetX;
+    }
+
+    /**
+     * Terrain pixel loop. One loop serves every terrain tool, with the tool chosen by a switch on
+     * a mode fixed for the whole stamp, so the switch is perfectly predictable and the row and
+     * distance handling exists once.
+     *
+     * Every branch ends by clamping elevation to be non-negative. Writing the clamped value in
+     * one step gives the same result as clamping the stored value afterwards, because rounding to
+     * 32-bit float never reorders values.
+     *
+     * Smooth deliberately re-reads the centre pixel for every pixel it updates, instead of once
+     * per stamp: the centre pixel lies inside the stamp and is itself updated part-way through
+     * the loop, so the elevation later pixels are pulled towards is part of the result.
+     */
+    #stampTerrain(stroke, shape, elevationData) {
+        const { tool, strength } = stroke;
+        const { cx, cy, size, coreSize, falloff, minY, rows } = shape;
+        const targetIndex = tool === "smooth" ? this.#getStampCentreIndex(cx, cy) : null;
+        const mode = this.#resolveTerrainMode(tool, targetIndex);
+        if (mode === TERRAIN_MODE.NONE) return;
+
+        const slopeElevation = this.activeSlopeElevation;
+        const width = this.mapWidth;
+
+        for (let row = 0; row < rows; row++) {
+            const y = minY + row;
+            const dy = y - cy;
+            const rowBase = y * width;
+            const xEnd = this.#spanEnd[row];
+
+            for (let x = this.#spanStart[row]; x <= xEnd; x++) {
+                const distance = exactHypot(x - cx, dy);
+                if (distance > size) continue;
+
+                const influence = distance > coreSize ? 1 - (distance - coreSize) / falloff : 1;
+                const index = rowBase + x;
+                const current = elevationData[index];
+
+                switch (mode) {
+                    case TERRAIN_MODE.RAISE:
+                        elevationData[index] = Math.max(0, Math.min(1, current + strength * influence));
+                        break;
+                    case TERRAIN_MODE.LOWER:
+                        elevationData[index] = Math.max(0, current - strength * influence);
+                        break;
+                    case TERRAIN_MODE.SMOOTH:
+                        elevationData[index] = Math.max(0, current + (elevationData[targetIndex] - current) * (strength * influence * SMOOTH_BLEND_FACTOR));
+                        break;
+                    case TERRAIN_MODE.SLOPE: {
+                        const slopeInfluence = Math.pow(influence, SLOPE_INFLUENCE_POWER);
+                        elevationData[index] = Math.max(0, current * (1 - slopeInfluence) + slopeElevation * slopeInfluence);
+                        break;
+                    }
+                    default:
+                        elevationData[index] = Math.max(0, current);
+                }
+            }
+        }
+    }
+
+    /**
+     * Biome paint pixel loop. Writes a biome override, but only where the paint value makes sense
+     * for the tile underneath - a land biome can't be hand-painted onto water and vice versa.
+     * That guard stays symmetric with ProceduralEngine.resolveBiomeLookup, which never lets a
+     * custom biome reach water except via an auto-generation rule match (see that method's own
+     * doc comment). Two built-in values are deliberate exceptions, both allowed to write onto
+     * water: Pack Ice, which has always rendered solid over water, and the Eraser (id 0), which
+     * needs to be able to clear a previous Pack-Ice-style override sitting on a water tile -
+     * otherwise that override could never be erased again.
+     *
+     * Paint is all-or-nothing across the whole brush circle, so unlike terrain it ignores the
+     * feather falloff.
+     */
+    #stampBiome(stroke, shape, elevationData, biomeOverrideData, seaLevel) {
+        const { paintValue } = stroke;
+        const { cx, cy, size, minY, rows } = shape;
+
         const isWaterBiome = paintValue === FILRODENSWMB.BIOME_IDS.DEEP_OCEAN || paintValue === FILRODENSWMB.BIOME_IDS.SHALLOW_OCEAN;
         const canPaintOverWater = paintValue === FILRODENSWMB.BIOME_IDS.PACK_ICE || paintValue === FILRODENSWMB.BIOME_IDS.ERASER;
+        const width = this.mapWidth;
 
-        if (canPaintOverWater || isLand !== isWaterBiome) {
-            biomeOverrideData[index] = paintValue;
+        for (let row = 0; row < rows; row++) {
+            const y = minY + row;
+            const dy = y - cy;
+            const rowBase = y * width;
+            const xEnd = this.#spanEnd[row];
+
+            for (let x = this.#spanStart[row]; x <= xEnd; x++) {
+                if (exactHypot(x - cx, dy) > size) continue;
+
+                const index = rowBase + x;
+                const isLand = elevationData[index] >= seaLevel;
+
+                if (canPaintOverWater || isLand !== isWaterBiome) {
+                    biomeOverrideData[index] = paintValue;
+                }
+            }
         }
     }
 }

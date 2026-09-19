@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { StudioCanvas } from "../canvas/StudioCanvas.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
+import { RenderTimer } from "../tools/RenderTimer.js";
 import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
 import { Scene3D } from "../canvas/Scene3D.js";
 import { SceneExporter } from "./SceneExporter.js";
@@ -266,6 +267,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
         this.customBiomeColors = {};
+
+        // Collects per-phase timings during a full render for the summary logged when it finishes
+        this.renderTimer = new RenderTimer();
 
         this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
         this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
@@ -1653,6 +1657,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async _repaintCanvas(bounds = null) {
         if (!this.currentElevationData) return;
 
+        // Each stage is timed for the full-render summary (see RenderTimer)
+        const timer = this.renderTimer;
+        let mark = performance.now();
+
         // If repainting the FULL map, recalculate the true peak for accurate contrast
         if (!bounds || !this.cachedMaxElevation) {
             this.cachedMaxElevation = 0;
@@ -1662,6 +1670,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 }
             }
         }
+        mark = timer.lap("Canvas repaint: peak scan", mark);
 
         const seaLevel = this.uiState["seaLevel"];
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
@@ -1673,6 +1682,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const baseBtn = this.element.querySelector('[data-layer="base"]');
         this.canvasEngine.toggleLayer("base", baseBtn ? baseBtn.classList.contains("active") : true);
+        mark = timer.lap("Canvas repaint: base layer", mark);
 
         // Pass the cached peak into the coloriser
         const maxPeak = this.cachedMaxElevation || 1.0;
@@ -1681,6 +1691,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const topoBtn = this.element.querySelector('[data-layer="topography"]');
         this.canvasEngine.toggleLayer("topography", topoBtn ? topoBtn.classList.contains("active") : true);
+        mark = timer.lap("Canvas repaint: topography layer", mark);
 
         if (this.currentMoistureData && this.currentTemperatureData) {
             engine.createBiomesMap(
@@ -1705,16 +1716,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
             this.canvasEngine.toggleLayer("biomes", biomesBtn ? biomesBtn.classList.contains("active") : true);
         }
+        mark = timer.lap("Canvas repaint: biomes layer", mark);
 
         const contourInterval = this.uiState["contourInterval"];
         engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds);
         this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight);
+        mark = timer.lap("Canvas repaint: contours layer", mark);
 
         if (this.canvasEngine) {
             this.canvasEngine.clearInteractiveTargets();
         }
 
         this._repaintVectors();
+        timer.lap("Canvas repaint: vector layers", mark);
     }
 
     _repaintVectors() {
@@ -1838,6 +1852,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // runs re-flags itself instead of being lost.
         this.#clearPendingFeatureMath();
 
+        // Started before the overlay's paint pause so the summary's total covers everything the
+        // user waits for, not just the phases that log their own times
+        this.renderTimer.begin();
+
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
 
         try {
@@ -1846,6 +1864,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             // The App maintains control of the Climate and Canvas rendering pipelines
             await this.generateClimate(null);
+
+            console.log(this.renderTimer.summarise());
         } finally {
             this.#endProcessing();
         }

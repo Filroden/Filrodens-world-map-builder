@@ -1172,7 +1172,7 @@ export class ProceduralEngine {
      * Decides which biome a pixel resolves to and whether it should render as water, in
      * priority order: a hand-painted override always wins; failing that, a matching custom
      * auto-generation rule (see BiomeRuleEngine); failing that, the built-in default via
-     * getBiomeKey(). BrushEngine's own paint guard (#applyBiomeMath) never lets a custom
+     * getBiomeKey(). BrushEngine's own paint guard (#stampBiome) never lets a custom
      * biome be hand-painted below sea level in the first place, so a custom biome only ever
      * ends up there via a rule match here.
      *

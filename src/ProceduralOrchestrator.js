@@ -27,7 +27,7 @@ export class ProceduralOrchestrator {
     /**
      * Directs the topography generation based on the active engine mode.
      */
-    static async #routeTopographyPass(app, engine, params) {
+    static #routeTopographyPass(app, engine, params) {
         const mode = app.uiState.generationEngine || "standard";
 
         console.log(`World Map Builder | Generating Topography (${mode} mode)...`);
@@ -38,13 +38,17 @@ export class ProceduralOrchestrator {
         } else if (mode === "advanced") {
             engine.generateTectonicTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
         } else if (mode === "guided") {
-            await engine.generateGuidedTopography(app.mapWidth, app.mapHeight, params, app.landMasks, app.baseElevationData);
+            // Synchronous like every other mode. This pass is not awaited by its caller, so making
+            // it async would defer the timing log below until after the brush history replay and
+            // report that time as topography, and turn any error into an unhandled rejection.
+            engine.generateGuidedTopography(app.mapWidth, app.mapHeight, params, app.landMasks, app.baseElevationData);
         } else {
             engine.generateTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData, [], [], null);
         }
 
         const t1 = performance.now();
         console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
+        app.renderTimer.record("Base topography", t1 - t0);
     }
 
     /**
@@ -52,6 +56,7 @@ export class ProceduralOrchestrator {
      * raster brush strokes and applying vector deformations on top.
      */
     static rebuildFromHistory(app, engine = null, params = null, bounds = null) {
+        const startTime = performance.now();
         const activeEngine = engine ?? new ProceduralEngine(app.uiState.mapSeed);
         const activeParams = params ?? MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors).params;
         const activeBounds = ProceduralEngine.resolveBounds(bounds, app.mapWidth, app.mapHeight);
@@ -73,19 +78,42 @@ export class ProceduralOrchestrator {
         }
 
         // 3. Replay all raster brush strokes
-        if (app.brushEngine?.history?.length > 0) {
-            app.brushEngine.replayHistory(app.currentElevationData, app.currentBiomeOverrides, activeParams.seaLevel, activeBounds);
-        }
+        const strokeCount = app.brushEngine?.history?.length ?? 0;
+        const replayMs = strokeCount > 0 ? this.#measureMs(() => app.brushEngine.replayHistory(app.currentElevationData, app.currentBiomeOverrides, activeParams.seaLevel, activeBounds)) : 0;
 
-        // 4. Apply vector faults across both base and brushed terrain
+        // 4-5. Deform the brushed terrain with the vector features
+        const vectorMs = this.#measureMs(() => this.#applyVectorDeformations(app, activeEngine, activeParams, activeBounds));
+
+        // Reported separately from the base topography time logged elsewhere, because on a map with
+        // a long brush history the replay is usually the largest part of a rebuild.
+        console.log(`World Map Builder | History rebuilt in ${(performance.now() - startTime).toFixed(2)}ms (${strokeCount} brush strokes replayed in ${replayMs.toFixed(2)}ms, faults and rivers applied in ${vectorMs.toFixed(2)}ms)`);
+        app.renderTimer.record("Brush history replay", replayMs, `${strokeCount} strokes`);
+        app.renderTimer.record("Faults and rivers", vectorMs);
+    }
+
+    /**
+     * Applies the vector features that deform terrain on top of the replayed brush strokes: tectonic
+     * faults across both base and brushed terrain, then manual rivers carved into the final
+     * deformed topography. The order matters because rivers must cut the terrain faults have
+     * already reshaped.
+     */
+    static #applyVectorDeformations(app, engine, params, bounds) {
         if (app.tectonicFaults?.length > 0) {
-            TectonicEngine.applyTectonicFaults(app.currentElevationData, app.mapWidth, app.mapHeight, app.tectonicFaults, activeEngine.simplex, activeBounds);
+            TectonicEngine.applyTectonicFaults(app.currentElevationData, app.mapWidth, app.mapHeight, app.tectonicFaults, engine.simplex, bounds);
         }
 
-        // 5. Carve manual rivers into the final deformed topography
         if (app.manualRivers?.length > 0) {
-            HydrologyEngine.carveManualRivers(app.currentElevationData, app.mapWidth, app.mapHeight, app.manualRivers, activeEngine.simplex, activeParams.seaLevel, activeBounds);
+            HydrologyEngine.carveManualRivers(app.currentElevationData, app.mapWidth, app.mapHeight, app.manualRivers, engine.simplex, params.seaLevel, bounds);
         }
+    }
+
+    /**
+     * Runs `work` and returns how long it took, in milliseconds.
+     */
+    static #measureMs(work) {
+        const start = performance.now();
+        work();
+        return performance.now() - start;
     }
 
     /**
@@ -131,6 +159,7 @@ export class ProceduralOrchestrator {
 
         const t1 = performance.now();
         console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
+        app.renderTimer.record("Climate", t1 - t0);
     }
 
     /**
@@ -183,5 +212,6 @@ export class ProceduralOrchestrator {
 
         const t1 = performance.now();
         console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
+        app.renderTimer.record("Features (springs and rivers)", t1 - t0);
     }
 }
