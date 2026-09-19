@@ -15,6 +15,10 @@ export class ProceduralOrchestrator {
         const { currentSeed, params } = MapStateManager.getMapParameters(app);
         const engine = new ProceduralEngine(currentSeed);
 
+        // A full generation is the point to try again for memory an earlier attempt could not get
+        app.brushEngine?.layerCache.retryAllocation();
+        app.scratchUnavailable = false;
+
         // 1. Route Base Topography
         this.#routeTopographyPass(app, engine, params);
 
@@ -76,22 +80,27 @@ export class ProceduralOrchestrator {
 
         // 1. Bring the brushed layer up to date, replaying the whole history only if it has to be
         const strokeCount = app.brushEngine?.history?.length ?? 0;
-        let replayed = false;
+        let brushed = { replayed: false, cached: false };
         const refreshMs = this.#measureMs(() => {
-            replayed = this.#refreshBrushedLayer(app, activeParams.seaLevel, baseChanged);
+            brushed = this.#refreshBrushedLayer(app, activeParams.seaLevel, baseChanged);
         });
 
-        // 2-3. Reset the working terrain and biome overrides to the brushed layer
-        const mergeMs = this.#measureMs(() => this.#resetToBrushedLayer(app, activeBounds));
+        // 2-3. Reset the working terrain and biome overrides to the brushed layer. If there is no
+        // layer (the browser had no memory for it) the strokes are replayed straight into the
+        // working terrain, which is what a rebuild did before the layer existed.
+        const mergeMs = this.#measureMs(() => this.#resetToBrushedLayer(app, activeBounds, brushed.cached));
+        const directReplayMs = this.#measureMs(() => this.#replayIntoWorkingTerrain(app, activeParams.seaLevel, activeBounds, brushed.cached));
+        const replayed = brushed.replayed || !brushed.cached;
+        const replayMs = brushed.cached ? refreshMs : directReplayMs;
 
         // 4-5. Deform the brushed terrain with the vector features
         const vectorMs = this.#measureMs(() => this.#applyVectorDeformations(app, app.currentElevationData, activeEngine, activeParams, activeBounds));
 
         // Reported separately from the base topography time logged elsewhere, because on a map with
         // a long brush history the replay is usually the largest part of a rebuild.
-        const brushSummary = replayed ? `${strokeCount} brush strokes replayed in ${refreshMs.toFixed(2)}ms` : `${strokeCount} brush strokes reused from the brushed layer`;
+        const brushSummary = replayed ? `${strokeCount} brush strokes replayed in ${replayMs.toFixed(2)}ms` : `${strokeCount} brush strokes reused from the brushed layer`;
         console.log(`World Map Builder | History rebuilt in ${(performance.now() - startTime).toFixed(2)}ms (${brushSummary}, layers merged in ${mergeMs.toFixed(2)}ms, faults and rivers applied in ${vectorMs.toFixed(2)}ms)`);
-        app.renderTimer.record(replayed ? "Brush history replay" : "Brush layer reused", refreshMs, `${strokeCount} strokes`);
+        app.renderTimer.record(replayed ? "Brush history replay" : "Brush layer reused", replayMs, `${strokeCount} strokes`);
         app.renderTimer.record("Brush layer merge", mergeMs);
         app.renderTimer.record("Faults and rivers", vectorMs);
     }
@@ -120,6 +129,8 @@ export class ProceduralOrchestrator {
      * @param {object|null} params - Derived map parameters; derived from the UI state if omitted.
      * @returns {{minX: number, maxX: number, minY: number, maxY: number}|null} Box around every
      *   pixel of the working terrain or the biome overrides that changed, or null if none did.
+     *   If the browser had no memory for the brushed layer or the scratch buffer, the terrain is
+     *   rebuilt in place without comparing, and the box covers the whole map.
      */
     static rebuildChangedTerrain(app, engine = null, params = null) {
         const startTime = performance.now();
@@ -129,12 +140,21 @@ export class ProceduralOrchestrator {
         const layer = app.brushEngine?.layerCache;
         const strokeCount = app.brushEngine?.history?.length ?? 0;
 
-        let replayed = false;
+        let brushed = { replayed: false, cached: false };
         const refreshMs = this.#measureMs(() => {
-            replayed = this.#refreshBrushedLayer(app, activeParams.seaLevel, false);
+            brushed = this.#refreshBrushedLayer(app, activeParams.seaLevel, false);
         });
 
-        const rebuilt = this.#getScratchBuffer(app);
+        // Both the layer and the scratch buffer are extra memory. If the browser cannot supply
+        // either, rebuild the whole terrain in place instead, which needs none, and report the
+        // whole map as changed since there is nothing to compare with.
+        const rebuilt = brushed.cached ? this.#tryGetScratchBuffer(app) : null;
+        if (!rebuilt) {
+            this.rebuildFromHistory(app, activeEngine, activeParams, null, false);
+            return wholeMap;
+        }
+
+        const replayed = brushed.replayed;
         const mergeMs = this.#measureMs(() => rebuilt.set(layer?.elevation ?? app.baseElevationData));
         const vectorMs = this.#measureMs(() => this.#applyVectorDeformations(app, rebuilt, activeEngine, activeParams, wholeMap));
 
@@ -183,25 +203,31 @@ export class ProceduralOrchestrator {
      * Makes sure the brush engine's brushed layer equals a full replay of the stroke history,
      * replaying it from the base terrain if it does not.
      *
-     * @returns {boolean} True if the history had to be replayed.
+     * @returns {{replayed: boolean, cached: boolean}} Whether the history had to be replayed into
+     *   the layer, and whether the layer can be used: it cannot if the browser had no memory for
+     *   it, and the caller must then replay the history some other way. Without a brush engine
+     *   there are no strokes, so there is nothing to replay and nothing to cache.
      */
     static #refreshBrushedLayer(app, seaLevel, baseChanged) {
         const brushEngine = app.brushEngine;
-        if (!brushEngine) return false;
-        if (!baseChanged && brushEngine.isLayerCacheCurrent(seaLevel)) return false;
+        if (!brushEngine) return { replayed: false, cached: true };
+        if (!baseChanged && brushEngine.isLayerCacheCurrent(seaLevel)) return { replayed: false, cached: true };
 
-        brushEngine.rebuildLayerCache(app.baseElevationData, seaLevel);
-        return true;
+        const cached = brushEngine.rebuildLayerCache(app.baseElevationData, seaLevel);
+        return { replayed: cached, cached };
     }
 
     /**
      * Overwrites the working elevation and biome overrides, within the bounds, with the brushed
      * layer, discarding whatever vector deformations and live brush strokes they held. Without a
-     * brush engine there are no strokes, so the working terrain is the base terrain with no
-     * painted biomes.
+     * usable layer (there are no strokes, or the browser had no memory for it) they are set to
+     * the base terrain with no painted biomes, ready for the strokes to be replayed onto them
+     * (see #replayIntoWorkingTerrain).
+     *
+     * @param {boolean} layerUsable - Whether the brush engine's layer holds the brushed terrain.
      */
-    static #resetToBrushedLayer(app, bounds) {
-        const layer = app.brushEngine?.layerCache;
+    static #resetToBrushedLayer(app, bounds, layerUsable) {
+        const layer = layerUsable ? app.brushEngine?.layerCache : null;
         const elevationSource = layer?.elevation ?? app.baseElevationData;
 
         this.#forEachBoundsRow(bounds, app.mapWidth, (start, end) => {
@@ -221,6 +247,19 @@ export class ProceduralOrchestrator {
                 app.currentBiomeOverrides.fill(0, start, end);
             }
         });
+    }
+
+    /**
+     * Replays the stroke history straight onto the working terrain, which #resetToBrushedLayer has
+     * just set to the base terrain. This is the way rebuilds worked before the brushed layer
+     * existed: it needs no extra memory but takes time in proportion to the number of strokes, so
+     * it is only used when the layer could not be allocated.
+     *
+     * @param {boolean} layerUsable - Whether the layer was used; nothing is replayed if it was.
+     */
+    static #replayIntoWorkingTerrain(app, seaLevel, bounds, layerUsable) {
+        if (layerUsable) return;
+        app.brushEngine?.replayHistory(app.currentElevationData, app.currentBiomeOverrides, seaLevel, bounds);
     }
 
     /**
@@ -250,6 +289,27 @@ export class ProceduralOrchestrator {
             app.bufferScratch = new Float32Array(pixels);
         }
         return app.bufferScratch;
+    }
+
+    /**
+     * The scratch buffer, or null if the browser has no memory for it. Running out of memory is
+     * not something the module can prevent, so callers fall back to work that needs no extra
+     * buffer. After a failure it is not tried again until the next full generation (see
+     * processTopographyPhase), since each failed allocation costs time.
+     */
+    static #tryGetScratchBuffer(app) {
+        if (app.scratchUnavailable) return null;
+
+        try {
+            return this.#getScratchBuffer(app);
+        } catch (error) {
+            if (!(error instanceof RangeError)) throw error;
+
+            app.bufferScratch = null;
+            app.scratchUnavailable = true;
+            console.warn(`World Map Builder | Not enough memory for the rebuild scratch buffer (${error.message}). Refreshes will cover the whole map instead of just the changed area.`);
+            return null;
+        }
     }
 
     /**
@@ -321,7 +381,8 @@ export class ProceduralOrchestrator {
      * @param {object} app - The MapStudioApp instance.
      * @param {boolean} trackWaterChanges - Whether to report where the water changed.
      * @returns {object|null} Box around every pixel whose water depth changed, or null if
-     *   none did or tracking was not requested.
+     *   none did or tracking was not requested. If tracking was requested but the browser had no
+     *   memory for the previous water to compare with, the box covers the whole map.
      */
     static processFeaturePhase(app, trackWaterChanges = false) {
         const { currentSeed, params } = MapStateManager.getMapParameters(app);
@@ -359,7 +420,7 @@ export class ProceduralOrchestrator {
         // generateRivers rewrites the water mask from scratch, so the previous one has to be
         // kept aside to compare with. It goes in the shared scratch buffer, which nothing else
         // is using at this point.
-        const previousWater = trackWaterChanges ? this.#getScratchBuffer(app) : null;
+        const previousWater = trackWaterChanges ? this.#tryGetScratchBuffer(app) : null;
         previousWater?.set(app.bufferWaterMask);
 
         app.currentRiverData = engine.generateRivers(
@@ -378,6 +439,10 @@ export class ProceduralOrchestrator {
         console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
         app.renderTimer.record("Features (springs and rivers)", t1 - t0);
 
-        return previousWater ? BufferDiff.changedBounds(previousWater, app.bufferWaterMask, app.mapWidth, app.mapHeight) : null;
+        if (!trackWaterChanges) return null;
+
+        // Without the scratch buffer the old water is gone, so all that can be said is that any of
+        // it may have changed; the repaint then covers the whole map.
+        return previousWater ? BufferDiff.changedBounds(previousWater, app.bufferWaterMask, app.mapWidth, app.mapHeight) : ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight);
     }
 }

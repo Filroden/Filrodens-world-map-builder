@@ -118,6 +118,11 @@ export const FILRODENSWMB = {
             CLIMATE: 800,
             FEATURES: 600,
             CANVAS: 2000,
+            // How long after the last refresh the rebuild scratch buffer (a map-sized float raster
+            // used to compare the rebuilt terrain and water with the live ones) is released.
+            // It is recreated on demand, so this only trades a short allocation on the next edit
+            // for not holding the memory while the map sits idle.
+            SCRATCH_RELEASE: 30000,
         },
     },
     DISPLAY: {

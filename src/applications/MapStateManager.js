@@ -27,6 +27,10 @@ export class MapStateManager {
         // "Preview Rule Coverage" button is hovered - see ProceduralEngine.createBiomesMap's
         // outFallbackBuffer parameter for what actually gets written into it.
         app.bufferBiomeFallback = new Uint8Array(totalPixels * 4);
+
+        // The rebuild scratch buffer is created on demand at the map's current size (see
+        // ProceduralOrchestrator); drop any left over from a map of a different size.
+        app.bufferScratch = null;
     }
 
     /**

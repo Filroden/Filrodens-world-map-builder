@@ -4,11 +4,31 @@ import { FILRODENSWMB } from "../config.js";
 const PATCH_TILE_SIZE = 64;
 
 /**
- * Upper bound on the memory all undo patches together may hold. When a new patch would take the
- * total past this, the oldest patches are dropped; undoing a stroke that lost its patch is still
- * correct, it just rebuilds the whole layer by replaying the history instead of restoring a tile.
+ * Most memory all undo patches together may hold. When a new patch would take the total past its
+ * budget, the oldest patches are dropped; undoing a stroke that lost its patch is still correct,
+ * it just rebuilds the whole layer by replaying the history instead of restoring a tile.
  */
-const PATCH_BUDGET_BYTES = 64 * 1024 * 1024;
+const PATCH_BUDGET_MAX_BYTES = 64 * 1024 * 1024;
+
+/**
+ * Least memory the patch budget is ever cut down to, however large the map, so that undoing a
+ * few recent strokes stays fast.
+ */
+const PATCH_BUDGET_MIN_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Most extra memory the brushed layer, the scratch buffer that rebuilds are built in (see
+ * ProceduralOrchestrator) and the undo patches may add together. On a map big enough that the
+ * two map-sized buffers alone approach this, the patch budget shrinks so the total stays near it
+ * instead of growing without limit with the map.
+ */
+const EXTRA_MEMORY_CEILING_BYTES = 256 * 1024 * 1024;
+
+/** Bytes per pixel of the brushed layer: an elevation float plus a biome override byte. */
+const LAYER_BYTES_PER_PIXEL = Float32Array.BYTES_PER_ELEMENT + Uint8Array.BYTES_PER_ELEMENT;
+
+/** Bytes per pixel of the rebuild scratch buffer, a single float raster. */
+const SCRATCH_BYTES_PER_PIXEL = Float32Array.BYTES_PER_ELEMENT;
 
 /**
  * The brushed layer of a map: the base terrain with every raster brush stroke in the history
@@ -45,6 +65,13 @@ export class BrushLayerCache {
     /** Whether `elevation` and `overrides` currently equal a full replay of the stroke history. */
     valid = false;
 
+    /**
+     * Whether the browser refused to allocate the two buffers. The layer then stays unusable and
+     * callers rebuild by replaying the history, which needs no extra memory. It is not retried on
+     * every rebuild, since each failed attempt costs time, only when retryAllocation() is called.
+     */
+    allocationFailed = false;
+
     /** Sea level the layer was built with. Biome paint tests elevation against it, so it is part of the result. */
     seaLevel = null;
 
@@ -69,12 +96,31 @@ export class BrushLayerCache {
      * @param {number} [options.maxPatches] - How many patches to keep. Only as many strokes as the
      *   session undo history holds can ever be undone, so keeping more would be wasted memory.
      */
-    constructor(width, height, { patchBudgetBytes = PATCH_BUDGET_BYTES, maxPatches = FILRODENSWMB.LIMITS.HISTORY_MAX } = {}) {
+    constructor(width, height, { patchBudgetBytes = BrushLayerCache.patchBudgetFor(width, height), maxPatches = FILRODENSWMB.LIMITS.HISTORY_MAX } = {}) {
         this.#width = width;
         this.#height = height;
         this.#tilesAcross = Math.ceil(width / PATCH_TILE_SIZE);
         this.#patchBudgetBytes = patchBudgetBytes;
         this.#maxPatches = maxPatches;
+    }
+
+    /**
+     * How much memory the undo patches may hold on a map of this size.
+     *
+     * The layer and the rebuild scratch buffer each cost a fixed amount per pixel, so the bigger
+     * the map, the less room is left under the extra-memory ceiling. The budget is the full
+     * amount on maps up to a size where that leaves plenty (about 22 million pixels, larger than
+     * a 4000 by 4000 map), then shrinks in step with the map, but never below a floor that keeps
+     * the most recent strokes quick to undo.
+     *
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @returns {number} The patch budget in bytes.
+     */
+    static patchBudgetFor(width, height) {
+        const bufferBytes = width * height * (LAYER_BYTES_PER_PIXEL + SCRATCH_BYTES_PER_PIXEL);
+        const roomLeft = EXTRA_MEMORY_CEILING_BYTES - bufferBytes;
+        return Math.min(PATCH_BUDGET_MAX_BYTES, Math.max(PATCH_BUDGET_MIN_BYTES, roomLeft));
     }
 
     /**
@@ -84,17 +130,51 @@ export class BrushLayerCache {
      *
      * @param {Float32Array} baseElevation - The base terrain, same size as the map.
      * @param {number} seaLevel - Sea level the replay will use.
+     * @returns {boolean} False if the buffers could not be allocated, in which case the layer is
+     *   unusable and there is nothing to replay into.
      */
     reset(baseElevation, seaLevel) {
-        const pixels = this.#width * this.#height;
-        this.elevation ??= new Float32Array(pixels);
-        this.overrides ??= new Uint8Array(pixels);
+        this.valid = false;
+        this.#recording = null;
+        this.#discardAllPatches();
+        if (!this.#allocateBuffers()) return false;
 
         this.elevation.set(baseElevation);
         this.overrides.fill(0);
         this.seaLevel = seaLevel;
-        this.valid = false;
-        this.#discardAllPatches();
+        return true;
+    }
+
+    /** Allows the next reset() to try allocating again after an earlier attempt failed. */
+    retryAllocation() {
+        this.allocationFailed = false;
+    }
+
+    /**
+     * Allocates the two buffers on first use. Running out of memory is not an error the module
+     * can prevent, so it is handled here by leaving the layer unusable, which callers already
+     * treat as "replay the history instead". Any other failure is a bug and is left to propagate.
+     *
+     * @returns {boolean} True if both buffers exist.
+     */
+    #allocateBuffers() {
+        if (this.allocationFailed) return false;
+        if (this.elevation && this.overrides) return true;
+
+        try {
+            const pixels = this.#width * this.#height;
+            this.elevation ??= new Float32Array(pixels);
+            this.overrides ??= new Uint8Array(pixels);
+            return true;
+        } catch (error) {
+            if (!(error instanceof RangeError)) throw error;
+
+            this.elevation = null;
+            this.overrides = null;
+            this.allocationFailed = true;
+            console.warn(`World Map Builder | Not enough memory for the brushed layer (${error.message}). Brush edits will replay the whole brush history instead, which is slower.`);
+            return false;
+        }
     }
 
     markValid() {

@@ -112,13 +112,17 @@ export class BrushEngine {
      *
      * @param {Float32Array} baseElevation - The base terrain to replay the strokes onto.
      * @param {number} seaLevel - Sea level for biome paint, which only lands on the right kind of tile.
+     * @returns {boolean} False if there was not enough memory for the layer. Nothing was replayed
+     *   and the layer stays invalid, so the caller has to replay the history some other way.
      */
     rebuildLayerCache(baseElevation, seaLevel) {
         const cache = this.layerCache;
-        cache.reset(baseElevation, seaLevel);
+        if (!cache.reset(baseElevation, seaLevel)) return false;
+
         this.replayHistory(cache.elevation, cache.overrides, seaLevel);
         cache.markValid();
         this.#markLayerCacheInLineWithHistory();
+        return true;
     }
 
     /**
@@ -290,7 +294,12 @@ export class BrushEngine {
         } catch (error) {
             // A stroke that failed part-way leaves the layer in a state no replay would produce.
             cache.invalidate();
-            throw error;
+
+            // Running out of memory while saving the undo data only costs the shortcut: the
+            // stroke is already in the history, and the next rebuild replays it with the rest.
+            // Anything else is a bug and must not be hidden.
+            if (!(error instanceof RangeError)) throw error;
+            console.warn(`World Map Builder | Could not keep the brushed layer up to date (${error.message}). The next rebuild will replay the whole brush history instead.`);
         } finally {
             this.#footprintObserver = null;
             this.currentStroke = null;

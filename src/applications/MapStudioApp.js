@@ -198,6 +198,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.baseElevationData = null;
         this.currentElevationData = null;
         this.currentBiomeOverrides = null;
+        // Map-sized float raster that rebuilds are built and compared in; created on demand and
+        // released when idle. scratchUnavailable is set if the browser refused to allocate it, so
+        // refreshes fall back to covering the whole map (see ProceduralOrchestrator).
+        this.bufferScratch = null;
+        this.scratchUnavailable = false;
         this.currentMoistureData = null;
         this.currentTemperatureData = null;
         this.currentRiverData = null;
@@ -279,6 +284,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedCanvasClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
         this.debouncedHistoryRebuild = foundry.utils.debounce(() => this.#refreshFromBrushHistory("Brush stroke rebuild"), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+
+        // Every refresh that uses the scratch buffer restarts this timer. The buffer is only ever
+        // used inside single synchronous steps and refilled before each use, so it can be dropped
+        // whenever the timer fires, even between the steps of a refresh.
+        this.debouncedReleaseScratch = foundry.utils.debounce(() => {
+            this.bufferScratch = null;
+        }, FILRODENSWMB.UI.DEBOUNCE_MS.SCRATCH_RELEASE);
     }
 
     markDirty() {
@@ -1006,6 +1018,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (this.canvasEngine) this.canvasEngine.destroy();
         if (this.scene3D) this.scene3D.destroy();
+
+        // The scratch buffer is recreated whenever it is needed, so it can go with the window
+        this.bufferScratch = null;
         return super.close(options);
     }
 
@@ -1869,6 +1884,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 if (SpatialMath.isValidBounds(staleArea)) await this.generateClimate(staleArea);
             } finally {
                 this.#endProcessing();
+                this.debouncedReleaseScratch();
             }
         });
     }
@@ -1902,10 +1918,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async generateClimate(bounds = null) {
         if (!this.currentElevationData) return;
 
-        // Resolve active bounds before clearing pending state. Bounds that cover nothing (as
-        // merging two empty areas produces) mean a whole-map refresh.
+        // Resolve active bounds before clearing pending state
         const requestedBounds = bounds || this.pendingTerrainBounds;
-        const activeBounds = SpatialMath.isValidBounds(requestedBounds) ? requestedBounds : null;
+        const activeBounds = this.#resolveRefreshBounds(requestedBounds);
         if (!bounds && this.pendingTerrainBounds) {
             this.pendingTerrainBounds = null;
         }
@@ -1927,7 +1942,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async generateFeatures(requestedBounds = null) {
         if (!this.currentElevationData) return;
 
-        const bounds = SpatialMath.isValidBounds(requestedBounds) ? requestedBounds : null;
+        const bounds = this.#resolveRefreshBounds(requestedBounds);
 
         await this.#runTimed(`Features refresh (${bounds ? "bounded" : "whole map"})`, async () => {
             await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
@@ -1940,8 +1955,27 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 await this._repaintCanvas(repaintBounds, { verifyPeak: !!bounds });
             } finally {
                 this.#endProcessing();
+                this.debouncedReleaseScratch();
             }
         });
+    }
+
+    /**
+     * Turns the area a refresh was asked to cover into what the stages below work with: null for
+     * the whole map, or the area itself.
+     *
+     * Bounds that cover nothing (as merging two empty areas produces) mean the whole map. So do
+     * bounds that already cover all of it: a whole-map refresh gives the same result without the
+     * work of tracking what changed, which exists only to limit a refresh to part of the map.
+     *
+     * @param {object|null} bounds - The requested area, or null.
+     * @returns {object|null} The area to refresh, or null for the whole map.
+     */
+    #resolveRefreshBounds(bounds) {
+        if (!SpatialMath.isValidBounds(bounds)) return null;
+
+        const coversMap = bounds.minX <= 0 && bounds.minY <= 0 && bounds.maxX >= this.mapWidth - 1 && bounds.maxY >= this.mapHeight - 1;
+        return coversMap ? null : bounds;
     }
 
     /**
