@@ -18,7 +18,7 @@ export class ProceduralOrchestrator {
         this.#routeTopographyPass(app, engine, params);
 
         // 2. Replay History & Features
-        this.rebuildFromHistory(app, engine, params, null);
+        this.rebuildFromHistory(app, engine, params, null, true);
 
         // 3. Reset Ephemeral Overrides
         app.currentSpringOverrides.fill(0);
@@ -52,43 +52,91 @@ export class ProceduralOrchestrator {
     }
 
     /**
-     * Reconstructs currentElevationData from baseElevationData, replaying
-     * raster brush strokes and applying vector deformations on top.
+     * Reconstructs currentElevationData: the brushed layer (base terrain with every raster brush
+     * stroke applied) with the vector deformations on top.
+     *
+     * The brushed layer is kept by the brush engine and updated as strokes are finished, undone
+     * and redone, so a rebuild normally just copies it and re-applies the vector features. It is
+     * replayed from the base terrain, which is the slow part, only when it cannot be trusted: on a
+     * full generation (the base terrain may have changed), or after something invalidated it.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @param {ProceduralEngine|null} engine - Engine to take the noise source from; created if omitted.
+     * @param {object|null} params - Derived map parameters; derived from the UI state if omitted.
+     * @param {object|null} bounds - Restricts the rebuild to a rectangle; null rebuilds the whole map.
+     * @param {boolean} baseChanged - True when the base terrain was just regenerated, so the
+     *   brushed layer must be replayed from it whatever state the layer is in.
      */
-    static rebuildFromHistory(app, engine = null, params = null, bounds = null) {
+    static rebuildFromHistory(app, engine = null, params = null, bounds = null, baseChanged = false) {
         const startTime = performance.now();
         const activeEngine = engine ?? new ProceduralEngine(app.uiState.mapSeed);
         const activeParams = params ?? MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors).params;
         const activeBounds = ProceduralEngine.resolveBounds(bounds, app.mapWidth, app.mapHeight);
 
-        // 1. Reset current elevation from pristine base elevation within the target bounds
-        this.#forEachBoundsRow(activeBounds, app.mapWidth, (start, end) => {
-            app.currentElevationData.set(app.baseElevationData.subarray(start, end), start);
+        // 1. Bring the brushed layer up to date, replaying the whole history only if it has to be
+        const strokeCount = app.brushEngine?.history?.length ?? 0;
+        let replayed = false;
+        const refreshMs = this.#measureMs(() => {
+            replayed = this.#refreshBrushedLayer(app, activeParams.seaLevel, baseChanged);
         });
 
-        // 2. Clear biome overrides within the target bounds. Unlike elevation, painted biomes
-        // have no separate "base" layer to reset from - 0 is the sentinel createBiomesMap()
-        // already treats as "no override, compute the biome normally" - so replaying brush
-        // history must start from that clean slate. Without this, undoing a paint stroke would
-        // leave its override sitting on pixels no remaining stroke touches.
-        if (app.currentBiomeOverrides) {
-            this.#forEachBoundsRow(activeBounds, app.mapWidth, (start, end) => {
-                app.currentBiomeOverrides.fill(0, start, end);
-            });
-        }
-
-        // 3. Replay all raster brush strokes
-        const strokeCount = app.brushEngine?.history?.length ?? 0;
-        const replayMs = strokeCount > 0 ? this.#measureMs(() => app.brushEngine.replayHistory(app.currentElevationData, app.currentBiomeOverrides, activeParams.seaLevel, activeBounds)) : 0;
+        // 2-3. Reset the working terrain and biome overrides to the brushed layer
+        const mergeMs = this.#measureMs(() => this.#resetToBrushedLayer(app, activeBounds));
 
         // 4-5. Deform the brushed terrain with the vector features
         const vectorMs = this.#measureMs(() => this.#applyVectorDeformations(app, activeEngine, activeParams, activeBounds));
 
         // Reported separately from the base topography time logged elsewhere, because on a map with
         // a long brush history the replay is usually the largest part of a rebuild.
-        console.log(`World Map Builder | History rebuilt in ${(performance.now() - startTime).toFixed(2)}ms (${strokeCount} brush strokes replayed in ${replayMs.toFixed(2)}ms, faults and rivers applied in ${vectorMs.toFixed(2)}ms)`);
-        app.renderTimer.record("Brush history replay", replayMs, `${strokeCount} strokes`);
+        const brushSummary = replayed ? `${strokeCount} brush strokes replayed in ${refreshMs.toFixed(2)}ms` : `${strokeCount} brush strokes reused from the brushed layer`;
+        console.log(`World Map Builder | History rebuilt in ${(performance.now() - startTime).toFixed(2)}ms (${brushSummary}, layers merged in ${mergeMs.toFixed(2)}ms, faults and rivers applied in ${vectorMs.toFixed(2)}ms)`);
+        app.renderTimer.record(replayed ? "Brush history replay" : "Brush layer reused", refreshMs, `${strokeCount} strokes`);
+        app.renderTimer.record("Brush layer merge", mergeMs);
         app.renderTimer.record("Faults and rivers", vectorMs);
+    }
+
+    /**
+     * Makes sure the brush engine's brushed layer equals a full replay of the stroke history,
+     * replaying it from the base terrain if it does not.
+     *
+     * @returns {boolean} True if the history had to be replayed.
+     */
+    static #refreshBrushedLayer(app, seaLevel, baseChanged) {
+        const brushEngine = app.brushEngine;
+        if (!brushEngine) return false;
+        if (!baseChanged && brushEngine.isLayerCacheCurrent(seaLevel)) return false;
+
+        brushEngine.rebuildLayerCache(app.baseElevationData, seaLevel);
+        return true;
+    }
+
+    /**
+     * Overwrites the working elevation and biome overrides, within the bounds, with the brushed
+     * layer, discarding whatever vector deformations and live brush strokes they held. Without a
+     * brush engine there are no strokes, so the working terrain is the base terrain with no
+     * painted biomes.
+     */
+    static #resetToBrushedLayer(app, bounds) {
+        const layer = app.brushEngine?.layerCache;
+        const elevationSource = layer?.elevation ?? app.baseElevationData;
+
+        this.#forEachBoundsRow(bounds, app.mapWidth, (start, end) => {
+            app.currentElevationData.set(elevationSource.subarray(start, end), start);
+        });
+
+        // Painted biomes have no separate "base" layer: 0 is the sentinel createBiomesMap()
+        // already treats as "no override, compute the biome normally", so with no strokes the
+        // overrides are cleared. Without this reset, undoing a paint stroke would leave its
+        // override sitting on pixels no remaining stroke touches.
+        if (!app.currentBiomeOverrides) return;
+
+        this.#forEachBoundsRow(bounds, app.mapWidth, (start, end) => {
+            if (layer) {
+                app.currentBiomeOverrides.set(layer.overrides.subarray(start, end), start);
+            } else {
+                app.currentBiomeOverrides.fill(0, start, end);
+            }
+        });
     }
 
     /**

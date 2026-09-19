@@ -1,4 +1,5 @@
 import { SpatialMath } from "./SpatialMath.js";
+import { BrushLayerCache } from "./BrushLayerCache.js";
 import { FILRODENSWMB } from "../config.js";
 
 /** Brush feather is capped just below 1 so the falloff band never collapses to zero width. */
@@ -50,9 +51,28 @@ export class BrushEngine {
     #spanStart = new Int32Array(0);
     #spanEnd = new Int32Array(0);
 
+    // Stroke history behind the `history` accessor below.
+    #history = [];
+
+    // Set only while a stroke is being applied to the brushed layer, so that each stamp can save
+    // the tiles it is about to overwrite for that stroke's undo patch.
+    #footprintObserver = null;
+
+    // The history length and last stroke the brushed layer was last brought in line with. If the
+    // history no longer ends the way this says, something changed it behind the engine's back
+    // (a direct push or splice on the array) and the layer cannot be trusted.
+    #layerCacheStrokeCount = 0;
+    #layerCacheLastStroke = null;
+
     constructor(mapWidth, mapHeight) {
         this.mapWidth = mapWidth;
         this.mapHeight = mapHeight;
+
+        // The base terrain with every stroke in `history` applied, kept up to date as strokes are
+        // finished, undone and redone so that rebuilding terrain does not have to replay the whole
+        // history. See BrushLayerCache. Created before `history` because assigning history
+        // invalidates it.
+        this.layerCache = new BrushLayerCache(mapWidth, mapHeight);
 
         // The permanent, uncapped record of every completed brush stroke (terrain or biome).
         // MapStudioApp saves this array in full with the map and never trims it - it's not undo
@@ -70,6 +90,68 @@ export class BrushEngine {
         this.lastY = null;
     }
 
+    get history() {
+        return this.#history;
+    }
+
+    /**
+     * Replacing the whole history (loading a saved map) invalidates the brushed layer, because
+     * it was built from the strokes that were there before. Changing strokes in place (scaling or
+     * shifting the map) is invisible to a setter, so callers that do that must call
+     * invalidateLayerCache() themselves.
+     */
+    set history(strokes) {
+        this.#history = strokes;
+        this.layerCache.invalidate();
+    }
+
+    /**
+     * Replays the whole stroke history over `baseElevation` into the brushed layer and marks it
+     * valid, so later rebuilds, undos and redos can reuse it. Call this whenever the base terrain
+     * or the sea level may have changed, and whenever the layer is invalid.
+     *
+     * @param {Float32Array} baseElevation - The base terrain to replay the strokes onto.
+     * @param {number} seaLevel - Sea level for biome paint, which only lands on the right kind of tile.
+     */
+    rebuildLayerCache(baseElevation, seaLevel) {
+        const cache = this.layerCache;
+        cache.reset(baseElevation, seaLevel);
+        this.replayHistory(cache.elevation, cache.overrides, seaLevel);
+        cache.markValid();
+        this.#markLayerCacheInLineWithHistory();
+    }
+
+    /**
+     * Whether the brushed layer can stand in for a full replay right now: it is valid, it was
+     * built with this sea level, and the history still ends with the stroke it was last brought
+     * in line with. The last check catches strokes added or removed by editing the history array
+     * directly instead of through this class.
+     *
+     * @param {number} seaLevel - Sea level the rebuild about to happen will use.
+     * @returns {boolean} True if the layer's buffers equal a full replay of the history.
+     */
+    isLayerCacheCurrent(seaLevel) {
+        return this.layerCache.seaLevel === seaLevel && this.#layerCacheInLineWithHistory();
+    }
+
+    /**
+     * Whether the layer is valid and the history still ends with the stroke the layer was last
+     * brought in line with.
+     */
+    #layerCacheInLineWithHistory() {
+        return this.layerCache.valid && this.#layerCacheStrokeCount === this.#history.length && this.#layerCacheLastStroke === (this.#history.at(-1) ?? null);
+    }
+
+    #markLayerCacheInLineWithHistory() {
+        this.#layerCacheStrokeCount = this.#history.length;
+        this.#layerCacheLastStroke = this.#history.at(-1) ?? null;
+    }
+
+    /** Marks the brushed layer as stale. Call after editing strokes in place. */
+    invalidateLayerCache() {
+        this.layerCache.invalidate();
+    }
+
     startStroke(layer, tool, size, strength, feather, paintValue = null) {
         this.currentStroke = {
             layer,
@@ -83,6 +165,12 @@ export class BrushEngine {
 
         this.lastX = null;
         this.lastY = null;
+
+        // Starting a new stroke discards the redo stack for good, so its strokes can never be
+        // redone and their undo patches are dead weight.
+        for (const discarded of this.redoStack) {
+            this.layerCache.discardPatch(discarded);
+        }
         this.redoStack = [];
         this.activeSlopeElevation = null;
     }
@@ -98,45 +186,117 @@ export class BrushEngine {
             return;
         }
 
-        this.history.push(this.currentStroke);
+        const stroke = this.currentStroke;
+        this.#appendToHistory(stroke);
         this.currentStroke = null;
         this.lastX = null;
         this.lastY = null;
     }
 
+    /**
+     * Adds a stroke to the end of the history and, if the brushed layer matched the history
+     * beforehand, applies the stroke to it as well. A layer that did not match (the history was
+     * edited without the engine's knowledge) is invalidated instead, because applying one more
+     * stroke to it would not make it right.
+     */
+    #appendToHistory(stroke) {
+        const layerWasInLine = this.#layerCacheInLineWithHistory();
+        this.#history.push(stroke);
+
+        if (layerWasInLine) {
+            this.#applyStrokeToLayerCache(stroke);
+        } else {
+            this.layerCache.invalidate();
+        }
+    }
+
     undo() {
-        if (this.history.length === 0) return false;
-        this.redoStack.push(this.history.pop());
+        if (this.#history.length === 0) return false;
+
+        const layerWasInLine = this.#layerCacheInLineWithHistory();
+        const stroke = this.#history.pop();
+        this.redoStack.push(stroke);
+
+        // No patch for this stroke (it was dropped to save memory) means the layer cannot be
+        // wound back, so it is invalidated and the caller's next rebuild replays the history.
+        if (layerWasInLine && this.layerCache.revert(stroke)) {
+            this.#markLayerCacheInLineWithHistory();
+        } else {
+            this.layerCache.invalidate();
+        }
         return true;
     }
 
     redo() {
         if (this.redoStack.length === 0) return false;
-        this.history.push(this.redoStack.pop());
+
+        this.#appendToHistory(this.redoStack.pop());
         return true;
     }
 
     replayHistory(elevationData, biomeOverrideData, seaLevel, activeBounds = null) {
-        for (const stroke of this.history) {
+        for (const stroke of this.#history) {
             // Fast box check to skip strokes entirely outside the active rebuild zone
             if (activeBounds) {
                 const strokeBounds = SpatialMath.getVectorBounds(stroke, stroke.size);
                 if (!SpatialMath.isValidBounds(SpatialMath.intersectBounds(strokeBounds, activeBounds))) continue;
             }
 
-            this.currentStroke = stroke;
-            this.lastX = null;
-            this.lastY = null;
-            this.activeSlopeElevation = null;
-
-            for (const pt of stroke.points) {
-                // Pass activeBounds down to restrict the internal stamping loops
-                this.#lerpAndStamp(pt.x, pt.y, elevationData, biomeOverrideData, seaLevel, false, activeBounds);
-            }
+            this.#replayStroke(stroke, elevationData, biomeOverrideData, seaLevel, activeBounds);
         }
         this.currentStroke = null;
         this.lastX = null;
         this.lastY = null;
+    }
+
+    /**
+     * Applies one recorded stroke from its stored points, exactly as a replay of the full
+     * history does when it reaches that stroke. Every stroke starts with no previous position and
+     * no anchored slope elevation, so the result depends only on the stroke and the buffers.
+     */
+    #replayStroke(stroke, elevationData, biomeOverrideData, seaLevel, activeBounds = null) {
+        this.currentStroke = stroke;
+        this.lastX = null;
+        this.lastY = null;
+        this.activeSlopeElevation = null;
+
+        for (const pt of stroke.points) {
+            // Pass activeBounds down to restrict the internal stamping loops
+            this.#lerpAndStamp(pt.x, pt.y, elevationData, biomeOverrideData, seaLevel, false, activeBounds);
+        }
+    }
+
+    /**
+     * Brings the brushed layer up to date with a stroke that was just added to the history (by
+     * finishing it or redoing it), recording an undo patch on the way. Does nothing while the
+     * layer is invalid: the next full rebuild will replay the stroke along with the rest.
+     *
+     * The stroke is replayed from its recorded points rather than reusing what the live brush
+     * painted, because the live brush paints on the working terrain (with faults and rivers
+     * carved in, and un-rounded pointer positions), while the layer must equal what a replay of
+     * the history produces.
+     */
+    #applyStrokeToLayerCache(stroke) {
+        const cache = this.layerCache;
+        if (!cache.valid) return;
+
+        cache.beginPatch(stroke);
+        this.#footprintObserver = (footprint) => cache.noteFootprint(footprint);
+
+        try {
+            this.#replayStroke(stroke, cache.elevation, cache.overrides, cache.seaLevel);
+            cache.commitPatch();
+            this.#markLayerCacheInLineWithHistory();
+        } catch (error) {
+            // A stroke that failed part-way leaves the layer in a state no replay would produce.
+            cache.invalidate();
+            throw error;
+        } finally {
+            this.#footprintObserver = null;
+            this.currentStroke = null;
+            this.lastX = null;
+            this.lastY = null;
+        }
     }
 
     // --- Private Interpolation Engine ---
@@ -248,6 +408,7 @@ export class BrushEngine {
 
         // Safety Check: If the brush stroke is entirely outside the rebuild zone, abort early
         if (SpatialMath.isValidBounds(b)) {
+            this.#footprintObserver?.(b);
             const shape = this.#buildStampShape(stroke, b, cx, cy);
             this.#rasteriseStamp(stroke, shape, elevationData, biomeOverrideData, seaLevel);
         }

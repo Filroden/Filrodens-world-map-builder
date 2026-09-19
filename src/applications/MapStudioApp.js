@@ -279,9 +279,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedCanvasClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
         this.debouncedHistoryRebuild = foundry.utils.debounce(() => {
-            this.#rebuildFromHistory(true).then(() => {
-                this._repaintCanvas(null);
-                this.generateClimate(null);
+            this.#runTimed("Brush stroke rebuild", async () => {
+                await this.#rebuildFromHistory(true);
+                await this._repaintCanvas(null);
+                await this.generateClimate(null);
             });
         }, FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
     }
@@ -1852,23 +1853,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // runs re-flags itself instead of being lost.
         this.#clearPendingFeatureMath();
 
-        // Started before the overlay's paint pause so the summary's total covers everything the
-        // user waits for, not just the phases that log their own times
-        this.renderTimer.begin();
+        // The run starts before the overlay's paint pause so the summary's total covers everything
+        // the user waits for, not just the phases that log their own times
+        await this.#runTimed("Full render", async () => {
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
 
-        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
+            try {
+                // Hand off the mathematical heavy lifting to the Orchestrator
+                ProceduralOrchestrator.processTopographyPhase(this);
 
-        try {
-            // Hand off the mathematical heavy lifting to the Orchestrator
-            ProceduralOrchestrator.processTopographyPhase(this);
-
-            // The App maintains control of the Climate and Canvas rendering pipelines
-            await this.generateClimate(null);
-
-            console.log(this.renderTimer.summarise());
-        } finally {
-            this.#endProcessing();
-        }
+                // The App maintains control of the Climate and Canvas rendering pipelines
+                await this.generateClimate(null);
+            } finally {
+                this.#endProcessing();
+            }
+        });
     }
 
     async generateClimate(bounds = null) {
@@ -1880,26 +1879,45 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.pendingTerrainBounds = null;
         }
 
-        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
+        await this.#runTimed(`Climate refresh (${activeBounds ? "bounded" : "whole map"})`, async () => {
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
 
-        try {
-            ProceduralOrchestrator.processClimatePhase(this, activeBounds);
-            await this.generateFeatures(activeBounds);
-        } finally {
-            this.#endProcessing();
-        }
+            try {
+                ProceduralOrchestrator.processClimatePhase(this, activeBounds);
+                await this.generateFeatures(activeBounds);
+            } finally {
+                this.#endProcessing();
+            }
+        });
     }
 
     async generateFeatures(bounds = null) {
         if (!this.currentElevationData) return;
 
-        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
+        await this.#runTimed(`Features refresh (${bounds ? "bounded" : "whole map"})`, async () => {
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
 
+            try {
+                ProceduralOrchestrator.processFeaturePhase(this);
+                await this._repaintCanvas(bounds);
+            } finally {
+                this.#endProcessing();
+            }
+        });
+    }
+
+    /**
+     * Runs `work` as a timed run and logs the phase-by-phase summary when the outermost run
+     * finishes (see RenderTimer). The steps of a render call each other, so only the outermost of
+     * them logs; and the summary is logged even if `work` throws, showing how far it got.
+     */
+    async #runTimed(title, work) {
+        this.renderTimer.begin(title);
         try {
-            ProceduralOrchestrator.processFeaturePhase(this);
-            await this._repaintCanvas(bounds);
+            return await work();
         } finally {
-            this.#endProcessing();
+            const summary = this.renderTimer.end();
+            if (summary) console.log(summary);
         }
     }
 
@@ -2660,8 +2678,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 if (this.baseElevationData && brushAction) {
                     targetLedger.push("raster");
-                    await this.#rebuildFromHistory(true);
-                    this._repaintCanvas();
+                    await this.#runTimed(isUndo ? "Brush undo rebuild" : "Brush redo rebuild", async () => {
+                        await this.#rebuildFromHistory(true);
+                        await this._repaintCanvas();
+                    });
                     this.debouncedGenerateClimate();
                     break;
                 }
@@ -2721,6 +2741,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             };
             this.brushEngine.history.forEach(scaleStroke);
             this.brushEngine.redoStack.forEach(scaleStroke);
+            // The brushed layer was built from the strokes as they were before this change.
+            this.brushEngine.invalidateLayerCache();
         }
 
         this.uiState["noise.elevation.scale"] = targetScale;
@@ -3524,6 +3546,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const translateStroke = (stroke) => stroke.points.forEach(translatePoint);
             this.brushEngine.history.forEach(translateStroke);
             this.brushEngine.redoStack.forEach(translateStroke);
+            // The brushed layer was built from the strokes as they were before this change.
+            this.brushEngine.invalidateLayerCache();
         }
 
         this.uiState["noise.offsetX"] += dx;
