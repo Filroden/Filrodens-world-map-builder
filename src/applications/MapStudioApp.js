@@ -203,6 +203,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // refreshes fall back to covering the whole map (see ProceduralOrchestrator).
         this.bufferScratch = null;
         this.scratchUnavailable = false;
+        // What the last finished full generation was computed from, and the base terrain buffer it
+        // produced; lets an edit that cannot have changed the base terrain skip regenerating it
+        // (see ProceduralOrchestrator.canSkipBaseRegeneration).
+        this.generationInputs = null;
+        this.generationBase = null;
         this.currentMoistureData = null;
         this.currentTemperatureData = null;
         this.currentRiverData = null;
@@ -283,7 +288,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedCanvasTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
         this.debouncedCanvasClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
-        this.debouncedHistoryRebuild = foundry.utils.debounce(() => this.#refreshFromBrushHistory("Brush stroke rebuild"), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedHistoryRebuild = foundry.utils.debounce(() => this.#refreshChangedTerrain("Brush stroke rebuild"), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
         // Every refresh that uses the scratch buffer restarts this timer. The buffer is only ever
         // used inside single synchronous steps and refilled before each use, so it can be dropped
@@ -1857,7 +1862,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /**
      * Brings the terrain and everything derived from it in line with the brush history after a
-     * stroke was finished, undone or redone, limited to the area that actually changed.
+     * stroke was finished, undone or redone, or after faults or manual rivers were edited, limited
+     * to the area that actually changed.
      *
      * The working terrain is rebuilt from the brush engine's brushed layer (see
      * ProceduralOrchestrator.rebuildChangedTerrain), which reports where it ended up different.
@@ -1872,7 +1878,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      *
      * @param {string} title - Names the run in the console timing summary.
      */
-    async #refreshFromBrushHistory(title) {
+    async #refreshChangedTerrain(title) {
         await this.#runTimed(title, async () => {
             await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.RebuildingHistory"));
 
@@ -1882,6 +1888,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.pendingTerrainBounds = null;
 
                 if (SpatialMath.isValidBounds(staleArea)) await this.generateClimate(staleArea);
+                else await this.#refreshRivers();
             } finally {
                 this.#endProcessing();
                 this.debouncedReleaseScratch();
@@ -1889,14 +1896,48 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
     }
 
-    async generateTerrain() {
-        // Enforce global array resets
-        this.pendingTerrainBounds = null;
+    /**
+     * Reruns the river pass over the whole map and repaints wherever the water changed, for a
+     * refresh that found no change to the terrain.
+     *
+     * The rivers depend on more than the terrain (the spring pins, and the source points of the
+     * manual rivers), so they are always rerun. This costs a few tens of milliseconds, against the
+     * rest of the map that is left alone.
+     */
+    async #refreshRivers() {
+        await this.#runTimed("Features refresh (rivers only)", async () => {
+            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
 
+            try {
+                const waterBounds = ProceduralOrchestrator.processFeaturePhase(this, true);
+
+                if (waterBounds) await this._repaintCanvas(waterBounds);
+                else this._repaintVectors();
+            } finally {
+                this.#endProcessing();
+            }
+        });
+    }
+
+    async generateTerrain() {
         // Any full generation, whichever path triggered it, satisfies changes deferred by the
         // pause toggle. Clearing before the generation reads state means an edit made while it
         // runs re-flags itself instead of being lost.
         this.#clearPendingFeatureMath();
+
+        // If nothing the base terrain depends on has changed since the last full generation (the
+        // edit was to faults, manual rivers or brush strokes), regenerating it and replaying the
+        // brush strokes would only recreate what is already there. Refreshing what changed gives
+        // the same result. Deciding this reads the settings the same way a generation does.
+        if (ProceduralOrchestrator.canSkipBaseRegeneration(this)) {
+            await this.#refreshChangedTerrain("Terrain refresh");
+            return;
+        }
+
+        // A full generation covers the whole map, so the areas recorded so far need no tracking
+        this.pendingTerrainBounds = null;
+        const inputs = ProceduralOrchestrator.describeGenerationInputs(this);
+        ProceduralOrchestrator.forgetGenerationInputs(this);
 
         // The run starts before the overlay's paint pause so the summary's total covers everything
         // the user waits for, not just the phases that log their own times
@@ -1909,6 +1950,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 // The App maintains control of the Climate and Canvas rendering pipelines
                 await this.generateClimate(null);
+
+                ProceduralOrchestrator.rememberGenerationInputs(this, inputs);
             } finally {
                 this.#endProcessing();
             }
@@ -2727,7 +2770,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     // elevation data, so an undo/redo that alters any of them needs a terrain
                     // regeneration, not just a repaint.
                     if (previousTerrainInputs !== this.#serialiseTerrainInputs()) {
-                        this._repaintCanvas();
+                        // The pixel layers only change once the terrain is regenerated, so only
+                        // the vector layers need redrawing now
+                        this._repaintVectors();
                         this.requestTerrainUpdate(null, this.debouncedGenerateTerrain);
                     } else if (previousFeaturePins !== currentFeaturePins) {
                         this._repaintCanvas();
@@ -2750,7 +2795,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 if (this.baseElevationData && brushAction) {
                     targetLedger.push("raster");
-                    await this.#refreshFromBrushHistory(isUndo ? "Brush undo" : "Brush redo");
+                    await this.#refreshChangedTerrain(isUndo ? "Brush undo" : "Brush redo");
                     break;
                 }
             }

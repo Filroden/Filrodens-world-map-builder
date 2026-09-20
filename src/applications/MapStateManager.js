@@ -31,6 +31,10 @@ export class MapStateManager {
         // The rebuild scratch buffer is created on demand at the map's current size (see
         // ProceduralOrchestrator); drop any left over from a map of a different size.
         app.bufferScratch = null;
+
+        // Fresh buffers hold nothing from any earlier generation
+        app.generationInputs = null;
+        app.generationBase = null;
     }
 
     /**

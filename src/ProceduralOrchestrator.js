@@ -30,6 +30,89 @@ export class ProceduralOrchestrator {
     }
 
     /**
+     * Describes everything the terrain and the layers derived from it are computed from, other
+     * than the things whose effect a refresh finds by comparing results: the brush strokes,
+     * faults and manual rivers (see rebuildChangedTerrain), and the pins, which only feed the
+     * river pass that a refresh always reruns.
+     *
+     * Two descriptions are equal exactly when a generation from scratch would start from the same
+     * base terrain and settings, which is what makes it safe to skip regenerating the base terrain
+     * (see canSkipBaseRegeneration). It covers the engine mode, seed and map size, the sea level as
+     * the sliders and the repaint read it, every derived generation parameter (climate, noise,
+     * hydrology, palette and display settings), the custom biomes and their colours as they were
+     * entered, and, in guided mode only, the land masks, which are the only vector shapes the base
+     * terrain is built from.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @returns {string} A string that differs between two states exactly when their inputs differ.
+     */
+    static describeGenerationInputs(app) {
+        const { currentSeed, params } = MapStateManager.getMapParameters(app);
+
+        // The compiled biome rules are typed arrays built from the custom biomes, which are
+        // included as entered, so they are left out rather than serialised twice
+        const leaveOutCompiledRules = (key, value) => (key === "customBiomeRules" ? undefined : value);
+
+        return JSON.stringify(
+            [app.uiState.generationEngine, currentSeed, app.mapWidth, app.mapHeight, app.uiState.seaLevel, app.uiState.customBiomes, app.customBiomeColors, this.#getGuidedMaskInputs(app), params],
+            leaveOutCompiledRules,
+        );
+    }
+
+    /**
+     * The land masks as guided mode's base terrain reads them, or nothing in any other mode,
+     * where they do not affect the terrain.
+     */
+    static #getGuidedMaskInputs(app) {
+        if (app.uiState.generationEngine !== "guided") return [];
+
+        const minVertices = FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES;
+        return (app.landMasks ?? []).filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points]);
+    }
+
+    /**
+     * Records that a full generation has just finished, so that a later refresh can tell whether
+     * the base terrain it produced is still what the current settings would produce.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @param {string} inputs - The description taken when that generation started.
+     */
+    static rememberGenerationInputs(app, inputs) {
+        app.generationInputs = inputs;
+        app.generationBase = app.baseElevationData;
+    }
+
+    /**
+     * Forgets the last full generation, so that nothing is skipped until the next one finishes.
+     * Called when one starts, so that one that fails part-way is not mistaken for a finished one.
+     */
+    static forgetGenerationInputs(app) {
+        app.generationInputs = null;
+        app.generationBase = null;
+    }
+
+    /**
+     * Whether the base terrain, and everything derived from it that is not covered by comparing
+     * results, is still what a full generation with the current settings would produce, so that
+     * regenerating the base terrain and the whole map can be skipped.
+     *
+     * This is the case after edits that only touch faults, manual rivers, land masks outside
+     * guided mode and the brush strokes, which is most edits. It is not the case for anything
+     * else (the seed, any slider, the map size, a loaded map), and the description also differs
+     * if a generation never finished or the buffers were replaced, so any doubt means a full
+     * generation.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @returns {boolean} True if only a refresh of what actually changed is needed.
+     */
+    static canSkipBaseRegeneration(app) {
+        if (!app.generationInputs || !app.currentElevationData) return false;
+        if (app.generationBase !== app.baseElevationData) return false;
+
+        return app.generationInputs === this.describeGenerationInputs(app);
+    }
+
+    /**
      * Directs the topography generation based on the active engine mode.
      */
     static #routeTopographyPass(app, engine, params) {
