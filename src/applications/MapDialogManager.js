@@ -16,7 +16,7 @@ import {
 
 export class MapDialogManager {
     /**
-     * Shows a standard Yes/No confirmation dialog.
+     * Shows a standard Yes/No confirmation dialogue.
      */
     static async _confirmDialog(title, content) {
         return foundry.applications.api.DialogV2.confirm({
@@ -76,7 +76,7 @@ export class MapDialogManager {
     }
 
     /**
-     * Extracts shared "label properties" form fields from a submitted dialog.
+     * Extracts shared "label properties" form fields from a submitted dialogue.
      */
     static _extractLabelResultFields(form) {
         return {
@@ -90,7 +90,7 @@ export class MapDialogManager {
     }
 
     /**
-     * Helper to bind shared label property inputs across different dialogs.
+     * Helper to bind shared label property inputs across different dialogues.
      */
     static bindLabelPropertiesDialog(html, uiState) {
         const labelQuickStyleSelect = html.querySelector('select[name="labelQuickStyle"]');
@@ -153,7 +153,7 @@ export class MapDialogManager {
     }
 
     /**
-     * Shared Add/Edit dialog for a single custom pin icon: name, a native file-picker path,
+     * Shared Add/Edit dialogue for a single custom pin icon: name, a native file-picker path,
      * and a live preview of the raw SVG against a black background so the GM can confirm
      * it's genuinely solid white before accepting (see the "why custom icons must be solid
      * white" design note - this is a self-check, not an automated one).
@@ -433,11 +433,11 @@ export class MapDialogManager {
      * currently selected via a type's Select checkboxes, in one batch. Mirrors the shape of
      * QUICK_STYLE_CONFIG above so the two systems stay easy to read side-by-side, but each
      * entry describes an opt-in FIELD LIST instead of a single style object - only fields the
-     * GM ticks in the Mass Edit dialog are applied, everything else is left untouched on every
+     * GM ticks in the Mass Edit dialogue are applied, everything else is left untouched on every
      * selected entity (a deliberate design choice: mass edit never overwrites a property the
      * GM didn't explicitly opt into). The "quickStyle" field, where present, is a bundle:
      * ticking it applies both the chosen style's id and its resolved aesthetic properties
-     * together, exactly as picking a Quick Style does in the single-item edit dialogs. Any
+     * together, exactly as picking a Quick Style does in the single-item edit dialogues. Any
      * other checked field is extracted and merged in afterwards (see _extractMassEditPatch),
      * so an explicit per-field value always wins over whatever the quick style would have set.
      */
@@ -447,7 +447,7 @@ export class MapDialogManager {
         const resolveStyle = (registryKey) => (app, id) => (app.uiState[registryKey] || []).find((s) => s.id === id);
 
         // Pins, Routes, and Regions each carry an attached label (the same `label{...}`
-        // sub-object their single-item edit dialogs expose as a second "Label Properties"
+        // sub-object their single-item edit dialogues expose as a second "Label Properties"
         // fieldset) - Mass Edit should be able to batch those fields too, not just the
         // entity's own visual properties.
         const labelFields = () => [
@@ -477,7 +477,7 @@ export class MapDialogManager {
             { checkboxName: "applyLabelJustify", extract: (form) => ({ label: { justify: form.elements["labelJustify"].value } }) },
         ];
 
-        // The dialog context (fonts, the Label Quick Style registry, and starting field
+        // The dialogue context (fonts, the Label Quick Style registry, and starting field
         // values) needed to render that shared fieldset - merged into each owning type's own
         // getContext() result below.
         const getLabelContext = (app) => ({
@@ -729,7 +729,7 @@ export class MapDialogManager {
     }
 
     /**
-     * Opens the Biome Rule Stacker (see RuleEditorDialog) - a dedicated large dialog for
+     * Opens the Biome Rule Stacker (see RuleEditorDialog) - a dedicated large dialogue for
      * reviewing and editing custom biomes' auto-generation rules against the built-in
      * defaults. Delegates entirely to RuleEditorDialog, which is
      * kept in its own file rather than grown here given how large this feature is expected
@@ -1033,12 +1033,12 @@ export class MapDialogManager {
     // --- MASS EDIT ---
 
     /**
-     * Wires up the opt-in checkboxes in a Mass Edit dialog. Every field row is a `.form-group`
+     * Wires up the opt-in checkboxes in a Mass Edit dialogue. Every field row is a `.form-group`
      * containing one gate checkbox (name starting "apply...") plus the field(s) it controls;
      * this leaves every other control in that row disabled until its checkbox is ticked, which
      * both prevents an accidental submit of a field the GM never meant to touch and gives free
      * "this field is inactive" styling from the existing global `:disabled` rules. The custom
-     * pin-icon picker in the Pins dialog isn't a native input, so it can't be disabled the same
+     * pin-icon picker in the Pins dialogue isn't a native input, so it can't be disabled the same
      * way - it's instead toggled via the `.fwmb-mass-edit-locked` CSS class (pointer-events
      * off, dimmed), applied to any `.fwmb-custom-select` found in the same row.
      */
@@ -1083,11 +1083,11 @@ export class MapDialogManager {
     }
 
     /**
-     * Opens the Mass Edit dialog for one entity type and applies whatever the GM confirms to
-     * every currently-selected entity of that type in a single batch. Cancelling the dialog
+     * Opens the Mass Edit dialogue for one entity type and applies whatever the GM confirms to
+     * every currently-selected entity of that type in a single batch. Cancelling the dialogue
      * leaves the selection and every entity untouched - Select mode stays active so the GM can
      * adjust their selection and try again. Confirming it (even with nothing ticked) always
-     * exits Select mode and clears the selection: by design, completing the Mass Edit dialog
+     * exits Select mode and clears the selection: by design, completing the Mass Edit dialogue
      * is the second way out of Select mode, alongside toggling Select off directly.
      */
     static async onMassEdit(app, event, target) {

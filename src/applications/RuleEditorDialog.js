@@ -4,12 +4,12 @@ import { ColorMath } from "../tools/ColorMath.js";
 
 /**
  * The "Biome Rule Stacker" - a dedicated, large DialogV2 window (not one of the module's
- * usual small single-purpose dialogs) where a GM builds up auto-generation rules for their
+ * usual small single-purpose dialogues) where a GM builds up auto-generation rules for their
  * custom biomes against the built-in defaults. Fully interactive: dragging a segment's
  * ends, adding/removing a range on one axis, adding/removing a whole rule row, reordering
  * a biome's priority, and the elevation zone quick-picks. All of it mutates a
  * `customBiomes` array `open()` deep-clones from `app.uiState.customBiomes` - a working
- * copy that lives only for the dialog's lifetime, and is only committed back to
+ * copy that lives only for the dialogue's lifetime, and is only committed back to
  * `app.uiState.customBiomes` if the GM clicks Accept (see `open()`); Cancel, and the
  * window's own close button (mapped to the same action), discard it untouched. The
  * "Default biomes" table is read-only and never re-rendered, computed live from
@@ -89,7 +89,7 @@ export class RuleEditorDialog {
         app.markDirty();
     }
 
-    /** Populates the dialog's two (otherwise empty) host elements once it's in the DOM. */
+    /** Populates the dialogue's two (otherwise empty) host elements once it's in the DOM. */
     static #renderContent(root, customBiomes, defaultBiomes, seaLevel) {
         const customHost = root.querySelector("#fwmb-rule-custom-rows");
         const defaultHost = root.querySelector("#fwmb-rule-default-rows");

@@ -620,7 +620,7 @@
     background: var(--fwmb-accent-hover);
 }
 
-/* The checkbox + field-name label pairing used for every opt-in row in a Mass Edit dialog. */
+/* The checkbox + field-name label pairing used for every opt-in row in a Mass Edit dialogue. */
 .fwmb-mass-edit-label {
     display: flex;
     align-items: center;

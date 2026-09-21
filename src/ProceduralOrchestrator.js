@@ -334,9 +334,8 @@ export class ProceduralOrchestrator {
 
     /**
      * Replays the stroke history straight onto the working terrain, which #resetToBrushedLayer has
-     * just set to the base terrain. This is the way rebuilds worked before the brushed layer
-     * existed: it needs no extra memory but takes time in proportion to the number of strokes, so
-     * it is only used when the layer could not be allocated.
+     * just set to the base terrain. It needs no extra memory but takes time in proportion to the
+     * number of strokes, so it is only used when the layer could not be allocated.
      *
      * @param {boolean} layerUsable - Whether the layer was used; nothing is replayed if it was.
      */

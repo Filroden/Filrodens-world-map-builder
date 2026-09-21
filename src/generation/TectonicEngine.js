@@ -133,7 +133,7 @@ export class TectonicEngine {
     static #applySlip(elevationData, readBuffer, idx, x, y, width, height, normDist, p1, p2, strength, thickness, noiseFactor) {
         const side = this.#getVectorSide(x, y, p1, p2);
 
-        // 1. Calculate normalized direction vector of the fault line
+        // 1. Calculate normalised direction vector of the fault line
         const dx = p2.x - p1.x;
         const dy = p2.y - p1.y;
         const len = Math.hypot(dx, dy);
@@ -141,7 +141,7 @@ export class TectonicEngine {
         const nx = dx / len;
         const ny = dy / len;
 
-        // 2. Shift magnitude tapers off quadratically from the epicenter
+        // 2. Shift magnitude tapers off quadratically from the epicentre
         const shiftMag = Math.pow(1.0 - normDist, 2) * strength * thickness * side;
 
         // 3. Modulate the shift with noise so the tear isn't perfectly surgical

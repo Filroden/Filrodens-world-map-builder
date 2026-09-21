@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { resolvePinIconPath } from "../data/pinIcons.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { getRegionUploadResource } from "./RegionUploadResource.js";
 
 export class StudioCanvas {
     constructor(htmlContainer) {
@@ -567,8 +568,20 @@ export class StudioCanvas {
     /**
      * Takes a raw RGBA pixel buffer and paints it directly to a specific layer in the stack.
      * Utilises persistent sprite caching to eliminate VRAM reallocation spikes during live editing.
+     *
+     * When the caller knows which pixels changed since it last sent this layer, it passes them as
+     * bounds, and only those rows are copied into the texture and uploaded to the GPU (see
+     * RegionUploadResource). The bounds must cover every pixel that differs, including any margin
+     * the painters add around a repaint area (ProceduralEngine.getRepaintBounds). Without bounds
+     * the whole buffer is sent.
+     *
+     * @param {string} layerId - The layer to paint to.
+     * @param {Uint8Array} pixelBuffer - RGBA pixels of the whole map.
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @param {object|null} bounds - The pixels that changed since the last call for this layer.
      */
-    renderPixelBuffer(layerId, pixelBuffer, width, height) {
+    renderPixelBuffer(layerId, pixelBuffer, width, height, bounds = null) {
         const targetLayer = this.layers[layerId];
         if (!targetLayer) return;
 
@@ -583,9 +596,11 @@ export class StudioCanvas {
         if (!sprite || sprite.width !== width || sprite.height !== height) {
             if (sprite) sprite.destroy(true);
 
-            // Create a brand new typed array to decouple from the engine's reference
-            const buffer = new PIXI.BufferResource(new Uint8Array(pixelBuffer), { width, height });
-            const baseTexture = new PIXI.BaseTexture(buffer);
+            // The texture keeps its own copy of the pixels, decoupled from the engine's buffer
+            const RegionUploadResource = getRegionUploadResource(PIXI);
+            const resource = new RegionUploadResource(new Uint8Array(pixelBuffer.length), { width, height });
+            resource.write(pixelBuffer);
+            const baseTexture = new PIXI.BaseTexture(resource);
             const texture = new PIXI.Texture(baseTexture);
 
             sprite = new PIXI.Sprite(texture);
@@ -595,9 +610,9 @@ export class StudioCanvas {
             targetLayer.addChild(sprite);
         } else {
             // Strictly mutate the underlying buffer and notify the GPU
-            const resource = sprite.texture.baseTexture.resource;
-            resource.data.set(pixelBuffer);
-            sprite.texture.baseTexture.update();
+            const baseTexture = sprite.texture.baseTexture;
+            baseTexture.resource.write(pixelBuffer, bounds);
+            baseTexture.update();
         }
 
         if (!this.hasGeneratedMap) {
@@ -654,7 +669,7 @@ export class StudioCanvas {
         for (let i = 1; i < path.length; i++) {
             const point = path[i];
 
-            // If the climate crosses the freezing threshold, snap the line and change colors
+            // If the climate crosses the freezing threshold, snap the line and change colours
             if (point.isFrozen !== currentIsFrozen) {
                 currentIsFrozen = point.isFrozen;
                 this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
@@ -666,7 +681,7 @@ export class StudioCanvas {
     }
 
     /**
-     * Renders Vector Pins directly from the POI array using a flattened color map.
+     * Renders Vector Pins directly from the POI array using a flattened colour map.
      */
     #drawMapPins(mapPins, isFeatureEdit) {
         this.featurePinGraphics.lineStyle(0);
@@ -1046,7 +1061,7 @@ export class StudioCanvas {
             });
             this.#drawVectorPath(this.routeGraphics, splinePoints, route.style, route.thickness);
 
-            // Pass 2: Draw the colored foreground line
+            // Pass 2: Draw the coloured foreground line
             this.routeGraphics.lineStyle({
                 width: route.thickness,
                 color: colorHex,
@@ -1772,7 +1787,7 @@ export class StudioCanvas {
             this.cropGraphics.clear();
             this.cropBox = null;
         } else if (!this.cropBox) {
-            // Initialise default bounding box to 50% of the screen center
+            // Initialise default bounding box to 50% of the screen centre
             const w = this.mapWidth * 0.5;
             const h = this.mapHeight * 0.5;
             this.cropBox = { x: (this.mapWidth - w) / 2, y: (this.mapHeight - h) / 2, width: w, height: h };

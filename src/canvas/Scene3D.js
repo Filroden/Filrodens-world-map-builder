@@ -100,7 +100,7 @@ export class Scene3D {
             side: THREE.DoubleSide,
         });
 
-        // 2. Build the optimized Mesh Geometry
+        // 2. Build the optimised Mesh Geometry
         const geoWidth = Math.min(width, 400);
         const geoHeight = Math.min(height, 400);
         const geometry = new THREE.PlaneGeometry(width, height, geoWidth, geoHeight);

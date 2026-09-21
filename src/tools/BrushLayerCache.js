@@ -34,11 +34,11 @@ const SCRATCH_BYTES_PER_PIXEL = Float32Array.BYTES_PER_ELEMENT;
  * The brushed layer of a map: the base terrain with every raster brush stroke in the history
  * applied, and nothing else (no faults, no rivers).
  *
- * Rebuilding terrain after any brush edit used to mean starting from the base and replaying every
- * stroke ever painted, which on a map with thousands of strokes dominates the time of every stroke,
- * undo and redo. Keeping this layer alongside the working terrain turns that into a copy: the
- * working terrain is this layer with the vector features carved on top, so a rebuild only has to
- * copy it and carve again.
+ * Without it, rebuilding terrain after any brush edit means starting from the base and replaying
+ * every stroke ever painted, which on a map with thousands of strokes dominates the time of every
+ * stroke, undo and redo. Keeping this layer alongside the working terrain turns that into a copy:
+ * the working terrain is this layer with the vector features carved on top, so a rebuild only has
+ * to copy it and carve again.
  *
  * The layer is only useful if it is exactly what a full replay would produce, so it is never
  * updated by anything except the operations below, each of which reproduces a replay's result:

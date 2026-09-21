@@ -181,7 +181,7 @@
     --fwmb-text-primary:     var(--fwmb-main-100); /* Main readable text */
     --fwmb-text-secondary:   var(--fwmb-main-200); /* Slightly dimmed text */
     --fwmb-text-muted:       var(--fwmb-main-400); /* Placeholders, hints, disabled text */
-    --fwmb-text-inverse:     var(--fwmb-main-900); /* Text placed on top of the accent color */
+    --fwmb-text-inverse:     var(--fwmb-main-900); /* Text placed on top of the accent colour */
 
     /* --- Borders & Outlines --- */
     --fwmb-border-main:      var(--fwmb-main-700); /* Standard structural borders */

@@ -16,6 +16,9 @@ import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
+// Turns a fraction into a percentage for the timing summary
+const PERCENT = 100;
+
 export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static DEFAULT_OPTIONS = {
         id: "fwmb-map-studio",
@@ -166,12 +169,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * The four Style Library registries a GM can bundle into a shareable settings file, in
      * export/import order. Each maps its uiState array key to the existing legend/fieldset
-     * localisation key already shown in tools-library.hbs, so the export dialog's checkboxes
+     * localisation key already shown in tools-library.hbs, so the export dialogue's checkboxes
      * reuse those labels rather than duplicating them under new keys. Custom Pin Icons are
      * deliberately not included - they're a world-scoped Foundry setting referencing a live
      * file path rather than a per-map uiState array, so a portable export needs to embed the
-     * actual image data. That's left for a future follow-up; this set covers every registry
-     * that's already plain, self-contained JSON.
+     * actual image data, which a settings file does not carry; this set covers every registry
+     * that's plain, self-contained JSON.
      */
     static STYLE_LIBRARY_CATEGORIES = [
         { key: "customBiomes", labelKey: "FILRODENSWMB.UI.SettingsBiomeColors" },
@@ -863,7 +866,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (name === "biomeAlphaActive" || name === "biomeAlphaInactive") return this.#updateBiomeAlphas();
         if (name === "contourInterval") return this.#updateContours();
 
-        // 2. Custom biome color handler (uses dataset instead of name)
+        // 2. Custom biome colour handler (uses dataset instead of name)
         if (target.type === "color" && target.dataset.biome) return this.#updateBiomeColor(target);
 
         // 3. Delegate debounced procedural map generation
@@ -965,8 +968,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             // Mirrors the same priority-chain lookup the biome layer itself paints with
             // (ProceduralEngine.createBiomesMap) - getBiomeKey() alone only ever computes the
             // built-in default, silently ignoring a hand-painted override or a matching custom
-            // auto-generation rule, which used to make this readout lie about anything painted
-            // or rule-generated. Uses getDerivedMapParameters() directly rather than the
+            // auto-generation rule, so the readout would be wrong for anything painted or
+            // rule-generated. Uses getDerivedMapParameters() directly rather than the
             // DOM-syncing getMapParameters(), since this fires on every mouse move over the
             // canvas and doesn't need to re-read every input's current value to answer "what
             // biome is under the cursor right now".
@@ -987,10 +990,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Resolves a ProceduralEngine.resolveBiomeLookup() `lookupKey` to the text a person should
      * see. A built-in default comes back as its i18n key name (e.g. "GRASSLAND", from
-     * getBiomeKey()) and localizes directly. A hand-painted or rule-matched override comes back
+     * getBiomeKey()) and localises directly. A hand-painted or rule-matched override comes back
      * as a numeric id instead, which can name either a built-in biome (still an i18n key, just
      * addressed by number rather than name here) or a custom biome (a plain name the GM typed
-     * in, never localized).
+     * in, never localised).
      */
     #getBiomeDisplayName(lookupKey) {
         if (typeof lookupKey === "number") {
@@ -1207,7 +1210,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Whether faults or manual rivers exist. They are carved into the terrain after the brush
      * strokes, so a stroke painted live on top of them is only correct once the terrain has been
-     * rebuilt (see #refreshFromBrushHistory).
+     * rebuilt (see #refreshChangedTerrain).
      */
     #hasVectorTerrainFeatures() {
         return this.manualRivers?.length > 0 || this.tectonicFaults?.length > 0;
@@ -1702,28 +1705,34 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (verifyPeak) bounds = plan.bounds;
             this.cachedMaxElevation = plan.peak;
         }
-        mark = timer.lap("Canvas repaint: peak scan", mark);
+        mark = timer.lap("Canvas repaint: peak scan", mark, `asked to repaint ${this.#describeRepaintArea(requestedBounds)}`);
 
         const seaLevel = this.uiState["seaLevel"];
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
         const engine = new ProceduralEngine(currentSeed);
         const waterMask = this.bufferWaterMask;
 
+        // Only the pixels the painters write are copied to the canvas textures and uploaded to the GPU
+        const uploadBounds = ProceduralEngine.getRepaintBounds(bounds, this.mapWidth, this.mapHeight);
+        mark = timer.lap("Canvas repaint: settings", mark, `repainting ${this.#describeRepaintArea(bounds)}`);
+
         engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, this.bufferBase, bounds);
-        this.canvasEngine.renderPixelBuffer("base", this.bufferBase, this.mapWidth, this.mapHeight);
+        mark = timer.lap("Canvas repaint: base painter", mark);
+        this.canvasEngine.renderPixelBuffer("base", this.bufferBase, this.mapWidth, this.mapHeight, uploadBounds);
 
         const baseBtn = this.element.querySelector('[data-layer="base"]');
         this.canvasEngine.toggleLayer("base", baseBtn ? baseBtn.classList.contains("active") : true);
-        mark = timer.lap("Canvas repaint: base layer", mark);
+        mark = timer.lap("Canvas repaint: canvas textures", mark);
 
         // Pass the cached peak into the coloriser
         const maxPeak = this.cachedMaxElevation || 1.0;
         engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography, bounds, maxPeak);
-        this.canvasEngine.renderPixelBuffer("topography", this.bufferTopography, this.mapWidth, this.mapHeight);
+        mark = timer.lap("Canvas repaint: topography painter", mark);
+        this.canvasEngine.renderPixelBuffer("topography", this.bufferTopography, this.mapWidth, this.mapHeight, uploadBounds);
 
         const topoBtn = this.element.querySelector('[data-layer="topography"]');
         this.canvasEngine.toggleLayer("topography", topoBtn ? topoBtn.classList.contains("active") : true);
-        mark = timer.lap("Canvas repaint: topography layer", mark);
+        mark = timer.lap("Canvas repaint: canvas textures", mark);
 
         if (this.currentMoistureData && this.currentTemperatureData) {
             engine.createBiomesMap(
@@ -1740,20 +1749,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 bounds,
                 this.bufferBiomeFallback,
             );
-            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
+            mark = timer.lap("Canvas repaint: biomes painter", mark);
+            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight, uploadBounds);
             // Kept current every repaint, but its layer stays hidden until the "Preview Rule
             // Coverage" button is hovered (see #bindToolbarListeners) - no visibility toggle here.
-            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight);
+            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight, uploadBounds);
 
             const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
             this.canvasEngine.toggleLayer("biomes", biomesBtn ? biomesBtn.classList.contains("active") : true);
         }
-        mark = timer.lap("Canvas repaint: biomes layer", mark);
+        mark = timer.lap("Canvas repaint: canvas textures", mark);
 
         const contourInterval = this.uiState["contourInterval"];
         engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds);
-        this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight);
-        mark = timer.lap("Canvas repaint: contours layer", mark);
+        mark = timer.lap("Canvas repaint: contours painter", mark);
+        this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight, uploadBounds);
+        mark = timer.lap("Canvas repaint: canvas textures", mark);
 
         if (this.canvasEngine) {
             this.canvasEngine.clearInteractiveTargets();
@@ -1761,6 +1772,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this._repaintVectors();
         timer.lap("Canvas repaint: vector layers", mark);
+    }
+
+    /**
+     * Describes the area a repaint covers, for the timing summary.
+     *
+     * @param {object|null} bounds - The area being repainted, or nothing for the whole map.
+     * @returns {string} The area and its share of the map.
+     */
+    #describeRepaintArea(bounds) {
+        if (!SpatialMath.isValidBounds(bounds)) return "whole map";
+
+        const pixels = (bounds.maxX - bounds.minX + 1) * (bounds.maxY - bounds.minY + 1);
+        const share = (pixels / (this.mapWidth * this.mapHeight)) * PERCENT;
+        return `x ${bounds.minX}-${bounds.maxX}, y ${bounds.minY}-${bounds.maxY}, ${share.toFixed(1)}% of the map`;
     }
 
     _repaintVectors() {
@@ -1845,8 +1870,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.bufferBiomeFallback,
             );
 
-            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight);
-            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight);
+            const uploadBounds = ProceduralEngine.getRepaintBounds(strokeBounds, this.mapWidth, this.mapHeight);
+            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight, uploadBounds);
+            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight, uploadBounds);
             return;
         }
 
@@ -2181,7 +2207,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             });
         }
 
-        // Guarantee every pin has a valid color property, defaulting to white for legacy maps
+        // Guarantee every pin has a valid `color` property, defaulting to white for legacy maps
         this.mapPins = (payload.mapPins || []).map((pin) => {
             pin.color = pin.color || "#ffffff";
             return pin;
@@ -2669,7 +2695,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Resolves the localized UI label for a modified vector entity.
+     * Resolves the localised UI label for a modified vector entity.
      */
     #getActionLabel(key, entity) {
         if (!key) return game.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
@@ -2910,7 +2936,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return false;
         }
 
-        // Calculate the center-anchor offset
+        // Calculate the centre-anchor offset
         const dx = (newWidth - this.mapWidth) / 2;
         const dy = (newHeight - this.mapHeight) / 2;
 
@@ -2926,7 +2952,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Inject the engine choice into the wiped state
         this.uiState.generationEngine = newEngine;
 
-        // Reset biome colors to defaults so the DOM sync catches them
+        // Reset biome colours to defaults so the DOM sync catches them
         this.customBiomeColors = {};
         Object.entries(FILRODENSWMB.BIOMES).forEach(([key, rgb]) => {
             this.customBiomeColors[key] = rgb;
@@ -2943,7 +2969,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapRoutes = [];
         this.regionLayers = [];
 
-        // Apply the center offset to keep masks perfectly framed
+        // Apply the centre offset to keep masks perfectly framed
         this.landMasks =
             newEngine === "guided"
                 ? this.landMasks.map((mask) => ({
@@ -3688,7 +3714,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Generates a random 6-character alphanumeric seed (uppercased) - the one place this logic
      * lives, so anywhere a blank or randomised map seed is needed (this button, an auto-generated
-     * default map name, a blank seed left on the Create/Convert Map dialog) goes through the same
+     * default map name, a blank seed left on the Create/Convert Map dialogue) goes through the same
      * approach rather than each call site inventing its own.
      */
     #generateRandomSeed() {

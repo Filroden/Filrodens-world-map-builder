@@ -135,6 +135,10 @@ export const FILRODENSWMB = {
         PIN_RADIUS: 6,
         PIN_ALPHA: 0.4,
         CONTOUR_INTERVAL: 0.1,
+        // How far past a repaint area the colour, biome and contour painters also write: each pixel
+        // there depends on its neighbours (contour lines sit between two pixels), so the ring just
+        // outside the area is redrawn with it. See ProceduralEngine.getRepaintBounds.
+        REPAINT_MARGIN: 1,
         FALLBACK_HIGHLIGHT_COLOR: [255, 32, 200],
         FALLBACK_HIGHLIGHT_ALPHA: 0.55,
         // Guided-mode land mask colours, shared by the canvas outline and the Land Masks list swatch
