@@ -1,0 +1,14 @@
+<div class="fwmb-dialog-content">
+    <div class="form-group stacked">
+        <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <input type="text" name="maskName" value="{{mask.name}}" autofocus />
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.LandMaskType"}}</label>
+        <select name="maskOperation">
+            <option value="add" {{#unless (eq mask.operation "subtract")}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.LandMaskTypeLand"}}</option>
+            <option value="subtract" {{#if (eq mask.operation "subtract")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.LandMaskTypeOcean"}}</option>
+        </select>
+    </div>
+</div>

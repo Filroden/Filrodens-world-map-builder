@@ -109,7 +109,7 @@ export function getCustomPinIconList() {
 
 /**
  * A single custom icon's raw stored entry, exactly as FilePicker returned its path - used to
- * prefill the add/edit dialog, where the native `<file-picker>` element needs the original
+ * prefill the add/edit dialogue, where the native `<file-picker>` element needs the original
  * Data-relative path rather than the mask-safe URL getCustomPinIconList() exposes.
  */
 export function getCustomPinIconById(id) {

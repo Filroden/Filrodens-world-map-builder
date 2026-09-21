@@ -15,13 +15,19 @@ export class ProceduralEngine {
             seedNum = seed;
         }
 
-        // Store the PRNG on the instance so we can calculate deterministic rivers later
+        // Seeded from the map seed, so the same seed always produces the same noise
         this.prng = ProceduralEngine.#mulberry32(seedNum);
         this.simplex = new SimplexNoise(this.prng);
 
-        // Dedicated, isolated PRNG streams for distinct generation phases
+        // Dedicated, isolated PRNG streams for distinct generation phases. riverPrng seeds the
+        // tectonic plates; the rivers themselves use riverTracePrng, below.
         this.springPrng = ProceduralEngine.#mulberry32(seedNum + 1);
         this.riverPrng = ProceduralEngine.#mulberry32(seedNum + 2);
+
+        // Stream that the river currently being traced draws its random choices from. It is
+        // replaced at the start of every river (see generateRivers), so it is never shared.
+        this.riverTracePrng = this.riverPrng;
+        this.seedNumber = seedNum;
     }
 
     // Cardinal and ordinal directions for pathfinding to prevent array reallocation in tight loops
@@ -45,8 +51,26 @@ export class ProceduralEngine {
     }
 
     /**
+     * The pixels the layer painters (colorize, createBiomesMap and createContourMap) write when they
+     * are asked to repaint an area: the area plus the margin they add around it. Anything that has
+     * to carry a repainted layer somewhere else, such as the texture on the GPU, must cover exactly
+     * this, so it is worked out here for all of them.
+     *
+     * @param {object|null} bounds - The area being repainted, or nothing for the whole map.
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @returns {object|null} The pixels written, or null when the whole map is repainted.
+     */
+    static getRepaintBounds(bounds, width, height) {
+        if (!SpatialMath.isValidBounds(bounds)) return null;
+
+        const margin = FILRODENSWMB.DISPLAY.REPAINT_MARGIN;
+        return SpatialMath.padBounds(bounds, margin, margin, width, height);
+    }
+
+    /**
      * Determines if a given pixel coordinate falls within a vector polygon.
-     * Highly optimized Ray-Casting (Even-Odd) algorithm for tight generation loops.
+     * Highly optimised Ray-Casting (Even-Odd) algorithm for tight generation loops.
      */
     static isPointInPolygon(x, y, points) {
         let isInside = false;
@@ -72,6 +96,28 @@ export class ProceduralEngine {
             t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
             return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
         };
+    }
+
+    /**
+     * Derives the seed of one river's random stream from the map seed and the river's spring.
+     *
+     * The seed depends on nothing but those, so a river's random choices are the same whatever
+     * else is on the map. The pixel index goes through an integer finaliser (the mixing steps of
+     * MurmurHash3) so that springs a pixel apart get unrelated streams, instead of the nearly
+     * identical ones that seeds one apart would give.
+     *
+     * @param {number} seedNumber - The map's numeric seed.
+     * @param {number} springIndex - Row-major pixel index of the river's spring.
+     * @returns {number} An unsigned 32-bit seed for the river's stream.
+     */
+    static #riverSeed(seedNumber, springIndex) {
+        let hash = (seedNumber + 2) ^ Math.imul(springIndex + 1, 0x9e3779b1);
+        hash ^= hash >>> 16;
+        hash = Math.imul(hash, 0x85ebca6b);
+        hash ^= hash >>> 13;
+        hash = Math.imul(hash, 0xc2b2ae35);
+        hash ^= hash >>> 16;
+        return hash >>> 0;
     }
 
     /**
@@ -124,7 +170,7 @@ export class ProceduralEngine {
     #getLowestNeighbor(cx, cy, elevationData, width, height, params) {
         let minElev = Infinity;
         let bestTarget = null;
-        const startIdx = Math.floor(this.riverPrng() * 8);
+        const startIdx = Math.floor(this.riverTracePrng() * 8);
         const meanderJitter = params?.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER;
 
         for (let i = 0; i < 8; i++) {
@@ -138,7 +184,7 @@ export class ProceduralEngine {
             if (this.riverVisitedBuffer[idx] === this.riverTraceId) continue;
 
             const actualElev = elevationData[idx];
-            const perceivedElev = actualElev + this.riverPrng() * meanderJitter;
+            const perceivedElev = actualElev + this.riverTracePrng() * meanderJitter;
 
             if (perceivedElev < minElev) {
                 minElev = perceivedElev;
@@ -537,7 +583,7 @@ export class ProceduralEngine {
      */
     generateGuidedTopography(width, height, params, landMasks, outBuffer) {
         const elevationData = outBuffer;
-        const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= 3);
+        const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES);
 
         let distanceField;
 
@@ -925,6 +971,30 @@ export class ProceduralEngine {
     }
 
     /**
+     * How far, in pixels, the climate pass looks upwind along a row for the elevation that
+     * decides how much rain a pixel gets (the "Western Horizon" sampling below). It is the wind
+     * distance setting scaled to the map's width and to how much of the globe the map spans.
+     *
+     * The distance is also how far from a changed pixel the moisture can change: a pixel reads
+     * the elevation at most this many columns away on its own row, so a bounded climate refresh
+     * has to recompute that many columns beyond the edited area on either side.
+     *
+     * @param {number} width - Map width in pixels.
+     * @param {object} params - Derived map parameters.
+     * @returns {number} Maximum upwind sampling distance, in whole pixels.
+     */
+    static getWindDistance(width, params) {
+        const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
+        const widthScale = width / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        const latTop = params.latTop ?? FILRODENSWMB.DEFAULTS.LAT_TOP;
+        const latBottom = params.latBottom ?? FILRODENSWMB.DEFAULTS.LAT_BOTTOM;
+        const latRange = Math.max(0.1, Math.abs(latTop - latBottom));
+        const latScale = 180 / latRange;
+
+        return Math.round(baseWind * widthScale * latScale);
+    }
+
+    /**
      * Calculates moisture and temperature based on the final topography.
      * Applies globally deterministic Orographic Lift via Western Horizon sampling.
      */
@@ -934,14 +1004,10 @@ export class ProceduralEngine {
 
         const climateBounds = ProceduralEngine.resolveBounds(bounds, width, height);
 
-        // Scale the mathematical wind distance to match the padded boundaries
-        const baseWind = params.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
-        const widthScale = width / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        const dynamicWindDistance = ProceduralEngine.getWindDistance(width, params);
         const latTop = params.latTop ?? FILRODENSWMB.DEFAULTS.LAT_TOP;
         const latBottom = params.latBottom ?? FILRODENSWMB.DEFAULTS.LAT_BOTTOM;
         const latRange = Math.max(0.1, Math.abs(latTop - latBottom));
-        const latScale = 180 / latRange;
-        const dynamicWindDistance = Math.round(baseWind * widthScale * latScale);
 
         const panX = params.noise.offsetX ?? 0;
         const panY = params.noise.offsetY ?? 0;
@@ -1008,7 +1074,7 @@ export class ProceduralEngine {
     colorize(elevationData, temperatureData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, maxPeak = 1.0) {
         const pixelBuffer = outBuffer;
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
-        const renderBounds = SpatialMath.padBounds(baseBounds, 1, 1, width, height);
+        const renderBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
 
         for (let y = renderBounds.minY; y <= renderBounds.maxY; y++) {
             for (let x = renderBounds.minX; x <= renderBounds.maxX; x++) {
@@ -1172,7 +1238,7 @@ export class ProceduralEngine {
      * Decides which biome a pixel resolves to and whether it should render as water, in
      * priority order: a hand-painted override always wins; failing that, a matching custom
      * auto-generation rule (see BiomeRuleEngine); failing that, the built-in default via
-     * getBiomeKey(). BrushEngine's own paint guard (#applyBiomeMath) never lets a custom
+     * getBiomeKey(). BrushEngine's own paint guard (#stampBiome) never lets a custom
      * biome be hand-painted below sea level in the first place, so a custom biome only ever
      * ends up there via a rule match here.
      *
@@ -1180,7 +1246,7 @@ export class ProceduralEngine {
      * like DEEP_OCEAN/SHALLOW_OCEAN below, so the biome layer stays transparent and the
      * topography layer's own elevation-based water rendering (ProceduralEngine.colorize)
      * shows through underneath, rather than the custom biome's flat colour hiding it. A biome
-     * can opt out of that via its own `solidOverWater` flag (the Add/Edit Custom Biome dialog's
+     * can opt out of that via its own `solidOverWater` flag (the Add/Edit Custom Biome dialogue's
      * checkbox, compiled into the sparse `solidOverWater` id->true map below by
      * MapStateManager.getDerivedMapParameters) - exactly like the built-in PACK_ICE biome,
      * which has always rendered as a solid colour over water rather than transparently. This
@@ -1244,7 +1310,7 @@ export class ProceduralEngine {
     createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, outFallbackBuffer = null) {
         const pixelBuffer = outBuffer;
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
-        const renderBounds = SpatialMath.padBounds(baseBounds, 1, 1, width, height);
+        const renderBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
         const [fbR, fbG, fbB] = FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR;
         const fbAlpha = Math.round(FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_ALPHA * 255);
 
@@ -1313,8 +1379,15 @@ export class ProceduralEngine {
             const index = spring.y * width + spring.x;
             if (riverMap[index]) continue;
 
+            // Every river draws from a stream of its own, seeded by its spring. With one stream
+            // shared by all rivers, a river that took a different number of steps would shift the
+            // stream for every river traced after it, and each of those would re-route wherever
+            // the choice between equally low neighbours (or the meander jitter) went the other
+            // way. One edit would then reshape rivers all over the map, and everything derived
+            // from the water would have to be recomputed over that whole area.
+            this.riverTracePrng = ProceduralEngine.#mulberry32(ProceduralEngine.#riverSeed(this.seedNumber, index));
             this.riverTraceId++;
-            const path = this.#traceRiver(spring.x, spring.y, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params);
+            const path =this.#traceRiver(spring.x, spring.y, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params);
             if (path) rivers.push({ id: `river_${rivers.length}`, path: path });
         }
 
@@ -1338,13 +1411,13 @@ export class ProceduralEngine {
 
     /**
      * Extracts topographical contour lines.
-     * Uses a high-performance neighbor-thresholding edge detection algorithm.
+     * Uses a high-performance neighbour-thresholding edge detection algorithm.
      */
     createContourMap(elevationData, width, height, interval, seaLevel, outBuffer, bounds = null) {
         if (!interval || interval <= 0) return outBuffer;
 
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
-        const contourBounds = SpatialMath.padBounds(baseBounds, 1, 1, width, height);
+        const contourBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
 
         // Targeted erasure of the rendering zone instead of a full buffer wipe
         for (let y = contourBounds.minY; y <= contourBounds.maxY; y++) {
@@ -1383,7 +1456,7 @@ export class ProceduralEngine {
     }
 
     /**
-     * A highly optimized box-blur used exclusively for smoothing the low-resolution Tectonic Mesh.
+     * A highly optimised box-blur used exclusively for smoothing the low-resolution Tectonic Mesh.
      */
     #blurMesh(mesh, width, height, radius) {
         const result = new Float32Array(width * height);

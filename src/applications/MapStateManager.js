@@ -27,6 +27,14 @@ export class MapStateManager {
         // "Preview Rule Coverage" button is hovered - see ProceduralEngine.createBiomesMap's
         // outFallbackBuffer parameter for what actually gets written into it.
         app.bufferBiomeFallback = new Uint8Array(totalPixels * 4);
+
+        // The rebuild scratch buffer is created on demand at the map's current size (see
+        // ProceduralOrchestrator); drop any left over from a map of a different size.
+        app.bufferScratch = null;
+
+        // Fresh buffers hold nothing from any earlier generation
+        app.generationInputs = null;
+        app.generationBase = null;
     }
 
     /**
@@ -185,11 +193,10 @@ export class MapStateManager {
      *
      * Custom Biomes (`uiState.customBiomes` - name/code/colour/rules) are included here too,
      * even though they're `uiState` rather than a `MapStudioApp` vector array like the rest of
-     * this snapshot - every biome-add/edit/delete action already calls `pushVectorState` before
-     * applying its change (see MapDialogManager), which only makes sense if a biome change is
-     * actually part of what gets undone. Previously it wasn't: this snapshot silently omitted
-     * `customBiomes`, so Ctrl+Z after renaming or recolouring a custom biome (or - once 4b-iii
-     * lands - editing its auto-generation rules) had no effect on it at all.
+     * this snapshot - every biome-add/edit/delete action calls `pushVectorState` before
+     * applying its change (see MapDialogManager), which only works if a biome change is part of
+     * what gets undone. Leaving `customBiomes` out would make Ctrl+Z after renaming, recolouring
+     * or editing the auto-generation rules of a custom biome have no effect on it at all.
      */
     static getVectorStateSnapshot(app) {
         return {

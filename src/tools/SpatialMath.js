@@ -1,3 +1,5 @@
+import { FILRODENSWMB } from "../config.js";
+
 export class SpatialMath {
     /**
      * Calculates the closest segment on a vector path (like routes, faults, or rivers) to a given coordinate.
@@ -70,7 +72,7 @@ export class SpatialMath {
                 if (region.visibility === "none" || !region.points || region.points.length < 2) continue;
 
                 // Closed polygons check the segment returning to the start node
-                const isClosed = region.points.length >= 3 && region.id !== activeRegionId;
+                const isClosed = region.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && region.id !== activeRegionId;
 
                 if (region.smoothing && isClosed) {
                     const match = this.#closestPointOnTaggedPath(this.#buildClosedSpline(region.points), x, y, threshold);
@@ -147,6 +149,10 @@ export class SpatialMath {
      * Builds a seamless, wrapped Catmull-Rom loop through a closed polygon, tagged for hit-testing.
      */
     static #buildClosedSpline(points, resolution = 20) {
+        // This 3 is a geometric requirement, not the polygon rule (FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES):
+        // a wrapped Catmull-Rom loop needs at least three control points, because with two the
+        // neighbour points either side of each segment coincide and the "loop" collapses onto a
+        // straight line. It must not follow that constant if the polygon minimum is ever changed.
         if (!points || points.length < 3) return [];
 
         const tagged = [];

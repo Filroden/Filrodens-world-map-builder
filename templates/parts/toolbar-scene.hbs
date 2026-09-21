@@ -14,6 +14,15 @@
 
         <div class="fwmb-divider-vertical"></div>
 
+        <button type="button" class="fwmb-btn {{#if uiState.liveFeatureUpdates}}active{{/if}}" data-action="toggleLiveFeatureUpdates" data-tooltip="{{#if uiState.liveFeatureUpdates}}{{localize 'FILRODENSWMB.UI.PauseTerrainGeneration'}}{{else}}{{localize 'FILRODENSWMB.UI.ResumeTerrainGeneration'}}{{/if}}">
+            <i class="fwmb-icon {{#if uiState.liveFeatureUpdates}}sync{{else}}sync_disabled{{/if}}"></i>
+        </button>
+        <button type="button" class="fwmb-btn wide {{#unless hasPendingFeatureMath}}disabled{{/unless}}" data-action="applyFeatureMath" {{#unless hasPendingFeatureMath}}disabled{{/unless}}>
+            {{localize "FILRODENSWMB.UI.ApplyChanges"}}
+        </button>
+
+        <div class="fwmb-divider-vertical"></div>
+
         <button type="button" class="fwmb-btn primary" data-action="toggleEditMode">
             <i class="fwmb-icon edit-off"></i> {{localize "FILRODENSWMB.UI.EndEdit"}}
         </button>

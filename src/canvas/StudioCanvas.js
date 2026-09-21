@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { resolvePinIconPath } from "../data/pinIcons.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { getRegionUploadResource } from "./RegionUploadResource.js";
 
 export class StudioCanvas {
     constructor(htmlContainer) {
@@ -225,6 +226,7 @@ export class StudioCanvas {
 
         if (isTransformable) {
             e.preventDefault();
+            this.#beginDragOnce();
             const target = this.activeDrag.target;
 
             if (e.shiftKey && dragWrapper.isDecoration) {
@@ -309,9 +311,11 @@ export class StudioCanvas {
         if (grabbedTarget && !isEraserActive) {
             e.preventDefault();
             e.stopPropagation();
-            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType };
+            // The drag is only "armed" here. It becomes a real drag - recording its undo snapshot
+            // and moving the item - once the pointer has travelled past the drag threshold (see
+            // #beginDragOnce), so a plain click or double-click on an item changes nothing.
+            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType, originX: e.clientX, originY: e.clientY, started: false };
             canvasElement.style.cursor = "grabbing";
-            if (this.onInfraDragStart) this.onInfraDragStart();
             return;
         }
 
@@ -370,6 +374,9 @@ export class StudioCanvas {
 
         // --- NODE DRAGGING ---
         if (this.activeDrag) {
+            if (!this.activeDrag.started && !this.#hasExceededDragThreshold(e)) return;
+            this.#beginDragOnce();
+
             // Line/polygon nodes (routes, regions, land masks, fault lines) may be dragged into the
             // buffer so they can span well outside the visible map. Single-point markers (pins,
             // labels, decorations) and manual river nodes stay confined to the map itself - the same
@@ -397,6 +404,26 @@ export class StudioCanvas {
             const hit = this.#getHitTarget(coords.x, coords.y);
             canvasElement.style.cursor = hit ? "grab" : "crosshair";
         }
+    }
+
+    /**
+     * True once the pointer has moved far enough from where it pressed on an item to count as a drag.
+     */
+    #hasExceededDragThreshold(e) {
+        const { originX, originY } = this.activeDrag;
+        return Math.hypot(e.clientX - originX, e.clientY - originY) >= FILRODENSWMB.UI.NODE_DRAG_THRESHOLD_PX;
+    }
+
+    /**
+     * Marks the active drag as genuinely started, notifying the app the first time only so it can
+     * snapshot the state before anything has changed. Called before the item is first modified,
+     * whether by moving it or by rotating/scaling it with the mouse wheel while it is held.
+     */
+    #beginDragOnce() {
+        if (this.activeDrag.started) return;
+
+        this.activeDrag.started = true;
+        if (this.onInfraDragStart) this.onInfraDragStart();
     }
 
     #processCropDrag(coords) {
@@ -476,9 +503,10 @@ export class StudioCanvas {
                 return;
             }
             if (this.activeDrag) {
+                const wasDragged = this.activeDrag.started;
                 this.activeDrag = null;
                 canvasElement.style.cursor = "crosshair";
-                if (this.onInfraDragEnd) this.onInfraDragEnd();
+                if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
                 return;
             }
             if (this.isEditMode && this.onBrushEnd) {
@@ -540,8 +568,20 @@ export class StudioCanvas {
     /**
      * Takes a raw RGBA pixel buffer and paints it directly to a specific layer in the stack.
      * Utilises persistent sprite caching to eliminate VRAM reallocation spikes during live editing.
+     *
+     * When the caller knows which pixels changed since it last sent this layer, it passes them as
+     * bounds, and only those rows are copied into the texture and uploaded to the GPU (see
+     * RegionUploadResource). The bounds must cover every pixel that differs, including any margin
+     * the painters add around a repaint area (ProceduralEngine.getRepaintBounds). Without bounds
+     * the whole buffer is sent.
+     *
+     * @param {string} layerId - The layer to paint to.
+     * @param {Uint8Array} pixelBuffer - RGBA pixels of the whole map.
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @param {object|null} bounds - The pixels that changed since the last call for this layer.
      */
-    renderPixelBuffer(layerId, pixelBuffer, width, height) {
+    renderPixelBuffer(layerId, pixelBuffer, width, height, bounds = null) {
         const targetLayer = this.layers[layerId];
         if (!targetLayer) return;
 
@@ -556,9 +596,11 @@ export class StudioCanvas {
         if (!sprite || sprite.width !== width || sprite.height !== height) {
             if (sprite) sprite.destroy(true);
 
-            // Create a brand new typed array to decouple from the engine's reference
-            const buffer = new PIXI.BufferResource(new Uint8Array(pixelBuffer), { width, height });
-            const baseTexture = new PIXI.BaseTexture(buffer);
+            // The texture keeps its own copy of the pixels, decoupled from the engine's buffer
+            const RegionUploadResource = getRegionUploadResource(PIXI);
+            const resource = new RegionUploadResource(new Uint8Array(pixelBuffer.length), { width, height });
+            resource.write(pixelBuffer);
+            const baseTexture = new PIXI.BaseTexture(resource);
             const texture = new PIXI.Texture(baseTexture);
 
             sprite = new PIXI.Sprite(texture);
@@ -568,9 +610,9 @@ export class StudioCanvas {
             targetLayer.addChild(sprite);
         } else {
             // Strictly mutate the underlying buffer and notify the GPU
-            const resource = sprite.texture.baseTexture.resource;
-            resource.data.set(pixelBuffer);
-            sprite.texture.baseTexture.update();
+            const baseTexture = sprite.texture.baseTexture;
+            baseTexture.resource.write(pixelBuffer, bounds);
+            baseTexture.update();
         }
 
         if (!this.hasGeneratedMap) {
@@ -627,7 +669,7 @@ export class StudioCanvas {
         for (let i = 1; i < path.length; i++) {
             const point = path[i];
 
-            // If the climate crosses the freezing threshold, snap the line and change colors
+            // If the climate crosses the freezing threshold, snap the line and change colours
             if (point.isFrozen !== currentIsFrozen) {
                 currentIsFrozen = point.isFrozen;
                 this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
@@ -639,7 +681,7 @@ export class StudioCanvas {
     }
 
     /**
-     * Renders Vector Pins directly from the POI array using a flattened color map.
+     * Renders Vector Pins directly from the POI array using a flattened colour map.
      */
     #drawMapPins(mapPins, isFeatureEdit) {
         this.featurePinGraphics.lineStyle(0);
@@ -942,6 +984,10 @@ export class StudioCanvas {
      * A variation of the spline generator that wraps the array to create a perfectly closed, seamless loop.
      */
     #getClosedSplinePoints(points, resolution = 20) {
+        // This 3 is a geometric requirement, not the polygon rule (FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES):
+        // a wrapped Catmull-Rom loop needs at least three control points, because with two the
+        // neighbour points either side of each segment coincide and the "loop" collapses onto a
+        // straight line. It must not follow that constant if the polygon minimum is ever changed.
         if (!points || points.length < 3) return points;
         const curve = [];
 
@@ -1015,7 +1061,7 @@ export class StudioCanvas {
             });
             this.#drawVectorPath(this.routeGraphics, splinePoints, route.style, route.thickness);
 
-            // Pass 2: Draw the colored foreground line
+            // Pass 2: Draw the coloured foreground line
             this.routeGraphics.lineStyle({
                 width: route.thickness,
                 color: colorHex,
@@ -1109,8 +1155,10 @@ export class StudioCanvas {
             const isActive = mask.id === activeMaskId;
             const isSubtract = mask.operation === "subtract";
 
-            // Green for Add Land, Red for Subtract Land (Add Ocean)
-            const baseColor = isSubtract ? 0xf87171 : 0x4ade80;
+            // Green for Add Land, Red for Subtract Land (Add Ocean). The same hex values drive the
+            // swatch on the Land Masks list, so the two stay in step.
+            const { ADD, SUBTRACT } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
+            const baseColor = ColorMath.hexToPackedInt(isSubtract ? SUBTRACT : ADD);
 
             g.lineStyle(2, baseColor, isActive ? 0.9 : 0.4);
             g.beginFill(baseColor, isActive ? 0.3 : 0.1);
@@ -1121,7 +1169,7 @@ export class StudioCanvas {
             }
 
             // Close the visual outline when the polygon has finished drawing
-            const isClosed = mask.points.length >= 3 && !isActive;
+            const isClosed = mask.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && !isActive;
             if (isClosed) {
                 g.closePath();
             }
@@ -1154,7 +1202,7 @@ export class StudioCanvas {
                 const lineColorHex = ColorMath.hexToPackedInt(region.lineColor);
 
                 // A polygon is "closed" if it has 3+ points and the user isn't actively currently drawing it
-                const isClosed = region.points.length >= 3 && region.id !== activeRegionId;
+                const isClosed = region.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && region.id !== activeRegionId;
                 const pts = region.smoothing && isClosed ? this.#getClosedSplinePoints(region.points) : region.points;
 
                 // 1. Draw Fill
@@ -1429,7 +1477,7 @@ export class StudioCanvas {
                 let regionVis = region.visibility || "all";
                 if (regionVis !== "none" && layer.visibility === "gm") regionVis = "gm";
 
-                if (!this.#isVisibleInCurrentPass(regionVis, layer.visibility, true) || !region.points || region.points.length < 3) return;
+                if (!this.#isVisibleInCurrentPass(regionVis, layer.visibility, true) || !region.points || region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) return;
 
                 let minX = Infinity,
                     maxX = -Infinity,
@@ -1739,7 +1787,7 @@ export class StudioCanvas {
             this.cropGraphics.clear();
             this.cropBox = null;
         } else if (!this.cropBox) {
-            // Initialise default bounding box to 50% of the screen center
+            // Initialise default bounding box to 50% of the screen centre
             const w = this.mapWidth * 0.5;
             const h = this.mapHeight * 0.5;
             this.cropBox = { x: (this.mapWidth - w) / 2, y: (this.mapHeight - h) / 2, width: w, height: h };
