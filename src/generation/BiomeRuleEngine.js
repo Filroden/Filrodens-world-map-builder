@@ -168,6 +168,13 @@ export class BiomeRuleEngine {
      * 0/1 numbers, never "unbounded". Chosen over changing the terrain engine itself so the
      * engine's own output range stays exactly as documented elsewhere - only rule *matching*
      * gets more permissive at the true edges.
+     *
+     * This behaviour is also what makes elevation matching work correctly once hand-edited
+     * terrain (brush strokes, tectonic faults, carved rivers) is allowed to exceed [0, 1] in
+     * storage: any rule already resting on a true 0 or 1 edge absorbs an overshoot of any size
+     * with no further change needed here. Do not tighten this to a literal <= / >= comparison
+     * against 0/1 without checking that first - doing so would silently stop matching every
+     * elevation value past the old range, leaving it unable to match any rule at all.
      */
     static #axisMatches(segments, start, count, value) {
         const end = start + count * SEGMENT_STRIDE;

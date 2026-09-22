@@ -153,8 +153,16 @@ export class HydrologyEngine {
                 const terrainElev = elevationData[idx];
                 const carvedElev = bedElev + (terrainElev - bedElev) * blendFactor;
 
+                // Compare and write the same, unclamped value. Carving only ever lowers terrain
+                // (the check below is the whole "only if this is actually deeper" guard), so
+                // there is no ceiling to worry about; and there must be no floor, because a river
+                // routed through a hand-carved trench already below 0 has to be able to deepen it
+                // further. Clamping the write to a floor of 0 while comparing against the
+                // unclamped value here would let this check decide "yes, deepen it" and then write
+                // a value that is actually *higher* than the already-negative terrain it was
+                // supposed to deepen, raising the riverbed instead of carving it.
                 if (carvedElev < elevationData[idx]) {
-                    elevationData[idx] = Math.max(0, carvedElev);
+                    elevationData[idx] = carvedElev;
                 }
             }
         }

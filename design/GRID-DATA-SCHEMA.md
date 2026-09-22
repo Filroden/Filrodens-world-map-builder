@@ -1,8 +1,10 @@
 # Grid Exploration Data — Proposed Schema (Draft for Feedback)
 
-**Status:** Draft. Four of the original open questions have been settled by Ken (see "Resolved by Ken" below), with two rounds of correction to the land terrain-band math along the way; two questions remain open for the system developer — see "Still open" at the end. **Pushed back to v2.4.0** (2026-09-15): Custom Biomes improvements now landed v2.3.0, which is expected to add a user-defined `code` field (and possibly other identity changes) to custom biomes — this schema's `biome` object should reflect whatever that work settles on rather than being finalised first and retrofitted afterward. Still fine to share this draft with the system developer for feedback in the meantime; nothing here is expected to change shape, just possibly gain a field on `biome`.
+**Status:** Implemented for v2.6.0 (2026-09-22), pending a manual in-Foundry check of a real exported Scene (grid-cell offset math against Foundry's live Grid API isn't verifiable outside Foundry itself — see the implementation plan's own verification section). Both features this schema depended on have shipped — Custom Biomes (v2.3.0, adding the `code` field used below) and unclamped terrain edits (v2.6.0, which changes how the land terrain bands are defined — see "Resolved by Ken" #5). **Format confirmed by Ken (2026-09-22): a dictionary object keyed by `"i,j"`, as originally drafted** — no longer an open question, see "Coordinate system" below. **`temperatureBand` added (2026-09-22)** — a gap Ken caught: temperature was missing entirely alongside biome/terrain/moisture. See "Resolved by Ken" #7. **`rivers` added (2026-09-22)** — `hasRiver` alone couldn't distinguish a procedural river from a named custom one; a cell now also lists the id/name of any custom river passing through it, alongside the existing boolean.
 
-**Target release:** v2.4.0 (after v2.3.0, Custom Biomes improvements)
+Implemented in `src/applications/GridDataExporter.js` (per-cell field computation, called from `SceneExporter`) and `src/generation/GridAggregator.js` (the generic point-in-polygon/majority-vote/segment-intersection primitives it's built on). The band thresholds and `schemaVersion` below live in `src/config.js`'s `FILRODENSWMB.GRID_DATA` block, so this document and the actual export trace back to the same numbers.
+
+**Target release:** v2.6.0
 
 ## What this is
 
@@ -14,14 +16,14 @@ This data is written once, at export time, from the map's own generated terrain 
 
 Cells are addressed the same way Foundry VTT itself addresses a grid cell: an offset pair `{ i, j }`, where `i` is the row and `j` is the column. This is the same structure Foundry uses for square grids and both hexagonal orientations — it isn't a Filroden's-specific format, and it's the same coordinate you'd get back from Foundry's own grid API (`grid.getOffset(point)`) for a token's position on that Scene.
 
-In JSON, a cell's offset is written as the object key `"i,j"` (e.g. `"3,7"` for row 3, column 7).
+In JSON, a cell's offset is written as the object key `"i,j"` (e.g. `"3,7"` for row 3, column 7) — a dictionary object, not an array of cell objects, confirmed by Ken (2026-09-22).
 
 ## Top-level structure
 
 ```json
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-15T12:00:00Z",
+  "generatedAt": "2026-09-22T12:00:00Z",
   "grid": {
     "type": 2,
     "typeName": "HEXODDR",
@@ -46,17 +48,19 @@ In JSON, a cell's offset is written as the object key `"i,j"` (e.g. `"3,7"` for 
 
 ```json
 "3,7": {
-  "biome": { "id": "GRASSLAND", "name": "Grassland" },
+  "biome": { "id": "GRASSLAND", "name": "Grassland", "code": null },
   "terrainBand": "lowland",
   "moistureBand": "moderate",
+  "temperatureBand": "temperate",
   "hasRiver": false,
+  "rivers": [ { "id": "Qw7Nf2Rt8Lc5Xp1V", "name": "The Silverrun" } ],
   "isCoastal": true,
   "regions": [
-    { "id": "reg-8f3a", "name": "The Whispering Woods", "visibility": "all" }
+    { "id": "TR8k2mFq9xLp3Zc7", "name": "The Whispering Woods", "layer": { "id": "aWn4Vb1sQd6Yh0Ku", "name": "Forests" }, "visibility": "all", "coverage": 0.82 }
   ],
   "infrastructure": {
-    "pins": [ { "id": "pin-11c2", "name": "Millbrook", "icon": "castle", "visibility": "all" } ],
-    "routes": [ { "id": "route-04d1", "name": "King's Road", "visibility": "gm" } ]
+    "pins": [ { "id": "Mh5Nx8Rt2Jf0Wc4P", "name": "Millbrook", "icon": "castle", "visibility": "all" } ],
+    "routes": [ { "id": "Bq3Ls7Vg1Kn9Zy6D", "name": "King's Road", "visibility": "gm" } ]
   }
 }
 ```
@@ -65,46 +69,60 @@ In JSON, a cell's offset is written as the object key `"i,j"` (e.g. `"3,7"` for 
 |---|---|---|
 | `biome.id` | string | Stable identifier for the dominant biome in this cell (majority of the cell's area). Built-in biomes use a fixed set of keys (e.g. `GRASSLAND`, `DECIDUOUS_FOREST`, `DEEP_OCEAN`); a GM-defined custom biome gets its own id. Always present. |
 | `biome.name` | string | Human-readable display name — always present, even for custom biomes. |
-| `terrainBand` | string | One of `deepOcean`, `shallowOcean`, `lowland`, `upland`, `highland`, `mountain`. Always present — no raw elevation value is exposed (see "Resolved by Ken" #1). The ocean bands are intended to always agree with `biome.id` (a `DEEP_OCEAN`-biome cell is always `deepOcean`, `SHALLOW_OCEAN` always `shallowOcean`), rather than using an independently-computed elevation cutoff that could disagree with the biome. The land bands are fixed elevation distances above this map's own sea level, clamped — see "Resolved by Ken" #5 and the formula below. On some maps, one or more of the higher land bands may simply have zero cells (e.g. no `mountain` on a very-high-sea-level map); that's expected, not an error. |
+| `biome.code` | string \| null | The GM's own optional short code for a custom biome (e.g. an RMU-style terrain code) — `null` for a built-in biome or a custom biome with no code set. New in this release, alongside Custom Biomes' own `code` field. |
+| `terrainBand` | string | One of `deepOcean`, `shallowOcean`, `lowland`, `upland`, `highland`, `mountain`. Always present — no raw elevation value is exposed (see "Resolved by Ken" #1). The ocean bands always agree with `biome.id` (a `DEEP_OCEAN`-biome cell is always `deepOcean`, `SHALLOW_OCEAN` always `shallowOcean`), rather than using an independently-computed elevation cutoff that could disagree with the biome. The land bands are open-ended elevation thresholds above this map's own sea level — see "Resolved by Ken" #5 below. A band can still be absent from a given map (zero cells), but only because nothing on that particular map happens to reach it, never because it's mathematically unreachable — elevation itself has no ceiling. |
 | `moistureBand` | string | One of `dry`, `moderate`, `wet`. Always present — no raw moisture value is exposed. |
-| `hasRiver` | boolean | A river segment passes through this cell. |
+| `temperatureBand` | string | One of `frigid`, `cold`, `temperate`, `warm`, `scorching` — five bands: two for the climate extremes, three covering the more ordinary range between them. Always present — no raw temperature value is exposed. See "Resolved by Ken" #7. |
+| `hasRiver` | boolean | A river segment — procedural or custom — passes through this cell, or a lake formed by one does. |
+| `rivers` | array | Every **custom** (hand-drawn) river whose line passes through this cell, by id and name. Procedural rivers — the ones traced automatically from a spring pin at generation time — never appear here: they're never named, so there's nothing to report beyond `hasRiver` already being true. Empty array if no custom river passes through, even when `hasRiver` is true (a procedural river, or a lake overflow channel, with no custom river drawn there). No `visibility` field — unlike regions, pins and routes, a river has no visibility setting of its own; it's carved into the terrain itself, not a toggleable annotation. |
+| `rivers[].id` / `.name` | string | Stable id and the GM-given name (e.g. "The Silverrun") — the same name shown in the Terrain Features tool's river list. |
 | `isCoastal` | boolean | This cell borders ocean. |
-| `regions` | array | Every GM-authored Region (drawn with the Regions tool) that contains this cell, **regardless of visibility** — see "Resolved by Ken" #3. Empty array if none. A region with `visibility: "none"` (a draft/WIP region, never shown to anyone in-game) is excluded — consistent with it never appearing in the exported Scene either. |
+| `regions` | array | Every GM-authored Region (drawn with the Regions tool) that covers any part of this cell, **regardless of visibility** — see "Resolved by Ken" #3 and #6 (region membership). Sorted by `coverage` descending, so `regions[0]` is always the region that covers the most of the cell. Empty array if none. A region with `visibility: "none"` (a draft/WIP region, never shown to anyone in-game) is excluded, and so is every region belonging to a region *layer* set to `visibility: "none"` — consistent with neither ever appearing in the exported Scene either. |
 | `regions[].id` / `.name` | string | Stable id and the GM-given name (e.g. "The Whispering Woods"). |
-| `regions[].visibility` | string | `all` or `gm` — whether this region is meant to be player-visible or secret, per the GM's own setting in the Studio. Exposed rather than filtered — see "Resolved by Ken" #3. |
-| `infrastructure.pins` | array | Every infrastructure pin (settlement, landmark, etc.) located in this cell, regardless of visibility (same `none`-exclusion rule as regions). Empty array if none. |
+| `regions[].layer` | object | `{ id, name }` of the Region *layer* this region belongs to (Filroden's supports several named region layers per map, e.g. "Forests" vs. "Political Borders") — lets a consumer tell a political state from a forest instead of only seeing individual named regions with no grouping. See "Resolved by Ken" #6. |
+| `regions[].visibility` | string | `all` or `gm` — whether this region is meant to be player-visible or secret. This is the region's *effective* visibility, not only its own setting: a region marked `all` under a `gm`-visibility layer is written out as `gm`, matching what actually happens when the layer itself is toggled to GM-only in the Studio (the layer overrides every region under it, never the other way round). Exposed rather than filtered — see "Resolved by Ken" #3. |
+| `regions[].coverage` | number | Fraction (0–1, exclusive of 0) of this cell's area that falls inside this region's polygon. Exists because a cell can sit inside more than one region at once — this is what lets a consumer decide which one "counts" for a given purpose, rather than guessing. See "Resolved by Ken" #6. |
+| `infrastructure.pins` | array | Every infrastructure pin (settlement, landmark, etc.) located in this cell, regardless of visibility (same `none`-exclusion rule as regions). A pin with no icon assigned — the internal marker a procedural river's source gets, not a GM-placed point of interest — is excluded, the same way it's already excluded from the journal/Note generation the rest of the export does. Empty array if none. |
 | `infrastructure.pins[].id` / `.name` / `.icon` / `.visibility` | string | Pin identity, its icon key (useful for classification — e.g. distinguishing a settlement from a ruin), and its `all`/`gm` visibility. |
 | `infrastructure.routes` | array | Every route (road, river-adjacent path, etc.) passing through this cell, regardless of visibility. Empty array if none. |
 | `infrastructure.routes[].id` / `.name` / `.visibility` | string | Route identity and its `all`/`gm` visibility. |
 
-## Resolved by Ken (2026-09-15)
+**A note on the id format above:** every `id` in this schema (regions, pins, routes, custom rivers, region layers) is Filroden's own internal id for that object — a 16-character alphanumeric string (`foundry.utils.randomID()`), with no prefix. The `reg-`/`pin-`/`route-` style shown in earlier drafts of this document was illustrative only and doesn't match the real format; fixed in this revision so a consumer doesn't code against a prefix that will never actually appear. `biome.id`, separately, is either one of the fixed built-in biome keys (`GRASSLAND`, etc.) or a small integer for a custom biome, always as a string.
+
+## Resolved by Ken (2026-09-15, #5–#7 added/rewritten 2026-09-22)
 
 1. **No raw `elevation`/`moisture` values — bands only.** A raw value averaged across a cell is too variable to mean much even for a single cell, let alone comparably across cells. The bands themselves become the defined, stable part of the schema rather than a derived convenience alongside raw numbers.
-2. **`terrainBand` gets two ocean bands, not one**, matching the existing `DEEP_OCEAN`/`SHALLOW_OCEAN` biome distinction: `deepOcean` and `shallowOcean`, alongside the land bands `lowland`/`upland`/`highland`/`mountain`. Renamed from `elevationBand` to `terrainBand` to match, since it's no longer purely an elevation-derived value once it has to agree with biome at the ocean end. The land bands are computed relative to each map's own sea level rather than fixed absolute thresholds — see the corrected formula below.
+2. **`terrainBand` gets two ocean bands, not one**, matching the existing `DEEP_OCEAN`/`SHALLOW_OCEAN` biome distinction: `deepOcean` and `shallowOcean`, alongside the land bands `lowland`/`upland`/`highland`/`mountain`. Renamed from `elevationBand` to `terrainBand` to match, since it's no longer purely an elevation-derived value once it has to agree with biome at the ocean end.
 3. **Visibility is exposed everywhere it exists, not just on regions** — pins and routes both get a `visibility` field too, and GM-only (`gm`-visibility) content is included rather than filtered out. Ken's position: he has no concerns exposing GM-secret information in Scene flags — a player determined to read flag data to cheat would find another way regardless, and that's a table-trust problem, not something the module should try to engineer around.
 4. **Cell coverage is always complete, never sparse.** Every cell always has biome, terrain, and moisture information — every offset within `bounds` is present in `cells`, none omitted as an implicit default.
-5. **Land terrain bands can be legitimately absent on some maps — that's expected, not an edge case to work around.** See the corrected formula below; a high-sea-level "island world" map might have zero `highland` or `mountain` cells, and that's a true statement about that map's terrain, not a bug.
+5. **Land terrain bands, rewritten for v2.6.0's unclamped terrain edits — open-ended, not clamped.** The original design clamped each band's range to `[seaLevel, 1.0]` and treated a band as absent whenever its start would exceed elevation 1.0, since 1.0 used to be a hard ceiling no stored elevation could ever cross. That ceiling no longer exists: v2.6.0 lets hand-edited terrain (brush strokes, tectonic faults, carved rivers) genuinely exceed `[0,1]` and stay that way in storage. A "clamped to 1.0" band definition stops making sense once elevation itself is unbounded above — so each land band is now defined by its **lower threshold only**, open-ended at the top:
 
-**Proposed band thresholds** (still a strawman for the land bands and for moisture — worth the system developer's opinion before treating as final; the two ocean bands are fixed by definition, always mirroring biome):
+   | Band | Elevation range |
+   |---|---|
+   | `lowland` | `seaLevel` and above |
+   | `upland` | `seaLevel + 0.10` and above |
+   | `highland` | `seaLevel + 0.22` and above |
+   | `mountain` | `seaLevel + 0.38` and above, with no upper bound |
 
-- **`terrainBand` land bands are a fixed elevation *distance* above this map's own sea level, clamped — not a fraction of the remaining range.** Two earlier approaches were tried and rejected. A fixed *absolute* offset above sea level (e.g. "+0.70") breaks because sea level is a per-map setting: at sea level 0.4, reaching `mountain` would need an elevation of 1.1, which is impossible, so the band could vanish even at an ordinary sea level. Rescaling to a *fraction of the remaining land range* (e.g. "the top 20% of whatever land elevation exists above sea level") fixes that but breaks the other way at the extremes: on an "island world" map with sea level at 0.8, only 0.2 of elevation range remains above water, and splitting that sliver into four equal-percentage bands would label a cell just barely above the waterline (elevation 0.84) as `mountain` — a meaningless result.
+   A cell's band is whichever of these it qualifies for highest — e.g. an elevation of `seaLevel + 0.5` is `mountain`, not `highland`, even though it also technically clears the `highland`/`upland`/`lowland` thresholds. A band can still have zero cells on a given map (e.g. no `mountain` on a very-high-sea-level "island world" map where nothing happens to reach `seaLevel + 0.38`), but that's now a fact about what that map's terrain actually contains, never a mathematical impossibility the way "elevation 1.1" used to be. **Sea level itself must be read as the map's *effective* sea level** (`MapStateManager.getDerivedMapParameters().seaLevel`), not the raw `uiState.seaLevel` slider value — Advanced-mode maps pin their effective sea level to 0.35 regardless of what the UI shows, and banding against the wrong value would silently mis-band every Advanced map.
+6. **Region membership: an explicit "coverage" rule, not just "contains."** The original draft said a region "contains" a cell without saying what that means once two regions can overlap the same cell — already possible today, and certain to be far more common once a future version's generated content (political states, biome-driven regions, etc.) tiles the whole map, at which point every border cell would sit in two or more regions with no way for a consumer to tell which one dominates. Settled now, while nothing yet depends on the old ambiguous meaning, rather than left to become a silent breaking change later: each `regions[]` entry carries a `coverage` fraction (0–1) of the cell's area inside that region's polygon, and the array is sorted by `coverage` descending — a consumer that only wants "the" region for a cell can always take `regions[0]`.
+7. **`temperatureBand` added.** The schema exposed biome, terrain, and moisture but had no temperature field at all — a real gap, caught by Ken directly. Added as `temperatureBand`, five bands rather than moisture's three, "like moisture" in kind (a flat classification of a `[0,1]` value, not relative to a per-map setting the way terrain bands are relative to sea level) but finer-grained per Ken's specific request: two bands for the climate extremes plus three bands covering the more ordinary range between them, rather than moisture's simpler extremes-plus-one-middle-band split. See the band table below.
 
-  Instead, each band is a **fixed elevation distance above sea level**, the same absolute distance on every map, with each band simply absent if its starting point would fall above the maximum possible elevation (1.0):
+**Land terrain-band threshold numbers** (0.10 / 0.22 / 0.38 above sea level) are unchanged from the previous draft — only the *open-ended* framing is new, not the numbers themselves — and remain a first proposal worth the system developer's sanity check on whether the resulting terrain mix feels right for picking an encounter table.
 
-  | Band | Starts at (elevation) | Ends at (elevation) |
-  |---|---|---|
-  | `lowland` | `seaLevel` | `seaLevel + 0.10` |
-  | `upland` | `seaLevel + 0.10` | `seaLevel + 0.22` |
-  | `highland` | `seaLevel + 0.22` | `seaLevel + 0.38` |
-  | `mountain` | `seaLevel + 0.38` | `1.0` |
+`moistureBand`: `dry` below 0.33 · `moderate` 0.33–0.66 · `wet` above 0.66 — unchanged, and already effectively open-ended at both outer bands (there's no upper bound on `wet` or lower bound on `dry`), so this needed no rewrite for the unclamped-elevation change.
 
-  Every band's range is clamped to `[seaLevel, 1.0]`. If a band's start already exceeds `1.0`, it simply has zero cells on that map — it isn't rescaled or forced to exist. Worked examples:
-  - **Default sea level (0.35):** `lowland` 0.35–0.45, `upland` 0.45–0.57, `highland` 0.57–0.73, `mountain` 0.73–1.0. All four bands exist with reasonable room.
-  - **High sea level (0.8, "island world"):** `lowland` 0.80–0.90, `upland` 0.90–1.0 (clamped — its nominal end of 1.02 is cut off at the max). `highland` would start at 1.02, past the maximum elevation, so it and `mountain` simply don't occur anywhere on this map — no islands reach that high, which is exactly the intended behaviour for a map dominated by shallow islands.
-  - **Low sea level (0.1, a dry, mostly-land world):** `lowland` 0.1–0.2, `upland` 0.2–0.32, `highland` 0.32–0.48, `mountain` 0.48–1.0 — a much larger `mountain` range, because there's a much larger elevation range above sea level to begin with. That's expected: these bands describe terrain *character* relative to sea level, not a guarantee of equal-sized bands.
+`temperatureBand`: five equal-width bands across the full `[0,1]` temperature range, the same flat (not sea-level-style relative) treatment as moisture, since temperature — unlike elevation — is never hand-edited past `[0,1]` by any tool:
 
-  These threshold numbers (0.10 / 0.22 / 0.38) are a first proposal, smaller and better-calibrated than an earlier broken draft — worth the system developer's sanity check on whether the resulting terrain mix feels right for picking an encounter table, alongside the open questions below.
-- `moistureBand`: `dry` below 0.33 · `moderate` 0.33–0.66 · `wet` above 0.66. Worth flagging to the developer that with raw values gone, three bands is all the moisture signal there is — worth confirming that's granular enough for his purposes rather than assuming it.
+| Band | Temperature range |
+|---|---|
+| `frigid` | 0.0 – 0.2 |
+| `cold` | 0.2 – 0.4 |
+| `temperate` | 0.4 – 0.6 |
+| `warm` | 0.6 – 0.8 |
+| `scorching` | 0.8 – 1.0 |
+
+A strawman like the other band sets — equal fifths is the simplest defensible default, not tuned against the module's own internal biome-generation temperature cutoffs (`getBiomeKey`'s arctic/subarctic/temperate/tropical bands use their own, differently-spaced thresholds, the same way `moistureBand`'s flat thirds were never tied to `getBiomeKey`'s own per-band moisture cutoffs). Worth the system developer's opinion alongside the other band sets on whether five bands, spaced this way, are the right granularity for picking an encounter table.
 
 ## Gridless maps
 
@@ -112,9 +130,10 @@ A map exported with no grid (`gridType: "none"`) has no cell geometry to summari
 
 ## Stability
 
-Once in use, this becomes a small public contract other modules build against. `schemaVersion` exists so a future breaking change is detectable rather than silently breaking a consumer; additive changes (a new optional field) won't bump it.
+Once in use, this becomes a small public contract other modules build against. `schemaVersion` exists so a future breaking change is detectable rather than silently breaking a consumer; additive changes (a new optional field) won't bump it. A future version's generated content (settlements, roads, political regions) is expected to travel through the existing `regions`/`infrastructure` fields with no shape change, since it's planned to be authored as ordinary regions/pins/routes rather than a new kind of object.
 
 ## Still open — for the system developer
 
-1. **Format:** is an object keyed by `"i,j"` string easy to consume, or would an array of cell objects (each carrying its own `i`/`j` fields) suit your parsing better?
-2. **Anything missing:** any other per-cell property your system — or one you can imagine another system wanting — would need that isn't listed here (e.g. a distance-to-nearest-settlement value, a GM-settable custom tag per cell)? Also worth his opinion on whether three moisture bands (`dry`/`moderate`/`wet`) is granular enough now that there's no raw value alongside it, and whether the land `terrainBand` cut-points above feel right for picking an encounter table.
+1. **Anything missing, now that the shape has settled further:** any other per-cell property your system — or one you can imagine another system wanting — would need that isn't listed here (e.g. a distance-to-nearest-settlement value, a GM-settable custom tag per cell)? Also worth his opinion on whether three moisture bands (`dry`/`moderate`/`wet`) and five temperature bands (`frigid`/`cold`/`temperate`/`warm`/`scorching`) are the right granularity, and whether the land `terrainBand` cut-points feel right for picking an encounter table.
+
+The format question (object keyed by `"i,j"` vs. an array of cell objects) is no longer open — Ken has confirmed the dictionary-object format above.

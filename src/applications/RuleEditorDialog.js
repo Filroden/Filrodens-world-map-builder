@@ -25,6 +25,22 @@ export class RuleEditorDialog {
     static #EPS = 0.008;
 
     /**
+     * Snaps a raw fraction to the same two-decimal precision every chip already displays it
+     * at (see #buildInteractiveSegment's syncVisual, which formats min/max with toFixed(2)).
+     * Every place a segment's min/max is actually written - a drag, or an elevation zone
+     * quick-pick - goes through this, so the stored value can never be a hair off what the
+     * GM sees. Without it, a handle dragged to what reads as "0.55" on screen is stored as
+     * whatever a pointer's exact pixel position divided out to (e.g. 0.5499643392060064) -
+     * visually identical to a neighbouring rule's own "0.55" but numerically not quite it,
+     * leaving a sliver of climate space between two ranges a GM intended to meet exactly.
+     * #axisMatches only ever compares these stored numbers directly, so rounding here is
+     * enough on its own to close a gap like that; no change to matching itself is needed.
+     */
+    static #round2(value) {
+        return Math.round(value * 100) / 100;
+    }
+
+    /**
      * DialogV2's content is one static HTML blob, not an ApplicationV2 subclass with its own
      * `PARTS`/`scrollable: [...]` declarations, so none of ApplicationV2's built-in scroll-
      * position restoration applies here - every full or partial rebuild below (`renderCustom`,
@@ -424,7 +440,7 @@ export class RuleEditorDialog {
             const onMove = (moveEvent) => {
                 const rect = track.getBoundingClientRect();
                 let pct = rect.width > 0 ? (moveEvent.clientX - rect.left) / rect.width : segment[edgeIndex];
-                pct = Math.max(0, Math.min(1, pct));
+                pct = RuleEditorDialog.#round2(Math.max(0, Math.min(1, pct)));
 
                 if (edgeIndex === 0) {
                     pct = Math.min(pct, segment[1]);
@@ -504,7 +520,10 @@ export class RuleEditorDialog {
      */
     static #elevationZones(seaLevel) {
         const span = (1 - seaLevel) / 4;
-        const bounds = [0, seaLevel, seaLevel + span, seaLevel + span * 2, seaLevel + span * 3, 1];
+        // Rounded for the same reason a dragged handle is (see #round2): a quarter-of-the-
+        // land-band boundary like seaLevel + span rarely lands on a clean two-decimal value
+        // on its own, and a quick-picked zone sits on the same track as hand-dragged ranges.
+        const bounds = [0, seaLevel, seaLevel + span, seaLevel + span * 2, seaLevel + span * 3, 1].map((bound) => RuleEditorDialog.#round2(bound));
         const keys = ["Underwater", "Lowland", "Upland", "Highland", "Mountain"];
 
         return keys.map((key, i) => ({

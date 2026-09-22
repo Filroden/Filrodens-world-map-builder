@@ -118,7 +118,6 @@ export class ProceduralOrchestrator {
     static #routeTopographyPass(app, engine, params) {
         const mode = app.uiState.generationEngine || "standard";
 
-        console.log(`World Map Builder | Generating Topography (${mode} mode)...`);
         const t0 = performance.now();
 
         if (mode === "flat") {
@@ -127,16 +126,16 @@ export class ProceduralOrchestrator {
             engine.generateTectonicTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
         } else if (mode === "guided") {
             // Synchronous like every other mode. This pass is not awaited by its caller, so making
-            // it async would defer the timing log below until after the brush history replay and
-            // report that time as topography, and turn any error into an unhandled rejection.
+            // it async would defer the render-timer record below until after the brush history
+            // replay and report that time as topography, and turn any error into an unhandled
+            // rejection.
             engine.generateGuidedTopography(app.mapWidth, app.mapHeight, params, app.landMasks, app.baseElevationData);
         } else {
             engine.generateTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData, [], [], null);
         }
 
         const t1 = performance.now();
-        console.log(`World Map Builder | Topography generated in ${(t1 - t0).toFixed(2)}ms`);
-        app.renderTimer.record("Base topography", t1 - t0);
+        app.renderTimer.record("Base topography", t1 - t0, mode);
     }
 
     /**
@@ -156,7 +155,6 @@ export class ProceduralOrchestrator {
      *   brushed layer must be replayed from it whatever state the layer is in.
      */
     static rebuildFromHistory(app, engine = null, params = null, bounds = null, baseChanged = false) {
-        const startTime = performance.now();
         const activeEngine = engine ?? new ProceduralEngine(app.uiState.mapSeed);
         const activeParams = params ?? MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors).params;
         const activeBounds = ProceduralEngine.resolveBounds(bounds, app.mapWidth, app.mapHeight);
@@ -181,8 +179,6 @@ export class ProceduralOrchestrator {
 
         // Reported separately from the base topography time logged elsewhere, because on a map with
         // a long brush history the replay is usually the largest part of a rebuild.
-        const brushSummary = replayed ? `${strokeCount} brush strokes replayed in ${replayMs.toFixed(2)}ms` : `${strokeCount} brush strokes reused from the brushed layer`;
-        console.log(`World Map Builder | History rebuilt in ${(performance.now() - startTime).toFixed(2)}ms (${brushSummary}, layers merged in ${mergeMs.toFixed(2)}ms, faults and rivers applied in ${vectorMs.toFixed(2)}ms)`);
         app.renderTimer.record(replayed ? "Brush history replay" : "Brush layer reused", replayMs, `${strokeCount} strokes`);
         app.renderTimer.record("Brush layer merge", mergeMs);
         app.renderTimer.record("Faults and rivers", vectorMs);
@@ -216,7 +212,6 @@ export class ProceduralOrchestrator {
      *   rebuilt in place without comparing, and the box covers the whole map.
      */
     static rebuildChangedTerrain(app, engine = null, params = null) {
-        const startTime = performance.now();
         const activeEngine = engine ?? new ProceduralEngine(app.uiState.mapSeed);
         const activeParams = params ?? MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors).params;
         const wholeMap = ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight);
@@ -248,9 +243,6 @@ export class ProceduralOrchestrator {
             changed = elevationChanged && overridesChanged ? SpatialMath.mergeBounds(elevationChanged, overridesChanged) : elevationChanged || overridesChanged;
         });
 
-        const brushSummary = replayed ? `${strokeCount} brush strokes replayed in ${refreshMs.toFixed(2)}ms` : `${strokeCount} brush strokes reused from the brushed layer`;
-        const where = changed ? `changed area x ${changed.minX}-${changed.maxX}, y ${changed.minY}-${changed.maxY}` : "nothing changed";
-        console.log(`World Map Builder | History rebuilt in ${(performance.now() - startTime).toFixed(2)}ms (${brushSummary}, ${where})`);
         app.renderTimer.record(replayed ? "Brush history replay" : "Brush layer reused", refreshMs, `${strokeCount} strokes`);
         app.renderTimer.record("Brush layer merge", mergeMs);
         app.renderTimer.record("Faults and rivers", vectorMs);
@@ -262,24 +254,36 @@ export class ProceduralOrchestrator {
     /**
      * Decides what a canvas repaint has to cover, given the area the caller believes changed.
      *
-     * Land is shaded relative to the map's highest point, so if that point has moved, every land
-     * pixel's colour has changed and the whole map must be repainted, whatever area the caller
-     * asked for. Finding the highest point means reading every elevation, which is much cheaper
-     * than the repaint it can save.
+     * Land is shaded relative to the map's highest point, and ocean relative to its lowest, so if
+     * either has moved, every affected pixel's colour has changed and the whole map must be
+     * repainted, whatever area the caller asked for. Finding both means reading every elevation,
+     * which is much cheaper than the repaint it can save - tracking the lowest point alongside the
+     * highest is one extra comparison per pixel in a scan this already has to do.
+     *
+     * The trough starts at 0 and is never raised, so on any map where nothing has carved elevation
+     * below 0 it stays exactly 0 - every current write path (all three generation engines, every
+     * brush tool, every tectonic fault type, and river carving) floors at 0, so this is inert until
+     * hand-edited terrain is actually allowed to go negative.
      *
      * @param {Float32Array} elevationData - Current elevation of the whole map.
      * @param {number} cachedPeak - The highest elevation the canvas was last shaded against.
+     * @param {number} cachedTrough - The lowest elevation the canvas was last shaded against.
      * @param {object|null} bounds - Area to repaint, or null for the whole map.
-     * @returns {{bounds: (object|null), peak: number}} The area to repaint (null meaning the
-     *   whole map) and the current highest elevation, to remember for next time.
+     * @returns {{bounds: (object|null), peak: number, trough: number}} The area to repaint (null
+     *   meaning the whole map), and the current highest and lowest elevation, to remember for
+     *   next time.
      */
-    static planRepaint(elevationData, cachedPeak, bounds) {
+    static planRepaint(elevationData, cachedPeak, cachedTrough, bounds) {
         let peak = 0;
+        let trough = 0;
         for (let i = 0; i < elevationData.length; i++) {
-            if (elevationData[i] > peak) peak = elevationData[i];
+            const elevation = elevationData[i];
+            if (elevation > peak) peak = elevation;
+            if (elevation < trough) trough = elevation;
         }
 
-        return { bounds: peak === cachedPeak ? bounds : null, peak };
+        const extremesChanged = peak !== cachedPeak || trough !== cachedTrough;
+        return { bounds: extremesChanged ? null : bounds, peak, trough };
     }
 
     /**
@@ -389,7 +393,7 @@ export class ProceduralOrchestrator {
 
             app.bufferScratch = null;
             app.scratchUnavailable = true;
-            console.warn(`World Map Builder | Not enough memory for the rebuild scratch buffer (${error.message}). Refreshes will cover the whole map instead of just the changed area.`);
+            console.warn(`FWMB | Not enough memory for the rebuild scratch buffer (${error.message}). Refreshes will cover the whole map instead of just the changed area.`);
             return null;
         }
     }
@@ -439,13 +443,11 @@ export class ProceduralOrchestrator {
             activeBounds = SpatialMath.padBounds(activeBounds, windDistance, 0, app.mapWidth, app.mapHeight);
         }
 
-        console.log("World Map Builder | Generating Climate Data...");
         const t0 = performance.now();
 
         engine.generateClimateData(app.currentElevationData, app.mapWidth, app.mapHeight, params, app.currentMoistureData, app.currentTemperatureData, activeBounds);
 
         const t1 = performance.now();
-        console.log(`World Map Builder | Climate mapped in ${(t1 - t0).toFixed(2)}ms`);
         app.renderTimer.record("Climate", t1 - t0);
 
         return activeBounds;
@@ -470,7 +472,6 @@ export class ProceduralOrchestrator {
         const { currentSeed, params } = MapStateManager.getMapParameters(app);
         const engine = new ProceduralEngine(currentSeed);
 
-        console.log("World Map Builder | Generating Features...");
         const t0 = performance.now();
 
         // Bake procedural springs into permanent pins on first load or new map generation
@@ -518,7 +519,6 @@ export class ProceduralOrchestrator {
         );
 
         const t1 = performance.now();
-        console.log(`World Map Builder | Features generated in ${(t1 - t0).toFixed(2)}ms`);
         app.renderTimer.record("Features (springs and rivers)", t1 - t0);
 
         if (!trackWaterChanges) return null;

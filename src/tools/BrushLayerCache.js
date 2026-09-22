@@ -172,7 +172,7 @@ export class BrushLayerCache {
             this.elevation = null;
             this.overrides = null;
             this.allocationFailed = true;
-            console.warn(`World Map Builder | Not enough memory for the brushed layer (${error.message}). Brush edits will replay the whole brush history instead, which is slower.`);
+            console.warn(`FWMB | Not enough memory for the brushed layer (${error.message}). Brush edits will replay the whole brush history instead, which is slower.`);
             return false;
         }
     }
