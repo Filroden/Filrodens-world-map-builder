@@ -265,6 +265,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.hasPendingFeatureMath = false;
         this.pendingTerrainBounds = null;
         this.cachedMaxElevation = null;
+
+        // The lowest elevation the canvas was last shaded against, alongside cachedMaxElevation
+        // above - see ProceduralOrchestrator.planRepaint. Stays null (read as 0 by #paintOceanPixel
+        // until a repaint sets it) until hand-edited terrain is actually allowed to go negative.
+        this.cachedMinElevation = null;
         this.brushEngine = null;
 
         this.currentSaveId = null;
@@ -980,6 +985,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 params.solidOverWater,
             );
 
+            // Deliberately left uncapped: a value past 100% (or below 0%) is the honest readout for
+            // elevation a user has hand-pushed past the old [0, 1] range. Normalising this against
+            // the map's discovered peak/trough instead was considered and rejected, because it would
+            // make the same stored elevation display as a different percentage purely because the
+            // map's extremes changed somewhere else - a point the user never touched could appear to
+            // move. Do not add a clamp here.
             this.element.querySelector("#fwmb-readout-elev").textContent = Math.round(elev * 100) + "%";
             this.element.querySelector("#fwmb-readout-mois").textContent = Math.round(mois * 100) + "%";
             this.element.querySelector("#fwmb-readout-temp").textContent = Math.round(temp * 100) + "%";
@@ -1698,12 +1709,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const timer = this.renderTimer;
         let mark = performance.now();
 
-        // If repainting the FULL map, recalculate the true peak for accurate contrast
+        // If repainting the FULL map, recalculate the true peak and trough for accurate contrast
         let bounds = requestedBounds;
         if (verifyPeak || !bounds || !this.cachedMaxElevation) {
-            const plan = ProceduralOrchestrator.planRepaint(this.currentElevationData, this.cachedMaxElevation, bounds);
+            const plan = ProceduralOrchestrator.planRepaint(this.currentElevationData, this.cachedMaxElevation, this.cachedMinElevation, bounds);
             if (verifyPeak) bounds = plan.bounds;
             this.cachedMaxElevation = plan.peak;
+            this.cachedMinElevation = plan.trough;
         }
         mark = timer.lap("Canvas repaint: peak scan", mark, `asked to repaint ${this.#describeRepaintArea(requestedBounds)}`);
 
@@ -1724,9 +1736,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.toggleLayer("base", baseBtn ? baseBtn.classList.contains("active") : true);
         mark = timer.lap("Canvas repaint: canvas textures", mark);
 
-        // Pass the cached peak into the coloriser
+        // Pass the cached peak and trough into the coloriser
         const maxPeak = this.cachedMaxElevation || 1.0;
-        engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography, bounds, maxPeak);
+        const minTrough = this.cachedMinElevation || 0;
+        engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography, bounds, maxPeak, minTrough);
         mark = timer.lap("Canvas repaint: topography painter", mark);
         this.canvasEngine.renderPixelBuffer("topography", this.bufferTopography, this.mapWidth, this.mapHeight, uploadBounds);
 

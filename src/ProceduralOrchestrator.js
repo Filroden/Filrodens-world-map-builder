@@ -262,24 +262,36 @@ export class ProceduralOrchestrator {
     /**
      * Decides what a canvas repaint has to cover, given the area the caller believes changed.
      *
-     * Land is shaded relative to the map's highest point, so if that point has moved, every land
-     * pixel's colour has changed and the whole map must be repainted, whatever area the caller
-     * asked for. Finding the highest point means reading every elevation, which is much cheaper
-     * than the repaint it can save.
+     * Land is shaded relative to the map's highest point, and ocean relative to its lowest, so if
+     * either has moved, every affected pixel's colour has changed and the whole map must be
+     * repainted, whatever area the caller asked for. Finding both means reading every elevation,
+     * which is much cheaper than the repaint it can save - tracking the lowest point alongside the
+     * highest is one extra comparison per pixel in a scan this already has to do.
+     *
+     * The trough starts at 0 and is never raised, so on any map where nothing has carved elevation
+     * below 0 it stays exactly 0 - every current write path (all three generation engines, every
+     * brush tool, every tectonic fault type, and river carving) floors at 0, so this is inert until
+     * hand-edited terrain is actually allowed to go negative.
      *
      * @param {Float32Array} elevationData - Current elevation of the whole map.
      * @param {number} cachedPeak - The highest elevation the canvas was last shaded against.
+     * @param {number} cachedTrough - The lowest elevation the canvas was last shaded against.
      * @param {object|null} bounds - Area to repaint, or null for the whole map.
-     * @returns {{bounds: (object|null), peak: number}} The area to repaint (null meaning the
-     *   whole map) and the current highest elevation, to remember for next time.
+     * @returns {{bounds: (object|null), peak: number, trough: number}} The area to repaint (null
+     *   meaning the whole map), and the current highest and lowest elevation, to remember for
+     *   next time.
      */
-    static planRepaint(elevationData, cachedPeak, bounds) {
+    static planRepaint(elevationData, cachedPeak, cachedTrough, bounds) {
         let peak = 0;
+        let trough = 0;
         for (let i = 0; i < elevationData.length; i++) {
-            if (elevationData[i] > peak) peak = elevationData[i];
+            const elevation = elevationData[i];
+            if (elevation > peak) peak = elevation;
+            if (elevation < trough) trough = elevation;
         }
 
-        return { bounds: peak === cachedPeak ? bounds : null, peak };
+        const extremesChanged = peak !== cachedPeak || trough !== cachedTrough;
+        return { bounds: extremesChanged ? null : bounds, peak, trough };
     }
 
     /**

@@ -116,18 +116,43 @@ export class TectonicEngine {
         }
     }
 
+    /**
+     * Raises elevation towards a ceiling of 1, tapering the effect off smoothly as terrain
+     * nears that ceiling instead of letting it hit an abrupt wall - the "damping factor" (`room`)
+     * is how much headroom is left below 1.
+     *
+     * `room` is clamped to [0, 1] on its own, separately from the output. That matters once
+     * `currentElev` can already be above 1 (hand-raised past the old ceiling by the brush, or by
+     * an earlier fault): without the clamp, `1.0 - currentElev` goes negative and `dampened`
+     * follows it negative, which would make a convergent fault *lower* an already-tall peak -
+     * exactly backwards for a fault whose whole purpose is to raise terrain. Clamping `room`
+     * instead makes the fault do nothing further once terrain is already at or past the ceiling,
+     * which is the correct "no more room to push into" behaviour, and leaves elevation itself
+     * unclamped so a peak already above 1 stays exactly where it was. For any `currentElev`
+     * already inside [0, 1] - everything reachable before hand-edited terrain could overflow -
+     * `room` equals what `1.0 - currentElev` always computed, so this changes nothing there.
+     */
     static #applyConvergent(elevationData, idx, currentElev, normDist, strength, noiseFactor) {
         const gaussian = Math.exp(-Math.pow(normDist * this.MATH.GAUSSIAN_SPREAD_STANDARD, 2));
         const modification = gaussian * strength * (this.MATH.BASE_MODIFIER + noiseFactor * this.MATH.NOISE_MODIFIER);
-        const dampened = modification * (1.0 - currentElev);
-        elevationData[idx] = Math.min(1.0, currentElev + dampened);
+        const room = Math.max(0, Math.min(1, 1.0 - currentElev));
+        const dampened = modification * room;
+        elevationData[idx] = currentElev + dampened;
     }
 
+    /**
+     * Lowers elevation towards a floor of 0, the mirror image of #applyConvergent above: `room`
+     * is how much depth is left above 0, clamped to [0, 1] independently of the output for the
+     * same reason - without the clamp, a hand-carved trench already below 0 would make `room`
+     * negative and the fault would raise the trench instead of deepening it. See #applyConvergent
+     * for the full reasoning; it applies here with the floor and ceiling swapped.
+     */
     static #applyDivergent(elevationData, idx, currentElev, normDist, strength, noiseFactor) {
         const gaussian = Math.exp(-Math.pow(normDist * this.MATH.GAUSSIAN_SPREAD_STANDARD, 2));
         const modification = gaussian * strength * (this.MATH.BASE_MODIFIER + noiseFactor * this.MATH.NOISE_MODIFIER);
-        const dampened = modification * currentElev;
-        elevationData[idx] = Math.max(0.0, currentElev - dampened);
+        const room = Math.max(0, Math.min(1, currentElev));
+        const dampened = modification * room;
+        elevationData[idx] = currentElev - dampened;
     }
 
     static #applySlip(elevationData, readBuffer, idx, x, y, width, height, normDist, p1, p2, strength, thickness, noiseFactor) {
@@ -210,9 +235,15 @@ export class TectonicEngine {
                     const currentElev = elevationData[idx];
 
                     const volcanoDome = (this.MATH.VOLCANO_BASE + mappedNoise * this.MATH.VOLCANO_NOISE) * falloff * strength;
-                    const dampened = volcanoDome * (1.0 - currentElev);
 
-                    elevationData[idx] = Math.min(1.0, currentElev + dampened);
+                    // Same damping-factor clamp as #applyConvergent, and for the same reason: a
+                    // hotspot plume raises terrain towards a ceiling of 1, so `room` (not the
+                    // output) is what has to stop going negative once currentElev is already
+                    // past 1, or the plume would start lowering an already-tall hand-raised peak.
+                    const room = Math.max(0, Math.min(1, 1.0 - currentElev));
+                    const dampened = volcanoDome * room;
+
+                    elevationData[idx] = currentElev + dampened;
                 }
             }
         }

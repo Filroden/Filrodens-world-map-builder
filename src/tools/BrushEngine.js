@@ -357,12 +357,16 @@ export class BrushEngine {
 
             const gradientBoost = 0.3;
 
+            // activeSlopeElevation is the target the SLOPE stamp blends terrain towards (see
+            // #stampTerrain); it is not itself written into elevationData here, but it ends up
+            // in the stored elevation the moment a stamp uses it, so it is bound by the same
+            // "no [0, 1] ceiling or floor" rule as everything else this brush writes. Without
+            // that, dragging slopeUp across terrain already raised past 1 would silently cap the
+            // slope's target back at 1 and start levelling the peak instead of continuing to climb it.
             if (this.currentStroke.tool === "slopeUp") {
                 this.activeSlopeElevation += this.currentStroke.strength * stepSpacing * gradientBoost;
-                this.activeSlopeElevation = Math.min(1, this.activeSlopeElevation);
             } else if (this.currentStroke.tool === "slopeDown") {
                 this.activeSlopeElevation -= this.currentStroke.strength * stepSpacing * gradientBoost;
-                this.activeSlopeElevation = Math.max(0, this.activeSlopeElevation);
             }
 
             const stampBounds = this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel, activeBounds);
@@ -504,8 +508,9 @@ export class BrushEngine {
      * Chooses the terrain update for a stroke's tool. Returns TERRAIN_MODE.NONE when the stamp
      * can have no effect at all: smooth pulls every pixel towards the elevation under the stamp
      * centre, which does nothing if that centre is off the map, and the slope tools do nothing
-     * until the stroke's first click has anchored an elevation. An unrecognised tool still
-     * clamps the elevation of every pixel it covers to be non-negative, like every other tool.
+     * until the stroke's first click has anchored an elevation. An unrecognised tool falls through
+     * to TERRAIN_MODE.CLAMP_ONLY, whose branch in #stampTerrain writes each pixel's elevation back
+     * unchanged - a safe no-op rather than a guess at what an unknown tool should do to the terrain.
      */
     #resolveTerrainMode(tool, targetIndex) {
         if (tool === "raise") return TERRAIN_MODE.RAISE;
@@ -534,9 +539,15 @@ export class BrushEngine {
      * a mode fixed for the whole stamp, so the switch is perfectly predictable and the row and
      * distance handling exists once.
      *
-     * Every branch ends by clamping elevation to be non-negative. Writing the clamped value in
-     * one step gives the same result as clamping the stored value afterwards, because rounding to
-     * 32-bit float never reorders values.
+     * No branch clamps elevation to [0, 1]. Hand-authored terrain (this brush, tectonic faults,
+     * carved rivers) is deliberately allowed to exceed the range procedural generation itself
+     * always stays within, so a user has headroom to push a mountain higher than sea level's
+     * compression would otherwise leave room for, or carve a trench deeper than the seafloor -
+     * without needing to touch sea level to get it. The stored value is the real one; every place
+     * that turns elevation into something on screen (colour, a contour line, the elevation
+     * readout, a biome lookup) is responsible for clamping or saturating at the point it is
+     * actually used, never here. Writing an unclamped value in one step gives the same result as
+     * clamping later, because rounding to 32-bit float never reorders values.
      *
      * Smooth deliberately re-reads the centre pixel for every pixel it updates, instead of once
      * per stamp: the centre pixel lies inside the stamp and is itself updated part-way through
@@ -568,21 +579,21 @@ export class BrushEngine {
 
                 switch (mode) {
                     case TERRAIN_MODE.RAISE:
-                        elevationData[index] = Math.max(0, Math.min(1, current + strength * influence));
+                        elevationData[index] = current + strength * influence;
                         break;
                     case TERRAIN_MODE.LOWER:
-                        elevationData[index] = Math.max(0, current - strength * influence);
+                        elevationData[index] = current - strength * influence;
                         break;
                     case TERRAIN_MODE.SMOOTH:
-                        elevationData[index] = Math.max(0, current + (elevationData[targetIndex] - current) * (strength * influence * SMOOTH_BLEND_FACTOR));
+                        elevationData[index] = current + (elevationData[targetIndex] - current) * (strength * influence * SMOOTH_BLEND_FACTOR);
                         break;
                     case TERRAIN_MODE.SLOPE: {
                         const slopeInfluence = Math.pow(influence, SLOPE_INFLUENCE_POWER);
-                        elevationData[index] = Math.max(0, current * (1 - slopeInfluence) + slopeElevation * slopeInfluence);
+                        elevationData[index] = current * (1 - slopeInfluence) + slopeElevation * slopeInfluence;
                         break;
                     }
                     default:
-                        elevationData[index] = Math.max(0, current);
+                        elevationData[index] = current;
                 }
             }
         }

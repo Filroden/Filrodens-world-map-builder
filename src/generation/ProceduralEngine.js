@@ -1071,7 +1071,7 @@ export class ProceduralEngine {
         return { moistureData, temperatureData };
     }
 
-    colorize(elevationData, temperatureData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, maxPeak = 1.0) {
+    colorize(elevationData, temperatureData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, maxPeak = 1.0, minTrough = 0.0) {
         const pixelBuffer = outBuffer;
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const renderBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
@@ -1083,7 +1083,7 @@ export class ProceduralEngine {
                 const bufferIndex = i * 4;
 
                 if (elevation < seaLevel) {
-                    this.#paintOceanPixel(pixelBuffer, bufferIndex, elevation, seaLevel);
+                    this.#paintOceanPixel(pixelBuffer, bufferIndex, elevation, seaLevel, minTrough);
                 } else if (waterMask && waterMask[i] > 0) {
                     const temp = temperatureData ? temperatureData[i] : 1;
                     this.#paintLakePixel(pixelBuffer, bufferIndex, elevation, waterMask[i], temp, params);
@@ -1096,8 +1096,29 @@ export class ProceduralEngine {
         return pixelBuffer;
     }
 
-    #paintOceanPixel(pixelBuffer, bufferIndex, elevation, seaLevel) {
-        const depth = seaLevel > 0 ? (seaLevel - elevation) / seaLevel : 0;
+    /**
+     * Shades an ocean pixel darker the deeper it is, normalised against the map's discovered
+     * lowest point (minTrough) rather than a fixed floor of 0 - the same pattern #paintLandPixel
+     * already uses for its ceiling, with maxPeak. On every map where nothing has carved elevation
+     * below 0, minTrough is exactly 0 and this produces the same result it always has: depth
+     * reaches 1 (the darkest shade) exactly at elevation 0. Once a hand-carved trench pushes
+     * minTrough below 0, ordinary seafloor at elevation 0 no longer maxes out the shade - it
+     * reads as partway to the discovered trough - so a deliberately deepened trench still reads
+     * as visibly deeper than ordinary ocean instead of saturating to the same darkest blue as
+     * everything else at or below the old floor.
+     */
+    #paintOceanPixel(pixelBuffer, bufferIndex, elevation, seaLevel, minTrough = 0.0) {
+        // The trough tracked by ProceduralOrchestrator.planRepaint starts at 0 and is only ever
+        // lowered, so it should never be positive - but a positive value here would shrink the
+        // shading range instead of extending it, which is the wrong direction. Floor it at 0 as a
+        // defensive guard, so a caller passing a stale or unexpected value can only ever be
+        // ignored (falling back to the pre-trough range of [0, seaLevel]), never make the shading
+        // range invalid. Also guards the seaLevel === trough edge case: that range would be empty,
+        // but it can only arise with no actual ocean on the map, since any real ocean pixel's
+        // elevation is by definition below seaLevel and no lower than the discovered trough.
+        const trough = Math.min(0, minTrough);
+        const range = seaLevel - trough;
+        const depth = range > 0 ? (seaLevel - elevation) / range : 0;
         pixelBuffer[bufferIndex] = Math.max(20, 100 - 80 * depth);
         pixelBuffer[bufferIndex + 1] = Math.max(30, 150 - 120 * depth);
         pixelBuffer[bufferIndex + 2] = Math.max(80, 200 - 120 * depth);
@@ -1200,6 +1221,13 @@ export class ProceduralEngine {
         return ProceduralEngine.#getTropicalBiome(moisture);
     }
 
+    /**
+     * Deliberately keeps depth relative to seaLevel alone, unlike #paintOceanPixel's shading,
+     * which also normalises against the map's discovered lowest point. This is a binary
+     * classification (past the halfway point or not), not a continuous shade, so a trench well
+     * below the old floor still correctly reads past 0.5 and classifies as DEEP_OCEAN with no
+     * need to know how much further down the trough actually goes.
+     */
     static #getOceanBiome(elevation, temp, seaLevel) {
         if (temp < FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD) return "PACK_ICE";
         const depth = seaLevel > 0 ? (seaLevel - elevation) / seaLevel : 0;
@@ -1412,6 +1440,12 @@ export class ProceduralEngine {
     /**
      * Extracts topographical contour lines.
      * Uses a high-performance neighbour-thresholding edge detection algorithm.
+     *
+     * Bands a pixel by `Math.floor(elevation / interval)` and draws a line wherever a neighbour
+     * falls in a different band. Math.floor (unlike the `%` operator) rounds consistently towards
+     * negative infinity for a negative input, so this keeps producing one band per interval-sized
+     * step with no discontinuity at 0 even once elevation can go negative or above 1 - nothing
+     * here needs to change for hand-edited terrain to exceed the old [0, 1] range.
      */
     createContourMap(elevationData, width, height, interval, seaLevel, outBuffer, bounds = null) {
         if (!interval || interval <= 0) return outBuffer;
