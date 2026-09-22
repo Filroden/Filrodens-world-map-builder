@@ -40,22 +40,29 @@ export class GridDataExporter {
         const visiblePins = (app.mapPins || []).filter((pin) => pin.visibility !== "none" && pin.icon);
         const visibleRoutes = (app.mapRoutes || []).filter((route) => route.visibility !== "none" && route.points?.length >= 2);
         const namedRivers = (app.manualRivers || []).filter((river) => river.points?.length >= 2);
-        const rasterBounds = { minX: 0, minY: 0, maxX: app.mapWidth - 1, maxY: app.mapHeight - 1 };
 
         const cells = {};
         // `getOffsetRange` returns its end offsets exclusive (matching the same convention as the
-        // width/height it was given), so the loops below stop short of i1/j1 - confirm this against
-        // a live Foundry instance during manual verification (see the grid-data implementation plan's
-        // own verification section) since it cannot be checked from this module in isolation.
+        // width/height it was given), so the loops below stop short of i1/j1 - confirmed against a
+        // live Foundry instance during manual verification.
+        //
+        // Every offset in that range gets a cell - there is deliberately no early skip for one
+        // whose bounding box doesn't overlap the raster at all. A hex grid's row/column offsets
+        // don't line up neatly with a rectangular pixel raster (an odd-row-offset grid's trailing
+        // column is the clearest example: an odd row is shifted half a cell relative to an even
+        // one, so at the last column an odd row's cell can fall entirely past the raster's edge
+        // while the even row's cell at the same column still overlaps it), so `getOffsetRange`'s
+        // own rectangular index range necessarily includes some fringe offsets like this whose true
+        // polygon sits partly or wholly outside the map image. `#buildCell`'s fallback sampling (see
+        // its own doc comment) already exists specifically to give a cell like that real,
+        // clamped-to-raster data instead of nothing - an earlier version of this loop skipped such
+        // a cell before that fallback ever ran, which produced a `bounds` rectangle advertising
+        // offsets `cells` didn't actually contain, breaking the schema's own guarantee that every
+        // offset within `bounds` always has an entry. Do not reintroduce that skip.
         for (let i = i0; i < i1; i++) {
             for (let j = j0; j < j1; j++) {
                 const polygon = grid.getVertices({ i, j });
                 const cellBounds = GridAggregator.getPolygonPixelBounds(polygon);
-                // A hex grid's row/column offsets don't line up neatly with a rectangular raster,
-                // so some offsets in range can fall entirely outside the map image. Skip those
-                // rather than emitting a cell with no real data behind it.
-                if (!GridAggregator.boundsOverlap(cellBounds, rasterBounds)) continue;
-
                 cells[`${i},${j}`] = GridDataExporter.#buildCell(app, params, polygon, cellBounds, biomeIdToKey, visibleRegions, visiblePins, visibleRoutes, namedRivers);
             }
         }

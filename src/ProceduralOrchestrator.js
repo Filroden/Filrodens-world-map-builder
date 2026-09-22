@@ -393,7 +393,7 @@ export class ProceduralOrchestrator {
 
             app.bufferScratch = null;
             app.scratchUnavailable = true;
-            console.warn(`World Map Builder | Not enough memory for the rebuild scratch buffer (${error.message}). Refreshes will cover the whole map instead of just the changed area.`);
+            console.warn(`FWMB | Not enough memory for the rebuild scratch buffer (${error.message}). Refreshes will cover the whole map instead of just the changed area.`);
             return null;
         }
     }

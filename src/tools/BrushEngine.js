@@ -299,7 +299,7 @@ export class BrushEngine {
             // stroke is already in the history, and the next rebuild replays it with the rest.
             // Anything else is a bug and must not be hidden.
             if (!(error instanceof RangeError)) throw error;
-            console.warn(`World Map Builder | Could not keep the brushed layer up to date (${error.message}). The next rebuild will replay the whole brush history instead.`);
+            console.warn(`FWMB | Could not keep the brushed layer up to date (${error.message}). The next rebuild will replay the whole brush history instead.`);
         } finally {
             this.#footprintObserver = null;
             this.currentStroke = null;

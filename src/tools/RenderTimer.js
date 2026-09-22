@@ -100,7 +100,7 @@ export class RenderTimer {
         const labelWidth = Math.max(...rows.map((row) => row.label.length)) + COLUMN_GAP;
         const lines = rows.map((row) => this.#formatRow(row, labelWidth, total));
 
-        return `World Map Builder | ${this.#title} took ${total.toFixed(2)}ms\n${lines.join("\n")}`;
+        return `FWMB | ${this.#title} took ${total.toFixed(2)}ms\n${lines.join("\n")}`;
     }
 
     #formatRow(row, labelWidth, total) {
