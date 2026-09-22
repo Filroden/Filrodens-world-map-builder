@@ -4,9 +4,27 @@ export const FILRODENSWMB = {
         IS_ACTIVE: "isActiveCanvas",
         HEX_DATA: "hexData",
         PARAMS: "generationParams",
+        // Where GridDataExporter writes the per-grid-cell exploration data layer at export time
+        // (see GRID_DATA below for the thresholds that classify it). Named "gridData" rather than
+        // reusing HEX_DATA above because the schema covers every grid shape FWMB supports (square
+        // and both hex orientations), not hexes specifically.
+        GRID_DATA: "gridData",
     },
     TEMPLATES: {
         TOOLBAR: "modules/filrodens-world-map-builder/templates/toolbar.hbs",
+    },
+    // Foundry's own CONST.GRID_TYPES numeric values (and a human-readable label for each) for the
+    // three grid shapes FWMB supports, keyed by uiState.gridType. FWMB only ever exports the
+    // odd-offset hex variants (HEXODDR/HEXODDQ) - Foundry's even-offset variants are never used -
+    // so this is a fixed, small map rather than the full GRID_TYPES enum. Shared by SceneExporter
+    // (which writes `type` onto the Scene document's own grid config) and GridDataExporter (which
+    // writes both `type` and `name` into the exported grid-data payload's `grid` object), so the
+    // mapping only exists in one place.
+    GRID_TYPES: {
+        none: { value: 0, name: "GRIDLESS" },
+        square: { value: 1, name: "SQUARE" },
+        hexR: { value: 2, name: "HEXODDR" },
+        hexC: { value: 4, name: "HEXODDQ" },
     },
     DEFAULTS: {
         SEED: "FILRODEN",
@@ -192,6 +210,49 @@ export const FILRODENSWMB = {
                     DECIDUOUS: 0.7,
                 },
             },
+        },
+    },
+    // Thresholds used by GridDataExporter to classify each Scene grid cell's terrain, moisture and
+    // temperature into the coarse bands documented in design/GRID-DATA-SCHEMA.md. Keeping these as
+    // named constants, rather than literals inside the exporter, is what keeps that document and
+    // the actual export in agreement - if a threshold changes here, the doc's tables need updating
+    // to match, but there is only ever one place that defines the real cut-points.
+    GRID_DATA: {
+        // Bump only for a breaking change to the flag's shape (a field removed, renamed, or
+        // reinterpreted). Adding a new optional field to a cell does not require a bump - existing
+        // consumers reading older fields are unaffected.
+        SCHEMA_VERSION: 1,
+        // Land terrain bands are each defined by a lower threshold only, open-ended at the top, and
+        // read against the map's effective sea level (MapStateManager.getDerivedMapParameters's
+        // `params.seaLevel`, not the raw uiState.seaLevel slider - Advanced-mode maps pin their
+        // effective sea level to 0.35 regardless of what that slider shows). There is deliberately
+        // no upper bound: hand-edited terrain (brush, tectonic faults, carved rivers) can push
+        // elevation past 1.0, and a band with a fixed ceiling would either drop that terrain from
+        // every band or need constant re-clamping as the edit tools' own ceiling changes.
+        TERRAIN_BAND_OFFSETS: {
+            LOWLAND: 0,
+            UPLAND: 0.1,
+            HIGHLAND: 0.22,
+            MOUNTAIN: 0.38,
+        },
+        // Flat cut-points against the raw [0,1] moisture value, independent of sea level. Not tied
+        // to getBiomeKey's own per-band moisture cutoffs (FILRODENSWMB.CLIMATE.THRESHOLDS.MOISTURE),
+        // which are deliberately differently-spaced for biome selection rather than a general-purpose
+        // export classification.
+        MOISTURE_CUTOFFS: {
+            DRY: 0.33,
+            WET: 0.66,
+        },
+        // Flat cut-points against the raw [0,1] temperature value, equal fifths across the full
+        // range. Like MOISTURE_CUTOFFS, deliberately not tied to getBiomeKey's own (differently
+        // spaced) arctic/subarctic/temperate thresholds - temperature is never hand-edited past
+        // [0,1] by any tool in the module, so unlike TERRAIN_BAND_OFFSETS this needs no open-ended
+        // top band.
+        TEMPERATURE_CUTOFFS: {
+            FRIGID: 0.2,
+            COLD: 0.4,
+            TEMPERATE: 0.6,
+            WARM: 0.8,
         },
     },
     NOISE: {

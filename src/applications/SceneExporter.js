@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { resolvePinIconPath } from "../data/pinIcons.js";
+import { GridDataExporter } from "./GridDataExporter.js";
 
 export class SceneExporter {
     /**
@@ -152,14 +153,22 @@ export class SceneExporter {
     }
 
     static async #createScene(app, sceneName, bgPath, gmOverlayPath, journalObj) {
-        // Map grid types to Foundry's raw integer constants for strict V14 compatibility
-        const gridTypeMap = {
-            square: 1, // SQUARE
-            hexR: 2, // HEXODDRQ (Pointy top)
-            hexC: 4, // HEXODDCQ (Flat top)
-            none: 0, // GRIDLESS
-        };
-        const mappedGridType = gridTypeMap[app.uiState.gridType] ?? 1;
+        // Foundry's raw integer grid-type constants, shared with GridDataExporter so the Scene
+        // document's own grid config and the exported grid-data payload always agree on which
+        // numeric type a given uiState.gridType maps to.
+        const mappedGridType = FILRODENSWMB.GRID_TYPES[app.uiState.gridType]?.value ?? 1;
+
+        // Compute the grid-cell exploration data layer before the Scene document exists, since it
+        // only needs the map's own generation buffers and grid settings, not a live placed Scene.
+        // A failure here shouldn't abort the whole export - the background, journals, and the Scene
+        // itself matter more - so it's logged and treated as "no grid data" rather than thrown.
+        let gridData = null;
+        try {
+            ui.notifications.info(`FWMB | Calculating Grid Cell Data...`);
+            gridData = GridDataExporter.build(app);
+        } catch (err) {
+            console.error("FWMB | Grid data export failed.", err);
+        }
 
         // Base Scene Document Payload
         const sceneData = {
@@ -186,6 +195,9 @@ export class SceneExporter {
                 },
             ],
         };
+        if (gridData) {
+            sceneData.flags = { [FILRODENSWMB.ID]: { [FILRODENSWMB.FLAGS.GRID_DATA]: gridData } };
+        }
 
         // Safe Update vs Create
         let scene = game.scenes.getName(sceneName);
@@ -193,6 +205,13 @@ export class SceneExporter {
             if (scene) {
                 ui.notifications.info(`FWMB | Updating existing Scene data...`);
                 await scene.update(sceneData);
+
+                // A map switched to gridless since its last export would otherwise leave the
+                // previous export's now-stale grid data flag behind, so clear it explicitly rather
+                // than only ever adding or replacing it.
+                if (!gridData && scene.getFlag(FILRODENSWMB.ID, FILRODENSWMB.FLAGS.GRID_DATA)) {
+                    await scene.unsetFlag(FILRODENSWMB.ID, FILRODENSWMB.FLAGS.GRID_DATA);
+                }
 
                 // Clear old module-specific embedded documents to prevent infinite stacking
                 const oldTiles = scene.tiles.filter((t) => t.texture?.src?.includes("_gm.png")).map((t) => t.id);
