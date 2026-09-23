@@ -12,6 +12,7 @@ import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -2084,6 +2085,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState.generationEngine = payload.generationEngine || "standard";
 
+        // The terrain rules this map was built with, so it regenerates exactly as it was saved.
+        // A map saved before the revision number existed has none, and reads as the legacy
+        // revision (see TerrainVersion). Only regional maps carry a world description.
+        this.uiState.terrainVersion = TerrainVersion.getVersion(payload);
+        this.uiState.world = payload.world ?? null;
+
         this.mapWidth = payload.mapWidth;
         this.mapHeight = payload.mapHeight;
 
@@ -2458,6 +2465,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const payload = {
                 seed: currentSeed,
                 generationEngine: this.uiState.generationEngine,
+                terrainVersion: this.uiState.terrainVersion,
+                world: this.uiState.world,
                 springsBaked: this.uiState.springsBaked,
                 mapWidth: this.mapWidth,
                 mapHeight: this.mapHeight,

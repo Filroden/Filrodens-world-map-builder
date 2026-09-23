@@ -326,13 +326,15 @@ export class ProceduralEngine {
         const panX = params.noise.offsetX ?? 0;
         const panY = params.noise.offsetY ?? 0;
         const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
+        // Finer detail layers for a zoomed-in regional map; 0 for any other map
+        const extraOctaves = params.terrain?.extraOctaves ?? 0;
 
         // 1. Generate Base Elevation Noise
         for (let y = activeBounds.minY; y <= activeBounds.maxY; y++) {
             for (let x = activeBounds.minX; x <= activeBounds.maxX; x++) {
                 const worldX = x + panX;
                 const worldY = y + panY;
-                elevationData[y * width + x] = this.#fbm(worldX, worldY, eOctaves, eScale);
+                elevationData[y * width + x] = this.#fbm(worldX, worldY, eOctaves, eScale, extraOctaves);
             }
         }
 
@@ -1020,6 +1022,10 @@ export class ProceduralEngine {
         const seasonOffset = params.seasonOffset ?? 0;
         const moistureOffset = params.noise.moistureOffset ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE;
         const tempOffset = params.noise.tempOffset ?? FILRODENSWMB.NOISE.OFFSET_TEMP;
+        // Finer moisture and temperature detail for a zoomed-in regional map, matching the extra
+        // terrain detail generateTopography adds, so biome borders gain detail instead of being
+        // the parent map's outlines magnified; 0 for any other map
+        const extraOctaves = params.terrain?.extraOctaves ?? 0;
 
         for (let y = climateBounds.minY; y <= climateBounds.maxY; y++) {
             const currentLat = latTop - (y / height) * latRange;
@@ -1032,7 +1038,7 @@ export class ProceduralEngine {
                 const worldY = y + panY;
 
                 // --- MOISTURE ---
-                const moistureNoise = this.#fbm(worldX + moistureOffset, worldY + moistureOffset, mOctaves, mScale);
+                const moistureNoise = this.#fbm(worldX + moistureOffset, worldY + moistureOffset, mOctaves, mScale, extraOctaves);
                 let baseMoisture = moistureNoise + (globalMoisture - 0.5);
                 const elevation = elevationData[index];
                 const isLand = elevation > params.seaLevel;
@@ -1054,7 +1060,7 @@ export class ProceduralEngine {
                 moistureData[index] = Math.max(0, Math.min(1, baseMoisture));
 
                 // --- TEMPERATURE ---
-                const tempNoise = this.#fbm(worldX + tempOffset, worldY + tempOffset, tOctaves, tScale);
+                const tempNoise = this.#fbm(worldX + tempOffset, worldY + tempOffset, tOctaves, tScale, extraOctaves);
                 let temperature = latGradient * 0.75 + tempNoise * 0.25;
                 temperature += globalTemp - 0.3;
                 temperature += seasonImpact;
@@ -1160,23 +1166,38 @@ export class ProceduralEngine {
         pixelBuffer[bufferIndex + 3] = 255;
     }
 
-    #fbm(x, y, octaves, scale) {
+    /**
+     * Fractal Brownian motion: layered simplex noise, each octave at double the frequency and
+     * half the amplitude of the one before, normalised to roughly 0..1 (see below for the edges).
+     *
+     * `extraOctaves` adds finer layers beyond `octaves` (used by regional maps to fill in terrain,
+     * moisture and temperature detail, see TerrainVersion.getExtraOctaves). They are deliberately
+     * left out of the normalising total: normalising by the larger total would shrink every
+     * coarser layer slightly and shift the large-scale shape the parent map shows, whereas
+     * excluding them keeps the coarse layers exactly as they were and lets the extra layers add
+     * small variation on top.
+     *
+     * The result is only floored at 0, never capped at 1, with or without extra layers. The
+     * simplex noise can already take the normalised sum slightly past 1 on its own, and the
+     * highest peaks (and their snow) come from exactly those values, so capping the extra-layer
+     * case would flatten a regional map's mountain tops that its parent map shows. With no extra
+     * layers the result is exactly what it has always been.
+     */
+    #fbm(x, y, octaves, scale, extraOctaves = 0) {
         let total = 0;
         let frequency = scale;
         let amplitude = 1;
         let maxAmplitude = 0;
 
-        for (let i = 0; i < octaves; i++) {
+        for (let i = 0; i < octaves + extraOctaves; i++) {
             const noiseVal = this.simplex.noise2D(x * frequency, y * frequency);
             total += noiseVal * amplitude;
-            maxAmplitude += amplitude;
+            if (i < octaves) maxAmplitude += amplitude;
             amplitude *= 0.5;
             frequency *= 2;
         }
 
-        const normalized = total / maxAmplitude;
-
-        return Math.max(0, (normalized + 1) / 2);
+        return Math.max(0, (total / maxAmplitude + 1) / 2);
     }
 
     /**

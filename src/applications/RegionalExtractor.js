@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
 
 export class RegionalExtractor {
     /**
@@ -21,7 +22,17 @@ export class RegionalExtractor {
         const targetHeight = Math.max(targetGridSize, Math.round(rawHeight / targetGridSize) * targetGridSize);
 
         // 2. Mutate Map State Properties
+        const world = TerrainVersion.deriveChildWorld(state, cropBox, zoomScale);
+        const windDistance = TerrainVersion.getRegionalWindDistance(state, cropBox);
         this.#applyScaleToState(state, cropBox, zoomScale, targetWidth, targetHeight, app.mapHeight);
+
+        // A regional map is always built with the current terrain rules, whatever revision its
+        // parent was made with, so it gets the corrected wind distance and the extra detail.
+        // Both the world description and the wind distance are worked out from the parent's
+        // unscaled state, since #applyScaleToState overwrites the size they are derived from.
+        state.terrainVersion = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        state.world = world;
+        state.windDistance = windDistance;
 
         // 3. Derive Map Parameters
         const { currentSeed, params: newParams } = MapStateManager.getDerivedMapParameters(state, app.customBiomeColors);
@@ -41,6 +52,8 @@ export class RegionalExtractor {
         return {
             seed: currentSeed,
             generationEngine: state.generationEngine,
+            terrainVersion: state.terrainVersion,
+            world: state.world,
             springsBaked: true,
             mapWidth: targetWidth,
             mapHeight: targetHeight,
@@ -70,7 +83,9 @@ export class RegionalExtractor {
         state["noise.offsetY"] = (state["noise.offsetY"] + cropBox.y) * zoomScale;
         state["noise.moistureOffset"] = (state["noise.moistureOffset"] || FILRODENSWMB.NOISE.OFFSET_MOISTURE) * zoomScale;
         state["noise.tempOffset"] = (state["noise.tempOffset"] || FILRODENSWMB.NOISE.OFFSET_TEMP) * zoomScale;
-        state.windDistance = (state.windDistance || FILRODENSWMB.CLIMATE.WIND_DISTANCE) * zoomScale;
+        // The wind distance is not scaled here. It is set by createPayload from
+        // TerrainVersion.getRegionalWindDistance, because the right value depends on the crop's
+        // shape rather than its zoom (getWindDistance already scales it by the map's size).
 
         state["noise.elevation.scale"] *= zoomScale;
         state["noise.moisture.scale"] *= zoomScale;

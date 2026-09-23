@@ -84,6 +84,22 @@ export const FILRODENSWMB = {
             NOISE_OFFSET: { X: 4000, Y: 4000 },
         },
     },
+    // Which revision of the terrain generation rules a saved map was built with. Generation is
+    // re-run from the saved settings every time a map is opened (no terrain pixels are stored),
+    // so a change to the rules that alters the output of existing settings would silently change
+    // every saved map. Instead, each map records the revision it was made with, and anything that
+    // differs between revisions is decided from that number (see TerrainVersion).
+    //   1 - every map saved before the number existed. Regional maps store a wind distance that
+    //       was scaled by the crop's zoom on top of the scaling getWindDistance already applies,
+    //       and add no extra terrain detail when zoomed in.
+    //   2 - regional maps store a wind distance that makes their wind reach exactly their
+    //       parent's enlarged by the zoom, whatever the crop's shape, and add finer terrain,
+    //       moisture and temperature detail (extra noise octaves) in proportion to how far they
+    //       are zoomed in.
+    TERRAIN_VERSION: {
+        LEGACY: 1,
+        CURRENT: 2,
+    },
     LIMITS: {
         HISTORY_MAX: 100,
         SNAP_THRESHOLD: 15,

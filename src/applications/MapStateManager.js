@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
 
 export class MapStateManager {
     /**
@@ -74,6 +75,11 @@ export class MapStateManager {
 
         return {
             generationEngine: "standard",
+
+            // A new map is always built with the current terrain generation rules, and is never
+            // a regional map until RegionalExtractor makes one (see TerrainVersion).
+            terrainVersion: FILRODENSWMB.TERRAIN_VERSION.CURRENT,
+            world: null,
 
             mapWidth: width,
             mapHeight: height,
@@ -318,6 +324,11 @@ export class MapStateManager {
             latBottom: state.latBottom,
             globalMoisture: state.globalMoisture,
             riverDensity: state.riverDensity,
+            // Values that depend on the map's terrain revision, already resolved into plain
+            // numbers so the generation engines never need to know which revision they serve.
+            terrain: {
+                extraOctaves: TerrainVersion.getExtraOctaves(state),
+            },
             noise: {
                 offsetX: state["noise.offsetX"],
                 offsetY: state["noise.offsetY"],
