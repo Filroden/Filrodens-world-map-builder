@@ -13,6 +13,7 @@ import { MapDialogManager } from "./MapDialogManager.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { TerrainUpgrade } from "./TerrainUpgrade.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -132,6 +133,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
             toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
             undoBrush(e, t)                 { this._onUndoBrush(e, t); },
+            updateMapTerrain(e, t)          { this._onUpdateMapTerrain(e, t); },
             zoomIn(e, t)                    { this._onZoomIn(e, t); },
             zoomOut(e, t)                   { this._onZoomOut(e, t); },
             zoomToFeature(e, t)             { this._onZoomToFeature(e, t); },
@@ -276,6 +278,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.currentSaveId = null;
         this.currentSaveName = null;
         this.currentParentId = null;
+
+        // What updating the open map to the current terrain rules would change, or null if it is
+        // already current or would not change (see TerrainUpgrade). Drives the Update Map button.
+        this.terrainUpgrade = null;
+        // Size of the map at the top of the open map's chain of crops, when the open map is a
+        // legacy regional map (which did not record it) and it could be found by following its
+        // parent maps. Used to correct its wind distance, and passed on to regional maps cut from it.
+        this.legacyRootSize = null;
         this.isDirty = false;
         this.isSaving = false;
 
@@ -395,6 +405,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         context.uiState = this.uiState;
         context.currentSaveName = this.currentSaveName;
+        context.terrainUpgradeAvailable = this.terrainUpgrade !== null;
 
         context.infrastructureIcons = getPinIconPickerList(this.uiState.activeIcon);
         context.builtinPinIcons = getBuiltinPinIconList();
@@ -2090,6 +2101,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // revision (see TerrainVersion). Only regional maps carry a world description.
         this.uiState.terrainVersion = TerrainVersion.getVersion(payload);
         this.uiState.world = payload.world ?? null;
+        this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
+        this.terrainUpgrade = null;
 
         this.mapWidth = payload.mapWidth;
         this.mapHeight = payload.mapHeight;
@@ -2126,6 +2139,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState["noise.moistureOffset"] = p.noise.moistureOffset ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE;
         this.uiState["noise.tempOffset"] = p.noise.tempOffset ?? FILRODENSWMB.NOISE.OFFSET_TEMP;
         this.uiState.windDistance = p.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
+
+        // Read after the wind distance, which is what identifies a legacy regional map
+        this.legacyRootSize = TerrainVersion.isLegacyRegional(this.uiState) ? await TerrainUpgrade.resolveLegacyRootSize(payload) : null;
+
         this.uiState["noise.elevation.scale"] = 1 / p.noise.elevation.scale;
         this.uiState["noise.elevation.octaves"] = p.noise.elevation.octaves;
         this.uiState["noise.elevation.stretch"] = p.noise.elevation.stretch;
@@ -2467,6 +2484,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 generationEngine: this.uiState.generationEngine,
                 terrainVersion: this.uiState.terrainVersion,
                 world: this.uiState.world,
+                terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
                 springsBaked: this.uiState.springsBaked,
                 mapWidth: this.mapWidth,
                 mapHeight: this.mapHeight,
@@ -2973,6 +2991,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Inject the engine choice into the wiped state
         this.uiState.generationEngine = newEngine;
+
+        // A new map is built with the current terrain rules, so there is nothing to update
+        this.terrainUpgrade = null;
+        this.legacyRootSize = null;
 
         // Reset biome colours to defaults so the DOM sync catches them
         this.customBiomeColors = {};
@@ -3604,7 +3626,67 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             this.render({ parts: ["toolbar", "context"] });
             this.isDirty = false;
+
+            // Offered only once the map is fully generated and marked clean: the check reads the
+            // generated climate, and an update applied here must leave the map marked unsaved.
+            await this.#offerTerrainUpgrade();
         }
+    }
+
+    /**
+     * Works out whether the map just loaded would change under the current terrain rules and, if
+     * so, offers to update it. A map whose owner chose "don't ask again" is not asked, but the
+     * Update Map button (see _onUpdateMapTerrain) stays available for it.
+     */
+    async #offerTerrainUpgrade() {
+        this.terrainUpgrade = await this.#assessTerrainUpgrade();
+        if (!this.terrainUpgrade) return;
+
+        this.render({ parts: ["context"] });
+        if (this.uiState.terrainUpgradeDismissed) return;
+
+        const choice = await MapDialogManager.promptTerrainUpgrade(this.terrainUpgrade, true);
+        if (choice.apply) await this.#applyTerrainUpgrade();
+        else if (choice.dismiss) await TerrainUpgrade.dismiss(this);
+    }
+
+    /**
+     * What updating the open map would change (see TerrainUpgrade.assess), with the processing
+     * overlay shown while it is measured. Only legacy regional maps can change, so every other
+     * map is answered at once without measuring anything.
+     */
+    async #assessTerrainUpgrade() {
+        if (!TerrainVersion.isLegacyRegional(this.uiState)) return null;
+
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.CheckingTerrainUpdate"));
+        try {
+            return TerrainUpgrade.assess(this);
+        } finally {
+            this.#endProcessing();
+        }
+    }
+
+    /**
+     * Updates the open map to the current terrain rules, regenerates it and leaves it marked as
+     * unsaved, so the update is kept only if the map is saved.
+     */
+    async #applyTerrainUpgrade() {
+        const { plan } = this.terrainUpgrade;
+        this.terrainUpgrade = null;
+
+        await TerrainUpgrade.apply(this, plan);
+        this.render({ parts: ["context"] });
+        ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApplied"));
+    }
+
+    /**
+     * The Update Map button: the same offer as on load, without the "don't ask again" option.
+     */
+    async _onUpdateMapTerrain(event, target) {
+        if (!this.terrainUpgrade) return;
+
+        const choice = await MapDialogManager.promptTerrainUpgrade(this.terrainUpgrade, false);
+        if (choice.apply) await this.#applyTerrainUpgrade();
     }
 
     async #handleMapDelete(mapId) {

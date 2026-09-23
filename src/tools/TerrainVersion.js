@@ -60,45 +60,118 @@ export class TerrainVersion {
      * the interface. So a saved wind distance divided by the baseline is exactly the product of
      * every crop's zoom, including crops of crops. A map that was never cropped reads as 1.
      *
+     * The result can be below 1: a regional map may be generated at fewer pixels than the crop
+     * it was cut from (a 2000 pixel wide crop saved as a 1000 pixel wide map is x0.5), and it is
+     * still a regional map whose wind distance was scaled.
+     *
      * @param {object} state - A uiState object (reads windDistance).
-     * @returns {number} The cumulative zoom, 1 or more.
+     * @returns {number} The cumulative zoom (1 for a map that was never cropped).
      */
     static getLegacyZoom(state) {
         const baseline = FILRODENSWMB.CLIMATE.WIND_DISTANCE;
         const windDistance = state.windDistance ?? baseline;
-        return Math.max(1, windDistance / baseline);
+        return windDistance > 0 ? windDistance / baseline : 1;
     }
 
     /**
-     * The wind distance setting to store on a regional map so that its wind reach, in its own
-     * pixels, is exactly its parent's wind reach enlarged by the crop's zoom.
+     * Whether a map was built with the legacy terrain revision and is a regional map (a crop of
+     * another map). These are the only maps the current revision changes; a legacy map that was
+     * never cropped regenerates identically under either revision.
+     *
+     * @param {object} state - A uiState object or saved payload's equivalent fields.
+     * @returns {boolean}
+     */
+    static isLegacyRegional(state) {
+        return this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.CURRENT && this.getLegacyZoom(state) !== 1;
+    }
+
+    /**
+     * The wind distance setting that gives a map exactly the wind reach of the map at the top of
+     * its chain of crops, enlarged by the map's zoom.
      *
      * ProceduralEngine.getWindDistance turns the setting into pixels using the map's width and
      * the span of latitude it covers (its height, in degrees). A crop enlarges the width and the
-     * pixels-per-degree of latitude by the same zoom, so if the crop had the parent's shape the
-     * parent's setting would carry over unchanged. A crop of a different shape breaks that: the
-     * width grows with the crop's width but the latitude span shrinks with its height, so a crop
-     * twice as wide (relative to its height) as its parent would reach twice too far downwind.
-     * Scaling the setting by the parent's shape divided by the crop's shape cancels that out
-     * exactly, and the zoom itself cancels too, so it does not appear here.
+     * pixels-per-degree of latitude by the same zoom, so a crop with the top map's shape needs
+     * the baseline setting unchanged. A crop of a different shape does not: its width grows with
+     * the crop's width but its latitude span shrinks with its height, so a crop twice as wide
+     * (relative to its height) as the top map would reach twice too far downwind. Scaling the
+     * baseline by the top map's shape divided by this map's shape cancels that out exactly, and
+     * the zoom itself cancels too, so it does not appear here.
      *
-     * The parent's setting is taken as it should be under the current rules. A revision 1
-     * regional map stored its setting multiplied by its zoom (see getLegacyZoom), so for any
-     * revision 1 map the setting is taken as the baseline instead.
+     * @param {number} rootShape - Width divided by height of the map at the top of the chain.
+     * @param {number} mapShape - Width divided by height of this map (or of the crop that made it).
+     * @returns {number} The wind distance setting.
+     */
+    static getWindDistanceFor(rootShape, mapShape) {
+        return FILRODENSWMB.CLIMATE.WIND_DISTANCE * (rootShape / mapShape);
+    }
+
+    /**
+     * The width divided by height of the map at the top of a map's chain of crops, if known.
+     *
+     * A map's own world description carries the top map's size (revision 2 regional maps), and a
+     * map that was never cropped is its own top map. A revision 1 regional map knows neither, so
+     * the caller may supply the size found by walking its chain of parent maps (see
+     * TerrainUpgrade.resolveLegacyRootSize).
+     *
+     * @param {object} state - A uiState object.
+     * @param {{width: number, height: number}|null} [rootSize] - The top map's size, if found elsewhere.
+     * @returns {number|null} The top map's shape, or null if it cannot be known.
+     */
+    static getRootShape(state, rootSize = null) {
+        const world = this.resolveWorld(state);
+        const width = world.rootW ?? rootSize?.width ?? null;
+        const height = world.rootH ?? rootSize?.height ?? null;
+        return width && height ? width / height : null;
+    }
+
+    /**
+     * The wind distance setting to store on a regional map cropped out of a parent map (see
+     * getWindDistanceFor for why it depends on shape rather than zoom).
+     *
+     * If the shape of the map at the top of the chain cannot be known (a crop of a revision 1
+     * regional map whose chain of parents could not be followed), the parent's own shape stands
+     * in for it, which is exact whenever the parent was cropped to the top map's proportions.
      *
      * @param {object} parentState - The parent map's uiState, before any regional scaling.
      * @param {{width: number, height: number}} cropBox - The crop, in the parent's pixels.
+     * @param {{width: number, height: number}|null} [rootSize] - The top map's size, if known.
      * @returns {number} The wind distance setting for the regional map.
      */
-    static getRegionalWindDistance(parentState, cropBox) {
-        const baseline = FILRODENSWMB.CLIMATE.WIND_DISTANCE;
-        const isLegacy = this.getVersion(parentState) < FILRODENSWMB.TERRAIN_VERSION.CURRENT;
-        const parentSetting = isLegacy ? baseline : (parentState.windDistance ?? baseline);
-
+    static getRegionalWindDistance(parentState, cropBox, rootSize = null) {
         const parentShape = parentState.mapWidth / parentState.mapHeight;
-        const cropShape = cropBox.width / cropBox.height;
+        const rootShape = this.getRootShape(parentState, rootSize) ?? parentShape;
+        return this.getWindDistanceFor(rootShape, cropBox.width / cropBox.height);
+    }
 
-        return parentSetting * (parentShape / cropShape);
+    /**
+     * What a legacy regional map's settings become when it is updated to the current terrain
+     * revision: the current revision number, the corrected wind distance, and a world
+     * description carrying its zoom (so it gains the extra detail octaves) and, if known, the size
+     * of the map at the top of its chain.
+     *
+     * Its position within that top map cannot be recovered and is left unknown; nothing in the
+     * current revision needs it for a map of this kind.
+     *
+     * @param {object} state - The legacy regional map's uiState.
+     * @param {{width: number, height: number}|null} [rootSize] - The top map's size, if found.
+     * @returns {{terrainVersion: number, windDistance: number, world: object}} The settings to apply.
+     */
+    static planUpgrade(state, rootSize = null) {
+        const mapShape = state.mapWidth / state.mapHeight;
+        const rootShape = this.getRootShape(state, rootSize) ?? mapShape;
+
+        return {
+            terrainVersion: FILRODENSWMB.TERRAIN_VERSION.CURRENT,
+            windDistance: this.getWindDistanceFor(rootShape, mapShape),
+            world: {
+                zoom: this.getLegacyZoom(state),
+                originX: null,
+                originY: null,
+                rootW: rootSize?.width ?? null,
+                rootH: rootSize?.height ?? null,
+            },
+        };
     }
 
     /**
@@ -120,10 +193,8 @@ export class TerrainVersion {
 
         // Only a revision 1 map encodes its zoom in the wind distance; from revision 2 on the
         // wind distance also depends on the crop's shape, so it must not be read as a zoom.
-        const isLegacy = this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.CURRENT;
-        const legacyZoom = isLegacy ? this.getLegacyZoom(state) : 1;
-        if (legacyZoom > 1) {
-            return { zoom: legacyZoom, originX: null, originY: null, rootW: null, rootH: null };
+        if (this.isLegacyRegional(state)) {
+            return { zoom: this.getLegacyZoom(state), originX: null, originY: null, rootW: null, rootH: null };
         }
 
         return { zoom: 1, originX: 0, originY: 0, rootW: state.mapWidth, rootH: state.mapHeight };
@@ -134,14 +205,16 @@ export class TerrainVersion {
      *
      * Zoom compounds (a x2 crop of a x4 regional map is x8 of the top map). The crop box is in
      * the parent's own pixels, so it is divided by the parent's zoom to place the child's corner
-     * in the top map's pixels. Anything the parent does not know (see resolveWorld) stays null.
+     * in the top map's pixels. Anything the parent does not know (see resolveWorld) stays null,
+     * except the top map's size, which the caller may supply if it found it another way.
      *
      * @param {object} parentState - The parent map's uiState, before any regional scaling.
      * @param {{x: number, y: number}} cropBox - The crop's top-left corner, in the parent's pixels.
      * @param {number} zoomScale - How much the crop is enlarged to fill the regional map.
+     * @param {{width: number, height: number}|null} [rootSize] - The top map's size, if known.
      * @returns {{zoom: number, originX: number|null, originY: number|null, rootW: number|null, rootH: number|null}}
      */
-    static deriveChildWorld(parentState, cropBox, zoomScale) {
+    static deriveChildWorld(parentState, cropBox, zoomScale, rootSize = null) {
         const parent = this.resolveWorld(parentState);
         const offsetInRoot = (origin, cropOffset) => (origin === null ? null : origin + cropOffset / parent.zoom);
 
@@ -149,8 +222,8 @@ export class TerrainVersion {
             zoom: parent.zoom * zoomScale,
             originX: offsetInRoot(parent.originX, cropBox.x),
             originY: offsetInRoot(parent.originY, cropBox.y),
-            rootW: parent.rootW,
-            rootH: parent.rootH,
+            rootW: parent.rootW ?? rootSize?.width ?? null,
+            rootH: parent.rootH ?? rootSize?.height ?? null,
         };
     }
 }

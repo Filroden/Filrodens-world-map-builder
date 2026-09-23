@@ -591,5 +591,19 @@
     "FILRODENSWMB.UI.ContinentScale": "Continent Scale",
     "FILRODENSWMB.UI.ContinentScaleHint": "Defines the gradient slope. Lower values create steep coastal mountains; higher values create sprawling, flat coastal plains.",
     "FILRODENSWMB.UI.ContinentalShelf": "Continental Shelf",
-    "FILRODENSWMB.UI.ShelfRangeHint": "Controls the width of the shallow water transition zone before dropping into deep ocean."
+    "FILRODENSWMB.UI.ShelfRangeHint": "Controls the width of the shallow water transition zone before dropping into deep ocean.",
+
+    "FILRODENSWMB.UI.CheckingTerrainUpdate": "Checking for terrain updates...",
+    "FILRODENSWMB.UI.TerrainUpdateTitle": "Terrain Update Available",
+    "FILRODENSWMB.UI.TerrainUpdateIntro": "This regional map was created with older terrain rules. Updating it makes it match its parent map more closely:",
+    "FILRODENSWMB.UI.TerrainUpdateTerrain": "Finer terrain detail, such as more intricate coastlines. The overall shape of the land stays the same.",
+    "FILRODENSWMB.UI.TerrainUpdateBiomes": "Biomes that match the parent map. Rain shadows were placed too far downwind, so some forests, grasslands and deserts will move. Biome borders also gain finer detail.",
+    "FILRODENSWMB.UI.TerrainUpdateNotSaved": "The update is not saved automatically. Reloading the map without saving returns it to how it was. Saving the map keeps the update.",
+    "FILRODENSWMB.UI.TerrainUpdateApply": "Update Map",
+    "FILRODENSWMB.UI.TerrainUpdateKeep": "Keep Original",
+    "FILRODENSWMB.UI.TerrainUpdateDismiss": "Don't ask again for this map",
+    "FILRODENSWMB.UI.TerrainUpdateDismissHint": "You can still update this map later with the update button at the top of the Create New Map tool.",
+    "FILRODENSWMB.UI.TerrainUpdateApplied": "Map updated. Save the map to keep the update, or reload it to return to the original.",
+    "FILRODENSWMB.UI.UpdateMap": "Update Map to latest engine(s)",
+    "FILRODENSWMB.UI.UpdateMapHint": "This map was created with older terrain rules. Update it to match its parent map more closely."
 }

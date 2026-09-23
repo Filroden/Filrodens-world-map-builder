@@ -3,6 +3,12 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.CanvasSettings"}}</legend>
 
+        {{#if terrainUpgradeAvailable}}
+            <button type="button" class="fwmb-btn subtle danger" data-action="updateMapTerrain" data-tooltip="{{localize 'FILRODENSWMB.UI.UpdateMapHint'}}">
+                <i class="fwmb-icon sync"></i> {{localize "FILRODENSWMB.UI.UpdateMap"}}
+            </button>
+        {{/if}}
+
         <div class="form-group">
             <label data-tooltip="">{{localize "FILRODENSWMB.UI.GenerationEngine"}}</label>
             <select name="generationEngine">

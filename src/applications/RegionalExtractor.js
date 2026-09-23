@@ -22,8 +22,11 @@ export class RegionalExtractor {
         const targetHeight = Math.max(targetGridSize, Math.round(rawHeight / targetGridSize) * targetGridSize);
 
         // 2. Mutate Map State Properties
-        const world = TerrainVersion.deriveChildWorld(state, cropBox, zoomScale);
-        const windDistance = TerrainVersion.getRegionalWindDistance(state, cropBox);
+        // A legacy regional parent does not record the size of the map at the top of its chain;
+        // app.legacyRootSize holds it if it was found when the parent was loaded.
+        const rootSize = app.legacyRootSize ?? null;
+        const world = TerrainVersion.deriveChildWorld(state, cropBox, zoomScale, rootSize);
+        const windDistance = TerrainVersion.getRegionalWindDistance(state, cropBox, rootSize);
         this.#applyScaleToState(state, cropBox, zoomScale, targetWidth, targetHeight, app.mapHeight);
 
         // A regional map is always built with the current terrain rules, whatever revision its

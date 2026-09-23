@@ -80,6 +80,9 @@ export class MapStateManager {
             // a regional map until RegionalExtractor makes one (see TerrainVersion).
             terrainVersion: FILRODENSWMB.TERRAIN_VERSION.CURRENT,
             world: null,
+            // Set when the owner of a legacy map declined updating it and asked not to be asked
+            // again (see TerrainUpgrade.dismiss); never true for a map built at the current revision.
+            terrainUpgradeDismissed: false,
 
             mapWidth: width,
             mapHeight: height,

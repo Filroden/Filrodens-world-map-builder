@@ -56,6 +56,49 @@ export class MapDialogManager {
     }
 
     /**
+     * Offers to update a map built with older terrain generation rules (see TerrainUpgrade).
+     *
+     * Lists only the changes this map would actually see, explains that the update is not saved
+     * until the map is, and (when opened automatically on load) lets the user stop being asked
+     * for this map. Closing the dialog counts as keeping the original.
+     *
+     * @param {{changesTerrain: boolean, changesBiomes: boolean}} impact - What the update changes.
+     * @param {boolean} allowDismiss - Whether to show the "don't ask again" option.
+     * @returns {Promise<{apply: boolean, dismiss: boolean}>} The user's choice.
+     */
+    static async promptTerrainUpgrade(impact, allowDismiss) {
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/terrain-upgrade.hbs", {
+            changesTerrain: impact.changesTerrain,
+            changesBiomes: impact.changesBiomes,
+            allowDismiss,
+        });
+
+        const readDismiss = (button) => button.form?.elements?.dismissUpgrade?.checked === true;
+
+        return foundry.applications.api.DialogV2.wait({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateTitle") },
+            content,
+            buttons: [
+                {
+                    action: "apply",
+                    label: game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApply"),
+                    icon: "fwmb-icon sync",
+                    default: true,
+                    callback: () => ({ apply: true, dismiss: false }),
+                },
+                {
+                    action: "keep",
+                    label: game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateKeep"),
+                    icon: "fwmb-icon cancel",
+                    callback: (event, button) => ({ apply: false, dismiss: readDismiss(button) }),
+                },
+            ],
+            close: () => ({ apply: false, dismiss: false }),
+        });
+    }
+
+    /**
      * Builds a safe copy of an entity inheriting the current global label defaults.
      */
     static _withLabelDefaults(app, entity) {

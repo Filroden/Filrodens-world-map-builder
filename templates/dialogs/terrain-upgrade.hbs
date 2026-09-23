@@ -1,0 +1,25 @@
+<div class="fwmb-dialog-content">
+    <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntro"}}</p>
+
+    <ul class="fwmb-terrain-update-list">
+        {{#if changesTerrain}}
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTerrain"}}</li>
+        {{/if}}
+        {{#if changesBiomes}}
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateBiomes"}}</li>
+        {{/if}}
+    </ul>
+
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TerrainUpdateNotSaved"}}</p>
+
+    {{#if allowDismiss}}
+        <div class="fwmb-divider"></div>
+
+        <div class="form-group stacked">
+            <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.TerrainUpdateDismissHint'}}">
+                <input type="checkbox" name="dismissUpgrade" class="fwmb-checkbox" />
+                <strong>{{localize "FILRODENSWMB.UI.TerrainUpdateDismiss"}}</strong>
+            </label>
+        </div>
+    {{/if}}
+</div>

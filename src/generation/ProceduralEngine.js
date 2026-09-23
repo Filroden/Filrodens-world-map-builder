@@ -999,82 +999,139 @@ export class ProceduralEngine {
     /**
      * Calculates moisture and temperature based on the final topography.
      * Applies globally deterministic Orographic Lift via Western Horizon sampling.
+     *
+     * The per-pixel work lives in getMoistureAt and getTemperatureAt, which read the settings
+     * prepared once here by prepareClimate. The same pair lets a caller work out the climate of
+     * individual pixels under different settings without allocating map-sized output buffers
+     * (see TerrainUpgrade), and guarantees both paths give exactly the same numbers.
      */
     generateClimateData(elevationData, width, height, params, outMoisture, outTemperature, bounds = null) {
         const moistureData = outMoisture;
         const temperatureData = outTemperature;
 
         const climateBounds = ProceduralEngine.resolveBounds(bounds, width, height);
-
-        const dynamicWindDistance = ProceduralEngine.getWindDistance(width, params);
-        const latTop = params.latTop ?? FILRODENSWMB.DEFAULTS.LAT_TOP;
-        const latBottom = params.latBottom ?? FILRODENSWMB.DEFAULTS.LAT_BOTTOM;
-        const latRange = Math.max(0.1, Math.abs(latTop - latBottom));
-
-        const panX = params.noise.offsetX ?? 0;
-        const panY = params.noise.offsetY ?? 0;
-        const mScale = params.noise.moisture.scale;
-        const mOctaves = params.noise.moisture.octaves;
-        const globalMoisture = params.globalMoisture ?? FILRODENSWMB.DEFAULTS.GLOBAL_MOISTURE;
-        const tScale = params.noise.temperature.scale ?? 1 / FILRODENSWMB.NOISE.TEMPERATURE.SCALE;
-        const tOctaves = params.noise.temperature.octaves ?? FILRODENSWMB.NOISE.TEMPERATURE.OCTAVES;
-        const globalTemp = params.globalTemp ?? FILRODENSWMB.DEFAULTS.GLOBAL_TEMP;
-        const seasonOffset = params.seasonOffset ?? 0;
-        const moistureOffset = params.noise.moistureOffset ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE;
-        const tempOffset = params.noise.tempOffset ?? FILRODENSWMB.NOISE.OFFSET_TEMP;
-        // Finer moisture and temperature detail for a zoomed-in regional map, matching the extra
-        // terrain detail generateTopography adds, so biome borders gain detail instead of being
-        // the parent map's outlines magnified; 0 for any other map
-        const extraOctaves = params.terrain?.extraOctaves ?? 0;
+        const climate = this.prepareClimate(width, height, params);
 
         for (let y = climateBounds.minY; y <= climateBounds.maxY; y++) {
-            const currentLat = latTop - (y / height) * latRange;
-            const latGradient = 1 - Math.abs(currentLat) / 90;
-            const seasonImpact = (currentLat / 90) * seasonOffset * 0.35;
-
             for (let x = climateBounds.minX; x <= climateBounds.maxX; x++) {
                 const index = y * width + x;
-                const worldX = x + panX;
-                const worldY = y + panY;
-
-                // --- MOISTURE ---
-                const moistureNoise = this.#fbm(worldX + moistureOffset, worldY + moistureOffset, mOctaves, mScale, extraOctaves);
-                let baseMoisture = moistureNoise + (globalMoisture - 0.5);
-                const elevation = elevationData[index];
-                const isLand = elevation > params.seaLevel;
-
-                if (isLand) {
-                    const absLat = Math.abs(currentLat);
-                    const windCellBlend = Math.cos(absLat * (Math.PI / 45));
-
-                    // Use the dynamically scaled wind distance
-                    const windDirectionX = dynamicWindDistance * windCellBlend;
-
-                    const upwindX = Math.max(0, Math.min(width - 1, Math.round(x + windDirectionX)));
-                    const upwindElev = elevationData[y * width + upwindX];
-
-                    const slope = elevation - upwindElev;
-                    baseMoisture += slope * 3;
-                }
-
-                moistureData[index] = Math.max(0, Math.min(1, baseMoisture));
-
-                // --- TEMPERATURE ---
-                const tempNoise = this.#fbm(worldX + tempOffset, worldY + tempOffset, tOctaves, tScale, extraOctaves);
-                let temperature = latGradient * 0.75 + tempNoise * 0.25;
-                temperature += globalTemp - 0.3;
-                temperature += seasonImpact;
-
-                if (isLand) {
-                    const altitude = (elevation - params.seaLevel) / (1 - params.seaLevel);
-                    const altCooling = params.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING;
-                    temperature -= altitude * altCooling;
-                }
-
-                temperatureData[index] = Math.max(0, Math.min(1, temperature));
+                moistureData[index] = this.getMoistureAt(climate, elevationData, x, y);
+                temperatureData[index] = this.getTemperatureAt(climate, elevationData, x, y);
             }
         }
         return { moistureData, temperatureData };
+    }
+
+    /**
+     * Resolves everything the climate of a pixel depends on that is the same for every pixel of
+     * the map, so getMoistureAt and getTemperatureAt do not repeat it per pixel.
+     *
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @param {object} params - Derived map parameters.
+     * @returns {object} Settings to pass to getMoistureAt and getTemperatureAt.
+     */
+    prepareClimate(width, height, params) {
+        const latTop = params.latTop ?? FILRODENSWMB.DEFAULTS.LAT_TOP;
+        const latBottom = params.latBottom ?? FILRODENSWMB.DEFAULTS.LAT_BOTTOM;
+
+        return {
+            width,
+            height,
+            seaLevel: params.seaLevel,
+            windDistance: ProceduralEngine.getWindDistance(width, params),
+            latTop,
+            latRange: Math.max(0.1, Math.abs(latTop - latBottom)),
+            panX: params.noise.offsetX ?? 0,
+            panY: params.noise.offsetY ?? 0,
+            mScale: params.noise.moisture.scale,
+            mOctaves: params.noise.moisture.octaves,
+            globalMoisture: params.globalMoisture ?? FILRODENSWMB.DEFAULTS.GLOBAL_MOISTURE,
+            tScale: params.noise.temperature.scale ?? 1 / FILRODENSWMB.NOISE.TEMPERATURE.SCALE,
+            tOctaves: params.noise.temperature.octaves ?? FILRODENSWMB.NOISE.TEMPERATURE.OCTAVES,
+            globalTemp: params.globalTemp ?? FILRODENSWMB.DEFAULTS.GLOBAL_TEMP,
+            seasonOffset: params.seasonOffset ?? 0,
+            moistureOffset: params.noise.moistureOffset ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE,
+            tempOffset: params.noise.tempOffset ?? FILRODENSWMB.NOISE.OFFSET_TEMP,
+            altCooling: params.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING,
+            // Finer moisture and temperature detail for a zoomed-in regional map, matching the
+            // extra terrain detail generateTopography adds, so biome borders gain detail instead
+            // of being the parent map's outlines magnified; 0 for any other map
+            extraOctaves: params.terrain?.extraOctaves ?? 0,
+        };
+    }
+
+    /**
+     * The latitude, in degrees, of a row of the map.
+     */
+    #latitudeAt(climate, y) {
+        return climate.latTop - (y / climate.height) * climate.latRange;
+    }
+
+    /**
+     * The moisture of one pixel: noise shifted by the global moisture setting, plus orographic
+     * lift on land (rising ground relative to the ground upwind catches more rain, falling ground
+     * lies in a rain shadow). Clamped to 0..1.
+     *
+     * @param {object} climate - Settings from prepareClimate.
+     * @param {Float32Array} elevationData - Elevation of the whole map.
+     * @param {number} x - Pixel column.
+     * @param {number} y - Pixel row.
+     * @returns {number} Moisture, 0..1.
+     */
+    getMoistureAt(climate, elevationData, x, y) {
+        const worldX = x + climate.panX;
+        const worldY = y + climate.panY;
+        const moistureNoise = this.#fbm(worldX + climate.moistureOffset, worldY + climate.moistureOffset, climate.mOctaves, climate.mScale, climate.extraOctaves);
+        let baseMoisture = moistureNoise + (climate.globalMoisture - 0.5);
+        const elevation = elevationData[y * climate.width + x];
+
+        if (elevation > climate.seaLevel) {
+            const absLat = Math.abs(this.#latitudeAt(climate, y));
+            const windCellBlend = Math.cos(absLat * (Math.PI / 45));
+
+            // Use the dynamically scaled wind distance
+            const windDirectionX = climate.windDistance * windCellBlend;
+
+            const upwindX = Math.max(0, Math.min(climate.width - 1, Math.round(x + windDirectionX)));
+            const upwindElev = elevationData[y * climate.width + upwindX];
+
+            const slope = elevation - upwindElev;
+            baseMoisture += slope * 3;
+        }
+
+        return Math.max(0, Math.min(1, baseMoisture));
+    }
+
+    /**
+     * The temperature of one pixel: mostly latitude, varied by noise, shifted by the global
+     * temperature and season settings, and cooled with altitude on land. Clamped to 0..1.
+     *
+     * @param {object} climate - Settings from prepareClimate.
+     * @param {Float32Array} elevationData - Elevation of the whole map.
+     * @param {number} x - Pixel column.
+     * @param {number} y - Pixel row.
+     * @returns {number} Temperature, 0..1.
+     */
+    getTemperatureAt(climate, elevationData, x, y) {
+        const currentLat = this.#latitudeAt(climate, y);
+        const latGradient = 1 - Math.abs(currentLat) / 90;
+        const seasonImpact = (currentLat / 90) * climate.seasonOffset * 0.35;
+
+        const worldX = x + climate.panX;
+        const worldY = y + climate.panY;
+        const tempNoise = this.#fbm(worldX + climate.tempOffset, worldY + climate.tempOffset, climate.tOctaves, climate.tScale, climate.extraOctaves);
+        let temperature = latGradient * 0.75 + tempNoise * 0.25;
+        temperature += climate.globalTemp - 0.3;
+        temperature += seasonImpact;
+
+        const elevation = elevationData[y * climate.width + x];
+        if (elevation > climate.seaLevel) {
+            const altitude = (elevation - climate.seaLevel) / (1 - climate.seaLevel);
+            temperature -= altitude * climate.altCooling;
+        }
+
+        return Math.max(0, Math.min(1, temperature));
     }
 
     colorize(elevationData, temperatureData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, maxPeak = 1.0, minTrough = 0.0) {

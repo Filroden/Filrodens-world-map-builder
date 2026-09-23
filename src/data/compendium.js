@@ -167,6 +167,34 @@ export async function duplicateSavedMap(id) {
 }
 
 /**
+ * Writes individual fields of a saved map's data straight to the compendium, leaving every other
+ * field (and the rest of the journal entry) exactly as it was saved.
+ *
+ * This is for small preferences that must be remembered even if the map's other, unsaved changes
+ * are later discarded (for example, declining a terrain update for a map). A full save would write
+ * those unsaved changes too, so it cannot be used for this.
+ *
+ * @param {string} documentId - The saved map's journal entry id.
+ * @param {object} fields - Field names (top-level keys of the map data) and their new values.
+ * @returns {Promise<boolean>} Whether the map was found and updated.
+ */
+export async function updateMapDataFields(documentId, fields) {
+    const pack = game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
+    if (!pack) return false;
+
+    const doc = await pack.getDocument(documentId);
+    if (!doc) return false;
+
+    const update = {};
+    for (const [key, value] of Object.entries(fields)) {
+        update[`flags.${FILRODENSWMB.ID}.mapData.${key}`] = value;
+    }
+
+    await doc.update(update);
+    return true;
+}
+
+/**
  * Retrieves a specific map's data payload from the compendium.
  */
 export async function loadMapData(documentId) {
