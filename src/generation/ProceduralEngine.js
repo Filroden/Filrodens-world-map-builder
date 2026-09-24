@@ -31,6 +31,10 @@ export class ProceduralEngine {
     }
 
     // Cardinal and ordinal directions for pathfinding to prevent array reallocation in tight loops
+    // The plate mesh's value away from any boundary (see #calculateTectonicBoundaries); plate
+    // relief is read relative to it
+    static #PLATE_RELIEF_BASE = 0.5;
+
     static ADJACENT_OFFSETS = [
         { dx: 0, dy: -1 },
         { dx: 1, dy: -1 },
@@ -474,17 +478,18 @@ export class ProceduralEngine {
     }
 
     /**
-     * Generates random starting coordinates and drift vectors for tectonic plates.
+     * Generates random starting coordinates and drift vectors for tectonic plates, drawn from
+     * `prng` (the legacy tectonic engine's shared stream unless another is given).
      */
-    #seedTectonicPlates(width, height, plateCount) {
+    #seedTectonicPlates(width, height, plateCount, prng = this.riverPrng) {
         const plates = new Float32Array(plateCount * 4);
 
         for (let i = 0; i < plateCount; i++) {
             const index = i * 4;
-            plates[index] = this.riverPrng() * width; // x
-            plates[index + 1] = this.riverPrng() * height; // y
-            plates[index + 2] = (this.riverPrng() - 0.5) * 2; // dx (Drift velocity X)
-            plates[index + 3] = (this.riverPrng() - 0.5) * 2; // dy (Drift velocity Y)
+            plates[index] = prng() * width; // x
+            plates[index + 1] = prng() * height; // y
+            plates[index + 2] = (prng() - 0.5) * 2; // dx (Drift velocity X)
+            plates[index + 3] = (prng() - 0.5) * 2; // dy (Drift velocity Y)
         }
 
         return plates;
@@ -593,11 +598,148 @@ export class ProceduralEngine {
         const elevationData = outBuffer;
         const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES);
         const frame = ProceduralEngine.#resolveTerrainFrame(width, height, params);
-        const field = this.#buildCoastDistanceField(width, height, params, frame, validMasks);
+        const land = validMasks.length > 0 ? this.#maskLand(validMasks, frame) : null;
+        const field = this.#buildCoastDistanceField(width, height, params, frame, land, { findRidges: true });
 
         this.#applyGuidedDetail(width, height, params, frame, field, elevationData);
 
         return elevationData;
+    }
+
+    /**
+     * TECTONIC PASS (current rules): the same pipeline as guided terrain, with the land and
+     * ocean decided by tectonic plates instead of drawn land masks.
+     *
+     * Each plate is given a buoyancy, from sinking ocean floor (-1) to buoyant continental crust
+     * (+1). A point is land where low-frequency continent noise plus the buoyancy of the plates
+     * around it clears the Continental Grouping threshold, so the plates set out where
+     * continents lie and the noise gives them their outlines. That land is then shaped exactly
+     * as guided terrain shapes land drawn by hand (coastline distance field, Coastline
+     * Fracture, coastal plains and shelf, Continent and Ocean Scale), so both engines share one
+     * set of controls and both can make regional maps.
+     *
+     * The plate boundaries also shape the relief: where plates collide they raise mountain
+     * ranges on land and cut trenches at sea, and where they pull apart they open rift valleys
+     * on land and raise mid-ocean ridges at sea (scaled by the Mid-Ocean Ridges setting). These
+     * are read at the same warped position as the coastline, so Coastline Fracture bends the
+     * mountain ranges along with the coasts.
+     *
+     * Everything is laid out over the map at the top of this map's chain of crops, like guided
+     * terrain, so a regional map finds the same plates, continents and ranges as its parent.
+     */
+    generateTectonicV2Topography(width, height, params, outBuffer) {
+        const frame = ProceduralEngine.#resolveTerrainFrame(width, height, params);
+        const continents = this.#continentNoise(params, frame);
+        const plates = this.#buildPlateModel(params, frame, continents);
+        const land = this.#plateLand(frame, plates, continents);
+        const field = this.#buildCoastDistanceField(width, height, params, frame, land, { findRidges: false });
+        if (ProceduralEngine.#ridgeStrengthOf(params) > 0) field.ridges = this.#buildPlateRidgeField(frame, plates);
+
+        this.#applyGuidedDetail(width, height, params, frame, field, outBuffer, plates);
+
+        return outBuffer;
+    }
+
+    /** Land and ocean as the land masks draw them, as a test of any world position (see #plateLand). */
+    #maskLand(validMasks, frame) {
+        const compiledMasks = this.#compileMaskData(ProceduralEngine.#masksToWorld(validMasks, frame));
+        return (worldX, worldY) => this.#resolvePixelOwnership(worldX, worldY, compiledMasks);
+    }
+
+    /**
+     * The low-frequency continent noise that, with the plates, decides where land lies, and the
+     * threshold it is measured against (Continental Grouping, see TECTONICS_V2.GROUPING_OFFSET).
+     * The noise is read at the same noise position guided terrain uses for its detail at that
+     * world point (the world position plus the map's pan), so a regional map reads exactly the
+     * noise its parent did.
+     *
+     * @returns {{at: function(number, number): number, threshold: number}}
+     */
+    #continentNoise(params, frame) {
+        const masking = FILRODENSWMB.GENERATION.CONTINENTAL_MASKING;
+        const noiseScale = masking.FREQUENCY_MULT / Math.max(frame.rootW, frame.rootH);
+        const shiftX = (params.noise.offsetX ?? 0) / frame.zoom - frame.originX;
+        const shiftY = (params.noise.offsetY ?? 0) / frame.zoom - frame.originY;
+
+        return {
+            at: (worldX, worldY) => this.#fbm(worldX + shiftX, worldY + shiftY, masking.OCTAVES, noiseScale),
+            threshold: (params.continentalGrouping ?? FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING) + FILRODENSWMB.GENERATION.TECTONICS_V2.GROUPING_OFFSET,
+        };
+    }
+
+    /**
+     * The tectonic plates, laid over the map at the top of the chain of crops on the same
+     * coarse mesh the legacy tectonic engine uses: where each plate lies, how buoyant it is, and
+     * the relief its boundaries raise (see #calculateTectonicBoundaries).
+     *
+     * The plates are seeded from a random stream of their own, so nothing else drawn from the
+     * map's seed (springs, rivers) shifts when the number of plates changes, and each plate keeps
+     * its place when plates are added (plate n always takes the same draws from the stream).
+     *
+     * A plate's buoyancy leans towards what the continent noise says at the plate's centre:
+     * buoyant where the noise already favours land, sinking where it favours ocean, plus a
+     * random part from a hash of the seed and the plate's number. Purely random buoyancy made
+     * every added plate a coin flip over the whole area it took from its neighbours, so one more
+     * plate could sink or raise half a continent. Leaning on the noise means a new plate mostly
+     * agrees with the land already there, so adding plates reshapes coasts and ranges rather than
+     * redrawing the map, while the random part still lets some plates go against the noise.
+     *
+     * Both the relief and the buoyancy are blurred across the mesh, so neither turns into blocky
+     * steps when read between cells.
+     */
+    #buildPlateModel(params, frame, continents) {
+        const settings = FILRODENSWMB.GENERATION.TECTONICS_V2;
+        const meshWidth = FILRODENSWMB.GENERATION.TECTONIC_MESH.WIDTH;
+        const meshHeight = FILRODENSWMB.GENERATION.TECTONIC_MESH.HEIGHT;
+        const blurRadius = FILRODENSWMB.GENERATION.TECTONIC_MESH.BLUR_RADIUS;
+        const plateCount = params.tectonicPlates ?? FILRODENSWMB.GENERATION.TECTONIC_PLATES;
+
+        const platePrng = ProceduralEngine.#mulberry32(this.seedNumber + settings.PLATE_SEED_OFFSET);
+        const plates = this.#seedTectonicPlates(meshWidth, meshHeight, plateCount, platePrng);
+        const cellMap = this.#mapTectonicCells(meshWidth, meshHeight, plateCount, plates);
+        const relief = this.#blurMesh(this.#calculateTectonicBoundaries(meshWidth, meshHeight, cellMap, plates), meshWidth, meshHeight, blurRadius);
+
+        const plateBuoyancy = Array.from({ length: plateCount }, (_, plate) => {
+            const centreX = (plates[plate * 4] / (meshWidth - 1)) * frame.rootW;
+            const centreY = (plates[plate * 4 + 1] / (meshHeight - 1)) * frame.rootH;
+            const leaning = (continents.at(centreX, centreY) - continents.threshold) * settings.BUOYANCY_ALIGNMENT;
+            const random = (ProceduralEngine.#hash01(this.seedNumber * settings.BUOYANCY_SEED_MULTIPLIER + plate * settings.BUOYANCY_PLATE_MULTIPLIER) * 2 - 1) * settings.BUOYANCY_RANDOMNESS;
+            return Math.max(-1, Math.min(1, leaning + random));
+        });
+        const buoyancy = this.#blurMesh(Float32Array.from(cellMap, (plate) => plateBuoyancy[plate]), meshWidth, meshHeight, blurRadius);
+
+        return { relief, buoyancy, meshWidth, meshHeight, plates, plateCount };
+    }
+
+    /**
+     * Land and ocean as the plates decide them (see generateTectonicV2Topography), as a test of
+     * any world position.
+     */
+    #plateLand(frame, plates, continents) {
+        const weight = FILRODENSWMB.GENERATION.TECTONICS_V2.PLATE_WEIGHT;
+
+        return (worldX, worldY) => {
+            const buoyancy = this.#samplePlateMesh(plates, plates.buoyancy, frame, worldX, worldY);
+            return continents.at(worldX, worldY) + weight * buoyancy > continents.threshold ? 1 : 0;
+        };
+    }
+
+    /** Reads one of the plate model's meshes at a world position (the mesh spans the top map). */
+    #samplePlateMesh(plates, mesh, frame, worldX, worldY) {
+        const meshX = Math.max(0, Math.min(1, worldX / frame.rootW)) * (plates.meshWidth - 1);
+        const meshY = Math.max(0, Math.min(1, worldY / frame.rootH)) * (plates.meshHeight - 1);
+        return this.#bilinearSample(mesh, plates.meshWidth, plates.meshHeight, meshX, meshY);
+    }
+
+    /** A well-mixed number from 0 to 1 for an integer, the same every time for the same integer. */
+    static #hash01(value) {
+        let hash = value | 0;
+        hash ^= hash >>> 16;
+        hash = Math.imul(hash, 0x85ebca6b);
+        hash ^= hash >>> 13;
+        hash = Math.imul(hash, 0xc2b2ae35);
+        hash ^= hash >>> 16;
+        return (hash >>> 0) / 4294967296;
     }
 
     /**
@@ -647,7 +789,7 @@ export class ProceduralEngine {
      * Under the current coastal profile the grid also records, for every cell, how large the
      * nearest landmass is (see #measureLandmasses), so small islands can rise to proper hills.
      */
-    #buildCoastDistanceField(width, height, params, frame, validMasks) {
+    #buildCoastDistanceField(width, height, params, frame, land, { findRidges }) {
         const margin = ProceduralEngine.#coastFieldMargin(params, frame);
         const u0 = Math.max(0, Math.floor(frame.originX - margin));
         const v0 = Math.max(0, Math.floor(frame.originY - margin));
@@ -671,16 +813,15 @@ export class ProceduralEngine {
             ridges: null,
         };
 
-        if (validMasks.length === 0) {
+        if (!land) {
             // Bypass JFA and flood the field with a massive negative distance to force deep ocean
             const deepOceanDistance = -Math.max(width, height);
             grid.distances = new Float32Array(grid.width * grid.height).fill(deepOceanDistance);
         } else {
-            const worldMasks = ProceduralEngine.#masksToWorld(validMasks, frame);
-            const field = this.#generateJFADistanceField(grid, worldMasks, frame.fillEnclosedCoast, frame.coastalBuffers);
+            const field = this.#generateJFADistanceField(grid, land, frame.fillEnclosedCoast, frame.coastalBuffers);
             grid.distances = field.distances;
             grid.landmassReach = field.landmassReach;
-            if (frame.coastalBuffers && ProceduralEngine.#ridgeStrengthOf(params) > 0) grid.ridges = this.#buildRidgeField(frame, worldMasks);
+            if (findRidges && frame.coastalBuffers && ProceduralEngine.#ridgeStrengthOf(params) > 0) grid.ridges = this.#buildRidgeField(frame, land);
         }
 
         return grid;
@@ -783,13 +924,13 @@ export class ProceduralEngine {
      *
      * @returns {{distances: Float32Array, landmassReach: Float32Array|null}}
      */
-    #generateJFADistanceField(grid, validMasks, fillEnclosedCoast, measureLandmasses = false) {
+    #generateJFADistanceField(grid, land, fillEnclosedCoast, measureLandmasses = false) {
         const { width, height } = grid;
         const totalPixels = width * height;
         let seedGrid = new Int32Array(totalPixels * 2).fill(-1);
         const distanceGrid = new Float32Array(totalPixels);
 
-        const ownershipGrid = this.#generateOwnershipGrid(grid, validMasks);
+        const ownershipGrid = this.#generateOwnershipGrid(grid, land);
 
         this.#initialiseJFABoundaries(seedGrid, ownershipGrid, width, height);
         seedGrid = this.#runJumpFlood(seedGrid, width, height);
@@ -828,23 +969,94 @@ export class ProceduralEngine {
      *   A grid holding each cell's distance, in world pixels, to the nearest ridge line, or null
      *   if no two landmasses are large enough to place a ridge between them.
      */
-    #buildRidgeField(frame, worldMasks) {
+    #buildRidgeField(frame, land) {
         const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE.OCEAN_RIDGES;
-        const cellSize = settings.CELL_SIZE * frame.resolutionScale;
-        const grid = {
+        const grid = ProceduralEngine.#ridgeGrid(frame);
+
+        const { distances } = this.#generateJFADistanceField(grid, land, true);
+        const landmassOf = ProceduralEngine.#labelContinents(grid, distances, settings.MIN_LANDMASS_REACH * frame.resolutionScale);
+        const nearestContinent = this.#findNearestContinent(grid, landmassOf);
+        const differentContinents = (own, other) => own !== -1 && other !== -1 && own !== other;
+        const ridgeDistances = this.#measureRidgeDistances(grid, nearestContinent, differentContinents);
+
+        return ridgeDistances ? { ...grid, distances: ridgeDistances } : null;
+    }
+
+    /**
+     * The coarse grid ridge lines are found on: the whole map at the top of the chain of crops,
+     * at OCEAN_RIDGES.CELL_SIZE pixels of a baseline map per cell, whatever this map's own size
+     * or zoom (see #buildRidgeField).
+     */
+    static #ridgeGrid(frame) {
+        const cellSize = FILRODENSWMB.GENERATION.COASTAL_PROFILE.OCEAN_RIDGES.CELL_SIZE * frame.resolutionScale;
+        return {
             u0: 0,
             v0: 0,
             cellsPerPixel: 1 / cellSize,
             width: Math.max(1, Math.ceil(frame.rootW / cellSize)),
             height: Math.max(1, Math.ceil(frame.rootH / cellSize)),
         };
+    }
 
-        const { distances } = this.#generateJFADistanceField(grid, worldMasks, true);
-        const landmassOf = ProceduralEngine.#labelContinents(grid, distances, settings.MIN_LANDMASS_REACH * frame.resolutionScale);
-        const nearestContinent = this.#findNearestContinent(grid, landmassOf);
-        const ridgeDistances = this.#measureRidgeDistances(grid, nearestContinent, cellSize);
+    /**
+     * Where mid-ocean ridges run on tectonic terrain: along every boundary where two plates pull
+     * apart, as real ridges form where the seabed spreads. The plates are the same ones that
+     * place the land (see #buildPlateModel), assigned to the cells of the same coarse grid guided
+     * terrain uses for its ridges, so both engines' ridges are then shaped identically by
+     * #ridgeLift (a wandering crest, a rift valley, flanks easing into the abyssal plain). Only
+     * the parts under deep ocean show, since #ridgeLift fades out up the continental slope;
+     * where parting plates lie under land they open rift valleys instead (plate relief, see
+     * #shapeLand).
+     *
+     * @returns {{u0: number, v0: number, cellsPerPixel: number, width: number, height: number, distances: Float32Array}|null}
+     *   A grid holding each cell's distance to the nearest spreading boundary, or null if no two
+     *   neighbouring plates pull apart.
+     */
+    #buildPlateRidgeField(frame, model) {
+        const grid = ProceduralEngine.#ridgeGrid(frame);
+        const cellSize = 1 / grid.cellsPerPixel;
+        const plateOf = new Int32Array(grid.width * grid.height);
+
+        for (let y = 0; y < grid.height; y++) {
+            const meshY = Math.min(1, (y * cellSize) / frame.rootH) * (model.meshHeight - 1);
+            for (let x = 0; x < grid.width; x++) {
+                const meshX = Math.min(1, (x * cellSize) / frame.rootW) * (model.meshWidth - 1);
+                plateOf[y * grid.width + x] = ProceduralEngine.#nearestPlate(model.plates, model.plateCount, meshX, meshY);
+            }
+        }
+
+        const spreading = (own, other) => own !== other && !ProceduralEngine.#platesCollide(model.plates, own, other);
+        const ridgeDistances = this.#measureRidgeDistances(grid, plateOf, spreading);
 
         return ridgeDistances ? { ...grid, distances: ridgeDistances } : null;
+    }
+
+    /** The plate whose seed point is nearest a position on the plate mesh. */
+    static #nearestPlate(plates, plateCount, meshX, meshY) {
+        let nearest = 0;
+        let nearestDistance = Infinity;
+        for (let plate = 0; plate < plateCount; plate++) {
+            const dx = meshX - plates[plate * 4];
+            const dy = meshY - plates[plate * 4 + 1];
+            const distance = dx * dx + dy * dy;
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearest = plate;
+            }
+        }
+        return nearest;
+    }
+
+    /**
+     * Whether two plates are moving towards each other (their relative velocity points against
+     * their relative position), the same test #calculateTectonicBoundaries uses to raise ranges.
+     */
+    static #platesCollide(plates, own, other) {
+        const relativePosX = plates[other * 4] - plates[own * 4];
+        const relativePosY = plates[other * 4 + 1] - plates[own * 4 + 1];
+        const relativeVelX = plates[other * 4 + 2] - plates[own * 4 + 2];
+        const relativeVelY = plates[other * 4 + 3] - plates[own * 4 + 3];
+        return relativePosX * relativeVelX + relativePosY * relativeVelY < 0;
     }
 
     /**
@@ -928,23 +1140,24 @@ export class ProceduralEngine {
 
     /**
      * For every cell, the distance in world pixels to the nearest ridge line: the edge between
-     * cells whose nearest continents differ. Those edge cells seed a final jump flood.
+     * neighbouring cells whose labels (nearest continent, or plate) `isRidgeBetween` says a ridge
+     * divides. Those edge cells seed a final jump flood.
      *
-     * @returns {Float32Array|null} The distances, or null if no such edge exists (fewer than two
-     *   continents).
+     * @param {function(number, number): boolean} isRidgeBetween - Whether a ridge runs between
+     *   a cell with the first label and a neighbour with the second.
+     * @returns {Float32Array|null} The distances, or null if no such edge exists.
      */
-    #measureRidgeDistances(grid, nearestContinent, cellSize) {
+    #measureRidgeDistances(grid, labels, isRidgeBetween) {
         const { width, height } = grid;
         const total = width * height;
+        const cellSize = 1 / grid.cellsPerPixel;
         const seedGrid = new Int32Array(total * 2).fill(-1);
         let hasRidge = false;
 
         for (let index = 0; index < total; index++) {
-            const own = nearestContinent[index];
-            if (own === -1) continue;
-
+            const own = labels[index];
             const x = index % width;
-            const onRidge = ProceduralEngine.#gridNeighbours(index, x, width, height).some((neighbour) => nearestContinent[neighbour] !== -1 && nearestContinent[neighbour] !== own);
+            const onRidge = ProceduralEngine.#gridNeighbours(index, x, width, height).some((neighbour) => isRidgeBetween(own, labels[neighbour]));
             if (!onRidge) continue;
 
             seedGrid[index * 2] = x;
@@ -1077,15 +1290,14 @@ export class ProceduralEngine {
      * Creates a flat, memory-efficient binary map of land/ocean ownership, one entry per grid
      * cell, each cell tested at its world position.
      */
-    #generateOwnershipGrid(grid, validMasks) {
+    #generateOwnershipGrid(grid, land) {
         const { width, height, u0, v0, cellsPerPixel } = grid;
         const ownership = new Uint8Array(width * height);
-        const compiledMasks = this.#compileMaskData(validMasks);
 
         for (let y = 0; y < height; y++) {
             const worldY = v0 + y / cellsPerPixel;
             for (let x = 0; x < width; x++) {
-                ownership[y * width + x] = this.#resolvePixelOwnership(u0 + x / cellsPerPixel, worldY, compiledMasks);
+                ownership[y * width + x] = land(u0 + x / cellsPerPixel, worldY);
             }
         }
 
@@ -1321,7 +1533,7 @@ export class ProceduralEngine {
      * #shapeCoastalProfile), and stops Continent Scale from resizing the coastline noise (see
      * #coastlineNoiseScale).
      */
-    #applyGuidedDetail(width, height, params, frame, field, elevationData) {
+    #applyGuidedDetail(width, height, params, frame, field, elevationData, plates = null) {
         const generation = FILRODENSWMB.GENERATION;
         const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
         const zoom = frame.zoom;
@@ -1368,10 +1580,11 @@ export class ProceduralEngine {
         };
         const coastalProfile = frame.coastalBuffers ? ProceduralEngine.#resolveCoastalProfile(params, frame) : null;
         if (coastalProfile && field.ridges) coastalProfile.ridges = ProceduralEngine.#resolveRidges(params, frame, field.ridges);
+        if (coastalProfile && plates) coastalProfile.tectonics = true;
 
         // One reusable record of the point being shaped, filled in afresh for every pixel under
         // the current coastal profile, so the loop allocates nothing per pixel
-        const pixel = { worldX: 0, worldY: 0, sampleX: 0, sampleY: 0, distance: 0, detailNoise: 0, landmassReach: 0 };
+        const pixel = { worldX: 0, worldY: 0, sampleX: 0, sampleY: 0, distance: 0, detailNoise: 0, landmassReach: 0, tectonic: 0 };
 
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
@@ -1399,8 +1612,12 @@ export class ProceduralEngine {
                 // the (warped) shape of the mask itself.
                 const effectiveDistance = this.#computeEffectiveCoastDistance(worldX, worldY, macroDistance, boundary);
 
-                // 4. Base Noise & Suppression
-                const detailNoise = this.#fbm(worldX + warpX, worldY + warpY, eOctaves, eScale, extraOctaves);
+                // 4. Base Noise & Suppression. The legacy profile reads the detail noise at the
+                // warped position too. The warp bends over a few hundred pixels, far wider than
+                // the finer octaves, so it stretches them into long parallel streaks that relief
+                // shading shows as combed hillsides; the current profile reads the noise where
+                // the pixel lies, and only the coastline (and the plates beneath it) are warped.
+                const detailNoise = coastalProfile ? this.#fbm(worldX, worldY, eOctaves, eScale, extraOctaves) : this.#fbm(worldX + warpX, worldY + warpY, eOctaves, eScale, extraOctaves);
 
                 if (coastalProfile) {
                     pixel.worldX = worldX;
@@ -1410,8 +1627,9 @@ export class ProceduralEngine {
                     pixel.distance = effectiveDistance;
                     pixel.detailNoise = detailNoise;
                     pixel.landmassReach = this.#sampleLandmassReach(field, sampleX, sampleY);
-                    const finalElev = this.#shapeCoastalProfile(pixel, seaLevel, eStretch, coastalProfile);
-                    elevationData[index] = Math.max(0, Math.min(1, finalElev));
+                    pixel.tectonic = plates ? this.#samplePlateMesh(plates, plates.relief, frame, sampleX, sampleY) - ProceduralEngine.#PLATE_RELIEF_BASE : 0;
+                    // Not clamped to 0..1 (see #shapeCoastalProfile)
+                    elevationData[index] = this.#shapeCoastalProfile(pixel, seaLevel, eStretch, coastalProfile);
                     continue;
                 }
 
@@ -1470,6 +1688,14 @@ export class ProceduralEngine {
      *
      * Out on the abyssal plain, mid-ocean ridges rise between continents (see #ridgeLift).
      *
+     * The profile aims to keep terrain between 0 and 1, and guided terrain stays there (give or
+     * take a hair where the detail noise peaks). It is not a hard limit, though: where tectonic
+     * plates collide under land that has already reached its full height, the range they raise
+     * may climb past 1, and a trench under the deepest seabed may cut below 0. Clamping instead
+     * would flatten those into plateaus (which the rivers then fill as lakes). The rest of the
+     * module already handles elevations outside 0 to 1, since terrain edits can take the land
+     * there too.
+     *
      * @param {{worldX: number, worldY: number, sampleX: number, sampleY: number, distance: number,
      *   detailNoise: number, landmassReach: number}} pixel - The point being shaped: its noise
      *   position, its warped position in the coastline fields, its distance to the coastline
@@ -1489,7 +1715,7 @@ export class ProceduralEngine {
         // Keep every sea pixel below sea level, however the noise falls
         const minimumDepth = 0.002;
         const depth = this.#shapeSeabed(pixel, reach, widthFactor, nearCoast, profile);
-        return seaLevel - Math.max(minimumDepth, Math.min(1, depth)) * profile.oceanDepth;
+        return seaLevel - Math.max(minimumDepth, depth) * profile.oceanDepth;
     }
 
     /** The land side of the current coastal profile (see #shapeCoastalProfile). */
@@ -1514,8 +1740,12 @@ export class ProceduralEngine {
         const pastPlain = this.#smoothstep(plainWidth, plainWidth + profile.coastalBand, reach);
         const noiseWeight = settings.PLAIN_DETAIL * nearCoast + (1 - settings.PLAIN_DETAIL) * pastPlain;
 
+        // Plate boundaries (tectonic terrain only): ranges where plates collide, rift valleys
+        // where they part, kept off the coastal plain like the rest of the relief
+        const plateRelief = profile.tectonics ? pixel.tectonic * FILRODENSWMB.GENERATION.TECTONICS_V2.RIDGE_WEIGHT * pastPlain : 0;
+
         const blendWeights = FILRODENSWMB.GENERATION.BLEND_WEIGHTS;
-        const baseTexture = Math.pow(Math.max(0, structure * blendWeights.GUIDED_MACRO + pixel.detailNoise * noiseWeight * blendWeights.GUIDED_DETAIL), stretch);
+        const baseTexture = Math.pow(Math.max(0, structure * blendWeights.GUIDED_MACRO + pixel.detailNoise * noiseWeight * blendWeights.GUIDED_DETAIL + plateRelief), stretch);
 
         // Keep every land pixel clearly above sea level. Right at the coast the height can be
         // so small that storing it as a 32-bit float rounds it down onto sea level, which
@@ -1545,7 +1775,20 @@ export class ProceduralEngine {
         const noise = (pixel.detailNoise - 0.5) * (settings.SHELF_NOISE + settings.ABYSS_NOISE * descent) * nearCoast;
         const depth = shelfEdgeDepth + (settings.ABYSS_DEPTH - shelfEdgeDepth) * descent + noise;
 
-        return profile.ridges && descent > 0 ? depth - this.#ridgeLift(pixel, descent, profile.ridges) : depth;
+        const trench = profile.tectonics ? this.#plateTrench(pixel.tectonic, descent) : 0;
+        const ridge = profile.ridges && descent > 0 ? this.#ridgeLift(pixel, descent, profile.ridges) : 0;
+        return depth + trench - ridge;
+    }
+
+    /**
+     * How much deeper colliding plates cut the seabed at a point, as a share of the full ocean
+     * depth: a trench along the boundary, fading out up the continental slope (`descent`).
+     * Plates pulling apart raise mid-ocean ridges instead, which #ridgeLift shapes.
+     */
+    #plateTrench(tectonic, descent) {
+        const settings = FILRODENSWMB.GENERATION.TECTONICS_V2;
+        const collision = Math.max(0, tectonic) / settings.CONVERGENT_RELIEF;
+        return settings.TRENCH_DEPTH * collision * descent;
     }
 
     /**
@@ -1805,6 +2048,7 @@ export class ProceduralEngine {
         const pixelBuffer = outBuffer;
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const renderBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
+        const relief = ProceduralEngine.#resolveReliefShading(params, width, height);
 
         for (let y = renderBounds.minY; y <= renderBounds.maxY; y++) {
             for (let x = renderBounds.minX; x <= renderBounds.maxX; x++) {
@@ -1817,13 +2061,85 @@ export class ProceduralEngine {
                 } else if (waterMask && waterMask[i] > 0) {
                     const temp = temperatureData ? temperatureData[i] : 1;
                     this.#paintLakePixel(pixelBuffer, bufferIndex, elevation, waterMask[i], temp, params);
+                    // A lake's surface is flat, so it is left unshaded
+                    continue;
                 } else {
                     // Use the dynamic map peak instead of the hardcoded 1.0
                     this.#paintLandPixel(pixelBuffer, bufferIndex, elevation, seaLevel, maxPeak);
                 }
+
+                if (relief) ProceduralEngine.#shadeRelief(pixelBuffer, bufferIndex, elevationData, x, y, width, height, relief);
             }
         }
         return pixelBuffer;
+    }
+
+    /**
+     * Everything relief shading needs that stays the same across the whole map, or null when it
+     * is switched off (see #shadeRelief).
+     *
+     * Slopes are measured per pixel of a BASELINE_DIMENSION map rather than per pixel of this
+     * map, so the same terrain is shaded equally strongly at any size or zoom: a 4000 pixel map,
+     * or a x4 regional map, spreads each slope over four times as many pixels, which would
+     * otherwise make it look four times flatter. The map at the top of the chain of crops sets
+     * that scale (params.terrain.world); a map without one is its own top map.
+     *
+     * @returns {{strength: number, slopeScale: number, lightX: number, lightY: number, lightZ: number}|null}
+     */
+    static #resolveReliefShading(params, width, height) {
+        const display = FILRODENSWMB.DISPLAY;
+        const strength = params?.display?.reliefShading ?? display.RELIEF_SHADING;
+        if (!(strength > 0)) return null;
+
+        const world = params?.terrain?.world;
+        const rootSize = world ? Math.max(world.rootW, world.rootH) : Math.max(width, height);
+        const pixelsPerBaseline = ((world?.zoom ?? 1) * rootSize) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+
+        // The light's direction is a fixed compass bearing (0 from the north, the top of the map,
+        // turning clockwise), and it shines down from RELIEF.ALTITUDE degrees above the horizon
+        const bearing = (display.LIGHT_DIRECTION * Math.PI) / 180;
+        const altitude = (display.RELIEF.ALTITUDE * Math.PI) / 180;
+
+        return {
+            strength,
+            slopeScale: display.RELIEF.EXAGGERATION * pixelsPerBaseline,
+            lightX: Math.sin(bearing) * Math.cos(altitude),
+            lightY: -Math.cos(bearing) * Math.cos(altitude),
+            lightZ: Math.sin(altitude),
+        };
+    }
+
+    /**
+     * Relief shading: brightens slopes that face the light and darkens those that face away, so
+     * the shape of the ground shows as well as its height. Without it, a pixel's shade depends
+     * on its height alone, and hills a little higher than their surroundings are only a little
+     * lighter, so fine detail blends into soft gradients.
+     *
+     * The slope comes from the heights either side of the pixel (clamped at the map's edges).
+     * Flat ground keeps exactly its unshaded colour: the brightness is scaled by how much more
+     * or less directly the ground faces the light than flat ground does, so turning shading on
+     * leaves plains and still water as they were and only brings out the slopes. The sea floor
+     * is shaded too, which shows its ridges, trenches and continental slopes under the water.
+     */
+    static #shadeRelief(pixelBuffer, bufferIndex, elevationData, x, y, width, height, relief) {
+        const settings = FILRODENSWMB.DISPLAY.RELIEF;
+        const row = y * width;
+        const left = elevationData[row + Math.max(0, x - 1)];
+        const right = elevationData[row + Math.min(width - 1, x + 1)];
+        const up = elevationData[Math.max(0, y - 1) * width + x];
+        const down = elevationData[Math.min(height - 1, y + 1) * width + x];
+
+        // The surface normal of the ground, from its slope across and down the map
+        const slopeX = ((right - left) / 2) * relief.slopeScale;
+        const slopeY = ((down - up) / 2) * relief.slopeScale;
+        const facing = (-slopeX * relief.lightX - slopeY * relief.lightY + relief.lightZ) / Math.hypot(slopeX, slopeY, 1);
+
+        const change = ((facing - relief.lightZ) / relief.lightZ) * relief.strength;
+        const factor = Math.max(settings.MIN_FACTOR, Math.min(settings.MAX_FACTOR, 1 + change));
+
+        pixelBuffer[bufferIndex] = Math.min(255, pixelBuffer[bufferIndex] * factor);
+        pixelBuffer[bufferIndex + 1] = Math.min(255, pixelBuffer[bufferIndex + 1] * factor);
+        pixelBuffer[bufferIndex + 2] = Math.min(255, pixelBuffer[bufferIndex + 2] * factor);
     }
 
     /**

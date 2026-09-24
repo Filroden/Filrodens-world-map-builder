@@ -14,8 +14,8 @@
             <select name="generationEngine">
                 <option value="standard" {{#if (eq uiState.generationEngine "standard")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StandardGeneration"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineStandardHint'}}"></i></option>
                 <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.FlatCanvas"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineFlatHint'}}"></i></option>
-                <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.TectonicGeneration"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}"></i></option>
-                <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GuidedGeneration"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}"></i></option>
+                <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{engineLabels.advanced}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}"></i></option>
+                <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{engineLabels.guided}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}"></i></option>
             </select>
         </div>
 
@@ -124,15 +124,16 @@
 
     <div class="fwmb-flex-1"></div>
 
-    {{#if (eq uiState.generationEngine "advanced")}}
-        <!-- Hidden entirely in advanced mode -->
-    {{else if (eq uiState.generationEngine "guided")}}
+    {{#if (eq uiState.generationEngine "guided")}}
         <!-- Rendered inside the Canvas Settings fieldset above -->
-    {{else}}
+    {{else if canCreateRegionalMap}}
         <div class="fwmb-divider"></div>
         <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditCanvasHint'}}">
             {{localize "FILRODENSWMB.UI.EditCanvas"}}
         </button>
+    {{else}}
+        <!-- Nothing to edit on the canvas of a map still on the original tectonic engine (it
+             cannot make regional maps until it is updated) -->
     {{/if}}
 
 </div>

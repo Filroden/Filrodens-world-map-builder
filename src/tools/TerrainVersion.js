@@ -189,9 +189,9 @@ export class TerrainVersion {
     /**
      * Whether a regional map can be cut from this map.
      *
-     * Standard and flat maps always can. A guided map can from the current revision on, since
-     * its terrain is then worked out in the top map's pixels, which is what lets a regional map
-     * match it. A legacy guided map has to be updated first: a regional map always uses the
+     * Standard and flat maps always can. A guided or tectonic map can from the current revision
+     * on, since its terrain is then worked out in the top map's pixels, which is what lets a
+     * regional map match it. A legacy one has to be updated first: a regional map always uses the
      * current rules, so it would not match a map still using the legacy ones.
      *
      * @param {object} state - A uiState object.
@@ -200,9 +200,33 @@ export class TerrainVersion {
     static canCreateRegionalMap(state) {
         const engine = state.generationEngine;
         if (engine === "standard" || engine === "flat") return true;
-        if (engine !== "guided") return false;
+        if (!FILRODENSWMB.TERRAIN_VERSION.COASTLINE_ENGINES.includes(engine)) return false;
 
         return !this.isLegacyCoastline(state);
+    }
+
+    /**
+     * Whether a legacy map uses an engine the current revision replaced outright (see
+     * FILRODENSWMB.TERRAIN_VERSION.REPLACED_ENGINES), so an update gives it new terrain.
+     *
+     * @param {object} state - A uiState object.
+     * @returns {boolean}
+     */
+    static isLegacyReplacedEngine(state) {
+        return this.isLegacyCoastline(state) && FILRODENSWMB.TERRAIN_VERSION.REPLACED_ENGINES.includes(state.generationEngine);
+    }
+
+    /**
+     * The version number to show beside a map's engine name (for example "Guided v2"), or null
+     * for an engine that has only ever had one version. Engines with more than one version are
+     * the coastline engines, whose version is the map's terrain revision.
+     *
+     * @param {object} state - A uiState object (reads generationEngine and terrainVersion).
+     * @returns {number|null}
+     */
+    static getDisplayVersion(state) {
+        if (!FILRODENSWMB.TERRAIN_VERSION.COASTLINE_ENGINES.includes(state.generationEngine)) return null;
+        return this.getVersion(state);
     }
 
     /**
@@ -327,7 +351,7 @@ export class TerrainVersion {
                 windDistance: state.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE,
                 world: state.world ?? null,
             };
-            if (this.isLegacyResized(state)) plan.coastlineFracture = this.#equivalentFracture(state, plan);
+            if (this.isLegacyResized(state) && !this.isLegacyReplacedEngine(state)) plan.coastlineFracture = this.#equivalentFracture(state, plan);
             return plan;
         }
 

@@ -307,6 +307,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedCanvasTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
         this.debouncedCanvasClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
+        this.debouncedRepaintCanvas = foundry.utils.debounce(() => this._repaintCanvas(), FILRODENSWMB.UI.DEBOUNCE_MS.DISPLAY);
+
         this.debouncedHistoryRebuild = foundry.utils.debounce(() => this.#refreshChangedTerrain("Brush stroke rebuild"), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
         // Every refresh that uses the scratch buffer restarts this timer. The buffer is only ever
@@ -408,6 +410,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context.terrainUpgradeAvailable = this.terrainUpgrade !== null;
         context.canCreateRegionalMap = TerrainVersion.canCreateRegionalMap(this.uiState);
         context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
+        context.engineLabels = this.#getEngineLabels();
 
         context.infrastructureIcons = getPinIconPickerList(this.uiState.activeIcon);
         context.builtinPinIcons = getBuiltinPinIconList();
@@ -881,7 +884,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (name === "referenceAlpha") return this.#updateReferenceAlpha(target);
         if (name === "gridType" || name === "gridSize") return this.#updateGridSettings();
         if (name === "biomeAlphaActive" || name === "biomeAlphaInactive") return this.#updateBiomeAlphas();
-        if (name === "contourInterval") return this.#updateContours();
+        if (name === "contourInterval" || name === "reliefShading") return this.debouncedRepaintCanvas();
 
         // 2. Custom biome colour handler (uses dataset instead of name)
         if (target.type === "color" && target.dataset.biome) return this.#updateBiomeColor(target);
@@ -917,11 +920,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #updateBiomeAlphas() {
         MapStateManager.getMapParameters(this);
         this.#updateBiomeOpacity();
-    }
-
-    #updateContours() {
-        MapStateManager.getMapParameters(this);
-        this._repaintCanvas();
     }
 
     #updateBiomeColor(target) {
@@ -2174,6 +2172,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.altCooling = p.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING;
         this.uiState.freezingThreshold = p.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
         this.uiState.contourInterval = p.display?.contourInterval ?? 0.1;
+        this.uiState.reliefShading = p.display?.reliefShading ?? FILRODENSWMB.DISPLAY.RELIEF_SHADING;
         this.uiState.biomeAlphaActive = p.display?.biomeAlphaActive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE;
         this.uiState.biomeAlphaInactive = p.display?.biomeAlphaInactive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
         this.uiState.cartographyScaleEnable = c.scaleEnable ?? this.defaultUiState.cartographyScaleEnable;
@@ -2994,8 +2993,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
         this.uiState.mapSeed = newSeed;
 
-        // Inject the engine choice into the wiped state
+        // Inject the engine choice into the wiped state, with any defaults of its own (kept in
+        // defaultUiState too, so double-clicking a slider resets it to the engine's default)
         this.uiState.generationEngine = newEngine;
+        if (newEngine === "advanced") {
+            const fracture = FILRODENSWMB.GENERATION.TECTONICS_V2.COASTLINE_FRACTURE;
+            this.uiState.coastlineFracture = fracture;
+            this.defaultUiState.coastlineFracture = fracture;
+        }
 
         // A new map is built with the current terrain rules, so there is nothing to update
         this.terrainUpgrade = null;
@@ -3185,8 +3190,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /**
      * Whether the Scene tool's edit mode is currently set to the regional map crop, as opposed
-     * to something else that takes clicks on the canvas. Standard and flat maps have nothing else,
-     * so it is always the crop for them. Guided maps share the edit mode with land mask drawing,
+     * to something else that takes clicks on the canvas. Standard, flat and tectonic maps have
+     * nothing else, so it is always the crop for them. Guided maps share the edit mode with land mask drawing,
      * so it is the crop only once the crop button has been chosen (and only if a regional map
      * can be made from this map at all; see TerrainVersion.canCreateRegionalMap).
      */
@@ -4174,6 +4179,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Toggles visibility of the WebGL layers.
      */
+    /**
+     * The names shown in the engine list for the engines that have had more than one version,
+     * with their version (for example "Guided v2"). The open map's own engine shows the version
+     * the map was made with; any other engine shows the version a new map would get, since
+     * choosing it creates a new map.
+     */
+    #getEngineLabels() {
+        const current = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        const labelFor = (engine, nameKey) => {
+            const version = this.uiState.generationEngine === engine ? (TerrainVersion.getDisplayVersion(this.uiState) ?? current) : current;
+            return game.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: game.i18n.localize(nameKey), version });
+        };
+
+        return {
+            advanced: labelFor("advanced", "FILRODENSWMB.UI.EngineNameTectonics"),
+            guided: labelFor("guided", "FILRODENSWMB.UI.EngineNameGuided"),
+        };
+    }
+
     _onToggleLayer(event, target) {
         const layerId = target.dataset.layer;
         if (!layerId || !this.canvasEngine) return;

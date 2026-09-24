@@ -5,6 +5,7 @@ import { TectonicEngine } from "./generation/TectonicEngine.js";
 import { SpatialMath } from "./tools/SpatialMath.js";
 import { BufferDiff } from "./tools/BufferDiff.js";
 import { FILRODENSWMB } from "./config.js";
+import { TerrainVersion } from "./tools/TerrainVersion.js";
 
 export class ProceduralOrchestrator {
     /**
@@ -123,7 +124,13 @@ export class ProceduralOrchestrator {
         if (mode === "flat") {
             app.baseElevationData.fill(params.seaLevel + 0.05);
         } else if (mode === "advanced") {
-            engine.generateTectonicTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
+            // Tectonic maps made under the current rules share guided terrain's pipeline; older
+            // ones keep the original tectonic engine until they are updated (see TerrainVersion)
+            if (TerrainVersion.usesCurrentCoastline(app.uiState)) {
+                engine.generateTectonicV2Topography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
+            } else {
+                engine.generateTectonicTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
+            }
         } else if (mode === "guided") {
             // Synchronous like every other mode. This pass is not awaited by its caller, so making
             // it async would defer the render-timer record below until after the brush history

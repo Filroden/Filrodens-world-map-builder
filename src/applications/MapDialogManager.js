@@ -70,6 +70,7 @@ export class MapDialogManager {
     static async promptTerrainUpgrade(impact, allowDismiss) {
         const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/terrain-upgrade.hbs", {
             isRegional: impact.kind === "regional",
+            isTectonics: impact.kind === "tectonics",
             fracture: impact.fracture,
             fractureChanges: impact.fracture !== undefined && impact.fracture.before !== impact.fracture.after,
             resized: impact.resized === true,

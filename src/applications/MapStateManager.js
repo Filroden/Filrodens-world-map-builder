@@ -137,6 +137,7 @@ export class MapStateManager {
             liveFeatureUpdates: true,
 
             contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
+            reliefShading: FILRODENSWMB.DISPLAY.RELIEF_SHADING,
             biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,
             biomeAlphaInactive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE,
             maxLakeSize: FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE,
@@ -375,6 +376,7 @@ export class MapStateManager {
             customBiomeRules: BiomeRuleEngine.compile(state.customBiomes || []),
             display: {
                 contourInterval: state.contourInterval,
+                reliefShading: state.reliefShading,
                 biomeAlphaActive: state.biomeAlphaActive,
                 biomeAlphaInactive: state.biomeAlphaInactive,
             },

@@ -69,6 +69,40 @@ export const FILRODENSWMB = {
             GUIDED_MACRO: 0.5,
             GUIDED_DETAIL: 0.5,
         },
+        // Tectonic terrain under the current rules (ProceduralEngine.generateTectonicV2Topography)
+        TECTONICS_V2: {
+            // Coastline Fracture for a new map: the land this engine makes has far more
+            // coastline than a typical hand-drawn land mask, so the shared default breaks it up
+            // too much
+            COASTLINE_FRACTURE: 0.2,
+            // Plates draw from a random stream of their own, this far from the map's seed
+            PLATE_SEED_OFFSET: 3,
+            // A plate's buoyancy: how far it leans towards what the continent noise says at its
+            // centre (per unit of noise above or below the land threshold), and the size of the
+            // random part added to that (see ProceduralEngine#buildPlateModel)
+            BUOYANCY_ALIGNMENT: 1.5,
+            BUOYANCY_RANDOMNESS: 0.75,
+            // Multipliers mixing the seed and a plate's number into its buoyancy hash
+            BUOYANCY_SEED_MULTIPLIER: 31,
+            BUOYANCY_PLATE_MULTIPLIER: 7919,
+            // How strongly a plate's buoyancy (-1 to 1) pushes its area towards ocean or land,
+            // against the continent noise and the Continental Grouping threshold
+            PLATE_WEIGHT: 0.45,
+            // Added to Continental Grouping before it is used as the land threshold. The slider
+            // keeps the range and default the original tectonic engine uses, but that threshold
+            // turned about two thirds of a map into land here; this brings the default to
+            // roughly a third, with the rest of the slider's range still running from mostly
+            // land to open ocean.
+            GROUPING_OFFSET: 0.35,
+            // Height of the mountain ranges (and depth of the rift valleys) plate boundaries
+            // raise on land, as a share of the land's full height
+            RIDGE_WEIGHT: 0.6,
+            // Depth of the trenches colliding plates cut at sea, as a share of the ocean depth
+            TRENCH_DEPTH: 0.12,
+            // The boundary relief the plate mesh gives colliding plates (see
+            // ProceduralEngine#calculateTectonicBoundaries), used to scale trenches to 0-1
+            CONVERGENT_RELIEF: 0.8,
+        },
         TECTONIC_MESH: {
             WIDTH: 100,
             HEIGHT: 100,
@@ -190,7 +224,8 @@ export const FILRODENSWMB = {
     //       resolution; see COASTLINE_ENGINES). Its coastal profile is rebuilt: Continental Shelf
     //       and the new Coastal Plains are bands of set width along the coast, the seabed beyond
     //       the shelf falls steeply to an abyssal plain, and Continent Scale no longer changes the
-    //       coastline itself (see GENERATION.COASTAL_PROFILE).
+    //       coastline itself (see GENERATION.COASTAL_PROFILE). Tectonic terrain is rebuilt on
+    //       the same pipeline, with its land placed by tectonic plates.
     TERRAIN_VERSION: {
         LEGACY: 1,
         CURRENT: 2,
@@ -198,8 +233,15 @@ export const FILRODENSWMB = {
         // rules of the current revision: settings measured in pixels of a map BASELINE_DIMENSION
         // pixels across and scaled to the actual map (before, they were fixed pixel counts, so
         // the same values gave smoother, straighter coastlines on bigger maps), and the coastal
-        // profile described in GENERATION.COASTAL_PROFILE.
-        COASTLINE_ENGINES: ["guided"],
+        // profile described in GENERATION.COASTAL_PROFILE. For the tectonic engine ("advanced")
+        // the current revision is a different engine altogether: the guided pipeline with land
+        // placed by tectonic plates (ProceduralEngine.generateTectonicV2Topography), where
+        // revision 1 kept the original tectonic engine (generateTectonicTopography).
+        COASTLINE_ENGINES: ["guided", "advanced"],
+        // Coastline engines whose legacy revision was a different engine altogether, so updating
+        // one of their maps builds new terrain from the same settings rather than refining it
+        // (and no setting can be converted to keep its old look)
+        REPLACED_ENGINES: ["advanced"],
     },
     LIMITS: {
         HISTORY_MAX: 100,
@@ -253,6 +295,10 @@ export const FILRODENSWMB = {
             CLIMATE: 800,
             FEATURES: 600,
             CANVAS: 2000,
+            // Repainting the map after a display slider moves (contours, relief shading). Short,
+            // since nothing is regenerated, but long enough that dragging a slider does not
+            // repaint the whole map for every step it passes through.
+            DISPLAY: 300,
             // How long after the last refresh the rebuild scratch buffer (a map-sized float raster
             // used to compare the rebuilt terrain and water with the live ones) is released.
             // It is recreated on demand, so this only trades a short allocation on the next edit
@@ -270,6 +316,23 @@ export const FILRODENSWMB = {
         PIN_RADIUS: 6,
         PIN_ALPHA: 0.4,
         CONTOUR_INTERVAL: 0.1,
+        // Relief shading of the elevation layer (see ProceduralEngine#shadeRelief): its default
+        // strength (0 is off; each map sets its own) and the compass bearing the light comes from.
+        // The bearing is fixed as part of the module's look rather than offered as a setting:
+        // 315 (the north-west) is the usual choice for maps, and light from the south or east
+        // makes hills read as sunken, so other angles gain little.
+        RELIEF_SHADING: 0.5,
+        LIGHT_DIRECTION: 315,
+        RELIEF: {
+            // How high the light stands above the horizon, in degrees
+            ALTITUDE: 45,
+            // How much slopes are steepened before shading, per pixel of a BASELINE_DIMENSION
+            // map; elevations run from 0 to 1, so real slopes are far too gentle to shade visibly
+            EXAGGERATION: 100,
+            // Limits on how far shading can darken or brighten a pixel (as multiples of its colour)
+            MIN_FACTOR: 0.35,
+            MAX_FACTOR: 1.6,
+        },
         // How far past a repaint area the colour, biome and contour painters also write: each pixel
         // there depends on its neighbours (contour lines sit between two pixels), so the ring just
         // outside the area is redrawn with it. See ProceduralEngine.getRepaintBounds.

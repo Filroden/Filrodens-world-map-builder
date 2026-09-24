@@ -10,6 +10,13 @@
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateBiomes"}}</li>
             {{/if}}
         </ul>
+    {{else if isTectonics}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroTectonics"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTectonicsLand"}}</li>
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTectonicsFeatures"}}</li>
+        </ul>
     {{else}}
         <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroCoastline"}}</p>
 

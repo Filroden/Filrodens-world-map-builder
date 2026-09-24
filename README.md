@@ -1,6 +1,6 @@
 # Filroden's World Map Builder
 
-![Latest Version](https://img.shields.io/badge/Version-2.7.0-blue)
+![Latest Version](https://img.shields.io/badge/Version-3.0.0-blue)
 ![Foundry Version](https://img.shields.io/badge/Foundry_VTT-v14-orange)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![System Agnostic](https://img.shields.io/badge/System-Agnostic-green)
@@ -20,13 +20,13 @@ Maps are saved in Journals and stored in a Journal Compendium. The procedural pl
 
 ### Main Features
 
-- **Advanced Procedural Generation**: The underlying engine calculates authentic topography using layered noise and geological stretch parameters. It dynamically simulates climate by mapping global temperature gradients and tracking geographical orographic lift (rain shadows) to accurately determine Whittaker biomes.
+- **Advanced Procedural Generation**: The underlying engine calculates authentic topography using layered noise and geological stretch parameters. It dynamically simulates climate by mapping global temperature gradients and tracking geographical orographic lift (rain shadows) to accurately determine Whittaker biomes. Relief shading brings out the shape of hills, valleys and the seabed.
 - **Custom Biome Auto-Generation**: Define your own biomes and give them auto-generation rules - ranges of elevation, moisture and temperature - so they appear automatically wherever the procedural generator produces a matching climate, with the built-in defaults always available as a guaranteed fallback. A hover preview shows exactly where a map is still relying on those defaults, so gaps in your rule coverage are easy to spot.
-- **Four procedural terrain models**: Choose from standard, flat, advanced (tectonic) or guided procedural terrain models. Each provide different benefits.
+- **Four terrain engines**: Choose from Standard, Flat, Advanced (Tectonics) or Guided. Advanced (Tectonics) lets tectonic plates decide where the continents lie, raising mountain ranges, trenches and mid-ocean ridges where they meet or part, while Guided builds the land inside shapes you draw. Both create natural coastlines, continental shelves and deep oceans, and look the same at any map size. Each engine has different strengths (see the wiki).
 - **Dynamic Hydrology Systems**: Rivers are carved procedurally using greedy downhill algorithms, naturally pooling into lakes until they overflow their basins, and freezing intelligently based on altitude and regional climate thresholds. Additional river sources can be placed manually, and procedurally generated sources can be removed.
 - **Non-Destructive Vector Brush Engine**: Edit the terrain (raising, lowering, and smoothing) or paint custom biomes with a responsive freehand brush tool. Under the hood, edits are saved as a spatial vector history rather than static pixels, preserving your exact strokes for future map scaling and regional zooming.
 - **Vector Information Layers**: You can add infrastructure (points of interest, routes, etc), regional polygons, labels and cartographic decorations to any map, fine-tuning their placement, size and style.
-- **Easy Regional Map Creation**: Once your master world map is created you can generate regional maps that faithfully match the original but at much higher resolution. Because of procedural generation, this provides almost infinite ability to "zoom in" and create larger and larger scale maps (from World to almost street level). There are limits, so the more you increase map scale, the flatter the map will become.
+- **Easy Regional Map Creation**: Once your master world map is created you can generate regional maps that faithfully match the original but at much higher resolution, with finer detail in the coastlines, terrain and biome borders. Because of procedural generation, this provides almost infinite ability to "zoom in" and create larger and larger scale maps (from World to almost street level). There are limits, so the more you increase map scale, the flatter the map will become.
 - **Export to Scene**: All features (and entire layers) can be set to be visible to players, GMs or no-one. When you export the map to create a new Foundry Scene, it will export the player visible elements to the background image and place a map tile over it containing the GM-only features. A Scene Journal is also created which contains any feature names and descriptions and each feature is linked from the map to the journal using map pins.
 - **Export to PNG**: If you want to save the map for external use, you can also export the current visible features to a PNG file.
 - **Interactive 3D Visualisation**: View your 2D cartography in an interactive 3D web view. The biome map is draped over your custom topography, complete with topographical river vectors, ocean planes, and dynamic lighting. This feature is purely visual and included for fun. It will not update to any changes made until it is toggled again.

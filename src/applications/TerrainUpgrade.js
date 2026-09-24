@@ -77,8 +77,12 @@ export class TerrainUpgrade {
 
     /**
      * Works out whether updating the open map to the current terrain rules would visibly change
-     * it, and how. Two kinds of map can change, for different reasons, and the update is
+     * it, and how. Three kinds of map can change, for different reasons, and the update is
      * described to the user differently for each (`kind`):
+     *
+     * - "tectonics": a legacy tectonic map. The current revision replaces its engine outright, so
+     *   the update builds entirely new continents from the same seed and settings; nothing
+     *   needs measuring.
      *
      * - "coastline": a legacy map whose engine's coastline rules have changed (a guided map). Its
      *   coastal profile is always rebuilt, so its relief and ocean depths change whatever its
@@ -102,6 +106,10 @@ export class TerrainUpgrade {
      */
     static assess(app) {
         const state = app.uiState;
+
+        if (TerrainVersion.isLegacyReplacedEngine(state)) {
+            return { kind: "tectonics", plan: TerrainVersion.planUpgrade(state), changesTerrain: true, changesBiomes: true };
+        }
 
         if (TerrainVersion.isLegacyCoastline(state)) {
             const plan = TerrainVersion.planUpgrade(state);
