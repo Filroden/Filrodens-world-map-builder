@@ -3,42 +3,18 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.ClimateSettings"}}</legend>
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.GlobalTemp"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="globalTemp" value="{{lookup uiState 'globalTemp'}}" min="0" max="1" step="0.01" oninput="this.nextElementSibling.value = this.value" />
-                <output>{{lookup uiState "globalTemp"}}</output>
-            </div>
-        </div>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="globalTemp" label="FILRODENSWMB.UI.GlobalTemp" value=(lookup uiState 'globalTemp') min=0 max=1 step=0.01}}
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.SeasonOffset"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="seasonOffset" value="{{lookup uiState 'seasonOffset'}}" min="-1" max="1" step="0.05" oninput="this.nextElementSibling.value = this.value" />
-                <output>{{lookup uiState "seasonOffset"}}</output>
-            </div>
-        </div>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="seasonOffset" label="FILRODENSWMB.UI.SeasonOffset" value=(lookup uiState 'seasonOffset') min=-1 max=1 step=0.05}}
 
     </fieldset>
 
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.MoistureSettings"}}</legend>
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.GlobalMoisture"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="globalMoisture" value="{{lookup uiState 'globalMoisture'}}" min="0" max="1" step="0.01" oninput="this.nextElementSibling.value = this.value" />
-                <output>{{lookup uiState "globalMoisture"}}</output>
-            </div>
-        </div>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="globalMoisture" label="FILRODENSWMB.UI.GlobalMoisture" value=(lookup uiState 'globalMoisture') min=0 max=1 step=0.01}}
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.MoistureScale"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="noise.moisture.scale" value="{{lookup uiState 'noise.moisture.scale'}}" min="100" max="8000" step="10" />
-                <output>{{numberFormat (lookup uiState "noise.moisture.scale") decimals=0}}</output>
-            </div>
-        </div>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.moisture.scale" label="FILRODENSWMB.UI.MoistureScale" value=(lookup uiState 'noise.moisture.scale') min=100 max=8000 step=10 display=(numberFormat (lookup uiState "noise.moisture.scale") decimals=0)}}
     </fieldset>
 
     <fieldset class="fwmb-fieldset">

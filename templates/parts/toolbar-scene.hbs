@@ -10,16 +10,30 @@
             <button type="button" class="fwmb-btn {{#if (eq uiState.sceneMode 'subtractMask')}}active{{/if}}" data-action="setSceneMode" data-mode="subtractMask" data-tooltip="{{localize 'FILRODENSWMB.UI.DrawOceanMaskHint'}}">
                 <i class="fwmb-icon remove"></i>
             </button>
+
+            <button type="button" class="fwmb-btn {{#if (eq uiState.sceneMode 'crop')}}active{{/if}}" data-action="setSceneMode" data-mode="crop" {{#if canCreateRegionalMap}}data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegionalMap'}}"{{else}}disabled data-tooltip="{{localize 'FILRODENSWMB.UI.RegionalMapNeedsUpdate'}}"{{/if}}>
+                <i class="fwmb-icon crop"></i>
+            </button>
         </div>
 
         <div class="fwmb-divider-vertical"></div>
 
-        <button type="button" class="fwmb-btn {{#if uiState.liveFeatureUpdates}}active{{/if}}" data-action="toggleLiveFeatureUpdates" data-tooltip="{{#if uiState.liveFeatureUpdates}}{{localize 'FILRODENSWMB.UI.PauseTerrainGeneration'}}{{else}}{{localize 'FILRODENSWMB.UI.ResumeTerrainGeneration'}}{{/if}}">
-            <i class="fwmb-icon {{#if uiState.liveFeatureUpdates}}sync{{else}}sync_disabled{{/if}}"></i>
-        </button>
-        <button type="button" class="fwmb-btn wide {{#unless hasPendingFeatureMath}}disabled{{/unless}}" data-action="applyFeatureMath" {{#unless hasPendingFeatureMath}}disabled{{/unless}}>
-            {{localize "FILRODENSWMB.UI.ApplyChanges"}}
-        </button>
+        {{#if (eq uiState.sceneMode "crop")}}
+            <div class="fwmb-brush-settings">
+                {{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-regional-crop.hbs"}}
+            </div>
+            <div class="fwmb-divider-vertical"></div>
+            <button type="button" data-action="generateRegionalMap" class="fwmb-btn primary wide">
+                <i class="fwmb-icon map"></i> {{localize "FILRODENSWMB.UI.GenerateMap"}}
+            </button>
+        {{else}}
+            <button type="button" class="fwmb-btn {{#if uiState.liveFeatureUpdates}}active{{/if}}" data-action="toggleLiveFeatureUpdates" data-tooltip="{{#if uiState.liveFeatureUpdates}}{{localize 'FILRODENSWMB.UI.PauseTerrainGeneration'}}{{else}}{{localize 'FILRODENSWMB.UI.ResumeTerrainGeneration'}}{{/if}}">
+                <i class="fwmb-icon {{#if uiState.liveFeatureUpdates}}sync{{else}}sync_disabled{{/if}}"></i>
+            </button>
+            <button type="button" class="fwmb-btn wide {{#unless hasPendingFeatureMath}}disabled{{/unless}}" data-action="applyFeatureMath" {{#unless hasPendingFeatureMath}}disabled{{/unless}}>
+                {{localize "FILRODENSWMB.UI.ApplyChanges"}}
+            </button>
+        {{/if}}
 
         <div class="fwmb-divider-vertical"></div>
 
@@ -31,21 +45,7 @@
             <button type="button" data-action="setBrushTool" data-tool="crop" class="fwmb-btn {{#if (eq uiState.sceneBrushTool 'crop')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegionalMap'}}">
                 <i class="fwmb-icon crop"></i>
             </button>
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.RegionalResolution"}}</label>
-                <div class="fwmb-flex-row">
-                    <input type="number" name="regionalTargetWidth" value="{{lookup uiState 'regionalTargetWidth'}}" class="fwmb-flex-1" title="{{localize 'FILRODENSWMB.UI.TargetWidth'}}" step="100" min="500" />
-                    <span style="align-self: center; margin: 0 4px;">x</span>
-                    <input type="number" name="regionalTargetHeight" value="{{lookup uiState 'regionalTargetHeight'}}" class="fwmb-flex-1" disabled title="{{localize 'FILRODENSWMB.UI.CalculatedHeight'}}" />
-                </div>
-            </div>
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.RegionalLatitude"}}</label>
-                <div class="fwmb-setting-row" style="justify-content: space-between; font-size: 0.9em;">
-                    <span>{{localize "FILRODENSWMB.UI.LatTop"}}: <strong id="fwmb-readout-lat-top">--&deg;</strong></span>
-                    <span>{{localize "FILRODENSWMB.UI.LatBottom"}}: <strong id="fwmb-readout-lat-bottom">--&deg;</strong></span>
-                </div>
-            </div>
+            {{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-regional-crop.hbs"}}
         </div>
         <div class="fwmb-divider-vertical"></div>
         <button type="button" data-action="generateRegionalMap" class="fwmb-btn primary wide">

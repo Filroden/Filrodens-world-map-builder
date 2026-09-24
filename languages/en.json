@@ -589,9 +589,20 @@
     "FILRODENSWMB.UI.ErosionScaleHint": "Zooms the detail noise. Lower values cluster mountains tightly; higher values stretch features across broader areas.",
 
     "FILRODENSWMB.UI.ContinentScale": "Continent Scale",
-    "FILRODENSWMB.UI.ContinentScaleHint": "Defines the gradient slope. Lower values create steep coastal mountains; higher values create sprawling, flat coastal plains.",
+    "FILRODENSWMB.UI.ContinentScaleHint": "How far inland the land takes to reach its full height, beyond the Coastal Plains. Lower values create steep coastal mountains; higher values create broad, gradual slopes. Islands smaller than this rise over their own size instead, so they still have hills. Measured in pixels of a 1000 pixel map and scaled to your map's size, so the same value looks the same at any resolution.",
+    "FILRODENSWMB.UI.CoastLand": "Land",
+    "FILRODENSWMB.UI.CoastSea": "Sea",
+    "FILRODENSWMB.UI.CoastGeneral": "Land & Sea",
+    "FILRODENSWMB.UI.OceanScale": "Ocean Scale",
+    "FILRODENSWMB.UI.OceanRidges": "Mid-Ocean Ridges",
+    "FILRODENSWMB.UI.OceanRidgesHint": "How high the mid-ocean ridges rise from the deep ocean floor. Ridges run down the middle of the ocean between continents, where the seabed is equally far from both, and fade out towards the continental slopes. Small islands do not create ridges. Set to 0 for a flat ocean floor.",
+    "FILRODENSWMB.UI.OceanScaleHint": "How far out the seabed takes to fall to the deep ocean floor, beyond the Continental Shelf. Lower values create abrupt drops into deep water; higher values create broad, gradual slopes and shallower seas between nearby coasts. Measured in pixels of a 1000 pixel map and scaled to your map's size.",
+    "FILRODENSWMB.UI.ContinentScaleHintLegacy": "Defines the gradient slope. Lower values create steep coastal mountains; higher values create sprawling, flat coastal plains.",
     "FILRODENSWMB.UI.ContinentalShelf": "Continental Shelf",
     "FILRODENSWMB.UI.ShelfRangeHint": "Controls the width of the shallow water transition zone before dropping into deep ocean.",
+    "FILRODENSWMB.UI.ShelfWidthHint": "Width of the band of shallow sea along the coast, beyond which the seabed falls steeply to the deep ocean floor. Set to 0 for coasts that drop straight into deep water. Each 0.1 is 10 pixels on a 1000 pixel map, scaled to your map's size.",
+    "FILRODENSWMB.UI.CoastalPlains": "Coastal Plains",
+    "FILRODENSWMB.UI.CoastalPlainsHint": "Width of the band of low, gently rolling land along the coast before the land starts to rise. Set to 0 to let the terrain rise straight from the shore. Each 0.1 is 10 pixels on a 1000 pixel map, scaled to your map's size.",
 
     "FILRODENSWMB.UI.CheckingTerrainUpdate": "Checking for terrain updates...",
     "FILRODENSWMB.UI.TerrainUpdateTitle": "Terrain Update Available",
@@ -605,5 +616,10 @@
     "FILRODENSWMB.UI.TerrainUpdateDismissHint": "You can still update this map later with the update button at the top of the Create New Map tool.",
     "FILRODENSWMB.UI.TerrainUpdateApplied": "Map updated. Save the map to keep the update, or reload it to return to the original.",
     "FILRODENSWMB.UI.UpdateMap": "Update Map to latest engine(s)",
-    "FILRODENSWMB.UI.UpdateMapHint": "This map was created with older terrain rules. Update it to match its parent map more closely."
+    "FILRODENSWMB.UI.UpdateMapHint": "This map was created with older terrain rules. Update it to use the latest terrain engine.",
+    "FILRODENSWMB.UI.TerrainUpdateIntroCoastline": "This map was created with older terrain rules. Updating it to the latest guided terrain engine changes it as follows:",
+    "FILRODENSWMB.UI.TerrainUpdateFracture": "Coastline Fracture is lowered from {before} to {after}, which keeps your coastline close to its current shape. From now on, the same value gives the same look on a map of any size.",
+    "FILRODENSWMB.UI.TerrainUpdateCoastlines": "Coastline Fracture and Continent Scale used to be fixed sizes in pixels, so they had less effect the larger the map. They are now scaled to the map's size, so the same values look the same at any resolution, and coastlines gain finer detail.",
+    "FILRODENSWMB.UI.TerrainUpdateProfile": "Oceans become deeper. Continental Shelf now sets the width of a band of shallow sea along the coast, beyond which the seabed falls steeply to the deep ocean floor. The new Coastal Plains setting adds a band of low land along the coast. Continent Scale now only sets how steeply the land rises, and the new Ocean Scale (starting at your current Continent Scale) sets how steeply the sea deepens. Small islands now rise to proper hills, and mid-ocean ridges rise between continents (see the new Mid-Ocean Ridges setting). The land masks you drew stay the same.",
+    "FILRODENSWMB.UI.RegionalMapNeedsUpdate": "This map was created with older terrain rules. Update it to the latest engine (see the Create New Map tool) to create regional maps from it."
 }

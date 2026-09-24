@@ -770,7 +770,7 @@
     border-radius: var(--fwmb-radius-medium);
     padding: var(--fwmb-space-10);
     margin: var(--fwmb-space-10) 0;
-    gap: var(--fwmb-space-8);
+    gap: var(--fwmb-space-16);
     display: flex;
     flex-direction: column;
 }
@@ -1268,7 +1268,175 @@
     color: var(--fwmb-color-text-accent);
 }
 
-/* --- RANGE SLIDERS --- */
+/* --- RANGE SLIDERS ---
+   One look for every range slider in the tool panels and the edit toolbar, matching the tracks
+   in the biome rule editor: a rounded track, a tinted fill from the minimum up to the thumb, and
+   a round thumb with a soft glow.
+
+   The browser's own slider parts are replaced (appearance: none), so the track and thumb are
+   drawn separately for Chromium (::-webkit-*) and Firefox (::-moz-*); the two sets of rules must
+   be kept apart, because a browser drops a whole rule if it contains a selector it does not
+   recognise. The fill is a gradient on the track whose stop comes from --fwmb-range-fill, a
+   percentage kept up to date by RangeDisplay (src/tools/RangeDisplay.js), since Chromium has no
+   way to colour the filled portion of a native slider by itself. */
+.fwmb {
+    --fwmb-range-accent: var(--fwmb-accent-alternative-main);
+    --fwmb-range-accent-bright: var(--fwmb-accent-alternative-hover);
+    --fwmb-range-glow: var(--fwmb-shadow-alternative-focus);
+    --fwmb-range-track-height: 1.125rem;
+    --fwmb-range-thumb-size: 1rem;
+    --fwmb-range-border: 1px;
+}
+
+.fwmb input[type="range"].fwmb-range-input,
+.fwmb .fwmb-slider-group input[type="range"] {
+    appearance: none;
+    background: transparent;
+    height: var(--fwmb-range-track-height);
+    margin: 0;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+}
+
+/* Chromium */
+.fwmb input[type="range"].fwmb-range-input::-webkit-slider-runnable-track,
+.fwmb .fwmb-slider-group input[type="range"]::-webkit-slider-runnable-track {
+    box-sizing: border-box;
+    height: var(--fwmb-range-track-height);
+    border: var(--fwmb-range-border) solid var(--fwmb-border-subtle);
+    border-radius: 999px;
+    background: linear-gradient(to right, color-mix(in srgb, var(--fwmb-range-accent) 30%, transparent) 0 var(--fwmb-range-fill, 0%), var(--fwmb-bg-hover) var(--fwmb-range-fill, 0%));
+}
+.fwmb input[type="range"].fwmb-range-input:dir(rtl)::-webkit-slider-runnable-track,
+.fwmb .fwmb-slider-group input[type="range"]:dir(rtl)::-webkit-slider-runnable-track {
+    background: linear-gradient(to left, color-mix(in srgb, var(--fwmb-range-accent) 30%, transparent) 0 var(--fwmb-range-fill, 0%), var(--fwmb-bg-hover) var(--fwmb-range-fill, 0%));
+}
+.fwmb input[type="range"].fwmb-range-input::-webkit-slider-thumb,
+.fwmb .fwmb-slider-group input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    box-sizing: border-box;
+    width: var(--fwmb-range-thumb-size);
+    height: var(--fwmb-range-thumb-size);
+    /* The thumb is placed inside the track's border, so centre it within what is left */
+    margin-block-start: calc((var(--fwmb-range-track-height) - 2 * var(--fwmb-range-border) - var(--fwmb-range-thumb-size)) / 2);
+    border: 2px solid var(--fwmb-bg-base);
+    border-radius: 50%;
+    background: var(--fwmb-range-accent-bright);
+    box-shadow: var(--fwmb-range-glow);
+}
+
+/* Firefox */
+.fwmb input[type="range"].fwmb-range-input::-moz-range-track,
+.fwmb .fwmb-slider-group input[type="range"]::-moz-range-track {
+    box-sizing: border-box;
+    height: var(--fwmb-range-track-height);
+    border: var(--fwmb-range-border) solid var(--fwmb-border-subtle);
+    border-radius: 999px;
+    background: var(--fwmb-bg-hover);
+}
+.fwmb input[type="range"].fwmb-range-input::-moz-range-progress,
+.fwmb .fwmb-slider-group input[type="range"]::-moz-range-progress {
+    box-sizing: border-box;
+    height: var(--fwmb-range-track-height);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--fwmb-range-accent) 30%, transparent);
+}
+.fwmb input[type="range"].fwmb-range-input::-moz-range-thumb,
+.fwmb .fwmb-slider-group input[type="range"]::-moz-range-thumb {
+    box-sizing: border-box;
+    width: var(--fwmb-range-thumb-size);
+    height: var(--fwmb-range-thumb-size);
+    border: 2px solid var(--fwmb-bg-base);
+    border-radius: 50%;
+    background: var(--fwmb-range-accent-bright);
+    box-shadow: var(--fwmb-range-glow);
+}
+
+.fwmb input[type="range"].fwmb-range-input:focus-visible,
+.fwmb .fwmb-slider-group input[type="range"]:focus-visible {
+    outline: 2px solid var(--fwmb-range-accent);
+    outline-offset: 2px;
+    border-radius: 999px;
+}
+
+.fwmb input[type="range"].fwmb-range-input:disabled,
+.fwmb .fwmb-slider-group input[type="range"]:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Tool panel sliders (templates/parts/shared-range.hbs): name, info icon and value on one line
+   above a slider that takes the full width */
+.fwmb .fwmb-range {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-space-8);
+    margin-block-end: var(--fwmb-space-4);
+    min-width: 0;
+}
+.fwmb .fwmb-range.spaced {
+    margin-block-start: var(--fwmb-space-10);
+}
+
+.fwmb .fwmb-range-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--fwmb-space-8);
+    min-width: 0;
+}
+
+.fwmb .fwmb-range-label {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-space-4);
+    min-width: 0;
+    margin: 0;
+}
+
+.fwmb .fwmb-range-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fwmb .fwmb-range-value {
+    flex-shrink: 0;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: var(--fwmb-font-size-xs);
+    color: var(--fwmb-text-secondary);
+    white-space: nowrap;
+    background: var(--fwmb-bg-hover);
+    border: 1px solid var(--fwmb-border-subtle);
+    border-radius: 999px;
+    padding: var(--fwmb-space-1) var(--fwmb-space-6);
+}
+
+.fwmb .fwmb-range-input {
+    width: 100%;
+}
+
+/* A titled group of related sliders within a fieldset (for example the land and sea sides of
+   the coastline in guided terrain) */
+.fwmb .fwmb-range-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-space-8);
+    min-width: 0;
+}
+
+.fwmb .fwmb-range-group-heading {
+    font-size: var(--fwmb-font-size-xxs);
+    text-transform: uppercase;
+    letter-spacing: var(--fwmb-letter-spacing-wide);
+    color: var(--fwmb-text-muted);
+    border-block-end: 1px solid var(--fwmb-border-subtle);
+    padding-block-end: var(--fwmb-space-2);
+    margin-block: var(--fwmb-space-4);
+}
+
+/* Edit toolbar sliders: compact, with the value after the slider on the same line */
 .fwmb .fwmb-slider-group {
     display: flex;
     flex-direction: row;
@@ -1278,16 +1446,19 @@
 
 .fwmb .fwmb-slider-group input[type="range"] {
     flex: 1;
-    accent-color: var(--fwmb-accent-main);
-    cursor: pointer;
 }
 
 .fwmb .fwmb-slider-group output {
     width: 5ch;
-    text-align: right;
-    font-family: monospace;
+    text-align: end;
+    font-family: "Consolas", "Courier New", monospace;
     font-size: var(--fwmb-font-size-xs);
-    color: var(--fwmb-accent-main);
+    color: var(--fwmb-text-secondary);
+}
+
+.fwmb .fwmb-brush-setting {
+    --fwmb-range-track-height: 0.875rem;
+    --fwmb-range-thumb-size: 0.75rem;
 }
 
 /* --- STACKED FORM GROUPS --- */

@@ -580,69 +580,526 @@ export class ProceduralEngine {
 
     /**
      * GUIDED PASS:
-     * Generates a precise Signed Distance Field natively on the main thread.
-     * Falls back to a deep ocean generation if no land masks are provided.
+     * Builds a signed distance field to the edges of the land masks (the "macro" coastline), then
+     * lets noise, domain warping and continental shelving shape the terrain from it (see
+     * #applyGuidedDetail). Falls back to deep ocean if no land masks are provided.
+     *
+     * Everything is worked out in the pixels of the map at the top of this map's chain of crops
+     * (its "world", from params.terrain), so a regional map evaluates exactly the fields its
+     * parent did, only more densely. A map that was never cropped is its own top map, so for it
+     * world pixels are simply map pixels.
      */
     generateGuidedTopography(width, height, params, landMasks, outBuffer) {
         const elevationData = outBuffer;
         const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES);
+        const frame = ProceduralEngine.#resolveTerrainFrame(width, height, params);
+        const field = this.#buildCoastDistanceField(width, height, params, frame, validMasks);
 
-        let distanceField;
-
-        if (validMasks.length === 0) {
-            // Bypass JFA and flood the field with a massive negative distance to force deep ocean
-            const deepOceanDistance = -Math.max(width, height);
-            distanceField = new Float32Array(width * height).fill(deepOceanDistance);
-        } else {
-            distanceField = this.#generateJFADistanceField(width, height, validMasks);
-        }
-
-        this.#applyGuidedDetail(width, height, params, distanceField, elevationData);
+        this.#applyGuidedDetail(width, height, params, frame, field, elevationData);
 
         return elevationData;
     }
 
     /**
-     * Executes the Jump Flood Algorithm natively, eliminating Web Worker overhead.
+     * Reads the revision-dependent terrain values (see TerrainVersion.getTerrainParams) with the
+     * defaults that reproduce the legacy behaviour when they are absent: a map that is its own
+     * top map, settings at their baseline scale, no extra octaves.
+     *
+     * @returns {{zoom: number, originX: number, originY: number, rootW: number, rootH: number,
+     *   resolutionScale: number, detailOctaves: number, fillEnclosedCoast: boolean, coastalBuffers: boolean}}
      */
-    #generateJFADistanceField(width, height, validMasks) {
+    static #resolveTerrainFrame(width, height, params) {
+        const terrain = params.terrain ?? {};
+        const world = terrain.world ?? {};
+        const zoom = world.zoom ?? 1;
+
+        return {
+            zoom,
+            originX: world.originX ?? 0,
+            originY: world.originY ?? 0,
+            rootW: world.rootW ?? width / zoom,
+            rootH: world.rootH ?? height / zoom,
+            resolutionScale: terrain.resolutionScale ?? 1,
+            detailOctaves: terrain.detailOctaves ?? 0,
+            fillEnclosedCoast: terrain.fillEnclosedCoast === true,
+            coastalBuffers: terrain.coastalBuffers === true,
+        };
+    }
+
+    /**
+     * Builds the signed distance, in world pixels, from every point near this map to the nearest
+     * edge of the land masks: positive on land, negative at sea. It is returned as a grid with a
+     * sampler that reads it at any world position.
+     *
+     * The grid covers this map's footprint in the world plus a margin, because the terrain at a
+     * point depends on the coastline up to Continent Scale away (and further, once the domain
+     * warp moves the point being sampled). Without the margin a regional map cropped inside a
+     * continent would see no coastline at all. The grid is clipped to the top map, so a regional
+     * map near its parent's edge sees exactly the coastline its parent saw.
+     *
+     * Masks are stored in this map's own pixels, as every other vector feature is, and are
+     * converted to world pixels here. On a regional map the grid can have more than one cell per
+     * world pixel (up to the zoom), so masks drawn on the regional map itself keep their detail.
+     *
+     * For a map that was never cropped the grid is exactly the map, one cell per pixel, so the
+     * field is identical to the one this pass has always built.
+     *
+     * Under the current coastal profile the grid also records, for every cell, how large the
+     * nearest landmass is (see #measureLandmasses), so small islands can rise to proper hills.
+     */
+    #buildCoastDistanceField(width, height, params, frame, validMasks) {
+        const margin = ProceduralEngine.#coastFieldMargin(params, frame);
+        const u0 = Math.max(0, Math.floor(frame.originX - margin));
+        const v0 = Math.max(0, Math.floor(frame.originY - margin));
+        const u1 = Math.min(frame.rootW, Math.ceil(frame.originX + width / frame.zoom + margin));
+        const v1 = Math.min(frame.rootH, Math.ceil(frame.originY + height / frame.zoom + margin));
+
+        const worldArea = Math.max(1, (u1 - u0) * (v1 - v0));
+        const maxCellsPerPixel = Math.sqrt(FILRODENSWMB.GENERATION.COAST_FIELD_MAX_CELLS / worldArea);
+        const cellsPerPixel = frame.zoom <= 1 ? 1 : Math.max(1, Math.min(frame.zoom, maxCellsPerPixel));
+
+        const grid = {
+            u0,
+            v0,
+            cellsPerPixel,
+            width: Math.max(1, Math.round((u1 - u0) * cellsPerPixel)),
+            height: Math.max(1, Math.round((v1 - v0) * cellsPerPixel)),
+            // Which sides of the grid cut through the world, rather than lying on the top map's
+            // own edge (see #measureLandmasses)
+            cutEdges: { left: u0 > 0, top: v0 > 0, right: u1 < frame.rootW, bottom: v1 < frame.rootH },
+            landmassReach: null,
+            ridges: null,
+        };
+
+        if (validMasks.length === 0) {
+            // Bypass JFA and flood the field with a massive negative distance to force deep ocean
+            const deepOceanDistance = -Math.max(width, height);
+            grid.distances = new Float32Array(grid.width * grid.height).fill(deepOceanDistance);
+        } else {
+            const worldMasks = ProceduralEngine.#masksToWorld(validMasks, frame);
+            const field = this.#generateJFADistanceField(grid, worldMasks, frame.fillEnclosedCoast, frame.coastalBuffers);
+            grid.distances = field.distances;
+            grid.landmassReach = field.landmassReach;
+            if (frame.coastalBuffers && ProceduralEngine.#ridgeStrengthOf(params) > 0) grid.ridges = this.#buildRidgeField(frame, worldMasks);
+        }
+
+        return grid;
+    }
+
+    /**
+     * How far beyond this map's edges, in world pixels, the coastline can still shape its
+     * terrain: the full reach of the coastline structure (Continent Scale, or Ocean Scale if
+     * larger, beyond the widest coastal band under the current coastal profile), plus the band
+     * the coastline may wander
+     * within, plus the furthest the domain warp can move a sample. The warp term is taken at the
+     * full warp amplitude rather than the half that noise centred on 0.5 reaches in theory, since
+     * simplex noise overshoots its nominal range.
+     */
+    static #coastFieldMargin(params, frame) {
+        const generation = FILRODENSWMB.GENERATION;
+        const landScale = params.continentScale ?? generation.CONTINENT_SCALE;
+        const oceanScale = frame.coastalBuffers ? ProceduralEngine.#oceanScaleOf(params) : landScale;
+        const continentScale = Math.max(landScale, oceanScale) * frame.resolutionScale;
+        const fracture = params.coastlineFracture ?? generation.COASTLINE_FRACTURE;
+        const band = ProceduralEngine.#coastlineNoiseScale(params, frame) * generation.COASTAL_VARIANCE.BAND_RATIO;
+        const warpReach = fracture * generation.WARP.AMPLITUDE * frame.resolutionScale;
+        const bufferReach = frame.coastalBuffers ? ProceduralEngine.#resolveCoastalProfile(params, frame).maxBufferWidth : 0;
+
+        return Math.ceil(bufferReach + continentScale + band + warpReach);
+    }
+
+    /**
+     * The size, in world pixels, that the noise moving the coastline off the drawn edge is
+     * measured against (see COASTAL_VARIANCE). Legacy maps use their own Continent Scale; from
+     * the current coastal profile on it is the default Continent Scale, so that slider shapes the
+     * relief alone and Coastline Fracture is the one control over the coastline.
+     */
+    static #coastlineNoiseScale(params, frame) {
+        const generation = FILRODENSWMB.GENERATION;
+        const continentScale = frame.coastalBuffers ? generation.CONTINENT_SCALE : (params.continentScale ?? generation.CONTINENT_SCALE);
+        return continentScale * frame.resolutionScale;
+    }
+
+    /**
+     * Ocean Scale, the seaward counterpart of Continent Scale. A map saved before it existed
+     * uses its Continent Scale for both.
+     */
+    static #oceanScaleOf(params) {
+        return params.oceanScale ?? params.continentScale ?? FILRODENSWMB.GENERATION.OCEAN_SCALE;
+    }
+
+    /**
+     * Everything the current coastal profile (see #shapeCoastalProfile) needs that stays the same
+     * across the whole map, in world pixels, worked out once per generation.
+     */
+    static #resolveCoastalProfile(params, frame) {
+        const generation = FILRODENSWMB.GENERATION;
+        const profile = generation.COASTAL_PROFILE;
+        const scale = frame.resolutionScale;
+        const pixelsPerUnit = profile.BUFFER_WIDTH * scale;
+        const plainWidth = Math.max(0, params.coastalPlain ?? generation.COASTAL_PLAIN) * pixelsPerUnit;
+        const shelfWidth = Math.max(0, params.shelfRange ?? generation.SHELF_RANGE) * pixelsPerUnit;
+
+        return {
+            plainWidth,
+            shelfWidth,
+            maxBufferWidth: Math.max(plainWidth, shelfWidth) * (1 + profile.BUFFER_VARIATION),
+            variesWidth: plainWidth > 0 || shelfWidth > 0,
+            variationScale: 1 / (profile.BUFFER_VARIATION_LENGTH * scale),
+            continentScale: (params.continentScale ?? generation.CONTINENT_SCALE) * scale,
+            oceanScale: ProceduralEngine.#oceanScaleOf(params) * scale,
+            minimumRise: profile.LANDMASS_MIN_RISE * scale,
+            ridges: null,
+            coastalBand: (params.coastalBand ?? generation.COASTAL_BAND) * scale,
+            oceanDepth: (params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL) * generation.OCEAN_DEPTH_CAP,
+        };
+    }
+
+    /**
+     * Copies land masks with their points converted from this map's pixels to world pixels.
+     * For a map that was never cropped the conversion leaves every point exactly as it was.
+     */
+    static #masksToWorld(validMasks, frame) {
+        return validMasks.map((mask) => ({
+            ...mask,
+            points: mask.points.map((point) => ({
+                x: frame.originX + point.x / frame.zoom,
+                y: frame.originY + point.y / frame.zoom,
+            })),
+        }));
+    }
+
+    /**
+     * Executes the Jump Flood Algorithm natively, eliminating Web Worker overhead.
+     *
+     * Works in grid cells and returns distances in world pixels. When `fillEnclosedCoast` is set,
+     * a grid with no coastline anywhere in it (entirely inside, or entirely outside, the land
+     * masks) is given a large distance of the right sign, so it becomes deep inland or open ocean.
+     * The legacy revision left such a grid at distance zero, which put coastline noise across the
+     * whole map; it is kept that way for legacy maps so they regenerate unchanged.
+     *
+     * When `measureLandmasses` is set it also works out how large the nearest landmass is for
+     * every cell (see #measureLandmasses); otherwise `landmassReach` is null.
+     *
+     * @returns {{distances: Float32Array, landmassReach: Float32Array|null}}
+     */
+    #generateJFADistanceField(grid, validMasks, fillEnclosedCoast, measureLandmasses = false) {
+        const { width, height } = grid;
         const totalPixels = width * height;
         let seedGrid = new Int32Array(totalPixels * 2).fill(-1);
         const distanceGrid = new Float32Array(totalPixels);
 
-        const ownershipGrid = this.#generateOwnershipGrid(width, height, validMasks);
+        const ownershipGrid = this.#generateOwnershipGrid(grid, validMasks);
 
         this.#initialiseJFABoundaries(seedGrid, ownershipGrid, width, height);
+        seedGrid = this.#runJumpFlood(seedGrid, width, height);
 
-        let step = Math.max(width, height) / 2;
-        while (step >= 1) {
-            step = Math.floor(step);
-            seedGrid = this.#executeJFAPass(seedGrid, width, height, step);
-            step /= 2;
+        const enclosedDistance = fillEnclosedCoast ? Math.max(width, height) : 0;
+        this.#resolveAbsoluteDistances(seedGrid, distanceGrid, ownershipGrid, width, height, enclosedDistance);
+
+        if (grid.cellsPerPixel !== 1) {
+            for (let i = 0; i < totalPixels; i++) distanceGrid[i] /= grid.cellsPerPixel;
         }
 
-        seedGrid = this.#executeJFAPass(seedGrid, width, height, 1);
-        seedGrid = this.#executeJFAPass(seedGrid, width, height, 1);
+        const landmassReach = measureLandmasses ? ProceduralEngine.#measureLandmasses(grid, ownershipGrid, distanceGrid, seedGrid) : null;
+        return { distances: distanceGrid, landmassReach };
+    }
 
-        this.#resolveAbsoluteDistances(seedGrid, distanceGrid, ownershipGrid, width, height);
-
-        return distanceGrid;
+    /** The Mid-Ocean Ridges setting, from 0 (none) to 1. */
+    static #ridgeStrengthOf(params) {
+        return Math.max(0, params.oceanRidges ?? FILRODENSWMB.GENERATION.OCEAN_RIDGES);
     }
 
     /**
-     * Creates a flat, memory-efficient binary map of land/ocean ownership.
+     * Works out where mid-ocean ridges run: along the line through the ocean that lies equally
+     * far from two different landmasses, as real ridges run down the middle of an ocean between
+     * the continents on either side of it.
+     *
+     * This is worked out once over the whole of the map at the top of this map's chain of crops,
+     * on a coarse grid of fixed size in pixels of a BASELINE_DIMENSION map (see OCEAN_RIDGES), so
+     * a regional map finds exactly the same ridges as its parent even when the landmasses that
+     * place them lie far outside its own area. Ridges are broad and smooth, so the coarse grid
+     * loses nothing visible; it also keeps the three flood fills involved cheap.
+     *
+     * Only landmasses large enough to count as continents divide the ocean (see
+     * MIN_LANDMASS_REACH); otherwise every small island would sit inside its own ring of ridges.
+     *
+     * @returns {{u0: number, v0: number, cellsPerPixel: number, width: number, height: number, distances: Float32Array}|null}
+     *   A grid holding each cell's distance, in world pixels, to the nearest ridge line, or null
+     *   if no two landmasses are large enough to place a ridge between them.
      */
-    #generateOwnershipGrid(width, height, validMasks) {
-        const grid = new Uint8Array(width * height);
+    #buildRidgeField(frame, worldMasks) {
+        const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE.OCEAN_RIDGES;
+        const cellSize = settings.CELL_SIZE * frame.resolutionScale;
+        const grid = {
+            u0: 0,
+            v0: 0,
+            cellsPerPixel: 1 / cellSize,
+            width: Math.max(1, Math.ceil(frame.rootW / cellSize)),
+            height: Math.max(1, Math.ceil(frame.rootH / cellSize)),
+        };
+
+        const { distances } = this.#generateJFADistanceField(grid, worldMasks, true);
+        const landmassOf = ProceduralEngine.#labelContinents(grid, distances, settings.MIN_LANDMASS_REACH * frame.resolutionScale);
+        const nearestContinent = this.#findNearestContinent(grid, landmassOf);
+        const ridgeDistances = this.#measureRidgeDistances(grid, nearestContinent, cellSize);
+
+        return ridgeDistances ? { ...grid, distances: ridgeDistances } : null;
+    }
+
+    /**
+     * Labels each land cell with the landmass it belongs to, counting only landmasses whose middle
+     * lies at least `minimumReach` world pixels from their coast; every other cell is -1.
+     */
+    static #labelContinents(grid, distances, minimumReach) {
+        const { width, height } = grid;
+        const total = width * height;
+        const landmassOf = new Int32Array(total).fill(-1);
+        const visited = new Uint8Array(total);
+        const stack = new Int32Array(total);
+        let nextLandmass = 0;
+
+        for (let start = 0; start < total; start++) {
+            if (distances[start] <= 0 || visited[start]) continue;
+
+            const members = [];
+            let reach = 0;
+            let top = 0;
+            visited[start] = 1;
+            stack[top++] = start;
+
+            while (top > 0) {
+                const index = stack[--top];
+                members.push(index);
+                if (distances[index] > reach) reach = distances[index];
+
+                const x = index % width;
+                for (const neighbour of ProceduralEngine.#gridNeighbours(index, x, width, height)) {
+                    if (distances[neighbour] > 0 && !visited[neighbour]) {
+                        visited[neighbour] = 1;
+                        stack[top++] = neighbour;
+                    }
+                }
+            }
+
+            if (reach < minimumReach) continue;
+            for (const index of members) landmassOf[index] = nextLandmass;
+            nextLandmass++;
+        }
+
+        return landmassOf;
+    }
+
+    /** The up to four cells beside a grid cell (left, right, above, below), skipping the grid's edges. */
+    static #gridNeighbours(index, x, width, height) {
+        const neighbours = [];
+        if (x > 0) neighbours.push(index - 1);
+        if (x < width - 1) neighbours.push(index + 1);
+        if (index >= width) neighbours.push(index - width);
+        if (index < (height - 1) * width) neighbours.push(index + width);
+        return neighbours;
+    }
+
+    /**
+     * For every cell, the continent (see #labelContinents) whose land is nearest to it, or -1 if
+     * there is none. Every continent cell seeds a jump flood, so each cell ends up holding its
+     * nearest continent cell.
+     */
+    #findNearestContinent(grid, landmassOf) {
+        const { width, height } = grid;
+        const total = width * height;
+        const seedGrid = new Int32Array(total * 2).fill(-1);
+
+        for (let index = 0; index < total; index++) {
+            if (landmassOf[index] === -1) continue;
+            seedGrid[index * 2] = index % width;
+            seedGrid[index * 2 + 1] = Math.floor(index / width);
+        }
+
+        const flooded = this.#runJumpFlood(seedGrid, width, height);
+        const nearest = new Int32Array(total).fill(-1);
+        for (let index = 0; index < total; index++) {
+            const seedX = flooded[index * 2];
+            if (seedX !== -1) nearest[index] = landmassOf[flooded[index * 2 + 1] * width + seedX];
+        }
+
+        return nearest;
+    }
+
+    /**
+     * For every cell, the distance in world pixels to the nearest ridge line: the edge between
+     * cells whose nearest continents differ. Those edge cells seed a final jump flood.
+     *
+     * @returns {Float32Array|null} The distances, or null if no such edge exists (fewer than two
+     *   continents).
+     */
+    #measureRidgeDistances(grid, nearestContinent, cellSize) {
+        const { width, height } = grid;
+        const total = width * height;
+        const seedGrid = new Int32Array(total * 2).fill(-1);
+        let hasRidge = false;
+
+        for (let index = 0; index < total; index++) {
+            const own = nearestContinent[index];
+            if (own === -1) continue;
+
+            const x = index % width;
+            const onRidge = ProceduralEngine.#gridNeighbours(index, x, width, height).some((neighbour) => nearestContinent[neighbour] !== -1 && nearestContinent[neighbour] !== own);
+            if (!onRidge) continue;
+
+            seedGrid[index * 2] = x;
+            seedGrid[index * 2 + 1] = Math.floor(index / width);
+            hasRidge = true;
+        }
+
+        if (!hasRidge) return null;
+
+        const flooded = this.#runJumpFlood(seedGrid, width, height);
+        const distances = new Float32Array(total);
+        for (let index = 0; index < total; index++) {
+            const x = index % width;
+            const y = Math.floor(index / width);
+            distances[index] = Math.hypot(x - flooded[index * 2], y - flooded[index * 2 + 1]) * cellSize;
+        }
+
+        return distances;
+    }
+
+    /**
+     * Spreads seeds across a grid with the Jump Flood Algorithm: afterwards every cell holds the
+     * position of (very nearly) its nearest seed, as an x, y pair per cell in `seedGrid`, or -1
+     * if the grid had no seeds at all. Two closing passes at a step of one clean up the few cells
+     * the halving steps leave with a slightly-too-far seed.
+     *
+     * @returns {Int32Array} The flooded seed grid (a new array; the input is not modified).
+     */
+    #runJumpFlood(seedGrid, width, height) {
+        let flooded = seedGrid;
+        let step = Math.max(width, height) / 2;
+        while (step >= 1) {
+            step = Math.floor(step);
+            flooded = this.#executeJFAPass(flooded, width, height, step);
+            step /= 2;
+        }
+
+        flooded = this.#executeJFAPass(flooded, width, height, 1);
+        return this.#executeJFAPass(flooded, width, height, 1);
+    }
+
+    /**
+     * For every cell of the coastline grid, how far the middle of the nearest landmass lies from
+     * its coast, in world pixels: the greatest distance from the coast anywhere on that
+     * landmass. A small island measures a few pixels; a continent, hundreds.
+     *
+     * Landmasses are the connected areas of land in the grid. A land cell belongs to its own
+     * landmass; a sea cell takes the landmass on the far side of its nearest stretch of coast
+     * (from the jump flood's nearest boundary cell), so the value changes smoothly across the
+     * coastline rather than jumping there.
+     *
+     * A landmass that runs off a side of the grid which cuts through the world (a regional map's
+     * working area, not the top map's own edge) cannot be measured, since part of it is unseen.
+     * It is treated as unbounded, as is every cell of a grid with no coastline at all.
+     */
+    static #measureLandmasses(grid, ownershipGrid, distanceGrid, seedGrid) {
+        const { width, height, cutEdges } = grid;
+        const total = width * height;
+        const landmassOf = new Int32Array(total).fill(-1);
+        const landmassSizes = [];
+        const stack = new Int32Array(total);
+
+        for (let start = 0; start < total; start++) {
+            if (ownershipGrid[start] !== 1 || landmassOf[start] !== -1) continue;
+
+            const landmass = landmassSizes.length;
+            let reach = 0;
+            let unseen = false;
+            let top = 0;
+            landmassOf[start] = landmass;
+            stack[top++] = start;
+
+            while (top > 0) {
+                const index = stack[--top];
+                const x = index % width;
+                const y = (index - x) / width;
+                if (distanceGrid[index] > reach) reach = distanceGrid[index];
+                if ((x === 0 && cutEdges.left) || (y === 0 && cutEdges.top) || (x === width - 1 && cutEdges.right) || (y === height - 1 && cutEdges.bottom)) unseen = true;
+
+                if (x > 0) top = ProceduralEngine.#joinLandmass(index - 1, landmass, ownershipGrid, landmassOf, stack, top);
+                if (x < width - 1) top = ProceduralEngine.#joinLandmass(index + 1, landmass, ownershipGrid, landmassOf, stack, top);
+                if (y > 0) top = ProceduralEngine.#joinLandmass(index - width, landmass, ownershipGrid, landmassOf, stack, top);
+                if (y < height - 1) top = ProceduralEngine.#joinLandmass(index + width, landmass, ownershipGrid, landmassOf, stack, top);
+            }
+
+            landmassSizes.push(unseen ? Infinity : reach);
+        }
+
+        const landmassReach = new Float32Array(total);
+        for (let index = 0; index < total; index++) {
+            let landmass = landmassOf[index];
+
+            if (landmass === -1) {
+                // A sea cell: find the land beside its nearest boundary cell. Boundary cells are
+                // marked where a cell differs from its right or lower neighbour, so the land is
+                // the boundary cell itself or one of those two.
+                const seedX = seedGrid[index * 2];
+                const seedY = seedGrid[index * 2 + 1];
+                if (seedX !== -1 && seedY !== -1) {
+                    const seed = seedY * width + seedX;
+                    if (landmassOf[seed] !== -1) landmass = landmassOf[seed];
+                    else if (seedX < width - 1 && landmassOf[seed + 1] !== -1) landmass = landmassOf[seed + 1];
+                    else if (seedY < height - 1 && landmassOf[seed + width] !== -1) landmass = landmassOf[seed + width];
+                }
+            }
+
+            landmassReach[index] = landmass === -1 ? Infinity : landmassSizes[landmass];
+        }
+
+        return landmassReach;
+    }
+
+    /** Adds a neighbouring land cell to the landmass being traced, if it is not in one yet. */
+    static #joinLandmass(index, landmass, ownershipGrid, landmassOf, stack, top) {
+        if (ownershipGrid[index] !== 1 || landmassOf[index] !== -1) return top;
+        landmassOf[index] = landmass;
+        stack[top] = index;
+        return top + 1;
+    }
+
+    /** How large the landmass nearest a world position is (see #measureLandmasses). */
+    #sampleLandmassReach(field, worldX, worldY) {
+        if (!field.landmassReach) return Infinity;
+        const gridX = Math.round(Math.max(0, Math.min(field.width - 1, (worldX - field.u0) * field.cellsPerPixel)));
+        const gridY = Math.round(Math.max(0, Math.min(field.height - 1, (worldY - field.v0) * field.cellsPerPixel)));
+        return field.landmassReach[gridY * field.width + gridX];
+    }
+
+    /**
+     * Creates a flat, memory-efficient binary map of land/ocean ownership, one entry per grid
+     * cell, each cell tested at its world position.
+     */
+    #generateOwnershipGrid(grid, validMasks) {
+        const { width, height, u0, v0, cellsPerPixel } = grid;
+        const ownership = new Uint8Array(width * height);
         const compiledMasks = this.#compileMaskData(validMasks);
 
         for (let y = 0; y < height; y++) {
+            const worldY = v0 + y / cellsPerPixel;
             for (let x = 0; x < width; x++) {
-                grid[y * width + x] = this.#resolvePixelOwnership(x, y, compiledMasks);
+                ownership[y * width + x] = this.#resolvePixelOwnership(u0 + x / cellsPerPixel, worldY, compiledMasks);
             }
         }
 
-        return grid;
+        return ownership;
+    }
+
+    /**
+     * Reads the coastline distance field at a world position, between cells where it falls
+     * between them. Positions beyond the field read its nearest edge.
+     */
+    #sampleCoastDistance(field, worldX, worldY) {
+        const gridX = Math.max(0, Math.min(field.width - 1, (worldX - field.u0) * field.cellsPerPixel));
+        const gridY = Math.max(0, Math.min(field.height - 1, (worldY - field.v0) * field.cellsPerPixel));
+        return this.#bilinearSample(field.distances, field.width, field.height, gridX, gridY);
     }
 
     /**
@@ -813,14 +1270,15 @@ export class ProceduralEngine {
     /**
      * Resolves final signed distances using O(1) lookups against the cached ownership grid.
      */
-    #resolveAbsoluteDistances(seedGrid, distanceGrid, ownershipGrid, width, height) {
+    #resolveAbsoluteDistances(seedGrid, distanceGrid, ownershipGrid, width, height, enclosedDistance = 0) {
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const index = y * width + x;
                 const seedX = seedGrid[index * 2];
                 const seedY = seedGrid[index * 2 + 1];
 
-                let distance = 0;
+                // No coastline reached this cell (there is none in the whole grid)
+                let distance = enclosedDistance;
                 if (seedX !== -1 && seedY !== -1) {
                     distance = Math.hypot(x - seedX, y - seedY);
                 }
@@ -839,70 +1297,124 @@ export class ProceduralEngine {
      * the coastline within a tapered band either side of the edge (see
      * #computeEffectiveCoastDistance), so coastlineFracture actually shapes the coastline rather
      * than only bending a line that still traces the mask's own polygon.
+     *
+     * All noise is sampled at world positions (see generateGuidedTopography), so a regional map
+     * reads the same noise as its parent at every point. Two values from the terrain frame
+     * decide what differs between maps:
+     *   - `resolutionScale` multiplies every setting measured in pixels (Continent Scale, the
+     *     coastal band and the warp amplitude), so on a map twice the baseline size they span the
+     *     same share of the world and a slider value has the same effect at any size.
+     *     The fixed offsets that pick separate regions of the noise for the warp and the boundary
+     *     noise are deliberately NOT scaled. Scaling them would make maps of different sizes draw
+     *     the very same coastline from the same masks, but it would also move every map onto a
+     *     different region of the noise from the one the legacy rules used, so a legacy map
+     *     updated to these rules could never be brought back to its familiar coastline. Unscaled,
+     *     an updated map keeps its bays and inlets where they were, and matches its old look once
+     *     Coastline Fracture is divided by the scale (see TerrainVersion.planUpgrade); maps of
+     *     different sizes still get coastlines of the same character, just not identical ones.
+     *   - `detailOctaves` adds finer layers to the coastline and land detail noise, in step with
+     *     how many more pixels per unit of the world this map has than the baseline.
+     * Both are neutral (1 and 0) for a legacy map, which therefore generates exactly as before.
+     *
+     * A third, `coastalBuffers`, switches from the legacy coastal profile (Continent Scale ramp
+     * plus the Continental Shelf terrace around sea level) to the current one (see
+     * #shapeCoastalProfile), and stops Continent Scale from resizing the coastline noise (see
+     * #coastlineNoiseScale).
      */
-    #applyGuidedDetail(width, height, params, distanceField, elevationData) {
+    #applyGuidedDetail(width, height, params, frame, field, elevationData) {
+        const generation = FILRODENSWMB.GENERATION;
         const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
-        const eScale = params.noise.elevation.scale;
+        const zoom = frame.zoom;
+        const scale = frame.resolutionScale;
+        const extraOctaves = frame.detailOctaves;
+
+        // The elevation noise scale is stored per map (a regional map's is already divided by its
+        // zoom); multiplying by the zoom converts it back to world pixels.
+        const eScale = params.noise.elevation.scale * zoom;
         const eOctaves = params.noise.elevation.octaves;
         const eStretch = params.noise.elevation.stretch ?? 1.0;
+        const panX = params.noise.offsetX ?? 0;
+        const panY = params.noise.offsetY ?? 0;
 
-        const fracture = params.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
-        const coastalBand = params.coastalBand ?? FILRODENSWMB.GENERATION.COASTAL_BAND;
-        const continentScale = params.continentScale ?? FILRODENSWMB.GENERATION.CONTINENT_SCALE;
-        const shelfRange = params.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
-        const macroScale = 1 / Math.max(width, height);
+        const fracture = params.coastlineFracture ?? generation.COASTLINE_FRACTURE;
+        const coastalBand = (params.coastalBand ?? generation.COASTAL_BAND) * scale;
+        const continentScale = (params.continentScale ?? generation.CONTINENT_SCALE) * scale;
+        const shelfRange = params.shelfRange ?? generation.SHELF_RANGE;
+        const macroScale = 1 / Math.max(frame.rootW, frame.rootH);
 
-        // How far, in pixels, either side of the drawn edge the coastline may wander - and how
-        // strongly - before tapering back to the mask's own shape. Kept once here, outside the
-        // per-pixel loop below, since none of these depend on x/y.
-        const coastalVariance = FILRODENSWMB.GENERATION.COASTAL_VARIANCE;
-        const boundaryVarianceBand = continentScale * coastalVariance.BAND_RATIO;
-        const boundaryVarianceAmplitude = continentScale * coastalVariance.AMPLITUDE_RATIO * fracture;
-        const boundaryNoiseScale = macroScale * coastalVariance.FREQUENCY_MULT;
+        const warp = {
+            amplitude: generation.WARP.AMPLITUDE * scale,
+            frequency: macroScale * generation.WARP.FREQUENCY_MULT,
+            offsets: {
+                xx: generation.WARP.OFFSETS.X.X,
+                xy: generation.WARP.OFFSETS.X.Y,
+                yx: generation.WARP.OFFSETS.Y.X,
+                yy: generation.WARP.OFFSETS.Y.Y,
+            },
+        };
 
-        // Defines how far inland/out to sea the macro structure reaches its peak depth/height
+        // How far, in world pixels, either side of the drawn edge the coastline may wander - and
+        // how strongly - before tapering back to the mask's own shape. Kept once here, outside
+        // the per-pixel loop below, since none of these depend on x/y.
+        const coastalVariance = generation.COASTAL_VARIANCE;
+        const coastlineNoiseScale = ProceduralEngine.#coastlineNoiseScale(params, frame);
+        const boundary = {
+            band: coastlineNoiseScale * coastalVariance.BAND_RATIO,
+            amplitude: coastlineNoiseScale * coastalVariance.AMPLITUDE_RATIO * fracture,
+            noiseScale: macroScale * coastalVariance.FREQUENCY_MULT,
+            offsetX: coastalVariance.NOISE_OFFSET.X,
+            offsetY: coastalVariance.NOISE_OFFSET.Y,
+            extraOctaves,
+        };
+        const coastalProfile = frame.coastalBuffers ? ProceduralEngine.#resolveCoastalProfile(params, frame) : null;
+        if (coastalProfile && field.ridges) coastalProfile.ridges = ProceduralEngine.#resolveRidges(params, frame, field.ridges);
+
+        // One reusable record of the point being shaped, filled in afresh for every pixel under
+        // the current coastal profile, so the loop allocates nothing per pixel
+        const pixel = { worldX: 0, worldY: 0, sampleX: 0, sampleY: 0, distance: 0, detailNoise: 0, landmassReach: 0 };
+
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                const worldX = x + (params.noise.offsetX ?? 0);
-                const worldY = y + (params.noise.offsetY ?? 0);
+                // Noise position in world pixels, including the map's pan, and the matching
+                // position in the coastline field (world pixels without the pan)
+                const worldX = (x + panX) / zoom;
+                const worldY = (y + panY) / zoom;
+                const fieldX = frame.originX + x / zoom;
+                const fieldY = frame.originY + y / zoom;
                 const index = y * width + x;
 
                 // 1. Apply Domain Warping
-                const warpX =
-                    (this.#fbm(
-                        worldX + FILRODENSWMB.GENERATION.WARP.OFFSETS.X.X,
-                        worldY + FILRODENSWMB.GENERATION.WARP.OFFSETS.X.Y,
-                        FILRODENSWMB.GENERATION.WARP.OCTAVES,
-                        macroScale * FILRODENSWMB.GENERATION.WARP.FREQUENCY_MULT,
-                    ) -
-                        0.5) *
-                    fracture *
-                    FILRODENSWMB.GENERATION.WARP.AMPLITUDE;
-                const warpY =
-                    (this.#fbm(
-                        worldX + FILRODENSWMB.GENERATION.WARP.OFFSETS.Y.X,
-                        worldY + FILRODENSWMB.GENERATION.WARP.OFFSETS.Y.Y,
-                        FILRODENSWMB.GENERATION.WARP.OCTAVES,
-                        macroScale * FILRODENSWMB.GENERATION.WARP.FREQUENCY_MULT,
-                    ) -
-                        0.5) *
-                    fracture *
-                    FILRODENSWMB.GENERATION.WARP.AMPLITUDE;
+                const warpX = (this.#fbm(worldX + warp.offsets.xx, worldY + warp.offsets.xy, generation.WARP.OCTAVES, warp.frequency) - 0.5) * fracture * warp.amplitude;
+                const warpY = (this.#fbm(worldX + warp.offsets.yx, worldY + warp.offsets.yy, generation.WARP.OCTAVES, warp.frequency) - 0.5) * fracture * warp.amplitude;
 
                 // 2. Sample the macro distance field at the warped position with true sub-pixel
                 // (bilinear) precision, rather than snapping to the nearest whole pixel - this
                 // keeps coastlineFracture's effect smooth instead of quantised to a single pixel.
-                const sampleX = Math.max(0, Math.min(width - 1, x + warpX));
-                const sampleY = Math.max(0, Math.min(height - 1, y + warpY));
-                const macroDistance = this.#bilinearSample(distanceField, width, height, sampleX, sampleY);
+                const sampleX = Math.max(0, Math.min(frame.rootW - 1, fieldX + warpX));
+                const sampleY = Math.max(0, Math.min(frame.rootH - 1, fieldY + warpY));
+                const macroDistance = this.#sampleCoastDistance(field, sampleX, sampleY);
 
                 // 3. Let tapered, independent noise perturb that macro distance, so the actual
                 // coastline can move organically near the drawn edge instead of only following
                 // the (warped) shape of the mask itself.
-                const effectiveDistance = this.#computeEffectiveCoastDistance(worldX, worldY, macroDistance, boundaryVarianceBand, boundaryVarianceAmplitude, boundaryNoiseScale);
+                const effectiveDistance = this.#computeEffectiveCoastDistance(worldX, worldY, macroDistance, boundary);
 
                 // 4. Base Noise & Suppression
-                const detailNoise = this.#fbm(worldX + warpX, worldY + warpY, eOctaves, eScale);
+                const detailNoise = this.#fbm(worldX + warpX, worldY + warpY, eOctaves, eScale, extraOctaves);
+
+                if (coastalProfile) {
+                    pixel.worldX = worldX;
+                    pixel.worldY = worldY;
+                    pixel.sampleX = sampleX;
+                    pixel.sampleY = sampleY;
+                    pixel.distance = effectiveDistance;
+                    pixel.detailNoise = detailNoise;
+                    pixel.landmassReach = this.#sampleLandmassReach(field, sampleX, sampleY);
+                    const finalElev = this.#shapeCoastalProfile(pixel, seaLevel, eStretch, coastalProfile);
+                    elevationData[index] = Math.max(0, Math.min(1, finalElev));
+                    continue;
+                }
+
                 const noiseWeight = this.#smoothstep(0, coastalBand, Math.abs(effectiveDistance));
 
                 // 5. Macro Structure (Ease-out curve mapped 0.0 to 1.0)
@@ -915,14 +1427,14 @@ export class ProceduralEngine {
 
                 if (effectiveDistance >= 0) {
                     // LAND: Mathematically guaranteed to generate above seaLevel
-                    let baseTexture = structure * FILRODENSWMB.GENERATION.BLEND_WEIGHTS.GUIDED_MACRO + detailNoise * noiseWeight * FILRODENSWMB.GENERATION.BLEND_WEIGHTS.GUIDED_DETAIL;
+                    let baseTexture = structure * generation.BLEND_WEIGHTS.GUIDED_MACRO + detailNoise * noiseWeight * generation.BLEND_WEIGHTS.GUIDED_DETAIL;
                     baseTexture = Math.pow(baseTexture, eStretch);
                     finalElev = seaLevel + baseTexture * (1.0 - seaLevel);
                 } else {
                     // OCEAN: Mathematically guaranteed to generate below seaLevel
                     let baseTexture = structure * 0.5 + detailNoise * noiseWeight * 0.5;
                     // Capped to prevent breaching the absolute abyss limit
-                    finalElev = seaLevel - baseTexture * (seaLevel * FILRODENSWMB.GENERATION.OCEAN_DEPTH_CAP);
+                    finalElev = seaLevel - baseTexture * (seaLevel * generation.OCEAN_DEPTH_CAP);
                 }
 
                 // 7. Continental Shelving
@@ -933,19 +1445,174 @@ export class ProceduralEngine {
     }
 
     /**
+     * The current coastal profile: the elevation at a point, from its distance to the coastline
+     * (positive on land, negative at sea, in world pixels) and its detail noise.
+     *
+     * Along the coast lie two bands whose widths come from the sliders (see
+     * FILRODENSWMB.GENERATION.COASTAL_PROFILE), each wandering a little along the coast so it
+     * does not trace the coastline exactly:
+     *   - On land, a coastal plain: low ground that rises only a little towards its inland edge
+     *     and keeps some of its detail noise, so it reads as gently rolling lowland. Beyond it
+     *     the land rises to its full height over Continent Scale, on the same curve the legacy
+     *     profile uses, so a Coastal Plains width of 0 gives exactly the legacy land shape.
+     *   - At sea, a continental shelf: shallow water that deepens only a little towards its
+     *     outer edge. Beyond it the seabed falls steeply down the continental slope and levels
+     *     out into the abyssal plain, which carries only gentle noise, so deep water stays deep.
+     *
+     * Continent Scale sets how quickly the land rises once past the plain, and Ocean Scale how
+     * quickly the seabed falls once past the shelf; neither does anything else.
+     *
+     * A landmass smaller than that is never far enough from its coast to rise fully, so small
+     * islands would stay almost flat. Instead the land rises over the landmass's own size when
+     * that is shorter (`landmassReach`, see #measureLandmasses), and its coastal plain takes up
+     * no more than a set share of it, so an island of any size has hills and a high point while a
+     * continent keeps the broad slopes Continent Scale gives it.
+     *
+     * Out on the abyssal plain, mid-ocean ridges rise between continents (see #ridgeLift).
+     *
+     * @param {{worldX: number, worldY: number, sampleX: number, sampleY: number, distance: number,
+     *   detailNoise: number, landmassReach: number}} pixel - The point being shaped: its noise
+     *   position, its warped position in the coastline fields, its distance to the coastline
+     *   (positive on land), its detail noise and the size of its nearest landmass.
+     */
+    #shapeCoastalProfile(pixel, seaLevel, stretch, profile) {
+        const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE;
+        const offset = settings.BUFFER_VARIATION_OFFSET;
+        const reach = Math.abs(pixel.distance);
+
+        // Where along the coast the bands are wider or narrower than the slider says
+        const widthFactor = profile.variesWidth ? 1 + (this.#fbm(pixel.worldX + offset.X, pixel.worldY + offset.Y, settings.BUFFER_VARIATION_OCTAVES, profile.variationScale) - 0.5) * 2 * settings.BUFFER_VARIATION : 1;
+        const nearCoast = this.#smoothstep(0, profile.coastalBand, reach);
+
+        if (pixel.distance >= 0) return this.#shapeLand(pixel, reach, widthFactor, nearCoast, seaLevel, stretch, profile);
+
+        // Keep every sea pixel below sea level, however the noise falls
+        const minimumDepth = 0.002;
+        const depth = this.#shapeSeabed(pixel, reach, widthFactor, nearCoast, profile);
+        return seaLevel - Math.max(minimumDepth, Math.min(1, depth)) * profile.oceanDepth;
+    }
+
+    /** The land side of the current coastal profile (see #shapeCoastalProfile). */
+    #shapeLand(pixel, reach, widthFactor, nearCoast, seaLevel, stretch, profile) {
+        const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE;
+        const landmassReach = pixel.landmassReach;
+        const plainWidth = Math.min(profile.plainWidth * widthFactor, landmassReach * settings.PLAIN_SHARE_OF_LANDMASS);
+        const plainRise = plainWidth > 0 ? settings.PLAIN_RISE : 0;
+        const riseLength = Math.min(profile.continentScale, Math.max(profile.minimumRise, (landmassReach - plainWidth) * settings.LANDMASS_RISE_FACTOR));
+        let structure;
+
+        if (reach < plainWidth) {
+            const across = reach / plainWidth;
+            structure = plainRise * across * across * (3 - 2 * across);
+        } else {
+            const beyond = riseLength > 0 ? Math.min(1, (reach - plainWidth) / riseLength) : 1;
+            structure = plainRise + (1 - plainRise) * (1 - Math.pow(1 - beyond, 2));
+        }
+
+        // Detail fades in from the coast as in the legacy profile, but only partly across
+        // the plain; the rest arrives once past the plain's inland edge.
+        const pastPlain = this.#smoothstep(plainWidth, plainWidth + profile.coastalBand, reach);
+        const noiseWeight = settings.PLAIN_DETAIL * nearCoast + (1 - settings.PLAIN_DETAIL) * pastPlain;
+
+        const blendWeights = FILRODENSWMB.GENERATION.BLEND_WEIGHTS;
+        const baseTexture = Math.pow(Math.max(0, structure * blendWeights.GUIDED_MACRO + pixel.detailNoise * noiseWeight * blendWeights.GUIDED_DETAIL), stretch);
+
+        // Keep every land pixel clearly above sea level. Right at the coast the height can be
+        // so small that storing it as a 32-bit float rounds it down onto sea level, which
+        // would turn it into sea; how often that happens would then depend on the band
+        // widths, and they must never move the coastline.
+        const minimumHeight = 0.0001;
+        return seaLevel + Math.max(minimumHeight, baseTexture) * (1.0 - seaLevel);
+    }
+
+    /**
+     * The sea side of the current coastal profile (see #shapeCoastalProfile), as a share of the
+     * full ocean depth: shelf, then continental slope, then abyssal plain, with any mid-ocean
+     * ridge rising from the abyssal plain.
+     */
+    #shapeSeabed(pixel, reach, widthFactor, nearCoast, profile) {
+        const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE;
+        const shelfWidth = profile.shelfWidth * widthFactor;
+        const shelfEdgeDepth = shelfWidth > 0 ? settings.SHELF_DEPTH : 0;
+
+        if (reach < shelfWidth) {
+            return shelfEdgeDepth * (reach / shelfWidth) + (pixel.detailNoise - 0.5) * settings.SHELF_NOISE * nearCoast;
+        }
+
+        const slopeLength = profile.oceanScale * settings.SLOPE_REACH;
+        const beyond = slopeLength > 0 ? Math.min(1, (reach - shelfWidth) / slopeLength) : 1;
+        const descent = 1 - Math.pow(1 - beyond, settings.SLOPE_EXPONENT);
+        const noise = (pixel.detailNoise - 0.5) * (settings.SHELF_NOISE + settings.ABYSS_NOISE * descent) * nearCoast;
+        const depth = shelfEdgeDepth + (settings.ABYSS_DEPTH - shelfEdgeDepth) * descent + noise;
+
+        return profile.ridges && descent > 0 ? depth - this.#ridgeLift(pixel, descent, profile.ridges) : depth;
+    }
+
+    /**
+     * Everything the mid-ocean ridges need that stays the same across the whole map, in world
+     * pixels and shares of the full ocean depth, worked out once per generation.
+     */
+    static #resolveRidges(params, frame, field) {
+        const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE.OCEAN_RIDGES;
+        const scale = frame.resolutionScale;
+
+        return {
+            field,
+            height: ProceduralEngine.#ridgeStrengthOf(params) * settings.HEIGHT,
+            halfWidth: settings.HALF_WIDTH * scale,
+            riftWidth: settings.RIFT_WIDTH * scale,
+            wander: settings.WANDER * scale,
+            wanderScale: 1 / (settings.WANDER_LENGTH * scale),
+            heightScale: 1 / (settings.HEIGHT_VARIATION_LENGTH * scale),
+        };
+    }
+
+    /**
+     * How far a mid-ocean ridge lifts the seabed at a point, as a share of the full ocean depth.
+     *
+     * The crest follows the ridge line (see #buildRidgeField), wandering from side to side with
+     * noise so it is never a clean Voronoi edge, and rising higher or lower along its length. Its
+     * flanks fall away with the square root of the distance from the crest (steep at first, then
+     * easing out into the abyssal plain), much as a real ridge's flanks deepen as the new seabed
+     * spreading from it cools. A narrow rift valley runs down the crest itself.
+     *
+     * The lift fades out with the continental slope (`descent` from 0 at the shelf edge to 1 on
+     * the abyssal plain, squared), so a ridge never climbs the slope or reaches the shelf where
+     * two continents lie close together.
+     */
+    #ridgeLift(pixel, descent, ridges) {
+        const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE.OCEAN_RIDGES;
+        const offset = settings.NOISE_OFFSET;
+        const wanderX = (this.#fbm(pixel.worldX + offset.X, pixel.worldY + offset.Y, settings.WANDER_OCTAVES, ridges.wanderScale) - 0.5) * 2 * ridges.wander;
+        const wanderY = (this.#fbm(pixel.worldX + offset.Y, pixel.worldY - offset.X, settings.WANDER_OCTAVES, ridges.wanderScale) - 0.5) * 2 * ridges.wander;
+        const distance = this.#sampleCoastDistance(ridges.field, pixel.sampleX + wanderX, pixel.sampleY + wanderY);
+        if (distance >= ridges.halfWidth) return 0;
+
+        const flank = 1 - Math.sqrt(distance / ridges.halfWidth);
+        const rift = settings.RIFT_DEPTH * (1 - this.#smoothstep(0, ridges.riftWidth, distance));
+        const heightNoise = this.#fbm(pixel.worldX - offset.X, pixel.worldY + offset.Y, settings.HEIGHT_VARIATION_OCTAVES, ridges.heightScale);
+        const heightFactor = 1 + (heightNoise - 0.5) * 2 * settings.HEIGHT_VARIATION;
+
+        return ridges.height * Math.max(0, flank - rift) * heightFactor * descent * descent;
+    }
+
+    /**
      * Perturbs a macro coastline distance (from the guided-mode JFA distance field) with
      * independent, tapered noise. The perturbation is strongest exactly at the drawn edge and
-     * fades to zero over `boundaryVarianceBand`, via the same smoothstep-based taper used
-     * elsewhere in this file - so land/ocean ownership, and the coastal shelving maths that
-     * depends on a stable far-field crossing, are completely unaffected beyond that band. Only
-     * the zone immediately around the drawn edge, inside and out, can actually move.
+     * fades to zero over `boundary.band`, via the same smoothstep-based taper used elsewhere in
+     * this file - so land/ocean ownership, and the coastal shelving maths that depends on a
+     * stable far-field crossing, are completely unaffected beyond that band. Only the zone
+     * immediately around the drawn edge, inside and out, can actually move.
+     *
+     * @param {object} boundary - Band, amplitude, noise scale, noise offsets and extra octaves,
+     *   all resolved once per generation by #applyGuidedDetail.
      */
-    #computeEffectiveCoastDistance(worldX, worldY, macroDistance, boundaryVarianceBand, boundaryVarianceAmplitude, boundaryNoiseScale) {
+    #computeEffectiveCoastDistance(worldX, worldY, macroDistance, boundary) {
         const coastalVariance = FILRODENSWMB.GENERATION.COASTAL_VARIANCE;
-        const boundaryNoise = this.#fbm(worldX + coastalVariance.NOISE_OFFSET.X, worldY + coastalVariance.NOISE_OFFSET.Y, coastalVariance.OCTAVES, boundaryNoiseScale);
-        const boundaryTaper = 1.0 - this.#smoothstep(0, boundaryVarianceBand, Math.abs(macroDistance));
+        const boundaryNoise = this.#fbm(worldX + boundary.offsetX, worldY + boundary.offsetY, coastalVariance.OCTAVES, boundary.noiseScale, boundary.extraOctaves);
+        const boundaryTaper = 1.0 - this.#smoothstep(0, boundary.band, Math.abs(macroDistance));
 
-        return macroDistance + (boundaryNoise - 0.5) * 2 * boundaryVarianceAmplitude * boundaryTaper;
+        return macroDistance + (boundaryNoise - 0.5) * 2 * boundary.amplitude * boundaryTaper;
     }
 
     /**

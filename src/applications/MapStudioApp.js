@@ -406,6 +406,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context.uiState = this.uiState;
         context.currentSaveName = this.currentSaveName;
         context.terrainUpgradeAvailable = this.terrainUpgrade !== null;
+        context.canCreateRegionalMap = TerrainVersion.canCreateRegionalMap(this.uiState);
+        context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
 
         context.infrastructureIcons = getPinIconPickerList(this.uiState.activeIcon);
         context.builtinPinIcons = getBuiltinPinIconList();
@@ -533,12 +535,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #bindGlobalListeners() {
-        this.element.addEventListener("input", (event) => {
-            if (event.target.type === "range") {
-                const output = event.target.parentElement.querySelector("output");
-                if (output) output.value = event.target.value;
-            }
-        });
+        // Range sliders' value displays and filled tracks are kept up to date module-wide, for
+        // this window and every dialogue alike, by the listeners registered in main.js (see
+        // RangeDisplay).
 
         if (!this.element.dataset.hasDblClickListener) {
             this.element.addEventListener("dblclick", (event) => {
@@ -547,7 +546,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     const defaultVal = this.defaultUiState[target.name];
                     if (defaultVal !== undefined && target.value !== String(defaultVal)) {
                         target.value = defaultVal;
-                        if (target.nextElementSibling?.tagName === "OUTPUT") target.nextElementSibling.value = defaultVal;
+                        // The input event refreshes the value display and filled track (see
+                        // RangeDisplay), and triggers regeneration as a drag would.
                         target.dispatchEvent(new Event("input", { bubbles: true }));
                     }
                 }
@@ -943,7 +943,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #routeProceduralGenerators(target) {
         if (
             target.matches(
-                'input[name="seaLevel"], input[name="tectonicPlates"], input[name="coastlineFracture"], input[name="continentalGrouping"], input[name="shelfRange"], input[name="continentScale"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]',
+                'input[name="seaLevel"], input[name="tectonicPlates"], input[name="coastlineFracture"], input[name="continentalGrouping"], input[name="shelfRange"], input[name="coastalPlain"], input[name="continentScale"], input[name="oceanScale"], input[name="oceanRidges"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]',
             )
         ) {
             this.debouncedGenerateTerrain();
@@ -2125,7 +2125,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.coastlineFracture = p.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
         this.uiState.continentalGrouping = p.continentalGrouping ?? FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING;
         this.uiState.shelfRange = p.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
+        this.uiState.coastalPlain = p.coastalPlain ?? FILRODENSWMB.GENERATION.COASTAL_PLAIN;
         this.uiState.continentScale = p.continentScale ?? FILRODENSWMB.GENERATION.CONTINENT_SCALE;
+        // Maps saved before Ocean Scale existed used Continent Scale for the sea too, so an
+        // updated map starts with the same value on both sides.
+        this.uiState.oceanScale = p.oceanScale ?? this.uiState.continentScale;
+        this.uiState.oceanRidges = p.oceanRidges ?? FILRODENSWMB.GENERATION.OCEAN_RIDGES;
         this.uiState.globalTemp = p.globalTemp;
         this.uiState.seasonOffset = p.seasonOffset;
         this.uiState.latTop = p.latTop;
@@ -3174,9 +3179,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.setReferenceMode(newTool === "reference");
 
         if (this.canvasEngine.setCropMode) {
-            const isCropAllowed = ["standard", "flat"].includes(this.uiState.generationEngine);
-            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode && isCropAllowed);
+            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode && this.#isCropToolSelected());
         }
+    }
+
+    /**
+     * Whether the Scene tool's edit mode is currently set to the regional map crop, as opposed
+     * to something else that takes clicks on the canvas. Standard and flat maps have nothing else,
+     * so it is always the crop for them. Guided maps share the edit mode with land mask drawing,
+     * so it is the crop only once the crop button has been chosen (and only if a regional map
+     * can be made from this map at all; see TerrainVersion.canCreateRegionalMap).
+     */
+    #isCropToolSelected() {
+        if (!TerrainVersion.canCreateRegionalMap(this.uiState)) return false;
+        if (this.uiState.generationEngine !== "guided") return true;
+        return this.uiState.sceneMode === "crop";
     }
 
     /**
@@ -3652,11 +3669,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /**
      * What updating the open map would change (see TerrainUpgrade.assess), with the processing
-     * overlay shown while it is measured. Only legacy regional maps can change, so every other
-     * map is answered at once without measuring anything.
+     * overlay shown while it is measured. Only legacy regional maps and legacy guided maps that
+     * are not the baseline size can change, so every other map is answered at once without
+     * measuring anything.
      */
     async #assessTerrainUpgrade() {
-        if (!TerrainVersion.isLegacyRegional(this.uiState)) return null;
+        if (!TerrainVersion.isUpgradeCandidate(this.uiState)) return null;
 
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.CheckingTerrainUpdate"));
         try {
@@ -4017,6 +4035,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (needsTerrain) this.requestTerrainUpdate();
         }
 
+        // The crop takes over canvas clicks while it is showing, so it is shown only in its own
+        // mode, never while land masks are being drawn
+        this.canvasEngine?.setCropMode?.(this.uiState.isEditMode && this.activeTool === "scene" && this.#isCropToolSelected());
+
         this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
@@ -4130,9 +4152,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.setEditMode(isActivating);
 
             if (this.canvasEngine.setCropMode) {
-                // Only enable the crop tool for standard and flat maps
-                const isCropAllowed = ["standard", "flat"].includes(this.uiState.generationEngine);
-                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene" && isCropAllowed);
+                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene" && this.#isCropToolSelected());
             }
         }
 

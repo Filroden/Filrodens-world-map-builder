@@ -9,8 +9,9 @@ import { loadMapData, updateMapDataFields } from "../data/compendium.js";
  *
  * Saved maps store settings, not pixels, so a map regenerates from its settings every time it is
  * opened. A map built with legacy rules keeps regenerating with them (see TerrainVersion) until
- * its owner chooses to update it. Only legacy regional maps can change under the current rules;
- * everything else regenerates identically, so nothing is offered for it.
+ * its owner chooses to update it. Only legacy regional maps, and legacy guided maps that are not
+ * the baseline size, can change under the current rules; everything else regenerates
+ * identically, so nothing is offered for it.
  *
  * The update is applied to the open map only. It becomes permanent when the map is saved, and
  * reloading the map without saving restores the original.
@@ -76,25 +77,39 @@ export class TerrainUpgrade {
 
     /**
      * Works out whether updating the open map to the current terrain rules would visibly change
-     * it, and how.
+     * it, and how. Two kinds of map can change, for different reasons, and the update is
+     * described to the user differently for each (`kind`):
      *
-     * Two things can change on a legacy regional map. Its base terrain gains finer detail, but
-     * only in standard mode (the only engine whose base terrain is built from the elevation noise
-     * that takes extra octaves). Its biomes can change in any mode: the corrected wind distance
-     * moves rain shadows, and moisture and temperature gain finer detail too. Whether any biome
-     * actually changes depends on the terrain the map really has (a flat map with no hand-edited
-     * terrain has no slopes for the wind to act on), so it is measured on the open map rather
-     * than assumed from its engine; see #changesBiomes.
+     * - "coastline": a legacy map whose engine's coastline rules have changed (a guided map). Its
+     *   coastal profile is always rebuilt, so its relief and ocean depths change whatever its
+     *   size and nothing needs measuring. If it is not the baseline size (`resized`), its
+     *   coastline settings, which were fixed pixel sizes, are also scaled to its size, and its
+     *   Coastline Fracture is lowered to keep its coastline's shape (reported as `fracture`).
      *
-     * Must be called once the map has finished generating, since it reads the current moisture,
-     * temperature and elevation.
+     * - "regional": a legacy regional map. Its base terrain gains finer detail, but only in
+     *   standard mode (the only engine whose base terrain is built from the elevation noise that
+     *   takes extra octaves; no legacy regional map can be guided). Its biomes can change in any
+     *   mode: the corrected wind distance moves rain shadows, and moisture and temperature gain
+     *   finer detail too. Whether any biome actually changes depends on the terrain the map
+     *   really has (a flat map with no hand-edited terrain has no slopes for the wind to act on),
+     *   so it is measured on the open map rather than assumed from its engine; see
+     *   #changesBiomes. This must run once the map has finished generating, since it reads the
+     *   current moisture, temperature and elevation.
      *
      * @param {object} app - The MapStudioApp instance, with a legacy map open.
-     * @returns {{plan: object, changesTerrain: boolean, changesBiomes: boolean}|null} What the
-     *   update would apply and change, or null if it would change nothing visible.
+     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean}|null}
+     *   What the update would apply and change, or null if it would change nothing visible.
      */
     static assess(app) {
         const state = app.uiState;
+
+        if (TerrainVersion.isLegacyCoastline(state)) {
+            const plan = TerrainVersion.planUpgrade(state);
+            const resized = TerrainVersion.isLegacyResized(state);
+            const fracture = { before: state.coastlineFracture, after: plan.coastlineFracture ?? state.coastlineFracture };
+            return { kind: "coastline", plan, resized, fracture, changesTerrain: true, changesBiomes: true };
+        }
+
         if (!TerrainVersion.isLegacyRegional(state)) return null;
 
         const plan = TerrainVersion.planUpgrade(state, app.legacyRootSize);
@@ -102,7 +117,7 @@ export class TerrainUpgrade {
         const changesBiomes = this.#changesBiomes(app, plan);
 
         if (!changesTerrain && !changesBiomes) return null;
-        return { plan, changesTerrain, changesBiomes };
+        return { kind: "regional", plan, changesTerrain, changesBiomes };
     }
 
     /**
@@ -162,9 +177,13 @@ export class TerrainUpgrade {
      * Applies an update to the open map and regenerates it. The map is marked as having unsaved
      * changes, so the update is kept only if the map is saved.
      *
-     * The changed settings (revision, wind distance, world description) are all read when the
-     * generation inputs are compared, so the regeneration always rebuilds the base terrain rather
-     * than reusing the one on screen.
+     * The changed settings (revision, wind distance, world description, and Coastline Fracture
+     * where the plan changes it) are all read when the generation inputs are compared, so the
+     * regeneration always rebuilds the base terrain rather than reusing the one on screen.
+     *
+     * The side panel is re-rendered before generating. Generation reads every setting back from
+     * the panel's inputs first (see MapStateManager.getMapParameters), so a slider still showing
+     * the old Coastline Fracture would otherwise put it straight back.
      *
      * @param {object} app - The MapStudioApp instance.
      * @param {object} plan - The settings to apply, from assess().
@@ -173,8 +192,10 @@ export class TerrainUpgrade {
         app.uiState.terrainVersion = plan.terrainVersion;
         app.uiState.windDistance = plan.windDistance;
         app.uiState.world = plan.world;
+        if (plan.coastlineFracture !== undefined) app.uiState.coastlineFracture = plan.coastlineFracture;
         app.uiState.terrainUpgradeDismissed = false;
 
+        await app.render({ parts: ["context"] });
         await app.generateTerrain();
         app.markDirty();
     }

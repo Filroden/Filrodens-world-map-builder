@@ -39,10 +39,19 @@ export const FILRODENSWMB = {
     GENERATION: {
         TECTONIC_PLATES: 10,
         COASTLINE_FRACTURE: 0.3,
+        // The Coastline Fracture slider's step (tools-terrain.hbs uses the same value). Values
+        // worked out in code for the slider, such as the one a map is given when it is updated
+        // to the current terrain rules, are rounded to it so the slider can show them exactly.
+        COASTLINE_FRACTURE_STEP: 0.05,
         CONTINENTAL_GROUPING: 0.4,
         COASTAL_BAND: 30,
         CONTINENT_SCALE: 150,
+        OCEAN_SCALE: 150,
+        // The Mid-Ocean Ridges setting's default (0 is none, 1 the full height in
+        // COASTAL_PROFILE.OCEAN_RIDGES)
+        OCEAN_RIDGES: 0.5,
         SHELF_RANGE: 0.15,
+        COASTAL_PLAIN: 0.05,
         OCEAN_DEPTH_CAP: 0.9,
         MASK_BLEND_WIDTH: 0.25,
         WARP: {
@@ -72,8 +81,9 @@ export const FILRODENSWMB = {
         // Lets tapered, independent noise perturb the guided-mode coastline itself (see
         // ProceduralEngine#computeEffectiveCoastDistance), instead of noise being suppressed to
         // zero exactly at the drawn edge. BAND_RATIO/AMPLITUDE_RATIO are expressed relative to
-        // CONTINENT_SCALE rather than fixed pixel values, so the effect scales sensibly if that
-        // slider is retuned - calibrated against CONTINENT_SCALE's default of 150.
+        // CONTINENT_SCALE, calibrated against its default of 150. Legacy maps multiply them by the
+        // map's own Continent Scale; from terrain revision 2 on they are multiplied by the default
+        // instead, so Continent Scale shapes the relief without also changing the coastline.
         COASTAL_VARIANCE: {
             BAND_RATIO: 0.53,
             AMPLITUDE_RATIO: 1.33,
@@ -82,6 +92,85 @@ export const FILRODENSWMB = {
             // Arbitrary large offsets, matching the pattern of WARP.OFFSETS above, so this noise
             // field samples a different region of the simplex field than the domain warp does.
             NOISE_OFFSET: { X: 4000, Y: 4000 },
+        },
+        // The most cells the guided-mode coastline distance field may have. The field covers the
+        // map plus a margin at up to one cell per map pixel; on a zoomed-in regional map that
+        // would otherwise grow with the square of the zoom, so beyond this size its cells are
+        // made coarser instead (the field is smooth, so it is sampled between cells without
+        // visible steps). A map that was never cropped always gets one cell per pixel.
+        COAST_FIELD_MAX_CELLS: 4000000,
+        // How guided terrain rises from the coast and the seabed falls away from it, from terrain
+        // revision 2 on (see ProceduralEngine#shapeCoastalProfile). Continental Shelf and Coastal
+        // Plains each set the width of a band along the coast: shallow shelf on the sea side, low
+        // plain on the land side. Beyond them, Continent Scale sets how far it takes the land to
+        // reach its full height, and Ocean Scale how far it takes the seabed to reach the
+        // abyssal plain.
+        COASTAL_PROFILE: {
+            // Width of each band, in pixels of a BASELINE_DIMENSION map, for a slider value of 1
+            // (the sliders' maximum).
+            BUFFER_WIDTH: 100,
+            // How much the band widths wander along the coast (0.4 is 40% either way), so the
+            // bands do not trace the coastline exactly, and how long that wandering is, in
+            // pixels of a BASELINE_DIMENSION map.
+            BUFFER_VARIATION: 0.4,
+            BUFFER_VARIATION_LENGTH: 90,
+            BUFFER_VARIATION_OCTAVES: 3,
+            BUFFER_VARIATION_OFFSET: { X: 9100, Y: -7300 },
+            // Share of the land's full height reached at the inland edge of the coastal plain.
+            PLAIN_RISE: 0.06,
+            // Share of the usual land detail noise kept on the coastal plain, so it reads as low,
+            // gently rolling ground rather than a flat sheet.
+            PLAIN_DETAIL: 0.6,
+            // Landmasses too small to rise fully over Continent Scale rise over their own size
+            // instead: the distance from their coast to their middle, less any coastal plain,
+            // times LANDMASS_RISE_FACTOR (above 1 so the middle stops a little short of the full
+            // height). The coastal plain may take up at most PLAIN_SHARE_OF_LANDMASS of that
+            // distance, so a small island is never all plain. LANDMASS_MIN_RISE, in pixels of a
+            // BASELINE_DIMENSION map, stops the tiniest islets turning into spikes.
+            LANDMASS_RISE_FACTOR: 1.25,
+            PLAIN_SHARE_OF_LANDMASS: 0.4,
+            LANDMASS_MIN_RISE: 10,
+            // Shares of the full ocean depth (OCEAN_DEPTH_CAP below sea level) at the outer edge
+            // of the shelf and on the abyssal plain.
+            SHELF_DEPTH: 0.08,
+            ABYSS_DEPTH: 0.85,
+            // The continental slope: the share of Ocean Scale over which the seabed falls
+            // from the shelf edge to the abyssal plain, and how sharply (a higher exponent falls
+            // faster at first and levels out sooner).
+            SLOPE_REACH: 0.6,
+            SLOPE_EXPONENT: 4,
+            // Amplitude of the detail noise on the seabed: on the shelf, and the extra it gains
+            // out on the abyssal plain.
+            SHELF_NOISE: 0.04,
+            ABYSS_NOISE: 0.08,
+            // Mid-ocean ridges, raised along the line through the ocean equally far from two
+            // continents (see ProceduralEngine#buildRidgeField and #ridgeLift). Lengths are in
+            // pixels of a BASELINE_DIMENSION map; heights are shares of the full ocean depth.
+            OCEAN_RIDGES: {
+                // Size of a cell of the grid the ridge lines are found on (the whole map at the
+                // top of the chain of crops, whatever this map's own size or zoom)
+                CELL_SIZE: 4,
+                // Only landmasses whose middle lies at least this far from their coast divide the
+                // ocean; smaller islands would each sit inside their own ring of ridges
+                MIN_LANDMASS_REACH: 25,
+                // Height of the crest above the abyssal plain with the setting at 1
+                HEIGHT: 0.6,
+                // Distance from the crest at which the flanks reach the abyssal plain
+                HALF_WIDTH: 90,
+                // The rift valley along the crest: its width, and its depth as a share of the
+                // ridge's height
+                RIFT_WIDTH: 4,
+                RIFT_DEPTH: 0.2,
+                // How far, and over what length, the crest wanders from side to side
+                WANDER: 14,
+                WANDER_LENGTH: 70,
+                WANDER_OCTAVES: 3,
+                // How much, and over what length, the crest's height varies along the ridge
+                HEIGHT_VARIATION: 0.35,
+                HEIGHT_VARIATION_LENGTH: 120,
+                HEIGHT_VARIATION_OCTAVES: 2,
+                NOISE_OFFSET: { X: 6200, Y: -2900 },
+            },
         },
     },
     // Which revision of the terrain generation rules a saved map was built with. Generation is
@@ -95,10 +184,22 @@ export const FILRODENSWMB = {
     //   2 - regional maps store a wind distance that makes their wind reach exactly their
     //       parent's enlarged by the zoom, whatever the crop's shape, and add finer terrain,
     //       moisture and temperature detail (extra noise octaves) in proportion to how far they
-    //       are zoomed in.
+    //       are zoomed in. Guided terrain is worked out in the pixels of the map at the top of
+    //       its chain of crops (so a regional map matches its parent), and its pixel-sized
+    //       settings are scaled to the map's size (so a slider value looks the same at any
+    //       resolution; see COASTLINE_ENGINES). Its coastal profile is rebuilt: Continental Shelf
+    //       and the new Coastal Plains are bands of set width along the coast, the seabed beyond
+    //       the shelf falls steeply to an abyssal plain, and Continent Scale no longer changes the
+    //       coastline itself (see GENERATION.COASTAL_PROFILE).
     TERRAIN_VERSION: {
         LEGACY: 1,
         CURRENT: 2,
+        // Engines that build their terrain outward from a coastline, and so use the coastline
+        // rules of the current revision: settings measured in pixels of a map BASELINE_DIMENSION
+        // pixels across and scaled to the actual map (before, they were fixed pixel counts, so
+        // the same values gave smoother, straighter coastlines on bigger maps), and the coastal
+        // profile described in GENERATION.COASTAL_PROFILE.
+        COASTLINE_ENGINES: ["guided"],
     },
     LIMITS: {
         HISTORY_MAX: 100,

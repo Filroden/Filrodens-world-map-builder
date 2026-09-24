@@ -1,14 +1,28 @@
 <div class="fwmb-dialog-content">
-    <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntro"}}</p>
+    {{#if isRegional}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntro"}}</p>
 
-    <ul class="fwmb-terrain-update-list">
-        {{#if changesTerrain}}
-            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTerrain"}}</li>
-        {{/if}}
-        {{#if changesBiomes}}
-            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateBiomes"}}</li>
-        {{/if}}
-    </ul>
+        <ul class="fwmb-terrain-update-list">
+            {{#if changesTerrain}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTerrain"}}</li>
+            {{/if}}
+            {{#if changesBiomes}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateBiomes"}}</li>
+            {{/if}}
+        </ul>
+    {{else}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroCoastline"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateProfile"}}</li>
+            {{#if resized}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateCoastlines"}}</li>
+            {{/if}}
+            {{#if fractureChanges}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFracture" before=fracture.before after=fracture.after}}</li>
+            {{/if}}
+        </ul>
+    {{/if}}
 
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TerrainUpdateNotSaved"}}</p>
 

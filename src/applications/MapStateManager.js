@@ -122,7 +122,10 @@ export class MapStateManager {
             coastlineFracture: FILRODENSWMB.GENERATION.COASTLINE_FRACTURE,
             continentalGrouping: FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING,
             shelfRange: FILRODENSWMB.GENERATION.SHELF_RANGE,
+            coastalPlain: FILRODENSWMB.GENERATION.COASTAL_PLAIN,
             continentScale: FILRODENSWMB.GENERATION.CONTINENT_SCALE,
+            oceanScale: FILRODENSWMB.GENERATION.OCEAN_SCALE,
+            oceanRidges: FILRODENSWMB.GENERATION.OCEAN_RIDGES,
 
             activeFeatureMode: "spring",
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
@@ -320,7 +323,10 @@ export class MapStateManager {
             coastlineFracture: state.coastlineFracture,
             continentalGrouping: state.continentalGrouping,
             shelfRange: state.shelfRange,
+            coastalPlain: state.coastalPlain,
             continentScale: state.continentScale,
+            oceanScale: state.oceanScale,
+            oceanRidges: state.oceanRidges,
             globalTemp: state.globalTemp,
             seasonOffset: state.seasonOffset,
             latTop: state.latTop,
@@ -329,9 +335,7 @@ export class MapStateManager {
             riverDensity: state.riverDensity,
             // Values that depend on the map's terrain revision, already resolved into plain
             // numbers so the generation engines never need to know which revision they serve.
-            terrain: {
-                extraOctaves: TerrainVersion.getExtraOctaves(state),
-            },
+            terrain: TerrainVersion.getTerrainParams(state),
             noise: {
                 offsetX: state["noise.offsetX"],
                 offsetY: state["noise.offsetY"],

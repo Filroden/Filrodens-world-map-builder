@@ -73,6 +73,7 @@ export class RegionalExtractor {
             mapRoutes: translate(app.mapRoutes),
             regionLayers: newRegions,
             mapLabels: translate(app.mapLabels),
+            landMasks: state.generationEngine === "guided" ? this.#translateLandMasks(app.landMasks ?? [], cropBox, zoomScale) : [],
             mapDecorations: translate(app.mapDecorations),
             parentId: app.currentSaveId,
         };
@@ -128,6 +129,28 @@ export class RegionalExtractor {
             if (isVisible) newHistory.push(translatedStroke);
         }
         return newHistory;
+    }
+
+    /**
+     * Converts every land mask into the regional map's pixels, keeping all of them.
+     *
+     * Unlike other vector features, a land mask cannot be dropped just because none of its points
+     * falls inside the crop: a crop taken from the middle of a large continent has no mask points
+     * inside it at all, yet the continent's mask is exactly what makes it land. Masks wholly
+     * outside the crop still shape it too, since guided terrain is shaped by coastlines up to
+     * Continent Scale away. Keeping them all is what lets the regional map build the same
+     * coastline its parent did (see ProceduralEngine.generateGuidedTopography); the terrain
+     * pass works out which ones are near enough to matter.
+     */
+    static #translateLandMasks(landMasks, cropBox, zoomScale) {
+        return landMasks.map((mask) => {
+            const translated = foundry.utils.deepClone(mask);
+            translated.points = translated.points.map((point) => ({
+                x: (point.x - cropBox.x) * zoomScale,
+                y: (point.y - cropBox.y) * zoomScale,
+            }));
+            return translated;
+        });
     }
 
     static #translateVectorList(list, cropBox, zoomScale, targetWidth, targetHeight) {
