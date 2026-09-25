@@ -318,6 +318,81 @@ export class ProceduralEngine {
     }
 
     /**
+     * The surface texture of the whole map: fine, rolling roughness from -1 to 1 at every pixel,
+     * which textured Flat ground starts with and the Roughen and Level brushes paint (scaled by
+     * the texture's amplitude, see ProceduralEngine.getSurfaceTextureAmplitude).
+     *
+     * It belongs to the ground, not to the map's pixels: it is read at each pixel's place in the
+     * top map (`params.terrain.world`), in pixels of a BASELINE_DIMENSION map, so a regional map
+     * shows the same texture as its parent and a larger map the same texture as a smaller one.
+     * Wherever there are more pixels to the world (a regional map, or a top map larger than the
+     * baseline), finer layers are added, one per doubling, as for the coastline detail.
+     *
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @param {object} params - Derived map parameters (reads `terrain.world`).
+     * @param {Float32Array} outBuffer - Receives the texture, one value per pixel.
+     * @returns {Float32Array} `outBuffer`.
+     */
+    generateSurfaceTexture(width, height, params, outBuffer) {
+        const settings = FILRODENSWMB.GENERATION.SURFACE_TEXTURE;
+        const world = params?.terrain?.world ?? { zoom: 1, originX: 0, originY: 0, rootW: width, rootH: height };
+        const zoom = world.zoom || 1;
+        const rootSize = Math.max(world.rootW || width / zoom, world.rootH || height / zoom);
+        const baselinePerWorld = FILRODENSWMB.LIMITS.BASELINE_DIMENSION / rootSize;
+        const density = zoom / baselinePerWorld;
+        const extraOctaves = density > 1 ? Math.round(Math.log2(density)) : 0;
+        const scale = 1 / settings.WAVELENGTH;
+
+        for (let y = 0; y < height; y++) {
+            const baselineY = ((world.originY || 0) + y / zoom) * baselinePerWorld + settings.NOISE_OFFSET.Y;
+            for (let x = 0; x < width; x++) {
+                const baselineX = ((world.originX || 0) + x / zoom) * baselinePerWorld + settings.NOISE_OFFSET.X;
+                outBuffer[y * width + x] = this.#signedFbm(baselineX, baselineY, settings.OCTAVES, scale, extraOctaves);
+            }
+        }
+
+        return outBuffer;
+    }
+
+    /**
+     * Fractal noise centred on 0, from -1 to 1, built like #fbm (each layer at double the
+     * frequency and half the amplitude, extra layers left out of the normalising total) but
+     * without #fbm's floor at 0, which would leave flat spots wherever the noise dips lowest.
+     *
+     * The simplex noise itself can reach about 1.5 either way, so the normalised sum passes 1 in
+     * about one pixel in a hundred. Clamping would flatten those pixels into small plateaus
+     * that relief shading shows as blotches; a hyperbolic tangent instead eases the extremes
+     * smoothly towards -1 and 1 and never quite reaches them.
+     */
+    #signedFbm(x, y, octaves, scale, extraOctaves) {
+        let total = 0;
+        let frequency = scale;
+        let amplitude = 1;
+        let maxAmplitude = 0;
+
+        for (let i = 0; i < octaves + extraOctaves; i++) {
+            total += this.simplex.noise2D(x * frequency, y * frequency) * amplitude;
+            if (i < octaves) maxAmplitude += amplitude;
+            amplitude *= 0.5;
+            frequency *= 2;
+        }
+
+        return Math.tanh(total / maxAmplitude);
+    }
+
+    /**
+     * How far the surface texture moves the ground either side of it, in elevation: a share of
+     * the height Flat ground sits above sea level, so textured Flat ground never dips into the sea.
+     *
+     * @returns {number}
+     */
+    static getSurfaceTextureAmplitude() {
+        const generation = FILRODENSWMB.GENERATION;
+        return generation.FLAT_HEIGHT * generation.SURFACE_TEXTURE.AMPLITUDE_SHARE;
+    }
+
+    /**
      * Calculates pure geographical altitude, applying exponents strictly to landmasses.
      */
     generateTopography(width, height, params, outBuffer, tectonicFaults = [], manualRivers = [], bounds = null) {
@@ -344,7 +419,7 @@ export class ProceduralEngine {
 
         // 2. Apply Vector Deformations strictly within the active bounds
         if (tectonicFaults.length > 0) {
-            TectonicEngine.applyTectonicFaults(elevationData, width, height, tectonicFaults, this.simplex, activeBounds);
+            TectonicEngine.applyTectonicFaults(elevationData, width, height, tectonicFaults, this.simplex, activeBounds, params.terrain?.faultFrame);
         }
         if (manualRivers.length > 0) {
             HydrologyEngine.carveManualRivers(elevationData, width, height, manualRivers, this.simplex, params.seaLevel, activeBounds);
@@ -1799,14 +1874,26 @@ export class ProceduralEngine {
         const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE.OCEAN_RIDGES;
         const scale = frame.resolutionScale;
 
+        const hills = settings.ABYSSAL_HILLS;
+        const strength = ProceduralEngine.#ridgeStrengthOf(params);
+
         return {
             field,
-            height: ProceduralEngine.#ridgeStrengthOf(params) * settings.HEIGHT,
+            height: strength * settings.HEIGHT,
             halfWidth: settings.HALF_WIDTH * scale,
             riftWidth: settings.RIFT_WIDTH * scale,
             wander: settings.WANDER * scale,
             wanderScale: 1 / (settings.WANDER_LENGTH * scale),
             heightScale: 1 / (settings.HEIGHT_VARIATION_LENGTH * scale),
+            // Finer layers on the wander and the hills wherever there are more pixels to the
+            // world (a regional map, or a top map larger than the baseline), as for the coastline
+            extraOctaves: frame.detailOctaves,
+            hills: {
+                height: strength * hills.HEIGHT,
+                reach: settings.HALF_WIDTH * hills.REACH * scale,
+                acrossScale: 1 / (hills.WAVELENGTH * scale),
+                alongScale: 1 / (hills.ALONG_LENGTH * scale),
+            },
         };
     }
 
@@ -1814,10 +1901,12 @@ export class ProceduralEngine {
      * How far a mid-ocean ridge lifts the seabed at a point, as a share of the full ocean depth.
      *
      * The crest follows the ridge line (see #buildRidgeField), wandering from side to side with
-     * noise so it is never a clean Voronoi edge, and rising higher or lower along its length. Its
-     * flanks fall away with the square root of the distance from the crest (steep at first, then
-     * easing out into the abyssal plain), much as a real ridge's flanks deepen as the new seabed
-     * spreading from it cools. A narrow rift valley runs down the crest itself.
+     * noise so it is never a clean Voronoi edge (with fine layers, so it kinks as well as bends),
+     * and rising higher or lower along its length. Its flanks fall away with the square root of
+     * the distance from the crest (steep at first, then easing out into the abyssal plain), much
+     * as a real ridge's flanks deepen as the new seabed spreading from it cools. A narrow rift
+     * valley runs down the crest itself, and abyssal hills ridge the flanks and the plain beyond
+     * them (see #abyssalHills).
      *
      * The lift fades out with the continental slope (`descent` from 0 at the shelf edge to 1 on
      * the abyssal plain, squared), so a ridge never climbs the slope or reaches the shelf where
@@ -1826,17 +1915,47 @@ export class ProceduralEngine {
     #ridgeLift(pixel, descent, ridges) {
         const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE.OCEAN_RIDGES;
         const offset = settings.NOISE_OFFSET;
-        const wanderX = (this.#fbm(pixel.worldX + offset.X, pixel.worldY + offset.Y, settings.WANDER_OCTAVES, ridges.wanderScale) - 0.5) * 2 * ridges.wander;
-        const wanderY = (this.#fbm(pixel.worldX + offset.Y, pixel.worldY - offset.X, settings.WANDER_OCTAVES, ridges.wanderScale) - 0.5) * 2 * ridges.wander;
+        const extraOctaves = ridges.extraOctaves;
+        const wanderX = (this.#fbm(pixel.worldX + offset.X, pixel.worldY + offset.Y, settings.WANDER_OCTAVES, ridges.wanderScale, extraOctaves) - 0.5) * 2 * ridges.wander;
+        const wanderY = (this.#fbm(pixel.worldX + offset.Y, pixel.worldY - offset.X, settings.WANDER_OCTAVES, ridges.wanderScale, extraOctaves) - 0.5) * 2 * ridges.wander;
         const distance = this.#sampleCoastDistance(ridges.field, pixel.sampleX + wanderX, pixel.sampleY + wanderY);
-        if (distance >= ridges.halfWidth) return 0;
+        if (distance >= Math.max(ridges.halfWidth, ridges.hills.reach)) return 0;
+
+        const hills = this.#abyssalHills(pixel, distance, ridges);
+        if (distance >= ridges.halfWidth) return hills * descent * descent;
 
         const flank = 1 - Math.sqrt(distance / ridges.halfWidth);
         const rift = settings.RIFT_DEPTH * (1 - this.#smoothstep(0, ridges.riftWidth, distance));
         const heightNoise = this.#fbm(pixel.worldX - offset.X, pixel.worldY + offset.Y, settings.HEIGHT_VARIATION_OCTAVES, ridges.heightScale);
         const heightFactor = 1 + (heightNoise - 0.5) * 2 * settings.HEIGHT_VARIATION;
 
-        return ridges.height * Math.max(0, flank - rift) * heightFactor * descent * descent;
+        return (ridges.height * Math.max(0, flank - rift) * heightFactor + hills) * descent * descent;
+    }
+
+    /**
+     * Abyssal hills at a point `distance` from a ridge's crest, as a share of the full ocean depth:
+     * low, narrow hills running parallel to the ridge, as real seabed breaks into long blocks
+     * while it spreads away from the crest.
+     *
+     * The noise is read across the ridge at the distance from the crest, so its bands follow the
+     * crest however it curves. Along the ridge it is read at a slowly changing second coordinate
+     * (low-frequency noise over the map), so each band ends after a while and the next begins,
+     * rather than running the whole length of the ridge. The hills only ever raise the seabed,
+     * and fade out towards `reach` and over the rift valley at the crest.
+     */
+    #abyssalHills(pixel, distance, ridges) {
+        const hills = ridges.hills;
+        if (!(hills.height > 0) || distance >= hills.reach) return 0;
+
+        const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE.OCEAN_RIDGES.ABYSSAL_HILLS;
+        const offset = settings.NOISE_OFFSET;
+        const along = (this.#fbm(pixel.worldX + offset.X, pixel.worldY + offset.Y, 2, hills.alongScale) - 0.5) * 2 * settings.ALONG_SPAN;
+        // Both coordinates are in units of one hill (across) and one hill's length (along)
+        const bands = this.#fbm(distance * hills.acrossScale + offset.Y, along, settings.OCTAVES, 1, ridges.extraOctaves);
+
+        const fadeOut = 1 - this.#smoothstep(hills.reach * 0.6, hills.reach, distance);
+        const fadeIn = this.#smoothstep(0, ridges.riftWidth * 2, distance);
+        return hills.height * bands * fadeOut * fadeIn;
     }
 
     /**

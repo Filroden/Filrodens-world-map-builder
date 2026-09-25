@@ -1,3 +1,4 @@
+import { FILRODENSWMB } from "../config.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
@@ -98,10 +99,12 @@ export class TerrainUpgrade {
      *   really has (a flat map with no hand-edited terrain has no slopes for the wind to act on),
      *   so it is measured on the open map rather than assumed from its engine; see
      *   #changesBiomes. This must run once the map has finished generating, since it reads the
-     *   current moisture, temperature and elevation.
+     *   current moisture, temperature and elevation. Any fault lines change too (`changesFaults`):
+     *   they are widened to their width on the parent map, and their texture and hotspot
+     *   volcanoes are laid out at the parent's scale (see TerrainVersion.getTerrainParams).
      *
      * @param {object} app - The MapStudioApp instance, with a legacy map open.
-     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean}|null}
+     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean}|null}
      *   What the update would apply and change, or null if it would change nothing visible.
      */
     static assess(app) {
@@ -123,9 +126,10 @@ export class TerrainUpgrade {
         const plan = TerrainVersion.planUpgrade(state, app.legacyRootSize);
         const changesTerrain = state.generationEngine === "standard" && TerrainVersion.getExtraOctaves({ ...state, ...plan }) > 0;
         const changesBiomes = this.#changesBiomes(app, plan);
+        const changesFaults = (app.tectonicFaults?.length ?? 0) > 0;
 
-        if (!changesTerrain && !changesBiomes) return null;
-        return { kind: "regional", plan, changesTerrain, changesBiomes };
+        if (!changesTerrain && !changesBiomes && !changesFaults) return null;
+        return { kind: "regional", plan, changesTerrain, changesBiomes, changesFaults };
     }
 
     /**
@@ -187,7 +191,8 @@ export class TerrainUpgrade {
      *
      * The changed settings (revision, wind distance, world description, and Coastline Fracture
      * where the plan changes it) are all read when the generation inputs are compared, so the
-     * regeneration always rebuilds the base terrain rather than reusing the one on screen.
+     * regeneration always rebuilds the base terrain rather than reusing the one on screen. A
+     * legacy regional map's fault lines are widened by the plan's `faultScale` before generating.
      *
      * The side panel is re-rendered before generating. Generation reads every setting back from
      * the panel's inputs first (see MapStateManager.getMapParameters), so a slider still showing
@@ -201,11 +206,22 @@ export class TerrainUpgrade {
         app.uiState.windDistance = plan.windDistance;
         app.uiState.world = plan.world;
         if (plan.coastlineFracture !== undefined) app.uiState.coastlineFracture = plan.coastlineFracture;
+        if (plan.faultScale) this.#scaleFaults(app, plan.faultScale);
         app.uiState.terrainUpgradeDismissed = false;
 
         await app.render({ parts: ["context"] });
         await app.generateTerrain();
         app.markDirty();
+    }
+
+    /**
+     * Widens every fault line and hotspot chain on the open map by `scale`, keeping any fault
+     * saved without a thickness at the width it was actually drawn with (the default).
+     */
+    static #scaleFaults(app, scale) {
+        for (const fault of app.tectonicFaults ?? []) {
+            fault.thickness = (fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS) * scale;
+        }
     }
 
     /**

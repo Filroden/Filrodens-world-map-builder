@@ -24,8 +24,8 @@ const PATCH_BUDGET_MIN_BYTES = 8 * 1024 * 1024;
  */
 const EXTRA_MEMORY_CEILING_BYTES = 256 * 1024 * 1024;
 
-/** Bytes per pixel of the brushed layer: an elevation float plus a biome override byte. */
-const LAYER_BYTES_PER_PIXEL = Float32Array.BYTES_PER_ELEMENT + Uint8Array.BYTES_PER_ELEMENT;
+/** Bytes per pixel of the brushed layer: an elevation float, a biome override byte and a roughness byte. */
+const LAYER_BYTES_PER_PIXEL = Float32Array.BYTES_PER_ELEMENT + 2 * Uint8Array.BYTES_PER_ELEMENT;
 
 /** Bytes per pixel of the rebuild scratch buffer, a single float raster. */
 const SCRATCH_BYTES_PER_PIXEL = Float32Array.BYTES_PER_ELEMENT;
@@ -62,11 +62,17 @@ export class BrushLayerCache {
     /** Painted biome overrides from every biome stroke. Allocated on the first rebuild. */
     overrides = null;
 
-    /** Whether `elevation` and `overrides` currently equal a full replay of the stroke history. */
+    /**
+     * How much of the surface texture each pixel carries, from 0 to 255 (see
+     * BrushEngine#stampTerrain), after every stroke. Allocated on the first rebuild.
+     */
+    roughness = null;
+
+    /** Whether the three buffers currently equal a full replay of the stroke history. */
     valid = false;
 
     /**
-     * Whether the browser refused to allocate the two buffers. The layer then stays unusable and
+     * Whether the browser refused to allocate the buffers. The layer then stays unusable and
      * callers rebuild by replaying the history, which needs no extra memory. It is not retried on
      * every rebuild, since each failed attempt costs time, only when retryAllocation() is called.
      */
@@ -74,6 +80,9 @@ export class BrushLayerCache {
 
     /** Sea level the layer was built with. Biome paint tests elevation against it, so it is part of the result. */
     seaLevel = null;
+
+    /** Roughness the layer's base terrain started with (see reset). */
+    baseRoughness = 0;
 
     #width;
     #height;
@@ -130,10 +139,12 @@ export class BrushLayerCache {
      *
      * @param {Float32Array} baseElevation - The base terrain, same size as the map.
      * @param {number} seaLevel - Sea level the replay will use.
+     * @param {number} [baseRoughness] - How much surface texture the base terrain already carries
+     *   (0 to 255): textured Flat ground starts fully rough, everything else with none.
      * @returns {boolean} False if the buffers could not be allocated, in which case the layer is
      *   unusable and there is nothing to replay into.
      */
-    reset(baseElevation, seaLevel) {
+    reset(baseElevation, seaLevel, baseRoughness = 0) {
         this.valid = false;
         this.#recording = null;
         this.#discardAllPatches();
@@ -141,7 +152,9 @@ export class BrushLayerCache {
 
         this.elevation.set(baseElevation);
         this.overrides.fill(0);
+        this.roughness.fill(baseRoughness);
         this.seaLevel = seaLevel;
+        this.baseRoughness = baseRoughness;
         return true;
     }
 
@@ -151,26 +164,28 @@ export class BrushLayerCache {
     }
 
     /**
-     * Allocates the two buffers on first use. Running out of memory is not an error the module
+     * Allocates the buffers on first use. Running out of memory is not an error the module
      * can prevent, so it is handled here by leaving the layer unusable, which callers already
      * treat as "replay the history instead". Any other failure is a bug and is left to propagate.
      *
-     * @returns {boolean} True if both buffers exist.
+     * @returns {boolean} True if all the buffers exist.
      */
     #allocateBuffers() {
         if (this.allocationFailed) return false;
-        if (this.elevation && this.overrides) return true;
+        if (this.elevation && this.overrides && this.roughness) return true;
 
         try {
             const pixels = this.#width * this.#height;
             this.elevation ??= new Float32Array(pixels);
             this.overrides ??= new Uint8Array(pixels);
+            this.roughness ??= new Uint8Array(pixels);
             return true;
         } catch (error) {
             if (!(error instanceof RangeError)) throw error;
 
             this.elevation = null;
             this.overrides = null;
+            this.roughness = null;
             this.allocationFailed = true;
             console.warn(`FWMB | Not enough memory for the brushed layer (${error.message}). Brush edits will replay the whole brush history instead, which is slower.`);
             return false;
@@ -195,10 +210,12 @@ export class BrushLayerCache {
      * Whether the layer can be used for a rebuild that uses `seaLevel`.
      *
      * @param {number} seaLevel - Sea level the rebuild will use.
-     * @returns {boolean} True if the layer is valid and was built with the same sea level.
+     * @param {number} [baseRoughness] - Roughness the base terrain starts with (see reset).
+     * @returns {boolean} True if the layer is valid and was built with the same sea level and
+     *   starting roughness.
      */
-    isCurrentFor(seaLevel) {
-        return this.valid && this.seaLevel === seaLevel;
+    isCurrentFor(seaLevel, baseRoughness = 0) {
+        return this.valid && this.seaLevel === seaLevel && this.baseRoughness === baseRoughness;
     }
 
     /**
@@ -222,15 +239,15 @@ export class BrushLayerCache {
         const recording = this.#recording;
         if (!recording) return;
 
-        const buffer = this.#bufferFor(recording.stroke);
-        if (!buffer) return;
+        const buffers = this.#buffersFor(recording.stroke);
+        if (buffers.length === 0) return;
 
         const lastTileX = Math.floor(footprint.maxX / PATCH_TILE_SIZE);
         const lastTileY = Math.floor(footprint.maxY / PATCH_TILE_SIZE);
 
         for (let tileY = Math.floor(footprint.minY / PATCH_TILE_SIZE); tileY <= lastTileY; tileY++) {
             for (let tileX = Math.floor(footprint.minX / PATCH_TILE_SIZE); tileX <= lastTileX; tileX++) {
-                this.#saveTile(recording, buffer, tileX, tileY);
+                this.#saveTile(recording, buffers, tileX, tileY);
             }
         }
     }
@@ -262,9 +279,9 @@ export class BrushLayerCache {
         const patch = this.#patches.get(stroke);
         if (!patch) return false;
 
-        const buffer = this.#bufferFor(stroke);
+        const buffers = this.#buffersFor(stroke);
         for (const [tileIndex, saved] of patch.tiles) {
-            this.#pasteTile(buffer, tileIndex, saved);
+            buffers.forEach((buffer, which) => this.#pasteTile(buffer, tileIndex, saved[which]));
         }
 
         this.discardPatch(stroke);
@@ -286,13 +303,15 @@ export class BrushLayerCache {
     }
 
     /**
-     * Which of the layer's two buffers a stroke writes to: terrain strokes change elevation,
-     * biome strokes change the overrides, and any other layer changes nothing.
+     * Which of the layer's buffers a stroke writes to: terrain strokes change elevation and
+     * roughness (Roughen, Level and Smooth change how much texture the ground carries), biome
+     * strokes change the overrides, and any other layer changes nothing. A patch saves and
+     * restores the buffers in this order.
      */
-    #bufferFor(stroke) {
-        if (stroke.layer === "terrain") return this.elevation;
-        if (stroke.layer === "biome") return this.overrides;
-        return null;
+    #buffersFor(stroke) {
+        if (stroke.layer === "terrain") return [this.elevation, this.roughness];
+        if (stroke.layer === "biome") return [this.overrides];
+        return [];
     }
 
     /** Rectangle of the map a tile covers; tiles on the right and bottom edges are clipped. */
@@ -303,20 +322,22 @@ export class BrushLayerCache {
         return { x, y, width: Math.min(PATCH_TILE_SIZE, this.#width - x), height: Math.min(PATCH_TILE_SIZE, this.#height - y) };
     }
 
-    #saveTile(recording, buffer, tileX, tileY) {
+    #saveTile(recording, buffers, tileX, tileY) {
         const tileIndex = tileY * this.#tilesAcross + tileX;
         if (recording.tiles.has(tileIndex)) return;
 
         const { x, y, width, height } = this.#tileRect(tileIndex);
-        const saved = new buffer.constructor(width * height);
-
-        for (let row = 0; row < height; row++) {
-            const start = (y + row) * this.#width + x;
-            saved.set(buffer.subarray(start, start + width), row * width);
-        }
+        const saved = buffers.map((buffer) => {
+            const copy = new buffer.constructor(width * height);
+            for (let row = 0; row < height; row++) {
+                const start = (y + row) * this.#width + x;
+                copy.set(buffer.subarray(start, start + width), row * width);
+            }
+            recording.bytes += copy.byteLength;
+            return copy;
+        });
 
         recording.tiles.set(tileIndex, saved);
-        recording.bytes += saved.byteLength;
     }
 
     #pasteTile(buffer, tileIndex, saved) {

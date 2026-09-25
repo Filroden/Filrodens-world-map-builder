@@ -37,6 +37,36 @@ export const FILRODENSWMB = {
         MAP_HEIGHT: 1000,
     },
     GENERATION: {
+        // How far above sea level a Flat map's ground sits
+        FLAT_HEIGHT: 0.05,
+        // Surface texture: the fine, rolling roughness a Flat map can start with and the Roughen
+        // brush paints (see ProceduralEngine.generateSurfaceTexture and BrushEngine#stampTerrain).
+        // It is a property of the ground rather than of a stroke, so it is laid out in the top
+        // map's pixels and matches between a map and its regional maps.
+        SURFACE_TEXTURE: {
+            // Its greatest height either side of the ground it roughens, as a share of
+            // FLAT_HEIGHT, so textured Flat ground always stays well above sea level
+            AMPLITUDE_SHARE: 0.4,
+            // Elsewhere it never moves ground by more than this share of the ground's own height
+            // above, or depth below, sea level, so it fades out towards the coast instead of
+            // moving the coastline (see BrushEngine#textureAmplitudeAt)
+            COAST_SHARE: 0.8,
+            // Wavelength of its coarsest layer, in pixels of a BASELINE_DIMENSION map (scaled to
+            // the map's size like the coastline settings, so it looks the same at any size).
+            // Kept short: a layer much wider than a brush makes Roughen look as if it pushes the
+            // ground up or down rather than roughening it.
+            WAVELENGTH: 30,
+            OCTAVES: 4,
+            // Arbitrary offsets, as for the other noise fields, so the texture comes from a region
+            // of the noise no other field reads
+            NOISE_OFFSET: { X: -7300, Y: 4100 },
+            // The outer share of the Roughen brush's radius across which it eases out, so a
+            // roughened patch blends into the ground around it instead of ending in a step
+            EDGE: 0.5,
+            // The roughness (see BrushLayerCache) of ground carrying all of the texture: roughness
+            // is stored as a byte per pixel, from 0 (none) to this
+            FULL_ROUGHNESS: 255,
+        },
         TECTONIC_PLATES: 10,
         COASTLINE_FRACTURE: 0.3,
         // The Coastline Fracture slider's step (tools-terrain.hbs uses the same value). Values
@@ -195,15 +225,33 @@ export const FILRODENSWMB = {
                 // ridge's height
                 RIFT_WIDTH: 4,
                 RIFT_DEPTH: 0.2,
-                // How far, and over what length, the crest wanders from side to side
-                WANDER: 14,
+                // How far, and over what length, the crest wanders from side to side (the finer
+                // layers make it kink on a small scale too, rather than bending smoothly)
+                WANDER: 16,
                 WANDER_LENGTH: 70,
-                WANDER_OCTAVES: 3,
+                WANDER_OCTAVES: 5,
                 // How much, and over what length, the crest's height varies along the ridge
                 HEIGHT_VARIATION: 0.35,
                 HEIGHT_VARIATION_LENGTH: 120,
                 HEIGHT_VARIATION_OCTAVES: 2,
                 NOISE_OFFSET: { X: 6200, Y: -2900 },
+                // Abyssal hills: low, narrow hills running parallel to the ridge across its flanks
+                // and out onto the abyssal plain, as the seabed breaks into blocks while it
+                // spreads away from the crest (see ProceduralEngine#abyssalHills)
+                ABYSSAL_HILLS: {
+                    // Their greatest height with the setting at 1, as a share of the full ocean depth
+                    HEIGHT: 0.035,
+                    // How far from the crest they reach, as a multiple of HALF_WIDTH
+                    REACH: 1.4,
+                    // Spacing of the hills across the ridge
+                    WAVELENGTH: 18,
+                    OCTAVES: 3,
+                    // Over what length along the ridge a hill ends and the next begins (roughly
+                    // ALONG_LENGTH divided by ALONG_SPAN)
+                    ALONG_LENGTH: 200,
+                    ALONG_SPAN: 4,
+                    NOISE_OFFSET: { X: -4100, Y: 8300 },
+                },
             },
         },
     },
@@ -225,7 +273,9 @@ export const FILRODENSWMB = {
     //       and the new Coastal Plains are bands of set width along the coast, the seabed beyond
     //       the shelf falls steeply to an abyssal plain, and Continent Scale no longer changes the
     //       coastline itself (see GENERATION.COASTAL_PROFILE). Tectonic terrain is rebuilt on
-    //       the same pipeline, with its land placed by tectonic plates.
+    //       the same pipeline, with its land placed by tectonic plates. Fault lines read their
+    //       noise, and space their hotspot volcanoes, in the top map's pixels, so a regional
+    //       map's faults match its parent's (on a map that was never cropped this changes nothing).
     TERRAIN_VERSION: {
         LEGACY: 1,
         CURRENT: 2,

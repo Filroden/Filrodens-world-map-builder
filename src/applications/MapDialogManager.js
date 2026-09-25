@@ -62,7 +62,7 @@ export class MapDialogManager {
      * until the map is, and (when opened automatically on load) lets the user stop being asked
      * for this map. Closing the dialog counts as keeping the original.
      *
-     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean}} impact - What the
+     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean}} impact - What the
      *   update changes, and why (see TerrainUpgrade.assess).
      * @param {boolean} allowDismiss - Whether to show the "don't ask again" option.
      * @returns {Promise<{apply: boolean, dismiss: boolean}>} The user's choice.
@@ -76,6 +76,7 @@ export class MapDialogManager {
             resized: impact.resized === true,
             changesTerrain: impact.changesTerrain,
             changesBiomes: impact.changesBiomes,
+            changesFaults: impact.changesFaults,
             allowDismiss,
         });
 

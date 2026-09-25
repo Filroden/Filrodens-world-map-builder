@@ -9,6 +9,9 @@
             {{#if changesBiomes}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateBiomes"}}</li>
             {{/if}}
+            {{#if changesFaults}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFaults"}}</li>
+            {{/if}}
         </ul>
     {{else if isTectonics}}
         <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroTectonics"}}</p>

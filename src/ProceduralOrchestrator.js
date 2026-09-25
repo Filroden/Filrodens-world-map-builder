@@ -114,6 +114,67 @@ export class ProceduralOrchestrator {
     }
 
     /**
+     * Flat ground just above sea level, carrying the full surface texture if the map was created
+     * with it (see getBaseRoughness).
+     */
+    static #generateFlatTopography(app, params) {
+        const flatHeight = params.seaLevel + FILRODENSWMB.GENERATION.FLAT_HEIGHT;
+        app.baseElevationData.fill(flatHeight);
+        if (this.getBaseRoughness(app) === 0) return;
+
+        const texture = this.getSurfaceTexture(app);
+        if (!texture) return;
+
+        const amplitude = ProceduralEngine.getSurfaceTextureAmplitude();
+        for (let i = 0; i < texture.length; i++) app.baseElevationData[i] = flatHeight + amplitude * texture[i];
+    }
+
+    /**
+     * How much surface texture the open map's base terrain carries, as a roughness from 0 to 255
+     * (see BrushLayerCache.reset): all of it on a Flat map created with textured ground, none on
+     * any other map, whose own detail is its texture.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @returns {number}
+     */
+    static getBaseRoughness(app) {
+        const textured = app.uiState.generationEngine === "flat" && app.uiState.flatTexture === true;
+        return textured ? FILRODENSWMB.GENERATION.SURFACE_TEXTURE.FULL_ROUGHNESS : 0;
+    }
+
+    /**
+     * The open map's surface texture (see ProceduralEngine.generateSurfaceTexture), worked out the
+     * first time it is needed and kept until something it depends on changes: the seed, the
+     * map's size, or its place in the top map. Only maps that use it (textured Flat ground, or
+     * the Roughen or Level brush) ever pay for it.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @returns {Float32Array|null} The texture, or null if the browser had no memory for it, in
+     *   which case the brushes that paint it leave the ground as it is.
+     */
+    static getSurfaceTexture(app) {
+        const world = TerrainVersion.getTerrainParams(app.uiState).world;
+        const key = [app.uiState.mapSeed, app.mapWidth, app.mapHeight, world.zoom, world.originX, world.originY, world.rootW, world.rootH].join("|");
+        if (app.surfaceTexture?.key === key) return app.surfaceTexture.buffer;
+        if (app.surfaceTextureUnavailable) return null;
+
+        try {
+            const pixels = app.mapWidth * app.mapHeight;
+            const buffer = app.surfaceTexture?.buffer?.length === pixels ? app.surfaceTexture.buffer : new Float32Array(pixels);
+            new ProceduralEngine(app.uiState.mapSeed).generateSurfaceTexture(app.mapWidth, app.mapHeight, { terrain: { world } }, buffer);
+            app.surfaceTexture = { key, buffer };
+            return buffer;
+        } catch (error) {
+            if (!(error instanceof RangeError)) throw error;
+
+            app.surfaceTexture = null;
+            app.surfaceTextureUnavailable = true;
+            console.warn(`FWMB | Not enough memory for the surface texture (${error.message}). Textured ground and the Roughen brush are unavailable until the map is reloaded.`);
+            return null;
+        }
+    }
+
+    /**
      * Directs the topography generation based on the active engine mode.
      */
     static #routeTopographyPass(app, engine, params) {
@@ -122,7 +183,7 @@ export class ProceduralOrchestrator {
         const t0 = performance.now();
 
         if (mode === "flat") {
-            app.baseElevationData.fill(params.seaLevel + 0.05);
+            this.#generateFlatTopography(app, params);
         } else if (mode === "advanced") {
             // Tectonic maps made under the current rules share guided terrain's pipeline; older
             // ones keep the original tectonic engine until they are updated (see TerrainVersion)
@@ -248,6 +309,10 @@ export class ProceduralOrchestrator {
             const elevationChanged = BufferDiff.adoptChanges(app.currentElevationData, rebuilt, app.mapWidth, app.mapHeight);
             const overridesChanged = layer && app.currentBiomeOverrides ? BufferDiff.adoptChanges(app.currentBiomeOverrides, layer.overrides, app.mapWidth, app.mapHeight) : null;
             changed = elevationChanged && overridesChanged ? SpatialMath.mergeBounds(elevationChanged, overridesChanged) : elevationChanged || overridesChanged;
+
+            // Roughness only matters to the brushes, not to anything drawn or derived, so it is
+            // copied rather than compared
+            if (layer && app.currentRoughness) app.currentRoughness.set(layer.roughness);
         });
 
         app.renderTimer.record(replayed ? "Brush history replay" : "Brush layer reused", refreshMs, `${strokeCount} strokes`);
@@ -305,9 +370,11 @@ export class ProceduralOrchestrator {
     static #refreshBrushedLayer(app, seaLevel, baseChanged) {
         const brushEngine = app.brushEngine;
         if (!brushEngine) return { replayed: false, cached: true };
-        if (!baseChanged && brushEngine.isLayerCacheCurrent(seaLevel)) return { replayed: false, cached: true };
 
-        const cached = brushEngine.rebuildLayerCache(app.baseElevationData, seaLevel);
+        const baseRoughness = this.getBaseRoughness(app);
+        if (!baseChanged && brushEngine.isLayerCacheCurrent(seaLevel, baseRoughness)) return { replayed: false, cached: true };
+
+        const cached = brushEngine.rebuildLayerCache(app.baseElevationData, seaLevel, baseRoughness);
         return { replayed: cached, cached };
     }
 
@@ -327,6 +394,19 @@ export class ProceduralOrchestrator {
         this.#forEachBoundsRow(bounds, app.mapWidth, (start, end) => {
             app.currentElevationData.set(elevationSource.subarray(start, end), start);
         });
+
+        // The working roughness follows the working terrain, so the brushes painted live start
+        // from the same texture record a replay does
+        if (app.currentRoughness) {
+            const baseRoughness = this.getBaseRoughness(app);
+            this.#forEachBoundsRow(bounds, app.mapWidth, (start, end) => {
+                if (layer) {
+                    app.currentRoughness.set(layer.roughness.subarray(start, end), start);
+                } else {
+                    app.currentRoughness.fill(baseRoughness, start, end);
+                }
+            });
+        }
 
         // Painted biomes have no separate "base" layer: 0 is the sentinel createBiomesMap()
         // already treats as "no override, compute the biome normally", so with no strokes the
@@ -352,7 +432,7 @@ export class ProceduralOrchestrator {
      */
     static #replayIntoWorkingTerrain(app, seaLevel, bounds, layerUsable) {
         if (layerUsable) return;
-        app.brushEngine?.replayHistory(app.currentElevationData, app.currentBiomeOverrides, seaLevel, bounds);
+        app.brushEngine?.replayHistory(app.currentElevationData, app.currentBiomeOverrides, seaLevel, bounds, app.currentRoughness ?? null);
     }
 
     /**
@@ -363,7 +443,7 @@ export class ProceduralOrchestrator {
      */
     static #applyVectorDeformations(app, elevationData, engine, params, bounds) {
         if (app.tectonicFaults?.length > 0) {
-            TectonicEngine.applyTectonicFaults(elevationData, app.mapWidth, app.mapHeight, app.tectonicFaults, engine.simplex, bounds);
+            TectonicEngine.applyTectonicFaults(elevationData, app.mapWidth, app.mapHeight, app.tectonicFaults, engine.simplex, bounds, params.terrain?.faultFrame);
         }
 
         if (app.manualRivers?.length > 0) {

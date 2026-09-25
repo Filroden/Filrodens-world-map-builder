@@ -16,6 +16,8 @@ export class MapStateManager {
         app.currentTemperatureData = new Float32Array(totalPixels);
         app.currentBiomeOverrides = new Uint8Array(totalPixels);
         app.currentSpringOverrides = new Uint8Array(totalPixels);
+        // How much of the surface texture the working terrain carries (see BrushLayerCache)
+        app.currentRoughness = new Uint8Array(totalPixels);
         app.bufferRiverMap = new Uint8Array(totalPixels);
         app.bufferWaterMask = new Float32Array(totalPixels);
 
@@ -29,9 +31,11 @@ export class MapStateManager {
         // outFallbackBuffer parameter for what actually gets written into it.
         app.bufferBiomeFallback = new Uint8Array(totalPixels * 4);
 
-        // The rebuild scratch buffer is created on demand at the map's current size (see
-        // ProceduralOrchestrator); drop any left over from a map of a different size.
+        // The rebuild scratch buffer and the surface texture are created on demand at the map's
+        // current size (see ProceduralOrchestrator); drop any left over from a map of a different size.
         app.bufferScratch = null;
+        app.surfaceTexture = null;
+        app.surfaceTextureUnavailable = false;
 
         // Fresh buffers hold nothing from any earlier generation
         app.generationInputs = null;
@@ -102,6 +106,8 @@ export class MapStateManager {
             nextCustomBiomeId: FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID,
 
             mapSeed: FILRODENSWMB.DEFAULTS.SEED,
+            // Whether a Flat map's ground starts with the surface texture (chosen when it is created)
+            flatTexture: false,
             seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
             globalTemp: FILRODENSWMB.DEFAULTS.GLOBAL_TEMP,
             seasonOffset: 0,
@@ -325,6 +331,7 @@ export class MapStateManager {
             continentalGrouping: state.continentalGrouping,
             shelfRange: state.shelfRange,
             coastalPlain: state.coastalPlain,
+            flatTexture: state.flatTexture === true,
             continentScale: state.continentScale,
             oceanScale: state.oceanScale,
             oceanRidges: state.oceanRidges,

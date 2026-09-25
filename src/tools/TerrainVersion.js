@@ -114,9 +114,10 @@ export class TerrainVersion {
      *
      * `world` always has every field filled in: a map that was never cropped is its own top map,
      * and for a legacy regional map, whose position and top map are unknown, the engines treat
-     * it as starting at the top map's corner and use its own size divided by its zoom. Guided
-     * terrain is the only engine that reads `world`, and no guided map can be a legacy regional
-     * map, since regional maps could not be made from guided maps before the current revision.
+     * it as starting at the top map's corner and use its own size divided by its zoom. The
+     * terrain engines that read `world` (guided and current tectonic terrain) can never be on a
+     * legacy regional map, since regional maps could not be made from them before the current
+     * revision. Relief shading reads only its zoom and size, which are right for any map.
      *
      * `fillEnclosedCoast` fixes a coastline distance that the legacy revision left at zero when no
      * coastline fell inside the map (a map entirely inside, or entirely outside, its land masks);
@@ -125,18 +126,25 @@ export class TerrainVersion {
      * `coastalBuffers` selects the current coastal profile (see
      * FILRODENSWMB.GENERATION.COASTAL_PROFILE) rather than the legacy one.
      *
+     * `faultFrame` is where fault lines read their noise and space their hotspot volcanoes (see
+     * TectonicEngine.applyTectonicFaults). From the current revision on it is the map's place in
+     * the top map, so a regional map's faults match its parent's. A legacy map keeps its own
+     * pixels, so its faults stay exactly as they were; for a map that was never cropped the two
+     * are the same anyway.
+     *
      * @param {object} state - A uiState object.
-     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object}}
+     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object}}
      */
     static getTerrainParams(state) {
         const world = this.resolveWorld(state);
         const zoom = world.zoom;
+        const isCurrent = this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
 
         return {
             extraOctaves: this.getExtraOctaves(state),
             detailOctaves: this.getDetailOctaves(state),
             resolutionScale: this.getResolutionScale(state),
-            fillEnclosedCoast: this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT,
+            fillEnclosedCoast: isCurrent,
             coastalBuffers: this.usesCurrentCoastline(state),
             world: {
                 zoom,
@@ -145,6 +153,7 @@ export class TerrainVersion {
                 rootW: world.rootW ?? state.mapWidth / zoom,
                 rootH: world.rootH ?? state.mapHeight / zoom,
             },
+            faultFrame: isCurrent ? { zoom, originX: world.originX ?? 0, originY: world.originY ?? 0 } : { zoom: 1, originX: 0, originY: 0 },
         };
     }
 
@@ -328,7 +337,9 @@ export class TerrainVersion {
      *
      * A legacy regional map gets the current revision number, the corrected wind distance, and a
      * world description carrying its zoom (so it gains the extra detail octaves) and, if known, the size
-     * of the map at the top of its chain.
+     * of the map at the top of its chain. Its fault lines are widened by the same zoom
+     * (`faultScale`): legacy crops kept each fault's thickness in pixels, so it was narrower in
+     * the world than on the parent, whereas a current crop scales it (see RegionalExtractor).
      *
      * Its position within that top map cannot be recovered and is left unknown; nothing in the
      * current revision needs it for a map of this kind.
@@ -341,7 +352,7 @@ export class TerrainVersion {
      *
      * @param {object} state - The legacy map's uiState.
      * @param {{width: number, height: number}|null} [rootSize] - The top map's size, if found.
-     * @returns {{terrainVersion: number, windDistance: number, world: object|null, coastlineFracture?: number}}
+     * @returns {{terrainVersion: number, windDistance: number, world: object|null, coastlineFracture?: number, faultScale?: number}}
      *   The settings to apply.
      */
     static planUpgrade(state, rootSize = null) {
@@ -357,12 +368,14 @@ export class TerrainVersion {
 
         const mapShape = state.mapWidth / state.mapHeight;
         const rootShape = this.getRootShape(state, rootSize) ?? mapShape;
+        const zoom = this.getLegacyZoom(state);
 
         return {
             terrainVersion: FILRODENSWMB.TERRAIN_VERSION.CURRENT,
             windDistance: this.getWindDistanceFor(rootShape, mapShape),
+            faultScale: zoom,
             world: {
-                zoom: this.getLegacyZoom(state),
+                zoom,
                 originX: null,
                 originY: null,
                 rootW: rootSize?.width ?? null,

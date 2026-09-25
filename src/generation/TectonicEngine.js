@@ -13,6 +13,9 @@ export class TectonicEngine {
         NOISE_SCALE_VARIANCE: 0.1,
         GAUSSIAN_SPREAD_STANDARD: 2,
         GAUSSIAN_SPREAD_TIGHT: 6,
+        // The outer share of a convergent or divergent fault's width across which its effect
+        // eases out to nothing (see #faultProfile)
+        EDGE_TAPER: 0.3,
         BASE_MODIFIER: 0.6,
         NOISE_MODIFIER: 0.8,
         SLIP_BASE_MODIFIER: 0.5,
@@ -24,10 +27,34 @@ export class TectonicEngine {
     };
 
     /**
-     * Applies all tectonic deformations to the raw elevation buffer.
+     * The frame a map's fault noise is read in when none is given: the map's own pixels. This is
+     * also the frame of every map that was never cropped, so for those maps the world frame
+     * below changes nothing.
      */
-    static applyTectonicFaults(elevationData, width, height, faults, simplex, activeBounds = null) {
+    static #MAP_FRAME = Object.freeze({ zoom: 1, originX: 0, originY: 0 });
+
+    /**
+     * Applies all tectonic deformations to the raw elevation buffer.
+     *
+     * `frame` places the map in the pixels of the top map it was cut from (see
+     * TerrainVersion.getTerrainParams): its zoom, and the top map pixel at its own top-left
+     * corner. Every noise value the faults use is read at the point's position in the top map,
+     * and hotspot volcanoes are spaced in the top map's pixels, so a fault on a regional map
+     * has the same texture, and the same volcanoes, as the same fault on its parent (its
+     * thickness is scaled with the crop by RegionalExtractor). Without a frame, noise is read
+     * in the map's own pixels, which is exactly the same for a map that was never cropped.
+     *
+     * @param {Float32Array} elevationData - The terrain to deform, in place.
+     * @param {number} width - The map's width in pixels.
+     * @param {number} height - The map's height in pixels.
+     * @param {object[]} faults - The fault lines and hotspot chains, in the map's pixels.
+     * @param {object} simplex - The map's simplex noise generator.
+     * @param {object|null} [activeBounds] - Only pixels inside these bounds are changed.
+     * @param {{zoom: number, originX: number, originY: number}} [frame] - See above.
+     */
+    static applyTectonicFaults(elevationData, width, height, faults, simplex, activeBounds = null, frame = TectonicEngine.#MAP_FRAME) {
         if (!faults || faults.length === 0) return;
+        const noise = TectonicEngine.#worldNoise(simplex, frame ?? TectonicEngine.#MAP_FRAME);
 
         let readBuffer = null;
 
@@ -35,18 +62,36 @@ export class TectonicEngine {
             if (!fault.points || fault.points.length < 2) continue;
 
             if (fault.type === FILRODENSWMB.TECTONICS.TYPES.HOTSPOT) {
-                this.#applyHotspotChain(elevationData, width, height, fault, simplex, activeBounds);
+                this.#applyHotspotChain(elevationData, width, height, fault, noise, activeBounds);
             } else if (fault.type === FILRODENSWMB.TECTONICS.TYPES.SLIP) {
                 if (!readBuffer) readBuffer = new Float32Array(elevationData);
                 else readBuffer.set(elevationData);
-                this.#applySlipFault(elevationData, readBuffer, width, height, fault, simplex, activeBounds);
+                this.#applySlipFault(elevationData, readBuffer, width, height, fault, noise, activeBounds);
             } else {
-                this.#applyStandardFault(elevationData, width, height, fault, simplex, activeBounds);
+                this.#applyStandardFault(elevationData, width, height, fault, noise, activeBounds);
             }
         }
     }
 
-    static #applyStandardFault(elevationData, width, height, fault, simplex, activeBounds = null) {
+    /**
+     * Noise read at a map pixel's position in the top map's pixels (see applyTectonicFaults).
+     *
+     * `scale` is applied to the top map position and `offset` added afterwards, in that order,
+     * so for a map that was never cropped (zoom 1, origin 0) every value is bit-identical to
+     * reading the noise at the map pixel directly.
+     *
+     * @returns {{at: function(number, number, number, number=): number, zoom: number}} `at(x, y, scale, offset)`
+     *   gives simplex noise in -1..1 for map pixel (x, y); `zoom` is the frame's zoom.
+     */
+    static #worldNoise(simplex, frame) {
+        const { zoom, originX, originY } = frame;
+        return {
+            zoom,
+            at: (x, y, scale, offset = 0) => simplex.noise2D((originX + x / zoom) * scale + offset, (originY + y / zoom) * scale + offset),
+        };
+    }
+
+    static #applyStandardFault(elevationData, width, height, fault, noise, activeBounds = null) {
         const thickness = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
         const strength = fault.strength || FILRODENSWMB.TECTONICS.DEFAULT_STRENGTH;
         const radiusSq = thickness * thickness;
@@ -68,7 +113,7 @@ export class TectonicEngine {
 
                     const dist = Math.sqrt(distSq);
                     const normDist = dist / thickness;
-                    const noiseFactor = simplex.noise2D(x * this.MATH.NOISE_SCALE_GLOBAL, y * this.MATH.NOISE_SCALE_GLOBAL) * 0.5 + 0.5;
+                    const noiseFactor = noise.at(x, y, this.MATH.NOISE_SCALE_GLOBAL) * 0.5 + 0.5;
                     const currentElev = elevationData[idx];
 
                     if (fault.type === FILRODENSWMB.TECTONICS.TYPES.CONVERGENT) {
@@ -81,7 +126,7 @@ export class TectonicEngine {
         }
     }
 
-    static #applySlipFault(elevationData, readBuffer, width, height, fault, simplex, activeBounds = null) {
+    static #applySlipFault(elevationData, readBuffer, width, height, fault, noise, activeBounds = null) {
         const thickness = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
         const strength = fault.strength || FILRODENSWMB.TECTONICS.DEFAULT_STRENGTH;
         const radiusSq = thickness * thickness;
@@ -108,7 +153,7 @@ export class TectonicEngine {
 
                     const dist = Math.sqrt(distSq);
                     const normDist = dist / thickness;
-                    const noiseFactor = simplex.noise2D(x * this.MATH.NOISE_SCALE_GLOBAL, y * this.MATH.NOISE_SCALE_GLOBAL) * 0.5 + 0.5;
+                    const noiseFactor = noise.at(x, y, this.MATH.NOISE_SCALE_GLOBAL) * 0.5 + 0.5;
 
                     this.#applySlip(elevationData, readBuffer, idx, x, y, width, height, normDist, p1, p2, strength, thickness, noiseFactor);
                 }
@@ -133,7 +178,7 @@ export class TectonicEngine {
      * `room` equals what `1.0 - currentElev` always computed, so this changes nothing there.
      */
     static #applyConvergent(elevationData, idx, currentElev, normDist, strength, noiseFactor) {
-        const gaussian = Math.exp(-Math.pow(normDist * this.MATH.GAUSSIAN_SPREAD_STANDARD, 2));
+        const gaussian = this.#faultProfile(normDist);
         const modification = gaussian * strength * (this.MATH.BASE_MODIFIER + noiseFactor * this.MATH.NOISE_MODIFIER);
         const room = Math.max(0, Math.min(1, 1.0 - currentElev));
         const dampened = modification * room;
@@ -148,11 +193,31 @@ export class TectonicEngine {
      * for the full reasoning; it applies here with the floor and ceiling swapped.
      */
     static #applyDivergent(elevationData, idx, currentElev, normDist, strength, noiseFactor) {
-        const gaussian = Math.exp(-Math.pow(normDist * this.MATH.GAUSSIAN_SPREAD_STANDARD, 2));
+        const gaussian = this.#faultProfile(normDist);
         const modification = gaussian * strength * (this.MATH.BASE_MODIFIER + noiseFactor * this.MATH.NOISE_MODIFIER);
         const room = Math.max(0, Math.min(1, currentElev));
         const dampened = modification * room;
         elevationData[idx] = currentElev - dampened;
+    }
+
+    /**
+     * The cross-section of a convergent or divergent fault: a bell curve, 1 on the fault line,
+     * eased out to exactly 0, with no slope, at its thickness (`normDist` 1).
+     *
+     * A plain bell curve is still about 2% of its height at the fault's edge, and the fault stops
+     * being applied beyond its thickness, so it used to end in a small step all the way along
+     * both sides, which relief shading shows as a line. Across the outer EDGE_TAPER share of the
+     * width the curve is multiplied down to 0 along a smooth S-curve, so neither the height nor
+     * the slope jumps at the edge; the rest of the cross-section is unchanged.
+     */
+    static #faultProfile(normDist) {
+        const bell = Math.exp(-Math.pow(normDist * this.MATH.GAUSSIAN_SPREAD_STANDARD, 2));
+        const taperStart = 1 - this.MATH.EDGE_TAPER;
+        if (normDist <= taperStart) return bell;
+        if (normDist >= 1) return 0;
+
+        const across = (1 - normDist) / this.MATH.EDGE_TAPER;
+        return bell * across * across * (3 - 2 * across);
     }
 
     static #applySlip(elevationData, readBuffer, idx, x, y, width, height, normDist, p1, p2, strength, thickness, noiseFactor) {
@@ -183,10 +248,12 @@ export class TectonicEngine {
         elevationData[idx] = readBuffer[readY * width + readX];
     }
 
-    static #applyHotspotChain(elevationData, width, height, fault, simplex, activeBounds = null) {
+    static #applyHotspotChain(elevationData, width, height, fault, noise, activeBounds = null) {
         const baseRadius = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
         const baseStrength = fault.strength || FILRODENSWMB.TECTONICS.DEFAULT_STRENGTH;
-        const spacing = FILRODENSWMB.TECTONICS.HOTSPOT_SPACING;
+        // The spacing is in the top map's pixels, so a regional map places the same volcanoes
+        // along the chain as its parent rather than more, smaller ones
+        const spacing = FILRODENSWMB.TECTONICS.HOTSPOT_SPACING * noise.zoom;
 
         const rawPlumes = this.#interpolatePlumeCenters(fault.points, spacing);
         const totalPlumes = rawPlumes.length;
@@ -195,8 +262,8 @@ export class TectonicEngine {
             const rawPlume = rawPlumes[i];
 
             const jitterMax = spacing * this.MATH.JITTER_MAX_RATIO;
-            const jitterX = simplex.noise2D(rawPlume.x * this.MATH.NOISE_SCALE_HOTSPOT, rawPlume.y * this.MATH.NOISE_SCALE_HOTSPOT) * jitterMax;
-            const jitterY = simplex.noise2D(rawPlume.x * this.MATH.NOISE_SCALE_HOTSPOT + this.MATH.JITTER_OFFSET, rawPlume.y * this.MATH.NOISE_SCALE_HOTSPOT + this.MATH.JITTER_OFFSET) * jitterMax;
+            const jitterX = noise.at(rawPlume.x, rawPlume.y, this.MATH.NOISE_SCALE_HOTSPOT) * jitterMax;
+            const jitterY = noise.at(rawPlume.x, rawPlume.y, this.MATH.NOISE_SCALE_HOTSPOT, this.MATH.JITTER_OFFSET) * jitterMax;
 
             const plume = {
                 x: rawPlume.x + jitterX,
@@ -204,7 +271,7 @@ export class TectonicEngine {
             };
 
             const ageRatio = 1.0 - (i / totalPlumes) * (1.0 - FILRODENSWMB.TECTONICS.HOTSPOT_DECAY);
-            const sizeVariance = (simplex.noise2D(plume.x * this.MATH.NOISE_SCALE_VARIANCE, plume.y * this.MATH.NOISE_SCALE_VARIANCE) + 1.0) / 2.0;
+            const sizeVariance = (noise.at(plume.x, plume.y, this.MATH.NOISE_SCALE_VARIANCE) + 1.0) / 2.0;
 
             const radius = baseRadius * ageRatio * (this.MATH.BASE_MODIFIER + sizeVariance * this.MATH.NOISE_MODIFIER);
             const strength = baseStrength * ageRatio;
@@ -228,7 +295,7 @@ export class TectonicEngine {
                     if (distSq > radiusSq) continue;
 
                     const falloff = Math.pow(1.0 - distSq / radiusSq, 2);
-                    const rawNoise = simplex.noise2D(x * this.MATH.NOISE_SCALE_VOLCANO, y * this.MATH.NOISE_SCALE_VOLCANO);
+                    const rawNoise = noise.at(x, y, this.MATH.NOISE_SCALE_VOLCANO);
                     const mappedNoise = (rawNoise + 1.0) / 2.0;
 
                     const idx = y * width + x;

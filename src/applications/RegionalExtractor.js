@@ -67,7 +67,7 @@ export class RegionalExtractor {
             customRouteStyles: state.customRouteStyles,
             customLabelStyles: state.customLabelStyles,
             history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight),
-            tectonicFaults: translate(app.tectonicFaults),
+            tectonicFaults: this.#translateFaults(app.tectonicFaults ?? [], cropBox, zoomScale, targetWidth, targetHeight),
             manualRivers: translate(app.manualRivers),
             mapPins: translate(app.mapPins),
             mapRoutes: translate(app.mapRoutes),
@@ -129,6 +129,47 @@ export class RegionalExtractor {
             if (isVisible) newHistory.push(translatedStroke);
         }
         return newHistory;
+    }
+
+    /**
+     * Converts fault lines and hotspot chains into the regional map's pixels, scaling their
+     * thickness with the crop as brush sizes are, so a fault is as wide in the world on the
+     * regional map as on its parent. (Its noise and its hotspot spacing follow the zoom in
+     * TectonicEngine, so the two together make the fault look the same.)
+     *
+     * A fault is kept when its width reaches into the crop anywhere, not only when one of its
+     * points lies inside: a fault crossing the crop between two points outside it, or running
+     * just outside its edge, still deforms the terrain inside.
+     */
+    static #translateFaults(faults, cropBox, zoomScale, targetWidth, targetHeight) {
+        const translated = [];
+
+        for (const fault of faults) {
+            const scaled = foundry.utils.deepClone(fault);
+            scaled.thickness = (fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS) * zoomScale;
+            scaled.points = (fault.points ?? []).map((point) => ({
+                ...point,
+                x: (point.x - cropBox.x) * zoomScale,
+                y: (point.y - cropBox.y) * zoomScale,
+            }));
+
+            if (this.#reachesCrop(scaled.points, scaled.thickness, targetWidth, targetHeight)) translated.push(scaled);
+        }
+
+        return translated;
+    }
+
+    /**
+     * Whether a line of points, widened by `reach` on every side, overlaps the regional map. The
+     * test uses the line's bounding box, so it may keep a line that passes near a corner without
+     * entering; that costs nothing, since a fault outside the map changes no pixel.
+     */
+    static #reachesCrop(points, reach, targetWidth, targetHeight) {
+        if (points.length === 0) return false;
+
+        const xs = points.map((point) => point.x);
+        const ys = points.map((point) => point.y);
+        return Math.max(...xs) + reach >= 0 && Math.min(...xs) - reach <= targetWidth && Math.max(...ys) + reach >= 0 && Math.min(...ys) - reach <= targetHeight;
     }
 
     /**

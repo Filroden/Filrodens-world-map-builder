@@ -589,7 +589,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!container || this.canvasEngine) return;
 
         this.canvasEngine = new StudioCanvas(container);
-        this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        this.brushEngine = this.#createBrushEngine();
         this.#wireBrushCallbacks();
 
         this.canvasEngine.onCropUpdate = (cropBox) => {
@@ -1051,6 +1051,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // The scratch buffer is recreated whenever it is needed, so it can go with the window
         this.bufferScratch = null;
         return super.close(options);
+    }
+
+    /**
+     * A brush engine for the open map's size, given the map's surface texture for the Roughen
+     * and Level brushes (see ProceduralOrchestrator.getSurfaceTexture). The texture is only
+     * worked out the first time one of those brushes needs it.
+     */
+    #createBrushEngine() {
+        const brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        brushEngine.surfaceTexture = () => ProceduralOrchestrator.getSurfaceTexture(this);
+        brushEngine.surfaceTextureAmplitude = ProceduralEngine.getSurfaceTextureAmplitude();
+        return brushEngine;
     }
 
     #wireBrushCallbacks() {
@@ -1867,7 +1879,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.currentElevationData) return;
 
         const seaLevel = this.uiState["seaLevel"];
-        const strokeBounds = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel);
+        const strokeBounds = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel, this.currentRoughness);
 
         if (!strokeBounds) return;
 
@@ -2113,7 +2125,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         MapStateManager.allocateBuffers(this);
 
-        this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        this.brushEngine = this.#createBrushEngine();
 
         const p = payload.params;
         const c = p.cartography || {};
@@ -2124,6 +2136,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.continentalGrouping = p.continentalGrouping ?? FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING;
         this.uiState.shelfRange = p.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
         this.uiState.coastalPlain = p.coastalPlain ?? FILRODENSWMB.GENERATION.COASTAL_PLAIN;
+        this.uiState.flatTexture = p.flatTexture === true;
         this.uiState.continentScale = p.continentScale ?? FILRODENSWMB.GENERATION.CONTINENT_SCALE;
         // Maps saved before Ocean Scale existed used Continent Scale for the sea too, so an
         // updated map starts with the same value on both sides.
@@ -2996,6 +3009,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Inject the engine choice into the wiped state, with any defaults of its own (kept in
         // defaultUiState too, so double-clicking a slider resets it to the engine's default)
         this.uiState.generationEngine = newEngine;
+        // Textured ground is chosen when a Flat map is created (the checkbox only shows while the
+        // open map is Flat, so a map switched to Flat from another engine starts smooth)
+        this.uiState.flatTexture = newEngine === "flat" && formData.flatTexture === true;
         if (newEngine === "advanced") {
             const fracture = FILRODENSWMB.GENERATION.TECTONICS_V2.COASTLINE_FRACTURE;
             this.uiState.coastlineFracture = fracture;
@@ -3016,7 +3032,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // 1. Reset all history and spatial arrays except for the land masks, which are preserved if switching to Guided Mode
         this.markDirty();
-        this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        this.brushEngine = this.#createBrushEngine();
         this.manualRivers = [];
         this.tectonicFaults = [];
         this.mapPins = [];

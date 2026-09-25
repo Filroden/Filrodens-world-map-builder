@@ -48,6 +48,16 @@
             </div>
         </div>
 
+        {{#if (eq uiState.generationEngine "flat")}}
+            <!-- Read when the map is created (Create New Map), not when it is ticked -->
+            <div class="form-group">
+                <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.FlatTextureHint'}}">
+                    <input type="checkbox" name="flatTexture" class="fwmb-checkbox" {{#if uiState.flatTexture}}checked{{/if}} />
+                    {{localize "FILRODENSWMB.UI.FlatTexture"}}
+                </label>
+            </div>
+        {{/if}}
+
         <button type="button" class="fwmb-btn" data-action="applyResolution">
             {{localize "FILRODENSWMB.UI.ApplyResolution"}}
         </button>
