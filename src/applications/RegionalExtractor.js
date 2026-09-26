@@ -1,6 +1,9 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
+import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
+import { BrushEngine } from "../tools/BrushEngine.js";
 
 export class RegionalExtractor {
     /**
@@ -66,7 +69,7 @@ export class RegionalExtractor {
             customBiomes: state.customBiomes,
             customRouteStyles: state.customRouteStyles,
             customLabelStyles: state.customLabelStyles,
-            history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight),
+            history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
             tectonicFaults: this.#translateFaults(app.tectonicFaults ?? [], cropBox, zoomScale, targetWidth, targetHeight),
             manualRivers: translate(app.manualRivers),
             mapPins: translate(app.mapPins),
@@ -111,10 +114,30 @@ export class RegionalExtractor {
         }
     }
 
-    static #translateHistory(history, cropBox, zoomScale, targetWidth, targetHeight) {
+    /**
+     * The elevation each of the parent's slope and Level strokes anchors to (see
+     * BrushEngine.resolveAnchors), or an empty map if the parent's terrain is not available.
+     */
+    static #resolveAnchors(app, seaLevel) {
+        const engine = app.brushEngine;
+        if (!engine?.resolveAnchors || !app.baseElevationData) return new Map();
+        return engine.resolveAnchors(app.baseElevationData, seaLevel, ProceduralOrchestrator.getBaseRoughness(app));
+    }
+
+    /**
+     * Converts the brush strokes into the regional map's pixels, keeping those that reach into
+     * the crop. A slope or Level stroke also keeps the elevation it anchored to on the parent
+     * (`anchors`, see BrushEngine.resolveAnchors), since the regional map cannot find it itself
+     * when the stroke starts outside the crop. A slope stroke also records how many regional
+     * pixels one pixel of the map it was painted on spans (`scale`, compounding through each crop),
+     * so it climbs to the same height over the same stretch of the world (see BrushEngine).
+     */
+    static #translateHistory(history, cropBox, zoomScale, targetWidth, targetHeight, anchors = new Map()) {
         const newHistory = [];
         for (const stroke of history) {
             const translatedStroke = foundry.utils.deepClone(stroke);
+            if (anchors.has(stroke)) translatedStroke.anchor = anchors.get(stroke);
+            if (BrushEngine.isSlope(stroke)) translatedStroke.scale = (stroke.scale ?? 1) * zoomScale;
             translatedStroke.size *= zoomScale;
             let isVisible = false;
 
@@ -153,7 +176,12 @@ export class RegionalExtractor {
                 y: (point.y - cropBox.y) * zoomScale,
             }));
 
-            if (this.#reachesCrop(scaled.points, scaled.thickness, targetWidth, targetHeight)) translated.push(scaled);
+            // A tectonic feature reaches further from its line than its thickness (a rift's shoulders,
+            // a hotspot chain's volcanoes), so each fault is kept by its own reach. A kept fault
+            // keeps its whole line, even the parts far outside the crop: a feature is laid out along
+            // its whole length (a hotspot chain's volcanoes, a range's taper towards its ends), so
+            // cutting the line would change the part inside the crop.
+            if (this.#reachesCrop(scaled.points, TectonicFeatureEngine.reachOf(scaled), targetWidth, targetHeight)) translated.push(scaled);
         }
 
         return translated;

@@ -2,6 +2,8 @@ import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { RuleEditorDialog } from "./RuleEditorDialog.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import {
     getCustomPinIconById,
     getPinIconPickerList,
@@ -62,7 +64,7 @@ export class MapDialogManager {
      * until the map is, and (when opened automatically on load) lets the user stop being asked
      * for this map. Closing the dialog counts as keeping the original.
      *
-     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean}} impact - What the
+     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults?: boolean, removesSlip?: boolean}} impact - What the
      *   update changes, and why (see TerrainUpgrade.assess).
      * @param {boolean} allowDismiss - Whether to show the "don't ask again" option.
      * @returns {Promise<{apply: boolean, dismiss: boolean}>} The user's choice.
@@ -71,6 +73,9 @@ export class MapDialogManager {
         const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/terrain-upgrade.hbs", {
             isRegional: impact.kind === "regional",
             isTectonics: impact.kind === "tectonics",
+            isFaults: impact.kind === "faults",
+            convertsFaults: impact.convertsFaults === true,
+            removesSlip: impact.removesSlip === true,
             fracture: impact.fracture,
             fractureChanges: impact.fracture !== undefined && impact.fracture.before !== impact.fracture.after,
             resized: impact.resized === true,
@@ -1221,33 +1226,119 @@ export class MapDialogManager {
         const fault = app.tectonicFaults.find((f) => f.id === id);
         if (!fault) return;
 
-        const tectonicTypes = Object.entries(FILRODENSWMB.TECTONICS?.LABELS || {}).map(([key, label]) => ({
-            id: key,
-            label: label,
-        }));
+        const currentMap = TerrainVersion.getVersion(app.uiState) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
 
         await this._processEditDialog(app, fault, {
             titleKey: "FILRODENSWMB.UI.EditFault",
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-tectonics.hbs",
-            context: { fault, tectonicTypes },
-            onExtract: (form) => ({
-                name: form.elements["faultName"].value,
-                description: form.elements["faultDesc"].value,
-                type: form.elements["faultType"].value,
-                thickness: Number(form.elements["faultThickness"].value),
-                strength: Number(form.elements["faultStrength"].value),
-            }),
+            context: {
+                fault,
+                tectonicTypes: TectonicFeatureEngine.typeOptions(currentMap, fault.type),
+                rangeStyles: Object.entries(FILRODENSWMB.TECTONICS.FEATURES.RANGE_STYLES).map(([styleId, label]) => ({ id: styleId, label })),
+                settings: this.#featureSettings(fault),
+                isFeature: TectonicFeatureEngine.isFeatureType(fault.type),
+            },
+            onRender: (dialogApp, html) => this.#watchFaultType(html),
+            onExtract: (form) => this.#extractFault(form),
             onSave: (entity, result) => {
-                entity.color = FILRODENSWMB.TECTONICS?.COLORS?.[result.type] || 0xffffff;
+                this.#finishFaultEdit(entity, result);
                 if (app.activeFaultId === id) {
-                    app.uiState.faultType = result.type;
-                    app.uiState.faultThickness = result.thickness;
-                    app.uiState.faultStrength = result.strength;
-                    app.render({ parts: ["toolbar"] });
+                    app.uiState.faultType = entity.type;
+                    app.uiState.faultThickness = entity.thickness;
+                    app.uiState.faultStrength = entity.strength;
+                    if (entity.style) app.uiState.faultStyle = entity.style;
+                    app.render({ parts: ["editToolbar"] });
                 }
             },
             triggersTerrain: true,
         });
+    }
+
+    /**
+     * The settings of every tectonic feature type for the edit dialogue: the fault's own values
+     * where it has them, the defaults otherwise, so switching type in the dialogue shows sensible
+     * starting values.
+     */
+    static #featureSettings(fault) {
+        const features = FILRODENSWMB.TECTONICS.FEATURES;
+        return {
+            style: fault.style ?? features.RANGE.DEFAULT_STYLE,
+            arcDistance: fault.arcDistance ?? features.SUBDUCTION.DEFAULT_ARC_DISTANCE,
+            trenchDepth: fault.trenchDepth ?? features.SUBDUCTION.DEFAULT_TRENCH_DEPTH,
+            floorTexture: fault.floorTexture ?? features.RIFT.DEFAULT_FLOOR_TEXTURE,
+            volcanoes: fault.volcanoes ?? 0,
+            spacing: fault.spacing ?? features.HOTSPOT.DEFAULT_SPACING,
+            spacingTrend: fault.spacingTrend ?? features.HOTSPOT.DEFAULT_SPACING_TREND,
+            scatter: fault.scatter ?? features.HOTSPOT.DEFAULT_SCATTER,
+            variation: fault.variation ?? features.HOTSPOT.DEFAULT_VARIATION,
+            pulses: fault.pulses ?? features.HOTSPOT.DEFAULT_PULSES,
+            vents: fault.vents ?? features.HOTSPOT.DEFAULT_VENTS,
+            drowned: fault.drowned ?? features.HOTSPOT.DEFAULT_DROWNED,
+        };
+    }
+
+    /** The settings each tectonic feature type reads, beyond thickness and strength. */
+    static #FEATURE_FIELDS = {
+        range: ["style"],
+        subduction: ["arcDistance", "trenchDepth"],
+        rift: ["floorTexture", "volcanoes"],
+        hotspot: ["spacing", "spacingTrend", "scatter", "variation", "pulses", "vents", "drowned"],
+    };
+
+    /**
+     * Shows the dialogue's settings for the chosen fault type and hides the rest, now and whenever
+     * the type changes (see edit-tectonics.hbs).
+     */
+    static #watchFaultType(html) {
+        const select = html.querySelector('select[name="faultType"]');
+        if (!select) return;
+        const update = () => {
+            for (const section of html.querySelectorAll("[data-fault-types]")) {
+                section.hidden = !section.dataset.faultTypes.split(" ").includes(select.value);
+            }
+        };
+        select.addEventListener("change", update);
+        update();
+    }
+
+    /**
+     * Reads the edit dialogue: the shared fields, plus the settings of the chosen type only, so
+     * a fault never keeps settings of a type it no longer is.
+     */
+    static #extractFault(form) {
+        const elements = form.elements;
+        const type = elements["faultType"].value;
+        const result = {
+            name: elements["faultName"].value,
+            description: elements["faultDesc"].value,
+            type,
+            thickness: Number(elements["faultThickness"].value),
+            strength: Number(elements["faultStrength"].value),
+            reversed: elements["faultReverse"]?.checked === true,
+        };
+        for (const field of this.#FEATURE_FIELDS[type] ?? []) {
+            const input = field === "style" ? elements["faultStyle"] : elements[field];
+            if (input) result[field] = field === "style" ? input.value : Number(input.value);
+        }
+        return result;
+    }
+
+    /**
+     * Completes an edited fault after the dialogue's values are merged into it: its colour, whether
+     * it is a tectonic feature, and dropping settings of other types. Its direction is a setting
+     * (`reversed`, see TectonicFeatureEngine), kept only while it is on and only for a feature.
+     */
+    static #finishFaultEdit(fault, result) {
+        fault.color = TectonicFeatureEngine.colorOf(fault.type);
+        if (!result.reversed || !TectonicFeatureEngine.isFeatureType(fault.type)) delete fault.reversed;
+
+        const keep = new Set(this.#FEATURE_FIELDS[fault.type] ?? []);
+        for (const fields of Object.values(this.#FEATURE_FIELDS)) {
+            for (const field of fields) if (!keep.has(field)) delete fault[field];
+        }
+
+        if (TectonicFeatureEngine.isFeatureType(fault.type)) fault.revision = FILRODENSWMB.TECTONICS.FEATURES.REVISION;
+        else delete fault.revision;
     }
 
     static async onEditLabel(app, event, target, explicitData = null) {

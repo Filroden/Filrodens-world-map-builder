@@ -21,6 +21,16 @@
                     {{/each}}
                 </select>
             </div>
+            {{#if faultIsRange}}
+                <div class="fwmb-brush-setting">
+                    <label>{{localize "FILRODENSWMB.UI.FaultStyle"}}</label>
+                    <select name="faultStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.FaultStyleHint'}}">
+                        {{#each rangeStyles}}
+                            <option value="{{this.id}}" {{#if (eq ../uiState.faultStyle this.id)}}selected{{/if}}>{{localize this.label}}</option>
+                        {{/each}}
+                    </select>
+                </div>
+            {{/if}}
             <div class="fwmb-brush-setting">
                 <label>{{localize "FILRODENSWMB.UI.FaultThickness"}}</label>
                 <div class="fwmb-slider-group">

@@ -1969,31 +1969,6 @@ input.fwmb-swatch {
     border-block-width: 0.5px;
 }
 
-#fwmb-infra-tooltip {
-    position: fixed;
-    pointer-events: none;
-    background: var(--fwmb-bg-base);
-    color: var(--fwmb-text-primary);
-    padding: var(--fwmb-space-8) var(--fwmb-space-10);
-    border-radius: var(--fwmb-radius-medium);
-    border: 1px solid var(--fwmb-border-focus);
-    font-size: var(--fwmb-font-size-xs);
-    line-height: 1.4;
-    z-index: 9999;
-    max-width: 16rem;
-    transform: translate(-50%, -100%);
-    box-shadow: var(--fwmb-shadow-window);
-}
-
-#fwmb-infra-tooltip strong {
-    display: block;
-    font-size: var(--fwmb-font-size-s);
-    font-weight: bold;
-    margin-block-end: var(--fwmb-space-4);
-    border-block-end: var(--fwmb-border-accent);
-    padding-block-end: var(--fwmb-space-2);
-}
-
 .fwmb .fwmb-name {
     font-size: var(--fwmb-font-size-xs);
     color: var(--fwmb-text-primary);
@@ -2730,4 +2705,11 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     .fwmb-rule-row-custom {
         grid-template-columns: 1fr;
     }
+}
+
+/* Fault edit dialogue: settings for only some fault types are hidden with the hidden attribute
+   while another type is chosen (see MapDialogManager.onEditFault). The groups and form rows set
+   their own display, which would otherwise override the attribute. */
+.fwmb .fwmb-fault-dialog [data-fault-types][hidden] {
+    display: none;
 }

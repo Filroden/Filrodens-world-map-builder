@@ -2,6 +2,7 @@ import { MapStateManager } from "./applications/MapStateManager.js";
 import { ProceduralEngine } from "./generation/ProceduralEngine.js";
 import { HydrologyEngine } from "./generation/HydrologyEngine.js";
 import { TectonicEngine } from "./generation/TectonicEngine.js";
+import { TectonicFeatureEngine } from "./generation/TectonicFeatureEngine.js";
 import { SpatialMath } from "./tools/SpatialMath.js";
 import { BufferDiff } from "./tools/BufferDiff.js";
 import { FILRODENSWMB } from "./config.js";
@@ -143,27 +144,84 @@ export class ProceduralOrchestrator {
     }
 
     /**
-     * The open map's surface texture (see ProceduralEngine.generateSurfaceTexture), worked out the
-     * first time it is needed and kept until something it depends on changes: the seed, the
-     * map's size, or its place in the top map. Only maps that use it (textured Flat ground, or
-     * the Roughen or Level brush) ever pay for it.
+     * The open map's surface texture (see ProceduralEngine.generateSurfaceTexture), holding at
+     * least the pixels in `bounds`.
+     *
+     * The texture is worked out in tiles (SURFACE_TEXTURE.TILE_SIZE), each the first time
+     * something asks for part of it, and kept until something it depends on changes: the seed,
+     * the map's size, or its place in the top map. A brush stamp asks only for the pixels under
+     * it, so a Roughen or Level stroke works out the texture where it paints and nowhere else,
+     * instead of making its first stamp wait for the whole map (several seconds on a large map).
+     * Only maps that use it (textured Flat ground, or the Roughen or Level brush) ever pay for it.
+     *
+     * The buffer covers the whole map, but only the tiles asked for so far hold the texture;
+     * callers must only read pixels inside the bounds they asked for.
      *
      * @param {object} app - The MapStudioApp instance.
+     * @param {object|null} [bounds] - The pixels needed (inclusive), or null for the whole map.
      * @returns {Float32Array|null} The texture, or null if the browser had no memory for it, in
      *   which case the brushes that paint it leave the ground as it is.
      */
-    static getSurfaceTexture(app) {
+    static getSurfaceTexture(app, bounds = null) {
+        const texture = this.#surfaceTextureFor(app);
+        if (!texture) return null;
+
+        this.#fillSurfaceTextureTiles(app, texture, ProceduralEngine.resolveBounds(bounds, app.mapWidth, app.mapHeight));
+        return texture.buffer;
+    }
+
+    /**
+     * Works out the texture's tiles that overlap `area` and have not been worked out yet.
+     */
+    static #fillSurfaceTextureTiles(app, texture, area) {
+        const tileSize = FILRODENSWMB.GENERATION.SURFACE_TEXTURE.TILE_SIZE;
+        const params = { terrain: { world: texture.world } };
+
+        for (let tileY = Math.floor(area.minY / tileSize); tileY <= Math.floor(area.maxY / tileSize); tileY++) {
+            for (let tileX = Math.floor(area.minX / tileSize); tileX <= Math.floor(area.maxX / tileSize); tileX++) {
+                const tile = tileY * texture.tilesAcross + tileX;
+                if (texture.filled[tile]) continue;
+
+                const tileBounds = {
+                    minX: tileX * tileSize,
+                    minY: tileY * tileSize,
+                    maxX: Math.min(app.mapWidth, (tileX + 1) * tileSize) - 1,
+                    maxY: Math.min(app.mapHeight, (tileY + 1) * tileSize) - 1,
+                };
+                texture.engine.generateSurfaceTexture(app.mapWidth, app.mapHeight, params, texture.buffer, tileBounds);
+                texture.filled[tile] = 1;
+            }
+        }
+    }
+
+    /**
+     * The open map's texture record (`app.surfaceTexture`): its buffer, which tiles have been
+     * worked out, and what it was worked out for. A new record, with no tiles worked out, is made
+     * whenever something the texture depends on has changed (reusing the old buffer if the size
+     * still fits, since every tile is written before it is read).
+     *
+     * @returns {object|null} The record, or null if the browser had no memory for it.
+     */
+    static #surfaceTextureFor(app) {
         const world = TerrainVersion.getTerrainParams(app.uiState).world;
         const key = [app.uiState.mapSeed, app.mapWidth, app.mapHeight, world.zoom, world.originX, world.originY, world.rootW, world.rootH].join("|");
-        if (app.surfaceTexture?.key === key) return app.surfaceTexture.buffer;
+        if (app.surfaceTexture?.key === key) return app.surfaceTexture;
         if (app.surfaceTextureUnavailable) return null;
 
         try {
+            const tileSize = FILRODENSWMB.GENERATION.SURFACE_TEXTURE.TILE_SIZE;
             const pixels = app.mapWidth * app.mapHeight;
+            const tilesAcross = Math.ceil(app.mapWidth / tileSize);
             const buffer = app.surfaceTexture?.buffer?.length === pixels ? app.surfaceTexture.buffer : new Float32Array(pixels);
-            new ProceduralEngine(app.uiState.mapSeed).generateSurfaceTexture(app.mapWidth, app.mapHeight, { terrain: { world } }, buffer);
-            app.surfaceTexture = { key, buffer };
-            return buffer;
+            app.surfaceTexture = {
+                key,
+                buffer,
+                world,
+                tilesAcross,
+                filled: new Uint8Array(tilesAcross * Math.ceil(app.mapHeight / tileSize)),
+                engine: new ProceduralEngine(app.uiState.mapSeed),
+            };
+            return app.surfaceTexture;
         } catch (error) {
             if (!(error instanceof RangeError)) throw error;
 
@@ -436,19 +494,49 @@ export class ProceduralOrchestrator {
     }
 
     /**
-     * Applies the vector features that deform terrain on top of the replayed brush strokes: tectonic
-     * faults across both base and brushed terrain, then manual rivers carved into the final
-     * deformed topography. The order matters because rivers must cut the terrain faults have
-     * already reshaped.
+     * Applies the vector features that deform terrain on top of the replayed brush strokes: the
+     * tectonic features (see TectonicFeatureEngine), then any original fault lines, both across
+     * base and brushed terrain, then manual rivers carved into the final deformed topography. The
+     * order matters because rivers must cut the terrain faults have already reshaped.
+     *
+     * The features' results are kept in `app.tectonicFeatureCache` between rebuilds, so an edit
+     * only works out again the features it affects.
      */
     static #applyVectorDeformations(app, elevationData, engine, params, bounds) {
         if (app.tectonicFaults?.length > 0) {
+            this.#applyTectonicFeatures(app, elevationData, engine, params, bounds);
             TectonicEngine.applyTectonicFaults(elevationData, app.mapWidth, app.mapHeight, app.tectonicFaults, engine.simplex, bounds, params.terrain?.faultFrame);
         }
 
         if (app.manualRivers?.length > 0) {
             HydrologyEngine.carveManualRivers(elevationData, app.mapWidth, app.mapHeight, app.manualRivers, engine.simplex, params.seaLevel, bounds);
         }
+    }
+
+    /**
+     * Adds the tectonic features to `elevationData`.
+     *
+     * The features are worked out from the ground (the brushed terrain) around them, not only
+     * inside the bounds. When the whole map is being rebuilt, `elevationData` has just been reset
+     * to that ground everywhere, so it serves as the ground itself (the engine works out every
+     * change before adding any). A rebuild limited to part of the map leaves the rest of
+     * `elevationData` holding the previous faults, so the brushed layer is read instead.
+     */
+    static #applyTectonicFeatures(app, elevationData, engine, params, bounds) {
+        const terrain = params.terrain ?? {};
+        const world = terrain.world ?? { rootW: app.mapWidth, rootH: app.mapHeight };
+        const wholeMap = !bounds || (bounds.minX <= 0 && bounds.minY <= 0 && bounds.maxX >= app.mapWidth - 1 && bounds.maxY >= app.mapHeight - 1);
+        const ground = wholeMap ? elevationData : (app.brushEngine?.layerCache?.elevation ?? app.baseElevationData);
+        app.tectonicFeatureCache ??= {};
+        TectonicFeatureEngine.apply(elevationData, ground, app.tectonicFaults, {
+            width: app.mapWidth,
+            height: app.mapHeight,
+            simplex: engine.simplex,
+            seaLevel: params.seaLevel,
+            frame: { ...(terrain.faultFrame ?? { zoom: 1, originX: 0, originY: 0 }), rootSize: Math.max(world.rootW ?? app.mapWidth, world.rootH ?? app.mapHeight) },
+            bounds,
+            cache: app.tectonicFeatureCache,
+        });
     }
 
     /**

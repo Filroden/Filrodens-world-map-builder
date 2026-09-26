@@ -1,5 +1,6 @@
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
+import { TectonicFeatureEngine } from "./TectonicFeatureEngine.js";
 
 /**
  * Handles signed distance field (SDF) calculations and spatial vector deformations
@@ -47,7 +48,8 @@ export class TectonicEngine {
      * @param {Float32Array} elevationData - The terrain to deform, in place.
      * @param {number} width - The map's width in pixels.
      * @param {number} height - The map's height in pixels.
-     * @param {object[]} faults - The fault lines and hotspot chains, in the map's pixels.
+     * @param {object[]} faults - The fault lines and hotspot chains, in the map's pixels. Tectonic
+     *   features among them (see TectonicFeatureEngine) are skipped: they have their own engine.
      * @param {object} simplex - The map's simplex noise generator.
      * @param {object|null} [activeBounds] - Only pixels inside these bounds are changed.
      * @param {{zoom: number, originX: number, originY: number}} [frame] - See above.
@@ -59,7 +61,7 @@ export class TectonicEngine {
         let readBuffer = null;
 
         for (const fault of faults) {
-            if (!fault.points || fault.points.length < 2) continue;
+            if (!fault.points || fault.points.length < 2 || TectonicFeatureEngine.isFeature(fault)) continue;
 
             if (fault.type === FILRODENSWMB.TECTONICS.TYPES.HOTSPOT) {
                 this.#applyHotspotChain(elevationData, width, height, fault, noise, activeBounds);

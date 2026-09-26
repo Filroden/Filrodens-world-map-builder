@@ -12,6 +12,21 @@
             {{#if changesFaults}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFaults"}}</li>
             {{/if}}
+            {{#if convertsFaults}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFeatures"}}</li>
+            {{/if}}
+            {{#if removesSlip}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
+        </ul>
+    {{else if isFaults}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroFaults"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFeatures"}}</li>
+            {{#if removesSlip}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
         </ul>
     {{else if isTectonics}}
         <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroTectonics"}}</p>
@@ -19,6 +34,12 @@
         <ul class="fwmb-terrain-update-list">
             <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTectonicsLand"}}</li>
             <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTectonicsFeatures"}}</li>
+            {{#if convertsFaults}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFeatures"}}</li>
+            {{/if}}
+            {{#if removesSlip}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
         </ul>
     {{else}}
         <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroCoastline"}}</p>
@@ -30,6 +51,12 @@
             {{/if}}
             {{#if fractureChanges}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFracture" before=fracture.before after=fracture.after}}</li>
+            {{/if}}
+            {{#if convertsFaults}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFeatures"}}</li>
+            {{/if}}
+            {{#if removesSlip}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
             {{/if}}
         </ul>
     {{/if}}

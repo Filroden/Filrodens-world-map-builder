@@ -7,6 +7,7 @@ import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap,
 import { Scene3D } from "../canvas/Scene3D.js";
 import { SceneExporter } from "./SceneExporter.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
+import { RefreshQueue } from "../tools/RefreshQueue.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
@@ -15,11 +16,31 @@ import { RegionalExtractor } from "./RegionalExtractor.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { TerrainUpgrade } from "./TerrainUpgrade.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
+
+/**
+ * Longest the processing overlay waits for the browser to paint it before the work it announces
+ * starts anyway (see #startProcessing). A browser can stop producing frames for a while (a window
+ * minimised or covered, or a graphics card under strain), and refreshes run one at a time, so
+ * waiting for a frame alone could hold every later refresh and save up for as long as that lasts.
+ */
+const OVERLAY_PAINT_WAIT_MAX_MS = 250;
+
+/**
+ * The kinds of refresh the map runs through its refresh queue (see RefreshQueue):
+ *   TERRAIN         - generateTerrain: a full generation, or a refresh of what changed when nothing
+ *                     the base terrain depends on has changed.
+ *   CHANGED_TERRAIN - a refresh of what changed after brush strokes, undo or redo, or edits to
+ *                     faults and rivers (see #refreshChangedTerrain).
+ *   CLIMATE         - generateClimate: the climate, then the rivers and the canvas.
+ *   FEATURES        - generateFeatures: the rivers, then the canvas.
+ */
+const REFRESH = Object.freeze({ TERRAIN: "terrain", CHANGED_TERRAIN: "changedTerrain", CLIMATE: "climate", FEATURES: "features" });
 
 export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static DEFAULT_OPTIONS = {
@@ -160,6 +181,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         },
     };
 
+    /** Whether close() has started, and may still be asking about unsaved changes (see close). */
+    #closing = false;
+
+    /**
+     * Whether close() has gone past the point of no return and destroyed the canvas. Work that
+     * was already running when the window closed (a refresh part-way through, say) checks this
+     * before it draws, since there is nothing left to draw on.
+     */
+    #shutDown = false;
+
+    /** The save under way, or null (see saveCurrentMap). */
+    #activeSave = null;
+
+    /** Runs the refreshes one at a time (see RefreshQueue and #createRefreshQueue). */
+    #refreshes;
+
     /**
      * Mass Edit item types whose "Select" toggle lives in the same context panel fieldset
      * group. Pins and Routes both live in the Infrastructure panel - having Select mode active
@@ -218,6 +255,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.currentTemperatureData = null;
         this.currentRiverData = null;
         this.tectonicFaults = [];
+        // Each tectonic feature's last worked-out change to the terrain, reused while neither it
+        // nor the ground under it changes (see TectonicFeatureEngine). Emptied whenever another
+        // map is loaded or created, so it never holds a previous map's features.
+        this.tectonicFeatureCache = {};
         this.activeFaultId = null;
         this.manualRivers = [];
         this.activeRiverId = null;
@@ -287,7 +328,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // parent maps. Used to correct its wind distance, and passed on to regional maps cut from it.
         this.legacyRootSize = null;
         this.isDirty = false;
-        this.isSaving = false;
 
         MapStateManager.allocateBuffers(this);
         this.hasBooted = false;
@@ -300,16 +340,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Collects per-phase timings during a full render for the summary logged when it finishes
         this.renderTimer = new RenderTimer();
 
-        this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
-        this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
-        this.debouncedGenerateFeatures = foundry.utils.debounce(this.generateFeatures.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.FEATURES);
+        this.#refreshes = this.#createRefreshQueue();
 
-        this.debouncedCanvasTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
-        this.debouncedCanvasClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        // Each of these runs a moment after the edit that scheduled it, by which time the window
+        // may have been closed; see #whileOpen
+        this.debouncedGenerateTerrain = foundry.utils.debounce(this.#whileOpen(() => this.generateTerrain()), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
+        this.debouncedGenerateClimate = foundry.utils.debounce(this.#whileOpen((bounds) => this.generateClimate(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
+        this.debouncedGenerateFeatures = foundry.utils.debounce(this.#whileOpen((bounds) => this.generateFeatures(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.FEATURES);
 
-        this.debouncedRepaintCanvas = foundry.utils.debounce(() => this._repaintCanvas(), FILRODENSWMB.UI.DEBOUNCE_MS.DISPLAY);
+        this.debouncedCanvasTerrain = foundry.utils.debounce(this.#whileOpen(() => this.generateTerrain()), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedCanvasClimate = foundry.utils.debounce(this.#whileOpen((bounds) => this.generateClimate(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
-        this.debouncedHistoryRebuild = foundry.utils.debounce(() => this.#refreshChangedTerrain("Brush stroke rebuild"), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedRepaintCanvas = foundry.utils.debounce(this.#whileOpen(() => this._repaintCanvas()), FILRODENSWMB.UI.DEBOUNCE_MS.DISPLAY);
+
+        this.debouncedHistoryRebuild = foundry.utils.debounce(this.#whileOpen(() => this.#requestChangedTerrain("Brush stroke rebuild")), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
         // Every refresh that uses the scratch buffer restarts this timer. The buffer is only ever
         // used inside single synchronous steps and refilled before each use, so it can be dropped
@@ -317,6 +361,68 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedReleaseScratch = foundry.utils.debounce(() => {
             this.bufferScratch = null;
         }, FILRODENSWMB.UI.DEBOUNCE_MS.SCRATCH_RELEASE);
+    }
+
+    /**
+     * The queue every refresh of the terrain, climate, rivers and canvas goes through, so that
+     * only one runs at a time (see RefreshQueue). The public generate methods and
+     * #requestChangedTerrain put requests on it; each kind runs the matching private method,
+     * which runs its later stages directly rather than through the queue.
+     */
+    #createRefreshQueue() {
+        const latest = (_waiting, next) => next;
+        return new RefreshQueue(
+            {
+                [REFRESH.TERRAIN]: { run: () => this.#generateTerrainNow(), merge: latest },
+                [REFRESH.CHANGED_TERRAIN]: { run: ({ title }) => this.#refreshChangedTerrain(title), merge: latest },
+                [REFRESH.CLIMATE]: { run: ({ bounds }) => this.#generateClimateNow(bounds), merge: (waiting, next) => this.#mergeClimateRequests(waiting, next) },
+                [REFRESH.FEATURES]: { run: ({ bounds }) => this.#generateFeaturesNow(bounds), merge: (waiting, next) => ({ bounds: waiting.bounds && next.bounds ? SpatialMath.mergeBounds(waiting.bounds, next.bounds) : null }) },
+            },
+            { isStopped: () => this.#shutDown },
+        );
+    }
+
+    /**
+     * Merges two waiting climate refreshes. Both with an area: the area covering both. Otherwise
+     * the merged refresh has no area of its own, which means the area painted since the last
+     * refresh (pendingTerrainBounds), or the whole map if none was recorded (see
+     * #generateClimateNow). The other request's area is added to that record, so it is covered
+     * either way.
+     */
+    #mergeClimateRequests(waiting, next) {
+        if (waiting.bounds && next.bounds) return { bounds: SpatialMath.mergeBounds(waiting.bounds, next.bounds) };
+
+        const area = waiting.bounds ?? next.bounds;
+        if (area) this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, area);
+        return { bounds: null };
+    }
+
+    /**
+     * Asks for the terrain to be brought in line with the brush history and the vector features
+     * (see #refreshChangedTerrain), after any refresh already running.
+     *
+     * @param {string} title - Names the run in the console timing summary.
+     * @returns {Promise<void>}
+     */
+    #requestChangedTerrain(title) {
+        return this.#refreshes.request(REFRESH.CHANGED_TERRAIN, { title });
+    }
+
+    /** Whether the window is open and its canvas can still be drawn on. */
+    get #isOpen() {
+        return this.rendered && !this.#shutDown;
+    }
+
+    /**
+     * Wraps work scheduled for later (a debounced refresh) so that it only runs while the window
+     * is open. Closing the window removes its element and destroys its canvas, so a refresh that
+     * fires afterwards would fail part-way, and there is nothing left for it to update.
+     *
+     * @param {Function} work - The work to run, given whatever arguments the wrapper receives.
+     * @returns {Function} A function that runs `work` if the window is still open.
+     */
+    #whileOpen(work) {
+        return (...args) => (this.#isOpen ? work(...args) : undefined);
     }
 
     markDirty() {
@@ -395,10 +501,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         context.biomeList = [...context.biomeList, ...customBiomesMapped];
 
-        context.tectonicTypes = Object.entries(FILRODENSWMB.TECTONICS?.LABELS || {}).map(([id, label]) => ({
-            id: id,
-            label: label,
-        }));
+        // The fault types on offer depend on the map's terrain version (see
+        // TectonicFeatureEngine.typeOptions); a type left over from a map of the other version is
+        // replaced by that version's default, so the toolbar never draws a type it cannot offer
+        context.tectonicTypes = TectonicFeatureEngine.typeOptions(this.#isCurrentTerrain());
+        this.uiState.faultType = this.#resolveFaultType();
+        context.faultIsRange = this.uiState.faultType === FILRODENSWMB.TECTONICS.FEATURES.TYPES.RANGE;
+        context.rangeStyles = Object.entries(FILRODENSWMB.TECTONICS.FEATURES.RANGE_STYLES).map(([id, label]) => ({ id, label }));
 
         const alphaSort = (a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
 
@@ -710,7 +819,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #syncFaultLiveEdits(name) {
-        if (!["faultType", "faultThickness", "faultStrength"].includes(name) || !this.activeFaultId) return;
+        if (!["faultType", "faultThickness", "faultStrength", "faultStyle"].includes(name)) return;
+        // The range style only shows while a range is chosen, so switching to or from one redraws the toolbar
+        if (name === "faultType") this.render({ parts: ["editToolbar"] });
+        if (!this.activeFaultId) return;
 
         const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
         if (!fault) return;
@@ -718,13 +830,44 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         fault.type = this.uiState.faultType;
         fault.thickness = this.uiState.faultThickness;
         fault.strength = this.uiState.faultStrength;
+        MapStudioApp.#applyFeatureFields(fault, this.uiState);
 
         if (name === "faultType") {
-            fault.color = FILRODENSWMB.TECTONICS?.COLORS?.[this.uiState.faultType] || 0xffffff;
+            fault.color = TectonicFeatureEngine.colorOf(this.uiState.faultType);
         }
 
         this._repaintVectors();
         this.requestTerrainUpdate();
+    }
+
+    /**
+     * Marks a fault as a tectonic feature (see TectonicFeatureEngine) when its type is one, and
+     * gives a mountain range its style; a fault of an original type keeps the original maths.
+     */
+    static #applyFeatureFields(fault, uiState) {
+        if (!TectonicFeatureEngine.isFeatureType(fault.type)) {
+            delete fault.revision;
+            return;
+        }
+        fault.revision = FILRODENSWMB.TECTONICS.FEATURES.REVISION;
+        if (fault.type === FILRODENSWMB.TECTONICS.FEATURES.TYPES.RANGE) fault.style = uiState.faultStyle ?? FILRODENSWMB.TECTONICS.FEATURES.RANGE.DEFAULT_STYLE;
+    }
+
+    /** Whether the open map is at the current terrain version, which draws tectonic features. */
+    #isCurrentTerrain() {
+        return TerrainVersion.getVersion(this.uiState) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+    }
+
+    /**
+     * The fault type new faults are drawn with: the one chosen in the toolbar if this map's
+     * version offers it, otherwise that version's default (a range on a current map, a convergent
+     * fault on an older one).
+     */
+    #resolveFaultType() {
+        const current = this.#isCurrentTerrain();
+        const offered = TectonicFeatureEngine.typeOptions(current).map((option) => option.id);
+        if (offered.includes(this.uiState.faultType)) return this.uiState.faultType;
+        return current ? FILRODENSWMB.TECTONICS.FEATURES.DEFAULT_TYPE : FILRODENSWMB.TECTONICS.TYPES.CONVERGENT;
     }
 
     #syncRouteLiveEdits(name, target) {
@@ -1042,9 +1185,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async close(options) {
-        const canClose = await this.#gateUnsavedChanges();
+        // A second close while the first is still asking about unsaved changes, or still
+        // closing, must not shut the window down twice
+        if (this.#closing) return;
+        this.#closing = true;
+
+        let canClose = false;
+        try {
+            // A save already under way decides whether there are unsaved changes left, so it is
+            // allowed to finish before the user is asked about them
+            if (this.#activeSave) await this.#activeSave;
+            canClose = await this.#gateUnsavedChanges();
+        } finally {
+            if (!canClose) this.#closing = false;
+        }
         if (!canClose) return; // Abort closure entirely
 
+        this.#shutDown = true;
         if (this.canvasEngine) this.canvasEngine.destroy();
         if (this.scene3D) this.scene3D.destroy();
 
@@ -1056,11 +1213,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * A brush engine for the open map's size, given the map's surface texture for the Roughen
      * and Level brushes (see ProceduralOrchestrator.getSurfaceTexture). The texture is only
-     * worked out the first time one of those brushes needs it.
+     * worked out where one of those brushes needs it, when it first does.
      */
     #createBrushEngine() {
         const brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
-        brushEngine.surfaceTexture = () => ProceduralOrchestrator.getSurfaceTexture(this);
+        brushEngine.surfaceTexture = (bounds) => ProceduralOrchestrator.getSurfaceTexture(this, bounds);
         brushEngine.surfaceTextureAmplitude = ProceduralEngine.getSurfaceTextureAmplitude();
         return brushEngine;
     }
@@ -1655,21 +1812,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             activeEntity = this.activeFaultId ? this.tectonicFaults.find((f) => f.id === this.activeFaultId) : null;
             const oldBounds = SpatialMath.getVectorBounds(activeEntity);
             if (this.activeFaultId) {
-                const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
-                if (fault) fault.points.push(finalPos);
+                const existing = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
+                if (existing) existing.points.push(finalPos);
             } else {
                 this.activeFaultId = foundry.utils.randomID();
-                this.tectonicFaults.push({
+                const type = this.#resolveFaultType();
+                const fault = {
                     id: this.activeFaultId,
                     name: `Fault ${this.tectonicFaults.length + 1}`,
                     description: "",
                     points: [finalPos],
-                    type: this.uiState.faultType,
+                    type,
                     thickness: this.uiState.faultThickness,
                     strength: this.uiState.faultStrength,
-                    color: FILRODENSWMB.TECTONICS?.COLORS?.[this.uiState.faultType] || 0xffffff,
+                    color: TectonicFeatureEngine.colorOf(type),
                     visibility: "all",
-                });
+                };
+                MapStudioApp.#applyFeatureFields(fault, this.uiState);
+                this.tectonicFaults.push(fault);
             }
             activeEntity = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
             const newBounds = SpatialMath.getVectorBounds(activeEntity);
@@ -1723,9 +1883,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      *   it moved, because land is shaded relative to it. The live brush leaves this off and
      *   repaints just the stamp area on every pointer move, where reading every elevation each
      *   time would be wasted work.
+     * @param {boolean} [options.vectors] - Whether to redraw the vector layers (pins, routes,
+     *   rivers, regions, labels) as well. The live brush leaves this off: painting changes none of
+     *   them, and redrawing them rebuilds every label's text and every pin's icon, which on every
+     *   pointer move creates canvases and GPU textures far faster than the browser frees them.
      */
-    async _repaintCanvas(requestedBounds = null, { verifyPeak = false } = {}) {
-        if (!this.currentElevationData) return;
+    async _repaintCanvas(requestedBounds = null, { verifyPeak = false, vectors = true } = {}) {
+        if (!this.currentElevationData || !this.#isOpen) return;
 
         // Each stage is timed for the full-render summary (see RenderTimer)
         const timer = this.renderTimer;
@@ -1801,6 +1965,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight, uploadBounds);
         mark = timer.lap("Canvas repaint: canvas textures", mark);
 
+        if (!vectors) return;
+
         if (this.canvasEngine) {
             this.canvasEngine.clearInteractiveTargets();
         }
@@ -1824,7 +1990,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     _repaintVectors() {
-        if (!this.canvasEngine) return;
+        if (!this.canvasEngine || !this.#isOpen) return;
 
         this.canvasEngine.clearInteractiveTargets();
         const isEditModeActive = this.canvasEngine.isEditMode;
@@ -1881,7 +2047,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const seaLevel = this.uiState["seaLevel"];
         const strokeBounds = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel, this.currentRoughness);
 
-        if (!strokeBounds) return;
+        // A pointer move shorter than the brush's step spacing stamps nothing yet (the brush
+        // waits until it has travelled a full step) and reports that as empty bounds. Nothing
+        // changed, so nothing is repainted: the painters read empty bounds as the whole map, so
+        // on a large map every short pointer move used to repaint all of it.
+        if (!SpatialMath.isValidBounds(strokeBounds)) return;
 
         // Biome overrides do not alter topography or climate math, so a biome stroke only has to
         // repaint the biome layer where it painted. It must not touch pendingTerrainBounds: that
@@ -1913,7 +2083,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Accumulate the bounds for the deferred procedural generation
         this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, strokeBounds);
-        this._repaintCanvas(strokeBounds);
+        this._repaintCanvas(strokeBounds, { vectors: false });
         if (this.activeTool === "terrain" && this.#hasVectorTerrainFeatures()) {
             this.debouncedHistoryRebuild();
         } else {
@@ -1948,7 +2118,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const staleArea = SpatialMath.mergeBounds(rebuiltArea, this.pendingTerrainBounds);
                 this.pendingTerrainBounds = null;
 
-                if (SpatialMath.isValidBounds(staleArea)) await this.generateClimate(staleArea);
+                if (SpatialMath.isValidBounds(staleArea)) await this.#generateClimateNow(staleArea);
                 else await this.#refreshRivers();
             } finally {
                 this.#endProcessing();
@@ -1980,7 +2150,40 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
     }
 
-    async generateTerrain() {
+    /**
+     * Regenerates the map from its settings, or refreshes only what changed when nothing the base
+     * terrain depends on has changed, after any refresh already running (see RefreshQueue).
+     *
+     * @returns {Promise<void>} Settles once the generation has run.
+     */
+    generateTerrain() {
+        return this.#refreshes.request(REFRESH.TERRAIN);
+    }
+
+    /**
+     * Recomputes the climate over an area (or, with none, over the area painted since the last
+     * refresh, or else the whole map), then the rivers and the canvas, after any refresh already
+     * running (see RefreshQueue).
+     *
+     * @param {object|null} [bounds] - The area to refresh.
+     * @returns {Promise<void>}
+     */
+    generateClimate(bounds = null) {
+        return this.#refreshes.request(REFRESH.CLIMATE, { bounds });
+    }
+
+    /**
+     * Retraces the rivers and repaints the canvas over an area (or, with none, the whole map),
+     * after any refresh already running (see RefreshQueue).
+     *
+     * @param {object|null} [bounds] - The area to refresh.
+     * @returns {Promise<void>}
+     */
+    generateFeatures(bounds = null) {
+        return this.#refreshes.request(REFRESH.FEATURES, { bounds });
+    }
+
+    async #generateTerrainNow() {
         // Any full generation, whichever path triggered it, satisfies changes deferred by the
         // pause toggle. Clearing before the generation reads state means an edit made while it
         // runs re-flags itself instead of being lost.
@@ -2010,7 +2213,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 ProceduralOrchestrator.processTopographyPhase(this);
 
                 // The App maintains control of the Climate and Canvas rendering pipelines
-                await this.generateClimate(null);
+                await this.#generateClimateNow(null);
 
                 ProceduralOrchestrator.rememberGenerationInputs(this, inputs);
             } finally {
@@ -2019,7 +2222,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
     }
 
-    async generateClimate(bounds = null) {
+    async #generateClimateNow(bounds = null) {
         if (!this.currentElevationData) return;
 
         // Resolve active bounds before clearing pending state
@@ -2036,14 +2239,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 // The climate is recomputed over a wider area than the one that changed, and the
                 // canvas has to be repainted over all of it
                 const climateBounds = ProceduralOrchestrator.processClimatePhase(this, activeBounds);
-                await this.generateFeatures(climateBounds);
+                await this.#generateFeaturesNow(climateBounds);
             } finally {
                 this.#endProcessing();
             }
         });
     }
 
-    async generateFeatures(requestedBounds = null) {
+    async #generateFeaturesNow(requestedBounds = null) {
         if (!this.currentElevationData) return;
 
         const bounds = this.#resolveRefreshBounds(requestedBounds);
@@ -2250,6 +2453,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.customBiomeColors = p.customColors || {};
 
         this.tectonicFaults = payload.tectonicFaults || [];
+        this.tectonicFeatureCache = {};
 
         this.manualRivers = payload.manualRivers || [];
         if (payload.manualRivers) {
@@ -2472,11 +2676,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Context-aware Quick Save.
      * Creates a new journal if none exists, otherwise overwrites the current ID.
+     *
+     * Only one save runs at a time; asking again while one is under way does nothing and reports
+     * no save. The save under way is kept so that closing the window can wait for it.
+     *
+     * @returns {Promise<boolean>} True if the map was saved.
      */
     async saveCurrentMap() {
-        if (this.isSaving) return false;
-        this.isSaving = true;
+        if (this.#activeSave) return false;
 
+        this.#activeSave = this.#performSave();
+        try {
+            return await this.#activeSave;
+        } finally {
+            this.#activeSave = null;
+        }
+    }
+
+    /** Saves the map (see saveCurrentMap). */
+    async #performSave() {
         let mapName = this.currentSaveName;
 
         try {
@@ -2539,7 +2757,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 return false;
             }
         } finally {
-            this.isSaving = false;
             this.#endProcessing();
         }
     }
@@ -2551,16 +2768,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async #startProcessing(message) {
         this.processingTasks = (this.processingTasks || 0) + 1;
 
-        const overlay = this.element.querySelector(".fwmb-processing-overlay");
+        // A task already under way (a save, say) can reach here after the window has closed,
+        // when there is no overlay left to show
+        const overlay = this.element?.querySelector(".fwmb-processing-overlay");
         if (overlay) {
             const textEl = overlay.querySelector(".fwmb-processing-text");
             if (textEl) textEl.textContent = message;
             overlay.classList.remove("fwmb-hidden");
         }
 
-        // Force browser to paint the DOM before locking the main thread
-        const activeWindow = this.element.ownerDocument.defaultView || window;
-        await new Promise((resolve) => activeWindow.requestAnimationFrame(() => activeWindow.setTimeout(resolve, 0)));
+        // Give the browser the chance to paint the overlay before the main thread is locked: the
+        // frame after next is when it has been painted. The wait is capped (see
+        // OVERLAY_PAINT_WAIT_MAX_MS), since without frames it would never end.
+        const activeWindow = this.element?.ownerDocument.defaultView || window;
+        await new Promise((resolve) => {
+            let settled = false;
+            const finish = (painted) => {
+                if (settled) return;
+                settled = true;
+                if (!painted) console.warn(`FWMB | The window did not repaint within ${OVERLAY_PAINT_WAIT_MAX_MS}ms, so "${message}" is going ahead without waiting for it.`);
+                resolve();
+            };
+            activeWindow.requestAnimationFrame(() => activeWindow.setTimeout(() => finish(true), 0));
+            activeWindow.setTimeout(() => finish(false), OVERLAY_PAINT_WAIT_MAX_MS);
+        });
     }
 
     /**
@@ -2570,7 +2801,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.processingTasks = Math.max(0, (this.processingTasks || 0) - 1);
         if (this.processingTasks > 0) return;
 
-        const overlay = this.element.querySelector(".fwmb-processing-overlay");
+        const overlay = this.element?.querySelector(".fwmb-processing-overlay");
         if (overlay) overlay.classList.add("fwmb-hidden");
     }
 
@@ -2878,7 +3109,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 if (this.baseElevationData && brushAction) {
                     targetLedger.push("raster");
-                    await this.#refreshChangedTerrain(isUndo ? "Brush undo" : "Brush redo");
+                    await this.#requestChangedTerrain(isUndo ? "Brush undo" : "Brush redo");
                     break;
                 }
             }
@@ -3035,6 +3266,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.brushEngine = this.#createBrushEngine();
         this.manualRivers = [];
         this.tectonicFaults = [];
+        this.tectonicFeatureCache = {};
         this.mapPins = [];
         this.mapRoutes = [];
         this.regionLayers = [];
@@ -3690,12 +3922,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /**
      * What updating the open map would change (see TerrainUpgrade.assess), with the processing
-     * overlay shown while it is measured. Only legacy regional maps and legacy guided maps that
-     * are not the baseline size can change, so every other map is answered at once without
-     * measuring anything.
+     * overlay shown while it is measured. Only the maps TerrainVersion.isUpgradeCandidate names
+     * can change, so every other map is answered at once without measuring anything.
      */
     async #assessTerrainUpgrade() {
-        if (!TerrainVersion.isUpgradeCandidate(this.uiState)) return null;
+        if (!TerrainVersion.isUpgradeCandidate(this.uiState, this.tectonicFaults)) return null;
 
         await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.CheckingTerrainUpdate"));
         try {

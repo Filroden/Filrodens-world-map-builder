@@ -332,9 +332,12 @@ export class ProceduralEngine {
      * @param {number} height - Map height in pixels.
      * @param {object} params - Derived map parameters (reads `terrain.world`).
      * @param {Float32Array} outBuffer - Receives the texture, one value per pixel.
+     * @param {object|null} [bounds] - Only the pixels in this area (inclusive) are worked out and
+     *   written; the rest of `outBuffer` is left as it is. Every pixel's value depends only on its
+     *   position, so an area comes out exactly as it would in a whole-map pass.
      * @returns {Float32Array} `outBuffer`.
      */
-    generateSurfaceTexture(width, height, params, outBuffer) {
+    generateSurfaceTexture(width, height, params, outBuffer, bounds = null) {
         const settings = FILRODENSWMB.GENERATION.SURFACE_TEXTURE;
         const world = params?.terrain?.world ?? { zoom: 1, originX: 0, originY: 0, rootW: width, rootH: height };
         const zoom = world.zoom || 1;
@@ -343,10 +346,11 @@ export class ProceduralEngine {
         const density = zoom / baselinePerWorld;
         const extraOctaves = density > 1 ? Math.round(Math.log2(density)) : 0;
         const scale = 1 / settings.WAVELENGTH;
+        const area = ProceduralEngine.resolveBounds(bounds, width, height);
 
-        for (let y = 0; y < height; y++) {
+        for (let y = area.minY; y <= area.maxY; y++) {
             const baselineY = ((world.originY || 0) + y / zoom) * baselinePerWorld + settings.NOISE_OFFSET.Y;
-            for (let x = 0; x < width; x++) {
+            for (let x = area.minX; x <= area.maxX; x++) {
                 const baselineX = ((world.originX || 0) + x / zoom) * baselinePerWorld + settings.NOISE_OFFSET.X;
                 outBuffer[y * width + x] = this.#signedFbm(baselineX, baselineY, settings.OCTAVES, scale, extraOctaves);
             }

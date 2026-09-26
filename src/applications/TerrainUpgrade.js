@@ -3,6 +3,7 @@ import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { loadMapData, updateMapDataFields } from "../data/compendium.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 
 /**
  * Offers a map built with an older revision of the terrain generation rules the chance to be
@@ -10,9 +11,9 @@ import { loadMapData, updateMapDataFields } from "../data/compendium.js";
  *
  * Saved maps store settings, not pixels, so a map regenerates from its settings every time it is
  * opened. A map built with legacy rules keeps regenerating with them (see TerrainVersion) until
- * its owner chooses to update it. Only legacy regional maps, and legacy guided maps that are not
- * the baseline size, can change under the current rules; everything else regenerates
- * identically, so nothing is offered for it.
+ * its owner chooses to update it. Only legacy regional maps, legacy guided and tectonic maps, and
+ * legacy maps with fault lines (which become tectonic features) can change under the current
+ * rules; everything else regenerates identically, so nothing is offered for it.
  *
  * The update is applied to the open map only. It becomes permanent when the map is saved, and
  * reloading the map without saving restores the original.
@@ -78,7 +79,7 @@ export class TerrainUpgrade {
 
     /**
      * Works out whether updating the open map to the current terrain rules would visibly change
-     * it, and how. Three kinds of map can change, for different reasons, and the update is
+     * it, and how. Four kinds of map can change, for different reasons, and the update is
      * described to the user differently for each (`kind`):
      *
      * - "tectonics": a legacy tectonic map. The current revision replaces its engine outright, so
@@ -103,11 +104,28 @@ export class TerrainUpgrade {
      *   they are widened to their width on the parent map, and their texture and hotspot
      *   volcanoes are laid out at the parent's scale (see TerrainVersion.getTerrainParams).
      *
+     * - "faults": a legacy map of any other kind (a standard or flat map that was never cropped)
+     *   whose only change is its fault lines. The current revision changes nothing else about
+     *   such a map, but its faults are replaced by tectonic features.
+     *
+     * Whatever the kind, a legacy map's original fault lines are replaced by the tectonic features
+     * a current map draws (`convertsFaults`; see TectonicFeatureEngine.convertLegacyFault), and
+     * slip faults, which have no equivalent, are removed (`removesSlip`).
+     *
      * @param {object} app - The MapStudioApp instance, with a legacy map open.
-     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean}|null}
+     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean}|null}
      *   What the update would apply and change, or null if it would change nothing visible.
      */
     static assess(app) {
+        const faults = this.#faultConversion(app);
+        const impact = this.#assessTerrain(app);
+        if (impact) return { ...impact, ...faults };
+        if (faults.convertsFaults) return { kind: "faults", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, ...faults };
+        return null;
+    }
+
+    /** What the update changes about the terrain itself (see assess), or null if nothing. */
+    static #assessTerrain(app) {
         const state = app.uiState;
 
         if (TerrainVersion.isLegacyReplacedEngine(state)) {
@@ -130,6 +148,20 @@ export class TerrainUpgrade {
 
         if (!changesTerrain && !changesBiomes && !changesFaults) return null;
         return { kind: "regional", plan, changesTerrain, changesBiomes, changesFaults };
+    }
+
+    /**
+     * Whether the update replaces the map's original fault lines with tectonic features
+     * (`convertsFaults`), and whether any slip faults are removed because no feature replaces
+     * them (`removesSlip`). See TectonicFeatureEngine.convertLegacyFault.
+     */
+    static #faultConversion(app) {
+        if (!TerrainVersion.hasLegacyFaults(app.uiState, app.tectonicFaults)) return { convertsFaults: false, removesSlip: false };
+        const legacy = app.tectonicFaults.filter((fault) => !TectonicFeatureEngine.isFeature(fault));
+        return {
+            convertsFaults: true,
+            removesSlip: legacy.some((fault) => TectonicFeatureEngine.convertLegacyFault(fault) === null),
+        };
     }
 
     /**
@@ -192,7 +224,8 @@ export class TerrainUpgrade {
      * The changed settings (revision, wind distance, world description, and Coastline Fracture
      * where the plan changes it) are all read when the generation inputs are compared, so the
      * regeneration always rebuilds the base terrain rather than reusing the one on screen. A
-     * legacy regional map's fault lines are widened by the plan's `faultScale` before generating.
+     * legacy regional map's fault lines are widened by the plan's `faultScale` before generating,
+     * and every original fault line is then converted to a tectonic feature (see #convertFaults).
      *
      * The side panel is re-rendered before generating. Generation reads every setting back from
      * the panel's inputs first (see MapStateManager.getMapParameters), so a slider still showing
@@ -207,6 +240,7 @@ export class TerrainUpgrade {
         app.uiState.world = plan.world;
         if (plan.coastlineFracture !== undefined) app.uiState.coastlineFracture = plan.coastlineFracture;
         if (plan.faultScale) this.#scaleFaults(app, plan.faultScale);
+        this.#convertFaults(app);
         app.uiState.terrainUpgradeDismissed = false;
 
         await app.render({ parts: ["context"] });
@@ -222,6 +256,17 @@ export class TerrainUpgrade {
         for (const fault of app.tectonicFaults ?? []) {
             fault.thickness = (fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS) * scale;
         }
+    }
+
+    /**
+     * Replaces every original fault line with the tectonic feature a current map draws instead
+     * (see TectonicFeatureEngine.convertLegacyFault), after any widening, and removes slip faults,
+     * which have no equivalent. Faults that are already features are left as they are.
+     */
+    static #convertFaults(app) {
+        const faults = app.tectonicFaults ?? [];
+        app.tectonicFaults = faults.map((fault) => (TectonicFeatureEngine.isFeature(fault) ? fault : TectonicFeatureEngine.convertLegacyFault(fault))).filter(Boolean);
+        if (app.activeFaultId && !app.tectonicFaults.some((fault) => fault.id === app.activeFaultId)) app.activeFaultId = null;
     }
 
     /**

@@ -185,14 +185,31 @@ export class TerrainVersion {
 
     /**
      * Whether updating this map to the current rules could change it at all: a legacy regional
-     * map (see isLegacyRegional) or a legacy map whose engine's coastline rules have changed (see
-     * isLegacyCoastline). No other map can change, so no other map is offered an update.
+     * map (see isLegacyRegional), a legacy map whose engine's coastline rules have changed (see
+     * isLegacyCoastline), or a legacy map with fault lines, which the update replaces with
+     * tectonic features (see hasLegacyFaults). No other map can change, so no other map is
+     * offered an update.
      *
      * @param {object} state - A uiState object.
+     * @param {object[]} [faults] - The map's fault lines.
      * @returns {boolean}
      */
-    static isUpgradeCandidate(state) {
-        return this.isLegacyRegional(state) || this.isLegacyCoastline(state);
+    static isUpgradeCandidate(state, faults = []) {
+        return this.isLegacyRegional(state) || this.isLegacyCoastline(state) || this.hasLegacyFaults(state, faults);
+    }
+
+    /**
+     * Whether a legacy map has any fault line of an original type. Maps at the current revision
+     * draw tectonic features instead (see TectonicFeatureEngine), so updating the map converts
+     * them. A fault is an original one unless it was saved at the feature revision.
+     *
+     * @param {object} state - A uiState object.
+     * @param {object[]} faults - The map's fault lines.
+     * @returns {boolean}
+     */
+    static hasLegacyFaults(state, faults) {
+        if (this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT) return false;
+        return (faults ?? []).some((fault) => (fault.revision ?? 0) < FILRODENSWMB.TECTONICS.FEATURES.REVISION);
     }
 
     /**

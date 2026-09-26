@@ -66,6 +66,12 @@ export const FILRODENSWMB = {
             // The roughness (see BrushLayerCache) of ground carrying all of the texture: roughness
             // is stored as a byte per pixel, from 0 (none) to this
             FULL_ROUGHNESS: 255,
+            // Edge of the square tiles the texture is worked out in, in map pixels. Only the tiles
+            // a brush touches are worked out (see ProceduralOrchestrator.getSurfaceTexture), so
+            // the first Roughen stroke on a large map does not wait for the whole map's texture;
+            // small enough that a stamp works out little it does not use, large enough that the
+            // per-tile bookkeeping costs nothing noticeable.
+            TILE_SIZE: 64,
         },
         TECTONIC_PLATES: 10,
         COASTLINE_FRACTURE: 0.3,
@@ -638,6 +644,198 @@ export const FILRODENSWMB = {
             divergent: "#06b6d4",
             slip: "#f59e0b",
             hotspot: "#d97706",
+        },
+        // Tectonic features: the fault types of maps at the current terrain version (see
+        // TectonicFeatureEngine). A fault saved with `revision` at or above REVISION is a feature;
+        // any other fault keeps the original TectonicEngine maths.
+        FEATURES: {
+            REVISION: 2,
+            TYPES: {
+                RANGE: "range",
+                SUBDUCTION: "subduction",
+                RIFT: "rift",
+                HOTSPOT: "hotspot",
+            },
+            LABELS: {
+                range: "FILRODENSWMB.TECTONICS.Range",
+                subduction: "FILRODENSWMB.TECTONICS.Subduction",
+                rift: "FILRODENSWMB.TECTONICS.Rift",
+                hotspot: "FILRODENSWMB.TECTONICS.HotspotChain",
+            },
+            COLORS: {
+                range: "#ef4444",
+                subduction: "#a855f7",
+                rift: "#06b6d4",
+                hotspot: "#d97706",
+            },
+            DEFAULT_TYPE: "range",
+            // How far each type can change the terrain from its line, as a multiple of its
+            // thickness, so a regional crop keeps every feature that reaches into it. A hotspot
+            // chain's volcanoes stray from the line and stand on aprons much wider than their
+            // islands, so it reaches furthest.
+            REACH: {
+                range: 1.4,
+                subduction: 1.2,
+                rift: 2,
+                hotspot: 4,
+            },
+            // Converting an original fault when a map is updated to the current terrain version:
+            // the feature type each original type becomes (slip faults have none and are removed),
+            // and how its width changes. A rift's floor is narrower than an original divergent
+            // fault's valley, and a hotspot chain's islands are a share of its thickness
+            // (HOTSPOT.ISLAND_SHARE), where an original chain's volcanoes were its full thickness.
+            CONVERSION: {
+                convergent: { type: "range", thicknessScale: 1 },
+                divergent: { type: "rift", thicknessScale: 1.3 },
+                hotspot: { type: "hotspot", thicknessScale: 1.6, reverse: true },
+            },
+            RANGE_STYLES: {
+                simple: "FILRODENSWMB.TECTONICS.StyleSimple",
+                fold: "FILRODENSWMB.TECTONICS.StyleFold",
+                rugged: "FILRODENSWMB.TECTONICS.StyleRugged",
+            },
+            // Every width and length below is in pixels of a BASELINE_DIMENSION map unless it is
+            // a share of the feature's own width; heights are shares of the land's height range
+            // (1 - sea level) unless stated otherwise.
+            LINE: {
+                // Points per span between two control points, matching StudioCanvas#getSplinePoints
+                // so the terrain follows the curve the canvas draws
+                SPLINE_RESOLUTION: 20,
+                // The line field is worked out exactly on a grid this many cells across the
+                // feature's reach, and interpolated between (see LineField)
+                GRID_CELLS_PER_REACH: 24,
+                MAX_GRID_STEP: 12,
+                // The distance along the line is blurred over this share of the reach, so it does
+                // not jump on the inside of a bend
+                ALONG_SMOOTHING: 0.25,
+            },
+            RANGE: {
+                // Share of the half-width that stays at full height before the fronts fall away
+                PLATEAU: 0.2,
+                // How much the crest stands above the rest of the plateau
+                CREST: 0.35,
+                FRONT_NOISE: 0.15,
+                FRONT_NOISE_LENGTH: 30,
+                WANDER: 0.18,
+                WANDER_LENGTH: 180,
+                WIDTH_VARIATION: 0.25,
+                WIDTH_VARIATION_LENGTH: 140,
+                HEIGHT_VARIATION: 0.3,
+                HEIGHT_VARIATION_LENGTH: 110,
+                // Fade-in and fade-out at the ends, as multiples of the half-width
+                END_TAPER: 1.5,
+                // How far the range reaches, as a multiple of the half-width (with margin)
+                REACH: 1.4,
+                // Radius of the local mean the ground's own relief is measured against
+                RELIEF_RADIUS: 6,
+                STYLES: {
+                    // Simple builds its own rolling hills as well as enlarging the ground's, so it has
+                    // relief even where the ground has none (a Flat map)
+                    simple: { amplify: 1.8, valleyFloor: 0.45, spur: 0, fold: 0, peaks: 0, hills: 1, hillScale: 40 },
+                    fold: { amplify: 1.8, valleyFloor: 0.55, spur: 0, fold: 0.6, peaks: 0.4, hills: 0, foldAcross: 20, foldAlong: 120, peakScale: 50 },
+                    rugged: { amplify: 1.2, valleyFloor: 0.45, spur: 0.5, fold: 0, peaks: 0.35, hills: 0, spurAlong: 11, spurAcross: 45, peakScale: 30 },
+                },
+                DEFAULT_STYLE: "simple",
+            },
+            SUBDUCTION: {
+                DEFAULT_ARC_DISTANCE: 0.65,
+                DEFAULT_TRENCH_DEPTH: 0.35,
+                // Trench depth is a share of the sea level (the ocean's depth range)
+                OUTER_RISE: { HEIGHT: 0.12, AT: -0.45, WIDTH: 0.22 },
+                TRENCH: { AT: -0.04, OUTER_WIDTH: 0.14, INNER_WIDTH: 0.07, NOISE: 0.2, NOISE_LENGTH: 60 },
+                FOREARC: { HEIGHT: 0.22, RIDGES: 0.15, RIDGE_ALONG: 40, RIDGE_ACROSS: 6 },
+                ARC: { HEIGHT: 0.55, WIDTH: 0.15, NOISE: 0.35, NOISE_LENGTH: 25 },
+                WANDER: 0.12,
+                WANDER_LENGTH: 160,
+                // The width narrows along the line by up to this share of the width set, and never
+                // grows past it
+                WIDTH_VARIATION: 0.35,
+                WIDTH_VARIATION_LENGTH: 140,
+                END_TAPER: 0.8,
+                REACH: 1.2,
+                // Arc volcanoes: radius and spacing as shares of the width and of the radius
+                VOLCANO_RADIUS: 0.12,
+                VOLCANO_SPACING: 2.4,
+                VOLCANO_HEIGHT: 1.1,
+                VOLCANO_PULSES: 0.8,
+                VOLCANO_PULSE_LENGTH: 12,
+            },
+            RIFT: {
+                FLOOR: 0.35,
+                WALL_END: 0.75,
+                SHOULDER: 0.35,
+                INFILL: 0.4,
+                DEFAULT_FLOOR_TEXTURE: 0.5,
+                FLOOR_TEXTURE_HEIGHT: 0.12,
+                FLOOR_TEXTURE_LENGTH: 9,
+                // Length over which the master fault swaps sides
+                SEGMENT_LENGTH: 110,
+                MASTER_WALL_WIDTH: 0.06,
+                RAMP_STEPS: 3,
+                RAMP_STEP_WIDTH: 0.05,
+                WALL_NOISE: 0.08,
+                WALL_NOISE_LENGTH: 20,
+                TILT: 0.25,
+                BASIN_VARIATION: 0.3,
+                BASIN_LENGTH: 70,
+                WANDER: 0.15,
+                WANDER_LENGTH: 150,
+                // The width narrows along the rift by up to this share of the width set, and never
+                // grows past it
+                WIDTH_VARIATION: 0.4,
+                WIDTH_VARIATION_LENGTH: 120,
+                // Rolling hills on the shoulders, as a share of the depth, so they are not smooth
+                SHOULDER_TEXTURE: 0.15,
+                SHOULDER_TEXTURE_LENGTH: 30,
+                END_TAPER: 1.2,
+                REACH: 2,
+                RELIEF_RADIUS: 6,
+                VOLCANO_RADIUS: 0.55,
+                VOLCANO_SPACING: 1.6,
+                VOLCANO_HEIGHT: 1.4,
+            },
+            HOTSPOT: {
+                DEFAULT_SPACING: 1.8,
+                DEFAULT_SPACING_TREND: 0,
+                DEFAULT_SCATTER: 0.5,
+                DEFAULT_VARIATION: 1,
+                DEFAULT_PULSES: 1,
+                DEFAULT_VENTS: 0.5,
+                DEFAULT_DROWNED: 0.5,
+                PULSE_LENGTH: 9,
+                // A young island's typical radius at sea level, as a share of the chain's thickness
+                // (the band its volcanoes lie in, which the canvas shows around the line)
+                ISLAND_SHARE: 0.3,
+            },
+            VOLCANO: {
+                // Stations along a line (see Volcanoes.walkStations)
+                QUIET_ACTIVITY: 0.18,
+                STEP_SPREAD: 0.7,
+                PAUSE_THRESHOLD: 0.8,
+                PAUSE_THRESHOLD_SPREAD: 0.15,
+                PAUSE_LENGTH: 1.5,
+                BUSY_CROWDING: 0.3,
+                MAX_STEP: 4,
+                MIN_STEP: 0.25,
+                // Shield profile: a convex shield over a long concave apron
+                SHIELD_SHARE: 0.55,
+                SHIELD_WEIGHT: 0.62,
+                // Share of the footprint searched around a volcano's centre for its foot
+                FOOT_RING_SAMPLES: 24,
+                BLEND: 0.008,
+                LAGOON_DEPTH: 0.01,
+                REEF_HEIGHT: 0.004,
+                // Lava flows and slumps over a shield, as a share of its rise from the seabed (so a
+                // large volcano is as textured as a small one), plus a floor so small ones still show them
+                FLOW_NOISE: 0.05,
+                FLOW_NOISE_MIN: 0.012,
+                FLOW_NOISE_LENGTH: 7,
+                EROSION_NOISE_LENGTH: 4,
+                STRATO_WOBBLE: 0.16,
+                STRATO_WOBBLE_LENGTH: 11,
+                STRATO_GULLY_LENGTH: 4,
+                ANGLE_SAMPLES: 32,
+            },
         },
     },
     ENTITY_CONFIG: {

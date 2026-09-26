@@ -8,6 +8,9 @@ const MAX_FEATHER = 0.99;
 /** The slope tools blend towards their anchored elevation by the brush influence raised to this power. */
 const SLOPE_INFLUENCE_POWER = 4;
 
+/** How far a slope stroke's target elevation climbs or falls per pixel it travels, at a Strength of 1. */
+const SLOPE_GRADIENT = 0.3;
+
 /**
  * The brush maths a stroke was painted with. Strokes are saved and replayed every time a map
  * loads, so changing how a tool works would change every map already painted with it; instead a
@@ -16,8 +19,9 @@ const SLOPE_INFLUENCE_POWER = 4;
  *   ORIGINAL - Smooth pulls each pixel towards the elevation under the stamp centre, by a
  *              share far too small to see at any strength; Level makes perfectly flat ground.
  *   CURRENT  - Smooth pulls each pixel towards the average of the ground around it (see
- *              #buildLocalMeans), by a share that reaches SMOOTH_MAX_BLEND at full Strength;
- *              Level lays the surface texture on the ground it levels.
+ *              #buildLocalMeans), by a share that reaches SMOOTH_MAX_BLEND at full Strength,
+ *              without moving the coastline (see #holdCoast); Level lays the surface texture
+ *              on the ground it levels.
  */
 const STROKE_REVISION = Object.freeze({ ORIGINAL: 1, CURRENT: 2 });
 
@@ -128,9 +132,10 @@ export class BrushEngine {
         this.lastY = null;
 
         // Supplies the map's surface texture (see ProceduralEngine.generateSurfaceTexture) to the
-        // strokes that paint it, as a function returning a map-sized Float32Array, or null if
-        // there is none. Set by the owner of the engine; the texture is only worked out the
-        // first time a stroke needs it.
+        // strokes that paint it, as a function given the pixels needed (inclusive bounds) and
+        // returning a map-sized Float32Array that holds the texture at least there, or null if
+        // there is none. Set by the owner of the engine, which may work the texture out only
+        // where it is asked for, so a stamp must only read the pixels it asked for.
         this.surfaceTexture = null;
         this.surfaceTextureAmplitude = 0;
     }
@@ -322,16 +327,18 @@ export class BrushEngine {
      * history does when it reaches that stroke. Every stroke starts with no previous position and
      * no anchored slope elevation, so the result depends only on the stroke and the buffers.
      */
-    #replayStroke(stroke, elevationData, biomeOverrideData, seaLevel, activeBounds = null, roughnessData = null) {
+    #replayStroke(stroke, elevationData, biomeOverrideData, seaLevel, activeBounds = null, roughnessData = null, onAnchor = null) {
         this.currentStroke = stroke;
         this.lastX = null;
         this.lastY = null;
         this.activeSlopeElevation = null;
 
-        for (const pt of stroke.points) {
+        stroke.points.forEach((pt, index) => {
             // Pass activeBounds down to restrict the internal stamping loops
             this.#lerpAndStamp(pt.x, pt.y, elevationData, biomeOverrideData, seaLevel, false, activeBounds, roughnessData);
-        }
+            // The first point anchors a slope or Level stroke (see resolveAnchors)
+            if (index === 0 && onAnchor && BrushEngine.#isAnchored(stroke)) onAnchor(this.activeSlopeElevation);
+        });
     }
 
     /**
@@ -378,9 +385,12 @@ export class BrushEngine {
         let dirtyBounds = SpatialMath.getEmptyBounds();
 
         if (this.lastX === null || this.lastY === null) {
-            // Anchor the slope elevation to the exact pixel where the user first clicked
-            if (this.currentStroke.tool === "slopeUp" || this.currentStroke.tool === "slopeDown" || this.currentStroke.tool === "level") {
-                this.activeSlopeElevation = this.#anchorElevation(x, y, elevationData, roughnessData, seaLevel);
+            // Anchor the slope elevation to the exact pixel where the user first clicked, unless
+            // the stroke carries the elevation it anchored to on the map it was painted on (see
+            // resolveAnchors)
+            if (BrushEngine.#isAnchored(this.currentStroke)) {
+                const saved = this.currentStroke.anchor;
+                this.activeSlopeElevation = Number.isFinite(saved) ? saved : this.#anchorElevation(x, y, elevationData, roughnessData, seaLevel);
             }
 
             if (shouldRecord) this.#recordControlPoint(x, y);
@@ -412,8 +422,6 @@ export class BrushEngine {
             const interpX = this.lastX + dx * lerpFactor;
             const interpY = this.lastY + dy * lerpFactor;
 
-            const gradientBoost = 0.3;
-
             // activeSlopeElevation is the target the SLOPE stamp blends terrain towards (see
             // #stampTerrain); it is not itself written into elevationData here, but it ends up
             // in the stored elevation the moment a stamp uses it, so it is bound by the same
@@ -421,9 +429,9 @@ export class BrushEngine {
             // that, dragging slopeUp across terrain already raised past 1 would silently cap the
             // slope's target back at 1 and start levelling the peak instead of continuing to climb it.
             if (this.currentStroke.tool === "slopeUp") {
-                this.activeSlopeElevation += this.currentStroke.strength * stepSpacing * gradientBoost;
+                this.activeSlopeElevation += this.#slopeStep(stepSpacing);
             } else if (this.currentStroke.tool === "slopeDown") {
-                this.activeSlopeElevation -= this.currentStroke.strength * stepSpacing * gradientBoost;
+                this.activeSlopeElevation -= this.#slopeStep(stepSpacing);
             }
 
             const stampBounds = this.#stampBrush(interpX, interpY, elevationData, biomeOverrideData, seaLevel, activeBounds, roughnessData);
@@ -442,6 +450,30 @@ export class BrushEngine {
     }
 
     /**
+     * How far a slope stroke's target elevation moves over one step of `stepSpacing` pixels.
+     *
+     * The change is proportional to the distance travelled, so a slope's gradient is a height per
+     * pixel of the map it was painted on. A regional map replays its parent's strokes at `scale`
+     * times their size and length (see RegionalExtractor), so the same stroke travels `scale`
+     * times as many of its pixels; dividing by the scale keeps the gradient per pixel of the
+     * parent, and the slope climbs to the same height over the same stretch of the world. A stroke
+     * painted on the map itself has no scale and moves exactly as it always has.
+     */
+    #slopeStep(stepSpacing) {
+        return (this.currentStroke.strength * stepSpacing * SLOPE_GRADIENT) / BrushEngine.#scaleOf(this.currentStroke);
+    }
+
+    /** How many of this map's pixels one pixel of the map a stroke was painted on spans (1 if not recorded). */
+    static #scaleOf(stroke) {
+        return Number.isFinite(stroke.scale) && stroke.scale > 0 ? stroke.scale : 1;
+    }
+
+    /** Whether a stroke's tool climbs or falls as it travels (Slope Up and Slope Down). */
+    static isSlope(stroke) {
+        return stroke.tool === "slopeUp" || stroke.tool === "slopeDown";
+    }
+
+    /**
      * The elevation a slope or Level stroke anchors to: the ground under the pixel where the
      * stroke starts, or null if that is off the map.
      *
@@ -456,10 +488,48 @@ export class BrushEngine {
 
         const index = ty * this.mapWidth + tx;
         const elevation = elevationData[index];
-        const texture = BrushEngine.#isCurrent(this.currentStroke) && roughnessData ? this.surfaceTexture?.() : null;
+        const texture = BrushEngine.#isCurrent(this.currentStroke) && roughnessData ? this.surfaceTexture?.({ minX: tx, maxX: tx, minY: ty, maxY: ty }) : null;
         if (!texture) return elevation;
 
         return elevation - this.#textureAmplitudeAt(elevation, seaLevel) * texture[index] * (roughnessData[index] / FULL_ROUGHNESS);
+    }
+
+    /** Whether a stroke's tool anchors to the elevation where the stroke starts (slopes and Level). */
+    static #isAnchored(stroke) {
+        return BrushEngine.isSlope(stroke) || stroke.tool === "level";
+    }
+
+    /**
+     * The elevation each slope and Level stroke in the history anchors to, found by replaying the
+     * history from the base terrain exactly as a rebuild does.
+     *
+     * A regional map replays its parent's strokes on its own terrain, so it has to be given these:
+     * a stroke that starts outside the crop has no ground to anchor to on the regional map (and so
+     * would level nothing at all), and one that starts inside would anchor to the regional map's
+     * slightly different ground rather than the parent's. RegionalExtractor saves each anchor on
+     * the regional map's copy of the stroke (`anchor`), which a replay then uses in place of
+     * sampling the ground.
+     *
+     * @param {Float32Array} baseElevation - The map's base terrain (not changed).
+     * @param {number} seaLevel - The map's sea level.
+     * @param {number} baseRoughness - The base terrain's roughness (see ProceduralOrchestrator.getBaseRoughness).
+     * @returns {Map<object, number>} Each anchored stroke's anchor, for strokes that found one.
+     */
+    resolveAnchors(baseElevation, seaLevel, baseRoughness) {
+        const anchors = new Map();
+        if (!this.#history.some((stroke) => BrushEngine.#isAnchored(stroke))) return anchors;
+
+        const elevation = new Float32Array(baseElevation);
+        const roughness = new Uint8Array(elevation.length).fill(baseRoughness);
+        for (const stroke of this.#history) {
+            this.#replayStroke(stroke, elevation, null, seaLevel, null, roughness, (anchor) => {
+                if (Number.isFinite(anchor)) anchors.set(stroke, anchor);
+            });
+        }
+        this.currentStroke = null;
+        this.lastX = null;
+        this.lastY = null;
+        return anchors;
     }
 
     /** Whether a stroke was painted with the current brush maths (see STROKE_REVISION). */
@@ -671,13 +741,15 @@ export class BrushEngine {
      * - Raise, Lower and the slope tools move the ground and whatever texture it carries alike,
      *   so they leave the roughness as it is.
      * The texture's height is limited near the coast (see #textureAmplitudeAt), so Roughen and
-     * Level never move the coastline.
+     * Level never move the coastline by laying it; a CURRENT Smooth is held back from the
+     * coastline in the same way (see #holdCoast).
      */
     #stampTerrain(stroke, shape, elevationData, roughnessData = null, seaLevel = 0) {
         const { tool, strength } = stroke;
         const { cx, cy, size, coreSize, falloff, minY, rows } = shape;
         const targetIndex = tool === "smooth" ? this.#getStampCentreIndex(cx, cy) : null;
-        const texture = roughnessData && (tool === "roughen" || (tool === "level" && BrushEngine.#isCurrent(stroke))) ? this.surfaceTexture?.() : null;
+        const usesTexture = roughnessData && (tool === "roughen" || (tool === "level" && BrushEngine.#isCurrent(stroke)));
+        const texture = usesTexture ? this.surfaceTexture?.(BrushEngine.#stampArea(shape)) : null;
         const mode = this.#resolveTerrainMode(stroke, targetIndex, texture !== null && texture !== undefined);
         if (mode === TERRAIN_MODE.NONE) return;
 
@@ -718,7 +790,7 @@ export class BrushEngine {
                     }
                     case TERRAIN_MODE.SMOOTH_AVERAGE: {
                         const share = smoothStrength * influence;
-                        elevationData[index] = current + (means[meansRow + x] - current) * share;
+                        elevationData[index] = BrushEngine.#holdCoast(current, (means[meansRow + x] - current) * share, seaLevel);
                         if (roughnessData) roughnessData[index] = Math.round(roughnessData[index] * (1 - share));
                         break;
                     }
@@ -750,6 +822,40 @@ export class BrushEngine {
                 }
             }
         }
+    }
+
+    /**
+     * A pixel's elevation after a change, limited so that the change cannot move the coastline:
+     * a change towards sea level moves the pixel at most SURFACE_TEXTURE.COAST_SHARE of the way
+     * there, the same limit the surface texture keeps to (see #textureAmplitudeAt), so land stays
+     * land and sea stays sea however many times a brush passes. A change away from sea level is
+     * made in full. Land is ground at or above sea level, as everywhere else.
+     *
+     * Elevations are stored as 32-bit floats, so ground that repeated passes have brought within
+     * rounding distance of sea level could still round onto the other side; such a pixel is left
+     * where it is.
+     *
+     * Without this, smoothing a coast averages land and sea together and pulls the coastline
+     * about, which is rarely what smoothing a coast is for.
+     *
+     * @param {number} current - The pixel's elevation.
+     * @param {number} change - The change the brush would make.
+     * @param {number} seaLevel - The map's sea level.
+     * @returns {number} The pixel's new elevation.
+     */
+    static #holdCoast(current, change, seaLevel) {
+        const isLand = current >= seaLevel;
+        const towardsSea = isLand ? change < 0 : change > 0;
+        if (!towardsSea) return current + change;
+
+        const limit = FILRODENSWMB.GENERATION.SURFACE_TEXTURE.COAST_SHARE * Math.abs(current - seaLevel);
+        const next = current + Math.sign(change) * Math.min(Math.abs(change), limit);
+        return Math.fround(next) >= seaLevel === isLand ? next : current;
+    }
+
+    /** The pixels a stamp's box covers, as inclusive bounds. */
+    static #stampArea(shape) {
+        return { minX: shape.minX, maxX: shape.minX + shape.cols - 1, minY: shape.minY, maxY: shape.minY + shape.rows - 1 };
     }
 
     /**

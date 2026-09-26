@@ -139,6 +139,7 @@ export class MapStateManager {
             faultType: "convergent",
             faultThickness: FILRODENSWMB.TECTONICS?.DEFAULT_THICKNESS || 40,
             faultStrength: FILRODENSWMB.TECTONICS?.DEFAULT_STRENGTH || 0.25,
+            faultStyle: FILRODENSWMB.TECTONICS.FEATURES.RANGE.DEFAULT_STYLE,
             riverWidth: 4,
             liveFeatureUpdates: true,
 
@@ -282,8 +283,11 @@ export class MapStateManager {
      * Syncs the active UI state from the DOM, then gets derived map parameters.
      */
     static getMapParameters(app) {
-        for (const key of Object.keys(app.uiState)) {
-            const input = app.element.querySelector(`[name="${key}"]`);
+        // After the window has closed (a save still under way, say) there are no inputs to read,
+        // and the state already holds every value they last showed
+        const element = app.element;
+        for (const key of element ? Object.keys(app.uiState) : []) {
+            const input = element.querySelector(`[name="${key}"]`);
             if (!input) continue;
 
             if (key === "mapSeed" || key === "gridType" || key === "generationEngine") {

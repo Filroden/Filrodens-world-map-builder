@@ -1,9 +1,13 @@
 import { FILRODENSWMB } from "../config.js";
 import { resolvePinIconPath } from "../data/pinIcons.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { getRegionUploadResource } from "./RegionUploadResource.js";
 
 export class StudioCanvas {
+    /** Whether destroy() has run (see destroy). */
+    #destroyed = false;
+
     constructor(htmlContainer) {
         this.container = htmlContainer;
 
@@ -562,7 +566,11 @@ export class StudioCanvas {
             activeWindow.cancelAnimationFrame(this.animationFrameId);
         }
         if (this.resizeObserver) this.resizeObserver.disconnect();
-        if (this.app) this.app.destroy(true, { children: true, texture: true, baseTexture: true });
+
+        // Destroying a PIXI application twice fails part-way (its resize plugin has already been
+        // torn down), so it is only ever destroyed once
+        if (this.app && !this.#destroyed) this.app.destroy(true, { children: true, texture: true, baseTexture: true });
+        this.#destroyed = true;
     }
 
     /**
@@ -583,7 +591,7 @@ export class StudioCanvas {
      */
     renderPixelBuffer(layerId, pixelBuffer, width, height, bounds = null) {
         const targetLayer = this.layers[layerId];
-        if (!targetLayer) return;
+        if (!targetLayer || this.#destroyed) return;
 
         this.mapWidth = width;
         this.mapHeight = height;
@@ -1032,7 +1040,10 @@ export class StudioCanvas {
         const sortedRoutes = [...routes].sort((a, b) => a.thickness - b.thickness);
 
         this.routeGraphics.clear();
-        this.pinContainer.removeChildren().forEach((c) => c.destroy(true));
+        // Pin icons come from PIXI's shared texture cache (Texture.from), so the sprites are
+        // destroyed without their textures. Destroying the texture as well would force the next
+        // redraw to load and rasterise every icon again, creating fresh GPU textures each time.
+        this.pinContainer.removeChildren().forEach((c) => c.destroy());
         this.nodeContainer.removeChildren().forEach((c) => c.destroy(true));
 
         // 1. Render Routes (Bottom Layer)
@@ -1098,37 +1109,6 @@ export class StudioCanvas {
             if (isEditMode) {
                 // The hit radius must expand to match the new size
                 this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2, entityType: "pin", entityId: pin.id });
-            } else if (!this.isEditMode && (pin.name || pin.description)) {
-                // Keep PIXI hover events for tooltips ONLY when the global canvas is not in ANY edit mode
-                sprite.eventMode = "static";
-                sprite.interactive = true;
-                sprite.cursor = "help";
-
-                sprite.on("pointerover", () => {
-                    const tooltip = document.getElementById("fwmb-infra-tooltip");
-                    if (!tooltip) return;
-
-                    let html = ``;
-                    if (pin.name) html += `<strong>${pin.name}</strong>`;
-                    if (pin.description) html += `<span>${pin.description.replaceAll("\n", "<br>")}</span>`;
-
-                    tooltip.innerHTML = html;
-                    tooltip.classList.remove("fwmb-hidden");
-                });
-
-                sprite.on("pointermove", (e) => {
-                    const tooltip = document.getElementById("fwmb-infra-tooltip");
-                    if (!tooltip) return;
-
-                    const evt = e.data.originalEvent;
-                    tooltip.style.left = `${evt.clientX}px`;
-                    tooltip.style.top = `${evt.clientY - 15}px`;
-                });
-
-                sprite.on("pointerout", () => {
-                    const tooltip = document.getElementById("fwmb-infra-tooltip");
-                    if (tooltip) tooltip.classList.add("fwmb-hidden");
-                });
             }
 
             this.pinContainer.addChild(sprite);
@@ -1913,6 +1893,8 @@ export class StudioCanvas {
                     cap: PIXI.LINE_CAP.ROUND,
                 });
                 this.#drawVectorPath(this.faultGraphics, spline, "solid", 3);
+                // A reversed feature is laid out from its last point to its first, and its markers follow suit
+                if (TectonicFeatureEngine.isFeature(fault)) this.#drawFeatureMarkers(fault.type, fault.reversed ? [...spline].reverse() : spline, colorHex);
             }
 
             // 2. Draw Edit Nodes LAST so they always render on top of the geometry
@@ -1921,6 +1903,91 @@ export class StudioCanvas {
                 this.#renderEditNodes(fault.points, this.faultGraphics, isActive, fault, "fault");
             }
         });
+    }
+
+    /**
+     * Marks a tectonic feature's line with the symbol geological maps use for it, so its type and
+     * the direction it was drawn in (which decides which plate a subduction zone's volcanoes stand
+     * on, and which end of a hotspot chain is youngest) can be read on the map:
+     *   - subduction: triangles on the overriding plate's side (anticlockwise from the drawing
+     *     direction, the left-hand side on screen), pointing towards it;
+     *   - mountain range: triangles on both sides, as for a thrust belt;
+     *   - rift: short ticks on both sides, as for normal faults;
+     *   - hotspot chain: arrowheads pointing along the line towards its youngest end.
+     *
+     * Markers are drawn at a fixed spacing along the spline, sized for the screen at the current
+     * zoom, and skip the line's ends so they never sit on an edit node.
+     *
+     * @param {string} type - The feature type.
+     * @param {{x: number, y: number}[]} spline - The drawn line.
+     * @param {number} color - The line's colour.
+     */
+    #drawFeatureMarkers(type, spline, color) {
+        const scale = this.stage.scale.x || 1;
+        const size = FEATURE_MARKER.SIZE / scale;
+        const spacing = FEATURE_MARKER.SPACING / scale;
+        const graphics = this.faultGraphics;
+        const types = FILRODENSWMB.TECTONICS.FEATURES.TYPES;
+
+        this.#forEachAlongSpline(spline, spacing, (x, y, dx, dy) => {
+            // Left of (dx, dy) on screen (y pointing down) is (dy, -dx)
+            const nx = dy;
+            const ny = -dx;
+            if (type === types.SUBDUCTION) this.#drawMarkerTriangle(graphics, x, y, nx, ny, dx, dy, size, color);
+            else if (type === types.RANGE) {
+                this.#drawMarkerTriangle(graphics, x, y, nx, ny, dx, dy, size, color);
+                this.#drawMarkerTriangle(graphics, x, y, -nx, -ny, dx, dy, size, color);
+            } else if (type === types.RIFT) this.#drawMarkerTicks(graphics, x, y, nx, ny, size, color);
+            else if (type === types.HOTSPOT) this.#drawMarkerArrow(graphics, x, y, dx, dy, size, color);
+        });
+    }
+
+    /** Calls fn(x, y, dx, dy) every `spacing` pixels along the spline, leaving its ends clear. */
+    #forEachAlongSpline(spline, spacing, fn) {
+        let travelled = 0;
+        let next = spacing / 2;
+        for (let i = 0; i < spline.length - 1; i++) {
+            const a = spline[i];
+            const b = spline[i + 1];
+            const length = Math.hypot(b.x - a.x, b.y - a.y);
+            if (length === 0) continue;
+            const dx = (b.x - a.x) / length;
+            const dy = (b.y - a.y) / length;
+            while (next <= travelled + length) {
+                const along = next - travelled;
+                fn(a.x + dx * along, a.y + dy * along, dx, dy);
+                next += spacing;
+            }
+            travelled += length;
+        }
+    }
+
+    /** A filled triangle standing on the line at (x, y), pointing towards (nx, ny). */
+    #drawMarkerTriangle(graphics, x, y, nx, ny, dx, dy, size, color) {
+        const half = size * FEATURE_MARKER.TRIANGLE_BASE;
+        graphics.lineStyle(0);
+        graphics.beginFill(color, FEATURE_MARKER.ALPHA);
+        graphics.drawPolygon([x - dx * half, y - dy * half, x + dx * half, y + dy * half, x + nx * size, y + ny * size]);
+        graphics.endFill();
+    }
+
+    /** A short tick either side of the line at (x, y). */
+    #drawMarkerTicks(graphics, x, y, nx, ny, size, color) {
+        graphics.lineStyle({ width: FEATURE_MARKER.TICK_WIDTH / (this.stage.scale.x || 1), color, alpha: FEATURE_MARKER.ALPHA });
+        graphics.moveTo(x + nx * size * FEATURE_MARKER.TICK_GAP, y + ny * size * FEATURE_MARKER.TICK_GAP);
+        graphics.lineTo(x + nx * size, y + ny * size);
+        graphics.moveTo(x - nx * size * FEATURE_MARKER.TICK_GAP, y - ny * size * FEATURE_MARKER.TICK_GAP);
+        graphics.lineTo(x - nx * size, y - ny * size);
+    }
+
+    /** An arrowhead on the line at (x, y), pointing along (dx, dy). */
+    #drawMarkerArrow(graphics, x, y, dx, dy, size, color) {
+        const back = size * FEATURE_MARKER.ARROW_LENGTH;
+        const half = size * FEATURE_MARKER.TRIANGLE_BASE;
+        graphics.lineStyle(0);
+        graphics.beginFill(color, FEATURE_MARKER.ALPHA);
+        graphics.drawPolygon([x + dx * size, y + dy * size, x - dx * back + dy * half, y - dy * back - dx * half, x - dx * back - dy * half, y - dy * back + dx * half]);
+        graphics.endFill();
     }
 
     renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null) {
@@ -2186,3 +2253,15 @@ export class StudioCanvas {
         }
     }
 }
+
+// Tectonic feature line markers (see StudioCanvas#drawFeatureMarkers): sizes and spacing in screen
+// pixels at the zoom they are drawn at, shapes as shares of the marker size
+const FEATURE_MARKER = {
+    SIZE: 9,
+    SPACING: 48,
+    TRIANGLE_BASE: 0.6,
+    ARROW_LENGTH: 0.6,
+    TICK_GAP: 0.2,
+    TICK_WIDTH: 2,
+    ALPHA: 0.9,
+};

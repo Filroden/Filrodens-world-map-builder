@@ -1,14 +1,20 @@
-<div class="fwmb-dialog-content">
+{{!--
+    Edit dialogue for a fault line or tectonic feature. Settings that apply to only some types sit
+    in sections marked with data-fault-types (a space-separated list of the types they apply to);
+    MapDialogManager.onEditFault shows the sections for the chosen type and hides the rest as the
+    type changes. They are drawn already shown or hidden for the fault's own type.
+--}}
+<div class="fwmb-dialog-content fwmb-fault-dialog">
     <div class="form-group stacked">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
         <input type="text" name="faultName" value="{{fault.name}}" />
     </div>
-    
+
     <div class="form-group stacked">
         <label>{{localize "FILRODENSWMB.UI.Description"}}</label>
         <textarea class="fwmb-scrollable stable" name="faultDesc" rows="4">{{fault.description}}</textarea>
     </div>
-    
+
     <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.FaultType"}}</label>
         <select name="faultType">
@@ -20,13 +26,42 @@
         </select>
     </div>
 
-    <div class="form-group">
-        <label>{{localize "FILRODENSWMB.UI.FaultThickness"}}</label>
-        <input type="number" name="faultThickness" value="{{fault.thickness}}" min="10" max="1000" step="1" />
+    <div class="form-group" data-fault-types="range" {{#unless (eq fault.type "range")}}hidden{{/unless}}>
+        <label>{{localize "FILRODENSWMB.UI.FaultStyle"}}</label>
+        <select name="faultStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.FaultStyleHint'}}">
+            {{#each rangeStyles}}
+                <option value="{{this.id}}" {{#if (eq ../settings.style this.id)}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
     </div>
-    
-    <div class="form-group">
-        <label>{{localize "FILRODENSWMB.UI.FaultStrength"}}</label>
-        <input type="number" name="faultStrength" value="{{fault.strength}}" min="0.1" max="1.0" step="0.05" />
+
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="faultThickness" label="FILRODENSWMB.UI.FaultThickness" hint="FILRODENSWMB.UI.FaultThicknessHint" value=fault.thickness min=10 max=1000 step=1}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="faultStrength" label="FILRODENSWMB.UI.FaultStrength" hint="FILRODENSWMB.UI.FaultStrengthHint" value=fault.strength min=0.1 max=1 step=0.05}}
+
+    <div class="fwmb-range-group" data-fault-types="subduction" {{#unless (eq fault.type "subduction")}}hidden{{/unless}}>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="arcDistance" label="FILRODENSWMB.UI.FaultArcDistance" hint="FILRODENSWMB.UI.FaultArcDistanceHint" value=settings.arcDistance min=0.3 max=0.9 step=0.05}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="trenchDepth" label="FILRODENSWMB.UI.FaultTrenchDepth" hint="FILRODENSWMB.UI.FaultTrenchDepthHint" value=settings.trenchDepth min=0 max=1 step=0.05}}
+    </div>
+
+    <div class="fwmb-range-group" data-fault-types="rift" {{#unless (eq fault.type "rift")}}hidden{{/unless}}>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="floorTexture" label="FILRODENSWMB.UI.FaultFloorTexture" hint="FILRODENSWMB.UI.FaultFloorTextureHint" value=settings.floorTexture min=0 max=1 step=0.05}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="volcanoes" label="FILRODENSWMB.UI.FaultVolcanoes" hint="FILRODENSWMB.UI.FaultVolcanoesHint" value=settings.volcanoes min=0 max=1 step=0.05}}
+    </div>
+
+    <div class="fwmb-range-group" data-fault-types="hotspot" {{#unless (eq fault.type "hotspot")}}hidden{{/unless}}>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="spacing" label="FILRODENSWMB.UI.FaultSpacing" hint="FILRODENSWMB.UI.FaultSpacingHint" value=settings.spacing min=0.8 max=3 step=0.1}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="spacingTrend" label="FILRODENSWMB.UI.FaultSpacingTrend" hint="FILRODENSWMB.UI.FaultSpacingTrendHint" value=settings.spacingTrend min=-1 max=1 step=0.1}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="scatter" label="FILRODENSWMB.UI.FaultScatter" hint="FILRODENSWMB.UI.FaultScatterHint" value=settings.scatter min=0 max=1 step=0.05}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="variation" label="FILRODENSWMB.UI.FaultVariation" hint="FILRODENSWMB.UI.FaultVariationHint" value=settings.variation min=0 max=1 step=0.05}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="pulses" label="FILRODENSWMB.UI.FaultPulses" hint="FILRODENSWMB.UI.FaultPulsesHint" value=settings.pulses min=0 max=1 step=0.05}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="vents" label="FILRODENSWMB.UI.FaultVents" hint="FILRODENSWMB.UI.FaultVentsHint" value=settings.vents min=0 max=1 step=0.05}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="drowned" label="FILRODENSWMB.UI.FaultDrowned" hint="FILRODENSWMB.UI.FaultDrownedHint" value=settings.drowned min=0 max=0.9 step=0.05}}
+    </div>
+
+    <div class="form-group" data-fault-types="range subduction rift hotspot" {{#unless isFeature}}hidden{{/unless}}>
+        <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.FaultReverseHint'}}">
+            <input type="checkbox" name="faultReverse" class="fwmb-checkbox" {{#if fault.reversed}}checked{{/if}} />
+            {{localize "FILRODENSWMB.UI.FaultReverse"}}
+        </label>
     </div>
 </div>

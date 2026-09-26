@@ -71,6 +71,10 @@ export async function getSavedMaps() {
  */
 /**
  * Upgraded Save function. If existingId is provided, it overwrites the payload natively.
+ *
+ * @param {string} mapName - The journal's name.
+ * @param {object} mapDataPayload - The map data to store.
+ * @param {string|null} [existingId] - The journal to overwrite, if any.
  */
 export async function saveMapData(mapName, mapDataPayload, existingId = null) {
     if (!mapDataPayload) return null;
