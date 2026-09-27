@@ -222,10 +222,11 @@ export class GridDataExporter {
         // Reuses the exact same priority chain (paint override -> custom rule match -> built-in
         // default) that already resolves the biome for the live biome layer and the on-canvas
         // hover readout, so the exported biome can never disagree with what's visibly on the map.
-        // Its own `isWater` flag isn't used here - it also covers lakes (via the water mask), but
-        // `isCoastal` below is specifically about the ocean shoreline (see the schema doc), which
-        // the terrain band below already answers precisely.
-        const { lookupKey } = ProceduralEngine.resolveBiomeLookup(
+        // Under water it reports the biome seen from above (the surface biome, such as Pack Ice,
+        // if there is one, otherwise the bed's). `isCoastal` below is specifically about the
+        // ocean shoreline (see the schema doc), which the terrain band below already answers
+        // precisely, so the lookup's own land/water split is not used for it.
+        const { visible: lookupKey } = ProceduralEngine.resolveBiomeLookup(
             overrideId,
             elevation,
             moisture,
@@ -235,7 +236,7 @@ export class GridDataExporter {
             pixelIndex,
             params.customBiomeRules,
             params.biomePalette,
-            params.solidOverWater
+            params.biomeSides
         );
         const terrainBand = GridDataExporter.#classifyTerrainBand(elevation, params.seaLevel);
         const isOceanPixel = terrainBand === "deepOcean" || terrainBand === "shallowOcean";

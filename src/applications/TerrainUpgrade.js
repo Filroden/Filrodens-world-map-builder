@@ -198,11 +198,12 @@ export class TerrainUpgrade {
 
     /**
      * The biome a pixel resolves to, by the same rules the biome layer is painted with (painted
-     * overrides first, then custom biome rules, then the built-in biomes).
+     * overrides first, then custom biome rules, then the built-in biomes). Under water this is
+     * the biome seen from above: the surface biome if there is one, otherwise the bed's.
      */
     static #biomeAt(app, params, index, moisture, temperature) {
         const overrideId = app.currentBiomeOverrides ? app.currentBiomeOverrides[index] : 0;
-        const { lookupKey } = ProceduralEngine.resolveBiomeLookup(
+        const { visible } = ProceduralEngine.resolveBiomeLookup(
             overrideId,
             app.currentElevationData[index],
             moisture,
@@ -212,9 +213,9 @@ export class TerrainUpgrade {
             index,
             params.customBiomeRules,
             params.biomePalette,
-            params.solidOverWater,
+            params.biomeSides,
         );
-        return lookupKey;
+        return visible;
     }
 
     /**

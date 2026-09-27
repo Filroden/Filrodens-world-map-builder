@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
+import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 
 export class MapStateManager {
@@ -21,11 +22,13 @@ export class MapStateManager {
         app.bufferRiverMap = new Uint8Array(totalPixels);
         app.bufferWaterMask = new Float32Array(totalPixels);
 
-        app.bufferBase = new Uint8Array(totalPixels * 4);
-        app.bufferTopography = new Uint8Array(totalPixels * 4);
-        app.bufferBiomes = new Uint8Array(totalPixels * 4);
+        // The terrain's three images (see TerrainShading): the biomes on land and on the water's
+        // surface, the biomes of the beds under water, and the packed relief, depth and height
+        app.bufferSurfaceBiomes = new Uint8Array(totalPixels * 4);
+        app.bufferUnderwaterBiomes = new Uint8Array(totalPixels * 4);
+        app.bufferTerrainAux = new Uint8Array(totalPixels * 4);
         app.bufferContours = new Uint8Array(totalPixels * 4);
-        // Kept in sync alongside bufferBiomes on every biome repaint (see MapStudioApp's
+        // Kept in sync alongside the biome buffers on every biome repaint (see MapStudioApp's
         // _repaintCanvas/#applyBrushStroke), but its own canvas layer stays hidden until the
         // "Preview Rule Coverage" button is hovered - see ProceduralEngine.createBiomesMap's
         // outFallbackBuffer parameter for what actually gets written into it.
@@ -145,6 +148,10 @@ export class MapStateManager {
 
             contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
             reliefShading: FILRODENSWMB.DISPLAY.RELIEF_SHADING,
+            seabedRelief: FILRODENSWMB.DISPLAY.WATER.SEABED_RELIEF,
+            waterClarity: FILRODENSWMB.DISPLAY.WATER.CLARITY,
+            waterHue: FILRODENSWMB.DISPLAY.WATER.HUE,
+            waterSaturation: FILRODENSWMB.DISPLAY.WATER.SATURATION,
             biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,
             biomeAlphaInactive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE,
             maxLakeSize: FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE,
@@ -317,16 +324,10 @@ export class MapStateManager {
             compiledPalette[cb.id] = cb.color;
         }
 
-        // Custom biomes default to rendering transparent below sea level, exactly like the
-        // map's own auto-generated biomes there - but a biome meant to represent something
-        // like pack ice or a floating landmass needs to stay visible over water instead, the
-        // way the built-in PACK_ICE biome always has. This map only lists the biomes that
-        // opted into that (a sparse id -> true lookup), so ProceduralEngine.resolveBiomeLookup
-        // can check it in O(1) per pixel without touching the ones that didn't.
-        const solidOverWater = {};
-        for (const cb of state.customBiomes || []) {
-            if (cb.solidOverWater) solidOverWater[cb.id] = true;
-        }
+        // Where each biome may appear (dry land, under water, on the water's surface), by id, so
+        // ProceduralEngine.resolveBiomeLookup can check a painted override's placement in O(1)
+        // per pixel. See BiomePlacement.
+        const biomeSides = BiomePlacement.buildSidesTable(state.customBiomes || []);
 
         const params = {
             seaLevel: state.generationEngine === "advanced" ? 0.35 : state.seaLevel,
@@ -379,7 +380,7 @@ export class MapStateManager {
                 windDistance: state.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE,
             },
             biomePalette: compiledPalette,
-            solidOverWater,
+            biomeSides,
             customColors: customBiomeColors,
             // Compiled once per generation, not per pixel - see BiomeRuleEngine's own doc
             // comment for why. Custom biomes with no rules yet (rules: [] or undefined)
@@ -388,6 +389,10 @@ export class MapStateManager {
             display: {
                 contourInterval: state.contourInterval,
                 reliefShading: state.reliefShading,
+                seabedRelief: state.seabedRelief,
+                waterClarity: state.waterClarity,
+                waterHue: state.waterHue,
+                waterSaturation: state.waterSaturation,
                 biomeAlphaActive: state.biomeAlphaActive,
                 biomeAlphaInactive: state.biomeAlphaInactive,
             },

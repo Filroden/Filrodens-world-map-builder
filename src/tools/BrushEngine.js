@@ -1,6 +1,7 @@
 import { SpatialMath } from "./SpatialMath.js";
 import { BrushLayerCache } from "./BrushLayerCache.js";
 import { FILRODENSWMB } from "../config.js";
+import { BiomePlacement } from "../generation/BiomePlacement.js";
 
 /** Brush feather is capped just below 1 so the falloff band never collapses to zero width. */
 const MAX_FEATHER = 0.99;
@@ -209,7 +210,16 @@ export class BrushEngine {
         this.layerCache.invalidate();
     }
 
-    startStroke(layer, tool, size, strength, feather, paintValue = null) {
+    /**
+     * Begins a stroke.
+     * @param {number|null} [paintValue] - The biome id a biome stroke paints (0 erases).
+     * @param {number|null} [paintSides] - For a biome stroke, the BIOME_SIDE flags of that biome's
+     * placement at the moment of painting (see BiomePlacement). Recorded on the stroke so that
+     * replaying it always writes exactly where it was painted, even if the biome's placement is
+     * changed afterwards (rendering applies the current placement anyway, see
+     * ProceduralEngine.resolveBiomeLookup).
+     */
+    startStroke(layer, tool, size, strength, feather, paintValue = null, paintSides = null) {
         this.currentStroke = {
             layer,
             tool,
@@ -223,6 +233,7 @@ export class BrushEngine {
         // New terrain strokes use the current brush maths; strokes saved before it replay with
         // the maths they were painted with (see STROKE_REVISION)
         if (layer === "terrain") this.currentStroke.revision = STROKE_REVISION.CURRENT;
+        if (paintSides !== null) this.currentStroke.paintSides = paintSides;
 
         this.lastX = null;
         this.lastY = null;
@@ -925,14 +936,10 @@ export class BrushEngine {
     }
 
     /**
-     * Biome paint pixel loop. Writes a biome override, but only where the paint value makes sense
-     * for the tile underneath - a land biome can't be hand-painted onto water and vice versa.
-     * That guard stays symmetric with ProceduralEngine.resolveBiomeLookup, which never lets a
-     * custom biome reach water except via an auto-generation rule match (see that method's own
-     * doc comment). Two built-in values are deliberate exceptions, both allowed to write onto
-     * water: Pack Ice, which has always rendered solid over water, and the Eraser (id 0), which
-     * needs to be able to clear a previous Pack-Ice-style override sitting on a water tile -
-     * otherwise that override could never be erased again.
+     * Biome paint pixel loop. Writes a biome override, but only where the biome may appear: a
+     * land biome can't be hand-painted onto the sea and a sea biome can't be painted onto land
+     * (see BiomePlacement.canPaint). The Eraser (id 0) may write anywhere, so any override can be
+     * cleared again.
      *
      * Paint is all-or-nothing across the whole brush circle, so unlike terrain it ignores the
      * feather falloff.
@@ -940,9 +947,7 @@ export class BrushEngine {
     #stampBiome(stroke, shape, elevationData, biomeOverrideData, seaLevel) {
         const { paintValue } = stroke;
         const { cx, cy, size, minY, rows } = shape;
-
-        const isWaterBiome = paintValue === FILRODENSWMB.BIOME_IDS.DEEP_OCEAN || paintValue === FILRODENSWMB.BIOME_IDS.SHALLOW_OCEAN;
-        const canPaintOverWater = paintValue === FILRODENSWMB.BIOME_IDS.PACK_ICE || paintValue === FILRODENSWMB.BIOME_IDS.ERASER;
+        const allowed = BrushEngine.#paintableSides(stroke);
         const width = this.mapWidth;
 
         for (let row = 0; row < rows; row++) {
@@ -955,12 +960,31 @@ export class BrushEngine {
                 if (exactHypot(x - cx, dy) > size) continue;
 
                 const index = rowBase + x;
-                const isLand = elevationData[index] >= seaLevel;
-
-                if (canPaintOverWater || isLand !== isWaterBiome) {
-                    biomeOverrideData[index] = paintValue;
-                }
+                const isSea = elevationData[index] < seaLevel;
+                if (isSea ? allowed.sea : allowed.land) biomeOverrideData[index] = paintValue;
             }
         }
+    }
+
+    /**
+     * Whether a biome stroke may write on land and on the sea.
+     *
+     * A stroke painted since biome placements existed records its biome's placement
+     * (`paintSides`) and follows it. An older stroke has none and keeps the rule it was painted
+     * under, so a saved map's history replays exactly as before: Deep and Shallow Ocean only on
+     * the sea, Pack Ice and the Eraser anywhere, every other biome only on land. (Pack Ice
+     * painted on land by such a stroke is still written, and simply not drawn, since Pack Ice
+     * may only appear on the water's surface.)
+     */
+    static #paintableSides(stroke) {
+        const { paintValue, paintSides } = stroke;
+        if (Number.isInteger(paintSides)) {
+            return { land: BiomePlacement.canPaint(paintSides, false), sea: BiomePlacement.canPaint(paintSides, true) };
+        }
+
+        const ids = FILRODENSWMB.BIOME_IDS;
+        const isWaterBiome = paintValue === ids.DEEP_OCEAN || paintValue === ids.SHALLOW_OCEAN;
+        const isAnywhere = paintValue === ids.PACK_ICE || paintValue === ids.ERASER;
+        return { land: isAnywhere || !isWaterBiome, sea: isAnywhere || isWaterBiome };
     }
 }

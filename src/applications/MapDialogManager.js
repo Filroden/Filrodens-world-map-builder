@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { RuleEditorDialog } from "./RuleEditorDialog.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
@@ -467,20 +468,35 @@ export class MapDialogManager {
                     name: `Custom Biome ${app.uiState.customBiomes.length + 1}`,
                     code: null,
                     color: [128, 128, 128],
-                    solidOverWater: false,
+                    placement: FILRODENSWMB.BIOME_PLACEMENT.LAND,
                 }),
                 getContext: (app, biome) => ({
                     biome: { ...biome, hex: ColorMath.rgbToHex(biome.color) },
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
+                    placements: this.#biomePlacementChoices(BiomePlacement.placementOfCustom(biome)),
                 }),
                 onExtract: (form, fallbackName) => ({
                     name: form.elements["biomeName"].value.trim() || fallbackName,
                     code: form.elements["biomeCode"].value.trim() || null,
                     color: ColorMath.hexToRgb(form.elements["biomeColor"].value),
-                    solidOverWater: form.elements["biomeSolidOverWater"].checked,
+                    placement: form.elements["biomePlacement"].value,
+                    // Superseded by `placement`, which takes priority over it anyway (see
+                    // BiomePlacement.placementOfCustom); cleared so an older map's flag is not
+                    // carried forward once the biome has been edited
+                    solidOverWater: undefined,
                 }),
             },
         };
+    }
+
+    /**
+     * The choices for a custom biome's Placement select, in the order they are offered, with the
+     * biome's current placement selected.
+     * @param {string} selected - One of FILRODENSWMB.BIOME_PLACEMENT.
+     * @returns {Array<{value: string, label: string, selected: boolean}>}
+     */
+    static #biomePlacementChoices(selected) {
+        return Object.values(FILRODENSWMB.BIOME_PLACEMENT).map((value) => ({ value, label: BiomePlacement.labelOf(value), selected: value === selected }));
     }
 
     /**

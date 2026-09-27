@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { StudioCanvas } from "../canvas/StudioCanvas.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
+import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { RenderTimer } from "../tools/RenderTimer.js";
 import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
@@ -148,9 +149,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
             toggleGrid(e, t)                { this._onToggleGrid(e, t); },
             toggleLayer(e, t)               { this._onToggleLayer(e, t); },
+            toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
             toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
             togglePinDropdown(e, t)         { this._onTogglePinDropdown(e, t); },
             toggleRegionSmoothing(e, t)     { this._onToggleRegionSmoothing(e, t); },
+            toggleTerrainLayer(e, t)        { this._onToggleTerrainLayer(e, t); },
             toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
             toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
             undoBrush(e, t)                 { this._onUndoBrush(e, t); },
@@ -193,6 +196,41 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /** The save under way, or null (see saveCurrentMap). */
     #activeSave = null;
+
+    /**
+     * The terrain's layers and the two map-control buttons that group them. Each group button
+     * opens a list of its layers. The layers are terrain shader settings (see TerrainShading),
+     * so switching one redraws without repainting. The keys are the setting names the shader
+     * takes; the values are the localisation keys of their names.
+     */
+    static #TERRAIN_LAYER_GROUPS = Object.freeze({
+        terrain: {
+            icon: "elevation",
+            tooltip: "FILRODENSWMB.UI.LayerTerrain",
+            layers: { elevation: "FILRODENSWMB.UI.LayerElevation", relief: "FILRODENSWMB.UI.LayerRelief", water: "FILRODENSWMB.UI.LayerWater" },
+        },
+        biomes: {
+            icon: "forest",
+            tooltip: "FILRODENSWMB.UI.LayerBiomes",
+            layers: { landBiomes: "FILRODENSWMB.UI.LayerLandBiomes", seaBiomes: "FILRODENSWMB.UI.LayerSeaBiomes" },
+        },
+    });
+
+    /** The terrain layer (or layers) each tool switches on when it is picked, so its work is visible. */
+    static #TOOL_TERRAIN_LAYERS = Object.freeze({
+        terrain: ["elevation"],
+        biomes: ["landBiomes", "seaBiomes"],
+    });
+
+    /**
+     * Which terrain layers are shown. They are not saved with the map: every map opens with all
+     * of them on, so a layer switched off for an export can never look like lost work the next
+     * time the map is opened.
+     */
+    #terrainLayers = MapStudioApp.#allTerrainLayers(true);
+
+    /** The terrain layer list that is open, or null (see _onToggleLayerMenu). */
+    #openLayerMenu = null;
 
     /** Runs the refreshes one at a time (see RefreshQueue and #createRefreshQueue). */
     #refreshes;
@@ -311,8 +349,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.cachedMaxElevation = null;
 
         // The lowest elevation the canvas was last shaded against, alongside cachedMaxElevation
-        // above - see ProceduralOrchestrator.planRepaint. Stays null (read as 0 by #paintOceanPixel
-        // until a repaint sets it) until hand-edited terrain is actually allowed to go negative.
+        // above (see ProceduralOrchestrator.planRepaint). Sea depth is measured down to it, so a
+        // trench below 0 reads as the deepest water. Null until the first repaint, and read as 0
+        // until then.
         this.cachedMinElevation = null;
         this.brushEngine = null;
 
@@ -475,8 +514,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS)
-            .filter(([key, id]) => id !== FILRODENSWMB.BIOME_IDS.ERASER && id !== 1 && id !== 2 && !key.toLowerCase().startsWith("custom"))
+        // Every paintable biome, built-in (Deep and Shallow Ocean included, now that they are
+        // drawn as the sea bed) then custom, each with its placement
+        const builtInBiomes = Object.entries(FILRODENSWMB.BIOME_IDS)
+            .filter(([key, id]) => id !== FILRODENSWMB.BIOME_IDS.ERASER && !key.toLowerCase().startsWith("custom"))
             .map(([key, id]) => {
                 const defaultRgb = FILRODENSWMB.BIOMES[key] || [0, 0, 0];
                 const currentRgb = this.customBiomeColors[key] || defaultRgb;
@@ -487,19 +528,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     label: `FILRODENSWMB.BIOMES.${key}`,
                     hex: ColorMath.rgbToHex(currentRgb),
                     isCustom: false,
+                    placement: BiomePlacement.placementOfBuiltIn(key),
                 };
             });
 
-        // Map custom biomes and append them to the UI list
         const customBiomesMapped = (this.uiState.customBiomes || []).map((cb) => ({
             id: cb.id,
             key: `custom_${cb.id}`,
             label: cb.name,
             hex: ColorMath.rgbToHex(cb.color),
             isCustom: true,
+            placement: BiomePlacement.placementOfCustom(cb),
         }));
 
-        context.biomeList = [...context.biomeList, ...customBiomesMapped];
+        context.biomeList = [...builtInBiomes, ...customBiomesMapped];
+        context.biomeGroups = MapStudioApp.#groupBiomesByPlacement(context.biomeList);
+        context.layerGroups = this.#layerGroupsContext();
 
         // The fault types on offer depend on the map's terrain version (see
         // TectonicFeatureEngine.typeOptions); a type left over from a map of the other version is
@@ -1027,7 +1071,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (name === "referenceAlpha") return this.#updateReferenceAlpha(target);
         if (name === "gridType" || name === "gridSize") return this.#updateGridSettings();
         if (name === "biomeAlphaActive" || name === "biomeAlphaInactive") return this.#updateBiomeAlphas();
-        if (name === "contourInterval" || name === "reliefShading") return this.debouncedRepaintCanvas();
+        if (name === "contourInterval") return this.debouncedRepaintCanvas();
+        // Relief strength and the water settings are terrain shader settings, so moving them
+        // redraws without repainting
+        if (MapStudioApp.#TERRAIN_SHADER_INPUTS.has(name)) return this.#updateTerrainShaderInputs();
 
         // 2. Custom biome colour handler (uses dataset instead of name)
         if (target.type === "color" && target.dataset.biome) return this.#updateBiomeColor(target);
@@ -1063,6 +1110,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #updateBiomeAlphas() {
         MapStateManager.getMapParameters(this);
         this.#updateBiomeOpacity();
+    }
+
+    /** The map settings the terrain shader reads directly (see #syncTerrainSettings). */
+    static #TERRAIN_SHADER_INPUTS = new Set(["reliefShading", "seabedRelief", "waterClarity", "waterHue", "waterSaturation"]);
+
+    #updateTerrainShaderInputs() {
+        MapStateManager.getMapParameters(this);
+        this.#syncTerrainSettings();
     }
 
     #updateBiomeColor(target) {
@@ -1133,9 +1188,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             // biome is under the cursor right now".
             const overrideId = this.currentBiomeOverrides ? this.currentBiomeOverrides[index] : 0;
             const { params } = MapStateManager.getDerivedMapParameters(this.uiState, this.customBiomeColors);
-            const { lookupKey } = ProceduralEngine.resolveBiomeLookup(
+            // The biome seen from above: under water that is the surface biome (such as Pack
+            // Ice) when there is one, otherwise the bed's
+            const { visible: lookupKey } = ProceduralEngine.resolveBiomeLookup(
                 overrideId, elev, mois, temp, seaLevel, this.bufferWaterMask, index, params.customBiomeRules, params.biomePalette,
-                params.solidOverWater,
+                params.biomeSides,
             );
 
             // Deliberately left uncapped: a value past 100% (or below 0%) is the honest readout for
@@ -1149,6 +1206,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.element.querySelector("#fwmb-readout-temp").textContent = Math.round(temp * 100) + "%";
             this.element.querySelector("#fwmb-readout-biome").textContent = this.#getBiomeDisplayName(lookupKey);
         };
+    }
+
+    /**
+     * Splits a biome list into one group per placement (for the brush's biome select, one
+     * optgroup each), in the order the placements are listed in FILRODENSWMB.BIOME_PLACEMENT.
+     * Biomes keep their order within a group (built-in first, then custom); a placement with no
+     * biomes is left out.
+     * @param {Array<{placement: string}>} biomeList
+     * @returns {Array<{label: string, biomes: object[]}>} `label` is a localisation key.
+     */
+    static #groupBiomesByPlacement(biomeList) {
+        return Object.values(FILRODENSWMB.BIOME_PLACEMENT)
+            .map((placement) => ({
+                label: BiomePlacement.labelOf(placement),
+                biomes: biomeList.filter((biome) => biome.placement === placement),
+            }))
+            .filter((group) => group.biomes.length > 0);
     }
 
     /**
@@ -1202,6 +1276,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!canClose) return; // Abort closure entirely
 
         this.#shutDown = true;
+        this.#closeLayerMenu();
         if (this.canvasEngine) this.canvasEngine.destroy();
         if (this.scene3D) this.scene3D.destroy();
 
@@ -1354,8 +1429,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Strict nullish check, not `||`: the Eraser Biome's paint value is a genuine 0, which
         // `||` would silently coerce back to the default Grassland fallback below.
         const paintValue = layer === "biome" ? (this.uiState.brushBiome ?? FILRODENSWMB.BIOME_IDS.GRASSLAND) : null;
+        // Where the painted biome may appear (land, sea or both), recorded on the stroke so it
+        // replays the same way whatever later happens to the biome's placement
+        const paintSides = layer === "biome" ? BiomePlacement.buildSidesTable(this.uiState.customBiomes)[paintValue] : null;
 
-        this.brushEngine.startStroke(layer, tool, size, strength, feather, paintValue);
+        this.brushEngine.startStroke(layer, tool, size, strength, feather, paintValue, paintSides);
         this.#applyBrushStroke(x, y);
     }
 
@@ -1861,6 +1939,165 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.markDirty();
     }
 
+    /** Every terrain layer, all on or all off. */
+    static #allTerrainLayers(isOn) {
+        const layers = {};
+        for (const group of Object.values(MapStudioApp.#TERRAIN_LAYER_GROUPS)) {
+            for (const key of Object.keys(group.layers)) layers[key] = isOn;
+        }
+        return layers;
+    }
+
+    /** The terrain images the painters fill, as the canvas's terrain shader takes them. */
+    #terrainBuffers() {
+        return { surface: this.bufferSurfaceBiomes, underwater: this.bufferUnderwaterBiomes, aux: this.bufferTerrainAux };
+    }
+
+    /**
+     * Sends the terrain shader the settings that come from the app rather than from the painted
+     * images: which terrain layers are shown, the relief strength and the map's water settings.
+     * (Biome opacity is sent by #updateBiomeOpacity, since it also depends on the active tool.)
+     */
+    #syncTerrainSettings() {
+        this.canvasEngine?.setTerrainSettings(this.#terrainSettings());
+    }
+
+    /** The terrain shading settings that come from the app (see TerrainShading.defaultSettings). */
+    #terrainSettings() {
+        const water = FILRODENSWMB.DISPLAY.WATER;
+        const hue = Math.min(water.HUE_MAX, Math.max(water.HUE_MIN, this.uiState.waterHue ?? water.HUE));
+        return {
+            ...this.#terrainLayers,
+            reliefStrength: this.uiState.reliefShading ?? FILRODENSWMB.DISPLAY.RELIEF_SHADING,
+            seabedRelief: this.uiState.seabedRelief ?? water.SEABED_RELIEF,
+            clarity: this.uiState.waterClarity ?? water.CLARITY,
+            hueShift: hue - water.BASE_HUE,
+            saturation: this.uiState.waterSaturation ?? water.SATURATION,
+        };
+    }
+
+    /**
+     * Whether all, some or none of a group's layers are on.
+     * @returns {"on"|"partial"|"off"}
+     */
+    #layerGroupState(groupId) {
+        const keys = Object.keys(MapStudioApp.#TERRAIN_LAYER_GROUPS[groupId].layers);
+        const onCount = keys.filter((key) => this.#terrainLayers[key]).length;
+        if (onCount === keys.length) return "on";
+        return onCount === 0 ? "off" : "partial";
+    }
+
+    /** The map controls' terrain layer groups, for map.hbs. */
+    #layerGroupsContext() {
+        const ariaChecked = { on: "true", partial: "mixed", off: "false" };
+        return Object.entries(MapStudioApp.#TERRAIN_LAYER_GROUPS).map(([id, group]) => {
+            const state = this.#layerGroupState(id);
+            return {
+                id,
+                icon: group.icon,
+                tooltip: group.tooltip,
+                state,
+                allChecked: ariaChecked[state],
+                items: Object.entries(group.layers).map(([key, label]) => ({ key, label, checked: this.#terrainLayers[key] ? "true" : "false" })),
+            };
+        });
+    }
+
+    /**
+     * Brings the terrain layer buttons and lists in the map controls in line with
+     * #terrainLayers, in place, so an open list stays open while it is being ticked.
+     */
+    #refreshLayerGroupControls() {
+        if (!this.element) return;
+        for (const group of this.#layerGroupsContext()) {
+            const container = this.element.querySelector(`.fwmb-layer-group[data-layer-group="${group.id}"]`);
+            if (!container) continue;
+
+            const button = container.querySelector('[data-action="toggleLayerMenu"]');
+            button?.classList.toggle("active", group.state === "on");
+            button?.classList.toggle("partial", group.state === "partial");
+            container.querySelector('[data-terrain-layer="all"]')?.setAttribute("aria-checked", group.allChecked);
+            for (const item of group.items) {
+                container.querySelector(`[data-terrain-layer="${item.key}"]`)?.setAttribute("aria-checked", item.checked);
+            }
+        }
+    }
+
+    /**
+     * Shows or hides terrain layers and redraws.
+     * @param {object} changes - Layer key -> whether it is shown.
+     */
+    #setTerrainLayers(changes) {
+        this.#terrainLayers = { ...this.#terrainLayers, ...changes };
+        this.#syncTerrainSettings();
+        this.#refreshLayerGroupControls();
+    }
+
+    /** Opens or closes a terrain layer group's list (a click on the group's button). */
+    _onToggleLayerMenu(_event, target) {
+        const container = target.closest(".fwmb-layer-group");
+        if (!container) return;
+        if (this.#openLayerMenu === container) {
+            this.#closeLayerMenu();
+            return;
+        }
+
+        this.#closeLayerMenu();
+        container.querySelector(".fwmb-layer-menu")?.classList.remove("fwmb-hidden");
+        target.setAttribute("aria-expanded", "true");
+        container.closest(".fwmb-map-controls")?.classList.add("fwmb-menu-open");
+        this.#openLayerMenu = container;
+
+        const doc = this.element.ownerDocument;
+        doc.addEventListener("pointerdown", this.#onPointerDownOutsideMenu, true);
+        doc.addEventListener("keydown", this.#onMenuKeyDown, true);
+        container.querySelector('[role="menuitemcheckbox"]')?.focus();
+    }
+
+    /** Closes the open terrain layer list, if any. */
+    #closeLayerMenu() {
+        const container = this.#openLayerMenu;
+        if (!container) return;
+
+        container.querySelector(".fwmb-layer-menu")?.classList.add("fwmb-hidden");
+        container.querySelector('[data-action="toggleLayerMenu"]')?.setAttribute("aria-expanded", "false");
+        container.closest(".fwmb-map-controls")?.classList.remove("fwmb-menu-open");
+        this.#openLayerMenu = null;
+
+        const doc = container.ownerDocument;
+        doc.removeEventListener("pointerdown", this.#onPointerDownOutsideMenu, true);
+        doc.removeEventListener("keydown", this.#onMenuKeyDown, true);
+    }
+
+    /** A click anywhere outside the open list (its button included, which toggles it itself) closes it. */
+    #onPointerDownOutsideMenu = (event) => {
+        if (this.#openLayerMenu && !this.#openLayerMenu.contains(event.target)) this.#closeLayerMenu();
+    };
+
+    /** Escape closes the open list and returns focus to its button. */
+    #onMenuKeyDown = (event) => {
+        if (event.key !== "Escape" || !this.#openLayerMenu) return;
+        event.stopPropagation();
+        const button = this.#openLayerMenu.querySelector('[data-action="toggleLayerMenu"]');
+        this.#closeLayerMenu();
+        button?.focus();
+    };
+
+    /** Ticks or unticks a layer in a terrain layer list, or all of the group's layers ("all"). */
+    _onToggleTerrainLayer(_event, target) {
+        const layer = target.dataset.terrainLayer;
+        const group = MapStudioApp.#TERRAIN_LAYER_GROUPS[target.dataset.layerGroup];
+        if (!layer || !group) return;
+
+        if (layer === "all") {
+            // "All" turns every layer of the group on, unless they already are, in which case it turns them all off
+            const turnOn = this.#layerGroupState(target.dataset.layerGroup) !== "on";
+            this.#setTerrainLayers(Object.fromEntries(Object.keys(group.layers).map((key) => [key, turnOn])));
+            return;
+        }
+        this.#setTerrainLayers({ [layer]: !this.#terrainLayers[layer] });
+    }
+
     #updateBiomeOpacity() {
         if (!this.canvasEngine) return;
         const isActive = this.activeTool === "biomes";
@@ -1914,24 +2151,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const uploadBounds = ProceduralEngine.getRepaintBounds(bounds, this.mapWidth, this.mapHeight);
         mark = timer.lap("Canvas repaint: settings", mark, `repainting ${this.#describeRepaintArea(bounds)}`);
 
-        engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, this.bufferBase, bounds);
-        mark = timer.lap("Canvas repaint: base painter", mark);
-        this.canvasEngine.renderPixelBuffer("base", this.bufferBase, this.mapWidth, this.mapHeight, uploadBounds);
-
-        const baseBtn = this.element.querySelector('[data-layer="base"]');
-        this.canvasEngine.toggleLayer("base", baseBtn ? baseBtn.classList.contains("active") : true);
-        mark = timer.lap("Canvas repaint: canvas textures", mark);
-
-        // Pass the cached peak and trough into the coloriser
+        // The terrain's packed relief, depth and height, relative to the cached peak and trough
         const maxPeak = this.cachedMaxElevation || 1.0;
         const minTrough = this.cachedMinElevation || 0;
-        engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography, bounds, maxPeak, minTrough);
-        mark = timer.lap("Canvas repaint: topography painter", mark);
-        this.canvasEngine.renderPixelBuffer("topography", this.bufferTopography, this.mapWidth, this.mapHeight, uploadBounds);
-
-        const topoBtn = this.element.querySelector('[data-layer="topography"]');
-        this.canvasEngine.toggleLayer("topography", topoBtn ? topoBtn.classList.contains("active") : true);
-        mark = timer.lap("Canvas repaint: canvas textures", mark);
+        engine.paintTerrainAux(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTerrainAux, bounds, maxPeak, minTrough);
+        mark = timer.lap("Canvas repaint: terrain painter", mark);
 
         if (this.currentMoistureData && this.currentTemperatureData) {
             engine.createBiomesMap(
@@ -1944,23 +2168,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 seaLevel,
                 waterMask,
                 params,
-                this.bufferBiomes,
+                this.bufferSurfaceBiomes,
                 bounds,
                 this.bufferBiomeFallback,
+                this.bufferUnderwaterBiomes,
             );
             mark = timer.lap("Canvas repaint: biomes painter", mark);
-            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight, uploadBounds);
             // Kept current every repaint, but its layer stays hidden until the "Preview Rule
             // Coverage" button is hovered (see #bindToolbarListeners) - no visibility toggle here.
             this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight, uploadBounds);
-
-            const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
-            this.canvasEngine.toggleLayer("biomes", biomesBtn ? biomesBtn.classList.contains("active") : true);
         }
+
+        this.#syncTerrainSettings();
+        this.canvasEngine.renderTerrain(this.#terrainBuffers(), this.mapWidth, this.mapHeight, uploadBounds);
         mark = timer.lap("Canvas repaint: canvas textures", mark);
 
         const contourInterval = this.uiState["contourInterval"];
-        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds);
+        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds, waterMask);
         mark = timer.lap("Canvas repaint: contours painter", mark);
         this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight, uploadBounds);
         mark = timer.lap("Canvas repaint: canvas textures", mark);
@@ -2070,13 +2294,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 seaLevel,
                 this.bufferWaterMask,
                 params,
-                this.bufferBiomes,
+                this.bufferSurfaceBiomes,
                 strokeBounds,
                 this.bufferBiomeFallback,
+                this.bufferUnderwaterBiomes,
             );
 
             const uploadBounds = ProceduralEngine.getRepaintBounds(strokeBounds, this.mapWidth, this.mapHeight);
-            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight, uploadBounds);
+            this.canvasEngine.renderTerrain(this.#terrainBuffers(), this.mapWidth, this.mapHeight, uploadBounds);
             this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight, uploadBounds);
             return;
         }
@@ -2327,6 +2552,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.gridVisible = payload.gridVisible ?? false;
 
         MapStateManager.allocateBuffers(this);
+        // Every terrain layer is on when a map opens (see #terrainLayers)
+        this.#setTerrainLayers(MapStudioApp.#allTerrainLayers(true));
 
         this.brushEngine = this.#createBrushEngine();
 
@@ -2389,6 +2616,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.freezingThreshold = p.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
         this.uiState.contourInterval = p.display?.contourInterval ?? 0.1;
         this.uiState.reliefShading = p.display?.reliefShading ?? FILRODENSWMB.DISPLAY.RELIEF_SHADING;
+        this.uiState.seabedRelief = p.display?.seabedRelief ?? FILRODENSWMB.DISPLAY.WATER.SEABED_RELIEF;
+        this.uiState.waterClarity = p.display?.waterClarity ?? FILRODENSWMB.DISPLAY.WATER.CLARITY;
+        this.uiState.waterHue = p.display?.waterHue ?? FILRODENSWMB.DISPLAY.WATER.HUE;
+        this.uiState.waterSaturation = p.display?.waterSaturation ?? FILRODENSWMB.DISPLAY.WATER.SATURATION;
         this.uiState.biomeAlphaActive = p.display?.biomeAlphaActive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE;
         this.uiState.biomeAlphaInactive = p.display?.biomeAlphaInactive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
         this.uiState.cartographyScaleEnable = c.scaleEnable ?? this.defaultUiState.cartographyScaleEnable;
@@ -3232,6 +3463,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapHeight = newHeight;
 
         MapStateManager.allocateBuffers(this);
+        // A new map opens with every terrain layer on (see #terrainLayers)
+        this.#setTerrainLayers(MapStudioApp.#allTerrainLayers(true));
 
         this.defaultUiState = MapStateManager.buildDefaultUiState(newWidth, newHeight);
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
@@ -3407,9 +3640,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #ensureToolLayerVisible(newTool) {
+        const terrainLayers = MapStudioApp.#TOOL_TERRAIN_LAYERS[newTool];
+        if (terrainLayers) {
+            this.#setTerrainLayers(Object.fromEntries(terrainLayers.map((key) => [key, true])));
+            return;
+        }
+
         const toolLayerMap = {
-            terrain: "topography",
-            biomes: "biomes",
             features: "features",
             infrastructure: "infrastructure",
             regions: "regions",
@@ -4346,30 +4583,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (contextPanel) contextPanel.style.display = "none";
         if (editToolbar) editToolbar.style.display = "none"; // Destroys the bottom margin bug!
 
-        // 4. Generate 3D Scene
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
-        const seaLevel = this.uiState["seaLevel"];
-        const waterMask = this.currentRiverData ? this.currentRiverData.waterMask : null;
-
-        const biomeBuffer = new Uint8Array(this.mapWidth * this.mapHeight * 4);
-        engine.createBiomesMap(
-            this.currentElevationData,
-            this.currentMoistureData,
-            this.currentTemperatureData,
-            this.currentBiomeOverrides,
-            this.mapWidth,
-            this.mapHeight,
-            seaLevel,
-            waterMask,
-            params,
-            biomeBuffer,
-        );
-
+        // 4. Generate 3D Scene. The terrain images the flat map was last painted from are
+        // current (any pending generation has just run), so the 3D view is built from the same
+        // images and settings and matches the flat map's layers and water.
         this.scene3D = new Scene3D(overlay);
-        const riverVectors = this.currentRiverData ? this.currentRiverData.vectors : null;
-
-        this.scene3D.render3DMap(this.currentElevationData, biomeBuffer, this.mapWidth, this.mapHeight, seaLevel, riverVectors, waterMask);
+        this.scene3D.render3DMap({
+            elevation: this.currentElevationData,
+            width: this.mapWidth,
+            height: this.mapHeight,
+            seaLevel: this.uiState["seaLevel"],
+            waterMask: this.bufferWaterMask,
+            terrain: this.#terrainBuffers(),
+            settings: this.#terrainSettings(),
+            rivers: this.currentRiverData ? this.currentRiverData.vectors : null,
+        });
     }
 
     _onToggleEditMode(event, target) {

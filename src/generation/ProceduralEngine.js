@@ -2,6 +2,8 @@ import { SimplexNoise } from "../../vendor/simplex-noise/simplex-noise.js";
 import { TectonicEngine } from "./TectonicEngine.js";
 import { HydrologyEngine } from "./HydrologyEngine.js";
 import { BiomeRuleEngine } from "./BiomeRuleEngine.js";
+import { BIOME_SIDE } from "./BiomePlacement.js";
+import { TerrainShading } from "../tools/TerrainShading.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
 
@@ -55,7 +57,7 @@ export class ProceduralEngine {
     }
 
     /**
-     * The pixels the layer painters (colorize, createBiomesMap and createContourMap) write when they
+     * The pixels the layer painters (paintTerrainAux, createBiomesMap and createContourMap) write when they
      * are asked to repaint an area: the area plus the margin they add around it. Anything that has
      * to carry a repainted layer somewhere else, such as the texture on the GPU, must cover exactly
      * this, so it is worked out here for all of them.
@@ -2167,39 +2169,74 @@ export class ProceduralEngine {
         return Math.max(0, Math.min(1, temperature));
     }
 
-    colorize(elevationData, temperatureData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, maxPeak = 1.0, minTrough = 0.0) {
-        const pixelBuffer = outBuffer;
+    /**
+     * Paints the terrain's packed image (see TerrainShading): per pixel the relief, the water
+     * depth and the land's height, which the terrain shader turns into the elevation colours,
+     * the relief shading and the water. Colour itself is worked out on the GPU, so the relief
+     * strength, the water settings and the layer switches never need a repaint.
+     *
+     * Water is the sea (below sea level) and lakes (the water mask). The sea's depth is measured
+     * against the map's discovered lowest point (minTrough) rather than a fixed floor of 0, the
+     * same pattern the land's height uses with maxPeak. On every map where nothing has carved
+     * elevation below 0, minTrough is exactly 0 and depth reaches 1 exactly at elevation 0. Once
+     * a hand-carved trench pushes minTrough below 0, ordinary seafloor at elevation 0 no longer
+     * reads as the deepest water, so a deliberately deepened trench still reads as deeper than
+     * the ordinary ocean instead of every point past the old floor looking the same. A lake is
+     * measured down from its own surface and scaled by WATER.LAKE_DEPTH_SCALE, since lakes are
+     * only a few thousandths of the elevation range deep.
+     *
+     * @param {Float32Array} elevationData - Elevation of the whole map.
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @param {number} seaLevel - The map's sea level.
+     * @param {Float32Array|null} waterMask - Lake surface elevation per pixel (0 where there is no lake).
+     * @param {object} params - Map parameters (for the relief's scale on regional maps).
+     * @param {Uint8Array} outBuffer - RGBA buffer of the whole map to paint into.
+     * @param {object|null} [bounds] - Area to repaint, or null for the whole map.
+     * @param {number} [maxPeak] - The map's highest elevation.
+     * @param {number} [minTrough] - The map's lowest elevation (0 unless something went below it).
+     * @returns {Uint8Array} outBuffer.
+     */
+    paintTerrainAux(elevationData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, maxPeak = 1.0, minTrough = 0.0) {
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const renderBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
-        const relief = ProceduralEngine.#resolveReliefShading(params, width, height);
+        const light = ProceduralEngine.#resolveReliefLight(params, width, height);
+
+        // Prevent division by zero in the edge case of a completely flat map. The trough is only
+        // ever lowered from 0 (see ProceduralOrchestrator.planRepaint), so a positive value could
+        // only be a stale one; it is floored at 0 so it can never shrink the depth range.
+        const safePeak = Math.max(maxPeak, seaLevel + ProceduralEngine.#MIN_LAND_RANGE);
+        const landRange = safePeak - seaLevel;
+        const seaRange = seaLevel - Math.min(0, minTrough);
+        const lakeScale = FILRODENSWMB.DISPLAY.WATER.LAKE_DEPTH_SCALE;
 
         for (let y = renderBounds.minY; y <= renderBounds.maxY; y++) {
             for (let x = renderBounds.minX; x <= renderBounds.maxX; x++) {
                 const i = y * width + x;
                 const elevation = elevationData[i];
-                const bufferIndex = i * 4;
+                const lakeSurface = waterMask ? waterMask[i] : 0;
+                const isSea = elevation < seaLevel;
+                const isWater = isSea || lakeSurface > 0;
 
-                if (elevation < seaLevel) {
-                    this.#paintOceanPixel(pixelBuffer, bufferIndex, elevation, seaLevel, minTrough);
-                } else if (waterMask && waterMask[i] > 0) {
-                    const temp = temperatureData ? temperatureData[i] : 1;
-                    this.#paintLakePixel(pixelBuffer, bufferIndex, elevation, waterMask[i], temp, params);
-                    // A lake's surface is flat, so it is left unshaded
-                    continue;
-                } else {
-                    // Use the dynamic map peak instead of the hardcoded 1.0
-                    this.#paintLandPixel(pixelBuffer, bufferIndex, elevation, seaLevel, maxPeak);
-                }
+                let depth = 0;
+                if (isSea) depth = seaRange > 0 ? (seaLevel - elevation) / seaRange : 0;
+                else if (isWater) depth = seaLevel > 0 ? ((lakeSurface - elevation) / seaLevel) * lakeScale : 0;
 
-                if (relief) ProceduralEngine.#shadeRelief(pixelBuffer, bufferIndex, elevationData, x, y, width, height, relief);
+                const o = i * 4;
+                outBuffer[o] = TerrainShading.encodeRelief(ProceduralEngine.#reliefChange(elevationData, x, y, width, height, light));
+                outBuffer[o + 1] = TerrainShading.encodeDepth(depth, isWater);
+                outBuffer[o + 2] = isWater ? 0 : TerrainShading.encodeHeight((elevation - seaLevel) / landRange);
+                outBuffer[o + 3] = 255;
             }
         }
-        return pixelBuffer;
+        return outBuffer;
     }
 
+    /** The smallest range of land height the height shading is spread over, so a flat map does not divide by zero. */
+    static #MIN_LAND_RANGE = 0.01;
+
     /**
-     * Everything relief shading needs that stays the same across the whole map, or null when it
-     * is switched off (see #shadeRelief).
+     * The light that relief shading is worked out with, the same across the whole map.
      *
      * Slopes are measured per pixel of a BASELINE_DIMENSION map rather than per pixel of this
      * map, so the same terrain is shaded equally strongly at any size or zoom: a 4000 pixel map,
@@ -2207,13 +2244,10 @@ export class ProceduralEngine {
      * otherwise make it look four times flatter. The map at the top of the chain of crops sets
      * that scale (params.terrain.world); a map without one is its own top map.
      *
-     * @returns {{strength: number, slopeScale: number, lightX: number, lightY: number, lightZ: number}|null}
+     * @returns {{slopeScale: number, lightX: number, lightY: number, lightZ: number}}
      */
-    static #resolveReliefShading(params, width, height) {
+    static #resolveReliefLight(params, width, height) {
         const display = FILRODENSWMB.DISPLAY;
-        const strength = params?.display?.reliefShading ?? display.RELIEF_SHADING;
-        if (!(strength > 0)) return null;
-
         const world = params?.terrain?.world;
         const rootSize = world ? Math.max(world.rootW, world.rootH) : Math.max(width, height);
         const pixelsPerBaseline = ((world?.zoom ?? 1) * rootSize) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
@@ -2224,7 +2258,6 @@ export class ProceduralEngine {
         const altitude = (display.RELIEF.ALTITUDE * Math.PI) / 180;
 
         return {
-            strength,
             slopeScale: display.RELIEF.EXAGGERATION * pixelsPerBaseline,
             lightX: Math.sin(bearing) * Math.cos(altitude),
             lightY: -Math.cos(bearing) * Math.cos(altitude),
@@ -2233,19 +2266,20 @@ export class ProceduralEngine {
     }
 
     /**
-     * Relief shading: brightens slopes that face the light and darkens those that face away, so
-     * the shape of the ground shows as well as its height. Without it, a pixel's shade depends
-     * on its height alone, and hills a little higher than their surroundings are only a little
-     * lighter, so fine detail blends into soft gradients.
+     * Relief shading's measure of one pixel: how much more or less directly the ground faces the
+     * light than flat ground does, as a share of flat ground's lighting (0 on flat ground,
+     * positive on slopes facing the light, negative on those facing away). The terrain shader
+     * multiplies the pixel's colour by 1 + this x the relief strength (within the limits in
+     * DISPLAY.RELIEF), so shading brings out the shape of the ground as well as its height
+     * while leaving plains and still water exactly their own colour. Without it, a pixel's
+     * shade depends on its height alone, and hills a little higher than their surroundings are
+     * only a little lighter, so fine detail blends into soft gradients.
      *
      * The slope comes from the heights either side of the pixel (clamped at the map's edges).
-     * Flat ground keeps exactly its unshaded colour: the brightness is scaled by how much more
-     * or less directly the ground faces the light than flat ground does, so turning shading on
-     * leaves plains and still water as they were and only brings out the slopes. The sea floor
-     * is shaded too, which shows its ridges, trenches and continental slopes under the water.
+     * The sea floor and lake beds are measured too, which shows their ridges, trenches and
+     * slopes through the water.
      */
-    static #shadeRelief(pixelBuffer, bufferIndex, elevationData, x, y, width, height, relief) {
-        const settings = FILRODENSWMB.DISPLAY.RELIEF;
+    static #reliefChange(elevationData, x, y, width, height, light) {
         const row = y * width;
         const left = elevationData[row + Math.max(0, x - 1)];
         const right = elevationData[row + Math.min(width - 1, x + 1)];
@@ -2253,80 +2287,11 @@ export class ProceduralEngine {
         const down = elevationData[Math.min(height - 1, y + 1) * width + x];
 
         // The surface normal of the ground, from its slope across and down the map
-        const slopeX = ((right - left) / 2) * relief.slopeScale;
-        const slopeY = ((down - up) / 2) * relief.slopeScale;
-        const facing = (-slopeX * relief.lightX - slopeY * relief.lightY + relief.lightZ) / Math.hypot(slopeX, slopeY, 1);
+        const slopeX = ((right - left) / 2) * light.slopeScale;
+        const slopeY = ((down - up) / 2) * light.slopeScale;
+        const facing = (-slopeX * light.lightX - slopeY * light.lightY + light.lightZ) / Math.hypot(slopeX, slopeY, 1);
 
-        const change = ((facing - relief.lightZ) / relief.lightZ) * relief.strength;
-        const factor = Math.max(settings.MIN_FACTOR, Math.min(settings.MAX_FACTOR, 1 + change));
-
-        pixelBuffer[bufferIndex] = Math.min(255, pixelBuffer[bufferIndex] * factor);
-        pixelBuffer[bufferIndex + 1] = Math.min(255, pixelBuffer[bufferIndex + 1] * factor);
-        pixelBuffer[bufferIndex + 2] = Math.min(255, pixelBuffer[bufferIndex + 2] * factor);
-    }
-
-    /**
-     * Shades an ocean pixel darker the deeper it is, normalised against the map's discovered
-     * lowest point (minTrough) rather than a fixed floor of 0 - the same pattern #paintLandPixel
-     * already uses for its ceiling, with maxPeak. On every map where nothing has carved elevation
-     * below 0, minTrough is exactly 0 and this produces the same result it always has: depth
-     * reaches 1 (the darkest shade) exactly at elevation 0. Once a hand-carved trench pushes
-     * minTrough below 0, ordinary seafloor at elevation 0 no longer maxes out the shade - it
-     * reads as partway to the discovered trough - so a deliberately deepened trench still reads
-     * as visibly deeper than ordinary ocean instead of saturating to the same darkest blue as
-     * everything else at or below the old floor.
-     */
-    #paintOceanPixel(pixelBuffer, bufferIndex, elevation, seaLevel, minTrough = 0.0) {
-        // The trough tracked by ProceduralOrchestrator.planRepaint starts at 0 and is only ever
-        // lowered, so it should never be positive - but a positive value here would shrink the
-        // shading range instead of extending it, which is the wrong direction. Floor it at 0 as a
-        // defensive guard, so a caller passing a stale or unexpected value can only ever be
-        // ignored (falling back to the pre-trough range of [0, seaLevel]), never make the shading
-        // range invalid. Also guards the seaLevel === trough edge case: that range would be empty,
-        // but it can only arise with no actual ocean on the map, since any real ocean pixel's
-        // elevation is by definition below seaLevel and no lower than the discovered trough.
-        const trough = Math.min(0, minTrough);
-        const range = seaLevel - trough;
-        const depth = range > 0 ? (seaLevel - elevation) / range : 0;
-        pixelBuffer[bufferIndex] = Math.max(20, 100 - 80 * depth);
-        pixelBuffer[bufferIndex + 1] = Math.max(30, 150 - 120 * depth);
-        pixelBuffer[bufferIndex + 2] = Math.max(80, 200 - 120 * depth);
-        pixelBuffer[bufferIndex + 3] = 255;
-    }
-
-    #paintLakePixel(pixelBuffer, bufferIndex, elevation, surfaceElev, temp, params) {
-        const depth = surfaceElev > 0 ? (surfaceElev - elevation) / surfaceElev : 0;
-        const freezeLimit = params?.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
-
-        if (temp < freezeLimit) {
-            pixelBuffer[bufferIndex] = Math.max(200, 255 - 50 * depth);
-            pixelBuffer[bufferIndex + 1] = Math.max(220, 255 - 30 * depth);
-            pixelBuffer[bufferIndex + 2] = 255;
-        } else {
-            pixelBuffer[bufferIndex] = Math.max(40, 120 - 80 * depth);
-            pixelBuffer[bufferIndex + 1] = Math.max(80, 170 - 120 * depth);
-            pixelBuffer[bufferIndex + 2] = Math.max(120, 210 - 120 * depth);
-        }
-        pixelBuffer[bufferIndex + 3] = 255;
-    }
-
-    #paintLandPixel(pixelBuffer, bufferIndex, elevation, seaLevel, maxElevation) {
-        // Prevent division by zero in the edge case of a completely flat map
-        const safeMax = Math.max(maxElevation, seaLevel + 0.01);
-
-        // Dynamically normalise the elevation against the true maximum peak
-        const heightParam = seaLevel < safeMax ? (elevation - seaLevel) / (safeMax - seaLevel) : 1;
-
-        const COLOR_BASE = 200;
-        const COLOR_RANGE = 140;
-        const MIN_BRIGHTNESS = 60;
-
-        const grayValue = Math.max(MIN_BRIGHTNESS, COLOR_BASE - COLOR_RANGE * heightParam);
-
-        pixelBuffer[bufferIndex] = grayValue;
-        pixelBuffer[bufferIndex + 1] = grayValue;
-        pixelBuffer[bufferIndex + 2] = grayValue;
-        pixelBuffer[bufferIndex + 3] = 255;
+        return (facing - light.lightZ) / light.lightZ;
     }
 
     /**
@@ -2364,40 +2329,14 @@ export class ProceduralEngine {
     }
 
     /**
-     * VISUAL PASS: Converts mathematical elevation into a pure, flat, binary land/sea map.
-     */
-    createBaseMap(elevationData, width, height, seaLevel, outBuffer, bounds = null) {
-        const pixelBuffer = outBuffer;
-        const activeBounds = ProceduralEngine.resolveBounds(bounds, width, height);
-
-        for (let y = activeBounds.minY; y <= activeBounds.maxY; y++) {
-            for (let x = activeBounds.minX; x <= activeBounds.maxX; x++) {
-                const i = y * width + x;
-                const isLand = elevationData[i] >= seaLevel;
-                const bufferIndex = i * 4;
-
-                if (isLand) {
-                    pixelBuffer[bufferIndex] = 212;
-                    pixelBuffer[bufferIndex + 1] = 184;
-                    pixelBuffer[bufferIndex + 2] = 114;
-                } else {
-                    pixelBuffer[bufferIndex] = 26;
-                    pixelBuffer[bufferIndex + 1] = 75;
-                    pixelBuffer[bufferIndex + 2] = 132;
-                }
-                pixelBuffer[bufferIndex + 3] = 255;
-            }
-        }
-        return pixelBuffer;
-    }
-
-    /**
-     * Evaluates elevation and climate to determine the precise Biome key.
+     * Evaluates elevation and climate to determine the precise Biome key. Below sea level this is
+     * the biome seen from above: Pack Ice where the surface freezes, otherwise the sea bed's
+     * biome (see getOverwaterBiomeKey and getUnderwaterBiomeKey, which resolve the two apart).
      */
     static getBiomeKey(elevation, moisture, temp, seaLevel) {
         const tempLimits = FILRODENSWMB.CLIMATE.THRESHOLDS.TEMPERATURE;
 
-        if (elevation < seaLevel) return ProceduralEngine.#getOceanBiome(elevation, temp, seaLevel);
+        if (elevation < seaLevel) return ProceduralEngine.getOverwaterBiomeKey(temp) ?? ProceduralEngine.getUnderwaterBiomeKey(elevation, seaLevel);
         if (temp < tempLimits.ARCTIC) return ProceduralEngine.#getArcticBiome(moisture);
         if (temp < tempLimits.SUBARCTIC) return ProceduralEngine.#getSubArcticBiome(moisture);
         if (temp < tempLimits.TEMPERATE) return ProceduralEngine.#getTemperateBiome(moisture);
@@ -2406,16 +2345,33 @@ export class ProceduralEngine {
     }
 
     /**
-     * Deliberately keeps depth relative to seaLevel alone, unlike #paintOceanPixel's shading,
-     * which also normalises against the map's discovered lowest point. This is a binary
-     * classification (past the halfway point or not), not a continuous shade, so a trench well
-     * below the old floor still correctly reads past 0.5 and classifies as DEEP_OCEAN with no
-     * need to know how much further down the trough actually goes.
+     * The built-in biome of the bed under the water: Deep Ocean past CLIMATE.DEEP_OCEAN_DEPTH of
+     * the sea level, Shallow Ocean above it, at every temperature (ice, where there is any, lies
+     * on the surface over it; see getOverwaterBiomeKey).
+     *
+     * Deliberately keeps depth relative to seaLevel alone, unlike the water's shading (see
+     * paintTerrainAux), which also normalises against the map's discovered lowest point. This is a binary
+     * classification (past the split or not), not a continuous shade, so a trench well below
+     * the old floor still correctly reads as deep and classifies as DEEP_OCEAN with no need to
+     * know how much further down the trough actually goes. A lake bed lies above sea level, so
+     * its depth here is never positive and it is always Shallow Ocean.
+     * @param {number} elevation
+     * @param {number} seaLevel
+     * @returns {string} A key of FILRODENSWMB.BIOMES.
      */
-    static #getOceanBiome(elevation, temp, seaLevel) {
-        if (temp < FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD) return "PACK_ICE";
+    static getUnderwaterBiomeKey(elevation, seaLevel) {
         const depth = seaLevel > 0 ? (seaLevel - elevation) / seaLevel : 0;
-        return depth > 0.5 ? "DEEP_OCEAN" : "SHALLOW_OCEAN";
+        return depth > FILRODENSWMB.CLIMATE.DEEP_OCEAN_DEPTH ? "DEEP_OCEAN" : "SHALLOW_OCEAN";
+    }
+
+    /**
+     * The built-in biome on the surface of the water: Pack Ice where the water freezes, and
+     * nothing (open water) elsewhere.
+     * @param {number} temp
+     * @returns {string|null} A key of FILRODENSWMB.BIOMES, or null for open water.
+     */
+    static getOverwaterBiomeKey(temp) {
+        return temp < FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD ? "PACK_ICE" : null;
     }
 
     static #getArcticBiome(moisture) {
@@ -2447,67 +2403,119 @@ export class ProceduralEngine {
     }
 
     /**
-     * Decides which biome a pixel resolves to and whether it should render as water, in
-     * priority order: a hand-painted override always wins; failing that, a matching custom
-     * auto-generation rule (see BiomeRuleEngine); failing that, the built-in default via
-     * getBiomeKey(). BrushEngine's own paint guard (#stampBiome) never lets a custom
-     * biome be hand-painted below sea level in the first place, so a custom biome only ever
-     * ends up there via a rule match here.
+     * The result resolveBiomeLookup fills in. One object is reused for every call (the biome
+     * painters call it for every pixel of the map), so a caller must read what it needs before
+     * the next call.
+     */
+    static #lookup = { land: null, underwater: null, overwater: null, visible: null, isFallback: false };
+
+    /**
+     * Decides which biomes a pixel shows. A pixel of dry land shows one biome. A pixel under
+     * water (below sea level, or part of a lake) shows two independently: the biome of the bed
+     * under the water and, optionally, one on the water's surface (Pack Ice over Deep Ocean, for
+     * example; open water leaves the surface empty).
      *
-     * By default a rule-matched custom biome below sea level still counts as water, exactly
-     * like DEEP_OCEAN/SHALLOW_OCEAN below, so the biome layer stays transparent and the
-     * topography layer's own elevation-based water rendering (ProceduralEngine.colorize)
-     * shows through underneath, rather than the custom biome's flat colour hiding it. A biome
-     * can opt out of that via its own `solidOverWater` flag (the Add/Edit Custom Biome dialogue's
-     * checkbox, compiled into the sparse `solidOverWater` id->true map below by
-     * MapStateManager.getDerivedMapParameters) - exactly like the built-in PACK_ICE biome,
-     * which has always rendered as a solid colour over water rather than transparently. This
-     * matters for a biome meant to represent something visible on top of water, like pack ice
-     * or a floating landmass, rather than the water itself.
+     * Each is resolved in priority order: a hand-painted override always wins; failing that, a
+     * matching custom auto-generation rule (see BiomeRuleEngine); failing that, the built-in
+     * default (getBiomeKey on land, getUnderwaterBiomeKey and getOverwaterBiomeKey under and over
+     * water). Every step obeys the biome's placement (see BiomePlacement): an override or rule
+     * biome that may not appear on a side is passed over there, so a land biome never shows
+     * under water and a sea biome never shows on dry land. An override that does not fit is
+     * ignored rather than erased, so if the ground is later raised or lowered back across sea
+     * level, the paint shows again. A pixel holds one override, so painting Pack Ice over painted
+     * coral replaces the coral; the bed under the ice then falls back to its rule or default.
      *
-     * An override only wins if `biomePalette` can still resolve it to a colour. Deleting a
-     * custom biome (MapDialogManager#onDeleteCustomBiome) deliberately leaves its old ID sitting
-     * in painted pixels and brush strokes rather than scrubbing it out everywhere, so undo/redo
-     * only ever has to snapshot uiState.customBiomes and never needs to touch raster data at all
-     * - bringing the biome back (by undo, or a fresh biome that happens to reuse the ID) makes
-     * the old paint reappear on its own. The other side of that deal is here: an override ID
-     * that doesn't currently resolve to anything is treated exactly like "never painted" and
-     * falls through to a custom rule match or the built-in default, instead of the caller
-     * falling back to a solid black square (params?.biomePalette?.[lookupKey] ?? ... ?? [0,0,0]
-     * in createBiomesMap) for a colour that will never exist. Built-in water IDs (1/2) are
-     * checked before consulting the palette at all, since they're never user-deletable and
-     * render transparently regardless of colour (see the `isWater` short-circuit below).
+     * An override only wins if `biomePalette` can still resolve it to a colour and it has a
+     * placement in `biomeSides`. Deleting a custom biome (MapDialogManager#onDeleteCustomBiome)
+     * deliberately leaves its old ID sitting in painted pixels and brush strokes rather than
+     * scrubbing it out everywhere, so undo/redo only ever has to snapshot uiState.customBiomes
+     * and never needs to touch raster data at all - bringing the biome back (by undo, or a fresh
+     * biome that happens to reuse the ID) makes the old paint reappear on its own. The other side
+     * of that deal is here: an override ID that doesn't currently resolve to anything is treated
+     * exactly like "never painted" and falls through to a custom rule match or the built-in
+     * default, instead of the caller falling back to a solid black square for a colour that will
+     * never exist.
      * @param {object} [biomePalette] - id/name -> RGB map for the map's current biomes (built-in
      * plus custom), as compiled fresh every repaint by MapStateManager.getDerivedMapParameters.
-     * @param {object} [solidOverWater] - sparse custom-biome-id -> true map of biomes that render
-     * solid rather than transparent below sea level, compiled the same way as biomePalette.
-     * @returns {{lookupKey: (string|number), isWater: boolean, isFallback: boolean}} `isFallback`
-     * is true only for the last branch below (getBiomeKey()'s built-in default) - a hand-painted
-     * override or a matching custom rule both count as "covered" and set it false, even when the
-     * matched custom biome turns out to render as water. This is what the "Preview Rule
-     * Coverage" highlight (MapStudioApp's hover button, see createBiomesMap's optional
-     * `outFallbackBuffer` below) tints: exactly the pixels a GM's custom rule set doesn't reach.
+     * @param {Uint8Array} biomeSides - BIOME_SIDE flags by biome id (BiomePlacement.buildSidesTable),
+     * compiled the same way as biomePalette.
+     * @returns {{land: (string|number|null), underwater: (string|number|null), overwater: (string|number|null), visible: (string|number), isFallback: boolean}}
+     * `land` is set only on dry land, `underwater` only under water, `overwater` only where the
+     * water's surface has a biome. `visible` is the one seen from above (the surface biome if
+     * there is one, otherwise the bed's or the land's), which is what the hover readout and the
+     * grid data export report. `isFallback` is true when `visible` came from the built-in
+     * default - a hand-painted override or a matching custom rule both count as "covered". This
+     * is what the "Preview Rule Coverage" highlight (MapStudioApp's hover button, see
+     * createBiomesMap's optional `outFallbackBuffer` below) tints: exactly the pixels a GM's
+     * custom rule set doesn't reach. The returned object is reused (see #lookup).
      */
-    static resolveBiomeLookup(overrideId, elevation, moisture, temp, seaLevel, waterMask, pixelIndex, customBiomeRules, biomePalette, solidOverWater) {
-        if (overrideId === 1 || overrideId === 2) {
-            return { lookupKey: overrideId, isWater: true, isFallback: false };
-        }
-        if (overrideId > 0 && biomePalette?.[overrideId]) {
-            return { lookupKey: overrideId, isWater: false, isFallback: false };
-        }
+    static resolveBiomeLookup(overrideId, elevation, moisture, temp, seaLevel, waterMask, pixelIndex, customBiomeRules, biomePalette, biomeSides) {
+        const result = ProceduralEngine.#lookup;
+        result.land = null;
+        result.underwater = null;
+        result.overwater = null;
+        result.isFallback = false;
 
-        const customId = customBiomeRules ? BiomeRuleEngine.matchBiomeId(customBiomeRules, elevation, moisture, temp) : 0;
-        if (customId > 0) {
-            return { lookupKey: customId, isWater: solidOverWater?.[customId] ? false : elevation < seaLevel, isFallback: false };
-        }
+        const overrideSides = overrideId > 0 && biomePalette?.[overrideId] ? (biomeSides?.[overrideId] ?? 0) : 0;
+        const isWater = elevation < seaLevel || (waterMask ? waterMask[pixelIndex] > 0 : false);
 
-        const lookupKey = ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
-        const isWater = lookupKey === "DEEP_OCEAN" || lookupKey === "SHALLOW_OCEAN" || (waterMask && waterMask[pixelIndex] > 0);
-        return { lookupKey, isWater, isFallback: true };
+        if (isWater) {
+            ProceduralEngine.#resolveWaterBiomes(result, overrideId, overrideSides, elevation, moisture, temp, seaLevel, customBiomeRules);
+        } else {
+            ProceduralEngine.#resolveLandBiome(result, overrideId, overrideSides, elevation, moisture, temp, seaLevel, customBiomeRules);
+        }
+        return result;
+    }
+
+    /** The land side of resolveBiomeLookup: override, then rule, then default. */
+    static #resolveLandBiome(result, overrideId, overrideSides, elevation, moisture, temp, seaLevel, customBiomeRules) {
+        if (overrideSides & BIOME_SIDE.LAND) {
+            result.land = overrideId;
+        } else {
+            const ruleId = customBiomeRules ? BiomeRuleEngine.matchBiomeId(customBiomeRules, elevation, moisture, temp, BIOME_SIDE.LAND) : 0;
+            result.land = ruleId > 0 ? ruleId : ProceduralEngine.getBiomeKey(elevation, moisture, temp, seaLevel);
+            result.isFallback = ruleId === 0;
+        }
+        result.visible = result.land;
     }
 
     /**
-     * VISUAL PASS: Evaluates Temp and Moisture to paint a climate biome map.
+     * The water side of resolveBiomeLookup: the bed and the surface, each by override, then
+     * rule, then default. The surface default is often empty (open water), in which case the bed
+     * is what is seen from above.
+     */
+    static #resolveWaterBiomes(result, overrideId, overrideSides, elevation, moisture, temp, seaLevel, customBiomeRules) {
+        let bedFromDefault = false;
+        if (overrideSides & BIOME_SIDE.UNDERWATER) {
+            result.underwater = overrideId;
+        } else {
+            const ruleId = customBiomeRules ? BiomeRuleEngine.matchBiomeId(customBiomeRules, elevation, moisture, temp, BIOME_SIDE.UNDERWATER) : 0;
+            result.underwater = ruleId > 0 ? ruleId : ProceduralEngine.getUnderwaterBiomeKey(elevation, seaLevel);
+            bedFromDefault = ruleId === 0;
+        }
+
+        let surfaceFromDefault = false;
+        if (overrideSides & BIOME_SIDE.OVERWATER) {
+            result.overwater = overrideId;
+        } else {
+            const ruleId = customBiomeRules ? BiomeRuleEngine.matchBiomeId(customBiomeRules, elevation, moisture, temp, BIOME_SIDE.OVERWATER) : 0;
+            result.overwater = ruleId > 0 ? ruleId : ProceduralEngine.getOverwaterBiomeKey(temp);
+            surfaceFromDefault = ruleId === 0;
+        }
+
+        const hasSurface = result.overwater !== null;
+        result.visible = hasSurface ? result.overwater : result.underwater;
+        result.isFallback = hasSurface ? surfaceFromDefault : bedFromDefault;
+    }
+
+    /**
+     * VISUAL PASS: paints the biome layers from temperature, moisture, painted biomes and rules.
+     *
+     * `outBuffer` receives what lies on top: the land's biome on dry ground, and on water the
+     * biome on the water's surface (such as Pack Ice), transparent over open water.
+     * `outUnderwaterBuffer`, when given, receives the biome of the bed under the water,
+     * transparent on dry ground. The terrain shader (see TerrainShading) draws the bed under the
+     * water and the surface biome over it.
      *
      * @param {Uint8Array} [outFallbackBuffer] - optional companion RGBA buffer, same dimensions
      * as `outBuffer`. When supplied, every pixel visited also gets tagged here: fully opaque in
@@ -2518,24 +2526,24 @@ export class ProceduralEngine {
      * toggles this buffer's own canvas layer visible/hidden rather than recomputing anything.
      * Left `null` (the default) for callers that don't need the preview - the 3D view
      * generation, for one - and costs nothing extra when omitted beyond the one `if` check.
+     * @param {Uint8Array} [outUnderwaterBuffer] - optional RGBA buffer for the beds' biomes.
      */
-    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, outFallbackBuffer = null) {
-        const pixelBuffer = outBuffer;
+    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, outFallbackBuffer = null, outUnderwaterBuffer = null) {
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const renderBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
         const [fbR, fbG, fbB] = FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR;
         const fbAlpha = Math.round(FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_ALPHA * 255);
+        const palette = params?.biomePalette;
 
         for (let y = renderBounds.minY; y <= renderBounds.maxY; y++) {
             for (let x = renderBounds.minX; x <= renderBounds.maxX; x++) {
                 const i = y * width + x;
                 const bufferIndex = i * 4;
-                const elevation = elevationData[i];
 
                 const overrideId = biomeOverrideData ? biomeOverrideData[i] : 0;
-                const { lookupKey, isWater, isFallback } = ProceduralEngine.resolveBiomeLookup(
-                    overrideId, elevation, moistureData[i], temperatureData[i], seaLevel, waterMask, i, params?.customBiomeRules, params?.biomePalette,
-                    params?.solidOverWater,
+                const { land, underwater, overwater, isFallback } = ProceduralEngine.resolveBiomeLookup(
+                    overrideId, elevationData[i], moistureData[i], temperatureData[i], seaLevel, waterMask, i, params?.customBiomeRules, palette,
+                    params?.biomeSides,
                 );
 
                 if (outFallbackBuffer) {
@@ -2545,22 +2553,28 @@ export class ProceduralEngine {
                     outFallbackBuffer[bufferIndex + 3] = isFallback ? fbAlpha : 0;
                 }
 
-                if (isWater) {
-                    pixelBuffer[bufferIndex] = 0;
-                    pixelBuffer[bufferIndex + 1] = 0;
-                    pixelBuffer[bufferIndex + 2] = 0;
-                    pixelBuffer[bufferIndex + 3] = 0;
-                    continue;
-                }
-
-                const color = params?.biomePalette?.[lookupKey] ?? FILRODENSWMB.BIOMES[lookupKey] ?? [0, 0, 0];
-                pixelBuffer[bufferIndex] = color[0];
-                pixelBuffer[bufferIndex + 1] = color[1];
-                pixelBuffer[bufferIndex + 2] = color[2];
-                pixelBuffer[bufferIndex + 3] = 255;
+                ProceduralEngine.#writeBiomeColour(outBuffer, bufferIndex, land ?? overwater, palette);
+                if (outUnderwaterBuffer) ProceduralEngine.#writeBiomeColour(outUnderwaterBuffer, bufferIndex, underwater, palette);
             }
         }
-        return pixelBuffer;
+        return outBuffer;
+    }
+
+    /** Writes a biome's colour into an RGBA buffer, or transparency for no biome (null). */
+    static #writeBiomeColour(buffer, bufferIndex, lookupKey, palette) {
+        if (lookupKey === null) {
+            buffer[bufferIndex] = 0;
+            buffer[bufferIndex + 1] = 0;
+            buffer[bufferIndex + 2] = 0;
+            buffer[bufferIndex + 3] = 0;
+            return;
+        }
+
+        const color = palette?.[lookupKey] ?? FILRODENSWMB.BIOMES[lookupKey] ?? [0, 0, 0];
+        buffer[bufferIndex] = color[0];
+        buffer[bufferIndex + 1] = color[1];
+        buffer[bufferIndex + 2] = color[2];
+        buffer[bufferIndex + 3] = 255;
     }
 
     generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params, outRiverMap, outWaterMask) {
@@ -2630,10 +2644,14 @@ export class ProceduralEngine {
      * negative infinity for a negative input, so this keeps producing one band per interval-sized
      * step with no discontinuity at 0 even once elevation can go negative or above 1 - nothing
      * here needs to change for hand-edited terrain to exceed the old [0, 1] range.
+     *
+     * The shoreline is drawn on the same layer (see #drawShoreline), so it follows the Contours
+     * switch. It is drawn even when the contour interval is off.
+     *
+     * @param {Float32Array|null} [waterMask] - Lake surface elevation per pixel (0 where there is
+     *   no lake), so lakes get a shoreline too.
      */
-    createContourMap(elevationData, width, height, interval, seaLevel, outBuffer, bounds = null) {
-        if (!interval || interval <= 0) return outBuffer;
-
+    createContourMap(elevationData, width, height, interval, seaLevel, outBuffer, bounds = null, waterMask = null) {
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const contourBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
 
@@ -2648,6 +2666,13 @@ export class ProceduralEngine {
             }
         }
 
+        if (interval > 0) ProceduralEngine.#drawContourLines(elevationData, width, height, interval, seaLevel, outBuffer, contourBounds);
+        ProceduralEngine.#drawShoreline(elevationData, width, height, seaLevel, waterMask, outBuffer, contourBounds);
+        return outBuffer;
+    }
+
+    /** The contour lines themselves (see createContourMap). */
+    static #drawContourLines(elevationData, width, height, interval, seaLevel, outBuffer, contourBounds) {
         const maxY = Math.min(contourBounds.maxY, height - 2);
         const maxX = Math.min(contourBounds.maxX, width - 2);
 
@@ -2671,6 +2696,53 @@ export class ProceduralEngine {
         }
 
         return outBuffer;
+    }
+
+    /**
+     * The shoreline: where dry ground meets water (the sea, or a lake), the dry pixel is darkened
+     * and the water pixel lightened (DISPLAY.SHORELINE), so the edge of the water reads clearly
+     * against the relief-shaded land and the see-through shallows. Contour lines only mark
+     * multiples of the contour interval, which sea level is usually not, so without this the
+     * coast has no line of its own. A pixel is on the shore when one of its four direct
+     * neighbours is on the other side; the shoreline is drawn over any contour line there.
+     *
+     * Every pixel it writes lies inside `contourBounds`, and a pixel's shore status depends only
+     * on its direct neighbours, which the repaint margin (DISPLAY.REPAINT_MARGIN) covers.
+     */
+    static #drawShoreline(elevationData, width, height, seaLevel, waterMask, outBuffer, contourBounds) {
+        const shore = FILRODENSWMB.DISPLAY.SHORELINE;
+        const dryAlpha = Math.round(shore.DRY_ALPHA * 255);
+        const wetAlpha = Math.round(shore.WET_ALPHA * 255);
+        const water = { elevationData, waterMask, seaLevel };
+
+        for (let y = contourBounds.minY; y <= contourBounds.maxY; y++) {
+            for (let x = contourBounds.minX; x <= contourBounds.maxX; x++) {
+                const index = y * width + x;
+                const wet = ProceduralEngine.#isWaterAt(water, index);
+                if (!ProceduralEngine.#isShore(water, width, height, x, y, wet)) continue;
+
+                const colour = wet ? shore.WET_COLOUR : shore.DRY_COLOUR;
+                const o = index * 4;
+                outBuffer[o] = colour[0];
+                outBuffer[o + 1] = colour[1];
+                outBuffer[o + 2] = colour[2];
+                outBuffer[o + 3] = wet ? wetAlpha : dryAlpha;
+            }
+        }
+    }
+
+    /** Whether a pixel is under water: below sea level, or in a lake. */
+    static #isWaterAt(water, index) {
+        return water.elevationData[index] < water.seaLevel || (water.waterMask ? water.waterMask[index] > 0 : false);
+    }
+
+    /** Whether any of a pixel's four direct neighbours (inside the map) is on the other side of the water's edge. */
+    static #isShore(water, width, height, x, y, wet) {
+        const index = y * width + x;
+        if (x > 0 && ProceduralEngine.#isWaterAt(water, index - 1) !== wet) return true;
+        if (x < width - 1 && ProceduralEngine.#isWaterAt(water, index + 1) !== wet) return true;
+        if (y > 0 && ProceduralEngine.#isWaterAt(water, index - width) !== wet) return true;
+        return y < height - 1 && ProceduralEngine.#isWaterAt(water, index + width) !== wet;
     }
 
     /**

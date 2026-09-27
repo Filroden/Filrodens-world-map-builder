@@ -1,8 +1,10 @@
 import { FILRODENSWMB } from "../config.js";
 import { resolvePinIconPath } from "../data/pinIcons.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { RiverSteps } from "../tools/RiverSteps.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { getRegionUploadResource } from "./RegionUploadResource.js";
+import { TerrainCompositor } from "./TerrainCompositor.js";
 
 export class StudioCanvas {
     /** Whether destroy() has run (see destroy). */
@@ -30,9 +32,9 @@ export class StudioCanvas {
 
         // Initialise a strict z-index hierarchy of layers
         this.layers = {
-            base: new PIXI.Container(),
-            topography: new PIXI.Container(),
-            biomes: new PIXI.Container(),
+            // Elevation, relief shading, water and biomes, drawn together by one shader (see
+            // TerrainCompositor); which of them show is a shader setting, not layer visibility
+            terrain: new PIXI.Container(),
             // Companion highlight layer for the "Preview Rule Coverage" hover button - painted
             // alongside `biomes` on every repaint, but hidden until hovered.
             biomeFallback: new PIXI.Container(),
@@ -46,7 +48,7 @@ export class StudioCanvas {
             cartography: new PIXI.Container(),
         };
 
-        this.layers.biomes.alpha = FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
+        this.terrainCompositor = new TerrainCompositor(PIXI);
         this.layers.biomeFallback.visible = false;
 
         // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
@@ -104,9 +106,7 @@ export class StudioCanvas {
 
         // Add them to the zooming stage in ascending order
         this.stage.addChild(
-            this.layers.base,
-            this.layers.topography,
-            this.layers.biomes,
+            this.layers.terrain,
             this.layers.biomeFallback,
             this.layers.contours,
             this.layers.landMasks,
@@ -569,7 +569,12 @@ export class StudioCanvas {
 
         // Destroying a PIXI application twice fails part-way (its resize plugin has already been
         // torn down), so it is only ever destroyed once
-        if (this.app && !this.#destroyed) this.app.destroy(true, { children: true, texture: true, baseTexture: true });
+        if (this.app && !this.#destroyed) {
+            // The terrain's mesh and textures go first: destroying them again after the stage
+            // has already destroyed its children would fail on the mesh's released geometry
+            this.terrainCompositor.destroy();
+            this.app.destroy(true, { children: true, texture: true, baseTexture: true });
+        }
         this.#destroyed = true;
     }
 
@@ -630,6 +635,42 @@ export class StudioCanvas {
     }
 
     /**
+     * Sends the terrain's images (see TerrainShading) to the GPU and draws them on the terrain
+     * layer. As with renderPixelBuffer, `bounds` limits the upload to the rows that changed.
+     *
+     * @param {{surface: Uint8Array, underwater: Uint8Array, aux: Uint8Array}} buffers - RGBA images of the whole map.
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @param {object|null} bounds - The pixels that changed since the last call.
+     */
+    renderTerrain(buffers, width, height, bounds = null) {
+        if (this.#destroyed) return;
+
+        this.mapWidth = width;
+        this.mapHeight = height;
+        this.#updateGlobalMask();
+
+        if (this.terrainCompositor.update(buffers, width, height, bounds)) {
+            this.layers.terrain.removeChildren();
+            this.layers.terrain.addChild(this.terrainCompositor.displayObject);
+        }
+
+        if (!this.hasGeneratedMap) {
+            this.resetCamera();
+            this.hasGeneratedMap = true;
+        }
+    }
+
+    /**
+     * Changes how the terrain is drawn (see TerrainCompositor.setSettings): the layer switches,
+     * biome opacity, relief strength and water settings. Nothing is repainted.
+     * @param {object} changes
+     */
+    setTerrainSettings(changes) {
+        this.terrainCompositor.setSettings(changes);
+    }
+
+    /**
      * Renders procedural, non-interactive water vectors.
      */
     renderProceduralRivers(rivers, waterMask) {
@@ -667,24 +708,29 @@ export class StudioCanvas {
         }
     }
 
+    /** Draws one procedural river, leaving out the parts that lie in a lake (see RiverSteps). */
     #drawSingleRiver(path, waterColor, frozenColor, waterMask) {
         if (!path || path.length === 0) return;
 
+        const graphics = this.proceduralRiverGraphics;
         let currentIsFrozen = path[0].isFrozen;
-        this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-        this.proceduralRiverGraphics.moveTo(path[0].x, path[0].y);
+        graphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+        graphics.moveTo(path[0].x, path[0].y);
 
         for (let i = 1; i < path.length; i++) {
+            const previous = path[i - 1];
             const point = path[i];
 
             // If the climate crosses the freezing threshold, snap the line and change colours
-            if (point.isFrozen !== currentIsFrozen) {
+            if (point.isFrozen !== undefined && point.isFrozen !== currentIsFrozen) {
                 currentIsFrozen = point.isFrozen;
-                this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-                this.proceduralRiverGraphics.moveTo(point.x, point.y);
-            } else {
-                this.proceduralRiverGraphics.lineTo(point.x, point.y);
+                graphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
+                graphics.moveTo(point.x, point.y);
+                continue;
             }
+
+            if (RiverSteps.isShown(previous, point, waterMask, this.mapWidth, this.mapHeight)) graphics.lineTo(point.x, point.y);
+            else graphics.moveTo(point.x, point.y);
         }
     }
 
@@ -760,12 +806,10 @@ export class StudioCanvas {
     }
 
     /**
-     * Dynamically adjusts the alpha transparency of the Biome layer.
+     * Sets the opacity of the biomes over the ground (a terrain shader setting).
      */
     setBiomeOpacity(alphaValue) {
-        if (this.layers.biomes) {
-            this.layers.biomes.alpha = alphaValue;
-        }
+        this.setTerrainSettings({ biomeAlpha: alphaValue });
     }
 
     /**
@@ -1645,6 +1689,9 @@ export class StudioCanvas {
             reference: this.layers.reference.visible,
             cartography: this.layers.cartography.visible,
             landMasks: this.layers.landMasks.visible,
+            terrain: this.layers.terrain.visible,
+            contours: this.layers.contours.visible,
+            features: this.layers.features.visible,
         };
 
         this.layers.reference.visible = false;
@@ -1656,9 +1703,7 @@ export class StudioCanvas {
         if (passType === "player") {
             this.gridLayer.visible = false;
         } else if (passType === "gm") {
-            this.layers.base.visible = false;
-            this.layers.topography.visible = false;
-            this.layers.biomes.visible = false;
+            this.layers.terrain.visible = false;
             this.layers.contours.visible = false;
             this.layers.features.visible = false;
             this.gridLayer.visible = false;
@@ -1691,11 +1736,10 @@ export class StudioCanvas {
         this.layers.reference.visible = originalVisibility.reference;
         this.layers.cartography.visible = originalVisibility.cartography;
         this.layers.landMasks.visible = originalVisibility.landMasks;
-        this.layers.base.visible = true;
-        this.layers.topography.visible = true;
-        this.layers.biomes.visible = true;
-        this.layers.contours.visible = true;
-        this.layers.features.visible = true;
+        // Each layer goes back to how the person had it, rather than always to visible
+        this.layers.terrain.visible = originalVisibility.terrain;
+        this.layers.contours.visible = originalVisibility.contours;
+        this.layers.features.visible = originalVisibility.features;
 
         return new Promise((resolve) => {
             canvas.toBlob((blob) => {

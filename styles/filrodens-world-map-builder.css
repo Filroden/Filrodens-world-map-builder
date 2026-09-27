@@ -1214,11 +1214,104 @@
     border-color: var(--fwmb-accent-main);
 }
 
+/* On: a clear accent fill, so a layer that is showing stands out from one that is not */
 .fwmb-map-controls button.active,
 .fwmb-map-history button.active {
     color: var(--fwmb-main-100);
-    background: rgba(0, 0, 0, 0.4);
+    background: color-mix(in srgb, var(--fwmb-accent-main) 45%, rgba(0, 0, 0, 0.4));
     border-color: var(--fwmb-accent-main);
+}
+
+/* Some of a group's layers on: a fainter fill and a dashed edge */
+.fwmb-map-controls button.partial {
+    color: var(--fwmb-main-200);
+    background: color-mix(in srgb, var(--fwmb-accent-main) 18%, rgba(0, 0, 0, 0.4));
+    border-color: var(--fwmb-accent-main);
+    border-style: dashed;
+}
+
+/* Keep the controls showing while one of their lists is open, even if the pointer leaves the map */
+.fwmb-map-controls.fwmb-menu-open {
+    opacity: 1;
+}
+
+/* A terrain layer group: its button, and the list of its layers that opens above it */
+.fwmb-layer-group {
+    position: relative;
+    display: flex;
+}
+
+.fwmb-layer-menu {
+    position: absolute;
+    inset-block-end: calc(100% + var(--fwmb-space-8));
+    inset-inline-end: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-space-2);
+    min-inline-size: 10rem;
+    padding: var(--fwmb-space-4);
+    background: rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--fwmb-radius-small);
+    z-index: 30;
+}
+
+.fwmb-layer-menu.fwmb-hidden {
+    display: none;
+}
+
+.fwmb-map-controls .fwmb-layer-menu button {
+    inline-size: 100%;
+    block-size: auto;
+    justify-content: flex-start;
+    gap: var(--fwmb-space-8);
+    padding: var(--fwmb-space-4) var(--fwmb-space-8);
+    font-size: var(--fwmb-font-size-s);
+    white-space: nowrap;
+    color: var(--fwmb-main-200);
+}
+
+.fwmb-map-controls .fwmb-layer-menu button.fwmb-layer-menu-all {
+    border-block-end: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0;
+    margin-block-end: var(--fwmb-space-2);
+}
+
+/* The tick box drawn in each list row, from the row's aria-checked */
+.fwmb-layer-check {
+    flex: none;
+    inline-size: 0.9rem;
+    block-size: 0.9rem;
+    border: 1px solid var(--fwmb-main-400);
+    border-radius: var(--fwmb-radius-small);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fwmb-layer-menu [aria-checked="true"] .fwmb-layer-check {
+    background: var(--fwmb-accent-main);
+    border-color: var(--fwmb-accent-main);
+}
+
+.fwmb-layer-menu [aria-checked="true"] .fwmb-layer-check::after {
+    content: "";
+    inline-size: 0.25rem;
+    block-size: 0.5rem;
+    border: solid var(--fwmb-text-inverse, #000);
+    border-width: 0 0.125rem 0.125rem 0;
+    transform: translateY(-0.06rem) rotate(45deg);
+}
+
+.fwmb-layer-menu [aria-checked="mixed"] .fwmb-layer-check {
+    border-color: var(--fwmb-accent-main);
+}
+
+.fwmb-layer-menu [aria-checked="mixed"] .fwmb-layer-check::after {
+    content: "";
+    inline-size: 0.5rem;
+    block-size: 0.125rem;
+    background: var(--fwmb-accent-main);
 }
 
 .fwmb-map-history button:disabled {

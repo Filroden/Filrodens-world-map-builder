@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { BiomePlacement } from "./BiomePlacement.js";
 
 /**
  * Compiles user-defined custom biome rules into a flat, allocation-free structure and
@@ -17,8 +18,15 @@ import { FILRODENSWMB } from "../config.js";
  * boundary values themselves (a literal 0 or 1) one small piece of matching-time meaning:
  * see that method's own doc comment for why.
  *
- * Defaults are NOT represented here - ProceduralEngine.getBiomeKey remains the guaranteed
- * fallback for any pixel no custom rule claims, so total climate-space coverage is
+ * Rules also obey each biome's placement (see BiomePlacement): matchBiomeId is asked for one
+ * side of a pixel at a time (dry land, the bed under water, or the water's surface), and a row
+ * whose biome may not appear on that side is passed over as if it did not match, so the next
+ * matching row gets its chance. A rule can therefore never put a land biome under the sea, or a
+ * sea biome on dry land, however its ranges are drawn.
+ *
+ * Defaults are NOT represented here - ProceduralEngine's built-in defaults (getBiomeKey on
+ * land, getUnderwaterBiomeKey and getOverwaterBiomeKey under and over water) remain the
+ * guaranteed fallback for any pixel no custom rule claims, so total climate-space coverage is
  * unaffected by whatever custom rules do or don't exist.
  *
  * createBiomesMap() runs the matcher below for every pixel in the generated buffer, so the
@@ -36,7 +44,7 @@ import { FILRODENSWMB } from "../config.js";
  *
  * @typedef {{elevation: RuleSegment[], moisture: RuleSegment[], temperature: RuleSegment[]}} RuleRow
  *
- * @typedef {{id: number, rules: RuleRow[]}} CustomBiome
+ * @typedef {{id: number, rules: RuleRow[], placement?: string}} CustomBiome
  */
 
 const SEGMENT_STRIDE = 2; // each segment occupies [min, max] in the flat segment arrays
@@ -56,14 +64,17 @@ export class BiomeRuleEngine {
     }
 
     /**
-     * Returns the id of the first custom biome whose rules match this pixel, or 0 if none
-     * do. 0 is the same "no override" sentinel already used elsewhere (e.g. the biome
-     * override raster) - callers can fall through to ProceduralEngine.getBiomeKey()
-     * whenever this returns 0, no separate "was there a match" check needed.
+     * Returns the id of the first custom biome whose rules match this pixel on the given side,
+     * or 0 if none do. 0 is the same "no override" sentinel already used elsewhere (e.g. the
+     * biome override raster) - callers can fall through to the built-in defaults whenever this
+     * returns 0, no separate "was there a match" check needed. Rows of biomes whose placement
+     * does not allow `side` are skipped before any range is tested.
      * @param {object} compiled Result of compile().
+     * @param {number} side - One BIOME_SIDE flag: the side of the pixel being resolved.
      */
-    static matchBiomeId(compiled, elevation, moisture, temperature) {
+    static matchBiomeId(compiled, elevation, moisture, temperature, side) {
         for (let row = 0; row < compiled.rowCount; row++) {
+            if ((compiled.rowSides[row] & side) === 0) continue;
             if (!BiomeRuleEngine.#axisMatches(compiled.elevSegments, compiled.rowElevStart[row], compiled.rowElevCount[row], elevation)) continue;
             if (!BiomeRuleEngine.#axisMatches(compiled.moistSegments, compiled.rowMoistStart[row], compiled.rowMoistCount[row], moisture)) continue;
             if (!BiomeRuleEngine.#axisMatches(compiled.tempSegments, compiled.rowTempStart[row], compiled.rowTempCount[row], temperature)) continue;
@@ -81,6 +92,7 @@ export class BiomeRuleEngine {
         const working = {
             rowCount: 0,
             rowBiomeId: [],
+            rowSides: [],
             rowElevStart: [],
             rowElevCount: [],
             rowMoistStart: [],
@@ -93,8 +105,9 @@ export class BiomeRuleEngine {
         };
 
         for (const biome of customBiomes) {
+            const sides = BiomePlacement.sidesOf(BiomePlacement.placementOfCustom(biome));
             for (const row of biome.rules ?? []) {
-                BiomeRuleEngine.#appendRow(working, biome.id, row);
+                BiomeRuleEngine.#appendRow(working, biome.id, sides, row);
             }
         }
 
@@ -102,8 +115,9 @@ export class BiomeRuleEngine {
     }
 
     /** Appends one rule row's three axes to the working arrays. */
-    static #appendRow(working, biomeId, row) {
+    static #appendRow(working, biomeId, sides, row) {
         working.rowBiomeId.push(biomeId);
+        working.rowSides.push(sides);
 
         const elevation = BiomeRuleEngine.#appendAxisSegments(working.elevSegments, row.elevation);
         working.rowElevStart.push(elevation.start);
@@ -137,6 +151,7 @@ export class BiomeRuleEngine {
         return {
             rowCount: working.rowCount,
             rowBiomeId: Int32Array.from(working.rowBiomeId),
+            rowSides: Uint8Array.from(working.rowSides),
             rowElevStart: Int32Array.from(working.rowElevStart),
             rowElevCount: Int32Array.from(working.rowElevCount),
             rowMoistStart: Int32Array.from(working.rowMoistStart),
@@ -195,15 +210,16 @@ export class BiomeRuleEngine {
      * can show a GM where their custom ranges sit relative to the defaults.
      *
      * Every value here is read live from FILRODENSWMB.CLIMATE and the map's current sea
-     * level, mirroring getBiomeKey()'s branches one-for-one (ocean split via
-     * #getOceanBiome, then the four temperature bands and their moisture cutoffs via
-     * #get*Biome) rather than hand-copied numbers, so this table can never drift from what
-     * getBiomeKey actually does. If getBiomeKey's branches or FILRODENSWMB.CLIMATE.THRESHOLDS
-     * ever change, update this alongside it. Note this intentionally reads the same fixed
-     * FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD constant #getOceanBiome itself reads, not the
-     * map's adjustable "Freezing Threshold" setting (state.freezingThreshold /
-     * params.climate.freezingThreshold) - getBiomeKey doesn't currently receive that setting
-     * either, so matching its actual behaviour here means matching that same constant.
+     * level, mirroring the built-in defaults one-for-one (the sea bed and surface via
+     * getUnderwaterBiomeKey and getOverwaterBiomeKey, then the four temperature bands and
+     * their moisture cutoffs via getBiomeKey's #get*Biome) rather than hand-copied numbers, so
+     * this table can never drift from what the defaults actually do. If those branches or
+     * FILRODENSWMB.CLIMATE.THRESHOLDS ever change, update this alongside them. Note this
+     * intentionally reads the same fixed FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD constant
+     * getOverwaterBiomeKey itself reads, not the map's adjustable "Freezing Threshold" setting
+     * (state.freezingThreshold / params.climate.freezingThreshold) - the defaults don't
+     * currently receive that setting either, so matching their actual behaviour here means
+     * matching that same constant.
      * @param {number} seaLevel - The map's current sea level (app.uiState.seaLevel).
      * @returns {Array<{key: string, color: number[], rows: RuleRow[]}>} One entry per
      *   built-in biome, keyed the same way as FILRODENSWMB.BIOMES, in a stable cold-to-hot
@@ -242,12 +258,15 @@ export class BiomeRuleEngine {
             }
         }
 
-        // Ocean branch - see #getOceanBiome. These elevation ranges are relative to the
-        // current map's sea level (not fixed constants), since #getOceanBiome computes depth
-        // as a fraction of seaLevel itself.
+        // Sea branch - see ProceduralEngine.getUnderwaterBiomeKey and getOverwaterBiomeKey. A
+        // sea pixel has a bed under the water and a surface over it, resolved independently:
+        // Deep or Shallow Ocean by depth at every temperature, and Pack Ice over them where it
+        // is freezing. These elevation ranges are relative to the current map's sea level (not
+        // fixed constants), since the depth split is a fraction of seaLevel itself.
+        const deepShare = FILRODENSWMB.CLIMATE.DEEP_OCEAN_DEPTH;
         addRow("PACK_ICE", { elevation: [segment(0, seaLevel)], moisture: [segment(0, 1)], temperature: [segment(0, freezingThreshold)] });
-        addRow("DEEP_OCEAN", { elevation: [segment(0, seaLevel * 0.5)], moisture: [segment(0, 1)], temperature: [segment(freezingThreshold, 1)] });
-        addRow("SHALLOW_OCEAN", { elevation: [segment(seaLevel * 0.5, seaLevel)], moisture: [segment(0, 1)], temperature: [segment(freezingThreshold, 1)] });
+        addRow("DEEP_OCEAN", { elevation: [segment(0, seaLevel * deepShare)], moisture: [segment(0, 1)], temperature: [segment(0, 1)] });
+        addRow("SHALLOW_OCEAN", { elevation: [segment(seaLevel * deepShare, seaLevel)], moisture: [segment(0, 1)], temperature: [segment(0, 1)] });
 
         // Stable display order: oceans first, then the same cold-to-hot progression
         // getBiomeKey itself branches through.

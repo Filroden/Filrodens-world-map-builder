@@ -27,7 +27,9 @@
       "temperature": {
         "scale": 0.04,
         "octaves": 2
-      }
+      },
+      "moistureOffset": 10000,
+      "tempOffset": 20000
     },
     "hydrology": {
       "maxLakeSize": 8000,
@@ -37,13 +39,19 @@
     },
     "climate": {
       "altCooling": 0.4,
-      "freezingThreshold": 0.2
+      "freezingThreshold": 0.2,
+      "windDistance": 40
     },
     "customColors": {},
     "display": {
       "contourInterval": 0.1,
       "biomeAlphaActive": 0.85,
-      "biomeAlphaInactive": 0.65
+      "biomeAlphaInactive": 0.65,
+      "reliefShading": 0.5,
+      "seabedRelief": 0.75,
+      "waterClarity": 1,
+      "waterHue": 210,
+      "waterSaturation": 1
     },
     "cartography": {
       "scaleEnable": true,
@@ -57,6 +65,191 @@
       "borderEnable": true,
       "borderStyle": "double",
       "borderColor": "#000000"
+    },
+    "tectonicPlates": 10,
+    "coastlineFracture": 0.3,
+    "continentalGrouping": 0.4,
+    "shelfRange": 0.15,
+    "coastalPlain": 0.05,
+    "flatTexture": false,
+    "continentScale": 150,
+    "oceanScale": 150,
+    "oceanRidges": 0.5,
+    "terrain": {
+      "extraOctaves": 0,
+      "detailOctaves": 0,
+      "resolutionScale": 1,
+      "fillEnclosedCoast": false,
+      "coastalBuffers": false,
+      "world": {
+        "zoom": 1,
+        "originX": 0,
+        "originY": 0,
+        "rootW": 4000,
+        "rootH": 4000
+      },
+      "faultFrame": {
+        "zoom": 1,
+        "originX": 0,
+        "originY": 0
+      }
+    },
+    "biomePalette": {
+      "0": [
+        0,
+        0,
+        0
+      ],
+      "1": [
+        26,
+        75,
+        132
+      ],
+      "2": [
+        46,
+        117,
+        182
+      ],
+      "3": [
+        240,
+        240,
+        240
+      ],
+      "4": [
+        149,
+        163,
+        164
+      ],
+      "5": [
+        77,
+        107,
+        83
+      ],
+      "6": [
+        141,
+        163,
+        104
+      ],
+      "7": [
+        58,
+        122,
+        70
+      ],
+      "8": [
+        41,
+        92,
+        53
+      ],
+      "9": [
+        194,
+        178,
+        128
+      ],
+      "10": [
+        23,
+        66,
+        32
+      ],
+      "11": [
+        196,
+        186,
+        114
+      ],
+      "12": [
+        214,
+        198,
+        137
+      ],
+      "13": [
+        225,
+        235,
+        240
+      ],
+      "ERASER": [
+        0,
+        0,
+        0
+      ],
+      "DEEP_OCEAN": [
+        26,
+        75,
+        132
+      ],
+      "SHALLOW_OCEAN": [
+        46,
+        117,
+        182
+      ],
+      "SNOW": [
+        240,
+        240,
+        240
+      ],
+      "TUNDRA": [
+        149,
+        163,
+        164
+      ],
+      "TAIGA": [
+        77,
+        107,
+        83
+      ],
+      "GRASSLAND": [
+        141,
+        163,
+        104
+      ],
+      "DECIDUOUS_FOREST": [
+        58,
+        122,
+        70
+      ],
+      "TEMPERATE_RAINFOREST": [
+        41,
+        92,
+        53
+      ],
+      "TEMPERATE_DESERT": [
+        194,
+        178,
+        128
+      ],
+      "TROPICAL_RAINFOREST": [
+        23,
+        66,
+        32
+      ],
+      "SAVANNA": [
+        196,
+        186,
+        114
+      ],
+      "SUBTROPICAL_DESERT": [
+        214,
+        198,
+        137
+      ],
+      "PACK_ICE": [
+        225,
+        235,
+        240
+      ]
+    },
+    "biomeSides": {},
+    "customBiomeRules": {
+      "rowCount": 0,
+      "rowBiomeId": {},
+      "rowSides": {},
+      "rowElevStart": {},
+      "rowElevCount": {},
+      "rowMoistStart": {},
+      "rowMoistCount": {},
+      "rowTempStart": {},
+      "rowTempCount": {},
+      "elevSegments": {},
+      "moistSegments": {},
+      "tempSegments": {}
     }
   },
   "history": [
@@ -1045,7 +1238,8 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "KnHQ5H2pNreuc7hQ"
+      "journalPageId": "KnHQ5H2pNreuc7hQ",
+      "color": "#ffffff"
     },
     {
       "id": "4gZEMaxsTcrRrEps",
@@ -1062,7 +1256,8 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "PxbtmlcEuLrCiv5p"
+      "journalPageId": "PxbtmlcEuLrCiv5p",
+      "color": "#ffffff"
     },
     {
       "id": "RpEOceUq5T2aseIL",
@@ -1080,7 +1275,8 @@
       "description": "",
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "yxIYdvWPZpyjHDif"
+      "journalPageId": "yxIYdvWPZpyjHDif",
+      "color": "#ffffff"
     },
     {
       "id": "zH1QhctgZjLldL4n",
@@ -1099,7 +1295,8 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "lmMCJxz32Djr6lXZ"
+      "journalPageId": "lmMCJxz32Djr6lXZ",
+      "color": "#ffffff"
     },
     {
       "id": "JOffO8KVBmwWuRw8",
@@ -1118,7 +1315,8 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "l2sa71VHKOK9zIOt"
+      "journalPageId": "l2sa71VHKOK9zIOt",
+      "color": "#ffffff"
     },
     {
       "id": "rhcvenvcwFGbdsv2",
@@ -1133,7 +1331,8 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "6qM7iAuiLPWszNYm"
+      "journalPageId": "6qM7iAuiLPWszNYm",
+      "color": "#ffffff"
     },
     {
       "id": "dN0rJiaqn1328T5p",
@@ -1152,7 +1351,8 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "4sDT66953ERNYlb1"
+      "journalPageId": "4sDT66953ERNYlb1",
+      "color": "#ffffff"
     },
     {
       "id": "bjUrSxYTECc6Y3dc",
@@ -1171,7 +1371,683 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "wktc16qJewVrIKmA"
+      "journalPageId": "wktc16qJewVrIKmA",
+      "color": "#ffffff"
+    },
+    {
+      "id": "SkRKcvL1XXXYOZsX",
+      "name": "River Source",
+      "x": 3617,
+      "y": 3940,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "Gvvv6SkUugpHhGPN",
+      "name": "River Source",
+      "x": 3311,
+      "y": 1486,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "eehaeYF9BTB9Lepp",
+      "name": "River Source",
+      "x": 3545,
+      "y": 3235,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "kYOh3jPXbrO8fGO9",
+      "name": "River Source",
+      "x": 1427,
+      "y": 28,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "gEARYXwdF7mPG8Fa",
+      "name": "River Source",
+      "x": 137,
+      "y": 1450,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "MLxhXMBpGdzUCbF4",
+      "name": "River Source",
+      "x": 3187,
+      "y": 3580,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "juUBKkkgDadmKmdI",
+      "name": "River Source",
+      "x": 213,
+      "y": 1540,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "PZUCmI6DiIdxtfKd",
+      "name": "River Source",
+      "x": 978,
+      "y": 2859,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "7gbuQNv3yeshtNRv",
+      "name": "River Source",
+      "x": 1342,
+      "y": 2971,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "Rw96kBPisQIxLous",
+      "name": "River Source",
+      "x": 3203,
+      "y": 1485,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "ZAyaQ5cGfgTzmozK",
+      "name": "River Source",
+      "x": 150,
+      "y": 3823,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "emd6Ic9dQ4DpinGY",
+      "name": "River Source",
+      "x": 2137,
+      "y": 2107,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "nIg0hBVkuKsW9Bb7",
+      "name": "River Source",
+      "x": 3653,
+      "y": 32,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "p8C60sMFpE2hxDuM",
+      "name": "River Source",
+      "x": 2099,
+      "y": 1248,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "AmmYalc6D9naLflC",
+      "name": "River Source",
+      "x": 328,
+      "y": 1537,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "tlh4cBxNFx2Ojwqg",
+      "name": "River Source",
+      "x": 632,
+      "y": 3167,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "z5VsMgfPYFcQMtNp",
+      "name": "River Source",
+      "x": 2381,
+      "y": 2286,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "Yl7qK8JElP2xg9Uk",
+      "name": "River Source",
+      "x": 231,
+      "y": 1573,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "APlIxjrYdaEVabc2",
+      "name": "River Source",
+      "x": 2460,
+      "y": 2202,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "mhibWnDVZqPyeTcb",
+      "name": "River Source",
+      "x": 2003,
+      "y": 2063,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "wfW0by2kPoGUR3vJ",
+      "name": "River Source",
+      "x": 968,
+      "y": 2832,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "v4jMlvUa4xz3OQav",
+      "name": "River Source",
+      "x": 3199,
+      "y": 1441,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "3fmKpcoowCBmy2kB",
+      "name": "River Source",
+      "x": 3211,
+      "y": 3586,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "21aeILBcF3shsGxT",
+      "name": "River Source",
+      "x": 3460,
+      "y": 1575,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "HQvzkZQTabA5d0Bv",
+      "name": "River Source",
+      "x": 1047,
+      "y": 2902,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "mKkbm9SDRvaS0CbP",
+      "name": "River Source",
+      "x": 1021,
+      "y": 798,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "gNT1wiCF7VKPEWUN",
+      "name": "River Source",
+      "x": 1396,
+      "y": 3056,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "h0enKgrvXkaaJbcZ",
+      "name": "River Source",
+      "x": 107,
+      "y": 3865,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "JK86OlLzsingOudI",
+      "name": "River Source",
+      "x": 619,
+      "y": 3061,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "kMJLH95L7asBT1Vf",
+      "name": "River Source",
+      "x": 1944,
+      "y": 1252,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "G3zs0cp6hTDgp343",
+      "name": "River Source",
+      "x": 1095,
+      "y": 822,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "nBtQ68EtMhPAfUuO",
+      "name": "River Source",
+      "x": 3677,
+      "y": 3875,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "haCpXLMvMWCMm57d",
+      "name": "River Source",
+      "x": 984,
+      "y": 2906,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "wNRz2C4V3irfZDZe",
+      "name": "River Source",
+      "x": 1072,
+      "y": 2868,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "moX5IxWnFkhlq8cq",
+      "name": "River Source",
+      "x": 2200,
+      "y": 2255,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "Pn60rZk9WkRrTKgl",
+      "name": "River Source",
+      "x": 3183,
+      "y": 1376,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "4MifxPGcAbsTtrUH",
+      "name": "River Source",
+      "x": 3646,
+      "y": 287,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "5GsWwte8kZCAOqhI",
+      "name": "River Source",
+      "x": 2987,
+      "y": 3697,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "UHTioqpTlxRW2lWZ",
+      "name": "River Source",
+      "x": 564,
+      "y": 3098,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "nWqydDELjWuUIRSK",
+      "name": "River Source",
+      "x": 3263,
+      "y": 1453,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "PHuw7q9CKNPVXMrl",
+      "name": "River Source",
+      "x": 1439,
+      "y": 109,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "thxMvJTycLDnVFZt",
+      "name": "River Source",
+      "x": 3302,
+      "y": 1852,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "Gnr6tJE3DrKQQA8M",
+      "name": "River Source",
+      "x": 2099,
+      "y": 2059,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "BqlzHufeWm996hpv",
+      "name": "River Source",
+      "x": 3118,
+      "y": 33,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "X0Ha3FgvTKzy45UL",
+      "name": "River Source",
+      "x": 2324,
+      "y": 2393,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "vLzG1tPKzgnpCW2y",
+      "name": "River Source",
+      "x": 1156,
+      "y": 3081,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "3PO0sOTboT4IX3aF",
+      "name": "River Source",
+      "x": 379,
+      "y": 1556,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "vX9lBm3DlHLXtJKO",
+      "name": "River Source",
+      "x": 3575,
+      "y": 431,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "kDKjnD6i2H1vbSup",
+      "name": "River Source",
+      "x": 2193,
+      "y": 2081,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "kQPE5Mmu2JqOVp2M",
+      "name": "River Source",
+      "x": 187,
+      "y": 1548,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "Tfnj1VtXn1Xpo9aR",
+      "name": "River Source",
+      "x": 3427,
+      "y": 3120,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "5HHCXkZHDfKxYA08",
+      "name": "River Source",
+      "x": 772,
+      "y": 2881,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "PEXjvEtZPCh4t2UC",
+      "name": "River Source",
+      "x": 3413,
+      "y": 3136,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "df3Mj5cYHavTbOJF",
+      "name": "River Source",
+      "x": 133,
+      "y": 3832,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "fgucL3aQYx9XYTbN",
+      "name": "River Source",
+      "x": 2239,
+      "y": 2285,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "yBIpkJsK7CM5njZD",
+      "name": "River Source",
+      "x": 3382,
+      "y": 1692,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "zZHZawmU5SwwWH40",
+      "name": "River Source",
+      "x": 2325,
+      "y": 2244,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "lNBSXU2j2lZK5vY4",
+      "name": "River Source",
+      "x": 3649,
+      "y": 123,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "d4ktftipB6eNZbtA",
+      "name": "River Source",
+      "x": 1214,
+      "y": 3142,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "nufM7zTBlIMPiab4",
+      "name": "River Source",
+      "x": 3180,
+      "y": 1425,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "uUTFPeSkSYxTE2gX",
+      "name": "River Source",
+      "x": 3215,
+      "y": 1396,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "8RfFxZtsSwAQD2lo",
+      "name": "River Source",
+      "x": 2935,
+      "y": 3632,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "JvFsLRACdayDDxmG",
+      "name": "River Source",
+      "x": 1343,
+      "y": 3235,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "3D8sidCBrEDysYbw",
+      "name": "River Source",
+      "x": 3258,
+      "y": 1476,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "y9yObBToMqUn4pEF",
+      "name": "River Source",
+      "x": 1040,
+      "y": 784,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "aEpZEG4QkuhWO9YK",
+      "name": "River Source",
+      "x": 1014,
+      "y": 2798,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "Ga2ntVUCCWS7SmAZ",
+      "name": "River Source",
+      "x": 1349,
+      "y": 3014,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "UOje3d8MoEXrkWKX",
+      "name": "River Source",
+      "x": 3066,
+      "y": 3341,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "r74okNuPMQuM9Z7i",
+      "name": "River Source",
+      "x": 1189,
+      "y": 3084,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "3nfvjumPcY1shlYd",
+      "name": "River Source",
+      "x": 2516,
+      "y": 3769,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "irdzMYCR4YMZpjCi",
+      "name": "River Source",
+      "x": 2977,
+      "y": 393,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "4tNdmZyEk4M11lj1",
+      "name": "River Source",
+      "x": 1272,
+      "y": 3233,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "Ky3iIFkTwtwxiXmP",
+      "name": "River Source",
+      "x": 2353,
+      "y": 3668,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "8w00Ly2XiXBghCZw",
+      "name": "River Source",
+      "x": 3328,
+      "y": 1539,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
+    },
+    {
+      "id": "9O6snKmuEY9cXoWc",
+      "name": "River Source",
+      "x": 3374,
+      "y": 3176,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all"
     }
   ],
   "mapRoutes": [
@@ -1227,7 +2103,8 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "9uKdSbSCO0WiuZBB",
@@ -1261,7 +2138,8 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "1nr4lirwg8osyPs5",
@@ -1302,7 +2180,8 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "oz18HaDioLiH2jqC",
@@ -1375,7 +2254,8 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "wK8B2Qxj4hTOki5a",
@@ -1396,7 +2276,8 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "D78oGVZIJ2R2ESiw",
@@ -1445,7 +2326,8 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     }
   ],
   "regionLayers": [
@@ -1677,7 +2559,8 @@
             "x": 2000,
             "y": 2137
           },
-          "visibility": "all"
+          "visibility": "all",
+          "quickStyle": "custom"
         }
       ],
       "visibility": "all"
@@ -1753,5 +2636,19 @@
       "opacity": 0.8,
       "visibility": "all"
     }
-  ]
+  ],
+  "generationEngine": "standard",
+  "terrainVersion": 1,
+  "world": null,
+  "terrainUpgradeDismissed": false,
+  "springsBaked": true,
+  "gridVisible": false,
+  "customBiomes": [],
+  "customRouteStyles": [],
+  "customLabelStyles": [],
+  "customRegionStyles": [],
+  "tectonicFaults": [],
+  "manualRivers": [],
+  "landMasks": [],
+  "parentId": null
 }

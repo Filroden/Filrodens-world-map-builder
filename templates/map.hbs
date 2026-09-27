@@ -37,15 +37,26 @@
                 <i class="fwmb-icon visibility-off"></i>
             </button>
             <div class="fwmb-divider-vertical"></div>
-            <button type="button" class="active" data-action="toggleLayer" data-layer="base" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerBase'}}">
-                <i class="fwmb-icon map"></i>
-            </button>
-            <button type="button" class="active" data-action="toggleLayer" data-layer="topography" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerTopography'}}">
-                <i class="fwmb-icon elevation"></i>
-            </button>
-            <button type="button" class="" data-action="toggleLayer" data-layer="biomes" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerBiomes'}}">
-                <i class="fwmb-icon forest"></i>
-            </button>
+            {{!-- Terrain and Biomes each open a list of their layers (terrain shader settings, see
+                 MapStudioApp.#TERRAIN_LAYER_GROUPS). The list opens upwards, ending in line with
+                 its button, since the controls sit at the map's bottom end corner. --}}
+            {{#each layerGroups}}
+                <div class="fwmb-layer-group" data-layer-group="{{this.id}}">
+                    <button type="button" class="{{#if (eq this.state 'on')}}active{{/if}} {{#if (eq this.state 'partial')}}partial{{/if}}" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" data-tooltip="{{localize this.tooltip}}">
+                        <i class="fwmb-icon {{this.icon}}"></i>
+                    </button>
+                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize this.tooltip}}">
+                        <button type="button" class="fwmb-layer-menu-all" role="menuitemcheckbox" aria-checked="{{this.allChecked}}" data-action="toggleTerrainLayer" data-layer-group="{{this.id}}" data-terrain-layer="all">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.LayerAll"}}
+                        </button>
+                        {{#each this.items}}
+                            <button type="button" role="menuitemcheckbox" aria-checked="{{this.checked}}" data-action="toggleTerrainLayer" data-layer-group="{{../id}}" data-terrain-layer="{{this.key}}">
+                                <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+                            </button>
+                        {{/each}}
+                    </div>
+                </div>
+            {{/each}}
             <button type="button" class="active" data-action="toggleLayer" data-layer="features" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerFeatures'}}">
                 <i class="fwmb-icon water-drop"></i>
             </button>
@@ -91,4 +102,4 @@
             <span class="fwmb-processing-text"></span>
         </div>
     </div>
-</div>
+</div>

@@ -372,7 +372,7 @@ export const FILRODENSWMB = {
         PIN_RADIUS: 6,
         PIN_ALPHA: 0.4,
         CONTOUR_INTERVAL: 0.1,
-        // Relief shading of the elevation layer (see ProceduralEngine#shadeRelief): its default
+        // Relief shading of the terrain (see ProceduralEngine#reliefChange and TerrainShading): its default
         // strength (0 is off; each map sets its own) and the compass bearing the light comes from.
         // The bearing is fixed as part of the module's look rather than offered as a setting:
         // 315 (the north-west) is the usual choice for maps, and light from the south or east
@@ -388,6 +388,88 @@ export const FILRODENSWMB = {
             // Limits on how far shading can darken or brighten a pixel (as multiples of its colour)
             MIN_FACTOR: 0.35,
             MAX_FACTOR: 1.6,
+        },
+        // How the terrain is drawn (see TerrainShading, which holds the maths, and
+        // TerrainCompositor, which runs it on the GPU). Colours are 0-255 RGB.
+        TERRAIN: {
+            // The elevation layer on land: a grey that darkens with height, from GREY_LOW at sea
+            // level to GREY_LOW - GREY_RANGE at the map's highest point, never below GREY_MIN
+            GREY_LOW: 200,
+            GREY_RANGE: 140,
+            GREY_MIN: 60,
+            // The ground under water (sea and lake beds) before any biome is laid on it
+            SEDIMENT: [172, 168, 158],
+            // The flat colours shown when the Elevation layer is switched off
+            BASE_LAND: [212, 184, 114],
+            BASE_SEA: [26, 75, 132],
+            // How strongly the flat sea colour covers the bed when Elevation is off (it carries no depth)
+            FLAT_WATER_ALPHA: 0.6,
+        },
+        // The water drawn over the sea and lakes (see TerrainShading.waterColour and waterAlpha).
+        WATER: {
+            // The water's colour starts at SHALLOW_COLOUR (depth 0) and each channel falls by
+            // DEEP_SLOPE over the full depth, never below DEEP_COLOUR. Depth is a share of the
+            // way from sea level to the map's lowest point.
+            SHALLOW_COLOUR: [100, 150, 200],
+            DEEP_SLOPE: [80, 120, 120],
+            DEEP_COLOUR: [20, 30, 80],
+            // Over the first TURQUOISE_DEPTH of depth the colour leans towards TURQUOISE, by up
+            // to TURQUOISE_MIX at the shore, so shallows over a pale bed read as clear water
+            TURQUOISE: [40, 170, 190],
+            TURQUOISE_DEPTH: 0.2,
+            TURQUOISE_MIX: 0.6,
+            // How much of the bed shows through: T = (1 - VEIL) * (FLOOR + (1 - FLOOR) * e^(-ABSORPTION * depth)).
+            // VEIL makes even the shoreline look wet; FLOOR is the share of the bed that always
+            // shows, so the deep sea floor's ridges stay readable.
+            VEIL: 0.3,
+            FLOOR: 0.06,
+            ABSORPTION: 7,
+            // Lakes are far shallower than the sea (a few thousandths of the elevation range), so
+            // their depth is scaled up by this much to give them a visible range of depth
+            LAKE_DEPTH_SCALE: 10,
+            // Defaults of the map's water settings: the share of relief shading still seen on the
+            // water's surface, the water's clarity (1 is the default depth of view; higher sees
+            // deeper), and the tint as a hue in degrees and a saturation multiplier. BASE_HUE is
+            // the hue of the colours above, so a tint of BASE_HUE leaves them exactly as they are;
+            // the tint is limited to HUE_MIN-HUE_MAX (blue-greens through blues to blue-violets),
+            // so the sea always reads as water.
+            SEABED_RELIEF: 0.75,
+            CLARITY: 1,
+            BASE_HUE: 210,
+            HUE: 210,
+            HUE_MIN: 170,
+            HUE_MAX: 260,
+            SATURATION: 1,
+        },
+        // The shoreline drawn on the contour layer where dry ground meets the sea or a lake (see
+        // ProceduralEngine#drawShoreline): the dry pixel darkened, the water pixel lightened
+        SHORELINE: {
+            DRY_COLOUR: [20, 25, 30],
+            DRY_ALPHA: 0.35,
+            WET_COLOUR: [235, 245, 250],
+            WET_ALPHA: 0.45,
+        },
+        // The 3D view (see Scene3D).
+        THREE_D: {
+            // How far up the terrain stands: the height in map pixels of one whole unit of elevation.
+            ALTITUDE_SCALE: 40,
+            // Procedural rivers are painted into the terrain's colours. Their width in map pixels
+            // is the map's longer side divided by RIVER_WIDTH_DIVISOR, but at least
+            // RIVER_MIN_WIDTH, so a river on a large map is still visible with the whole map in
+            // view. Colours as on the flat map.
+            RIVER_WIDTH_DIVISOR: 800,
+            RIVER_MIN_WIDTH: 2,
+            RIVER_COLOUR: [120, 170, 210],
+            FROZEN_RIVER_COLOUR: [225, 235, 240],
+            // The sea's surface. The water's colour over the bed is already painted into the
+            // terrain, so the surface only adds a faint sheen: this opacity at the default water
+            // clarity, less for clearer water and more for murkier.
+            WATER_OPACITY: 0.2,
+            WATER_MIN_OPACITY: 0.05,
+            WATER_MAX_OPACITY: 0.5,
+            // How far above the sea's surface a surface biome (Pack Ice and the like) is raised,
+            // so the surface does not cover it.
+            SURFACE_LIFT: 0.05,
         },
         // How far past a repaint area the colour, biome and contour painters also write: each pixel
         // there depends on its neighbours (contour lines sit between two pixels), so the ring just
@@ -421,6 +503,9 @@ export const FILRODENSWMB = {
         WIND_DISTANCE: 40,
         ALTITUDE_COOLING: 0.4,
         FREEZING_THRESHOLD: 0.2,
+        // The sea bed deeper than this share of the sea level is Deep Ocean, shallower is
+        // Shallow Ocean (the built-in default for the bed under the sea)
+        DEEP_OCEAN_DEPTH: 0.5,
         THRESHOLDS: {
             TEMPERATURE: {
                 ARCTIC: 0.2,
@@ -541,6 +626,25 @@ export const FILRODENSWMB = {
         SAVANNA: 11,
         SUBTROPICAL_DESERT: 12,
         PACK_ICE: 13,
+    },
+    // Where a biome may appear, relative to water. Every biome has exactly one of these; see
+    // BiomePlacement for how each one maps onto the three places a biome can be drawn (dry
+    // land, the bed under water, and the surface of the water). The values are saved with
+    // custom biomes, so they must never be renamed.
+    BIOME_PLACEMENT: {
+        LAND: "land",
+        UNDERWATER: "underwater",
+        OVERWATER: "overwater",
+        LAND_UNDERWATER: "landUnderwater",
+        LAND_OVERWATER: "landOverwater",
+    },
+    // Placement of the built-in biomes that are not land-only. Every built-in biome missing
+    // from this list is land-only. Deep and Shallow Ocean are the default beds under the sea
+    // (the water itself is drawn over them); Pack Ice floats on the surface.
+    BUILT_IN_BIOME_PLACEMENT: {
+        DEEP_OCEAN: "underwater",
+        SHALLOW_OCEAN: "underwater",
+        PACK_ICE: "overwater",
     },
     COMPENDIUM: {
         NAME: "fwmb-maps",

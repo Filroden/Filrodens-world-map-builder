@@ -21,10 +21,12 @@
     </div>
 
     <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-10);">
-        <label style="font-size: 0.8em; display: flex; align-items: center; gap: 4px; cursor: pointer;">
-            <input type="checkbox" class="fwmb-checkbox" name="biomeSolidOverWater" {{#if biome.solidOverWater}}checked{{/if}} />
-            {{localize "FILRODENSWMB.UI.BiomeSolidOverWater"}}
-        </label>
-        <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.BiomeSolidOverWaterHint"}}</p>
+        <label>{{localize "FILRODENSWMB.UI.BiomePlacement"}}</label>
+        <select name="biomePlacement">
+            {{#each placements}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+        <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.BiomePlacementHint"}}</p>
     </div>
-</div>
+</div>
