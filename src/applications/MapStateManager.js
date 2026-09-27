@@ -185,7 +185,7 @@ export class MapStateManager {
             regionLineThickness: 2,
             regionLineStyle: "solid",
             regionSmoothing: true,
-            regionOpacity: 0.5,
+            regionOpacity: FILRODENSWMB.DISPLAY.REGION_OPACITY,
             activeRegionQuickStyle: "custom",
             customRegionStyles: [],
 
@@ -395,6 +395,7 @@ export class MapStateManager {
                 waterSaturation: state.waterSaturation,
                 biomeAlphaActive: state.biomeAlphaActive,
                 biomeAlphaInactive: state.biomeAlphaInactive,
+                regionOpacity: state.regionOpacity,
             },
             cartography: {
                 scaleEnable: state.cartographyScaleEnable,

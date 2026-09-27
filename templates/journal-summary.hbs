@@ -17,12 +17,19 @@
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.Resolution"}}</strong></td>
-                <td>{{mapWidth}} &times; {{mapHeight}} pixels</td>
+                <td>{{localize "FILRODENSWMB.JOURNAL.ResolutionValue" width=mapWidth height=mapHeight}}</td>
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.Grid"}}</strong></td>
-                <td class="fwmb-capitalize">{{gridType}} ({{gridSize}}px)</td>
+                <td>{{#if journalGridless}}{{localize journalGridType}}{{else}}{{localize "FILRODENSWMB.JOURNAL.GridValue" type=(localize journalGridType) size=gridSize}}{{/if}}</td>
             </tr>
+            {{! Only regional maps (crops of another map) are magnified; the zoom is relative to the map at the top of the chain of crops. }}
+            {{#if journalRegionalZoom}}
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.RegionalZoom"}}</strong></td>
+                    <td>{{localize "FILRODENSWMB.JOURNAL.ZoomValue" zoom=journalRegionalZoom}}</td>
+                </tr>
+            {{/if}}
         </tbody>
     </table>
 
@@ -37,14 +44,7 @@
         <tbody>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.GenerationEngine"}}</strong></td>
-                <td>
-                    {{#if (eq generationEngine "standard")}}{{localize "FILRODENSWMB.UI.StandardGeneration"}}
-                    {{else if (eq generationEngine "flat")}}{{localize "FILRODENSWMB.UI.FlatCanvas"}}
-                    {{else if (eq generationEngine "advanced")}}{{localize "FILRODENSWMB.UI.TectonicGeneration"}}
-                    {{else if (eq generationEngine "guided")}}{{localize "FILRODENSWMB.UI.GuidedGeneration"}}
-                    {{else}}{{generationEngine}}
-                    {{/if}}
-                </td>
+                <td>{{journalEngineLabel}}</td>
             </tr>
 
             {{! Standard and Flat both generate around a user-set sea level; Advanced fixes it internally and Guided leaves it unused, so neither shows it here. }}
@@ -55,15 +55,22 @@
                 </tr>
             {{/if}}
 
+            {{#if (eq generationEngine "flat")}}
+                <tr>
+                    <td><strong>{{localize "FILRODENSWMB.JOURNAL.FlatTexture"}}</strong></td>
+                    <td>{{#if params.flatTexture}}{{localize "Yes"}}{{else}}{{localize "No"}}{{/if}}</td>
+                </tr>
+            {{/if}}
+
             {{! Standard is the only engine with a pannable/zoomable noise field, so these five rows are Standard-only. }}
             {{#if (eq generationEngine "standard")}}
                 <tr>
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.NoiseOffset"}}</strong></td>
-                    <td>{{params.noise.offsetX}}px, {{params.noise.offsetY}}px</td>
+                    <td>{{localize "FILRODENSWMB.JOURNAL.NoiseOffsetValue" x=params.noise.offsetX y=params.noise.offsetY}}</td>
                 </tr>
                 <tr>
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevScale"}}</strong></td>
-                    <td>{{params.noise.elevation.scale}}</td>
+                    <td>{{journalScales.elevation}}</td>
                 </tr>
                 <tr>
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevOctaves"}}</strong></td>
@@ -93,13 +100,32 @@
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.ContinentalGrouping"}}</strong></td>
                     <td>{{params.continentalGrouping}}</td>
                 </tr>
+                {{! Version 2 of the engine shapes the coast and seabed with these; version 1 has no such settings. }}
+                {{#if journalCurrentCoastline}}
+                    <tr>
+                        <td><strong>{{localize "FILRODENSWMB.JOURNAL.CoastalPlain"}}</strong></td>
+                        <td>{{params.coastalPlain}}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>{{localize "FILRODENSWMB.JOURNAL.ContinentScale"}}</strong></td>
+                        <td>{{params.continentScale}}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>{{localize "FILRODENSWMB.JOURNAL.OceanScale"}}</strong></td>
+                        <td>{{params.oceanScale}}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>{{localize "FILRODENSWMB.JOURNAL.OceanRidges"}}</strong></td>
+                        <td>{{params.oceanRidges}}</td>
+                    </tr>
+                {{/if}}
                 <tr>
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.SurfaceRoughness"}}</strong></td>
                     <td>{{params.noise.elevation.octaves}}</td>
                 </tr>
                 <tr>
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.ErosionScale"}}</strong></td>
-                    <td>{{params.noise.elevation.scale}}</td>
+                    <td>{{journalScales.elevation}}</td>
                 </tr>
             {{/if}}
 
@@ -117,13 +143,27 @@
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.ContinentScale"}}</strong></td>
                     <td>{{params.continentScale}}</td>
                 </tr>
+                {{#if journalCurrentCoastline}}
+                    <tr>
+                        <td><strong>{{localize "FILRODENSWMB.JOURNAL.CoastalPlain"}}</strong></td>
+                        <td>{{params.coastalPlain}}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>{{localize "FILRODENSWMB.JOURNAL.OceanScale"}}</strong></td>
+                        <td>{{params.oceanScale}}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>{{localize "FILRODENSWMB.JOURNAL.OceanRidges"}}</strong></td>
+                        <td>{{params.oceanRidges}}</td>
+                    </tr>
+                {{/if}}
                 <tr>
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.SurfaceRoughness"}}</strong></td>
                     <td>{{params.noise.elevation.octaves}}</td>
                 </tr>
                 <tr>
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.ErosionScale"}}</strong></td>
-                    <td>{{params.noise.elevation.scale}}</td>
+                    <td>{{journalScales.elevation}}</td>
                 </tr>
             {{/if}}
         </tbody>
@@ -152,11 +192,11 @@
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.Latitudes"}}</strong></td>
-                <td>Top: {{params.latTop}}&deg; / Bottom: {{params.latBottom}}&deg;</td>
+                <td>{{localize "FILRODENSWMB.JOURNAL.LatitudesValue" top=params.latTop bottom=params.latBottom}}</td>
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.MoistScale"}}</strong></td>
-                <td>{{params.noise.moisture.scale}}</td>
+                <td>{{journalScales.moisture}}</td>
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.MoistOctaves"}}</strong></td>
@@ -164,7 +204,7 @@
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.TempScale"}}</strong></td>
-                <td>{{params.noise.temperature.scale}}</td>
+                <td>{{journalScales.temperature}}</td>
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.TempOctaves"}}</strong></td>
@@ -184,11 +224,11 @@
         <tbody>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.RiverDensity"}}</strong></td>
-                <td>{{params.riverDensity}}%</td>
+                <td>{{localize "FILRODENSWMB.JOURNAL.PercentValue" value=params.riverDensity}}</td>
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.MaxLakeSize"}}</strong></td>
-                <td>{{params.hydrology.maxLakeSize}} pixels</td>
+                <td>{{localize "FILRODENSWMB.JOURNAL.PixelsValue" value=params.hydrology.maxLakeSize}}</td>
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.SpringAltOffset"}}</strong></td>
@@ -227,12 +267,89 @@
                 <td>{{params.display.contourInterval}}</td>
             </tr>
             <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.ReliefShading"}}</strong></td>
+                <td>{{params.display.reliefShading}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.SeabedRelief"}}</strong></td>
+                <td>{{params.display.seabedRelief}}</td>
+            </tr>
+            <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.AlphaActive"}}</strong></td>
                 <td>{{params.display.biomeAlphaActive}}</td>
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.AlphaInactive"}}</strong></td>
                 <td>{{params.display.biomeAlphaInactive}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.RegionOpacity"}}</strong></td>
+                <td>{{params.display.regionOpacity}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.WaterHue"}}</strong></td>
+                <td>{{localize "FILRODENSWMB.JOURNAL.DegreesValue" value=params.display.waterHue}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.WaterSaturation"}}</strong></td>
+                <td>{{params.display.waterSaturation}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.WaterClarity"}}</strong></td>
+                <td>{{params.display.waterClarity}}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    {{! Counts of what has been placed on the map. Procedural rivers are generated on load, so they are not counted. }}
+    <h3 class="fwmb-summary-title">{{localize "FILRODENSWMB.JOURNAL.SectionFeatures"}}</h3>
+    <table class="fwmb-summary-table">
+        <thead>
+            <tr>
+                <th>{{localize "FILRODENSWMB.JOURNAL.FeatureType"}}</th>
+                <th>{{localize "FILRODENSWMB.JOURNAL.FeatureCount"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeatureCustomRivers"}}</strong></td>
+                <td>{{journalFeatures.customRivers}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeatureSpringsAdded"}}</strong></td>
+                <td>{{journalFeatures.springsAdded}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeatureSpringsRemoved"}}</strong></td>
+                <td>{{journalFeatures.springsRemoved}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeatureTectonic"}}</strong></td>
+                <td>{{journalFeatures.tectonicFeatures}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeaturePointsOfInterest"}}</strong></td>
+                <td>{{journalFeatures.pointsOfInterest}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeatureRoutes"}}</strong></td>
+                <td>{{journalFeatures.routes}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeatureRegionLayers"}}</strong></td>
+                <td>{{journalFeatures.regionLayers}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeatureRegions"}}</strong></td>
+                <td>{{journalFeatures.regions}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeatureLabels"}}</strong></td>
+                <td>{{journalFeatures.labels}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.FeatureDecorations"}}</strong></td>
+                <td>{{journalFeatures.decorations}}</td>
             </tr>
         </tbody>
     </table>
@@ -243,6 +360,7 @@
             <tr>
                 <th>{{localize "FILRODENSWMB.JOURNAL.BiomeClassification"}}</th>
                 <th>{{localize "FILRODENSWMB.JOURNAL.HexValue"}}</th>
+                <th>{{localize "FILRODENSWMB.JOURNAL.BiomePlacement"}}</th>
             </tr>
         </thead>
         <tbody>
@@ -253,10 +371,11 @@
                         <span style="display: inline-block; width: 16px; height: 16px; background-color: {{this.hex}}; border: 1px solid var(--color-border-dark);"></span>
                         {{this.hex}}
                     </td>
+                    <td>{{localize this.placement}}</td>
                 </tr>
             {{else}}
                 <tr>
-                    <td colspan="2" style="font-style: italic;">{{localize "FILRODENSWMB.JOURNAL.StandardPalette"}}</td>
+                    <td colspan="3" style="font-style: italic;">{{localize "FILRODENSWMB.JOURNAL.StandardPalette"}}</td>
                 </tr>
             {{/each}}
         </tbody>

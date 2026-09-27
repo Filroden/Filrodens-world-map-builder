@@ -367,6 +367,7 @@ export const FILRODENSWMB = {
         GRID_ALPHA: 0.15,
         BIOME_ALPHA_ACTIVE: 0.85,
         BIOME_ALPHA_INACTIVE: 0.65,
+        REGION_OPACITY: 0.5,
         RIVER_WIDTH: 2,
         RIVER_ALPHA: 0.9,
         PIN_RADIUS: 6,

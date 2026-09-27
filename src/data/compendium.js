@@ -1,5 +1,21 @@
 import { FILRODENSWMB } from "../config.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { BiomePlacement } from "../generation/BiomePlacement.js";
+
+/** Decimal places kept when showing a regional map's zoom (a crop's zoom need not be a whole number). */
+const ZOOM_DECIMALS = 2;
+/** Decimal places kept when turning a saved noise scale back into its slider value. */
+const SCALE_DECIMALS = 2;
+/** Pin types that mark river sources (added or removed) rather than points of interest. */
+const SPRING_PIN_TYPES = Object.freeze({ ADDED: "spring", REMOVED: "block_spring" });
+/** The localisation key naming each grid type (see FILRODENSWMB.GRID_TYPES). */
+const GRID_LABELS = Object.freeze({
+    none: "FILRODENSWMB.UI.GridNone",
+    square: "FILRODENSWMB.UI.GridSquare",
+    hexR: "FILRODENSWMB.UI.GridHexRows",
+    hexC: "FILRODENSWMB.UI.GridHexCols",
+});
 
 /**
  * Ensures the world compendium exists, creating it natively if it does not.
@@ -66,6 +82,124 @@ export async function getSavedMaps() {
 }
 
 /**
+ * The values the journal summary (templates/journal-summary.hbs) shows that are not stored in
+ * the map data as they are displayed: they are worked out from it here, so the template only
+ * has to print them.
+ *
+ * @param {object} payload - The map data being saved.
+ * @returns {object} Fields to add to the template's data, each prefixed "journal".
+ */
+function buildJournalContext(payload) {
+    // TerrainVersion reads these fields from a uiState; the saved payload keeps the wind
+    // distance (from which an older regional map's zoom is recovered) inside its params.
+    const state = {
+        generationEngine: payload.generationEngine,
+        terrainVersion: payload.terrainVersion,
+        world: payload.world,
+        windDistance: payload.params?.climate?.windDistance,
+        mapWidth: payload.mapWidth,
+        mapHeight: payload.mapHeight,
+    };
+    const zoom = TerrainVersion.resolveWorld(state).zoom;
+
+    return {
+        journalEngineLabel: getEngineLabel(state),
+        journalCurrentCoastline: TerrainVersion.usesCurrentCoastline(state),
+        journalRegionalZoom: zoom === 1 ? null : Number(zoom.toFixed(ZOOM_DECIMALS)),
+        journalColors: getJournalColors(payload),
+        journalGridType: GRID_LABELS[payload.gridType] ?? payload.gridType,
+        journalGridless: payload.gridType === "none",
+        journalScales: getSliderScales(payload.params?.noise),
+        journalFeatures: countFeatures(payload),
+    };
+}
+
+/**
+ * The noise scales as their sliders show them. The map's parameters store each scale as its
+ * reciprocal (the noise frequency the engines multiply by), so a slider value of 250 is saved
+ * as 0.004; inverting it again gives back the value the user set.
+ * @param {object} [noise] - The saved params.noise.
+ * @returns {{elevation: number|null, moisture: number|null, temperature: number|null}}
+ */
+function getSliderScales(noise) {
+    const fromFrequency = (frequency) => (frequency > 0 ? Number((1 / frequency).toFixed(SCALE_DECIMALS)) : null);
+    return {
+        elevation: fromFrequency(noise?.elevation?.scale),
+        moisture: fromFrequency(noise?.moisture?.scale),
+        temperature: fromFrequency(noise?.temperature?.scale),
+    };
+}
+
+/**
+ * How many of each kind of feature the map holds. Procedural rivers are not counted: they are
+ * generated from the terrain each time the map loads, so they are not part of the saved data.
+ * @param {object} payload - The map data being saved.
+ * @returns {object} A count per feature kind.
+ */
+function countFeatures(payload) {
+    const pins = payload.mapPins || [];
+    const countPins = (type) => pins.filter((pin) => pin.type === type).length;
+    const layers = payload.regionLayers || [];
+    const springs = countPins(SPRING_PIN_TYPES.ADDED);
+    const blocked = countPins(SPRING_PIN_TYPES.REMOVED);
+
+    return {
+        customRivers: payload.manualRivers?.length ?? 0,
+        springsAdded: springs,
+        springsRemoved: blocked,
+        tectonicFeatures: payload.tectonicFaults?.length ?? 0,
+        pointsOfInterest: pins.length - springs - blocked,
+        routes: payload.mapRoutes?.length ?? 0,
+        regionLayers: layers.length,
+        regions: layers.reduce((total, layer) => total + (layer.regions?.length ?? 0), 0),
+        labels: payload.mapLabels?.length ?? 0,
+        decorations: payload.mapDecorations?.length ?? 0,
+    };
+}
+
+/**
+ * The engine's name as the engine list shows it, with its version for the engines that have had
+ * more than one (for example "Guided v2").
+ * @param {object} state - Reads generationEngine and terrainVersion.
+ * @returns {string}
+ */
+function getEngineLabel(state) {
+    const nameKeys = {
+        standard: "FILRODENSWMB.UI.StandardGeneration",
+        flat: "FILRODENSWMB.UI.FlatCanvas",
+        advanced: "FILRODENSWMB.UI.EngineNameTectonics",
+        guided: "FILRODENSWMB.UI.EngineNameGuided",
+    };
+    const nameKey = nameKeys[state.generationEngine];
+    if (!nameKey) return state.generationEngine ?? "";
+
+    const name = game.i18n.localize(nameKey);
+    const version = TerrainVersion.getDisplayVersion(state);
+    return version === null ? name : game.i18n.format("FILRODENSWMB.UI.EngineVersion", { name, version });
+}
+
+/**
+ * The biome palette rows: every built-in biome whose colour was changed, then every custom
+ * biome, each with its colour and placement. Built-in names are localisation keys; custom biome
+ * names are the user's own text, which the {{localize}} helper passes through unchanged.
+ * @param {object} payload - The map data being saved.
+ * @returns {Array<{label: string, hex: string, placement: string}>}
+ */
+function getJournalColors(payload) {
+    const builtIn = Object.entries(payload.params?.customColors || {}).map(([key, rgb]) => ({
+        label: `FILRODENSWMB.BIOMES.${key}`,
+        hex: ColorMath.rgbToHex(rgb),
+        placement: BiomePlacement.labelOf(BiomePlacement.placementOfBuiltIn(key)),
+    }));
+    const custom = (payload.customBiomes || []).map((biome) => ({
+        label: biome.name,
+        hex: ColorMath.rgbToHex(biome.color),
+        placement: BiomePlacement.labelOf(BiomePlacement.placementOfCustom(biome)),
+    }));
+    return [...builtIn, ...custom];
+}
+
+/**
  * Saves the Map Studio's generation parameters and brush history to a new JournalEntry.
  * Generates an embedded human-readable settings page within the text layer.
  */
@@ -84,19 +218,7 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null) {
     if (!pack) return null;
 
     const cleanPayload = foundry.utils.deepClone(mapDataPayload);
-
-    cleanPayload.journalColors = Object.entries(cleanPayload.params.customColors || {}).map(([key, rgb]) => {
-        const hex = ColorMath.rgbToHex(rgb);
-        return { label: `FILRODENSWMB.BIOMES.${key}`, hex: hex };
-    });
-
-    if (cleanPayload.customBiomes) {
-        const customColors = cleanPayload.customBiomes.map((cb) => ({
-            label: cb.name, // Passed as a raw string, bypassing the {{localize}} helper
-            hex: ColorMath.rgbToHex(cb.color),
-        }));
-        cleanPayload.journalColors.push(...customColors);
-    }
+    Object.assign(cleanPayload, buildJournalContext(cleanPayload));
 
     const narrativeHtml = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/journal-summary.hbs", cleanPayload);
 
