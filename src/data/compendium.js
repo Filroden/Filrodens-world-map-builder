@@ -7,6 +7,8 @@ import { BiomePlacement } from "../generation/BiomePlacement.js";
 const ZOOM_DECIMALS = 2;
 /** Decimal places kept when turning a saved noise scale back into its slider value. */
 const SCALE_DECIMALS = 2;
+/** Decimal places kept when showing the noise's pan offsets. */
+const OFFSET_DECIMALS = 2;
 /** Pin types that mark river sources (added or removed) rather than points of interest. */
 const SPRING_PIN_TYPES = Object.freeze({ ADDED: "spring", REMOVED: "block_spring" });
 /** The localisation key naming each grid type (see FILRODENSWMB.GRID_TYPES). */
@@ -110,6 +112,10 @@ function buildJournalContext(payload) {
         journalGridType: GRID_LABELS[payload.gridType] ?? payload.gridType,
         journalGridless: payload.gridType === "none",
         journalScales: getSliderScales(payload.params?.noise),
+        journalNoiseOffset: {
+            x: roundTo(payload.params?.noise?.offsetX, OFFSET_DECIMALS),
+            y: roundTo(payload.params?.noise?.offsetY, OFFSET_DECIMALS),
+        },
         journalFeatures: countFeatures(payload),
     };
 }
@@ -122,12 +128,22 @@ function buildJournalContext(payload) {
  * @returns {{elevation: number|null, moisture: number|null, temperature: number|null}}
  */
 function getSliderScales(noise) {
-    const fromFrequency = (frequency) => (frequency > 0 ? Number((1 / frequency).toFixed(SCALE_DECIMALS)) : null);
+    const fromFrequency = (frequency) => (frequency > 0 ? roundTo(1 / frequency, SCALE_DECIMALS) : null);
     return {
         elevation: fromFrequency(noise?.elevation?.scale),
         moisture: fromFrequency(noise?.moisture?.scale),
         temperature: fromFrequency(noise?.temperature?.scale),
     };
+}
+
+/**
+ * A number rounded to a number of decimal places, without trailing zeros (250, not 250.00).
+ * @param {number|undefined} value
+ * @param {number} decimals
+ * @returns {number|null} Null when there is no number to round.
+ */
+function roundTo(value, decimals) {
+    return Number.isFinite(value) ? Number(value.toFixed(decimals)) : null;
 }
 
 /**

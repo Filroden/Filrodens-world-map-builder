@@ -66,7 +66,7 @@
             {{#if (eq generationEngine "standard")}}
                 <tr>
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.NoiseOffset"}}</strong></td>
-                    <td>{{localize "FILRODENSWMB.JOURNAL.NoiseOffsetValue" x=params.noise.offsetX y=params.noise.offsetY}}</td>
+                    <td>{{localize "FILRODENSWMB.JOURNAL.NoiseOffsetValue" x=journalNoiseOffset.x y=journalNoiseOffset.y}}</td>
                 </tr>
                 <tr>
                     <td><strong>{{localize "FILRODENSWMB.JOURNAL.ElevScale"}}</strong></td>
@@ -367,15 +367,18 @@
             {{#each journalColors}}
                 <tr>
                     <td><strong>{{localize this.label}}</strong></td>
-                    <td class="fwmb-mono" style="display: flex; align-items: center; gap: 8px;">
-                        <span style="display: inline-block; width: 16px; height: 16px; background-color: {{this.hex}}; border: 1px solid var(--color-border-dark);"></span>
-                        {{this.hex}}
+                    <td class="fwmb-mono">
+                        {{! The swatch's colour is the biome's own, so it is the one style set here. }}
+                        <span class="fwmb-summary-colour">
+                            <span class="fwmb-summary-swatch" style="background-color: {{this.hex}};"></span>
+                            {{this.hex}}
+                        </span>
                     </td>
                     <td>{{localize this.placement}}</td>
                 </tr>
             {{else}}
                 <tr>
-                    <td colspan="3" style="font-style: italic;">{{localize "FILRODENSWMB.JOURNAL.StandardPalette"}}</td>
+                    <td colspan="3" class="fwmb-summary-empty">{{localize "FILRODENSWMB.JOURNAL.StandardPalette"}}</td>
                 </tr>
             {{/each}}
         </tbody>

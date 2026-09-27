@@ -1846,6 +1846,26 @@ input.fwmb-swatch {
     text-transform: capitalize;
 }
 
+/* A biome's colour in the journal's palette table: a small swatch beside its hex value. The
+   flex layout sits on an inner span, so the table cell itself stays a table cell and lines up
+   with the rest of its row. */
+.fwmb-summary-colour {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fwmb-space-8);
+}
+
+.fwmb-summary-swatch {
+    display: inline-block;
+    inline-size: 1rem;
+    block-size: 1rem;
+    border: 1px solid var(--color-border-dark);
+}
+
+.fwmb-summary-empty {
+    font-style: italic;
+}
+
 /* 3D Visualisation Container */
 .fwmb-3d-overlay {
     position: absolute;
