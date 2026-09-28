@@ -18,6 +18,7 @@ import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { TerrainUpgrade } from "./TerrainUpgrade.js";
 import { RiverSources } from "../generation/RiverSources.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
+import { LandMaskGenerator } from "../generation/LandMaskGenerator.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -122,6 +123,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             exportPng(e, t)                 { this._onExportPng(e, t); },
             exportScene(e, t)               { this._onExportScene(e, t); },
             exportSettings(e, t)            { this._onExportSettings(e, t); },
+            generateRandomLandMask(e, t)    { this._onGenerateRandomLandMask(e, t); },
             generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
             importMapJson(e, t)             { this._onImportMapJson(e, t); },
             importSettings(e, t)            { this._onImportSettings(e, t); },
@@ -1915,7 +1917,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #handleSceneClick(x, y) {
         // Guard clause: Only process clicks if we are actively drawing a land/ocean masks
-        if (this.uiState.sceneMode !== "addMask" && this.uiState.sceneMode !== "subtractMask") return;
+        if (!this.#isMaskDrawingMode()) return;
 
         // Reject clicks outside the visual 200px buffer
         const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
@@ -1930,14 +1932,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // If no mask is currently active, initialise a new one
         if (!this.activeLandMaskId) {
-            const isSubtract = this.uiState.sceneMode === "subtractMask";
-
-            const newMask = {
-                id: foundry.utils.randomID(),
-                name: isSubtract ? `Ocean Hole ${this.landMasks.length + 1}` : `Landmass ${this.landMasks.length + 1}`,
-                operation: isSubtract ? "subtract" : "add",
-                points: [],
-            };
+            const newMask = this.#createLandMask(this.#selectedMaskOperation(), []);
             this.landMasks.push(newMask);
             this.activeLandMaskId = newMask.id;
         }
@@ -1950,6 +1945,76 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this._repaintVectors();
             this.render({ parts: ["context"] });
         }
+    }
+
+    /** The land mask operation the Add Land / Remove Land toggle currently selects. */
+    #selectedMaskOperation() {
+        return this.uiState.sceneMode === "subtractMask" ? "subtract" : "add";
+    }
+
+    /**
+     * Builds a new land mask with the default name for its operation ("Landmass n" or
+     * "Ocean Hole n", numbered by the masks already on the map). It is not added to the map.
+     *
+     * @param {"add"|"subtract"} operation
+     * @param {Array<{x: number, y: number}>} points
+     */
+    #createLandMask(operation, points) {
+        const number = this.landMasks.length + 1;
+        return {
+            id: foundry.utils.randomID(),
+            name: operation === "subtract" ? `Ocean Hole ${number}` : `Landmass ${number}`,
+            operation,
+            points,
+        };
+    }
+
+    /**
+     * Adds one random land mask of the type the Add Land / Remove Land toggle selects (see
+     * LandMaskGenerator). The new mask is added to the existing ones as a single undo step, so it
+     * can be undone, edited node by node, or built on like a hand-drawn mask.
+     *
+     * A mask being drawn is finished first (or discarded if it is not yet a shape), exactly as
+     * switching mode does, so the random mask never joins it. A Remove Land shape is only made
+     * over existing land, since a hole in open sea would change nothing; with no land on the map
+     * the user is told why nothing happened instead.
+     */
+    _onGenerateRandomLandMask(event, target) {
+        if (!this.#isMaskDrawingMode()) return;
+
+        const finishedMaskNeedsTerrain = this.activeLandMaskId ? this._finishActiveLandMask() : false;
+        const operation = this.#selectedMaskOperation();
+        const points = LandMaskGenerator.generatePolygon({
+            mapWidth: this.mapWidth,
+            mapHeight: this.mapHeight,
+            operation,
+            existingMasks: this.landMasks,
+        });
+
+        if (!points) {
+            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.RandomLandMaskNoLand"));
+            this.#refreshAfterLandMaskChange(finishedMaskNeedsTerrain);
+            return;
+        }
+
+        MapStateManager.pushVectorState(this);
+        this.landMasks.push(this.#createLandMask(operation, points));
+        this.#refreshAfterLandMaskChange(true);
+    }
+
+    /** Whether the Add Land or Remove Land toggle is selected (rather than the crop tool). */
+    #isMaskDrawingMode() {
+        return this.uiState.sceneMode === "addMask" || this.uiState.sceneMode === "subtractMask";
+    }
+
+    /** Redraws the land masks and their list, and regenerates the terrain when asked to. */
+    #refreshAfterLandMaskChange(needsTerrain) {
+        this._repaintVectors();
+        if (needsTerrain) {
+            this.requestTerrainUpdate();
+            this.markDirty();
+        }
+        this.render({ parts: ["context"] });
     }
 
     #handleFeatureClick(x, y) {

@@ -1034,10 +1034,28 @@ export class ProceduralEngine {
         return outBuffer;
     }
 
-    /** Land and ocean as the land masks draw them, as a test of any world position (see #plateLand). */
+    /**
+     * Land and ocean as the land masks draw them, as a land sampler (see #generateOwnershipGrid).
+     *
+     * `at` tests a single world position. `fillRow` decides a whole row of the ownership grid at
+     * once by scanline: it finds where each mask's edges cross the row, then fills the spans
+     * between them. Testing cell by cell costs every edge of every mask whose bounding box holds
+     * the cell, so a large, detailed mask (a continent's bounding box covers most of the map)
+     * made generation time grow with the number of nodes. The scanline costs one pass over the
+     * edges per row plus one write per cell, whatever the node count, and gives exactly the same
+     * answer as `at` for every cell (see #fillMaskRow).
+     *
+     * @returns {{at: function(number, number): number, fillRow: function(object): void}}
+     */
     #maskLand(validMasks, frame) {
         const compiledMasks = this.#compileMaskData(ProceduralEngine.#masksToWorld(validMasks, frame));
-        return (worldX, worldY) => this.#resolvePixelOwnership(worldX, worldY, compiledMasks);
+        // One buffer for the edge crossings of any row, sized for the mask with the most edges
+        const crossings = new Float64Array(Math.max(...compiledMasks.map((mask) => mask.vertexCount)));
+
+        return {
+            at: (worldX, worldY) => this.#resolvePixelOwnership(worldX, worldY, compiledMasks),
+            fillRow: (row) => ProceduralEngine.#fillMaskRow(row, compiledMasks, crossings),
+        };
     }
 
     /**
@@ -1106,15 +1124,17 @@ export class ProceduralEngine {
     }
 
     /**
-     * Land and ocean as the plates decide them (see generateTectonicV2Topography), as a test of
-     * any world position.
+     * Land and ocean as the plates decide them (see generateTectonicV2Topography), as a land
+     * sampler (see #generateOwnershipGrid) that tests one world position at a time.
      */
     #plateLand(frame, plates, continents) {
         const weight = FILRODENSWMB.GENERATION.TECTONICS_V2.PLATE_WEIGHT;
 
-        return (worldX, worldY) => {
-            const buoyancy = this.#samplePlateMesh(plates, plates.buoyancy, frame, worldX, worldY);
-            return continents.at(worldX, worldY) + weight * buoyancy > continents.threshold ? 1 : 0;
+        return {
+            at: (worldX, worldY) => {
+                const buoyancy = this.#samplePlateMesh(plates, plates.buoyancy, frame, worldX, worldY);
+                return continents.at(worldX, worldY) + weight * buoyancy > continents.threshold ? 1 : 0;
+            },
         };
     }
 
@@ -1682,20 +1702,106 @@ export class ProceduralEngine {
 
     /**
      * Creates a flat, memory-efficient binary map of land/ocean ownership, one entry per grid
-     * cell, each cell tested at its world position.
+     * cell, each cell decided at its world position.
+     *
+     * `land` is a land sampler: `at(worldX, worldY)` returns 1 for land and 0 for ocean, and an
+     * optional `fillRow(row)` decides a whole row at once when the sampler has a faster way to do
+     * so than testing each cell (land masks do, see #maskLand). Both must agree cell for cell.
      */
     #generateOwnershipGrid(grid, land) {
         const { width, height, u0, v0, cellsPerPixel } = grid;
         const ownership = new Uint8Array(width * height);
 
         for (let y = 0; y < height; y++) {
-            const worldY = v0 + y / cellsPerPixel;
-            for (let x = 0; x < width; x++) {
-                ownership[y * width + x] = land(u0 + x / cellsPerPixel, worldY);
-            }
+            const row = { ownership, offset: y * width, width, worldY: v0 + y / cellsPerPixel, u0, cellsPerPixel };
+            if (land.fillRow) land.fillRow(row);
+            else ProceduralEngine.#sampleOwnershipRow(row, land);
         }
 
         return ownership;
+    }
+
+    /** Decides one row of the ownership grid by testing each cell at its world position. */
+    static #sampleOwnershipRow(row, land) {
+        const { ownership, offset, width, worldY, u0, cellsPerPixel } = row;
+        for (let x = 0; x < width; x++) {
+            ownership[offset + x] = land.at(u0 + x / cellsPerPixel, worldY);
+        }
+    }
+
+    /**
+     * Decides one row of the ownership grid from the land masks by scanline, giving exactly the
+     * result #resolvePixelOwnership gives cell by cell.
+     *
+     * A cell is inside a mask (even-odd rule) when an odd number of the mask's edges cross the row
+     * strictly to the right of it (#isPointInCompiledPolygon). With the crossings sorted, that is
+     * true exactly for cells from the 1st crossing up to (not including) the 2nd, from the 3rd up
+     * to the 4th, and so on, so each such span is filled with the mask's value. Masks are applied
+     * in order and each overwrites its spans, so the last mask covering a cell decides it, as it
+     * does cell by cell. A row outside a mask's bounding box has no crossings, and a cell beyond
+     * its left or right edge lies outside every span, which matches the bounding-box skip in
+     * #resolvePixelOwnership.
+     *
+     * The crossings use the same formula, on the same Float32Array coordinates, as
+     * #isPointInCompiledPolygon, and span ends are compared against each cell's world position
+     * computed the same way as #sampleOwnershipRow, so no cell can land on the other side of an
+     * edge through rounding. Do not "simplify" either to a different but equivalent-looking form.
+     */
+    static #fillMaskRow(row, compiledMasks, crossings) {
+        for (const mask of compiledMasks) {
+            if (row.worldY < mask.bounds.minY || row.worldY > mask.bounds.maxY) continue;
+
+            const count = ProceduralEngine.#collectRowCrossings(mask, row.worldY, crossings);
+            const sorted = crossings.subarray(0, count).sort();
+            ProceduralEngine.#fillCrossingSpans(row, sorted, mask.isAddOperation ? 1 : 0);
+        }
+    }
+
+    /**
+     * Writes into `crossings` the world x of every edge of a mask that crosses the row at `y`,
+     * with the edge test and intersection formula of #isPointInCompiledPolygon.
+     *
+     * @returns {number} How many crossings were written (always even for a closed polygon).
+     */
+    static #collectRowCrossings(mask, y, crossings) {
+        const { coordinates, vertexCount } = mask;
+        let count = 0;
+
+        for (let i = 0, j = vertexCount - 1; i < vertexCount; j = i++) {
+            const yi = coordinates[i * 2 + 1];
+            const yj = coordinates[j * 2 + 1];
+            if ((yi > y) === (yj > y)) continue;
+
+            const xi = coordinates[i * 2];
+            const xj = coordinates[j * 2];
+            crossings[count++] = ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+        }
+
+        return count;
+    }
+
+    /** Fills the spans between sorted pairs of crossings (1st to 2nd, 3rd to 4th...) with `value`. */
+    static #fillCrossingSpans(row, sorted, value) {
+        for (let k = 0; k + 1 < sorted.length; k += 2) {
+            const start = ProceduralEngine.#firstCellFrom(row, sorted[k]);
+            const end = ProceduralEngine.#firstCellFrom(row, sorted[k + 1]);
+            if (end > start) row.ownership.fill(value, row.offset + start, row.offset + end);
+        }
+    }
+
+    /**
+     * The first cell of the row whose world position is at or beyond `worldX` (the row's width if
+     * there is none). The division gives a first guess; the two loops then settle it against each
+     * cell's actual world position, so it agrees exactly with a cell-by-cell comparison.
+     */
+    static #firstCellFrom(row, worldX) {
+        const { width, u0, cellsPerPixel } = row;
+        let x = Math.min(width, Math.max(0, Math.ceil((worldX - u0) * cellsPerPixel)));
+
+        while (x > 0 && u0 + (x - 1) / cellsPerPixel >= worldX) x--;
+        while (x < width && u0 + x / cellsPerPixel < worldX) x++;
+
+        return x;
     }
 
     /**

@@ -316,6 +316,44 @@ export const FILRODENSWMB = {
         // never be selected or edited as a shape, and terrain generation ignores land masks below it.
         MIN_POLYGON_VERTICES: 3,
     },
+    // The random land mask button in Guided mode (see LandMaskGenerator). Sizes are fractions of
+    // the map's shorter side, so a shape covers the same share of any map.
+    RANDOM_LAND_MASK: {
+        // Radius of an Add Land shape: MIN_RADIUS + RADIUS_RANGE * r^RADIUS_SKEW for a random r,
+        // so most shapes are islands and fewer are continents
+        MIN_RADIUS: 0.12,
+        RADIUS_RANGE: 0.36,
+        RADIUS_SKEW: 1.3,
+        // Remove Land shapes are smaller, so a hole bites into the land rather than erasing it
+        SUBTRACT_RADIUS_SCALE: 0.6,
+        // Up to this stretch along a random axis, weighted towards round shapes
+        MAX_STRETCH: 1.2,
+        // Share of Add Land shapes centred on a map edge, so they run into the canvas buffer
+        EDGE_SHARE: 0.3,
+        // Where along an edge (as a fraction of its length) an edge-hugging shape is centred, and
+        // how far its centre sits beyond the edge (negative) or inside it, in radii
+        EDGE_SPAN: { MIN: 0.1, MAX: 0.9 },
+        EDGE_OFFSET: { MIN: -0.6, MAX: 0.3 },
+        // Where inside the map a shape that does not hug an edge is centred, as a fraction of each side
+        INTERIOR_SPAN: { MIN: 0.12, MAX: 0.88 },
+        // Nodes for the smallest and the largest shape on a BASELINE_DIMENSION map. The count grows
+        // with the square root of the map's size, so larger maps get more detailed outlines
+        // without the node count (and the work of editing them) growing with the map's area.
+        NODES: { MIN: 14, MAX: 40 },
+        MIN_NODES: 8,
+        // The turning walk: the typical deviation (radians) of each turn from an even share of a
+        // full circle, and the range of step lengths (relative to each other)
+        TURN_DEVIATION: { MIN: 0.35, MAX: 0.8 },
+        STEP_LENGTH: { MIN: 0.4, MAX: 1.3 },
+        // Walks tried before settling for one whose edges cross (a crossing is harmless but
+        // turns any area the outline loops over twice into sea)
+        MAX_SHAPE_ATTEMPTS: 6,
+        // Random spots tried when looking for existing land to place a Remove Land shape over
+        MAX_LAND_SEARCH_ATTEMPTS: 200,
+        // Nodes closer together than this (pixels) are merged, which tidies nodes clamped onto
+        // the edge of the canvas buffer
+        MIN_NODE_SPACING: 1,
+    },
     UI: {
         RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
         VISIBILITY_STATES: ["all", "gm", "none"],

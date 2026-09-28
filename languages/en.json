@@ -660,6 +660,8 @@
     "FILRODENSWMB.UI.DrawLandMaskHint": "Draw areas of the map that could be land.",
     "FILRODENSWMB.UI.DrawOceanMask": "Draw Ocean Mask",
     "FILRODENSWMB.UI.DrawOceanMaskHint": "Draw areas of the map that could be ocean.",
+    "FILRODENSWMB.UI.RandomLandMaskHint": "Add a random shape of the selected type. Remove Land shapes are always placed over existing land.",
+    "FILRODENSWMB.UI.RandomLandMaskNoLand": "There is no land on the map for a random Remove Land shape to cut into.",
     "FILRODENSWMB.UI.LandMasks": "Land Masks",
     "FILRODENSWMB.UI.NoLandMasks": "No land masks have been drawn yet.",
     "FILRODENSWMB.UI.EditLandMaskDetails": "Edit Land Mask Details",
