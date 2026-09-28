@@ -21,6 +21,8 @@ export class MapStateManager {
         app.currentRoughness = new Uint8Array(totalPixels);
         app.bufferRiverMap = new Uint8Array(totalPixels);
         app.bufferWaterMask = new Float32Array(totalPixels);
+        // The river image the terrain shader draws rivers from (see RiverNetwork.rasterise)
+        app.bufferRivers = new Uint8Array(totalPixels * 4);
 
         // The terrain's three images (see TerrainShading): the biomes on land and on the water's
         // surface, the biomes of the beds under water, and the packed relief, depth and height
@@ -43,6 +45,7 @@ export class MapStateManager {
         // Fresh buffers hold nothing from any earlier generation
         app.generationInputs = null;
         app.generationBase = null;
+        app.currentRiverData = null;
     }
 
     /**
@@ -70,6 +73,20 @@ export class MapStateManager {
         const id = currentIds.length > 0 ? Math.max(...currentIds) + 1 : FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID;
         state.nextCustomBiomeId = id + 1;
         return id;
+    }
+
+    /**
+     * The River Meander value for a map saved before it existed, from the legacy River Meander
+     * value it saved (random noise on the river trace, 0 to MEANDER_JITTER_MAX). No noise means
+     * the default meander and the most noise twice the default, so a map whose rivers were set to
+     * wander more keeps meandering more.
+     * @param {number} jitter - The saved legacy value.
+     * @returns {number}
+     */
+    static riverMeanderFromJitter(jitter) {
+        const channels = FILRODENSWMB.HYDROLOGY.CHANNELS;
+        const share = Math.min(1, Math.max(0, (jitter ?? 0) / FILRODENSWMB.HYDROLOGY.MEANDER_JITTER_MAX));
+        return channels.MEANDER * (1 + share);
     }
 
     /**
@@ -158,6 +175,8 @@ export class MapStateManager {
             springAltOffset: FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET,
             springMoistMin: FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN,
             meanderJitter: FILRODENSWMB.HYDROLOGY.MEANDER_JITTER,
+            riverMeander: FILRODENSWMB.HYDROLOGY.CHANNELS.MEANDER,
+            riverWidthScale: FILRODENSWMB.HYDROLOGY.CHANNELS.WIDTH,
             altCooling: FILRODENSWMB.CLIMATE.ALTITUDE_COOLING,
             freezingThreshold: FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD,
 
@@ -373,6 +392,8 @@ export class MapStateManager {
                 springAltOffset: state.springAltOffset,
                 springMoistMin: state.springMoistMin,
                 meanderJitter: state.meanderJitter,
+                riverMeander: state.riverMeander ?? FILRODENSWMB.HYDROLOGY.CHANNELS.MEANDER,
+                riverWidthScale: state.riverWidthScale ?? FILRODENSWMB.HYDROLOGY.CHANNELS.WIDTH,
             },
             climate: {
                 altCooling: state.altCooling,

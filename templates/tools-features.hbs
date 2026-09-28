@@ -1,7 +1,7 @@
 <div class="fwmb-tool-content fwmb-fixed-lists">
 
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.ManualRivers"}}</legend>
+    <details class="fwmb-fieldset fwmb-list-section" data-section="rivers" {{#unless collapsedSections.rivers}}open{{/unless}}>
+        <summary>{{localize "FILRODENSWMB.UI.ManualRivers"}}</summary>
 
         <div id="fwmb-scroll-rivers" class="fwmb-list-container fwmb-scrollable stable">
             {{#each manualRivers}}
@@ -22,10 +22,10 @@
                 <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoManualRivers"}}</div>
             {{/each}}
         </div>
-    </fieldset>
+    </details>
 
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.TectonicFaults"}}</legend>
+    <details class="fwmb-fieldset fwmb-list-section" data-section="faults" {{#unless collapsedSections.faults}}open{{/unless}}>
+        <summary>{{localize "FILRODENSWMB.UI.TectonicFaults"}}</summary>
 
         <div id="fwmb-scroll-faults" class="fwmb-list-container fwmb-scrollable stable">
             {{#each tectonicFaults}}
@@ -48,7 +48,7 @@
                 <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoFaultLines"}}</div>
             {{/each}}
         </div>
-    </fieldset>
+    </details>
 
     <div class="fwmb-divider"></div>
 

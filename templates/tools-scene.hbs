@@ -99,8 +99,8 @@
     </fieldset>
 
     {{#if (eq uiState.generationEngine "guided")}}
-        <fieldset class="fwmb-fixed-lists fwmb-fieldset">
-            <legend>{{localize "FILRODENSWMB.UI.LandMasks"}}</legend>
+        <details class="fwmb-fixed-lists fwmb-fieldset fwmb-list-section" data-section="landMasks" {{#unless collapsedSections.landMasks}}open{{/unless}}>
+            <summary>{{localize "FILRODENSWMB.UI.LandMasks"}}</summary>
 
             <div id="fwmb-scroll-landMasks" class="fwmb-list-container fwmb-scrollable stable">
                 {{#each landMasks}}
@@ -125,7 +125,7 @@
                     <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLandMasks"}}</div>
                 {{/each}}
             </div>
-        </fieldset>
+        </details>
 
         <button type="button" class="fwmb-btn wide subtle danger" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
             <i class="fwmb-icon delete"></i> {{localize "FILRODENSWMB.UI.DeleteAllLandMasksTitle"}}

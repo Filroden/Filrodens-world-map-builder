@@ -132,8 +132,10 @@ export class TerrainVersion {
      * pixels, so its faults stay exactly as they were; for a map that was never cropped the two
      * are the same anyway.
      *
+     * `currentRivers` selects the current river rules (see usesCurrentRivers).
+     *
      * @param {object} state - A uiState object.
-     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object}}
+     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object, currentRivers: boolean}}
      */
     static getTerrainParams(state) {
         const world = this.resolveWorld(state);
@@ -154,6 +156,7 @@ export class TerrainVersion {
                 rootH: world.rootH ?? state.mapHeight / zoom,
             },
             faultFrame: isCurrent ? { zoom, originX: world.originX ?? 0, originY: world.originY ?? 0 } : { zoom: 1, originX: 0, originY: 0 },
+            currentRivers: this.usesCurrentRivers(state),
         };
     }
 
@@ -186,16 +189,17 @@ export class TerrainVersion {
     /**
      * Whether updating this map to the current rules could change it at all: a legacy regional
      * map (see isLegacyRegional), a legacy map whose engine's coastline rules have changed (see
-     * isLegacyCoastline), or a legacy map with fault lines, which the update replaces with
-     * tectonic features (see hasLegacyFaults). No other map can change, so no other map is
-     * offered an update.
+     * isLegacyCoastline), a legacy map with fault lines, which the update replaces with
+     * tectonic features (see hasLegacyFaults), or a map made before the current river rules
+     * (see isLegacyRivers; whether it actually has rivers to change is measured on the open map,
+     * see TerrainUpgrade.assess). No other map can change, so no other map is offered an update.
      *
      * @param {object} state - A uiState object.
      * @param {object[]} [faults] - The map's fault lines.
      * @returns {boolean}
      */
     static isUpgradeCandidate(state, faults = []) {
-        return this.isLegacyRegional(state) || this.isLegacyCoastline(state) || this.hasLegacyFaults(state, faults);
+        return this.isLegacyRegional(state) || this.isLegacyCoastline(state) || this.hasLegacyFaults(state, faults) || this.isLegacyRivers(state);
     }
 
     /**
@@ -253,6 +257,30 @@ export class TerrainVersion {
     static getDisplayVersion(state) {
         if (!FILRODENSWMB.TERRAIN_VERSION.COASTLINE_ENGINES.includes(state.generationEngine)) return null;
         return this.getVersion(state);
+    }
+
+    /**
+     * Whether a map uses the current river rules (from the current revision on): rivers that follow
+     * the slope's own direction and join a river they run beside, and custom rivers carved with
+     * wide, gentle banks. A map from an earlier revision keeps the routes, lakes and carved
+     * channels it was made with, and the River Meander value it saved still nudges its rivers'
+     * routes as it always did.
+     *
+     * @param {object} state - A uiState object.
+     * @returns {boolean}
+     */
+    static usesCurrentRivers(state) {
+        return this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+    }
+
+    /**
+     * Whether a map was made before the current river rules (see usesCurrentRivers).
+     *
+     * @param {object} state - A uiState object.
+     * @returns {boolean}
+     */
+    static isLegacyRivers(state) {
+        return !this.usesCurrentRivers(state);
     }
 
     /**
@@ -365,7 +393,9 @@ export class TerrainVersion {
      * description. Its revision changes, which is enough for its engine to switch to the current
      * coastline rules (see isLegacyCoastline). If that also scales its coastline settings to its
      * size (see isLegacyResized), its Coastline Fracture is lowered to match, so its coastline
-     * keeps its familiar shape (see #equivalentFracture).
+     * keeps its familiar shape (see #equivalentFracture). A legacy map that is none of these
+     * (a standard or flat map that was never cropped) only changes revision, which is what moves
+     * it to the current river rules (see usesCurrentRivers).
      *
      * @param {object} state - The legacy map's uiState.
      * @param {{width: number, height: number}|null} [rootSize] - The top map's size, if found.

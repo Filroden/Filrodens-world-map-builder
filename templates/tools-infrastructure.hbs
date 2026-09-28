@@ -1,12 +1,12 @@
 <div class="fwmb-tool-content fwmb-fixed-lists">
 
-    <fieldset class="fwmb-fieldset">
-        <legend class="fwmb-legend-with-action">
+    <details class="fwmb-fieldset fwmb-list-section" data-section="pins" {{#unless collapsedSections.pins}}open{{/unless}}>
+        <summary class="fwmb-legend-with-action">
             <span>{{localize "FILRODENSWMB.UI.PointsOfInterest"}}</span>
             <a class="fwmb-legend-action {{#if massEditMode.pin}}active{{/if}} {{#if massEditBlocked.pin}}disabled{{/if}}" data-action="toggleMassEditMode" data-type="pin" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip-class="fwmb-tooltip">
                 <i class="fwmb-icon edit-square"></i>
             </a>
-        </legend>
+        </summary>
 
         {{#if massEditMode.pin}}
         <div class="fwmb-mass-edit-bar">
@@ -47,15 +47,15 @@
             <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoPoints"}}</div>
             {{/each}}
         </div>
-    </fieldset>
+    </details>
 
-    <fieldset class="fwmb-fieldset">
-        <legend class="fwmb-legend-with-action">
+    <details class="fwmb-fieldset fwmb-list-section" data-section="routes" {{#unless collapsedSections.routes}}open{{/unless}}>
+        <summary class="fwmb-legend-with-action">
             <span>{{localize "FILRODENSWMB.UI.Routes"}}</span>
             <a class="fwmb-legend-action {{#if massEditMode.route}}active{{/if}} {{#if massEditBlocked.route}}disabled{{/if}}" data-action="toggleMassEditMode" data-type="route" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip-class="fwmb-tooltip">
                 <i class="fwmb-icon edit-square"></i>
             </a>
-        </legend>
+        </summary>
 
         {{#if massEditMode.route}}
         <div class="fwmb-mass-edit-bar">
@@ -93,7 +93,7 @@
             <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoRoutes"}}</div>
             {{/each}}
         </div>
-    </fieldset>
+    </details>
 
     <div class="fwmb-divider"></div>
 

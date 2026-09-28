@@ -11,9 +11,10 @@ import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
  *
  * Saved maps store settings, not pixels, so a map regenerates from its settings every time it is
  * opened. A map built with legacy rules keeps regenerating with them (see TerrainVersion) until
- * its owner chooses to update it. Only legacy regional maps, legacy guided and tectonic maps, and
- * legacy maps with fault lines (which become tectonic features) can change under the current
- * rules; everything else regenerates identically, so nothing is offered for it.
+ * its owner chooses to update it. Only legacy regional maps, legacy guided and tectonic maps,
+ * legacy maps with fault lines (which become tectonic features) and maps with rivers made before
+ * the current river rules can change under the current rules; everything else regenerates
+ * identically, so nothing is offered for it.
  *
  * The update is applied to the open map only. It becomes permanent when the map is saved, and
  * reloading the map without saving restores the original.
@@ -79,7 +80,7 @@ export class TerrainUpgrade {
 
     /**
      * Works out whether updating the open map to the current terrain rules would visibly change
-     * it, and how. Four kinds of map can change, for different reasons, and the update is
+     * it, and how. Five kinds of map can change, for different reasons, and the update is
      * described to the user differently for each (`kind`):
      *
      * - "tectonics": a legacy tectonic map. The current revision replaces its engine outright, so
@@ -108,20 +109,38 @@ export class TerrainUpgrade {
      *   whose only change is its fault lines. The current revision changes nothing else about
      *   such a map, but its faults are replaced by tectonic features.
      *
+     * - "rivers": a legacy map whose only change is its rivers (see #riverChanges): a standard or
+     *   flat map that was never cropped and has no fault lines, but has rivers. Under every other
+     *   kind the rivers change as well, reported the same way (`changesRivers`, `changesChannels`).
+     *
      * Whatever the kind, a legacy map's original fault lines are replaced by the tectonic features
      * a current map draws (`convertsFaults`; see TectonicFeatureEngine.convertLegacyFault), and
      * slip faults, which have no equivalent, are removed (`removesSlip`).
      *
      * @param {object} app - The MapStudioApp instance, with a legacy map open.
-     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean}|null}
+     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean, changesRivers: boolean, changesChannels: boolean}|null}
      *   What the update would apply and change, or null if it would change nothing visible.
      */
     static assess(app) {
         const faults = this.#faultConversion(app);
+        const rivers = this.#riverChanges(app);
         const impact = this.#assessTerrain(app);
-        if (impact) return { ...impact, ...faults };
-        if (faults.convertsFaults) return { kind: "faults", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, ...faults };
+        if (impact) return { ...impact, ...faults, ...rivers };
+        if (faults.convertsFaults) return { kind: "faults", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, ...faults, ...rivers };
+        if (rivers.changesRivers) return { kind: "rivers", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, ...faults, ...rivers };
         return null;
+    }
+
+    /**
+     * Whether the update re-routes the map's rivers (`changesRivers`: a map made before the
+     * current river rules that has any river), and whether it recarves custom rivers' channels
+     * with the current, wider banks (`changesChannels`). See TerrainVersion.usesCurrentRivers.
+     */
+    static #riverChanges(app) {
+        if (!TerrainVersion.isLegacyRivers(app.uiState)) return { changesRivers: false, changesChannels: false };
+        const changesChannels = (app.manualRivers?.length ?? 0) > 0;
+        const changesRivers = changesChannels || (app.currentRiverData?.vectors?.length ?? 0) > 0;
+        return { changesRivers, changesChannels };
     }
 
     /** What the update changes about the terrain itself (see assess), or null if nothing. */

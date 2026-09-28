@@ -2,7 +2,13 @@ import { TerrainShading } from "../tools/TerrainShading.js";
 import { getRegionUploadResource } from "./RegionUploadResource.js";
 
 /** The terrain images the compositor draws from, by the shader uniform each is bound to. */
-const TEXTURE_UNIFORMS = Object.freeze({ surface: "uSurface", underwater: "uUnderwater", aux: "uAux" });
+const TEXTURE_UNIFORMS = Object.freeze({ surface: "uSurface", underwater: "uUnderwater", aux: "uAux", rivers: "uRivers" });
+
+/** The shader uniform told how many map pixels one screen pixel covers (see getTerrainMeshClass). */
+const FOOTPRINT_UNIFORM = "uRiverFootprint";
+
+/** The smallest scale the footprint is worked out for, so a collapsed canvas never divides by zero. */
+const MIN_SCALE = 1e-6;
 
 /** Which shader switch each layer setting drives (1 on, 0 off). */
 const LAYER_UNIFORMS = Object.freeze({
@@ -23,9 +29,47 @@ const VALUE_UNIFORMS = Object.freeze({
     saturation: "uSaturation",
 });
 
+// One class per PIXI namespace, as for RegionUploadResource
+const meshClasses = new WeakMap();
+
 /**
- * Draws the terrain (elevation, relief shading, water and biomes) on the map canvas as one mesh
- * whose shader combines three map-sized images (see TerrainShading for the maths and the images).
+ * Returns the mesh class the terrain is drawn with: a PIXI.Mesh that, just before each draw, tells
+ * its shader how many map pixels one pixel of the screen (or of an export) covers. The shader
+ * softens a river's edge over that width, so a river is sharp when zoomed in and fades smoothly,
+ * rather than breaking up, where it is narrower than a pixel.
+ *
+ * Working it out from the mesh's own transform at draw time means it follows every way the canvas
+ * is zoomed (the mouse wheel, the zoom buttons, zoom to feature, the camera reset) and the enlarged
+ * stage an export is drawn at, without any of them having to report a change. The renderer's
+ * resolution counts too: on a high-density display one screen pixel is several device pixels.
+ *
+ * Written against PIXI 7's Mesh._render(renderer), the method subclasses override to draw.
+ *
+ * @param {object} pixi - The PIXI namespace.
+ * @returns {Function} A subclass of PIXI.Mesh.
+ */
+function getTerrainMeshClass(pixi) {
+    if (meshClasses.has(pixi)) return meshClasses.get(pixi);
+
+    const TerrainMesh = class extends pixi.Mesh {
+        _render(renderer) {
+            const transform = this.worldTransform;
+            // Drawing into a render texture (an export), its own resolution applies, not the screen's
+            const target = renderer.renderTexture?.current;
+            const resolution = (target ? target.resolution : renderer.resolution) ?? 1;
+            const devicePixelsPerMapPixel = Math.hypot(transform.a, transform.b) * resolution;
+            this.shader.uniforms[FOOTPRINT_UNIFORM] = 1 / Math.max(devicePixelsPerMapPixel, MIN_SCALE);
+            super._render(renderer);
+        }
+    };
+
+    meshClasses.set(pixi, TerrainMesh);
+    return TerrainMesh;
+}
+
+/**
+ * Draws the terrain (elevation, relief shading, water, rivers and biomes) on the map canvas as one
+ * mesh whose shader combines four map-sized images (see TerrainShading for the maths and the images).
  *
  * The images are uploaded through RegionUploadResource, so a repaint of a small area sends only
  * the rows it changed to the GPU. The layer switches, biome opacity, relief strength and water
@@ -60,7 +104,7 @@ export class TerrainCompositor {
      * builds the textures and the mesh (see displayObject: the caller adds a new mesh to its
      * layer); later calls copy only the rows inside `bounds`.
      *
-     * @param {{surface: Uint8Array, underwater: Uint8Array, aux: Uint8Array}} buffers - RGBA images of the whole map.
+     * @param {{surface: Uint8Array, underwater: Uint8Array, aux: Uint8Array, rivers: Uint8Array}} buffers - RGBA images of the whole map.
      * @param {number} width - Map width in pixels.
      * @param {number} height - Map height in pixels.
      * @param {object|null} bounds - The pixels that changed since the last call, or null for all of them.
@@ -101,7 +145,7 @@ export class TerrainCompositor {
         this.#textures = {};
     }
 
-    /** Builds the three textures and the mesh that draws them, for a map of this size. */
+    /** Builds the four textures and the mesh that draws them, for a map of this size. */
     #build(buffers, width, height) {
         this.destroy();
         const PIXI = this.#pixi;
@@ -125,8 +169,11 @@ export class TerrainCompositor {
         const uniforms = {};
         for (const [key, uniform] of Object.entries(TEXTURE_UNIFORMS)) uniforms[uniform] = this.#textures[key];
 
+        uniforms[FOOTPRINT_UNIFORM] = 1;
+
         const shader = PIXI.Shader.from(TerrainShading.vertexSource(), TerrainShading.fragmentSource(), uniforms);
-        this.#mesh = new PIXI.Mesh(geometry, shader);
+        const TerrainMesh = getTerrainMeshClass(PIXI);
+        this.#mesh = new TerrainMesh(geometry, shader);
         this.#width = width;
         this.#height = height;
         this.#applySettings();

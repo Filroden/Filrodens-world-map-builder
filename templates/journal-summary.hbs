@@ -227,10 +227,6 @@
                 <td>{{localize "FILRODENSWMB.JOURNAL.PercentValue" value=params.riverDensity}}</td>
             </tr>
             <tr>
-                <td><strong>{{localize "FILRODENSWMB.JOURNAL.MaxLakeSize"}}</strong></td>
-                <td>{{localize "FILRODENSWMB.JOURNAL.PixelsValue" value=params.hydrology.maxLakeSize}}</td>
-            </tr>
-            <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.SpringAltOffset"}}</strong></td>
                 <td>{{params.hydrology.springAltOffset}}</td>
             </tr>
@@ -239,8 +235,12 @@
                 <td>{{params.hydrology.springMoistMin}}</td>
             </tr>
             <tr>
-                <td><strong>{{localize "FILRODENSWMB.JOURNAL.MeanderJitter"}}</strong></td>
-                <td>{{params.hydrology.meanderJitter}}</td>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.RiverWidth"}}</strong></td>
+                <td>{{params.hydrology.riverWidthScale}}</td>
+            </tr>
+            <tr>
+                <td><strong>{{localize "FILRODENSWMB.JOURNAL.RiverMeander"}}</strong></td>
+                <td>{{params.hydrology.riverMeander}}</td>
             </tr>
             <tr>
                 <td><strong>{{localize "FILRODENSWMB.JOURNAL.AltCooling"}}</strong></td>
@@ -383,4 +383,4 @@
             {{/each}}
         </tbody>
     </table>
-</div>
+</div>

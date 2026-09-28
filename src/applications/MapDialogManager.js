@@ -5,6 +5,7 @@ import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { RuleEditorDialog } from "./RuleEditorDialog.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
+import { RangeDisplay } from "../tools/RangeDisplay.js";
 import {
     getCustomPinIconById,
     getPinIconPickerList,
@@ -34,9 +35,12 @@ export class MapDialogManager {
      * Prompts for a single line of text via a minimal DialogV2 form.
      */
     static async _promptTextValue(title, label, defaultValue) {
+        // The value is escaped because it is often an existing name (a map or layer name) that
+        // may contain quotes, which would otherwise end the attribute early and cut the name short
+        const safeValue = Handlebars.escapeExpression(defaultValue ?? "");
         return foundry.applications.api.DialogV2.prompt({
             window: { title: title },
-            content: `<label>${label}</label><input type="text" id="fwmb-prompt-input" value="${defaultValue}">`,
+            content: `<label>${label}</label><input type="text" id="fwmb-prompt-input" value="${safeValue}">`,
             ok: { callback: (event, button) => button.form.elements["fwmb-prompt-input"].value },
         });
     }
@@ -65,7 +69,7 @@ export class MapDialogManager {
      * until the map is, and (when opened automatically on load) lets the user stop being asked
      * for this map. Closing the dialog counts as keeping the original.
      *
-     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults?: boolean, removesSlip?: boolean}} impact - What the
+     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults?: boolean, removesSlip?: boolean, changesRivers?: boolean, changesChannels?: boolean}} impact - What the
      *   update changes, and why (see TerrainUpgrade.assess).
      * @param {boolean} allowDismiss - Whether to show the "don't ask again" option.
      * @returns {Promise<{apply: boolean, dismiss: boolean}>} The user's choice.
@@ -75,6 +79,9 @@ export class MapDialogManager {
             isRegional: impact.kind === "regional",
             isTectonics: impact.kind === "tectonics",
             isFaults: impact.kind === "faults",
+            isRivers: impact.kind === "rivers",
+            changesRivers: impact.changesRivers === true,
+            changesChannels: impact.changesChannels === true,
             convertsFaults: impact.convertsFaults === true,
             removesSlip: impact.removesSlip === true,
             fracture: impact.fracture,
@@ -152,7 +159,6 @@ export class MapDialogManager {
         const labelQuickStyleSelect = html.querySelector('select[name="labelQuickStyle"]');
         const labelFontFamilySelect = html.querySelector('select[name="labelFontFamily"]');
         const labelFontSizeInput = html.querySelector('input[name="labelFontSize"]');
-        const labelFontSizeOutput = html.querySelector('input[name="labelFontSize"] + output');
         const labelColorInput = html.querySelector('input[name="labelFillColor"]');
         const labelMaxWidthInput = html.querySelector('input[name="labelMaxWidth"]');
         const labelJustifySelect = html.querySelector('select[name="labelJustify"]');
@@ -171,7 +177,7 @@ export class MapDialogManager {
 
             if (labelFontSizeInput) {
                 labelFontSizeInput.value = styleData.fontSize;
-                if (labelFontSizeOutput) labelFontSizeOutput.value = styleData.fontSize;
+                RangeDisplay.sync(labelFontSizeInput);
             }
         });
 
@@ -179,10 +185,8 @@ export class MapDialogManager {
             if (labelQuickStyleSelect) labelQuickStyleSelect.value = "custom";
         };
 
-        labelFontSizeInput?.addEventListener("input", (e) => {
-            if (labelFontSizeOutput) labelFontSizeOutput.value = e.target.value;
-            revertLabelToCustom();
-        });
+        // The slider's value display is kept current by the shared range listener (RangeDisplay)
+        labelFontSizeInput?.addEventListener("input", revertLabelToCustom);
 
         labelFontFamilySelect?.addEventListener("change", revertLabelToCustom);
         labelColorInput?.addEventListener("input", revertLabelToCustom);
@@ -301,11 +305,6 @@ export class MapDialogManager {
                     fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 }),
-                onRender: (dialogApp, html) => {
-                    const range = html.querySelector('input[name="styleFontSize"]');
-                    const output = html.querySelector("output");
-                    if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
-                },
                 onExtract: (form, fallbackName) => ({
                     name: form.elements["styleName"].value.trim() || fallbackName,
                     fontFamily: form.elements["styleFontFamily"].value,
@@ -618,7 +617,10 @@ export class MapDialogManager {
                         const style = resolveStyle("customRouteStyles")(app, e.target.value);
                         if (!style) return;
                         if (colorInput) colorInput.value = style.color;
-                        if (thicknessInput) thicknessInput.value = style.thickness;
+                        if (thicknessInput) {
+                            thicknessInput.value = style.thickness;
+                            RangeDisplay.sync(thicknessInput);
+                        }
                         if (styleSelect) styleSelect.value = style.style;
                     });
                     this.bindLabelPropertiesDialog(html, app.uiState);
@@ -717,7 +719,6 @@ export class MapDialogManager {
                     const quickStyleSelect = html.querySelector('select[name="massQuickStyle"]');
                     const fontFamilySelect = html.querySelector('select[name="massFontFamily"]');
                     const fontSizeInput = html.querySelector('input[name="massFontSize"]');
-                    const fontSizeOutput = html.querySelector('input[name="massFontSize"] + output');
                     const colorInput = html.querySelector('input[name="massFillColor"]');
                     const maxWidthInput = html.querySelector('input[name="massMaxWidth"]');
                     const justifySelect = html.querySelector('select[name="massJustify"]');
@@ -731,12 +732,8 @@ export class MapDialogManager {
                         if (justifySelect) justifySelect.value = style.justify;
                         if (fontSizeInput) {
                             fontSizeInput.value = style.fontSize;
-                            if (fontSizeOutput) fontSizeOutput.value = style.fontSize;
+                            RangeDisplay.sync(fontSizeInput);
                         }
-                    });
-
-                    fontSizeInput?.addEventListener("input", (e) => {
-                        if (fontSizeOutput) fontSizeOutput.value = e.target.value;
                     });
                 },
                 fields: [
@@ -1225,11 +1222,6 @@ export class MapDialogManager {
         await this._processEditDialog(app, dec, {
             titleKey: "FILRODENSWMB.UI.Edit",
             htmlContent: content,
-            onRender: (dialogApp, html) => {
-                const range = html.querySelector("#fwmb-dec-alpha");
-                const output = html.querySelector("output");
-                if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
-            },
             onExtract: (form) => ({
                 name: form.querySelector("#fwmb-dec-name").value,
                 opacity: Number(form.querySelector("#fwmb-dec-alpha").value),
@@ -1444,10 +1436,6 @@ export class MapDialogManager {
                 customLabelStyles: app.uiState.customLabelStyles || [],
             },
             onRender: (dialogApp, html) => {
-                const range = html.querySelector('input[name="pinScale"]');
-                const output = html.querySelector("output");
-                if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
-
                 const trigger = html.querySelector("#fwmb-edit-pin-select .fwmb-select-trigger");
                 const optionsMenu = html.querySelector("#fwmb-edit-pin-select .fwmb-select-options");
                 const hiddenInput = html.querySelector("#fwmb-edit-pin-icon-input");
@@ -1685,6 +1673,7 @@ export class MapDialogManager {
                         if (styleData) {
                             colorInput.value = styleData.color;
                             thicknessInput.value = styleData.thickness;
+                            RangeDisplay.sync(thicknessInput);
                             styleSelect.value = styleData.style;
                         }
                     }

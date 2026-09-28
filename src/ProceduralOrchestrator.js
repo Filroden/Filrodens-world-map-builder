@@ -1,6 +1,8 @@
 import { MapStateManager } from "./applications/MapStateManager.js";
 import { ProceduralEngine } from "./generation/ProceduralEngine.js";
 import { HydrologyEngine } from "./generation/HydrologyEngine.js";
+import { RiverNetwork } from "./generation/RiverNetwork.js";
+import { RiverSources } from "./generation/RiverSources.js";
 import { TectonicEngine } from "./generation/TectonicEngine.js";
 import { TectonicFeatureEngine } from "./generation/TectonicFeatureEngine.js";
 import { SpatialMath } from "./tools/SpatialMath.js";
@@ -509,7 +511,7 @@ export class ProceduralOrchestrator {
         }
 
         if (app.manualRivers?.length > 0) {
-            HydrologyEngine.carveManualRivers(elevationData, app.mapWidth, app.mapHeight, app.manualRivers, engine.simplex, params.seaLevel, bounds);
+            HydrologyEngine.carveManualRivers(elevationData, app.mapWidth, app.mapHeight, app.manualRivers, engine.simplex, params.seaLevel, bounds, params.terrain?.currentRivers === true);
         }
     }
 
@@ -649,7 +651,58 @@ export class ProceduralOrchestrator {
 
         const t0 = performance.now();
 
-        // Bake procedural springs into permanent pins on first load or new map generation
+        // Where rivers rise, and (under the current rules) the custom rivers laid down first
+        const isCurrent = params.terrain?.currentRivers === true;
+        const springPins = isCurrent ? this.#currentSprings(app, engine, params) : this.#legacySprings(app, engine, params);
+        const pixelsPerBaseline = RiverNetwork.pixelsPerBaseline(app.mapWidth, app.mapHeight, params.terrain?.world);
+        const authored = isCurrent ? HydrologyEngine.authoredRivers(app.currentElevationData, app.mapWidth, app.mapHeight, app.manualRivers, pixelsPerBaseline) : [];
+
+        // generateRivers rewrites the water mask from scratch, so the previous one has to be
+        // kept aside to compare with. It goes in the shared scratch buffer, which nothing else
+        // is using at this point.
+        const previousWater = trackWaterChanges ? this.#tryGetScratchBuffer(app) : null;
+        previousWater?.set(app.bufferWaterMask);
+
+        // The network drawn last time, to find what changed and reuse its buffer (see #drawRivers)
+        const previousNetwork = app.currentRiverData?.network ?? null;
+
+        app.currentRiverData = engine.generateRivers(
+            app.currentElevationData,
+            app.currentMoistureData,
+            app.currentTemperatureData,
+            springPins,
+            app.mapWidth,
+            app.mapHeight,
+            params,
+            app.bufferRiverMap,
+            app.bufferWaterMask,
+            authored,
+        );
+
+        const t1 = performance.now();
+        app.renderTimer.record("Features (springs and rivers)", t1 - t0);
+
+        // Without the scratch buffer the old water is gone, so all that can be said is that any of
+        // it may have changed; the repaint then covers the whole map.
+        let waterBounds = null;
+        if (trackWaterChanges) {
+            waterBounds = previousWater ? BufferDiff.changedBounds(previousWater, app.bufferWaterMask, app.mapWidth, app.mapHeight) : ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight);
+        }
+
+        const riverBounds = this.#drawRivers(app, params, previousNetwork, trackWaterChanges, waterBounds);
+        app.renderTimer.record("Features (river channels)", performance.now() - t1);
+
+        if (!trackWaterChanges) return null;
+        return waterBounds && riverBounds ? SpatialMath.mergeBounds(waterBounds, riverBounds) : waterBounds || riverBounds;
+    }
+
+    /**
+     * The springs of a map made before the current river rules: procedural springs are baked
+     * into permanent pins the first time the map is generated, and every custom river gets a
+     * spring near its top so the trace runs down its trench (see HydrologyEngine).
+     * @returns {object[]} The spring pins to trace from.
+     */
+    static #legacySprings(app, engine, params) {
         if (!app.uiState.springsBaked) {
             if (app.uiState.generationEngine !== "flat") {
                 const newSprings = engine.bakeProceduralSprings(app.currentElevationData, app.currentMoistureData, app.mapWidth, app.mapHeight, params);
@@ -669,37 +722,78 @@ export class ProceduralOrchestrator {
             app.markDirty();
         }
 
-        const dynamicPins = [...app.mapPins];
-
-        // Ensure procedural water spawns exactly at the highest point of our manual carve
         const manualSprings = HydrologyEngine.getRiverSources(app.currentElevationData, app.mapWidth, app.manualRivers);
-        dynamicPins.push(...manualSprings);
+        return [...app.mapPins, ...manualSprings];
+    }
 
-        // generateRivers rewrites the water mask from scratch, so the previous one has to be
-        // kept aside to compare with. It goes in the shared scratch buffer, which nothing else
-        // is using at this point.
-        const previousWater = trackWaterChanges ? this.#tryGetScratchBuffer(app) : null;
-        previousWater?.set(app.bufferWaterMask);
+    /**
+     * The springs of a map under the current river rules (see RiverSources): the procedural
+     * springs placed afresh on the current terrain (kept on `app.proceduralSprings`, so the canvas
+     * can show them while editing), less those the user removed, plus the user's own. Flat maps
+     * have no procedural springs.
+     *
+     * Pins that a map made under the legacy rules baked for its springs are removed first, once,
+     * since the procedural springs now take their place (see RiverSources.findBakedPins).
+     * @returns {object[]} The spring pins to trace from.
+     */
+    static #currentSprings(app, engine, params) {
+        const baked = RiverSources.findBakedPins(app.mapPins, engine.seedNumber, params, app.mapWidth, app.mapHeight);
+        if (baked.length > 0) {
+            const retired = new Set(baked);
+            app.mapPins = app.mapPins.filter((pin) => !retired.has(pin));
+            app.markDirty();
+        }
+        app.uiState.springsBaked = true;
 
-        app.currentRiverData = engine.generateRivers(
-            app.currentElevationData,
-            app.currentMoistureData,
-            app.currentTemperatureData,
-            dynamicPins,
-            app.mapWidth,
-            app.mapHeight,
-            params,
-            app.bufferRiverMap,
-            app.bufferWaterMask,
+        const map = { elevation: app.currentElevationData, moisture: app.currentMoistureData, width: app.mapWidth, height: app.mapHeight };
+        app.proceduralSprings = app.uiState.generationEngine === "flat" ? [] : RiverSources.place(map, engine.seedNumber, params, app.mapPins);
+        const procedural = app.proceduralSprings.map((spring) => ({ x: spring.x, y: spring.y, type: "spring" }));
+        return [...procedural, ...app.mapPins];
+    }
+
+    /**
+     * Turns the traced rivers into the channels that are drawn (see RiverNetwork) and paints them
+     * into the river image the terrain shader draws them from (`app.bufferRivers`).
+     *
+     * On a tracked refresh only the area that can differ is repainted: every channel that is new
+     * or gone (a changed channel is both), and wherever the water changed, since a river is drawn
+     * across a pool but not across a lake (see RiverNetwork.rasterise). Anything else repaints
+     * the whole image.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @param {object} params - The map's derived parameters.
+     * @param {object|null} previousNetwork - The network drawn before this refresh, if any.
+     * @param {boolean} isTracked - Whether this refresh is limited to an area (see processFeaturePhase).
+     * @param {object|null} waterBounds - Where the water changed, on a tracked refresh.
+     * @returns {object|null} Where the river image changed on a tracked refresh (null if nowhere);
+     *   null otherwise.
+     */
+    static #drawRivers(app, params, previousNetwork, isTracked, waterBounds) {
+        const previous = previousNetwork?.channels ?? null;
+        const network = RiverNetwork.build(
+            app.currentRiverData.vectors,
+            {
+                elevation: app.currentElevationData,
+                waterMask: app.bufferWaterMask,
+                width: app.mapWidth,
+                height: app.mapHeight,
+                seaLevel: params.seaLevel,
+                world: params.terrain?.world,
+            },
+            RiverNetwork.optionsFrom(params),
+            previousNetwork,
         );
+        app.currentRiverData.network = network;
 
-        const t1 = performance.now();
-        app.renderTimer.record("Features (springs and rivers)", t1 - t0);
+        const canLimit = isTracked && previous !== null;
+        if (!canLimit) {
+            RiverNetwork.rasterise(network, app.mapWidth, app.mapHeight, app.bufferRivers);
+            return isTracked ? ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight) : null;
+        }
 
-        if (!trackWaterChanges) return null;
-
-        // Without the scratch buffer the old water is gone, so all that can be said is that any of
-        // it may have changed; the repaint then covers the whole map.
-        return previousWater ? BufferDiff.changedBounds(previousWater, app.bufferWaterMask, app.mapWidth, app.mapHeight) : ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight);
+        const channelBounds = RiverNetwork.changedBounds(previous, network.channels, app.mapWidth, app.mapHeight);
+        const changed = channelBounds && waterBounds ? SpatialMath.mergeBounds(channelBounds, waterBounds) : channelBounds || waterBounds;
+        if (changed) RiverNetwork.rasterise(network, app.mapWidth, app.mapHeight, app.bufferRivers, changed);
+        return changed;
     }
 }

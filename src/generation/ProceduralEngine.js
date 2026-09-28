@@ -37,6 +37,10 @@ export class ProceduralEngine {
     // relief is read relative to it
     static #PLATE_RELIEF_BASE = 0.5;
 
+    // What #isSea found a pixel below sea level to be (0: not yet looked at)
+    static #OPEN_SEA = 1;
+    static #INLAND_HOLLOW = 2;
+
     static ADJACENT_OFFSETS = [
         { dx: 0, dy: -1 },
         { dx: 1, dy: -1 },
@@ -177,7 +181,10 @@ export class ProceduralEngine {
         let minElev = Infinity;
         let bestTarget = null;
         const startIdx = Math.floor(this.riverTracePrng() * 8);
-        const meanderJitter = params?.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER;
+        // The legacy River Meander value: random noise on each neighbour's height, which nudges a
+        // river's route. The current river rules draw meanders instead (see RiverNetwork), so it
+        // only still applies to maps made before them, keeping their rivers where they were.
+        const meanderJitter = this.currentRiverRules ? 0 : (params?.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER);
 
         for (let i = 0; i < 8; i++) {
             const dir = ProceduralEngine.ADJACENT_OFFSETS[(startIdx + i) % 8];
@@ -202,19 +209,34 @@ export class ProceduralEngine {
 
     /**
      * Simulates water pooling in a local minimum until it overflows the basin.
+     *
+     * The lake grows from its lowest shore pixel upwards until one of them has a lower neighbour
+     * to spill into. It never grows past the largest lake (see #maxLakePixels). Under the legacy
+     * rules a lake that reaches that size has no outflow and its river ends there.
+     *
+     * The current rules also flood the river's own earlier course (see #scanBasinNeighbors), and
+     * a lake that does so is one the river has wandered back into on flat ground, where its
+     * pools run together. Such a lake is kept to LOOP_LAKE_AREA. A lake that reaches its limit
+     * is breached rather than ending the river (see #breachBasin).
+     *
+     * @returns {{spillover: object|null, lakePixels: object[], surfaceElev: number, channel: {x: number, y: number}[]}}
+     *   `channel` is the breach the river cuts from the lake to the spillover (current rules only).
      */
-    #fillBasin(startX, startY, elevationData, width, height, riverMap, params) {
+    #fillBasin(startX, startY, elevationData, width, height, riverMap) {
         this.basinTraceId++;
         this.basinVisitedBuffer[startY * width + startX] = this.basinTraceId;
+        this.basinFloodsOwnRiver = false;
+        // Under the current rules, which pixel each shore pixel was reached from, for #breachBasin
+        this.basinCameFrom = this.currentRiverRules ? new Map() : null;
 
         const boundary = new MinHeap();
         boundary.push({ x: startX, y: startY, elev: elevationData[startY * width + startX] });
 
         const lakePixels = [];
         let surfaceElev = elevationData[startY * width + startX];
-        const maxLakeSize = params?.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
+        const limit = () => (this.basinFloodsOwnRiver ? Math.min(this.loopLakePixels, this.maxLakePixels) : this.maxLakePixels);
 
-        while (boundary.length > 0 && lakePixels.length < maxLakeSize) {
+        while (boundary.length > 0 && lakePixels.length < limit()) {
             const current = boundary.pop();
 
             lakePixels.push({ x: current.x, y: current.y, isLake: true });
@@ -224,14 +246,97 @@ export class ProceduralEngine {
             const spillover = this.#scanBasinNeighbors(current, elevationData, width, height, boundary);
 
             if (spillover) {
-                return { spillover, lakePixels, surfaceElev: current.elev };
+                return { spillover, lakePixels, surfaceElev: current.elev, channel: [] };
             }
         }
 
-        return { spillover: null, lakePixels, surfaceElev };
+        if (!this.currentRiverRules || boundary.length === 0) return { spillover: null, lakePixels, surfaceElev, channel: [] };
+        return { ...this.#breachBasin(boundary, lakePixels, surfaceElev, elevationData, width, height), lakePixels, surfaceElev };
     }
 
-    #scanBasinNeighbors(current, elevationData, width, height, boundary) {
+    /**
+     * Where a full lake breaks out (current rules only): the river wears a channel through the
+     * lowest ground around it rather than flooding a whole plain. The search carries on from the
+     * lake's shore exactly as the flood did, always from the lowest pixel reached so far, but
+     * without adding to the lake, until a pixel has a neighbour lower than the lake's surface
+     * that the river has not been through. The channel is the way the search reached that pixel
+     * from the lake, so it crosses the lowest rim there is, and the river flows on from the lower
+     * neighbour. Leaving only for ground below the lake keeps a river on a wide flat plain from
+     * breaking out into the next hollow, and the next, wandering round the plain for ever.
+     *
+     * The search reaching the edge of the map also lets the river out: the land goes on beyond
+     * the map, and the river leaves the map there.
+     *
+     * The search looks at no more than BREACH_AREA (square pixels of a BASELINE_DIMENSION map).
+     * A basin still closed after that (a wide hollow with no outlet for a long way) keeps the
+     * river, which ends in its lake.
+     *
+     * @returns {{spillover: object|null, channel: {x: number, y: number}[], leavesMap: boolean}}
+     */
+    #breachBasin(boundary, lakePixels, surfaceElev, elevationData, width, height) {
+        const lake = new Set(lakePixels.map((p) => p.y * width + p.x));
+        const channelTo = (pixel) => {
+            const channel = [];
+            for (let index = pixel.y * width + pixel.x; index !== undefined && !lake.has(index); index = this.basinCameFrom.get(index)) {
+                channel.push({ x: index % width, y: Math.floor(index / width) });
+            }
+            return channel.reverse();
+        };
+
+        // A lake already at the edge spills off the map there, rather than along the edge
+        const onEdge = (p) => p.x === 0 || p.y === 0 || p.x === width - 1 || p.y === height - 1;
+        if (lakePixels.some(onEdge)) return { spillover: null, channel: [], leavesMap: true };
+
+        for (let searched = 0; boundary.length > 0 && searched < this.breachPixels; searched++) {
+            const current = boundary.pop();
+            if (onEdge(current)) {
+                return { spillover: null, channel: channelTo(current), leavesMap: true };
+            }
+            const spillover = this.#scanBasinNeighbors(current, elevationData, width, height, boundary, Math.min(current.elev, surfaceElev));
+            if (spillover) return { spillover, channel: channelTo(current), leavesMap: false };
+        }
+        return { spillover: null, channel: [], leavesMap: false };
+    }
+
+    /**
+     * Whether a pixel below sea level is the sea a river ends in (current rules only; under the
+     * legacy rules every such pixel is). A small hollow below sea level inland, cut off from the
+     * sea, is not: a river runs into it and on out of it as it does through a lake. Pixels below
+     * sea level count as open sea when, joined up, they cover more than the largest lake, or reach
+     * the edge of the map. Each group is looked at once, the first time a river reaches it.
+     */
+    #isSea(x, y, elevationData, width, height, seaLevel) {
+        if (!this.currentRiverRules) return true;
+        const start = y * width + x;
+        if (this.seaKind[start]) return this.seaKind[start] === ProceduralEngine.#OPEN_SEA;
+
+        const group = [start];
+        this.seaKind[start] = ProceduralEngine.#INLAND_HOLLOW;
+        let isOpen = false;
+        for (let i = 0; i < group.length && !isOpen; i++) {
+            const index = group[i];
+            const px = index % width;
+            const py = (index - px) / width;
+            if (px === 0 || py === 0 || px === width - 1 || py === height - 1 || group.length > this.maxLakePixels) {
+                isOpen = true;
+                break;
+            }
+            for (const dir of ProceduralEngine.ADJACENT_OFFSETS) {
+                const next = (py + dir.dy) * width + px + dir.dx;
+                if (this.seaKind[next] === ProceduralEngine.#OPEN_SEA) {
+                    isOpen = true;
+                    break;
+                }
+                if (this.seaKind[next] || elevationData[next] > seaLevel) continue;
+                this.seaKind[next] = ProceduralEngine.#INLAND_HOLLOW;
+                group.push(next);
+            }
+        }
+        if (isOpen) for (const index of group) this.seaKind[index] = ProceduralEngine.#OPEN_SEA;
+        return isOpen;
+    }
+
+    #scanBasinNeighbors(current, elevationData, width, height, boundary, below = current.elev) {
         for (const dir of ProceduralEngine.ADJACENT_OFFSETS) {
             const nx = current.x + dir.dx;
             const ny = current.y + dir.dy;
@@ -244,12 +349,20 @@ export class ProceduralEngine {
 
             const nElev = elevationData[idx];
 
-            // If we found a pixel strictly lower than the one we are evaluating, it is the spillover lip.
-            if (nElev < current.elev) {
-                if (this.riverVisitedBuffer[idx] === this.riverTraceId) continue;
-                return { x: nx, y: ny, elevation: nElev };
+            // If we found a pixel strictly lower than the one we are evaluating, it is the spillover lip,
+            // unless the river has already been there
+            if (nElev < below) {
+                const isOwnRiver = this.riverVisitedBuffer[idx] === this.riverTraceId;
+                if (!isOwnRiver) return { x: nx, y: ny, elevation: nElev };
+                // The legacy rules pass over it. On flat ground a river can wander back past its
+                // own course; skipping those pixels could then wall the lake in completely, and
+                // the river ended in a pool a few pixels across. The current rules flood them as
+                // part of the lake (see #fillBasin).
+                if (!this.currentRiverRules) continue;
+                this.basinFloodsOwnRiver = true;
             }
 
+            this.basinCameFrom?.set(idx, current.y * width + current.x);
             boundary.push({ x: nx, y: ny, elev: nElev });
         }
         return null;
@@ -257,66 +370,266 @@ export class ProceduralEngine {
 
     /**
      * Executes the Greedy Downhill algorithm to plot a vector path to the ocean.
+     *
+     * Every pixel the river takes (and every pixel of a lake it fills) is marked with the river's
+     * number in the owner buffer, and its place in the path is recorded, so a later river that
+     * runs into it knows which river and which step it joined (see `record.mergeInto`), which is
+     * what the river network's flow is added up from (see RiverNetwork).
+     *
+     * Under the current river rules (see TerrainVersion.usesCurrentRivers) two more things
+     * apply. A river joins another as soon as it runs alongside it: if any of its eight
+     * neighbours is another river's pixel no higher than where it stands, it flows into that one.
+     * Without this, two rivers running down the same even slope a pixel apart never meet (each
+     * steps straight down, never onto the other), which drew them as two parallel lines. And a
+     * river running downhill follows the slope's own direction (see #followSlope). Maps made
+     * before these rules keep the plain steepest-neighbour trace, so their rivers and lakes stay
+     * where they were.
      */
-    #traceRiver(startX, startY, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params) {
-        const path = [];
+    #traceRiver(startX, startY, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params, record, resume = false) {
+        const map = { elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params };
         const freezeLimit = params?.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
-
-        let cx = startX;
-        let cy = startY;
-        let currentElev = elevationData[cy * width + cx];
         const maxLength = width * FILRODENSWMB.HYDROLOGY.MAX_RIVER_LENGTH_MULT;
 
-        while (path.length < maxLength) {
-            const idx = cy * width + cx;
-            const temp = temperatureData[idx];
-            const isFrozen = temp < freezeLimit;
+        // Where the river is, and where it would be if it could run in any direction rather
+        // than only to a neighbour (see #followSlope)
+        const at = { x: startX, y: startY, elevation: elevationData[startY * width + startX] };
+        const ideal = { x: startX, y: startY };
 
-            this.riverVisitedBuffer[idx] = this.riverTraceId;
-            path.push({ x: cx, y: cy, isFrozen: isFrozen });
-            riverMap[idx] = true;
+        // When resuming, the starting pixel is already the last step of the path
+        let isStartRecorded = resume;
+        while (record.path.length < maxLength) {
+            const index = at.y * width + at.x;
+            const isFrozen = temperatureData[index] < freezeLimit;
+            if (!isStartRecorded) this.#recordRiverStep(record, at.x, at.y, isFrozen, width, riverMap);
+            isStartRecorded = false;
 
-            const lowestNeighbor = this.#getLowestNeighbor(cx, cy, elevationData, width, height, params);
-
-            if (!lowestNeighbor) break;
-
-            if (lowestNeighbor.elevation <= seaLevel) {
-                path.push({ x: lowestNeighbor.x, y: lowestNeighbor.y });
-                break;
+            const next = this.#nextRiverStep(record, at, ideal, isFrozen, map);
+            if (!next) break;
+            at.x = next.x;
+            at.y = next.y;
+            at.elevation = next.elevation;
+            if (next.resetsIdeal) {
+                ideal.x = next.x;
+                ideal.y = next.y;
             }
-
-            if (riverMap[lowestNeighbor.y * width + lowestNeighbor.x]) {
-                path.push({ x: lowestNeighbor.x, y: lowestNeighbor.y, isMerge: true });
-                break;
-            }
-
-            if (lowestNeighbor.elevation >= currentElev) {
-                const basin = this.#fillBasin(cx, cy, elevationData, width, height, riverMap, params);
-
-                if (basin.lakePixels.length > 0) {
-                    path.push({ x: cx, y: cy, isLake: true, isFrozen: isFrozen });
-                    for (const lp of basin.lakePixels) {
-                        this.riverVisitedBuffer[lp.y * width + lp.x] = this.riverTraceId;
-                        waterMask[lp.y * width + lp.x] = basin.surfaceElev;
-                    }
-                }
-
-                if (basin.spillover) {
-                    cx = basin.spillover.x;
-                    cy = basin.spillover.y;
-                    currentElev = basin.spillover.elevation;
-                    continue;
-                } else {
-                    break;
-                }
-            }
-
-            cx = lowestNeighbor.x;
-            cy = lowestNeighbor.y;
-            currentElev = lowestNeighbor.elevation;
         }
 
-        return path.length > FILRODENSWMB.HYDROLOGY.MAX_PATH_LENGTH ? path : null;
+        return record.path.length > FILRODENSWMB.HYDROLOGY.MAX_PATH_LENGTH ? record.path : null;
+    }
+
+    /**
+     * Where a river goes from the pixel it has just reached, or null where it ends (at the sea,
+     * joining another river, or in a basin with no way out). The steps that end it are added to
+     * its path here.
+     * @returns {{x: number, y: number, elevation: number, resetsIdeal: boolean}|null}
+     */
+    #nextRiverStep(record, at, ideal, isFrozen, map) {
+        const { elevationData, width, height, seaLevel, riverMap, params } = map;
+
+        const alongside = this.currentRiverRules ? this.#findAdjacentRiver(at.x, at.y, at.elevation, elevationData, width, height, riverMap, record.ownerId) : null;
+        if (alongside) return this.#mergeRiverAt(record, alongside.x, alongside.y, width);
+
+        const lowestNeighbor = this.#getLowestNeighbor(at.x, at.y, elevationData, width, height, params);
+        // Hemmed in by its own course or lakes: under the current rules the river pools there
+        // and breaches its way out like any other basin, rather than ending on dry land
+        if (!lowestNeighbor) return this.currentRiverRules ? this.#spillFromBasin(record, at, isFrozen, map) : null;
+
+        if (lowestNeighbor.elevation <= seaLevel && this.#isSea(lowestNeighbor.x, lowestNeighbor.y, elevationData, width, height, seaLevel)) {
+            record.path.push({ x: lowestNeighbor.x, y: lowestNeighbor.y });
+            return null;
+        }
+
+        if (riverMap[lowestNeighbor.y * width + lowestNeighbor.x]) return this.#mergeRiverAt(record, lowestNeighbor.x, lowestNeighbor.y, width);
+
+        // Going downhill, follow the slope's own direction rather than always the steepest of
+        // the eight neighbours (see #followSlope)
+        if (this.currentRiverRules && lowestNeighbor.elevation < at.elevation) {
+            const next = this.#followSlope(ideal, at.x, at.y, at.elevation, elevationData, width, height, riverMap);
+            if (next) return { ...next, resetsIdeal: false };
+        }
+
+        if (lowestNeighbor.elevation >= at.elevation) return this.#spillFromBasin(record, at, isFrozen, map);
+
+        return { ...lowestNeighbor, resetsIdeal: true };
+    }
+
+    /**
+     * Fills the basin a river has run into as a lake (see #fillBasin), records its pixels as the
+     * river's, and returns where the lake spills over, or null if it never does.
+     */
+    #spillFromBasin(record, at, isFrozen, { elevationData, width, height, riverMap, waterMask }) {
+        const basin = this.#fillBasin(at.x, at.y, elevationData, width, height, riverMap);
+
+        if (basin.lakePixels.length > 0) {
+            record.path.push({ x: at.x, y: at.y, isLake: true, isFrozen });
+            const lakeIndex = record.path.length - 1;
+            for (const lp of basin.lakePixels) {
+                const lakePixel = lp.y * width + lp.x;
+                this.riverVisitedBuffer[lakePixel] = this.riverTraceId;
+                waterMask[lakePixel] = basin.surfaceElev;
+                this.riverOwnerBuffer[lakePixel] = record.ownerId;
+                record.indexOf.set(lakePixel, lakeIndex);
+            }
+        }
+
+        if (!basin.spillover && !basin.leavesMap) return null;
+
+        // The breach the river cuts out of the lake, if it had to (see #breachBasin). It can
+        // open onto another river, which the river then joins, or lead off the map.
+        for (const step of basin.channel ?? []) {
+            const index = step.y * width + step.x;
+            if (riverMap[index] && this.riverOwnerBuffer[index] !== record.ownerId) return this.#mergeRiverAt(record, step.x, step.y, width);
+            this.#recordRiverStep(record, step.x, step.y, isFrozen, width, riverMap);
+        }
+        if (basin.leavesMap) return null;
+
+        const spill = basin.spillover;
+        const spillIndex = spill.y * width + spill.x;
+        if (this.currentRiverRules && riverMap[spillIndex] && this.riverOwnerBuffer[spillIndex] !== record.ownerId) return this.#mergeRiverAt(record, spill.x, spill.y, width);
+        return { ...spill, resetsIdeal: true };
+    }
+
+    /** Adds a pixel to a river's path and marks it as the river's. */
+    #recordRiverStep(record, x, y, isFrozen, width, riverMap) {
+        const index = y * width + x;
+        this.riverVisitedBuffer[index] = this.riverTraceId;
+        record.path.push({ x, y, isFrozen });
+        this.#claimRiverPixel(record, index, record.path.length - 1);
+        riverMap[index] = true;
+    }
+
+    /**
+     * A custom river under the current river rules (see HydrologyEngine.authoredRivers): its path
+     * is the line the user drew, pixel by pixel, rather than a trace. It ends early where that
+     * line reaches the sea or runs into another river (joining it). Where the line ends on land,
+     * the river is traced on from there like any other, so it still finds its way to the sea.
+     *
+     * Custom rivers are laid down before any spring is traced, so procedural rivers that reach
+     * one join it. `record.authored` is how many steps of the path follow the user's line.
+     */
+    #traceAuthored(authored, record, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params) {
+        const freezeLimit = params?.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
+        const endsAt = (length) => {
+            record.authored = length;
+            return record.path.length > FILRODENSWMB.HYDROLOGY.MAX_PATH_LENGTH;
+        };
+
+        for (const { x, y } of authored.pixels) {
+            const index = y * width + x;
+            if (elevationData[index] <= seaLevel && this.#isSea(x, y, elevationData, width, height, seaLevel)) {
+                record.path.push({ x, y });
+                return endsAt(record.path.length);
+            }
+            if (riverMap[index] && this.riverOwnerBuffer[index] !== record.ownerId) {
+                this.#mergeRiverAt(record, x, y, width);
+                return endsAt(record.path.length);
+            }
+            if (this.riverVisitedBuffer[index] === this.riverTraceId) continue;
+            this.#recordRiverStep(record, x, y, temperatureData[index] < freezeLimit, width, riverMap);
+        }
+
+        record.authored = record.path.length;
+        const last = record.path.at(-1);
+        if (!last) return false;
+        return !!this.#traceRiver(last.x, last.y, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params, record, true);
+    }
+
+    /** Marks a pixel as the river's and remembers the step of its path it is (the first time only). */
+    #claimRiverPixel(record, index, pathIndex) {
+        this.riverOwnerBuffer[index] = record.ownerId;
+        if (!record.indexOf.has(index)) record.indexOf.set(index, pathIndex);
+    }
+
+    /**
+     * Ends a river by joining it to the river whose pixel it steps onto, recording which river and
+     * which step of it (see RiverNetwork, which adds the flow up from these joins).
+     * @returns {null} The river ends here.
+     */
+    #mergeRiverAt(record, x, y, width) {
+        const index = y * width + x;
+        record.path.push({ x, y, isMerge: true });
+        const target = this.riverRecords[this.riverOwnerBuffer[index] - 1];
+        if (target && target !== record) record.mergeInto = { record: target, index: target.indexOf.get(index) ?? target.path.length - 1 };
+        return null;
+    }
+
+    /**
+     * The next pixel of a river running downhill, following the slope's direction.
+     *
+     * Always stepping to the steepest of the eight neighbours makes a river on an even slope run
+     * in a dead straight line at 0 or 45 degrees, however the slope actually faces, then turn
+     * sharply when another neighbour becomes steeper. Instead the river carries a point that
+     * moves one pixel at a time straight down the slope (measured over a few pixels, bilinearly),
+     * and steps to whichever lower, unvisited neighbour is closest to it, so over several steps
+     * the pixels follow the slope at any angle. The point is kept within STREAM_SLACK pixels of
+     * the pixel actually taken.
+     *
+     * @param {{x: number, y: number}} ideal - The carried point, moved in place.
+     * @returns {{x: number, y: number, elevation: number}|null} Null when no neighbour is lower.
+     */
+    #followSlope(ideal, cx, cy, currentElev, elevationData, width, height, riverMap) {
+        const reach = FILRODENSWMB.HYDROLOGY.STREAM_GRADIENT_REACH;
+        const sample = (x, y) => {
+            const px = Math.min(width - 1, Math.max(0, x));
+            const py = Math.min(height - 1, Math.max(0, y));
+            const x0 = Math.floor(px);
+            const y0 = Math.floor(py);
+            const x1 = Math.min(width - 1, x0 + 1);
+            const y1 = Math.min(height - 1, y0 + 1);
+            const fx = px - x0;
+            const fy = py - y0;
+            const top = elevationData[y0 * width + x0] * (1 - fx) + elevationData[y0 * width + x1] * fx;
+            const bottom = elevationData[y1 * width + x0] * (1 - fx) + elevationData[y1 * width + x1] * fx;
+            return top * (1 - fy) + bottom * fy;
+        };
+        const gx = sample(ideal.x + reach, ideal.y) - sample(ideal.x - reach, ideal.y);
+        const gy = sample(ideal.x, ideal.y + reach) - sample(ideal.x, ideal.y - reach);
+        const length = Math.hypot(gx, gy);
+        if (length === 0) return null;
+        const tx = ideal.x - gx / length;
+        const ty = ideal.y - gy / length;
+
+        let best = null;
+        let bestDistance = Infinity;
+        for (const dir of ProceduralEngine.ADJACENT_OFFSETS) {
+            const nx = cx + dir.dx;
+            const ny = cy + dir.dy;
+            if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+            const idx = ny * width + nx;
+            if (this.riverVisitedBuffer[idx] === this.riverTraceId || riverMap[idx]) continue;
+            const elevation = elevationData[idx];
+            if (elevation >= currentElev) continue;
+            const distance = (nx - tx) ** 2 + (ny - ty) ** 2;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = { x: nx, y: ny, elevation };
+            }
+        }
+        if (!best) return null;
+
+        const slack = FILRODENSWMB.HYDROLOGY.STREAM_SLACK;
+        ideal.x = best.x + Math.max(-slack, Math.min(slack, tx - best.x));
+        ideal.y = best.y + Math.max(-slack, Math.min(slack, ty - best.y));
+        return best;
+    }
+
+    /**
+     * The lowest pixel of another river among a pixel's eight neighbours that is no higher than
+     * the pixel itself, or null.
+     */
+    #findAdjacentRiver(cx, cy, currentElev, elevationData, width, height, riverMap, ownerId) {
+        let best = null;
+        for (const dir of ProceduralEngine.ADJACENT_OFFSETS) {
+            const nx = cx + dir.dx;
+            const ny = cy + dir.dy;
+            if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+            const idx = ny * width + nx;
+            if (!riverMap[idx] || this.riverOwnerBuffer[idx] === ownerId || this.riverOwnerBuffer[idx] === 0) continue;
+            const elevation = elevationData[idx];
+            if (elevation > currentElev) continue;
+            if (!best || elevation < best.elevation) best = { x: nx, y: ny, elevation };
+        }
+        return best;
     }
 
     /**
@@ -428,7 +741,7 @@ export class ProceduralEngine {
             TectonicEngine.applyTectonicFaults(elevationData, width, height, tectonicFaults, this.simplex, activeBounds, params.terrain?.faultFrame);
         }
         if (manualRivers.length > 0) {
-            HydrologyEngine.carveManualRivers(elevationData, width, height, manualRivers, this.simplex, params.seaLevel, activeBounds);
+            HydrologyEngine.carveManualRivers(elevationData, width, height, manualRivers, this.simplex, params.seaLevel, activeBounds, params.terrain?.currentRivers === true);
         }
 
         // 3. Apply Elevation Exponent & Pivot Map to Land/Sea Boundaries
@@ -2577,10 +2890,18 @@ export class ProceduralEngine {
         buffer[bufferIndex + 3] = 255;
     }
 
-    generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params, outRiverMap, outWaterMask) {
+    /**
+     * Traces every river: first the custom rivers drawn under the current river rules
+     * (`authoredRivers`, see #traceAuthored), then one from every spring pin.
+     *
+     * @param {object[]} [authoredRivers] - From HydrologyEngine.authoredRivers: `{ pixels, inflow }`.
+     * @returns {{vectors: object[], waterMask: Float32Array}} The rivers (`{ id, path, mergeInto,
+     *   inflow, authored }`, where `authored` is how many steps follow a custom river's line) and
+     *   the water mask.
+     */
+    generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params, outRiverMap, outWaterMask, authoredRivers = []) {
         const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
 
-        const rivers = [];
         const riverMap = outRiverMap;
         const waterMask = outWaterMask;
 
@@ -2592,15 +2913,37 @@ export class ProceduralEngine {
         if (this.riverVisitedBuffer?.length !== totalPixels) {
             this.riverVisitedBuffer = new Uint32Array(totalPixels);
             this.basinVisitedBuffer = new Uint32Array(totalPixels);
+            this.riverOwnerBuffer = new Int32Array(totalPixels);
+        } else {
+            this.riverOwnerBuffer.fill(0);
         }
 
         this.riverTraceId = 0;
         this.basinTraceId = 0;
+        this.riverRecords = [];
+        // Which trace rules this map uses (see TerrainVersion.usesCurrentRivers), and the largest
+        // lake they allow (see HYDROLOGY.MAX_LAKE_AREA)
+        this.currentRiverRules = params?.terrain?.currentRivers === true;
+        this.maxLakePixels = this.#maxLakePixels(params, width, height);
+        this.loopLakePixels = this.#loopLakePixels(params, width, height);
+        this.breachPixels = ProceduralEngine.#worldArea(FILRODENSWMB.HYDROLOGY.BREACH_AREA, params, width, height);
+        // Which pixels below sea level are open sea (see #isSea), worked out as rivers reach them
+        this.seaKind = this.currentRiverRules ? new Uint8Array(totalPixels) : null;
 
-        // 1. Setup springs purely from the baked pins array
-        const finalSprings = this.#parseSpringPins(mapPins);
+        // 1. Custom rivers drawn under the current river rules, before any spring
+        for (const authored of authoredRivers) {
+            if (!authored.pixels?.length) continue;
+            const first = authored.pixels[0];
+            this.riverTracePrng = ProceduralEngine.#mulberry32(ProceduralEngine.#riverSeed(this.seedNumber, first.y * width + first.x));
+            this.riverTraceId++;
+            const record = { ownerId: this.riverRecords.length + 1, path: [], indexOf: new Map(), mergeInto: null, inflow: authored.inflow ?? 0 };
+            this.riverRecords.push(record);
+            record.kept = this.#traceAuthored(authored, record, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params);
+        }
 
-        // 2. Trace
+        // 2. Springs, from the pins
+        const finalSprings = this.#parseSpringPins(mapPins, width, height);
+
         for (const spring of finalSprings) {
             const index = spring.y * width + spring.x;
             if (riverMap[index]) continue;
@@ -2613,24 +2956,67 @@ export class ProceduralEngine {
             // from the water would have to be recomputed over that whole area.
             this.riverTracePrng = ProceduralEngine.#mulberry32(ProceduralEngine.#riverSeed(this.seedNumber, index));
             this.riverTraceId++;
-            const path =this.#traceRiver(spring.x, spring.y, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params);
-            if (path) rivers.push({ id: `river_${rivers.length}`, path: path });
+            const record = { ownerId: this.riverRecords.length + 1, path: [], indexOf: new Map(), mergeInto: null, inflow: spring.inflow ?? 0 };
+            this.riverRecords.push(record);
+            record.kept = !!this.#traceRiver(spring.x, spring.y, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params, record);
         }
 
-        return { vectors: rivers, waterMask: waterMask };
+        // 3. The rivers kept, each knowing the river (and the step of it) it flows into
+        const rivers = [];
+        for (const record of this.riverRecords) {
+            if (!record.kept) continue;
+            record.id = `river_${rivers.length}`;
+            rivers.push(record);
+        }
+        const vectors = rivers.map((record) => {
+            const target = record.mergeInto?.record;
+            const mergeInto = target?.kept ? { id: target.id, index: record.mergeInto.index } : null;
+            return { id: record.id, path: record.path, mergeInto, inflow: record.inflow, authored: record.authored ?? 0 };
+        });
+        this.riverRecords = null;
+
+        return { vectors, waterMask: waterMask };
     }
 
-    #parseSpringPins(mapPins) {
+    /**
+     * The largest lake in this map's pixels. The current river rules measure it in the world
+     * (MAX_LAKE_AREA square pixels of a BASELINE_DIMENSION map), so a regional map, whose basins
+     * cover more pixels, allows lakes of the same size in the world as its parent. Maps made
+     * before them keep the pixel limit they saved.
+     */
+    #maxLakePixels(params, width, height) {
+        if (!this.currentRiverRules) return params?.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
+        return ProceduralEngine.#worldArea(FILRODENSWMB.HYDROLOGY.MAX_LAKE_AREA, params, width, height);
+    }
+
+    /** The largest lake that floods its river's own course (see #fillBasin), in this map's pixels. */
+    #loopLakePixels(params, width, height) {
+        return ProceduralEngine.#worldArea(FILRODENSWMB.HYDROLOGY.LOOP_LAKE_AREA, params, width, height);
+    }
+
+    /** An area in square pixels of a BASELINE_DIMENSION map, in this map's pixels. */
+    static #worldArea(area, params, width, height) {
+        const world = params?.terrain?.world;
+        const rootSize = world?.rootW && world?.rootH ? Math.max(world.rootW, world.rootH) : Math.max(width, height);
+        const pixelsPerBaseline = ((world?.zoom ?? 1) * rootSize) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        return Math.round(area * pixelsPerBaseline * pixelsPerBaseline);
+    }
+
+    /**
+     * The springs to trace from. A pin outside the map is left out: a regional map keeps the
+     * pins just beyond its edge (see RegionalExtractor), but a river traced from outside the map
+     * has no ground to run on.
+     */
+    #parseSpringPins(mapPins, width, height) {
         const finalSprings = [];
         if (!mapPins) return finalSprings;
 
         for (const pin of mapPins) {
-            if (pin.type === "spring" && pin.visibility !== "none") {
-                finalSprings.push({
-                    x: Math.round(pin.x),
-                    y: Math.round(pin.y),
-                });
-            }
+            if (pin.type !== "spring" || pin.visibility === "none") continue;
+            const x = Math.round(pin.x);
+            const y = Math.round(pin.y);
+            if (x < 0 || y < 0 || x >= width || y >= height) continue;
+            finalSprings.push({ x, y, inflow: pin.inflow ?? 0 });
         }
         return finalSprings;
     }
@@ -2645,13 +3031,10 @@ export class ProceduralEngine {
      * step with no discontinuity at 0 even once elevation can go negative or above 1 - nothing
      * here needs to change for hand-edited terrain to exceed the old [0, 1] range.
      *
-     * The shoreline is drawn on the same layer (see #drawShoreline), so it follows the Contours
-     * switch. It is drawn even when the contour interval is off.
-     *
-     * @param {Float32Array|null} [waterMask] - Lake surface elevation per pixel (0 where there is
-     *   no lake), so lakes get a shoreline too.
+     * The coast's shoreline is drawn on the same layer (see #drawShoreline), so it follows the
+     * Contours switch. It is drawn even when the contour interval is off.
      */
-    createContourMap(elevationData, width, height, interval, seaLevel, outBuffer, bounds = null, waterMask = null) {
+    createContourMap(elevationData, width, height, interval, seaLevel, outBuffer, bounds = null) {
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const contourBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
 
@@ -2667,7 +3050,7 @@ export class ProceduralEngine {
         }
 
         if (interval > 0) ProceduralEngine.#drawContourLines(elevationData, width, height, interval, seaLevel, outBuffer, contourBounds);
-        ProceduralEngine.#drawShoreline(elevationData, width, height, seaLevel, waterMask, outBuffer, contourBounds);
+        ProceduralEngine.#drawShoreline(elevationData, width, height, seaLevel, outBuffer, contourBounds);
         return outBuffer;
     }
 
@@ -2699,21 +3082,25 @@ export class ProceduralEngine {
     }
 
     /**
-     * The shoreline: where dry ground meets water (the sea, or a lake), the dry pixel is darkened
-     * and the water pixel lightened (DISPLAY.SHORELINE), so the edge of the water reads clearly
-     * against the relief-shaded land and the see-through shallows. Contour lines only mark
-     * multiples of the contour interval, which sea level is usually not, so without this the
-     * coast has no line of its own. A pixel is on the shore when one of its four direct
-     * neighbours is on the other side; the shoreline is drawn over any contour line there.
+     * The shoreline: where dry ground meets the sea, the dry pixel is darkened and the sea pixel
+     * lightened (DISPLAY.SHORELINE), so the coast reads clearly against the relief-shaded land and
+     * the see-through shallows. Contour lines only mark multiples of the contour interval, which
+     * sea level is usually not, so without this the coast has no line of its own. A pixel is on
+     * the shore when one of its four direct neighbours is on the other side; the shoreline is
+     * drawn over any contour line there.
+     *
+     * Lakes get no shoreline. Rivers run into and out of them, and a line around a lake cut
+     * across the river at both ends, so the lake read as a break in the river rather than part
+     * of it.
      *
      * Every pixel it writes lies inside `contourBounds`, and a pixel's shore status depends only
      * on its direct neighbours, which the repaint margin (DISPLAY.REPAINT_MARGIN) covers.
      */
-    static #drawShoreline(elevationData, width, height, seaLevel, waterMask, outBuffer, contourBounds) {
+    static #drawShoreline(elevationData, width, height, seaLevel, outBuffer, contourBounds) {
         const shore = FILRODENSWMB.DISPLAY.SHORELINE;
         const dryAlpha = Math.round(shore.DRY_ALPHA * 255);
         const wetAlpha = Math.round(shore.WET_ALPHA * 255);
-        const water = { elevationData, waterMask, seaLevel };
+        const water = { elevationData, seaLevel };
 
         for (let y = contourBounds.minY; y <= contourBounds.maxY; y++) {
             for (let x = contourBounds.minX; x <= contourBounds.maxX; x++) {
@@ -2731,9 +3118,9 @@ export class ProceduralEngine {
         }
     }
 
-    /** Whether a pixel is under water: below sea level, or in a lake. */
+    /** Whether a pixel is in the sea (below sea level). */
     static #isWaterAt(water, index) {
-        return water.elevationData[index] < water.seaLevel || (water.waterMask ? water.waterMask[index] > 0 : false);
+        return water.elevationData[index] < water.seaLevel;
     }
 
     /** Whether any of a pixel's four direct neighbours (inside the map) is on the other side of the water's edge. */

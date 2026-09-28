@@ -1,7 +1,7 @@
 <div class="fwmb-tool-content fwmb-fixed-lists">
 
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.AutoLabels"}}</legend>
+    <details class="fwmb-fieldset fwmb-list-section" data-section="autoLabels" {{#unless collapsedSections.autoLabels}}open{{/unless}}>
+        <summary>{{localize "FILRODENSWMB.UI.AutoLabels"}}</summary>
         <div id="fwmb-scroll-auto-labels" class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
             
             {{#each autoLabels}}
@@ -22,15 +22,15 @@
             {{/each}}
 
         </div>
-    </fieldset>
+    </details>
 
-    <fieldset class="fwmb-fieldset">
-        <legend class="fwmb-legend-with-action">
+    <details class="fwmb-fieldset fwmb-list-section" data-section="customLabels" {{#unless collapsedSections.customLabels}}open{{/unless}}>
+        <summary class="fwmb-legend-with-action">
             <span>{{localize "FILRODENSWMB.UI.CustomLabels"}}</span>
             <a class="fwmb-legend-action {{#if massEditMode.label}}active{{/if}}" data-action="toggleMassEditMode" data-type="label" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip-class="fwmb-tooltip">
                 <i class="fwmb-icon edit-square"></i>
             </a>
-        </legend>
+        </summary>
 
         {{#if massEditMode.label}}
         <div class="fwmb-mass-edit-bar">
@@ -67,7 +67,7 @@
             <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLabels"}}</div>
             {{/each}}
         </div>
-    </fieldset>
+    </details>
     
     <div class="fwmb-divider"></div>
     

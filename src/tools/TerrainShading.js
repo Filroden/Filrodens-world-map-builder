@@ -24,7 +24,20 @@ import { FILRODENSWMB } from "../config.js";
  *      shallows, turned to the map's tint), itself carrying a share of the relief shading, laid
  *      over the bed more thickly the deeper it is, so shallows show the bed and the deep sea
  *      mostly the water.
- *   5. Surface biomes (Pack Ice and the like) on top of the water (Land Biomes).
+ *   5. Rivers over dry ground, from the river image (see below): shallow water of the same
+ *      colour and tint as the sea and lakes, deepening towards the middle of a wide river, over
+ *      a sediment bed that carries the relief shading, or ice where the river is frozen. They
+ *      are part of the Water layer. Where a river meets a lake or the sea the water takes over,
+ *      except across a pool (a lake too small to stop a river), where the river is drawn on.
+ *   6. Surface biomes (Pack Ice and the like) on top of the water (Land Biomes).
+ *
+ * The river image (see RiverNetwork.rasterise) holds, per pixel, as bytes:
+ *   R - a distance field: how far the pixel is from the nearest river's edge. Filtered linearly
+ *       and compared with the size of a screen pixel in map pixels (the footprint), it gives a
+ *       river edge that is sharp and smooth at any zoom, rather than the map's pixel steps.
+ *   G - how frozen the river there is (255 ice).
+ *   B - 255 on and around a pool, where the river is drawn over the water.
+ *   A - always 255 (as for the packed image).
  *
  * The packed image ("aux") holds, per pixel, as bytes:
  *   R - the relief: how much more or less directly the ground faces the light than flat ground
@@ -40,6 +53,7 @@ import { FILRODENSWMB } from "../config.js";
 const TERRAIN = FILRODENSWMB.DISPLAY.TERRAIN;
 const WATER = FILRODENSWMB.DISPLAY.WATER;
 const RELIEF = FILRODENSWMB.DISPLAY.RELIEF;
+const RIVER = FILRODENSWMB.DISPLAY.RIVER;
 
 /** The largest relief value the packed image can hold either way; beyond it shading is clamped at any useful strength. */
 const RELIEF_RANGE = 2.6;
@@ -52,6 +66,8 @@ const MAX_BYTE = 255;
 /** Bounds of the water's share of the bed seen through it (FLOOR scaled by clarity may not reach 1). */
 const MAX_FLOOR = 0.9;
 const MIN_CLARITY = 0.1;
+/** The narrowest a river's soft edge gets when zoomed far in, in map pixels. */
+const MIN_FOOTPRINT = 0.05;
 
 /** RGB to YIQ and back, for turning the water's hue and saturation (see #tint). */
 const YIQ = Object.freeze({
@@ -112,6 +128,16 @@ export class TerrainShading {
     }
 
     /**
+     * How far a point is from the nearest river's edge, in map pixels (negative inside the
+     * river), from the river image's distance byte (see RiverNetwork.rasterise).
+     * @param {number} byte - 0-255, may be fractional where the GPU blends.
+     * @returns {number}
+     */
+    static riverEdge(byte) {
+        return RIVER.FIELD_RANGE - (2 * RIVER.FIELD_RANGE * byte) / MAX_BYTE;
+    }
+
+    /**
      * The height byte: the land's height as a share of the way from sea level to the map's
      * highest point.
      * @param {number} share - 0 to 1.
@@ -154,9 +180,11 @@ export class TerrainShading {
      * @param {number[]} surface - RGBA of the land or surface biome (alpha 0 for none).
      * @param {number[]} underwater - RGBA of the bed's biome (alpha 0 for none).
      * @param {object} settings - See defaultSettings.
+     * @param {number[]|null} [river] - The river image's bytes [distance, ice, pool], or null for none.
+     * @param {number} [footprint] - How many map pixels one screen pixel covers.
      * @returns {number[]} RGB, 0-255.
      */
-    static shade(aux, surface, underwater, settings) {
+    static shade(aux, surface, underwater, settings, river = null, footprint = 1) {
         const wet = TerrainShading.wetness(aux[1]);
         const depth = TerrainShading.decodeDepth(aux[1]);
         const change = TerrainShading.decodeRelief(aux[0]);
@@ -189,15 +217,62 @@ export class TerrainShading {
         const waterAlpha = mix(TERRAIN.FLAT_WATER_ALPHA, TerrainShading.waterAlpha(depth, settings.clarity), on(settings.elevation));
         colour = colour.map((c, i) => mix(c, water[i], waterAlpha * wet * on(settings.water)));
 
-        // 5. Surface biomes over the water
+        // 5. Rivers, on dry ground (and across pools)
+        if (river) colour = TerrainShading.#shadeRiver(colour, river, { wet, footprint, factor, waterFactor, settings });
+
+        // 6. Surface biomes over the water
         colour = colour.map((c, i) => mix(c, surface[i] / MAX_BYTE, surfaceAlpha * wet));
 
         return colour.map((c) => Math.round(clamp(c, 0, 1) * MAX_BYTE));
     }
 
     /**
+     * Step 5 of shade: a colour with the river drawn over it, if there is one at this point.
+     * @param {number[]} colour - The colour so far (0-1 each channel).
+     * @param {number[]} river - The river image's bytes [distance, ice, pool].
+     * @param {{wet: number, footprint: number, factor: number, waterFactor: number, settings: object}} at -
+     *   How wet the point is, the footprint in map pixels, the ground's and the water's relief
+     *   factors, and the shading settings.
+     * @returns {number[]}
+     */
+    static #shadeRiver(colour, river, { wet, footprint, factor, waterFactor, settings }) {
+        const on = (flag) => (flag ? 1 : 0);
+        const edge = TerrainShading.riverEdge(river[0]);
+        const overWater = river[2] / MAX_BYTE;
+        const coverage = clamp(0.5 - edge / Math.max(footprint, MIN_FOOTPRINT), 0, 1) * (1 - wet * (1 - overWater)) * on(settings.water);
+        if (coverage <= 0) return colour;
+
+        const depth = mix(RIVER.DEPTH_SHALLOW, RIVER.DEPTH_DEEP, clamp(-edge / RIVER.DEPTH_RANGE, 0, 1));
+        const riverColour = TerrainShading.riverColour(depth, river[1] / MAX_BYTE, factor, waterFactor, settings);
+        return colour.map((c, i) => mix(c, riverColour[i], coverage));
+    }
+
+    /**
+     * A river's own colour: water of the given depth over a sediment bed, or ice.
+     * @param {number} depth - The river's depth at this point (on the lakes' depth scale).
+     * @param {number} ice - 0 open water to 1 frozen.
+     * @param {number} factor - The ground's relief factor (1 without relief shading).
+     * @param {number} waterFactor - The water surface's relief factor.
+     * @param {object} settings - See defaultSettings.
+     * @returns {number[]} RGB, 0-1.
+     */
+    static riverColour(depth, ice, factor, waterFactor, settings) {
+        const elevation = settings.elevation ? 1 : 0;
+        const flatColour = TERRAIN.BASE_SEA.map((c) => c / MAX_BYTE);
+        const bed = TERRAIN.SEDIMENT.map((c) => Math.min(1, (c / MAX_BYTE) * factor));
+        const water = TerrainShading.#tint(
+            TerrainShading.waterRamp(depth).map((c, i) => mix(flatColour[i], c, elevation)),
+            settings.hueShift,
+            settings.saturation,
+        ).map((c) => Math.min(1, c * waterFactor));
+        const alpha = mix(TERRAIN.FLAT_WATER_ALPHA, Math.max(RIVER.MIN_ALPHA, TerrainShading.waterAlpha(depth, settings.clarity)), elevation);
+        const frozen = RIVER.ICE_COLOUR.map((c) => Math.min(1, (c / MAX_BYTE) * factor));
+        return bed.map((c, i) => mix(mix(c, water[i], alpha), frozen[i], ice));
+    }
+
+    /**
      * The colours of a whole image for the 3D view to lay over its terrain: the same steps as
-     * shade with the biomes at full opacity and no relief shading (the 3D scene's own light
+     * shade (rivers included) with the biomes at full opacity and no relief shading (the 3D scene's own light
      * shades the slopes). Without relief the water's colour and coverage depend only on the
      * depth byte, and the ground's grey only on the height byte, so both are worked out once
      * per byte value rather than once per pixel.
@@ -206,8 +281,10 @@ export class TerrainShading {
      * @param {Uint8Array} underwater - RGBA of the beds' biomes.
      * @param {object} settings - See defaultSettings; biomeAlpha and relief are ignored.
      * @param {Uint8Array} out - RGBA, written with alpha 255.
+     * @param {Uint8Array|null} [rivers] - The river image (see the class comment), drawn at one
+     *   screen pixel per map pixel (the drape's own resolution), or null for none.
      */
-    static drape(aux, surface, underwater, settings, out) {
+    static drape(aux, surface, underwater, settings, out, rivers = null) {
         const on = (flag) => (flag ? 1 : 0);
         const elevation = on(settings.elevation);
         const flatColour = TERRAIN.BASE_SEA.map((c) => c / MAX_BYTE);
@@ -234,6 +311,8 @@ export class TerrainShading {
 
         const landOn = on(settings.landBiomes) / MAX_BYTE;
         const seaOn = on(settings.seaBiomes) / MAX_BYTE;
+        const riverTable = rivers ? TerrainShading.#riverTable(settings) : null;
+        const colour = [0, 0, 0];
         for (let p = 0; p < out.length; p += 4) {
             const depthByte = aux[p + 1];
             const wet = depthByte > 0;
@@ -248,13 +327,50 @@ export class TerrainShading {
             const waterAt = depthByte * 3;
             const waterAlpha = wet ? coverage[depthByte] : 0;
             for (let i = 0; i < 3; i++) {
-                let colour = wet ? sediment[i] : ground[groundAt + i];
-                colour = mix(colour, biome[p + i] / MAX_BYTE, biomeAlpha);
-                colour = mix(colour, water[waterAt + i], waterAlpha);
-                if (wet) colour = mix(colour, surface[p + i] / MAX_BYTE, surfaceAlpha);
-                out[p + i] = Math.round(clamp(colour, 0, 1) * MAX_BYTE);
+                colour[i] = mix(wet ? sediment[i] : ground[groundAt + i], biome[p + i] / MAX_BYTE, biomeAlpha);
+                colour[i] = mix(colour[i], water[waterAt + i], waterAlpha);
+            }
+            if (riverTable && rivers[p] > 0) TerrainShading.#drapeRiver(colour, rivers, p, wet, riverTable, settings);
+            for (let i = 0; i < 3; i++) {
+                const final = wet ? mix(colour[i], surface[p + i] / MAX_BYTE, surfaceAlpha) : colour[i];
+                out[p + i] = Math.round(clamp(final, 0, 1) * MAX_BYTE);
             }
             out[p + 3] = MAX_BYTE;
+        }
+    }
+
+    /**
+     * Per distance byte of the river image, the colour of open water and of ice there (no relief,
+     * as in the drape), and the edge distance, so the drape works each out once rather than per pixel.
+     * @returns {{open: Float32Array, frozen: Float32Array, edge: Float32Array}}
+     */
+    static #riverTable(settings) {
+        const open = new Float32Array((MAX_BYTE + 1) * 3);
+        const frozen = new Float32Array((MAX_BYTE + 1) * 3);
+        const edge = new Float32Array(MAX_BYTE + 1);
+        for (let byte = 0; byte <= MAX_BYTE; byte++) {
+            edge[byte] = TerrainShading.riverEdge(byte);
+            const depth = mix(RIVER.DEPTH_SHALLOW, RIVER.DEPTH_DEEP, clamp(-edge[byte] / RIVER.DEPTH_RANGE, 0, 1));
+            const water = TerrainShading.riverColour(depth, 0, 1, 1, settings);
+            const ice = TerrainShading.riverColour(depth, 1, 1, 1, settings);
+            for (let i = 0; i < 3; i++) {
+                open[byte * 3 + i] = water[i];
+                frozen[byte * 3 + i] = ice[i];
+            }
+        }
+        return { open, frozen, edge };
+    }
+
+    /** Step 5 of the drape: draws the river at pixel offset p over `colour`, in place (see #shadeRiver). */
+    static #drapeRiver(colour, rivers, p, wet, table, settings) {
+        const byte = rivers[p];
+        const overWater = rivers[p + 2] / MAX_BYTE;
+        const coverage = clamp(0.5 - table.edge[byte], 0, 1) * (wet ? overWater : 1) * (settings.water ? 1 : 0);
+        if (coverage <= 0) return;
+        const ice = rivers[p + 1] / MAX_BYTE;
+        for (let i = 0; i < 3; i++) {
+            const riverColour = mix(table.open[byte * 3 + i], table.frozen[byte * 3 + i], ice);
+            colour[i] = mix(colour[i], riverColour, coverage);
         }
     }
 
@@ -329,6 +445,7 @@ varying vec2 vUvs;
 uniform sampler2D uSurface;
 uniform sampler2D uUnderwater;
 uniform sampler2D uAux;
+uniform sampler2D uRivers;
 
 uniform float uElevationOn;
 uniform float uReliefOn;
@@ -341,6 +458,7 @@ uniform float uSeabedRelief;
 uniform float uClarity;
 uniform float uHueShift;
 uniform float uSaturation;
+uniform float uRiverFootprint;
 
 const vec3 BASE_LAND = ${vec3(TERRAIN.BASE_LAND)};
 const vec3 BASE_SEA = ${vec3(TERRAIN.BASE_SEA)};
@@ -366,6 +484,13 @@ const float MAX_FACTOR = ${num(RELIEF.MAX_FACTOR)};
 const float RELIEF_RANGE = ${num(RELIEF_RANGE)};
 const float BYTE_MID = ${num(BYTE_MID)};
 const float DEPTH_STEPS = ${num(DEPTH_STEPS)};
+const float RIVER_RANGE = ${num(RIVER.FIELD_RANGE)};
+const float RIVER_SHALLOW = ${num(RIVER.DEPTH_SHALLOW)};
+const float RIVER_DEEP = ${num(RIVER.DEPTH_DEEP)};
+const float RIVER_DEPTH_RANGE = ${num(RIVER.DEPTH_RANGE)};
+const float RIVER_MIN_ALPHA = ${num(RIVER.MIN_ALPHA)};
+const float MIN_FOOTPRINT = ${num(MIN_FOOTPRINT)};
+const vec3 RIVER_ICE = ${vec3(RIVER.ICE_COLOUR)};
 
 const vec3 YIQ_Y = ${row(YIQ.Y)};
 const vec3 YIQ_I = ${row(YIQ.I)};
@@ -437,7 +562,8 @@ void main() {
     colour = mix(colour, straight(underwater), underAlpha * wet);
 
     // 3. Relief
-    colour = min(vec3(1.0), colour * reliefFactor(change * uReliefStrength * uReliefOn));
+    float factor = reliefFactor(change * uReliefStrength * uReliefOn);
+    colour = min(vec3(1.0), colour * factor);
 
     // 4. Water
     float waterFactor = reliefFactor(change * uReliefStrength * uSeabedRelief * uReliefOn);
@@ -446,7 +572,18 @@ void main() {
     float coverage = mix(FLAT_WATER_ALPHA, waterAlpha(depth, uClarity), uElevationOn);
     colour = mix(colour, water, coverage * wet * uWaterOn);
 
-    // 5. Surface biomes over the water
+    // 5. Rivers, on dry ground (and across pools)
+    vec4 river = texture2D(uRivers, vUvs);
+    float edge = RIVER_RANGE - 2.0 * RIVER_RANGE * river.r;
+    float riverCover = clamp(0.5 - edge / max(uRiverFootprint, MIN_FOOTPRINT), 0.0, 1.0) * (1.0 - wet * (1.0 - river.b)) * uWaterOn;
+    float riverDepth = mix(RIVER_SHALLOW, RIVER_DEEP, clamp(-edge / RIVER_DEPTH_RANGE, 0.0, 1.0));
+    vec3 riverBed = min(vec3(1.0), SEDIMENT * factor);
+    vec3 riverWater = min(vec3(1.0), tint(mix(BASE_SEA, waterRamp(riverDepth), uElevationOn), uHueShift, uSaturation) * waterFactor);
+    float riverAlpha = mix(FLAT_WATER_ALPHA, max(RIVER_MIN_ALPHA, waterAlpha(riverDepth, uClarity)), uElevationOn);
+    vec3 riverColour = mix(mix(riverBed, riverWater, riverAlpha), min(vec3(1.0), RIVER_ICE * factor), river.g);
+    colour = mix(colour, riverColour, riverCover);
+
+    // 6. Surface biomes over the water
     colour = mix(colour, straight(surface), surfaceAlpha * wet);
 
     gl_FragColor = vec4(clamp(colour, 0.0, 1.0), 1.0);

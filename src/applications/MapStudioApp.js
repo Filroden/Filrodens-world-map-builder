@@ -16,6 +16,7 @@ import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getP
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { TerrainUpgrade } from "./TerrainUpgrade.js";
+import { RiverSources } from "../generation/RiverSources.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 
@@ -136,6 +137,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             resetReferenceScale(e, t)       { this._onResetReferenceScale(e, t); },
             resetZoom(e, t)                 { this._onResetZoom(e, t); },
             saveMap(e, t)                   { this._onSaveMap(e, t); },
+            saveMapAs(e, t)                 { this._onSaveMapAs(e, t); },
             selectRegionLayer(e, t)         { this._onSelectRegionLayer(e, t); },
             setBrushBiome(e, t)             { this._onSetBrushBiome(e, t); },
             setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
@@ -172,7 +174,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context: {
             template: "modules/filrodens-world-map-builder/templates/context.hbs",
             classes: ["fwmb-context-panel"],
-            scrollable: [".fwmb-scrollable", "#fwmb-scroll-auto-labels", "#fwmb-scroll-custom-labels", "#fwmb-scroll-rivers", "#fwmb-scroll-faults", "#fwmb-scroll-pins", "#fwmb-scroll-routes"],
+            scrollable: [".fwmb-scrollable", "#fwmb-scroll-auto-labels", "#fwmb-scroll-custom-labels", "#fwmb-scroll-rivers", "#fwmb-scroll-faults", "#fwmb-scroll-pins", "#fwmb-scroll-routes", "#fwmb-scroll-region-layers"],
         },
         map: {
             template: "modules/filrodens-world-map-builder/templates/map.hbs",
@@ -220,6 +222,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static #TOOL_TERRAIN_LAYERS = Object.freeze({
         terrain: ["elevation"],
         biomes: ["landBiomes", "seaBiomes"],
+        // Rivers are drawn as part of the Water layer
+        features: ["water"],
     });
 
     /**
@@ -305,6 +309,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // cloned into saved map payloads) since whether this panel is expanded has nothing to
         // do with any particular map.
         this._builtinPinIconsExpanded = false;
+        // Which collapsible list sections in the tool panels the GM has collapsed, by their
+        // data-section key (see #bindCollapsibleFieldsets). Studio-session UI state like the flag
+        // above: every section starts open whenever the Studio is opened.
+        this._collapsedSections = new Set();
         // Mass Edit selection tool state - also Studio-session UI state, not map data, for the
         // same reason: which items are checked for a batch edit has nothing to do with the map
         // itself, and should reset (not persist) whenever the Studio app is reopened.
@@ -568,6 +576,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context.infrastructureIcons = getPinIconPickerList(this.uiState.activeIcon);
         context.builtinPinIcons = getBuiltinPinIconList();
         context.builtinPinIconsExpanded = this._builtinPinIconsExpanded;
+        // Read by the templates as collapsedSections.<key>, so a section drawn again stays as the
+        // GM left it rather than springing open
+        context.collapsedSections = Object.fromEntries([...this._collapsedSections].map((key) => [key, true]));
         context.customPinIcons = getCustomPinIconList();
 
         const activeIconEntry = context.infrastructureIcons.find((icon) => icon.key === this.uiState.activeIcon);
@@ -658,6 +669,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             context.regionLayers = [...(this.regionLayers || [])].sort(alphaSort).map((layer) => ({
                 ...layer,
                 isActive: layer.id === this.activeRegionLayerId,
+                // Region layer keys hold a dot, so the template cannot look them up in
+                // collapsedSections by path; the layer carries its own flag instead
+                collapsed: this._collapsedSections.has(`regionLayer.${layer.id}`),
                 regions: [...(layer.regions || [])].sort(alphaSort).map((r) => ({ ...r, massEditSelected: this.massEditSelection.region.has(r.id) })),
             }));
 
@@ -1009,18 +1023,44 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * only ever reflects whatever the last-rendered context said), which would otherwise slam
      * it shut the moment any action inside it - a checkbox, Hide/Reveal all - triggers a
      * context re-render. Tracking `open` in JS and feeding it back through the render context
-     * (see `builtinPinIconsExpanded` in _preparePartContext) keeps it open until the GM
-     * actually collapses it themselves. Assigning `ontoggle` (rather than addEventListener)
-     * is deliberate: re-running this after every render always replaces any previous handler,
-     * so the same element never ends up with duplicate listeners.
+     * (see `builtinPinIconsExpanded` and `collapsedSections` in _preparePartContext) keeps it as
+     * the GM left it until they toggle it themselves. Assigning `ontoggle` and `onclick`
+     * (rather than addEventListener) is deliberate: re-running this after every render always
+     * replaces any previous handler, so the same element never ends up with duplicate listeners.
+     *
+     * The collapsible list sections (tool panel lists and region layers) are marked with
+     * data-section. They are open by default, so only the collapsed ones are remembered.
      */
     #bindCollapsibleFieldsets() {
         const builtinIconsDetails = this.element.querySelector("#fwmb-builtin-pin-icons");
-        if (!builtinIconsDetails) return;
+        if (builtinIconsDetails) {
+            builtinIconsDetails.ontoggle = () => {
+                this._builtinPinIconsExpanded = builtinIconsDetails.open;
+            };
+        }
 
-        builtinIconsDetails.ontoggle = () => {
-            this._builtinPinIconsExpanded = builtinIconsDetails.open;
-        };
+        for (const section of this.element.querySelectorAll("details[data-section]")) {
+            section.ontoggle = () => this.#rememberSectionState(section);
+            section.querySelector(":scope > summary").onclick = MapStudioApp.#keepSummaryControlsFromToggling;
+        }
+    }
+
+    /** Records whether a collapsible list section is collapsed (see #bindCollapsibleFieldsets). */
+    #rememberSectionState(section) {
+        const key = section.dataset.section;
+        if (section.open) this._collapsedSections.delete(key);
+        else this._collapsedSections.add(key);
+    }
+
+    /**
+     * A click anywhere in a <summary> toggles its <details>, including a click on a button or
+     * link inside it (a region layer's Edit and Delete buttons, a list's Mass Edit toggle). Those
+     * controls should only do their own job, so their clicks have the toggle cancelled. Cancelling
+     * the default does not stop the click reaching the application's own data-action handling,
+     * which listens further up the page.
+     */
+    static #keepSummaryControlsFromToggling(event) {
+        if (event.target.closest("[data-action], button, a")) event.preventDefault();
     }
 
     #bindContextPanelListeners() {
@@ -1054,6 +1094,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         const name = target.name || "";
+
+        // The resolution fields describe the next map Create New Map will build, not the open
+        // map, so changing them neither marks the map unsaved nor regenerates anything
+        if (MapStudioApp.#NEW_MAP_SIZE_INPUTS.has(name)) return this.#recordNewMapSize(target, name);
 
         // Skip marking dirty for temporary visual overlays
         if (!name.startsWith("reference")) this.markDirty();
@@ -1112,6 +1156,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateBiomeOpacity();
     }
 
+    /** The Create New Map resolution fields (see #recordNewMapSize). */
+    static #NEW_MAP_SIZE_INPUTS = new Set(["mapWidth", "mapHeight"]);
+
+    /**
+     * Keeps a typed resolution in the UI state as soon as it is entered.
+     *
+     * The context panel is drawn from the UI state, so any redraw before Create New Map (a new
+     * random seed, switching tools and back) would otherwise put the fields back to the size of
+     * the open map and lose what was typed. The open map's real size lives in mapWidth and
+     * mapHeight on the app itself, which is what saves and the canvas use, so holding the typed
+     * size here changes nothing about the open map. A field left blank or unreadable is ignored;
+     * Create New Map falls back to the default size for it.
+     */
+    #recordNewMapSize(target, name) {
+        const size = Number.parseInt(target.value, 10);
+        if (!Number.isNaN(size)) this.uiState[name] = size;
+    }
+
     /** The map settings the terrain shader reads directly (see #syncTerrainSettings). */
     static #TERRAIN_SHADER_INPUTS = new Set(["reliefShading", "seabedRelief", "waterClarity", "waterHue", "waterSaturation"]);
 
@@ -1149,7 +1211,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             )
         ) {
             this.debouncedGenerateClimate();
-        } else if (target.matches('input[name="riverDensity"], input[name="maxLakeSize"], input[name="springAltOffset"], input[name="springMoistMin"], input[name="meanderJitter"]')) {
+        } else if (target.matches('input[name="riverDensity"], input[name="springAltOffset"], input[name="springMoistMin"], input[name="riverMeander"], input[name="riverWidthScale"]')) {
             this.debouncedGenerateFeatures();
         }
     }
@@ -1510,11 +1572,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
 
         if (this.activeTool === "features") {
-            this.canvasEngine.renderFeaturePins(this.mapPins, isEdit);
-
-            if (this.currentRiverData?.vectors) {
-                this.canvasEngine.renderProceduralRivers(this.currentRiverData.vectors, this.bufferWaterMask);
-            }
+            this.canvasEngine.renderFeaturePins(this.mapPins, isEdit, this.proceduralSprings);
 
             if (this.canvasEngine.renderFaultLines) {
                 this.canvasEngine.renderFaultLines(this.tectonicFaults, isEdit, this.activeFaultId);
@@ -1539,7 +1597,41 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    /**
+     * Removes a procedural spring (see RiverSources) by adding a pin that removes it, since
+     * procedural springs are placed afresh on every refresh and are not stored themselves.
+     * @returns {boolean} Whether `target` was a procedural spring.
+     */
+    #removeProceduralSpring(target) {
+        const index = this.proceduralSprings?.indexOf(target) ?? -1;
+        if (index < 0 || this.activeTool !== "features") return false;
+
+        MapStateManager.pushVectorState(this);
+        this.mapPins.push(RiverSources.removalPin(target));
+        this.proceduralSprings.splice(index, 1);
+        this._repaintVectors();
+        this.debouncedCanvasClimate();
+        this.render({ parts: ["context"] });
+        this.markDirty();
+        return true;
+    }
+
+    /**
+     * Turns every procedural spring the user dragged into their own spring where they dropped
+     * it, and removes the procedural one from where it was (see #removeProceduralSpring).
+     */
+    #adoptMovedSprings() {
+        for (const spring of this.proceduralSprings ?? []) {
+            if (spring.x === spring.homeX && spring.y === spring.homeY) continue;
+            this.mapPins.push(RiverSources.removalPin({ x: spring.homeX, y: spring.homeY }));
+            this.mapPins.push({ id: foundry.utils.randomID(), name: "River Source", x: spring.x, y: spring.y, type: "spring", radius: FILRODENSWMB.DISPLAY.PIN_RADIUS, visibility: "all" });
+            spring.homeX = spring.x;
+            spring.homeY = spring.y;
+        }
+    }
+
     #handleInfraDragEnd() {
+        if (this.activeTool === "features") this.#adoptMovedSprings();
         this.render({ parts: ["context"] });
         this.markDirty();
 
@@ -1643,6 +1735,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #handleInfraDeleteNode(target) {
         if (!["infrastructure", "regions", "features", "scene"].includes(this.activeTool)) return;
         if (target.icon && this.activeTool !== "infrastructure") return;
+        if (this.#removeProceduralSpring(target)) return;
 
         // 1. Locate the target and its specific deletion instructions
         const match = this.#findNodeToDelete(target);
@@ -1950,7 +2043,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /** The terrain images the painters fill, as the canvas's terrain shader takes them. */
     #terrainBuffers() {
-        return { surface: this.bufferSurfaceBiomes, underwater: this.bufferUnderwaterBiomes, aux: this.bufferTerrainAux };
+        return { surface: this.bufferSurfaceBiomes, underwater: this.bufferUnderwaterBiomes, aux: this.bufferTerrainAux, rivers: this.bufferRivers };
     }
 
     /**
@@ -2121,7 +2214,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      *   repaints just the stamp area on every pointer move, where reading every elevation each
      *   time would be wasted work.
      * @param {boolean} [options.vectors] - Whether to redraw the vector layers (pins, routes,
-     *   rivers, regions, labels) as well. The live brush leaves this off: painting changes none of
+     *   regions, labels) as well. The live brush leaves this off: painting changes none of
      *   them, and redrawing them rebuilds every label's text and every pin's icon, which on every
      *   pointer move creates canvases and GPU textures far faster than the browser frees them.
      */
@@ -2184,7 +2277,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         mark = timer.lap("Canvas repaint: canvas textures", mark);
 
         const contourInterval = this.uiState["contourInterval"];
-        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds, waterMask);
+        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds);
         mark = timer.lap("Canvas repaint: contours painter", mark);
         this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight, uploadBounds);
         mark = timer.lap("Canvas repaint: canvas textures", mark);
@@ -2219,13 +2312,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.clearInteractiveTargets();
         const isEditModeActive = this.canvasEngine.isEditMode;
 
-        // 1. Render Rivers, Springs & Faults
+        // 1. Render Springs, Faults and custom river guides
         const showPins = this.activeTool === "features" && isEditModeActive;
-        this.canvasEngine.renderFeaturePins(this.mapPins, showPins);
-
-        if (this.currentRiverData?.vectors) {
-            this.canvasEngine.renderProceduralRivers(this.currentRiverData.vectors, this.bufferWaterMask);
-        }
+        this.canvasEngine.renderFeaturePins(this.mapPins, showPins, this.proceduralSprings);
 
         if (this.canvasEngine.renderFaultLines) {
             const isFaultEdit = this.activeTool === "features" && isEditModeActive;
@@ -2612,6 +2701,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
         this.uiState.springMoistMin = p.hydrology?.springMoistMin ?? FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN;
         this.uiState.meanderJitter = p.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER;
+        this.uiState.riverMeander = p.hydrology?.riverMeander ?? MapStateManager.riverMeanderFromJitter(this.uiState.meanderJitter);
+        this.uiState.riverWidthScale = p.hydrology?.riverWidthScale ?? FILRODENSWMB.HYDROLOGY.CHANNELS.WIDTH;
         this.uiState.altCooling = p.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING;
         this.uiState.freezingThreshold = p.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
         this.uiState.contourInterval = p.display?.contourInterval ?? 0.1;
@@ -2906,18 +2997,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Context-aware Quick Save.
-     * Creates a new journal if none exists, otherwise overwrites the current ID.
+     * Saves the map to the compendium.
+     *
+     * A plain save overwrites the saved map that is open, or asks for a name and creates a new
+     * saved map when the open map has never been saved. "Save as" always asks for a name and
+     * creates a new saved map, which then becomes the one that is open: the map it was loaded
+     * from is left exactly as it was last saved, and later plain saves go to the new copy.
      *
      * Only one save runs at a time; asking again while one is under way does nothing and reports
      * no save. The save under way is kept so that closing the window can wait for it.
      *
+     * @param {object} [options]
+     * @param {boolean} [options.asNew=false] - Save as a new saved map ("Save as").
      * @returns {Promise<boolean>} True if the map was saved.
      */
-    async saveCurrentMap() {
+    async saveCurrentMap({ asNew = false } = {}) {
         if (this.#activeSave) return false;
 
-        this.#activeSave = this.#performSave();
+        this.#activeSave = this.#performSave(asNew);
         try {
             return await this.#activeSave;
         } finally {
@@ -2925,22 +3022,38 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    /** Saves the map (see saveCurrentMap). */
-    async #performSave() {
+    /**
+     * The name offered when a map is saved under a new name: the open map's name marked as a
+     * copy (so accepting it cannot be confused with the original in the saved maps list), or a
+     * name made from the seed for a map that has never been saved.
+     */
+    #defaultSaveName() {
+        if (this.currentSaveName) return game.i18n.format("FILRODENSWMB.UI.SaveAsCopyName", { name: this.currentSaveName });
+
+        const { currentSeed } = MapStateManager.getMapParameters(this);
+        const hash = currentSeed || this.#generateRandomSeed();
+        return `Terrain Map (${hash})`;
+    }
+
+    /**
+     * Saves the map (see saveCurrentMap).
+     *
+     * @param {boolean} asNew - Create a new saved map rather than overwrite the open one.
+     */
+    async #performSave(asNew) {
         let mapName = this.currentSaveName;
+        const createsNewMap = asNew || !this.currentSaveId;
+
+        // 1. Ask for the name BEFORE locking the UI. This sits outside the try block below: its
+        // finally releases the processing overlay, and a cancelled prompt has not claimed it, so
+        // releasing it here would hide the overlay of a refresh that is still running.
+        if (createsNewMap) {
+            mapName = (await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), this.#defaultSaveName()))?.trim();
+
+            if (!mapName) return false; // User cancelled the save prompt (or left the name blank)
+        }
 
         try {
-            // 1. Prompt the user BEFORE locking the UI
-            if (!this.currentSaveId) {
-                const { currentSeed } = MapStateManager.getMapParameters(this);
-                const hash = currentSeed || this.#generateRandomSeed();
-                const defaultName = `Terrain Map (${hash})`;
-
-                mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), defaultName);
-
-                if (!mapName) return false; // User cancelled the save prompt
-            }
-
             // 2. Lock the UI and show the spinner
             await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.SavingMap"));
             this.currentSaveName = mapName;
@@ -2976,13 +3089,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 parentId: this.currentParentId,
             };
 
-            const journal = await saveMapData(this.currentSaveName, payload, this.currentSaveId);
+            const journal = await saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId);
 
             if (journal) {
                 this.currentSaveId = journal.id;
                 this.isDirty = false; // Successfully saved, map is no longer dirty
                 ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
-                this.render({ parts: ["toolbar"] });
+                // A new saved map also belongs in the saved maps list, if it is showing
+                this.render({ parts: createsNewMap && this.activeTool === "manage" ? ["toolbar", "context"] : ["toolbar"] });
                 return true;
             } else {
                 ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
@@ -3648,7 +3762,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         const toolLayerMap = {
-            features: "features",
             infrastructure: "infrastructure",
             regions: "regions",
             labels: "labels",
@@ -4379,6 +4492,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (target) target.disabled = false;
     }
 
+    async _onSaveMapAs(event, target) {
+        if (target) target.disabled = true;
+        await this.saveCurrentMap({ asNew: true });
+        if (target) target.disabled = false;
+    }
+
     _onSelectRegionLayer(event, target) {
         const id = target.closest(".fwmb-accordion-group").dataset.layerId;
         this._finishActiveRegion();
@@ -4596,7 +4715,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             waterMask: this.bufferWaterMask,
             terrain: this.#terrainBuffers(),
             settings: this.#terrainSettings(),
-            rivers: this.currentRiverData ? this.currentRiverData.vectors : null,
         });
     }
 

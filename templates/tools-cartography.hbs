@@ -61,8 +61,8 @@
         </div>
     </fieldset>
 
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.CartographyDecorations"}}</legend>
+    <details class="fwmb-fieldset fwmb-list-section" data-section="decorations" {{#unless collapsedSections.decorations}}open{{/unless}}>
+        <summary>{{localize "FILRODENSWMB.UI.CartographyDecorations"}}</summary>
 
         <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
             {{#each mapDecorations}}
@@ -85,7 +85,7 @@
             <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoDecorations"}}</div>
             {{/each}}
         </div>
-    </fieldset>
+    </details>
 
     <div class="fwmb-divider"></div>
 

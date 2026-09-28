@@ -18,6 +18,21 @@
             {{#if removesSlip}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
             {{/if}}
+            {{#if changesRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{/if}}
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+        </ul>
+    {{else if isRivers}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroRivers"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
         </ul>
     {{else if isFaults}}
         <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroFaults"}}</p>
@@ -26,6 +41,12 @@
             <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFeatures"}}</li>
             {{#if removesSlip}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
+            {{#if changesRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{/if}}
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
             {{/if}}
         </ul>
     {{else if isTectonics}}
@@ -39,6 +60,12 @@
             {{/if}}
             {{#if removesSlip}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
+            {{#if changesRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{/if}}
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
             {{/if}}
         </ul>
     {{else}}
@@ -57,6 +84,12 @@
             {{/if}}
             {{#if removesSlip}}
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
+            {{#if changesRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{/if}}
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
             {{/if}}
         </ul>
     {{/if}}

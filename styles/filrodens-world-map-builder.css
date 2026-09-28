@@ -56,6 +56,9 @@
 .fwmb-icon.save {
     --fwmb-mask: url("../assets/icons/save.svg");
 }
+.fwmb-icon.save-as {
+    --fwmb-mask: url("../assets/icons/save_as.svg");
+}
 .fwmb-icon.accept {
     --fwmb-mask: url("../assets/icons/check.svg");
 }
@@ -997,10 +1000,62 @@
     overflow-y: hidden;
 }
 
-.fwmb-fixed-lists fieldset.fwmb-fieldset {
+.fwmb-fixed-lists fieldset.fwmb-fieldset,
+.fwmb .fwmb-fixed-lists details.fwmb-fieldset {
     flex: 1;
     min-height: 5rem;
     margin: 0;
+}
+
+/* --- COLLAPSIBLE LIST SECTIONS ---
+   The tool panel lists are <details> elements so the GM can fold away a list they are not
+   using. Open lists share the panel's height and each scrolls on its own; a collapsed list
+   shrinks to its heading and hands its share to the others. */
+.fwmb .fwmb-fixed-lists details.fwmb-fieldset:not([open]) {
+    flex: 0 0 auto;
+    min-height: 0;
+}
+
+/* The hidden content box still counts as a flex item, so a collapsed section drops the gap
+   that would otherwise sit below its heading */
+.fwmb details.fwmb-list-section:not([open]) {
+    gap: 0;
+}
+
+/* A <details> element lays out its content inside its own ::details-content box, not as its
+   own children, so that box has to be the flex column that lets the list fill the section and
+   scroll inside it (without this the list grows past the section and the panel cuts it off). */
+.fwmb details.fwmb-list-section[open]::details-content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-space-8);
+    flex: 1;
+    min-height: 0;
+}
+
+/* Region layers: the layer header is the <summary>. It is already a flex row (as a list
+   item), which hides the browser's own marker, so the chevron is drawn here to match the
+   collapsible fieldsets. */
+.fwmb details.fwmb-accordion-group > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.fwmb details.fwmb-accordion-group > summary::-webkit-details-marker {
+    display: none;
+}
+
+.fwmb details.fwmb-accordion-group > summary::before {
+    content: "▶";
+    display: inline-block;
+    font-size: var(--fwmb-font-size-xs);
+    transition: transform 0.2s ease;
+    color: var(--fwmb-text-primary);
+}
+
+.fwmb details.fwmb-accordion-group[open] > summary::before {
+    transform: rotate(90deg);
+    color: var(--fwmb-accent-main);
 }
 
 .fwmb .fwmb-wide {

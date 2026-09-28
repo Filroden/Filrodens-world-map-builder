@@ -17,7 +17,10 @@
 
     <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-10);">
         <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
-        <input type="number" name="styleThickness" value="{{style.thickness}}" min="1" max="10">
+        <div class="fwmb-slider-group">
+            <input type="range" name="styleThickness" value="{{style.thickness}}" min="1" max="10" step="1" />
+            <output>{{style.thickness}}</output>
+        </div>
     </div>
 
     <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-10);">

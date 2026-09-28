@@ -1,7 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { resolvePinIconPath } from "../data/pinIcons.js";
 import { ColorMath } from "../tools/ColorMath.js";
-import { RiverSteps } from "../tools/RiverSteps.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { getRegionUploadResource } from "./RegionUploadResource.js";
 import { TerrainCompositor } from "./TerrainCompositor.js";
@@ -51,7 +50,8 @@ export class StudioCanvas {
         this.terrainCompositor = new TerrainCompositor(PIXI);
         this.layers.biomeFallback.visible = false;
 
-        // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
+        // Vector Graphics Engine for non-pixel entities (custom river and fault guides, spring pins).
+        // Rivers themselves are drawn by the terrain shader (see TerrainCompositor).
         this.haloGraphics = new PIXI.Graphics();
         this.haloGraphics.filters = [new PIXI.AlphaFilter(0.15)];
         this.layers.features.addChild(this.haloGraphics);
@@ -61,9 +61,6 @@ export class StudioCanvas {
 
         this.faultGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.faultGraphics);
-
-        this.proceduralRiverGraphics = new PIXI.Graphics();
-        this.layers.features.addChild(this.proceduralRiverGraphics);
 
         this.featurePinGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.featurePinGraphics);
@@ -638,7 +635,7 @@ export class StudioCanvas {
      * Sends the terrain's images (see TerrainShading) to the GPU and draws them on the terrain
      * layer. As with renderPixelBuffer, `bounds` limits the upload to the rows that changed.
      *
-     * @param {{surface: Uint8Array, underwater: Uint8Array, aux: Uint8Array}} buffers - RGBA images of the whole map.
+     * @param {{surface: Uint8Array, underwater: Uint8Array, aux: Uint8Array, rivers: Uint8Array}} buffers - RGBA images of the whole map.
      * @param {number} width - Map width in pixels.
      * @param {number} height - Map height in pixels.
      * @param {object|null} bounds - The pixels that changed since the last call.
@@ -671,23 +668,11 @@ export class StudioCanvas {
     }
 
     /**
-     * Renders procedural, non-interactive water vectors.
+     * Renders interactive feature pins (like Springs and Blockers), and, while editing, the
+     * procedural springs placed on the current terrain (see RiverSources) as rings, so they can
+     * be moved or removed like the user's own.
      */
-    renderProceduralRivers(rivers, waterMask) {
-        if (!this.proceduralRiverGraphics) return;
-
-        this.proceduralRiverGraphics.clear();
-        this.proceduralRiverGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
-
-        if (rivers && rivers.length > 0) {
-            this.#drawRivers(rivers, waterMask);
-        }
-    }
-
-    /**
-     * Renders interactive feature pins (like Springs and Blockers).
-     */
-    renderFeaturePins(mapPins, isFeatureEdit) {
+    renderFeaturePins(mapPins, isFeatureEdit, proceduralSprings = []) {
         if (!this.featurePinGraphics) return;
 
         this.featurePinGraphics.clear();
@@ -696,42 +681,22 @@ export class StudioCanvas {
         if (mapPins && mapPins.length > 0) {
             this.#drawMapPins(mapPins, isFeatureEdit);
         }
+        if (isFeatureEdit) this.#drawProceduralSprings(proceduralSprings);
     }
 
-    #drawRivers(rivers, waterMask) {
-        const waterColor = 0x78aad2;
-        const frozenColor = 0xe1ebf0;
-
-        for (const river of rivers) {
-            if (!river.path || river.path.length < 2) continue;
-            this.#drawSingleRiver(river.path, waterColor, frozenColor, waterMask);
+    /** Draws the procedural springs as rings, each a target that can be dragged or removed. */
+    #drawProceduralSprings(springs) {
+        const style = FILRODENSWMB.DISPLAY.PROCEDURAL_SPRING;
+        const radius = FILRODENSWMB.DISPLAY.PIN_RADIUS;
+        const scale = this.stage.scale.x || 1;
+        for (const spring of springs) {
+            const x = spring.x + 0.5;
+            const y = spring.y + 0.5;
+            this.featurePinGraphics.lineStyle({ width: style.LINE_WIDTH / scale, color: style.COLOUR, alpha: style.ALPHA });
+            this.featurePinGraphics.drawCircle(x, y, radius);
+            this.interactiveTargets.push({ target: spring, x, y, radius: Math.max(radius, style.HIT_RADIUS), entityType: "proceduralSpring", entityId: spring.id });
         }
-    }
-
-    /** Draws one procedural river, leaving out the parts that lie in a lake (see RiverSteps). */
-    #drawSingleRiver(path, waterColor, frozenColor, waterMask) {
-        if (!path || path.length === 0) return;
-
-        const graphics = this.proceduralRiverGraphics;
-        let currentIsFrozen = path[0].isFrozen;
-        graphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-        graphics.moveTo(path[0].x, path[0].y);
-
-        for (let i = 1; i < path.length; i++) {
-            const previous = path[i - 1];
-            const point = path[i];
-
-            // If the climate crosses the freezing threshold, snap the line and change colours
-            if (point.isFrozen !== undefined && point.isFrozen !== currentIsFrozen) {
-                currentIsFrozen = point.isFrozen;
-                graphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-                graphics.moveTo(point.x, point.y);
-                continue;
-            }
-
-            if (RiverSteps.isShown(previous, point, waterMask, this.mapWidth, this.mapHeight)) graphics.lineTo(point.x, point.y);
-            else graphics.moveTo(point.x, point.y);
-        }
+        this.featurePinGraphics.lineStyle(0);
     }
 
     /**

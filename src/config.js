@@ -284,6 +284,9 @@ export const FILRODENSWMB = {
     //       map's faults match its parent's (on a map that was never cropped this changes nothing).
     TERRAIN_VERSION: {
         LEGACY: 1,
+        // Revision 2 also brings the current river rules: rivers follow the slope's own direction
+        // and join a river they run beside, and custom rivers carve a channel with wider, gentler
+        // banks (see TerrainVersion.usesCurrentRivers)
         CURRENT: 2,
         // Engines that build their terrain outward from a coastline, and so use the coastline
         // rules of the current revision: settings measured in pixels of a map BASELINE_DIMENSION
@@ -369,9 +372,15 @@ export const FILRODENSWMB = {
         BIOME_ALPHA_INACTIVE: 0.65,
         REGION_OPACITY: 0.5,
         RIVER_WIDTH: 2,
-        RIVER_ALPHA: 0.9,
         PIN_RADIUS: 6,
         PIN_ALPHA: 0.4,
+        // Procedural springs, shown as rings while editing Features (screen pixels for the line)
+        PROCEDURAL_SPRING: {
+            COLOUR: 0xff0000,
+            ALPHA: 0.9,
+            LINE_WIDTH: 2,
+            HIT_RADIUS: 10,
+        },
         CONTOUR_INTERVAL: 0.1,
         // Relief shading of the terrain (see ProceduralEngine#reliefChange and TerrainShading): its default
         // strength (0 is off; each map sets its own) and the compass bearing the light comes from.
@@ -442,6 +451,19 @@ export const FILRODENSWMB = {
             HUE_MAX: 260,
             SATURATION: 1,
         },
+        // Rivers, drawn by the terrain shader from the river image (see RiverNetwork.rasterise and
+        // TerrainShading). FIELD_RANGE is how far either side of a river's edge the image's
+        // distance field reaches, in map pixels. A river is water of depth DEPTH_SHALLOW at its
+        // edge to DEPTH_DEEP DEPTH_RANGE map pixels in (the same depth scale as a lake's), covering
+        // its bed at least MIN_ALPHA; a frozen river is ICE_COLOUR.
+        RIVER: {
+            FIELD_RANGE: 4,
+            DEPTH_SHALLOW: 0.08,
+            DEPTH_DEEP: 0.3,
+            DEPTH_RANGE: 3,
+            MIN_ALPHA: 0.7,
+            ICE_COLOUR: [225, 235, 240],
+        },
         // The shoreline drawn on the contour layer where dry ground meets the sea or a lake (see
         // ProceduralEngine#drawShoreline): the dry pixel darkened, the water pixel lightened
         SHORELINE: {
@@ -454,14 +476,6 @@ export const FILRODENSWMB = {
         THREE_D: {
             // How far up the terrain stands: the height in map pixels of one whole unit of elevation.
             ALTITUDE_SCALE: 40,
-            // Procedural rivers are painted into the terrain's colours. Their width in map pixels
-            // is the map's longer side divided by RIVER_WIDTH_DIVISOR, but at least
-            // RIVER_MIN_WIDTH, so a river on a large map is still visible with the whole map in
-            // view. Colours as on the flat map.
-            RIVER_WIDTH_DIVISOR: 800,
-            RIVER_MIN_WIDTH: 2,
-            RIVER_COLOUR: [120, 170, 210],
-            FROZEN_RIVER_COLOUR: [225, 235, 240],
             // The sea's surface. The water's colour over the bed is already painted into the
             // terrain, so the surface only adds a faint sheen: this opacity at the default water
             // clarity, less for clearer water and more for murkier.
@@ -487,18 +501,116 @@ export const FILRODENSWMB = {
     },
     HYDROLOGY: {
         RIVER_DENSITY: 40,
+        // The largest lake: MAX_LAKE_SIZE is the legacy limit in pixels, set per map (maps made
+        // before the current river rules keep theirs, and a river ends in a lake that reaches
+        // it). The current limits are in square pixels of a BASELINE_DIMENSION map, so they hold
+        // the same share of the world at any size or zoom: MAX_LAKE_AREA for any lake, and
+        // LOOP_LAKE_AREA for a lake that floods its own river's course on flat ground. A lake that
+        // reaches its limit is breached and the river flows on, if a way out lower than the lake
+        // lies within BREACH_AREA of it (see ProceduralEngine#breachBasin).
         MAX_LAKE_SIZE: 8000,
+        MAX_LAKE_AREA: 3000,
+        LOOP_LAKE_AREA: 20,
+        BREACH_AREA: 30000,
         SPRING_ALTITUDE_OFFSET: 0.25,
         SPRING_MOISTURE_MIN: 0.45,
+        // The legacy River Meander: random noise on the river trace, up to MEANDER_JITTER_MAX.
+        // Only maps made before the current river rules still use it (see
+        // TerrainVersion.usesCurrentRivers); the current setting is CHANNELS.MEANDER.
         MEANDER_JITTER: 0,
+        MEANDER_JITTER_MAX: 0.02,
+        // Custom rivers under the current river rules: the valley reaches MANUAL_RIVER_VALLEY_SPREAD
+        // times the channel's half-width either side of the line (see HydrologyEngine#carveValley),
+        // and the river drawn along it starts MANUAL_RIVER_START_SHARE as wide as its Width.
+        // MANUAL_RIVER_DEPTHS gives the depth for each Width (MANUAL_RIVER_DEFAULT_DEPTH for any
+        // other), of which the valley is MANUAL_RIVER_VALLEY_DEPTH as deep as the legacy trench.
+        MANUAL_RIVER_VALLEY_SPREAD: 5,
+        MANUAL_RIVER_VALLEY_DEPTH: 0.4,
+        MANUAL_RIVER_START_SHARE: 0.5,
+        MANUAL_RIVER_DEFAULT_DEPTH: 0.025,
         MANUAL_RIVER_DEPTHS: {
             2: 0.015,
             4: 0.025,
             6: 0.035,
             8: 0.05,
         },
+        // A river running downhill follows the slope measured STREAM_GRADIENT_REACH pixels either
+        // side of it, and may lag up to STREAM_SLACK pixels behind (see ProceduralEngine#followSlope)
+        STREAM_GRADIENT_REACH: 1.5,
+        STREAM_SLACK: 0.75,
+        // Procedural springs under the current river rules: RIVER_DENSITY * SPRING_CANDIDATES
+        // places are tried across the world (see RiverSources)
+        SPRING_CANDIDATES: 10,
         MAX_PATH_LENGTH: 5,
         MAX_RIVER_LENGTH_MULT: 1.5,
+        // A lake smaller than this (in square pixels of a BASELINE_DIMENSION map) is a pool the
+        // river is drawn across, rather than a lake it stops at (see RiverNetwork)...
+        POOL_AREA: 6,
+        // ... or one no wider than this, in pixels of a BASELINE_DIMENSION map from the shore to
+        // its middle (a string of water along a valley)
+        POOL_WIDTH: 1.5,
+        // How the traced rivers are drawn (see RiverNetwork). Lengths and widths are in pixels of
+        // a BASELINE_DIMENSION map unless they say otherwise.
+        CHANNELS: {
+            // Width: SOURCE_WIDTH + FLOW_WIDTH * sqrt(flow), where flow is the length of river
+            // upstream (tributaries included), times the slope factor, times WIDTH (the setting)
+            SOURCE_WIDTH: 0.8,
+            FLOW_WIDTH: 0.08,
+            WIDTH: 1,
+            // Slope, as elevation per baseline pixel measured over SLOPE_WINDOW either side:
+            // at or below FLAT_SLOPE the river is FLAT_FACTOR as wide, at or above STEEP_SLOPE
+            // STEEP_FACTOR as wide, in between in proportion
+            SLOPE_WINDOW: 6,
+            FLAT_SLOPE: 0.0004,
+            STEEP_SLOPE: 0.006,
+            FLAT_FACTOR: 1.35,
+            STEEP_FACTOR: 0.75,
+            // Over the last MOUTH_LENGTH before the sea a river widens by up to MOUTH_WIDENING
+            // times (on a flat coast)
+            MOUTH_LENGTH: 12,
+            MOUTH_WIDENING: 1.5,
+            // Never narrower than this half-width, in map pixels
+            MIN_RADIUS: 0.6,
+            // Smoothing of the pixel steps, and of the direction meanders are measured across
+            SMOOTHING: 1.6,
+            GUIDE_SMOOTHING: 6,
+            // Gentle wander everywhere: its size and wavelength
+            WANDER: 0.8,
+            WANDER_WAVELENGTH: 40,
+            // Meanders on flat ground: MEANDER is the setting (0 none, 1 default). On flat ground
+            // the river swings up to MEANDER_ANGLE radians either way (about 1.9 closes loops),
+            // over a wavelength of MEANDER_WAVELENGTH river widths (at least MEANDER_MIN_WAVELENGTH)
+            MEANDER: 1,
+            // Meanders are full at or below MEANDER_FLAT_SLOPE and gone at MEANDER_STEEP_SLOPE
+            MEANDER_FLAT_SLOPE: 0.0003,
+            MEANDER_STEEP_SLOPE: 0.0016,
+            MEANDER_ANGLE: 1.6,
+            MEANDER_WAVELENGTH: 16,
+            MEANDER_MIN_WAVELENGTH: 18,
+            // How much one bend differs from the next in size and length (0 all alike)
+            MEANDER_VARIETY: 0.6,
+            MEANDER_ROUNDNESS: 0.2,
+            MEANDER_RETURN: 0.6,
+            // Deltas (DELTA is the setting, 0 none, 1 default): a river carrying at least
+            // DELTA_MIN_FLOW whose last stretch is at least DELTA_FLATNESS flat (on the meander
+            // measure) splits DELTA_LENGTH * sqrt(flow) before the sea into up to DELTA_BRANCHES
+            // branches fanning out up to DELTA_ANGLE radians from its course, each
+            // DELTA_BRANCH_WIDTH as wide as the river at the fork
+            DELTA: 1,
+            DELTA_MIN_FLOW: 250,
+            DELTA_FLATNESS: 0.5,
+            DELTA_LENGTH: 2.2,
+            DELTA_BRANCHES: 5,
+            DELTA_ANGLE: 0.8,
+            DELTA_BRANCH_WIDTH: 0.5,
+            // (the river's drawn line must end within this many steps of its mouth)
+            DELTA_REACH_SLACK: 3,
+            // How much higher (elevation) than its own ground a bend may be pushed
+            MEANDER_CLIMB: 0.004,
+            // Spacing of the points while bending, and of the points drawn, in map pixels
+            SPACING: 0.75,
+            DRAWN_SPACING: 1.5,
+        },
     },
     CLIMATE: {
         WIND_DISTANCE: 40,

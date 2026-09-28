@@ -2,7 +2,6 @@ import * as THREE from "../../vendor/three/three.module.js";
 import { OrbitControls } from "../../vendor/three/OrbitControls.js";
 import { FILRODENSWMB } from "../config.js";
 import { TerrainShading } from "../tools/TerrainShading.js";
-import { RiverSteps } from "../tools/RiverSteps.js";
 
 export class Scene3D {
     constructor(containerElement) {
@@ -65,8 +64,9 @@ export class Scene3D {
      * The drape is made from the same images and settings as the flat map (see
      * TerrainShading.drape), so the layers, the biomes on the sea bed, the water's colour by
      * depth and the map's tint all match; only relief shading is left out, since the scene's
-     * light shades the real slopes. Procedural rivers are painted into the drape rather than
-     * drawn as lines, so they lie on the ground like any other colour.
+     * light shades the real slopes. Rivers (procedural and custom alike) come with it, from the
+     * same river image the flat map draws them from, so they lie on the ground like any other
+     * colour.
      *
      * The mesh follows the ground, except that lakes are raised flat to their surface and
      * surface biomes over the sea (Pack Ice and the like) to just above the sea's surface, so
@@ -77,18 +77,16 @@ export class Scene3D {
      * @param {number} map.height - Map pixel height.
      * @param {number} map.seaLevel
      * @param {Float32Array} map.waterMask - Each lake pixel's surface elevation, 0 elsewhere.
-     * @param {{aux: Uint8Array, surface: Uint8Array, underwater: Uint8Array}} map.terrain - The images the flat map is painted from.
+     * @param {{aux: Uint8Array, surface: Uint8Array, underwater: Uint8Array, rivers: Uint8Array}} map.terrain - The images the flat map is painted from.
      * @param {object} map.settings - The flat map's shading settings (see TerrainShading.defaultSettings).
-     * @param {object[]} [map.rivers] - Procedural river paths.
      */
-    render3DMap({ elevation, width, height, seaLevel, waterMask, terrain, settings, rivers }) {
+    render3DMap({ elevation, width, height, seaLevel, waterMask, terrain, settings }) {
         this.#disposeTerrain();
         const config = FILRODENSWMB.DISPLAY.THREE_D;
 
         // 1. The drape, with the rivers painted in
         const drape = new Uint8Array(width * height * 4);
-        TerrainShading.drape(terrain.aux, terrain.surface, terrain.underwater, settings, drape);
-        this.#paintRivers(drape, rivers, terrain.aux, width, height, waterMask);
+        TerrainShading.drape(terrain.aux, terrain.surface, terrain.underwater, settings, drape, terrain.rivers);
 
         // Mipmaps and anisotropic filtering keep thin features such as rivers from breaking up
         // into dots when the terrain is seen from afar or at a low angle.
@@ -162,78 +160,7 @@ export class Scene3D {
         this.controls.update();
     }
 
-    /**
-     * Paints the procedural rivers into the drape, on dry ground only.
-     *
-     * Each step of a river's path is drawn as a line segment with softened edges. The steps are
-     * chosen as on the flat map (see RiverSteps), which leaves out the parts inside lakes. Each pixel
-     * keeps the strongest coverage of any segment over it, so where segments overlap (at every
-     * bend) the river is not painted twice and does not darken.
-     */
-    #paintRivers(drape, rivers, aux, width, height, waterMask) {
-        if (!rivers?.length) return;
-        const config = FILRODENSWMB.DISPLAY.THREE_D;
-        const radius = Math.max(config.RIVER_MIN_WIDTH, Math.max(width, height) / config.RIVER_WIDTH_DIVISOR) / 2;
-        const coverage = new Float32Array(width * height);
-        const frozen = new Uint8Array(width * height);
-
-        for (const river of rivers) {
-            const path = river.path;
-            if (!path || path.length < 2) continue;
-            let isFrozen = Boolean(path[0].isFrozen);
-            for (let i = 1; i < path.length; i++) {
-                const previous = path[i - 1];
-                const point = path[i];
-                if (point.isFrozen !== undefined) isFrozen = Boolean(point.isFrozen);
-
-                if (RiverSteps.isShown(previous, point, waterMask, width, height)) this.#stampSegment(coverage, frozen, previous, point, isFrozen, radius, width, height);
-            }
-        }
-
-        const water = config.RIVER_COLOUR;
-        const ice = config.FROZEN_RIVER_COLOUR;
-        const alpha = FILRODENSWMB.DISPLAY.RIVER_ALPHA;
-        for (let i = 0; i < coverage.length; i++) {
-            if (coverage[i] === 0 || aux[i * 4 + 1] > 0) continue;
-            const colour = frozen[i] ? ice : water;
-            const share = coverage[i] * alpha;
-            for (let c = 0; c < 3; c++) {
-                const p = i * 4 + c;
-                drape[p] = Math.round(drape[p] + (colour[c] - drape[p]) * share);
-            }
-        }
-    }
-
-    /**
-     * Records one river segment's coverage: 1 within the radius of the line from a to b, fading
-     * to 0 over the next pixel so the edges are smooth.
-     */
-    #stampSegment(coverage, frozen, a, b, isFrozen, radius, width, height) {
-        const reach = Math.ceil(radius + 1);
-        const minX = Math.max(0, Math.min(a.x, b.x) - reach);
-        const maxX = Math.min(width - 1, Math.max(a.x, b.x) + reach);
-        const minY = Math.max(0, Math.min(a.y, b.y) - reach);
-        const maxY = Math.min(height - 1, Math.max(a.y, b.y) + reach);
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const lengthSquared = dx * dx + dy * dy;
-
-        for (let y = minY; y <= maxY; y++) {
-            for (let x = minX; x <= maxX; x++) {
-                // Distance from the pixel to the nearest point on the segment
-                const t = lengthSquared > 0 ? Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / lengthSquared)) : 0;
-                const distance = Math.hypot(x - (a.x + t * dx), y - (a.y + t * dy));
-                const share = Math.min(1, Math.max(0, radius + 0.5 - distance));
-                const index = y * width + x;
-                if (share > coverage[index]) {
-                    coverage[index] = share;
-                    frozen[index] = isFrozen ? 1 : 0;
-                }
-            }
-        }
-    }
-
-    /** Removes the terrain, sea and any older river lines, freeing their GPU memory. */
+    /** Removes the terrain and sea, freeing their GPU memory. */
     #disposeTerrain() {
         if (this.mesh) {
             this.mesh.geometry.dispose();

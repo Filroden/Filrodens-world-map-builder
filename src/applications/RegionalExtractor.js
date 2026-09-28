@@ -71,8 +71,8 @@ export class RegionalExtractor {
             customLabelStyles: state.customLabelStyles,
             history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
             tectonicFaults: this.#translateFaults(app.tectonicFaults ?? [], cropBox, zoomScale, targetWidth, targetHeight),
-            manualRivers: translate(app.manualRivers),
-            mapPins: translate(app.mapPins),
+            manualRivers: this.#scaleRiverWidths(translate(app.manualRivers), zoomScale),
+            mapPins: [...translate(app.mapPins), ...this.#riverInflows(app, cropBox, zoomScale, targetWidth, targetHeight)],
             mapRoutes: translate(app.mapRoutes),
             regionLayers: newRegions,
             mapLabels: translate(app.mapLabels),
@@ -220,6 +220,62 @@ export class RegionalExtractor {
             }));
             return translated;
         });
+    }
+
+    /**
+     * Records on each custom river how much wider than its Width it is drawn and carved
+     * (`widthScale`, compounding through crops of crops), so it is as wide in the world as on
+     * the parent map. The Width itself stays as it was, since it also picks the channel's depth
+     * (see HydrologyEngine).
+     */
+    static #scaleRiverWidths(rivers, zoomScale) {
+        for (const river of rivers) river.widthScale = (river.widthScale ?? 1) * zoomScale;
+        return rivers;
+    }
+
+    /**
+     * A spring for every river that flows into the crop from outside it, placed where the river
+     * crosses the crop's edge and carrying the flow the river has gathered by then (`inflow`, in
+     * baseline pixels of river upstream, see RiverNetwork). Without these, the regional map would
+     * only have the rivers whose sources lie inside it: a great river crossing the region would
+     * vanish, and the rest would all start as narrow streams.
+     *
+     * Only a river's first entry into the crop gets a spring. If it leaves and comes back, its
+     * return is traced from the first spring anyway, or joins the river that spring starts. A
+     * custom river needs none where it enters along its own line: the line is carried over.
+     *
+     * @returns {object[]} Spring pins, in the regional map's pixels.
+     */
+    static #riverInflows(app, cropBox, zoomScale, targetWidth, targetHeight) {
+        const rivers = app.currentRiverData?.vectors ?? [];
+        const flows = app.currentRiverData?.network?.flows;
+        if (!flows) return [];
+
+        const inside = (point) => point.x >= cropBox.x && point.x < cropBox.x + cropBox.width && point.y >= cropBox.y && point.y < cropBox.y + cropBox.height;
+        const pins = [];
+        for (const river of rivers) {
+            const entry = river.path.findIndex((point, i) => i > 0 && inside(point) && !inside(river.path[i - 1]));
+            // A custom river entering along its own line is carried over as a custom river
+            if (entry < 0 || entry < (river.authored ?? 0)) continue;
+
+            const point = river.path[entry];
+            pins.push({
+                id: foundry.utils.randomID(),
+                name: game.i18n.localize("FILRODENSWMB.UI.RiverInflow"),
+                x: this.#clampInside((point.x - cropBox.x) * zoomScale, targetWidth),
+                y: this.#clampInside((point.y - cropBox.y) * zoomScale, targetHeight),
+                type: "spring",
+                radius: FILRODENSWMB.DISPLAY.PIN_RADIUS,
+                visibility: "all",
+                inflow: flows.get(river.id)?.[entry] ?? 0,
+            });
+        }
+        return pins;
+    }
+
+    /** A coordinate kept a pixel inside the map, so a spring on the edge is traced from a real pixel. */
+    static #clampInside(value, size) {
+        return Math.min(size - 2, Math.max(1, Math.round(value)));
     }
 
     static #translateVectorList(list, cropBox, zoomScale, targetWidth, targetHeight) {
