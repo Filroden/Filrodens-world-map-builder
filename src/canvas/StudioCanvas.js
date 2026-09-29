@@ -107,6 +107,8 @@ export class StudioCanvas {
         this.cropStart = { x: 0, y: 0 };
         this.cropOriginalBox = null;
         this.onCropUpdate = null;
+        // Called with the crop when a drag of it ends, so the app can snap it (see setCropBox)
+        this.onCropRelease = null;
 
         // Add them to the zooming stage in ascending order
         this.stage.addChild(
@@ -685,6 +687,7 @@ export class StudioCanvas {
             if (this.activeCropAction) {
                 this.activeCropAction = null;
                 canvasElement.style.cursor = "crosshair";
+                if (this.cropBox && this.onCropRelease) this.onCropRelease({ ...this.cropBox });
                 return;
             }
             if (this.isDraggingReference) {
@@ -1946,11 +1949,25 @@ export class StudioCanvas {
 
             this.#drawCropOverlay();
             if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+            if (this.onCropRelease) this.onCropRelease({ ...this.cropBox });
         }
     }
 
     getCropData() {
         return this.cropBox;
+    }
+
+    /**
+     * Replaces the crop (while the crop tool is showing) and redraws it, as when the app snaps a
+     * crop the user has drawn to the one a regional map will actually use.
+     *
+     * @param {{x: number, y: number, width: number, height: number}} box - The crop, in map pixels.
+     */
+    setCropBox(box) {
+        if (!this.isCropMode || !box) return;
+        this.cropBox = { x: box.x, y: box.y, width: box.width, height: box.height };
+        this.#drawCropOverlay();
+        if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
     }
 
     #drawCropOverlay() {

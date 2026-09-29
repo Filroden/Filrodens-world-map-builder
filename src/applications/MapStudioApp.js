@@ -770,24 +770,47 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.brushEngine = this.#createBrushEngine();
         this.#wireBrushCallbacks();
 
-        this.canvasEngine.onCropUpdate = (cropBox) => {
-            const targetWidth = this.uiState.regionalTargetWidth;
-            const zoomScale = targetWidth / cropBox.width;
-            const calcHeight = Math.round(cropBox.height * zoomScale);
+        this.canvasEngine.onCropUpdate = (cropBox) => this.#showCropReadouts(cropBox);
+        this.canvasEngine.onCropRelease = (cropBox) => this.#snapCrop(cropBox);
+    }
 
-            this.uiState.regionalTargetHeight = calcHeight;
-            const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
-            if (heightInput) heightInput.value = calcHeight;
+    /**
+     * Moves the crop to the one the regional map will actually use (see
+     * RegionalExtractor.planCrop): snapped to the parent's grid so the two grids line up, and
+     * sized for the requested width. Done when a drag of the crop ends, when the crop tool opens
+     * and when the requested width changes, so the outline always shows what will be made.
+     */
+    #snapCrop(cropBox) {
+        if (!this.canvasEngine || !cropBox || !(cropBox.width > 0) || !(cropBox.height > 0)) return;
+        this.canvasEngine.setCropBox(this.#planCrop(cropBox).cropBox);
+    }
 
-            const latRange = Math.abs(this.uiState.latTop - this.uiState.latBottom);
-            const newLatTop = this.uiState.latTop - (cropBox.y / this.mapHeight) * latRange;
-            const newLatBottom = this.uiState.latTop - ((cropBox.y + cropBox.height) / this.mapHeight) * latRange;
+    /** The regional map the crop makes (see RegionalExtractor.planCrop). */
+    #planCrop(cropBox) {
+        return RegionalExtractor.planCrop(cropBox, this.uiState.regionalTargetWidth, { type: this.uiState.gridType, size: this.uiState.gridSize }, this.mapWidth, this.mapHeight);
+    }
 
-            const latTopEl = this.element.querySelector("#fwmb-readout-lat-top");
-            const latBottomEl = this.element.querySelector("#fwmb-readout-lat-bottom");
-            if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;
-            if (latBottomEl) latBottomEl.innerHTML = `${newLatBottom.toFixed(2)}&deg;`;
-        };
+    /**
+     * Shows the height and latitude range of the regional map the crop will make, as
+     * RegionalExtractor.planCrop works them out, for the crop as it will be snapped. While a
+     * crop is being dragged these show where it will snap to when released.
+     */
+    #showCropReadouts(cropBox) {
+        if (!cropBox || !(cropBox.width > 0) || !(cropBox.height > 0)) return;
+        const plan = this.#planCrop(cropBox);
+
+        this.uiState.regionalTargetHeight = plan.targetHeight;
+        const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
+        if (heightInput) heightInput.value = plan.targetHeight;
+
+        const latRange = Math.abs(this.uiState.latTop - this.uiState.latBottom);
+        const newLatTop = this.uiState.latTop - (plan.cropBox.y / this.mapHeight) * latRange;
+        const newLatBottom = this.uiState.latTop - ((plan.cropBox.y + plan.cropBox.height) / this.mapHeight) * latRange;
+
+        const latTopEl = this.element.querySelector("#fwmb-readout-lat-top");
+        const latBottomEl = this.element.querySelector("#fwmb-readout-lat-bottom");
+        if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;
+        if (latBottomEl) latBottomEl.innerHTML = `${newLatBottom.toFixed(2)}&deg;`;
     }
 
     #bindToolbarListeners() {
@@ -1018,15 +1041,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #syncCropLiveEdits(name) {
         if (name !== "regionalTargetWidth" || !this.canvasEngine) return;
 
-        const cropBox = this.canvasEngine.getCropData();
-        if (cropBox && cropBox.width > 0) {
-            const zoomScale = this.uiState.regionalTargetWidth / cropBox.width;
-            const calcHeight = Math.round(cropBox.height * zoomScale);
-            this.uiState.regionalTargetHeight = calcHeight;
-
-            const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
-            if (heightInput) heightInput.value = calcHeight;
-        }
+        this.#snapCrop(this.canvasEngine.getCropData());
     }
 
     /**
