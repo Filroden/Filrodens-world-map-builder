@@ -144,7 +144,6 @@
     "FILRODENSWMB.UI.RiverDensity": "River Density",
     "FILRODENSWMB.UI.EditFeatures": "Toggle Edit Terrain Features",
     "FILRODENSWMB.UI.ToolAddSpring": "Add New River Source",
-    "FILRODENSWMB.UI.ToolBlockSpring": "Block Prodcedurally Generated River Source",
     "FILRODENSWMB.UI.ToolErasePin": "Remove Pin",
 
     "FILRODENSWMB.BIOMES.DEEP_OCEAN": "Deep Ocean",
