@@ -4,6 +4,8 @@ import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
+import { UpwindMargin } from "../tools/UpwindMargin.js";
+import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 
 export class RegionalExtractor {
     /**
@@ -12,6 +14,9 @@ export class RegionalExtractor {
      */
     static createPayload(app, cropBox) {
         const state = foundry.utils.deepClone(app.uiState);
+        // Read before the state is scaled to the crop: the parent's own wind reach decides how
+        // much of its ground beyond the crop the regional map's climate needs
+        const upwindMargin = this.#buildUpwindMargin(app, state);
 
         // 1. Calculate Grid Snapping & Scale Factors
         const baseTargetWidth = state.regionalTargetWidth;
@@ -78,8 +83,26 @@ export class RegionalExtractor {
             mapLabels: translate(app.mapLabels),
             landMasks: state.generationEngine === "guided" ? this.#translateLandMasks(app.landMasks ?? [], cropBox, zoomScale) : [],
             mapDecorations: translate(app.mapDecorations),
+            upwindMargin: upwindMargin(cropBox, zoomScale),
             parentId: app.currentSaveId,
         };
+    }
+
+    /**
+     * The parent's ground either side of the crop, which the regional map's climate reads when
+     * it looks upwind past its own left or right edge (see UpwindMargin). Returns a function of
+     * the crop and zoom, since those are settled after the parent's settings are read here.
+     */
+    static #buildUpwindMargin(app, parentState) {
+        const { params } = MapStateManager.getDerivedMapParameters(parentState, app.customBiomeColors ?? {});
+        const parent = {
+            elevation: app.currentElevationData ?? null,
+            width: app.mapWidth,
+            height: app.mapHeight,
+            windDistance: ProceduralEngine.getWindDistance(app.mapWidth, params),
+            margin: app.upwindMargin ?? null,
+        };
+        return (cropBox, zoomScale) => UpwindMargin.build(parent, cropBox, zoomScale);
     }
 
     static #applyScaleToState(state, cropBox, zoomScale, targetWidth, targetHeight, originalMapHeight) {

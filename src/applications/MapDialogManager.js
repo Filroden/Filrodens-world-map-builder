@@ -64,6 +64,32 @@ export class MapDialogManager {
     }
 
     /**
+     * Asks to save the open map before a regional map is cut from it, because it has never been
+     * saved or has unsaved changes. A regional map is listed under the saved map it was cut from,
+     * and is built from the map as it is now, so without a save it would have no parent in the
+     * Map Management list, or would not match the parent saved there. There is no Discard: the
+     * regional map is built from the changes, so they must be kept to make it.
+     *
+     * @param {boolean} neverSaved - Whether the map has never been saved (rather than having
+     *   unsaved changes), which picks the title and message.
+     * @returns {Promise<boolean>} True to save and carry on, false to stop.
+     */
+    static async promptSaveBeforeRegionalMap(neverSaved) {
+        const message = neverSaved ? "FILRODENSWMB.UI.RegionalMapSaveFirstNew" : "FILRODENSWMB.UI.RegionalMapSaveFirstChanged";
+        const title = neverSaved ? "FILRODENSWMB.UI.SaveUnsavedMap" : "FILRODENSWMB.UI.SaveExistingMap";
+        const choice = await foundry.applications.api.DialogV2.wait({
+            window: { title: game.i18n.localize(title) },
+            content: `<p>${game.i18n.localize(message)}</p>`,
+            buttons: [
+                { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
+                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+            ],
+            close: () => "cancel",
+        });
+        return choice === "save";
+    }
+
+    /**
      * Offers to update a map built with older terrain generation rules (see TerrainUpgrade).
      *
      * Lists only the changes this map would actually see, explains that the update is not saved

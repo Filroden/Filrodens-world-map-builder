@@ -622,7 +622,7 @@ export class ProceduralOrchestrator {
 
         const t0 = performance.now();
 
-        engine.generateClimateData(app.currentElevationData, app.mapWidth, app.mapHeight, params, app.currentMoistureData, app.currentTemperatureData, activeBounds);
+        engine.generateClimateData(app.currentElevationData, app.mapWidth, app.mapHeight, params, app.currentMoistureData, app.currentTemperatureData, activeBounds, app.upwindMargin);
 
         const t1 = performance.now();
         app.renderTimer.record("Climate", t1 - t0);

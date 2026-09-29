@@ -252,6 +252,9 @@
     "FILRODENSWMB.UI.SaveMapAs": "Save Map As...",
     "FILRODENSWMB.UI.SaveAsCopyName": "{name} (Copy)",
     "FILRODENSWMB.UI.SaveAs": "Save As...",
+    "FILRODENSWMB.UI.SaveUnsavedMap": "Save Unsaved Map",
+    "FILRODENSWMB.UI.SaveExistingMap": "Save Existing Map",
+    "FILRODENSWMB.UI.SaveRegionalMap": "Save Regional Map",
     "FILRODENSWMB.UI.SaveSuccess": "Successfully saved {name} to the Compendium.",
     "FILRODENSWMB.UI.SaveError": "Failed to save the map. Please ensure the compendium is unlocked.",
 
@@ -778,5 +781,7 @@
     "FILRODENSWMB.UI.TerrainUpdateIntroRivers": "This map was created with older river rules. Updating it changes its rivers as follows:",
     "FILRODENSWMB.UI.TerrainUpdateRivers": "Rivers follow the lie of the land more closely instead of running in straight lines, a river that runs beside another joins it, and a lake that fills up breaks out through its lowest shore so its river flows on. River sources are placed afresh from the land and climate (the ones you added yourself are kept), so many rivers take a different course, and some lakes move, grow or shrink.",
     "FILRODENSWMB.UI.TerrainUpdateChannels": "Custom rivers run exactly along the line you drew, carry on downhill from its end, and are drawn like any other river. The ground around each is lowered into a gentle valley that keeps the texture of the land, in place of the old channel.",
-    "FILRODENSWMB.UI.RegionalMapNeedsUpdate": "This map was created with older terrain rules. Update it to the latest engine (see the Create New Map tool) to create regional maps from it."
+    "FILRODENSWMB.UI.RegionalMapNeedsUpdate": "This map was created with older terrain rules. Update it to the latest engine (see the Create New Map tool) to create regional maps from it.",
+    "FILRODENSWMB.UI.RegionalMapSaveFirstNew": "This map has not been saved yet. A regional map is listed under the map it was created from, so save this map first. Save it now and create the regional map?",
+    "FILRODENSWMB.UI.RegionalMapSaveFirstChanged": "This map has unsaved changes. A regional map is created from the map as you see it, so save the changes first to keep the saved map and its regional map matching. Save now and create the regional map?"
 }

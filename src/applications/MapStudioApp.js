@@ -380,6 +380,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // legacy regional map (which did not record it) and it could be found by following its
         // parent maps. Used to correct its wind distance, and passed on to regional maps cut from it.
         this.legacyRootSize = null;
+        // The parent map's ground beyond a regional map's left and right edges, which its climate
+        // reads when it looks upwind past its own edge (see UpwindMargin); null for any other map.
+        // Kept as saved, and passed on (and extended) to regional maps cut from this one.
+        this.upwindMargin = null;
         this.isDirty = false;
 
         MapStateManager.allocateBuffers(this);
@@ -2752,6 +2756,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // revision (see TerrainVersion). Only regional maps carry a world description.
         this.uiState.terrainVersion = TerrainVersion.getVersion(payload);
         this.uiState.world = payload.world ?? null;
+        this.upwindMargin = payload.upwindMargin ?? null;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
 
@@ -3141,12 +3146,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      *
      * @param {object} [options]
      * @param {boolean} [options.asNew=false] - Save as a new saved map ("Save as").
+     * @param {string|null} [options.promptTitle=null] - Title for the name prompt, when there is
+     *   one, in place of "Save As..." (so a save asked for as one step of something else says so).
      * @returns {Promise<boolean>} True if the map was saved.
      */
-    async saveCurrentMap({ asNew = false } = {}) {
+    async saveCurrentMap({ asNew = false, promptTitle = null } = {}) {
         if (this.#activeSave) return false;
 
-        this.#activeSave = this.#performSave(asNew);
+        this.#activeSave = this.#performSave(asNew, promptTitle);
         try {
             return await this.#activeSave;
         } finally {
@@ -3171,8 +3178,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Saves the map (see saveCurrentMap).
      *
      * @param {boolean} asNew - Create a new saved map rather than overwrite the open one.
+     * @param {string|null} [promptTitle] - Title for the name prompt, or null for "Save As...".
      */
-    async #performSave(asNew) {
+    async #performSave(asNew, promptTitle = null) {
         let mapName = this.currentSaveName;
         const createsNewMap = asNew || !this.currentSaveId;
 
@@ -3180,7 +3188,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // finally releases the processing overlay, and a cancelled prompt has not claimed it, so
         // releasing it here would hide the overlay of a refresh that is still running.
         if (createsNewMap) {
-            mapName = (await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), this.#defaultSaveName()))?.trim();
+            mapName = (await MapDialogManager._promptTextValue(promptTitle ?? game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), this.#defaultSaveName()))?.trim();
 
             if (!mapName) return false; // User cancelled the save prompt (or left the name blank)
         }
@@ -3196,6 +3204,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 generationEngine: this.uiState.generationEngine,
                 terrainVersion: this.uiState.terrainVersion,
                 world: this.uiState.world,
+                upwindMargin: this.upwindMargin ?? null,
                 terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
                 springsBaked: this.uiState.springsBaked,
                 mapWidth: this.mapWidth,
@@ -3726,6 +3735,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // A new map is built with the current terrain rules, so there is nothing to update
         this.terrainUpgrade = null;
         this.legacyRootSize = null;
+        // A new map is not a crop of anything, so has no parent ground beyond its edges
+        this.upwindMargin = null;
 
         // Reset biome colours to defaults so the DOM sync catches them
         this.customBiomeColors = {};
@@ -4042,6 +4053,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /**
      * Executes the regional map extraction pipeline.
+     *
+     * The open map must be saved, with no unsaved changes, before a regional map is cut from it
+     * (see MapDialogManager.promptSaveBeforeRegionalMap): the regional map is listed under the
+     * saved map it came from, and is built from the map as it is now, which must be what was saved.
+     * Each prompt on the way is titled for what it saves (the unsaved or changed map, then the
+     * regional map), so the two name prompts of a never-saved map don't read as the same question.
      */
     async _onGenerateRegionalMap(event, target) {
         if (!this.canvasEngine) return;
@@ -4053,8 +4070,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return;
         }
 
+        // 1a. Make sure there is a saved parent that matches the map as it is now
+        const neverSaved = !this.currentSaveId;
+        if (neverSaved || this.isDirty) {
+            if (!(await MapDialogManager.promptSaveBeforeRegionalMap(neverSaved))) return;
+            if (!(await this.saveCurrentMap({ promptTitle: game.i18n.localize("FILRODENSWMB.UI.SaveUnsavedMap") }))) return;
+        }
+
         // 2. Prompt for save name
-        const mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), `${this.currentSaveName || "Map"} (Region)`);
+        const mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveRegionalMap"), game.i18n.localize("FILRODENSWMB.UI.Name"), `${this.currentSaveName || "Map"} (Region)`);
 
         if (!mapName) return;
 

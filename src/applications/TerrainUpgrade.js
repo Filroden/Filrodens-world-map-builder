@@ -200,7 +200,7 @@ export class TerrainUpgrade {
         const updated = MapStateManager.getDerivedMapParameters({ ...app.uiState, ...plan }, app.customBiomeColors).params;
 
         const engine = new ProceduralEngine(app.uiState.mapSeed);
-        const climate = engine.prepareClimate(width, height, updated);
+        const climate = engine.prepareClimate(width, height, updated, app.upwindMargin);
         const elevationData = app.currentElevationData;
 
         for (let y = 0; y < height; y++) {

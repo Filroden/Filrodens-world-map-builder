@@ -5,6 +5,7 @@ import { BiomeRuleEngine } from "./BiomeRuleEngine.js";
 import { BIOME_SIDE } from "./BiomePlacement.js";
 import { TerrainShading } from "../tools/TerrainShading.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
+import { UpwindMargin } from "../tools/UpwindMargin.js";
 import { FILRODENSWMB } from "../config.js";
 
 export class ProceduralEngine {
@@ -2435,6 +2436,9 @@ export class ProceduralEngine {
      * the elevation at most this many columns away on its own row, so a bounded climate refresh
      * has to recompute that many columns beyond the edited area on either side.
      *
+     * Near the map's left or right edge the point upwind can lie beyond the map. A regional map
+     * then reads its parent's ground there (see UpwindMargin); any other map reads its edge column.
+     *
      * @param {number} width - Map width in pixels.
      * @param {object} params - Derived map parameters.
      * @returns {number} Maximum upwind sampling distance, in whole pixels.
@@ -2458,13 +2462,16 @@ export class ProceduralEngine {
      * prepared once here by prepareClimate. The same pair lets a caller work out the climate of
      * individual pixels under different settings without allocating map-sized output buffers
      * (see TerrainUpgrade), and guarantees both paths give exactly the same numbers.
+     *
+     * @param {object|null} [upwindMargin] - A regional map's record of its parent's ground beyond
+     *   its left and right edges (see UpwindMargin), as saved with the map, or null.
      */
-    generateClimateData(elevationData, width, height, params, outMoisture, outTemperature, bounds = null) {
+    generateClimateData(elevationData, width, height, params, outMoisture, outTemperature, bounds = null, upwindMargin = null) {
         const moistureData = outMoisture;
         const temperatureData = outTemperature;
 
         const climateBounds = ProceduralEngine.resolveBounds(bounds, width, height);
-        const climate = this.prepareClimate(width, height, params);
+        const climate = this.prepareClimate(width, height, params, upwindMargin);
 
         for (let y = climateBounds.minY; y <= climateBounds.maxY; y++) {
             for (let x = climateBounds.minX; x <= climateBounds.maxX; x++) {
@@ -2483,9 +2490,11 @@ export class ProceduralEngine {
      * @param {number} width - Map width in pixels.
      * @param {number} height - Map height in pixels.
      * @param {object} params - Derived map parameters.
+     * @param {object|null} [upwindMargin] - A regional map's record of its parent's ground beyond
+     *   its left and right edges (see UpwindMargin), as saved with the map, or null.
      * @returns {object} Settings to pass to getMoistureAt and getTemperatureAt.
      */
-    prepareClimate(width, height, params) {
+    prepareClimate(width, height, params, upwindMargin = null) {
         const latTop = params.latTop ?? FILRODENSWMB.DEFAULTS.LAT_TOP;
         const latBottom = params.latBottom ?? FILRODENSWMB.DEFAULTS.LAT_BOTTOM;
 
@@ -2512,6 +2521,9 @@ export class ProceduralEngine {
             // extra terrain detail generateTopography adds, so biome borders gain detail instead
             // of being the parent map's outlines magnified; 0 for any other map
             extraOctaves: params.terrain?.extraOctaves ?? 0,
+            // The parent's ground beyond a regional map's left and right edges, read when the
+            // point upwind lies off the map; null for any other map, which reads its edge column
+            upwindMargin: UpwindMargin.decode(upwindMargin),
         };
     }
 
@@ -2526,6 +2538,10 @@ export class ProceduralEngine {
      * The moisture of one pixel: noise shifted by the global moisture setting, plus orographic
      * lift on land (rising ground relative to the ground upwind catches more rain, falling ground
      * lies in a rain shadow). Clamped to 0..1.
+     *
+     * When the point upwind lies beyond the map's left or right edge, a regional map reads its
+     * parent's ground there (see UpwindMargin), as its parent did; any other map reads its own
+     * edge column.
      *
      * @param {object} climate - Settings from prepareClimate.
      * @param {Float32Array} elevationData - Elevation of the whole map.
@@ -2547,8 +2563,9 @@ export class ProceduralEngine {
             // Use the dynamically scaled wind distance
             const windDirectionX = climate.windDistance * windCellBlend;
 
-            const upwindX = Math.max(0, Math.min(climate.width - 1, Math.round(x + windDirectionX)));
-            const upwindElev = elevationData[y * climate.width + upwindX];
+            const upwindX = Math.round(x + windDirectionX);
+            const offMap = upwindX < 0 || upwindX >= climate.width;
+            const upwindElev = offMap && climate.upwindMargin ? UpwindMargin.sampleAt(climate.upwindMargin, upwindX, y) : elevationData[y * climate.width + Math.max(0, Math.min(climate.width - 1, upwindX))];
 
             const slope = elevation - upwindElev;
             baseMoisture += slope * 3;
