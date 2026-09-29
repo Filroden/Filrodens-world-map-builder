@@ -268,7 +268,19 @@ export class LandMaskGenerator {
             };
         });
 
-        return LandMaskGenerator.#dropStraightRuns(LandMaskGenerator.#dropDuplicates(placed));
+        return LandMaskGenerator.tidyOutline(placed);
+    }
+
+    /**
+     * Removes nodes an outline does not need: nodes on top of the node before them, and nodes on
+     * a straight line between their neighbours (as nodes lying along the edge of the canvas
+     * buffer do). They add nothing to the shape and would only be extra handles to edit.
+     *
+     * @param {Array<{x: number, y: number}>} nodes - A closed outline.
+     * @returns {Array<{x: number, y: number}>}
+     */
+    static tidyOutline(nodes) {
+        return LandMaskGenerator.#dropStraightRuns(LandMaskGenerator.#dropDuplicates(nodes));
     }
 
     /** Removes nodes that sit on (or within MIN_NODE_SPACING of) the node before them, around the loop. */
@@ -285,10 +297,7 @@ export class LandMaskGenerator {
         return kept;
     }
 
-    /**
-     * Removes nodes that lie on a straight line between their neighbours, as nodes clamped onto
-     * the buffer's edge do. They add nothing to the shape and would only be extra handles to edit.
-     */
+    /** Removes nodes that lie on a straight line between their neighbours (see tidyOutline). */
     static #dropStraightRuns(nodes) {
         if (nodes.length <= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) return nodes;
 

@@ -15,6 +15,10 @@
                 <i class="fwmb-icon shuffle"></i>
             </button>
 
+            <button type="button" class="fwmb-btn" data-action="generateRandomLandMap" {{#if (eq uiState.sceneMode 'crop')}}disabled{{/if}} data-tooltip="{{localize 'FILRODENSWMB.UI.RandomLandMapHint'}}">
+                <i class="fwmb-icon travel-explore"></i>
+            </button>
+
             <div class="fwmb-divider-vertical"></div>
 
             <button type="button" class="fwmb-btn {{#if (eq uiState.sceneMode 'crop')}}active{{/if}}" data-action="setSceneMode" data-mode="crop" {{#if canCreateRegionalMap}}data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegionalMap'}}"{{else}}disabled data-tooltip="{{localize 'FILRODENSWMB.UI.RegionalMapNeedsUpdate'}}"{{/if}}>

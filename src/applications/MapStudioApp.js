@@ -19,6 +19,7 @@ import { TerrainUpgrade } from "./TerrainUpgrade.js";
 import { RiverSources } from "../generation/RiverSources.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 import { LandMaskGenerator } from "../generation/LandMaskGenerator.js";
+import { RandomLandMap } from "../generation/RandomLandMap.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -123,6 +124,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             exportPng(e, t)                 { this._onExportPng(e, t); },
             exportScene(e, t)               { this._onExportScene(e, t); },
             exportSettings(e, t)            { this._onExportSettings(e, t); },
+            generateRandomLandMap(e, t)     { this._onGenerateRandomLandMap(e, t); },
             generateRandomLandMask(e, t)    { this._onGenerateRandomLandMask(e, t); },
             generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
             importMapJson(e, t)             { this._onImportMapJson(e, t); },
@@ -2002,6 +2004,29 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#refreshAfterLandMaskChange(true);
     }
 
+    /**
+     * Adds a random set of land masks covering the whole map (see RandomLandMap): landmasses as
+     * Add Land masks and the lakes and inland seas inside them as Remove Land masks. They are
+     * added after the existing masks as a single undo step, so they can be undone, edited node by
+     * node, or built on like hand-drawn masks. As the new masks come last, they decide the land
+     * wherever they cover it; existing land elsewhere stays.
+     *
+     * A mask being drawn is finished first (or discarded if it is not yet a shape), exactly as
+     * switching mode does.
+     */
+    _onGenerateRandomLandMap(event, target) {
+        if (!this.#isMaskDrawingMode()) return;
+        if (this.activeLandMaskId) this._finishActiveLandMask();
+
+        const masks = RandomLandMap.generate({ mapWidth: this.mapWidth, mapHeight: this.mapHeight });
+
+        MapStateManager.pushVectorState(this);
+        for (const { operation, points } of masks) {
+            this.landMasks.push(this.#createLandMask(operation, points));
+        }
+        this.#refreshAfterLandMaskChange(true);
+    }
+
     /** Whether the Add Land or Remove Land toggle is selected (rather than the crop tool). */
     #isMaskDrawingMode() {
         return this.uiState.sceneMode === "addMask" || this.uiState.sceneMode === "subtractMask";
@@ -2917,7 +2942,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 icon: this.uiState.activeIcon,
                 x: finalPos.x,
                 y: finalPos.y,
-                scale: this.uiState.pinScale ?? FILRODENSWMB.PINS?.DEFAULT_SCALE ?? 1,
+                scale: this.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
                 visibility: "all",
                 color: this.uiState.pinColor || "#ffffff",
                 label: {
@@ -3650,17 +3675,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
         this.uiState.mapSeed = newSeed;
 
-        // Inject the engine choice into the wiped state, with any defaults of its own (kept in
-        // defaultUiState too, so double-clicking a slider resets it to the engine's default)
+        // Inject the engine choice into the wiped state
         this.uiState.generationEngine = newEngine;
         // Textured ground is chosen when a Flat map is created (the checkbox only shows while the
         // open map is Flat, so a map switched to Flat from another engine starts smooth)
         this.uiState.flatTexture = newEngine === "flat" && formData.flatTexture === true;
-        if (newEngine === "advanced") {
-            const fracture = FILRODENSWMB.GENERATION.TECTONICS_V2.COASTLINE_FRACTURE;
-            this.uiState.coastlineFracture = fracture;
-            this.defaultUiState.coastlineFracture = fracture;
-        }
 
         // A new map is built with the current terrain rules, so there is nothing to update
         this.terrainUpgrade = null;

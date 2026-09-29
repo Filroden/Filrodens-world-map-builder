@@ -74,7 +74,7 @@ export const FILRODENSWMB = {
             TILE_SIZE: 64,
         },
         TECTONIC_PLATES: 10,
-        COASTLINE_FRACTURE: 0.3,
+        COASTLINE_FRACTURE: 0.2,
         // The Coastline Fracture slider's step (tools-terrain.hbs uses the same value). Values
         // worked out in code for the slider, such as the one a map is given when it is updated
         // to the current terrain rules, are rounded to it so the slider can show them exactly.
@@ -107,10 +107,6 @@ export const FILRODENSWMB = {
         },
         // Tectonic terrain under the current rules (ProceduralEngine.generateTectonicV2Topography)
         TECTONICS_V2: {
-            // Coastline Fracture for a new map: the land this engine makes has far more
-            // coastline than a typical hand-drawn land mask, so the shared default breaks it up
-            // too much
-            COASTLINE_FRACTURE: 0.2,
             // Plates draw from a random stream of their own, this far from the map's seed
             PLATE_SEED_OFFSET: 3,
             // A plate's buoyancy: how far it leans towards what the continent noise says at its
@@ -353,6 +349,32 @@ export const FILRODENSWMB = {
         // Nodes closer together than this (pixels) are merged, which tidies nodes clamped onto
         // the edge of the canvas buffer
         MIN_NODE_SPACING: 1,
+    },
+    // The random map button in Guided mode (see RandomLandMap)
+    RANDOM_LAND_MAP: {
+        // Spacing (pixels) of the Voronoi cells on a BASELINE_DIMENSION map. It grows with the
+        // square root of the map's size, so a larger map has more cells and more detailed
+        // coastlines, but the node count grows with its side rather than its area. The cells are
+        // coarse on purpose: Coastline Fracture adds the fine detail when the terrain is generated.
+        CELL_SPACING: 55,
+        // How many regions the cells are grouped into, and how fast each can grow relative to the
+        // others (a wider range gives a wider mix of region sizes)
+        GROUPS: { MIN: 8, MAX: 16 },
+        GROWTH_RATE: { MIN: 0.3, MAX: 2.5 },
+        // Share of the map (inside the canvas) to make land, chosen at random in this range
+        LAND_SHARE: { MIN: 0.55, MAX: 0.7 },
+        // A region is skipped when making it land would overshoot the land share by more than this
+        LAND_OVERSHOOT: 0.06,
+        // Regions are made land largest first, their sizes scaled by a random factor in this range
+        // so a smaller region sometimes wins; land is therefore usually, not always, the larger
+        SIZE_JITTER: { MIN: 0.5, MAX: 1.5 },
+        // Share of coastal cells swapped between land and sea, for ragged coasts, small islands
+        // and lakes
+        COAST_RAGGING: 0.15,
+        // Decimal places Voronoi corners are matched to when outlines are traced. Neighbouring
+        // cells share corners, but a corner cut by the canvas edge is computed separately for
+        // each cell and can differ in the last digits.
+        CORNER_PRECISION: 2,
     },
     UI: {
         RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
