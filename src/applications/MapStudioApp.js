@@ -2781,7 +2781,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.mapWidth = this.mapWidth;
         this.uiState.mapHeight = this.mapHeight;
         this.uiState.gridType = payload.gridType || "square";
-        this.uiState.gridSize = payload.gridSize || 100;
+        // Raised to the smallest grid Foundry allows: a map saved with a smaller grid (the slider
+        // used to go down to 10) would otherwise export a scene whose grid Foundry enlarges, while
+        // its grid data describes the smaller cells
+        this.uiState.gridSize = MapStateManager.gridSizeOf(payload.gridSize || 100);
         this.uiState.gridVisible = payload.gridVisible ?? false;
 
         MapStateManager.allocateBuffers(this);

@@ -95,7 +95,7 @@
             </select>
         </div>
 
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="gridSize" label="FILRODENSWMB.UI.GridSize" value=(lookup uiState 'gridSize') min=10 max=300 step=5}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="gridSize" label="FILRODENSWMB.UI.GridSize" value=(lookup uiState 'gridSize') min=20 max=300 step=5}}
     </fieldset>
 
     {{#if (eq uiState.generationEngine "guided")}}

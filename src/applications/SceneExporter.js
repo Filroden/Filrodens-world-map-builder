@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { resolvePinIconPath } from "../data/pinIcons.js";
 import { GridDataExporter } from "./GridDataExporter.js";
+import { MapStateManager } from "./MapStateManager.js";
 
 export class SceneExporter {
     /**
@@ -183,7 +184,8 @@ export class SceneExporter {
             },
             grid: {
                 type: mappedGridType,
-                size: app.uiState.gridSize,
+                // The same size the grid data was built with (see MapStateManager.gridSizeOf)
+                size: MapStateManager.gridSizeOf(app.uiState.gridSize),
                 color: "#000000",
                 alpha: 0.4, // Fixed opacity to guarantee visibility in Foundry
             },
@@ -230,6 +232,13 @@ export class SceneExporter {
         }
 
         if (!scene) return;
+
+        // The grid data describes cells of the size sent; if Foundry stored a different grid,
+        // every cell would be the wrong one, so say so rather than leave it silently wrong
+        if (gridData && scene.grid?.size !== sceneData.grid.size) {
+            console.warn(`FWMB | The scene's grid is ${scene.grid?.size} px but its grid data was built for ${sceneData.grid.size} px cells; the grid data will not line up.`);
+            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.GridDataSizeMismatch"));
+        }
 
         // Create the GM Overlay Tile (if requested)
         if (gmOverlayPath) {

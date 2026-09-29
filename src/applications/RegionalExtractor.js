@@ -155,8 +155,8 @@ export class RegionalExtractor {
         return { cropBox: { x, y, width, height }, zoomScale, targetWidth, targetHeight, gridSize };
     }
 
-    /** The smallest grid size the module draws (see StudioCanvas.drawGrid). */
-    static #MIN_GRID = 10;
+    /** The smallest grid size Foundry allows (see FILRODENSWMB.LIMITS.MIN_GRID_SIZE). */
+    static #MIN_GRID = FILRODENSWMB.LIMITS.MIN_GRID_SIZE;
 
     /**
      * How far apart, across and down, the points are where a grid's pattern starts again, in the

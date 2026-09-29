@@ -330,6 +330,18 @@ export class MapStateManager {
     }
 
     /**
+     * A map's grid size as Foundry will use it: never below the smallest grid Foundry allows
+     * (FILRODENSWMB.LIMITS.MIN_GRID_SIZE). The map's grid, the exported scene and its grid data
+     * all use this, so they always describe the same cells.
+     *
+     * @param {number} size - A stored or entered grid size.
+     * @returns {number} The grid size in pixels.
+     */
+    static gridSizeOf(size) {
+        return Math.max(FILRODENSWMB.LIMITS.MIN_GRID_SIZE, Math.round(Number(size)) || FILRODENSWMB.LIMITS.MIN_GRID_SIZE);
+    }
+
+    /**
      * Converts raw state strings/numbers into the final parameters needed by ProceduralEngine.
      */
     static getDerivedMapParameters(state, customBiomeColors) {

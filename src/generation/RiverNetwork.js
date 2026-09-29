@@ -253,6 +253,35 @@ export class RiverNetwork {
     }
 
     /**
+     * Whether a pixel's centre lies inside a drawn river channel, from the river image (see
+     * rasterise): its distance byte puts the channel's edge beyond the centre (a byte over half
+     * way, since the byte is (FIELD_RANGE - d) / (2 FIELD_RANGE) and d is negative inside).
+     *
+     * This is the channel as drawn, at its width, with its meanders and deltas, whether or not
+     * it is over water; the terrain shader only draws it on dry ground or across a pool (see
+     * TerrainShading), so a caller asking what the map shows applies that rule itself.
+     *
+     * @param {Uint8Array} image - The river image (RGBA per pixel).
+     * @param {number} index - The pixel's index (y * width + x).
+     * @returns {boolean}
+     */
+    static isInChannel(image, index) {
+        return image[index * 4] > MAX_BYTE / 2;
+    }
+
+    /**
+     * Whether a pixel is on or around a pool, where a river is drawn over the water (the river
+     * image's pool byte, see rasterise).
+     *
+     * @param {Uint8Array} image - The river image (RGBA per pixel).
+     * @param {number} index - The pixel's index (y * width + x).
+     * @returns {boolean}
+     */
+    static isOverPool(image, index) {
+        return image[index * 4 + 2] > 0;
+    }
+
+    /**
      * The area where two networks' river images differ: the box around every channel found in
      * one but not the other (a channel counts as the same only if every point matches), grown
      * by each channel's width and the distance field's reach.

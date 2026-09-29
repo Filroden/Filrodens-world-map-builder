@@ -1003,7 +1003,7 @@ export class StudioCanvas {
 
         const width = this.mapWidth;
         const height = this.mapHeight;
-        const s = Math.max(10, Number(size));
+        const s = Math.max(FILRODENSWMB.LIMITS.MIN_GRID_SIZE, Number(size));
 
         if (type === "square") {
             for (let x = 0; x <= width; x += s) {

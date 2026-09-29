@@ -306,6 +306,10 @@ export const FILRODENSWMB = {
         NOISE_SCALE_STEP: 50,
         OVERFLOW_BUFFER: 100,
         BASELINE_DIMENSION: 1000,
+        // The smallest grid size, in pixels. Foundry will not make a scene with a smaller grid
+        // (its CONST.GRID_MIN_SIZE): a smaller size is raised to this when the scene is created,
+        // so the map's own grid, and the grid data exported with the scene, must never go below it.
+        MIN_GRID_SIZE: 20,
         CUSTOM_BIOME_START_ID: 14,
         // The fewest nodes a polygon (region or guided-mode land mask) needs to enclose an area.
         // A shape still below this when the user finishes drawing it is discarded, since it could
