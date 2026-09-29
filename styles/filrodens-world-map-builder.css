@@ -1198,34 +1198,75 @@
     height: 100%;
 }
 
-.fwmb-map-controls {
+/* The boxes drawn over the map (map information, undo/redo, canvas hint and map control groups)
+   share one background and border, dark enough to stay readable over any part of the map. */
+.fwmb-map-container {
+    --fwmb-map-overlay-background: rgba(0, 0, 0, 0.7);
+    --fwmb-map-overlay-border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* The row along the map's bottom edge holding the canvas actions hint (start corner) and the map
+   controls (end corner). The row itself lets pointer events through to the canvas; only the
+   controls take them. The gap is the least space kept between the hint and the controls. */
+.fwmb-map-footer {
     position: absolute;
     inset-block-end: var(--fwmb-size-10);
-    inset-inline-end: var(--fwmb-size-10);
+    inset-inline: var(--fwmb-size-10);
     display: flex;
-    gap: var(--fwmb-size-4);
-    background: rgba(0, 0, 0, 0.5);
-    padding: var(--fwmb-size-4);
-    border-radius: var(--fwmb-radius-small);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--fwmb-size-32);
+    pointer-events: none;
+    z-index: 20;
+}
+
+/* The map controls: a row of separate groups (view filters, layers, overlays, zoom), each in its
+   own box (see .fwmb-map-control-group). The row itself draws nothing. */
+.fwmb-map-controls {
+    position: relative;
+    flex: none;
+    margin-inline-start: auto;
+    pointer-events: auto;
+    display: flex;
+    gap: var(--fwmb-size-8);
     z-index: 20;
     opacity: 0;
     transition: opacity 0.2s ease;
 }
 
+.fwmb-map-control-group {
+    display: flex;
+    gap: var(--fwmb-size-4);
+    background: var(--fwmb-map-overlay-background);
+    padding: var(--fwmb-size-4);
+    border-radius: var(--fwmb-radius-small);
+    border: var(--fwmb-map-overlay-border);
+}
+
+/* The canvas actions hint: one action per row (see CanvasHints). It is as wide as its longest
+   action and grows upwards, since the footer keeps it on the bottom edge. If the map is too
+   narrow for that width, it stops at the gap before the map controls and its rows wrap. */
 .fwmb-map-hint {
-    position: absolute;
-    inset-block-end: var(--fwmb-size-10);
-    inset-inline-start: var(--fwmb-size-10);
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-size-4);
     color: var(--fwmb-main-200);
     font-size: var(--fwmb-size-12);
-    background: rgba(0, 0, 0, 0.3);
-    padding: var(--fwmb-size-2) var(--fwmb-size-8);
+    background: var(--fwmb-map-overlay-background);
+    padding: var(--fwmb-size-4) var(--fwmb-size-8);
     border-radius: var(--fwmb-radius-small);
+    border: var(--fwmb-map-overlay-border);
     pointer-events: none;
     z-index: 10;
     opacity: 0;
     transition: opacity 0.2s ease;
+}
+
+/* An empty hint (before the first render fills it) would otherwise show as a small dark box */
+.fwmb-map-hint:empty {
+    display: none;
 }
 
 .fwmb-map-history {
@@ -1234,10 +1275,10 @@
     inset-inline-end: var(--fwmb-size-10);
     display: flex;
     gap: var(--fwmb-size-4);
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--fwmb-map-overlay-background);
     padding: var(--fwmb-size-4);
     border-radius: var(--fwmb-radius-small);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: var(--fwmb-map-overlay-border);
     z-index: 20;
     opacity: 0;
     transition: opacity 0.2s ease;
@@ -1379,10 +1420,10 @@
     position: absolute;
     inset-block-start: var(--fwmb-size-10);
     inset-inline-start: var(--fwmb-size-10);
-    background: rgba(0, 0, 0, 0.7);
+    background: var(--fwmb-map-overlay-background);
     padding: var(--fwmb-size-4) var(--fwmb-size-8);
     border-radius: var(--fwmb-radius-small);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: var(--fwmb-map-overlay-border);
     color: var(--fwmb-main-200);
     font-size: var(--fwmb-size-12);
     display: flex;

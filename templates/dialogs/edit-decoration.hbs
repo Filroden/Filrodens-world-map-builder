@@ -1,0 +1,30 @@
+<div class="fwmb-dialog-content">
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <input type="text" name="decorationName" value="{{decoration.name}}" />
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.Opacity"}}</label>
+        <div class="fwmb-slider-group">
+            <input type="range" name="decorationOpacity" value="{{decoration.opacity}}" min="0.1" max="1" step="0.1" />
+            <output>{{decoration.opacity}}</output>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.Scale"}}</label>
+        <div class="fwmb-slider-group">
+            <input type="range" name="decorationScale" value="{{decoration.scale}}" min="{{scaleRange.MIN}}" max="{{scaleRange.MAX}}" step="{{scaleRange.STEP}}" data-default="1" />
+            <output>{{decoration.scale}}</output>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.Rotation"}}</label>
+        <div class="fwmb-slider-group">
+            <input type="range" name="decorationRotation" value="{{decoration.rotation}}" min="{{rotationRange.MIN}}" max="{{rotationRange.MAX}}" step="{{rotationRange.STEP}}" data-default="0" />
+            <output>{{decoration.rotation}}</output>
+        </div>
+    </div>
+</div>

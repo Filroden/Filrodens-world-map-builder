@@ -6,6 +6,7 @@ import { RuleEditorDialog } from "./RuleEditorDialog.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
+import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import {
     getCustomPinIconById,
     getPinIconPickerList,
@@ -129,11 +130,14 @@ export class MapDialogManager {
             fontFamily: app.uiState.labelFontFamily || "Signika",
             fontSize: app.uiState.labelFontSize || 1,
             fillColor: app.uiState.labelFillColor || "#ffffff",
-            maxWidth: app.uiState.labelMaxWidth || 0,
+            maxChars: app.uiState.labelMaxChars || 0,
             justify: app.uiState.labelJustify || "left",
+            rotation: 0,
         };
 
         safe.label = { ...defaults, ...(safe.label || {}) };
+        // The copy only feeds the dialogue, so wrapping the angle here changes nothing stored
+        safe.label.rotation = CanvasTransforms.normalizeAngle(safe.label.rotation);
 
         return safe;
     }
@@ -142,14 +146,21 @@ export class MapDialogManager {
      * Extracts shared "label properties" form fields from a submitted dialogue.
      */
     static _extractLabelResultFields(form) {
-        return {
+        const fields = {
             quickStyle: form.elements["labelQuickStyle"].value,
             fontFamily: form.elements["labelFontFamily"].value,
             fontSize: Number(form.elements["labelFontSize"].value) || 1,
             fillColor: form.elements["labelFillColor"].value,
-            maxWidth: Number(form.elements["labelMaxWidth"].value) || 0,
+            maxChars: Number(form.elements["labelMaxChars"].value) || 0,
             justify: form.elements["labelJustify"].value,
         };
+
+        // Only dialogues that edit one placed label have a Rotation slider. Leaving the field out
+        // otherwise keeps the label's current angle when the result is merged into it.
+        const rotationInput = form.elements["labelRotation"];
+        if (rotationInput) fields.rotation = CanvasTransforms.normalizeAngle(rotationInput.value);
+
+        return fields;
     }
 
     /**
@@ -160,7 +171,7 @@ export class MapDialogManager {
         const labelFontFamilySelect = html.querySelector('select[name="labelFontFamily"]');
         const labelFontSizeInput = html.querySelector('input[name="labelFontSize"]');
         const labelColorInput = html.querySelector('input[name="labelFillColor"]');
-        const labelMaxWidthInput = html.querySelector('input[name="labelMaxWidth"]');
+        const labelMaxCharsInput = html.querySelector('input[name="labelMaxChars"]');
         const labelJustifySelect = html.querySelector('select[name="labelJustify"]');
 
         labelQuickStyleSelect?.addEventListener("change", (e) => {
@@ -172,7 +183,7 @@ export class MapDialogManager {
 
             if (labelFontFamilySelect) labelFontFamilySelect.value = styleData.fontFamily;
             if (labelColorInput) labelColorInput.value = styleData.fillColor;
-            if (labelMaxWidthInput) labelMaxWidthInput.value = styleData.maxWidth;
+            if (labelMaxCharsInput) labelMaxCharsInput.value = styleData.maxChars;
             if (labelJustifySelect) labelJustifySelect.value = styleData.justify;
 
             if (labelFontSizeInput) {
@@ -190,7 +201,7 @@ export class MapDialogManager {
 
         labelFontFamilySelect?.addEventListener("change", revertLabelToCustom);
         labelColorInput?.addEventListener("input", revertLabelToCustom);
-        labelMaxWidthInput?.addEventListener("input", revertLabelToCustom);
+        labelMaxCharsInput?.addEventListener("input", revertLabelToCustom);
         labelJustifySelect?.addEventListener("change", revertLabelToCustom);
     }
 
@@ -297,7 +308,7 @@ export class MapDialogManager {
                     fontFamily: app.uiState.labelFontFamily || "Signika",
                     fontSize: app.uiState.labelFontSize || 1,
                     fillColor: app.uiState.labelFillColor || "#000000",
-                    maxWidth: app.uiState.labelMaxWidth || 0,
+                    maxChars: app.uiState.labelMaxChars || 0,
                     justify: app.uiState.labelJustify || "left",
                 }),
                 getContext: (app, style) => ({
@@ -310,7 +321,7 @@ export class MapDialogManager {
                     fontFamily: form.elements["styleFontFamily"].value,
                     fontSize: Number(form.elements["styleFontSize"].value) || 1,
                     fillColor: form.elements["styleFillColor"].value,
-                    maxWidth: Number(form.elements["styleMaxWidth"].value) || 0,
+                    maxChars: Number(form.elements["styleMaxChars"].value) || 0,
                     justify: form.elements["styleJustify"].value,
                 }),
                 onCascade: (app, id, result) => {
@@ -318,7 +329,7 @@ export class MapDialogManager {
                         fontFamily: result.fontFamily,
                         fontSize: result.fontSize,
                         fillColor: result.fillColor,
-                        maxWidth: result.maxWidth,
+                        maxChars: result.maxChars,
                         justify: result.justify,
                     };
 
@@ -356,7 +367,7 @@ export class MapDialogManager {
                     app.uiState.labelFontFamily = result.fontFamily;
                     app.uiState.labelFontSize = result.fontSize;
                     app.uiState.labelFillColor = result.fillColor;
-                    app.uiState.labelMaxWidth = result.maxWidth;
+                    app.uiState.labelMaxChars = result.maxChars;
                     app.uiState.labelJustify = result.justify;
                 },
             },
@@ -533,7 +544,7 @@ export class MapDialogManager {
                                   fontFamily: style.fontFamily,
                                   fontSize: style.fontSize,
                                   fillColor: style.fillColor,
-                                  maxWidth: style.maxWidth,
+                                  maxChars: style.maxChars,
                                   justify: style.justify,
                               },
                           }
@@ -543,7 +554,7 @@ export class MapDialogManager {
             { checkboxName: "applyLabelFontFamily", extract: (form) => ({ label: { fontFamily: form.elements["labelFontFamily"].value } }) },
             { checkboxName: "applyLabelFontSize", extract: (form) => ({ label: { fontSize: Number(form.elements["labelFontSize"].value) || 1 } }) },
             { checkboxName: "applyLabelFillColor", extract: (form) => ({ label: { fillColor: form.elements["labelFillColor"].value } }) },
-            { checkboxName: "applyLabelMaxWidth", extract: (form) => ({ label: { maxWidth: Number(form.elements["labelMaxWidth"].value) || 0 } }) },
+            { checkboxName: "applyLabelMaxChars", extract: (form) => ({ label: { maxChars: Number(form.elements["labelMaxChars"].value) || 0 } }) },
             { checkboxName: "applyLabelJustify", extract: (form) => ({ label: { justify: form.elements["labelJustify"].value } }) },
         ];
 
@@ -720,7 +731,7 @@ export class MapDialogManager {
                     const fontFamilySelect = html.querySelector('select[name="massFontFamily"]');
                     const fontSizeInput = html.querySelector('input[name="massFontSize"]');
                     const colorInput = html.querySelector('input[name="massFillColor"]');
-                    const maxWidthInput = html.querySelector('input[name="massMaxWidth"]');
+                    const maxCharsInput = html.querySelector('input[name="massMaxChars"]');
                     const justifySelect = html.querySelector('select[name="massJustify"]');
 
                     quickStyleSelect?.addEventListener("change", (e) => {
@@ -728,7 +739,7 @@ export class MapDialogManager {
                         if (!style) return;
                         if (fontFamilySelect) fontFamilySelect.value = style.fontFamily;
                         if (colorInput) colorInput.value = style.fillColor;
-                        if (maxWidthInput) maxWidthInput.value = style.maxWidth;
+                        if (maxCharsInput) maxCharsInput.value = style.maxChars;
                         if (justifySelect) justifySelect.value = style.justify;
                         if (fontSizeInput) {
                             fontSizeInput.value = style.fontSize;
@@ -743,14 +754,14 @@ export class MapDialogManager {
                             const id = form.elements["massQuickStyle"].value;
                             const style = id !== "custom" ? resolveStyle("customLabelStyles")(app, id) : null;
                             return style
-                                ? { quickStyle: id, fontFamily: style.fontFamily, fontSize: style.fontSize, fillColor: style.fillColor, maxWidth: style.maxWidth, justify: style.justify }
+                                ? { quickStyle: id, fontFamily: style.fontFamily, fontSize: style.fontSize, fillColor: style.fillColor, maxChars: style.maxChars, justify: style.justify }
                                 : { quickStyle: "custom" };
                         },
                     },
                     { checkboxName: "applyFontFamily", extract: (form) => ({ fontFamily: form.elements["massFontFamily"].value }) },
                     { checkboxName: "applyFontSize", extract: (form) => ({ fontSize: Number(form.elements["massFontSize"].value) || 1 }) },
                     { checkboxName: "applyFillColor", extract: (form) => ({ fillColor: form.elements["massFillColor"].value }) },
-                    { checkboxName: "applyMaxWidth", extract: (form) => ({ maxWidth: Number(form.elements["massMaxWidth"].value) || 0 }) },
+                    { checkboxName: "applyMaxChars", extract: (form) => ({ maxChars: Number(form.elements["massMaxChars"].value) || 0 }) },
                     { checkboxName: "applyJustify", extract: (form) => ({ justify: form.elements["massJustify"].value }) },
                 ],
             },
@@ -1205,26 +1216,26 @@ export class MapDialogManager {
         const dec = app.mapDecorations.find((d) => d.id === id);
         if (!dec) return;
 
-        const content = `
-                <div class="form-group fwmb-dialog-content">
-                    <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
-                    <input type="text" id="fwmb-dec-name" value="${dec.name}">
-                </div>
-                <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-10);">
-                    <label>${game.i18n.localize("FILRODENSWMB.UI.Opacity")}</label>
-                    <div class="fwmb-slider-group">
-                        <input type="range" id="fwmb-dec-alpha" value="${dec.opacity ?? 1}" min="0.1" max="1" step="0.1" />
-                        <output>${dec.opacity ?? 1}</output>
-                    </div>
-                </div>
-            `;
-
         await this._processEditDialog(app, dec, {
             titleKey: "FILRODENSWMB.UI.Edit",
-            htmlContent: content,
+            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-decoration.hbs",
+            context: {
+                decoration: {
+                    name: dec.name,
+                    opacity: dec.opacity ?? 1,
+                    // Snapped to the slider's grid, so the value shown matches the slider's position
+                    // even for a scale saved before scales were stepped (1.157625 shows as 1.15)
+                    scale: CanvasTransforms.stepValue(dec.scale ?? 1, 0, FILRODENSWMB.UI.WHEEL_RESIZE.DECORATION_SCALE),
+                    rotation: CanvasTransforms.normalizeAngle(dec.rotation),
+                },
+                scaleRange: FILRODENSWMB.UI.WHEEL_RESIZE.DECORATION_SCALE,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
+            },
             onExtract: (form) => ({
-                name: form.querySelector("#fwmb-dec-name").value,
-                opacity: Number(form.querySelector("#fwmb-dec-alpha").value),
+                name: form.elements["decorationName"].value,
+                opacity: Number(form.elements["decorationOpacity"].value),
+                scale: Number(form.elements["decorationScale"].value) || 1,
+                rotation: CanvasTransforms.normalizeAngle(form.elements["decorationRotation"].value),
             }),
         });
     }
@@ -1370,6 +1381,7 @@ export class MapDialogManager {
 
         if (type === "custom") {
             foundry.utils.mergeObject(labelData, sourceObj);
+            labelData.rotation = CanvasTransforms.normalizeAngle(labelData.rotation);
         } else {
             const safeObj = this._withLabelDefaults(app, sourceObj);
             foundry.utils.mergeObject(labelData, safeObj.label);
@@ -1380,6 +1392,7 @@ export class MapDialogManager {
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-labels.hbs",
             context: {
                 label: labelData,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
                 fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 customLabelStyles: app.uiState.customLabelStyles || [],
@@ -1428,6 +1441,7 @@ export class MapDialogManager {
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs",
             context: {
                 pin: safePin,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
                 icons,
                 pinIconPath: currentIcon?.path || "",
                 pinIconIsCustom: currentIcon?.isCustom || false,
@@ -1513,6 +1527,7 @@ export class MapDialogManager {
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs",
             context: {
                 region: safeRegion,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
                 fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 customLabelStyles: app.uiState.customLabelStyles || [],
@@ -1655,6 +1670,7 @@ export class MapDialogManager {
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs",
             context: {
                 route: safeRoute,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
                 customRouteStyles: app.uiState.customRouteStyles || [],
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],

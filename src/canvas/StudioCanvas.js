@@ -4,6 +4,8 @@ import { ColorMath } from "../tools/ColorMath.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { getRegionUploadResource } from "./RegionUploadResource.js";
 import { TerrainCompositor } from "./TerrainCompositor.js";
+import { CanvasTransforms } from "../tools/CanvasTransforms.js";
+import { LabelWidth } from "../tools/LabelWidth.js";
 
 export class StudioCanvas {
     /** Whether destroy() has run (see destroy). */
@@ -81,6 +83,11 @@ export class StudioCanvas {
 
         // --- Global Drag Handling ---
         this.activeDrag = null;
+        // What the pointer holds, for the canvas hint: null, "label", "decoration", "pin",
+        // "region" or "mask" (see #heldItemKind)
+        this.heldItem = null;
+        // The highlight box around a shape being dragged with Shift (see #drawShapeDragBox)
+        this.shapeDragBox = null;
         this.interactiveTargets = [];
 
         // Instantiate the grid layer
@@ -221,24 +228,14 @@ export class StudioCanvas {
             return;
         }
 
-        // --- Label & Decoration Transformation Intercept ---
+        // --- Held Item Transformation Intercept ---
+        // While a label, decoration or pin is held with the left button, the wheel changes that
+        // item instead of the camera, so a slip of the wheel mid-drag never moves the view.
         const dragWrapper = this.activeDrag ? this.interactiveTargets.find((t) => t.target === this.activeDrag.target) : null;
-        const isTransformable = dragWrapper?.isLabel || dragWrapper?.isDecoration;
 
-        if (isTransformable) {
+        if (StudioCanvas.#isWheelTransformable(dragWrapper)) {
             e.preventDefault();
-            this.#beginDragOnce();
-            const target = this.activeDrag.target;
-
-            if (e.shiftKey && dragWrapper.isDecoration) {
-                const scale = isZoomIn ? config.SCALE_FACTOR : 1 / config.SCALE_FACTOR;
-                target.scale = (target.scale || 1) * scale;
-            } else if (!e.shiftKey) {
-                const rotation = isZoomIn ? -config.ROTATION_STEP : config.ROTATION_STEP;
-                target.rotation = (target.rotation || 0) + rotation;
-            }
-
-            if (this.onInfraDrag) this.onInfraDrag();
+            this.#transformHeldItem(dragWrapper, e.shiftKey, isZoomIn);
             return;
         }
 
@@ -260,6 +257,54 @@ export class StudioCanvas {
 
         this.#updateNodeScales();
         if (this.isCropMode) this.#drawCropOverlay();
+    }
+
+    /** Whether the wheel changes a held item rather than the camera (see #transformHeldItem). */
+    static #isWheelTransformable(wrapper) {
+        return !!(wrapper?.isLabel || wrapper?.isDecoration || wrapper?.isIconPin);
+    }
+
+    /**
+     * Applies one wheel notch to the held item: Shift resizes it, a plain notch rotates it.
+     * Labels and decorations rotate; pins have no rotation, so a plain notch does nothing to them.
+     * Rotation is kept between -180 and 180 degrees, the range of the edit dialogues' Rotation
+     * slider (see CanvasTransforms.normalizeAngle). Every item resizes in the same steps as its
+     * edit dialogue slider (see CanvasTransforms.stepValue).
+     *
+     * The first change counts as the start of a drag even if the item has not moved, so the
+     * state before it is recorded for undo, exactly as for a move.
+     */
+    #transformHeldItem(wrapper, isResize, isGrow) {
+        if (!isResize && wrapper.isIconPin) return;
+
+        this.#beginDragOnce();
+
+        if (isResize) {
+            this.#resizeHeldItem(wrapper, isGrow);
+        } else {
+            const rotation = isGrow ? -FILRODENSWMB.UI.WHEEL.ROTATION_STEP : FILRODENSWMB.UI.WHEEL.ROTATION_STEP;
+            wrapper.target.rotation = CanvasTransforms.normalizeAngle((wrapper.target.rotation || 0) + rotation);
+        }
+
+        if (this.onInfraDrag) this.onInfraDrag();
+    }
+
+    /**
+     * Resizes the held item by one wheel notch. A label's size is its font size (in rem, the value
+     * its edit dialogue shows); a pin's and a decoration's is their scale.
+     */
+    #resizeHeldItem(wrapper, isGrow) {
+        const target = wrapper.target;
+        const steps = isGrow ? 1 : -1;
+        const { LABEL_FONT_SIZE, PIN_SCALE, DECORATION_SCALE } = FILRODENSWMB.UI.WHEEL_RESIZE;
+
+        if (wrapper.isLabel) {
+            target.fontSize = CanvasTransforms.stepValue(target.fontSize || 1, steps, LABEL_FONT_SIZE);
+        } else if (wrapper.isIconPin) {
+            target.scale = CanvasTransforms.stepValue(target.scale || FILRODENSWMB.PINS.DEFAULT_SCALE, steps, PIN_SCALE);
+        } else {
+            target.scale = CanvasTransforms.stepValue(target.scale || 1, steps, DECORATION_SCALE);
+        }
     }
 
     #handlePointerDown(e, canvasElement) {
@@ -287,16 +332,22 @@ export class StudioCanvas {
             return;
         }
 
-        if (this.isEditMode && e.shiftKey && this.onInfraInsertNode) {
+        const hit = this.#getHitTarget(coords.x, coords.y);
+        const grabbedTarget = hit ? hit.target : null;
+
+        // Shift pressed on a node of a region or land mask picks up the whole shape (see
+        // #beginShapeDrag); Shift pressed anywhere else inserts a node on the nearest line or
+        // outline. Inserting a node on top of an existing node is never useful, so giving that
+        // press to the shape drag takes nothing away.
+        const isShapeGrab = e.shiftKey && !!hit?.shape;
+
+        if (this.isEditMode && e.shiftKey && !isShapeGrab && this.onInfraInsertNode) {
             e.preventDefault();
             e.stopPropagation();
             this.activeDrag = null;
             this.onInfraInsertNode(coords.x, coords.y);
             return;
         }
-
-        const hit = this.#getHitTarget(coords.x, coords.y);
-        const grabbedTarget = hit ? hit.target : null;
 
         if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
             e.preventDefault();
@@ -306,17 +357,16 @@ export class StudioCanvas {
             return;
         }
 
-        const rootApp = this.container.closest(".fwmb-layout") || document;
-        const isEraserActive = !!rootApp.querySelector('.fwmb-brush-tools button.active[data-tool="erasePin"]');
-
-        if (grabbedTarget && !isEraserActive) {
+        if (grabbedTarget) {
             e.preventDefault();
             e.stopPropagation();
             // The drag is only "armed" here. It becomes a real drag - recording its undo snapshot
             // and moving the item - once the pointer has travelled past the drag threshold (see
             // #beginDragOnce), so a plain click or double-click on an item changes nothing.
             this.activeDrag = { target: grabbedTarget, entityType: hit.entityType, originX: e.clientX, originY: e.clientY, started: false };
+            if (isShapeGrab) this.#beginShapeDrag(hit.shape, coords);
             canvasElement.style.cursor = "grabbing";
+            this.#setHeldItem(StudioCanvas.#heldItemKind(hit, this.activeDrag));
             return;
         }
 
@@ -378,6 +428,11 @@ export class StudioCanvas {
             if (!this.activeDrag.started && !this.#hasExceededDragThreshold(e)) return;
             this.#beginDragOnce();
 
+            if (this.activeDrag.shapeDrag) {
+                this.#moveDraggedShape(coords);
+                return;
+            }
+
             // Line/polygon nodes (routes, regions, land masks, fault lines) may be dragged into the
             // buffer so they can span well outside the visible map. Single-point markers (pins,
             // labels, decorations) and manual river nodes stay confined to the map itself - the same
@@ -403,7 +458,7 @@ export class StudioCanvas {
 
         if (this.isEditMode && !this.isDragging && !this.activeDrag) {
             const hit = this.#getHitTarget(coords.x, coords.y);
-            canvasElement.style.cursor = hit ? "grab" : "crosshair";
+            canvasElement.style.cursor = StudioCanvas.#hoverCursor(hit, e.shiftKey);
         }
     }
 
@@ -425,6 +480,140 @@ export class StudioCanvas {
 
         this.activeDrag.started = true;
         if (this.onInfraDragStart) this.onInfraDragStart();
+    }
+
+    /**
+     * The cursor over the canvas while editing and not dragging: "move" over a node that would
+     * drag its whole shape with Shift held (see #beginShapeDrag), "grab" over anything else that
+     * can be picked up, and the crosshair elsewhere.
+     */
+    static #hoverCursor(hit, isShiftHeld) {
+        if (!hit) return "crosshair";
+        return isShiftHeld && hit.shape ? "move" : "grab";
+    }
+
+    /**
+     * What the pointer is holding, for the canvas hint (see CanvasHints): a region or land mask
+     * ("mask") dragged whole with Shift, or a label, decoration or pin, whose wheel gestures
+     * differ from the tool's own. Nodes and anything else give null, since the tool's hint
+     * already covers them.
+     */
+    static #heldItemKind(hit, activeDrag) {
+        if (activeDrag?.shapeDrag) return hit.entityType === "landMask" ? "mask" : "region";
+        if (hit.isLabel) return "label";
+        if (hit.isDecoration) return "decoration";
+        if (hit.isIconPin) return "pin";
+        return null;
+    }
+
+    /** Tells the app what the pointer now holds, when that changes (see #heldItemKind). */
+    #setHeldItem(kind) {
+        if (this.heldItem === kind) return;
+        this.heldItem = kind;
+        if (this.onHeldItemChange) this.onHeldItemChange(kind);
+    }
+
+    /**
+     * Starts moving a whole region or land mask: records where its points start (see
+     * CanvasTransforms.beginShapeDrag) and shows the highlight box around it straight away, so
+     * pressing with Shift shows what will move before anything does.
+     */
+    #beginShapeDrag(shape, coords) {
+        this.activeDrag.shapeDrag = CanvasTransforms.beginShapeDrag(shape, coords);
+        this.#drawShapeDragBox(this.activeDrag.shapeDrag.bounds);
+    }
+
+    /**
+     * Moves the shape being dragged with Shift so it follows the pointer. Shapes may reach into the
+     * buffer around the map, as their nodes can when dragged one at a time.
+     */
+    #moveDraggedShape(coords) {
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+        const limits = { minX: -buffer, minY: -buffer, maxX: this.mapWidth + buffer, maxY: this.mapHeight + buffer };
+        const drag = this.activeDrag.shapeDrag;
+        const offset = CanvasTransforms.moveShape(drag, coords, limits);
+
+        const { minX, minY, maxX, maxY } = drag.bounds;
+        this.#drawShapeDragBox({ minX: minX + offset.dx, minY: minY + offset.dy, maxX: maxX + offset.dx, maxY: maxY + offset.dy });
+
+        if (this.onInfraDrag) this.onInfraDrag();
+    }
+
+    /**
+     * Draws (or redraws) the highlight box around the shape being dragged with Shift. It is a
+     * direct child of the stage, above every layer, so redrawing the vector layers while the
+     * shape moves leaves it in place.
+     */
+    #drawShapeDragBox(bounds) {
+        if (!this.shapeDragBox || this.shapeDragBox.destroyed) {
+            this.shapeDragBox = new PIXI.Graphics();
+            this.shapeDragBox.alpha = FILRODENSWMB.UI.HIGHLIGHT.HELD_ALPHA;
+        }
+
+        const width = bounds.maxX - bounds.minX;
+        const height = bounds.maxY - bounds.minY;
+        this.shapeDragBox.clear();
+        this.#drawHighlightBox(this.shapeDragBox, width, height);
+        this.shapeDragBox.x = bounds.minX + width / 2;
+        this.shapeDragBox.y = bounds.minY + height / 2;
+
+        // Re-adding keeps it on top of anything added to the stage since it was first drawn
+        this.stage.addChild(this.shapeDragBox);
+    }
+
+    /** Lets go of the shape-drag box: it fades out the same way as the zoom-to-feature box. */
+    #releaseShapeDragBox() {
+        if (!this.shapeDragBox) return;
+        this.#fadeOutHighlight(this.shapeDragBox);
+        this.shapeDragBox = null;
+    }
+
+    /**
+     * Draws the shared highlight box (see FILRODENSWMB.UI.HIGHLIGHT) centred on the graphics
+     * object's origin, around a feature `width` by `height` map pixels. Line width, padding and
+     * corner radius are divided by the current zoom so the box looks the same at any zoom.
+     */
+    #drawHighlightBox(graphics, width, height) {
+        const { COLOR, LINE_WIDTH, FILL_ALPHA, CORNER_RADIUS } = FILRODENSWMB.UI.HIGHLIGHT;
+        const invScale = 1 / (this.stage.scale.x || 1);
+        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale;
+
+        graphics.lineStyle(LINE_WIDTH * invScale, COLOR, 1);
+        graphics.beginFill(COLOR, FILL_ALPHA);
+        graphics.drawRoundedRect(-width / 2 - pad, -height / 2 - pad, width + pad * 2, height + pad * 2, CORNER_RADIUS * invScale);
+        graphics.endFill();
+    }
+
+    /**
+     * Fades a highlight out while growing it slightly, then destroys it. Runs on the PIXI ticker
+     * and stops by itself if the canvas is torn down first.
+     */
+    #fadeOutHighlight(displayObject) {
+        const { FADE_FRAMES, FADE_GROWTH } = FILRODENSWMB.UI.HIGHLIGHT;
+        const startAlpha = displayObject.alpha;
+        let elapsed = 0;
+
+        const tick = () => {
+            // Safety escape if the user closes the app mid-animation
+            if (displayObject.destroyed) {
+                this.app.ticker.remove(tick);
+                return;
+            }
+
+            elapsed++;
+            const progress = elapsed / FADE_FRAMES;
+
+            // Ease-out fade combined with a gentle outward expansion
+            displayObject.alpha = startAlpha * (1 - Math.pow(progress, 2));
+            displayObject.scale.set(1 + progress * FADE_GROWTH);
+
+            if (elapsed >= FADE_FRAMES) {
+                displayObject.destroy();
+                this.app.ticker.remove(tick);
+            }
+        };
+
+        this.app.ticker.add(tick);
     }
 
     #processCropDrag(coords) {
@@ -506,6 +695,8 @@ export class StudioCanvas {
             if (this.activeDrag) {
                 const wasDragged = this.activeDrag.started;
                 this.activeDrag = null;
+                this.#releaseShapeDragBox();
+                this.#setHeldItem(null);
                 canvasElement.style.cursor = "crosshair";
                 if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
                 return;
@@ -1117,7 +1308,9 @@ export class StudioCanvas {
 
             if (isEditMode) {
                 // The hit radius must expand to match the new size
-                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2, entityType: "pin", entityId: pin.id });
+                // isIconPin: a map pin with an icon, which can be resized with the wheel while held
+                // (see #transformHeldItem), unlike the Terrain Features tool's river source pins
+                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2, entityType: "pin", entityId: pin.id, isIconPin: true });
             }
 
             this.pinContainer.addChild(sprite);
@@ -1275,44 +1468,12 @@ export class StudioCanvas {
         this.#updateNodeScales();
 
         // --- Animated Target Highlight ---
-        const invScale = 1 / targetScale;
-        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale; // Maintain constant visual padding at any zoom
-
         const highlight = new PIXI.Graphics();
-        highlight.lineStyle(4 * invScale, 0x00e5ff, 1);
-        highlight.beginFill(0x00e5ff, 0.15);
-        highlight.drawRoundedRect(-trueWidth / 2 - pad, -trueHeight / 2 - pad, trueWidth + pad * 2, trueHeight + pad * 2, 12 * invScale);
-        highlight.endFill();
-
+        this.#drawHighlightBox(highlight, trueWidth, trueHeight);
         highlight.x = centerX;
         highlight.y = centerY;
         this.stage.addChild(highlight);
-
-        // Fire a self-cleaning animation loop directly into the PIXI ticker
-        let elapsed = 0;
-        const duration = 90; // Approx 1.5 seconds at 60fps
-
-        const tick = () => {
-            // Safety escape if the user closes the app mid-animation
-            if (highlight.destroyed) {
-                this.app.ticker.remove(tick);
-                return;
-            }
-
-            elapsed++;
-            const progress = elapsed / duration;
-
-            // Ease-out fade combined with a gentle outward expansion
-            highlight.alpha = 1 - Math.pow(progress, 2);
-            highlight.scale.set(1 + progress * 0.15);
-
-            if (elapsed >= duration) {
-                highlight.destroy();
-                this.app.ticker.remove(tick);
-            }
-        };
-
-        this.app.ticker.add(tick);
+        this.#fadeOutHighlight(highlight);
     }
 
     async updateReferenceImage(url, x, y, scale, alpha) {
@@ -1366,7 +1527,7 @@ export class StudioCanvas {
         this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
 
         // Extract native OS root font size to mimic CSS 'rem' behaviour
-        const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+        const rootFontSize = LabelWidth.rootFontSize();
 
         // Dynamically scale vectors based on the canvas dimensions
         const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
@@ -1402,11 +1563,13 @@ export class StudioCanvas {
                 dropShadowDistance: 2,
             };
 
-            // 2. Apply Word Wrapping & Justification
-            const rawMaxWidth = labelData.maxWidth || 0;
-            if (rawMaxWidth > 0) {
+            // 2. Apply Word Wrapping & Justification. The maximum width is a number of characters
+            // of this label's own font and size (see LabelWidth), so resizing the label or changing
+            // its font keeps its line breaks.
+            const wrapWidth = LabelWidth.wrapWidth(labelData, size, resScale);
+            if (wrapWidth > 0) {
                 styleConfig.wordWrap = true;
-                styleConfig.wordWrapWidth = rawMaxWidth * resScale;
+                styleConfig.wordWrapWidth = wrapWidth;
                 styleConfig.align = labelData.justify || "left";
             }
 
@@ -2060,6 +2223,10 @@ export class StudioCanvas {
         if (!points || points.length === 0) return;
 
         const hitRadius = 10 / (this.stage.scale.x || 1);
+        // Nodes of shapes that can be moved whole (Shift + drag) carry the shape itself, so the
+        // drag can reach every point and the label (see #beginShapeDrag). A shape still being
+        // drawn is not offered: its outline is not finished, and right-click would end it anyway.
+        const shape = FILRODENSWMB.UI.SHAPE_DRAG_TYPES.includes(entityType) && !isActive ? parentEntity : null;
 
         points.forEach((pt, index) => {
             const isLast = isActive && index === points.length - 1;
@@ -2072,6 +2239,7 @@ export class StudioCanvas {
                 entityType: entityType,
                 entityId: parentEntity.id,
                 layerId: layerId,
+                shape,
             });
         });
     }
@@ -2183,18 +2351,12 @@ export class StudioCanvas {
 
         const invScale = 1 / (this.stage.scale.x || 1);
         const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale;
-
-        const boxWidth = trueWidth + pad * 2;
-        const boxHeight = trueHeight + pad * 2;
         const boxX = -trueWidth / 2 - pad;
         const boxY = -trueHeight / 2 - pad;
 
         // 1. Draw the bounding box
         const graphics = new PIXI.Graphics();
-        graphics.lineStyle(4 * invScale, 0x00e5ff, 1);
-        graphics.beginFill(0x00e5ff, 0.15);
-        graphics.drawRoundedRect(boxX, boxY, boxWidth, boxHeight, 12 * invScale);
-        graphics.endFill();
+        this.#drawHighlightBox(graphics, trueWidth, trueHeight);
         this.actionPreview.addChild(graphics);
 
         // 2. Add the dynamic text label

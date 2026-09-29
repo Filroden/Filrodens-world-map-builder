@@ -36,6 +36,14 @@
     </div>
 
     <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.Rotation"}}</label>
+        <div class="fwmb-slider-group">
+            <input type="range" name="labelRotation" value="{{label.rotation}}" min="{{rotationRange.MIN}}" max="{{rotationRange.MAX}}" step="{{rotationRange.STEP}}" data-default="0" />
+            <output>{{label.rotation}}</output>
+        </div>
+    </div>
+
+    <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.FontColor"}}</label>
         <datalist id="fwmb-standard-colors">
             {{#each palette}}
@@ -47,7 +55,7 @@
 
     <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.MaxWidth"}}</label>
-        <input type="number" name="labelMaxWidth" value="{{label.maxWidth}}" min="0" step="10" />
+        <input type="number" name="labelMaxChars" value="{{label.maxChars}}" min="0" step="1" />
     </div>
 
     <div class="form-group">

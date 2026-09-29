@@ -104,6 +104,19 @@ Hooks.once("init", async () => {
         },
         { passive: true },
     );
+    // A slider carrying data-default (such as a dialogue's Rotation or Scale) returns to that
+    // value on double-click, in any FWMB window or dialogue. The studio window resets its toolbar
+    // and panel sliders to the map defaults itself; those sliders carry no data-default, so the two
+    // never act on the same slider.
+    document.addEventListener("dblclick", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) || target.type !== "range" || !target.closest(".fwmb")) return;
+        if (target.dataset.default === undefined || target.value === target.dataset.default) return;
+
+        target.value = target.dataset.default;
+        // The input event refreshes the value display and filled track (see RangeDisplay)
+        target.dispatchEvent(new Event("input", { bubbles: true }));
+    });
     Hooks.on("renderApplicationV2", (_application, element) => {
         if (element?.classList?.contains("fwmb")) RangeDisplay.syncAllFills(element);
     });

@@ -211,7 +211,7 @@ export class MapStateManager {
             labelFontFamily: FILRODENSWMB.LABELS?.DEFAULT_FONT,
             labelFontSize: FILRODENSWMB.LABELS?.DEFAULT_SIZE,
             labelFillColor: FILRODENSWMB.LABELS?.DEFAULT_COLOR,
-            labelMaxWidth: 0,
+            labelMaxChars: 0,
             labelJustify: "left",
             activeLabelQuickStyle: "custom",
             nextLabelText: game.i18n.localize(FILRODENSWMB.LABELS?.DEFAULT_TEXT) || "New Label",

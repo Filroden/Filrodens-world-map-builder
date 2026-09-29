@@ -387,9 +387,74 @@ export const FILRODENSWMB = {
         // trigger a terrain regeneration.
         NODE_DRAG_THRESHOLD_PX: 4,
         WHEEL: {
-            SCALE_FACTOR: 1.05,
             ROTATION_STEP: 5,
             CAMERA_FACTOR: 1.1,
+        },
+        // Resizing a held label, pin or decoration with Shift + mouse wheel (see
+        // StudioCanvas#resizeHeldItem). Each notch moves the stored value by one STEP inside the
+        // same range, and on the same step, as the item's edit dialogue slider, so a wheel-resized
+        // value always sits on a slider position and opening the dialogue never rounds it to
+        // something else.
+        WHEEL_RESIZE: {
+            LABEL_FONT_SIZE: { MIN: 0.2, MAX: 5, STEP: 0.1 },
+            PIN_SCALE: { MIN: 0.2, MAX: 4, STEP: 0.1 },
+            DECORATION_SCALE: { MIN: 0.05, MAX: 5, STEP: 0.05 },
+        },
+        // The rotation of labels and decorations, in degrees, as their edit dialogues' Rotation
+        // slider shows it. Stored angles are kept inside this range (see
+        // CanvasTransforms.normalizeAngle), with 0 (level) in the middle so small tilts either way
+        // sit close to it. The wheel's ROTATION_STEP is a whole number of STEPs, so wheel changes
+        // land exactly on slider positions.
+        ROTATION: { MIN: -180, MAX: 180, STEP: 1 },
+        // Entity types whose nodes move the whole shape when dragged with Shift held (see
+        // StudioCanvas#beginShapeDrag). Lines (routes, fault lines, rivers) are deliberately left
+        // out: they follow the terrain and each other, so moving one as a whole rarely lands it
+        // anywhere that makes sense, and dragging their nodes is the better tool.
+        SHAPE_DRAG_TYPES: ["region", "landMask"],
+        // The cyan box drawn around a feature: the undo/redo preview, the zoom-to-feature flash and
+        // the box around a shape being dragged with Shift all share this look (see
+        // StudioCanvas#drawHighlightBox). Widths and the corner radius are in screen pixels.
+        HIGHLIGHT: {
+            COLOR: 0x00e5ff,
+            LINE_WIDTH: 4,
+            FILL_ALPHA: 0.15,
+            CORNER_RADIUS: 12,
+            // Opacity of the box while a shape is held
+            HELD_ALPHA: 0.75,
+            // The fade after a zoom-to-feature, or on letting go of a shape: its length in frames
+            // (about 1.5 s at 60 fps), and how much the box grows as it fades.
+            FADE_FRAMES: 90,
+            FADE_GROWTH: 0.15,
+        },
+        // The list of canvas actions in the map's bottom corner (see CanvasHints). Each context
+        // lists the suffixes of its `FILRODENSWMB.UI.Hint…` localisation keys, in display order.
+        // Every hint names the thing it acts on (a pin, the crop area, the whole region), so each
+        // reads on its own. COMMON is shown ahead of every context except a held item, whose own
+        // list replaces the whole hint while the pointer holds it. Keep these lists in step with
+        // the pointer and wheel handling in StudioCanvas and the tool click handlers in MapStudioApp.
+        CANVAS_HINTS: {
+            COMMON: ["Pan", "Zoom"],
+            CONTEXTS: {
+                view: [],
+                // The 3D view's orbit camera: left-drag rotates, right-drag pans, scroll zooms
+                view3d: ["Rotate3D"],
+                reference: ["ReferenceMove", "ReferenceResize"],
+                crop: ["CropDraw", "CropMove", "CropResize"],
+                terrain: ["PaintTerrain"],
+                biomes: ["PaintBiomes"],
+                spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
+                line: ["AddPoint", "FinishLine", "MovePoint", "InsertPoint", "DeletePoint", "EditLine"],
+                region: ["AddPoint", "FinishRegion", "MovePoint", "MoveRegion", "InsertPoint", "DeletePoint", "EditRegion"],
+                mask: ["AddPoint", "FinishMask", "MovePoint", "MoveMask", "InsertPoint", "DeletePoint", "EditMask"],
+                pin: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
+                labels: ["PlaceLabel", "MoveLabel", "RotateLabel", "ResizeLabel", "EditLabel"],
+                cartography: ["MoveDecoration", "RotateDecoration", "ResizeDecoration", "EditDecoration"],
+                heldLabel: ["RotateHeldLabel", "ResizeHeldLabel"],
+                heldDecoration: ["RotateHeldDecoration", "ResizeHeldDecoration"],
+                heldPin: ["ResizeHeldPin"],
+                heldRegion: ["DropRegion"],
+                heldMask: ["DropMask"],
+            },
         },
         ZOOM: {
             FACTOR: 1.25,

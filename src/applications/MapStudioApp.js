@@ -1,5 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { StudioCanvas } from "../canvas/StudioCanvas.js";
+import { CanvasHints } from "../canvas/CanvasHints.js";
+import { LabelWidth } from "../tools/LabelWidth.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
@@ -699,6 +701,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
         this.#updateHistoryButtons();
+        this.#updateCanvasHint();
 
         const mapContainer = this.element.querySelector(".fwmb-map-container");
         const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
@@ -1380,6 +1383,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.canvasEngine.onRightClick = () => this.#handleRightClick();
         this.canvasEngine.onDoubleClick = (hitData) => this.#handleCanvasDoubleClick(hitData);
+        this.canvasEngine.onHeldItemChange = () => this.#updateCanvasHint();
+    }
+
+    /**
+     * Refreshes the list of canvas actions in the map's corner (see CanvasHints) for the current
+     * tool, mode, and whatever the pointer holds. Called after every render, since tool and mode
+     * changes all end in one, and whenever the pointer picks up or lets go of an item.
+     */
+    #updateCanvasHint() {
+        const element = this.element?.querySelector(".fwmb-map-hint");
+        if (!element) return;
+
+        const context = CanvasHints.resolveContext({
+            is3DView: !!this.scene3D,
+            isEditMode: !!this.uiState.isEditMode,
+            activeTool: this.activeTool,
+            isCropMode: !!this.canvasEngine?.isCropMode,
+            isReferenceMode: !!this.canvasEngine?.isReferenceMode,
+            featureMode: this.uiState.activeFeatureMode,
+            infraMode: this.uiState.activeInfraMode,
+            isMaskDrawing: this.#isMaskDrawingMode(),
+            heldItem: this.canvasEngine?.heldItem ?? null,
+        });
+
+        CanvasHints.render(element, CanvasHints.getKeys(context), (key) => game.i18n.localize(key));
     }
 
     #handleCanvasDoubleClick(hitData) {
@@ -1636,6 +1664,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #handleInfraDragEnd() {
         if (this.activeTool === "features") this.#adoptMovedSprings();
+
+        // A region's label is drawn on the labels layer, which the drag itself does not redraw
+        // outside the Labels tool (see #handleInfraDrag). A label not yet placed sits at its
+        // region's centre, so redrawing once on release brings it to the region's new centre.
+        if (this.activeTool === "regions") this._repaintVectors();
+
         this.render({ parts: ["context"] });
         this.markDirty();
 
@@ -2899,6 +2933,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
 
+        // Label widths saved in pixels (before widths were measured in characters) become
+        // characters, rounded up so no label wraps earlier than before (see LabelWidth). The map
+        // is not marked as changed: until it is saved, the same conversion runs on every load.
+        LabelWidth.migrateMap(
+            { mapLabels: this.mapLabels, mapPins: this.mapPins, mapRoutes: this.mapRoutes, regionLayers: this.regionLayers, customLabelStyles: this.uiState.customLabelStyles },
+            LabelWidth.rootFontSize(),
+        );
+
         // brushEngine.history is loaded in full, uncapped: it's the permanent replay log this
         // map's terrain/biomes get rebuilt from (see generateTerrain() below and
         // BrushEngine#replayHistory), not session undo/redo data, so it can't be trimmed without
@@ -2993,7 +3035,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             fontFamily: this.uiState.labelFontFamily,
             fontSize: this.uiState.labelFontSize,
             fillColor: this.uiState.labelFillColor,
-            maxWidth: this.uiState.labelMaxWidth,
+            maxChars: this.uiState.labelMaxChars,
             justify: this.uiState.labelJustify,
             visibility: "all",
         });
@@ -4257,6 +4299,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const validEntries = entries.filter((entry) => entry && typeof entry === "object" && typeof entry.name === "string");
             if (validEntries.length === 0) continue;
 
+            // A settings file exported before label widths were measured in characters holds
+            // pixel widths; convert them first, so they also compare correctly as duplicates
+            if (key === "customLabelStyles") validEntries.forEach((entry) => LabelWidth.migrateLabel(entry, LabelWidth.rootFontSize()));
+
             const existing = this.uiState[key] || [];
             const knownSignatures = new Set(existing.map((entry) => this.#styleEntrySignature(entry)));
 
@@ -4763,6 +4809,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (contextPanel) contextPanel.style.display = "";
             if (editToolbar) editToolbar.style.display = ""; // Restores standard CSS flow
 
+            this.#updateCanvasHint();
             return;
         }
 
@@ -4800,6 +4847,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             terrain: this.#terrainBuffers(),
             settings: this.#terrainSettings(),
         });
+
+        // The 3D view has its own camera gestures; no render follows this, so refresh directly
+        this.#updateCanvasHint();
     }
 
     _onToggleEditMode(event, target) {
