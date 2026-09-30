@@ -2038,7 +2038,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * over existing land, since a hole in open sea would change nothing; with no land on the map
      * the user is told why nothing happened instead.
      */
-    _onGenerateRandomLandMask(event, target) {
+    _onGenerateRandomLandMask(_event, _target) {
         if (!this.#isMaskDrawingMode()) return;
 
         const finishedMaskNeedsTerrain = this.activeLandMaskId ? this._finishActiveLandMask() : false;
@@ -2071,7 +2071,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * A mask being drawn is finished first (or discarded if it is not yet a shape), exactly as
      * switching mode does.
      */
-    _onGenerateRandomLandMap(event, target) {
+    _onGenerateRandomLandMap(_event, _target) {
         if (!this.#isMaskDrawingMode()) return;
         if (this.activeLandMaskId) this._finishActiveLandMask();
 
@@ -3742,7 +3742,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateReferenceLayer();
     }
 
-    async _onApplyFeatureMath(event, target) {
+    async _onApplyFeatureMath(_event, _target) {
         if (!this.hasPendingFeatureMath) return;
 
         // generateTerrain clears the pending flag itself, before it reads any state
@@ -4007,7 +4007,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Extracts the currently active canvas state to a PNG.
      */
-    async _onExportPng(event, target) {
+    async _onExportPng(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
             ui.notifications.warn("No map is currently generated to export.");
             return;
@@ -4022,7 +4022,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Prompts the user with the export configuration dialogue before triggering the async build pipeline.
      */
-    async _onExportScene(event, target) {
+    async _onExportScene(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
             ui.notifications.warn("No map is currently generated to export.");
             return;
@@ -4038,7 +4038,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             window: { title: game.i18n.localize("FILRODENSWMB.UI.ExportScene") || "Export to Scene" },
             content: content,
             ok: {
-                callback: (event, button, dialog) => {
+                callback: (event, button, _dialog) => {
                     return {
                         sceneName: button.form.elements["sceneName"].value.trim() || defaultName,
                         exportFolder: button.form.elements["exportFolder"].value.trim() || defaultFolder,
@@ -4127,7 +4127,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Each prompt on the way is titled for what it saves (the unsaved or changed map, then the
      * regional map), so the two name prompts of a never-saved map don't read as the same question.
      */
-    async _onGenerateRegionalMap(event, target) {
+    async _onGenerateRegionalMap(_event, _target) {
         if (!this.canvasEngine) return;
 
         // 1. Validate Crop Box
@@ -4172,7 +4172,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Opens a system file dialogue, validates the JSON payload, and imports it to the database.
      */
-    async _onImportMapJson(event, target) {
+    async _onImportMapJson(_event, _target) {
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".json";
@@ -4221,7 +4221,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * file, then downloads the result. Mirrors #handleMapExport's Blob-download pattern - a
      * client-side file save, no server round trip.
      */
-    async _onExportSettings(event, target) {
+    async _onExportSettings(_event, _target) {
         const categories = MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key, labelKey }) => {
             const count = (this.uiState[key] || []).length;
 
@@ -4294,7 +4294,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * and silently skipped, so re-importing the same file (or two files that overlap) doesn't
      * pile up repeat copies of every style.
      */
-    async _onImportSettings(event, target) {
+    async _onImportSettings(_event, _target) {
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".json";
@@ -4524,7 +4524,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * The Update Map button: the same offer as on load, without the "don't ask again" option.
      */
-    async _onUpdateMapTerrain(event, target) {
+    async _onUpdateMapTerrain(_event, _target) {
         if (!this.terrainUpgrade) return;
 
         const choice = await MapDialogManager.promptTerrainUpgrade(this.terrainUpgrade, false);
@@ -4652,7 +4652,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateReferenceLayer();
     }
 
-    async _onRandomizeSeed(event, target) {
+    async _onRandomizeSeed(_event, _target) {
         this.uiState.mapSeed = this.#generateRandomSeed();
         this.render({ parts: ["context"] });
     }
@@ -4667,17 +4667,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return Math.random().toString(36).substring(2, 8).toUpperCase();
     }
 
-    async _onRedoBrush(event, target) {
+    async _onRedoBrush(_event, _target) {
         await this.#processHistoryStep(false);
     }
 
-    _onRemoveReferenceImage(event, target) {
+    _onRemoveReferenceImage(_event, _target) {
         this.uiState.referenceImage = "";
         this.#updateReferenceLayer();
         this.render({ parts: ["context"] });
     }
 
-    _onResetNoisePan(event, target) {
+    _onResetNoisePan(_event, _target) {
         this.uiState["noise.offsetX"] = this.defaultUiState["noise.offsetX"];
         this.uiState["noise.offsetY"] = this.defaultUiState["noise.offsetY"];
         this.render({ parts: ["context"] });
@@ -4685,25 +4685,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedGenerateTerrain();
     }
 
-    _onResetNoiseScale(event, target) {
+    _onResetNoiseScale(_event, _target) {
         this.uiState["noise.elevation.scale"] = this.defaultUiState["noise.elevation.scale"];
         this.render({ parts: ["context"] });
         this.markDirty();
         this.debouncedGenerateTerrain();
     }
 
-    _onResetReferencePan(event, target) {
+    _onResetReferencePan(_event, _target) {
         this.uiState.referenceX = this.mapWidth / 2;
         this.uiState.referenceY = this.mapHeight / 2;
         this.#updateReferenceLayer();
     }
 
-    _onResetReferenceScale(event, target) {
+    _onResetReferenceScale(_event, _target) {
         this.uiState.referenceScale = 1;
         this.#updateReferenceLayer();
     }
 
-    _onResetZoom(event, target) {
+    _onResetZoom(_event, _target) {
         this.canvasEngine?.resetCamera();
     }
 
@@ -4875,7 +4875,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Toggles the interactive 3D topography visualisation.
      */
-    async _onThreeDView(event, target) {
+    async _onThreeDView(_event, _target) {
         const overlay = this.element.querySelector("#fwmb-3d-overlay");
 
         if (!overlay || !this.currentElevationData) return;
@@ -4943,7 +4943,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateCanvasHint();
     }
 
-    _onToggleEditMode(event, target) {
+    _onToggleEditMode(_event, _target) {
         const toolbar = this.element.querySelector(".fwmb-edit-toolbar");
         if (!toolbar) return;
 
@@ -5025,7 +5025,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.toggleLayer(layerId, isVisible);
     }
 
-    _onToggleLiveFeatureUpdates(event, target) {
+    _onToggleLiveFeatureUpdates(_event, _target) {
         this.uiState.liveFeatureUpdates = !this.uiState.liveFeatureUpdates;
 
         // If turned back on while changes are pending, immediately process them
@@ -5239,15 +5239,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return states[(currentIdx + 1) % states.length];
     }
 
-    async _onUndoBrush(event, target) {
+    async _onUndoBrush(_event, _target) {
         await this.#processHistoryStep(true);
     }
 
-    _onZoomIn(event, target) {
+    _onZoomIn(_event, _target) {
         this.canvasEngine?.zoomCamera(FILRODENSWMB.UI.ZOOM.FACTOR);
     }
 
-    _onZoomOut(event, target) {
+    _onZoomOut(_event, _target) {
         this.canvasEngine?.zoomCamera(1 / FILRODENSWMB.UI.ZOOM.FACTOR);
     }
 

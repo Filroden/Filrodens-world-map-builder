@@ -23,6 +23,9 @@ export default [
                 Actor: "readonly",
                 Item: "readonly",
                 Scene: "readonly",
+                Folder: "readonly",
+                JournalEntry: "readonly",
+                JournalEntryPage: "readonly",
                 Token: "readonly",
                 User: "readonly",
                 ChatMessage: "readonly",
@@ -44,7 +47,7 @@ export default [
             },
         },
         rules: {
-            "no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+            "no-unused-vars": ["warn", { argsIgnorePattern: "^_", ignoreRestSiblings: true }],
             "no-debugger": "warn",
             "no-console": "off", // Set to "warn" if you want to find left-over logs
         },

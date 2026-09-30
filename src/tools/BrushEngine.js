@@ -610,7 +610,7 @@ export class BrushEngine {
      */
     #stampBrush(cx, cy, elevationData, biomeOverrideData, seaLevel, activeBounds = null, roughnessData = null) {
         const stroke = this.currentStroke;
-        const { layer, size } = stroke;
+        const { size } = stroke;
 
         // Calculate the raw, physical footprint of the brush
         const minX = Math.max(0, Math.floor(cx - size));

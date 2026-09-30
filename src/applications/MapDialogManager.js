@@ -796,7 +796,7 @@ export class MapDialogManager {
 
     // --- ADD ACTIONS ---
 
-    static async onAddCustomBiome(app, event, target) {
+    static async onAddCustomBiome(app, _event, _target) {
         const config = this.QUICK_STYLE_CONFIG.Biome;
         const newBiome = config.getDefaults(app);
 
@@ -840,11 +840,11 @@ export class MapDialogManager {
      * kept in its own file rather than grown here given how large this feature is expected
      * to become - see that file's own doc comment.
      */
-    static async onOpenBiomeRuleEditor(app, event, target) {
+    static async onOpenBiomeRuleEditor(app, _event, _target) {
         await RuleEditorDialog.open(app);
     }
 
-    static async onAddCustomPinIcon(app, event, target) {
+    static async onAddCustomPinIcon(app, _event, _target) {
         const result = await this._promptPinIconDialog({ name: "", path: "" }, "FILRODENSWMB.UI.AddCustomPinIcon");
         if (!result) return;
 
@@ -860,17 +860,17 @@ export class MapDialogManager {
         app.render({ parts: ["context"] });
     }
 
-    static async onHideAllBuiltinPinIcons(app, event, target) {
+    static async onHideAllBuiltinPinIcons(app, _event, _target) {
         await setAllBuiltinPinIconsDisabled(true);
         app.render({ parts: ["context"] });
     }
 
-    static async onRevealAllBuiltinPinIcons(app, event, target) {
+    static async onRevealAllBuiltinPinIcons(app, _event, _target) {
         await setAllBuiltinPinIconsDisabled(false);
         app.render({ parts: ["context"] });
     }
 
-    static async onAddDecoration(app, event, target) {
+    static async onAddDecoration(app, _event, _target) {
         if (!app.canvasEngine?.isEditMode) return;
 
         const defaultName = `Decoration ${app.mapDecorations.length + 1}`;
@@ -938,7 +938,7 @@ export class MapDialogManager {
         });
     }
 
-    static onAddRegionLayer(app, event, target) {
+    static onAddRegionLayer(app, _event, _target) {
         const id = foundry.utils.randomID();
         app.regionLayers.push({ id: id, name: `Region Layer ${app.regionLayers.length + 1}`, visibility: "all", regions: [] });
         app.activeRegionLayerId = id;
@@ -1071,7 +1071,7 @@ export class MapDialogManager {
      * single id. A no-op when there's nothing to delete (the toolbar button is also disabled in
      * that case, but this guards direct calls too).
      */
-    static async onDeleteAllLandMasks(app, event, target) {
+    static async onDeleteAllLandMasks(app, _event, _target) {
         if (app.landMasks.length === 0) return;
 
         const confirmed = await this._confirmDialog(

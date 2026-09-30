@@ -710,7 +710,7 @@ export class StudioCanvas {
         }
     }
 
-    #handlePointerLeave(e, canvasElement) {
+    #handlePointerLeave(_e, _canvasElement) {
         if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
             this.onCanvasHover(null, null);
         }
