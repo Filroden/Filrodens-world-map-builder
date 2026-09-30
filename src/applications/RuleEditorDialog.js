@@ -135,8 +135,9 @@ export class RuleEditorDialog {
     /**
      * Fully rebuilds the custom-rules section from the current in-memory `customBiomes`
      * array. Passed to every button below as `rerender` - every STRUCTURAL change (add/
-     * remove a range, add/remove a row, reorder a biome) calls it, exactly like the agreed
-     * mockup's own renderCustom(). Dragging a handle deliberately does NOT call this (see
+     * remove a range, add/remove a row, reorder a biome) calls it, so the section is always
+     * rebuilt whole from the array rather than patched in place, and can never drift out of step
+     * with the data it shows. Dragging a handle deliberately does NOT call this (see
      * #buildInteractiveSegment) - rebuilding mid-drag would tear down the very handle the
      * user has pointer-captured.
      */

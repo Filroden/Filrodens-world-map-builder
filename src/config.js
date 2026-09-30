@@ -776,10 +776,10 @@ export const FILRODENSWMB = {
         },
     },
     // Thresholds used by GridDataExporter to classify each Scene grid cell's terrain, moisture and
-    // temperature into the coarse bands documented in design/GRID-DATA-SCHEMA.md. Keeping these as
-    // named constants, rather than literals inside the exporter, is what keeps that document and
-    // the actual export in agreement - if a threshold changes here, the doc's tables need updating
-    // to match, but there is only ever one place that defines the real cut-points.
+    // temperature into the coarse bands published on the module wiki's "Grid Cell Data" page.
+    // Keeping these as named constants, rather than literals inside the exporter, means there is
+    // only ever one place that defines the real cut-points. If a threshold changes here, that
+    // page's band tables need updating to match, since other modules rely on them.
     GRID_DATA: {
         // Bump only for a breaking change to the flag's shape (a field removed, renamed, or
         // reinterpreted). Adding a new optional field to a cell does not require a bump - existing

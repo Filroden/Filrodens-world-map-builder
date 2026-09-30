@@ -6,8 +6,9 @@ import { MapStateManager } from "./MapStateManager.js";
 
 /**
  * Builds the per-grid-cell exploration data layer written to
- * `scene.flags["filrodens-world-map-builder"].gridData` at export time (see
- * `design/GRID-DATA-SCHEMA.md` for the full field reference this class implements).
+ * `scene.flags["filrodens-world-map-builder"].gridData` at export time. Every field is documented,
+ * for the modules and game systems that read it, on the module wiki's "Grid Cell Data" page, so a
+ * change to what this class writes needs that page updating to match.
  *
  * The payload gives every cell of the Scene's configured grid a dominant biome, terrain band,
  * moisture band, temperature band, river/coastal flags, and which regions, points of interest,
@@ -409,8 +410,8 @@ export class GridDataExporter {
     /**
      * Normalises a winning `resolveBiomeLookup` key - a built-in biome's string key, a built-in
      * biome's numeric id (from a hand-painted override), or a custom biome's numeric id - into the
-     * schema's uniform `{id, name, code}` shape. `id` is always written out as a string (per
-     * design/GRID-DATA-SCHEMA.md's id-format note), even though a custom biome's real internal id
+     * schema's uniform `{id, name, code}` shape. `id` is always written out as a string (the
+     * published schema promises a string id for every biome), even though a custom biome's real internal id
      * is numeric, so a consumer never has to branch on whether `biome.id` happens to be a number
      * or a string depending on which kind of biome a cell resolved to. Only ever called once per
      * cell, on the vote's winning value, not once per sampled pixel.

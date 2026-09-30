@@ -62,3 +62,17 @@ Please see the [Wiki](https://github.com/Filroden/Filrodens-world-map-builder/wi
 ## Roadmap
 
 - Export map meta-data through scene flags linked grid coordinates which could be used by game systems and other modules.
+
+## Third-Party Licences
+
+Filroden's World Map Builder is released under the [MIT Licence](LICENSE). It also includes the following third-party code and icons. Each is kept in its own folder together with its licence, and that licence covers every file in the folder.
+
+| Dependency | Folder | Licence file | Licence |
+| :--- | :--- | :--- | :--- |
+| [d3-delaunay](https://github.com/d3/d3-delaunay) 6.0.4 (bundled into a single file with the two dependencies below) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`LICENSE`](vendor/d3-delaunay/LICENSE) | ISC |
+| [delaunator](https://github.com/mapbox/delaunator) 5.1.0 (bundled with d3-delaunay) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`LICENSE-delaunator`](vendor/d3-delaunay/LICENSE-delaunator) | ISC |
+| [robust-predicates](https://github.com/mourner/robust-predicates) 3.0.3 (bundled with d3-delaunay) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`LICENSE-robust-predicates`](vendor/d3-delaunay/LICENSE-robust-predicates) | Unlicense (public domain) |
+| Simplex noise by Jonas Wagner (modified for speed, giving exactly the same values) | [`vendor/simplex-noise/`](vendor/simplex-noise/) | [`licence-simplex-noise.md`](vendor/simplex-noise/licence-simplex-noise.md) | MIT |
+| [three.js](https://threejs.org/) r185 (development build) and its OrbitControls add-on, used by the 3D view | [`vendor/three/`](vendor/three/) | [`licence-three.md`](vendor/three/licence-three.md) | MIT |
+| [Google Material Design icons](https://fonts.google.com/icons) (the interface icons) | [`assets/icons/`](assets/icons/) | [`icons-licence.md`](assets/icons/icons-licence.md) | Apache 2.0 |
+| [Pinhead icons](https://pinhead.ink/) (the point of interest icons) | [`assets/pinhead-icons/`](assets/pinhead-icons/) | [`PINHEAD-LICENSE.txt`](assets/pinhead-icons/PINHEAD-LICENSE.txt) | CC0 1.0 (public domain dedication) |
