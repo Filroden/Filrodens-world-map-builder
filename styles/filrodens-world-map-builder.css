@@ -996,11 +996,14 @@
     min-height: 0;
 }
 
+/* The lists in these panels scroll on their own, so the panel itself only scrolls when it is too
+   short for its settings plus the smallest list heights (instead of cutting them off). */
 .fwmb-fixed-lists {
-    overflow-y: hidden;
+    overflow-y: auto;
 }
 
-.fwmb-fixed-lists fieldset.fwmb-fieldset,
+/* Only the list sections stretch to share the panel's height. Settings fieldsets (Cartography's
+   Scale and Border) keep their natural height, so they are never squashed into each other. */
 .fwmb .fwmb-fixed-lists details.fwmb-fieldset {
     flex: 1;
     min-height: 5rem;

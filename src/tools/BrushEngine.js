@@ -2,11 +2,19 @@ import { SpatialMath } from "./SpatialMath.js";
 import { BrushLayerCache } from "./BrushLayerCache.js";
 import { FILRODENSWMB } from "../config.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
+import { exactHypot, stampSpacing } from "./BrushGeometry.js";
+import { RoughenStroke } from "./RoughenStroke.js";
 
 /** Brush feather is capped just below 1 so the falloff band never collapses to zero width. */
 const MAX_FEATHER = 0.99;
 
-/** The slope tools blend towards their anchored elevation by the brush influence raised to this power. */
+/**
+ * The slope tools (and Level) blend towards their anchored elevation by the brush influence
+ * raised to this power. ORIGINAL strokes raise it with Math.pow; CURRENT strokes square it twice
+ * (see #slopeInfluence), which is several times faster but rounds differently in the last bit, so
+ * the two must not be swapped for strokes already saved. Squaring twice is only right for a power
+ * of 4, which is why the power is fixed here.
+ */
 const SLOPE_INFLUENCE_POWER = 4;
 
 /** How far a slope stroke's target elevation climbs or falls per pixel it travels, at a Strength of 1. */
@@ -22,7 +30,8 @@ const SLOPE_GRADIENT = 0.3;
  *   CURRENT  - Smooth pulls each pixel towards the average of the ground around it (see
  *              #buildLocalMeans), by a share that reaches SMOOTH_MAX_BLEND at full Strength,
  *              without moving the coastline (see #holdCoast); Level lays the surface texture
- *              on the ground it levels.
+ *              on the ground it levels; the slope tools and Level raise the brush influence to
+ *              its power by squaring (see #slopeInfluence).
  */
 const STROKE_REVISION = Object.freeze({ ORIGINAL: 1, CURRENT: 2 });
 
@@ -58,31 +67,6 @@ const TERRAIN_MODE = Object.freeze({ NONE: 0, RAISE: 1, LOWER: 2, SMOOTH: 3, SLO
 /** Roughness of ground carrying all of the surface texture (0 is none of it). */
 const FULL_ROUGHNESS = FILRODENSWMB.GENERATION.SURFACE_TEXTURE.FULL_ROUGHNESS;
 
-/**
- * Two-argument Math.hypot, reproducing the algorithm V8 (Chromium, and so Foundry) implements it
- * with: divide both values by the larger, add their squares, take the square root and scale back
- * up. (V8 sums with Kahan compensation, which cannot change the result with only two terms.)
- *
- * Math.hypot is by far the most expensive call in the stamp loop, and this inline copy costs
- * about half as much. Plain sqrt(dx*dx + dy*dy) would be cheaper still, but it rounds differently
- * in roughly a third of pixels; that is invisible in the stored 32-bit elevation almost
- * everywhere, yet it is not guaranteed to be, and replayed terrain would no longer match what
- * earlier versions produced from the same strokes. This copy returns exactly what Math.hypot
- * returns in V8. Other engines may differ from it in the last bit, as they already may differ
- * from V8's own Math.hypot, which never mattered because the difference is far below the
- * precision of the stored elevation.
- */
-function exactHypot(dx, dy) {
-    const ax = Math.abs(dx);
-    const ay = Math.abs(dy);
-    const max = ax > ay ? ax : ay;
-    if (max === 0) return 0;
-
-    const nx = ax / max;
-    const ny = ay / max;
-    return Math.sqrt(nx * nx + ny * ny) * max;
-}
-
 export class BrushEngine {
     // Per-row first and last column a stamp needs to test; reused across stamps to avoid
     // allocating for every row of every stamp. See #computeRowSpans.
@@ -93,6 +77,9 @@ export class BrushEngine {
     // across stamps and grown as needed
     #summedArea = new Float64Array(0);
     #localMeans = new Float32Array(0);
+
+    // The Roughen brush's working state, live and for replays (see RoughenStroke)
+    #roughen;
 
     // Stroke history behind the `history` accessor below.
     #history = [];
@@ -110,6 +97,7 @@ export class BrushEngine {
     constructor(mapWidth, mapHeight) {
         this.mapWidth = mapWidth;
         this.mapHeight = mapHeight;
+        this.#roughen = new RoughenStroke(mapWidth, mapHeight);
 
         // The base terrain with every stroke in `history` applied, kept up to date as strokes are
         // finished, undone and redone so that rebuilding terrain does not have to replay the whole
@@ -245,6 +233,8 @@ export class BrushEngine {
         }
         this.redoStack = [];
         this.activeSlopeElevation = null;
+
+        if (layer === "terrain" && tool === "roughen") this.#roughen.beginLive();
     }
 
     /**
@@ -344,11 +334,36 @@ export class BrushEngine {
         this.lastY = null;
         this.activeSlopeElevation = null;
 
+        // Roughen's result does not depend on the order or overlap of its stamps, so it is
+        // replayed in one pass (see RoughenStroke)
+        if (stroke.layer === "terrain" && stroke.tool === "roughen") {
+            this.#replayRoughen(stroke, elevationData, seaLevel, activeBounds, roughnessData);
+            return;
+        }
+
         stroke.points.forEach((pt, index) => {
             // Pass activeBounds down to restrict the internal stamping loops
             this.#lerpAndStamp(pt.x, pt.y, elevationData, biomeOverrideData, seaLevel, false, activeBounds, roughnessData);
             // The first point anchors a slope or Level stroke (see resolveAnchors)
             if (index === 0 && onAnchor && BrushEngine.#isAnchored(stroke)) onAnchor(this.activeSlopeElevation);
+        });
+    }
+
+    /**
+     * Replays a recorded Roughen stroke (see RoughenStroke.replay). Without a roughness record or
+     * a surface texture Roughen has nothing to lay, as when painted live.
+     */
+    #replayRoughen(stroke, elevationData, seaLevel, activeBounds, roughnessData) {
+        if (!roughnessData || !this.surfaceTexture || stroke.points.length === 0) return;
+
+        this.#roughen.replay(stroke, {
+            elevationData,
+            roughnessData,
+            seaLevel,
+            activeBounds,
+            surfaceTexture: this.surfaceTexture,
+            maxAmplitude: this.surfaceTextureAmplitude,
+            onArea: this.#footprintObserver,
         });
     }
 
@@ -418,8 +433,7 @@ export class BrushEngine {
         const dy = y - this.lastY;
         const distance = Math.hypot(dx, dy);
 
-        const radius = this.currentStroke.size;
-        const stepSpacing = Math.max(1, radius * 0.25);
+        const stepSpacing = stampSpacing(this.currentStroke.size);
 
         // Accumulator: Required so slow mouse movements eventually trigger a stamp
         if (distance < stepSpacing) {
@@ -541,6 +555,19 @@ export class BrushEngine {
         this.lastX = null;
         this.lastY = null;
         return anchors;
+    }
+
+    /**
+     * Whether a stroke lays the surface texture (see ProceduralEngine.generateSurfaceTexture):
+     * Roughen, and Level painted with the current brush maths. Only these ask for the texture, so
+     * only the ground they cover ever needs it worked out.
+     *
+     * @param {object} stroke - A recorded stroke.
+     * @returns {boolean}
+     */
+    static usesSurfaceTexture(stroke) {
+        if (stroke.layer !== "terrain") return false;
+        return stroke.tool === "roughen" || (stroke.tool === "level" && BrushEngine.#isCurrent(stroke));
     }
 
     /** Whether a stroke was painted with the current brush maths (see STROKE_REVISION). */
@@ -743,8 +770,10 @@ export class BrushEngine {
      * itself, and `roughnessData` records how much of it each pixel carries, from 0 to
      * FULL_ROUGHNESS. That record is what keeps the texture from building up:
      * - Roughen raises a pixel's roughness to its brush influence (full inside, fading across the
-     *   brush's outer edge, see #roughenInfluence) and adds only the texture it was missing, so
-     *   roughening ground that is already rough changes nothing. It ignores strength and feather.
+     *   brush's outer edge) and adds only the texture it was missing, so roughening ground that
+     *   is already rough changes nothing. It ignores strength and feather. Every stamp of a
+     *   stroke works from the pixel's state before the stroke, so the stroke's result does not
+     *   depend on how its stamps overlap (see RoughenStroke).
      * - Smooth flattens the texture along with everything else, so it lowers the roughness by
      *   the same share it moves the pixel, and Roughen can later put the texture back.
      * - A textured Level blends each pixel towards the levelled height plus the full texture,
@@ -759,17 +788,18 @@ export class BrushEngine {
         const { tool, strength } = stroke;
         const { cx, cy, size, coreSize, falloff, minY, rows } = shape;
         const targetIndex = tool === "smooth" ? this.#getStampCentreIndex(cx, cy) : null;
-        const usesTexture = roughnessData && (tool === "roughen" || (tool === "level" && BrushEngine.#isCurrent(stroke)));
+        const usesTexture = roughnessData && BrushEngine.usesSurfaceTexture(stroke);
         const texture = usesTexture ? this.surfaceTexture?.(BrushEngine.#stampArea(shape)) : null;
         const mode = this.#resolveTerrainMode(stroke, targetIndex, texture !== null && texture !== undefined);
         if (mode === TERRAIN_MODE.NONE) return;
 
         const slopeElevation = this.activeSlopeElevation;
         const levelAmplitude = mode === TERRAIN_MODE.TEXTURED_LEVEL ? this.#textureAmplitudeAt(slopeElevation, seaLevel) : 0;
-        const roughenEdge = size * (1 - FILRODENSWMB.GENERATION.SURFACE_TEXTURE.EDGE);
         const means = mode === TERRAIN_MODE.SMOOTH_AVERAGE ? this.#buildLocalMeans(elevationData, shape) : null;
         const smoothStrength = Math.min(1, strength / SMOOTH_FULL_STRENGTH) * SMOOTH_MAX_BLEND;
+        const squarePower = BrushEngine.#isCurrent(stroke);
         const width = this.mapWidth;
+        if (mode === TERRAIN_MODE.ROUGHEN) this.#roughen.noteLiveStamp(BrushEngine.#stampArea(shape));
 
         for (let row = 0; row < rows; row++) {
             const y = minY + row;
@@ -806,33 +836,38 @@ export class BrushEngine {
                         break;
                     }
                     case TERRAIN_MODE.SLOPE: {
-                        const slopeInfluence = Math.pow(influence, SLOPE_INFLUENCE_POWER);
+                        const slopeInfluence = BrushEngine.#slopeInfluence(influence, squarePower);
                         elevationData[index] = current * (1 - slopeInfluence) + slopeElevation * slopeInfluence;
                         break;
                     }
                     case TERRAIN_MODE.TEXTURED_LEVEL: {
-                        const levelInfluence = Math.pow(influence, SLOPE_INFLUENCE_POWER);
+                        const levelInfluence = BrushEngine.#slopeInfluence(influence, squarePower);
                         const texturedLevel = slopeElevation + levelAmplitude * texture[index];
                         const roughness = roughnessData[index];
                         elevationData[index] = current * (1 - levelInfluence) + texturedLevel * levelInfluence;
                         roughnessData[index] = Math.round(roughness + (FULL_ROUGHNESS - roughness) * levelInfluence);
                         break;
                     }
-                    case TERRAIN_MODE.ROUGHEN: {
-                        const target = Math.round(FULL_ROUGHNESS * BrushEngine.#roughenInfluence(distance, size, roughenEdge));
-                        const roughness = roughnessData[index];
-                        if (target > roughness) {
-                            const amplitude = this.#textureAmplitudeAt(current, seaLevel);
-                            elevationData[index] = current + ((target - roughness) / FULL_ROUGHNESS) * amplitude * texture[index];
-                            roughnessData[index] = target;
-                        }
+                    case TERRAIN_MODE.ROUGHEN:
+                        this.#roughen.paintLive(index, RoughenStroke.targetAt(distance, size), elevationData, roughnessData, texture[index], this.surfaceTextureAmplitude, seaLevel);
                         break;
-                    }
                     default:
                         elevationData[index] = current;
                 }
             }
         }
+    }
+
+    /**
+     * The share a slope or Level stamp moves a pixel towards its target: the brush influence to
+     * SLOPE_INFLUENCE_POWER, by Math.pow for ORIGINAL strokes (which must replay exactly as they
+     * were painted) or by squaring twice for CURRENT ones.
+     */
+    static #slopeInfluence(influence, squarePower) {
+        if (!squarePower) return Math.pow(influence, SLOPE_INFLUENCE_POWER);
+
+        const squared = influence * influence;
+        return squared * squared;
     }
 
     /**
@@ -875,7 +910,8 @@ export class BrushEngine {
      * the stamp changes anything so the result does not depend on the order pixels are visited.
      * A summed-area table over the box plus that reach gives each average in four lookups.
      *
-     * @returns {Float32Array} Averages for the stamp's box, row by row (`shape.cols` per row).
+     * @returns {Float32Array} Averages for the stamp's box, row by row (`shape.cols` per row). Only
+     *   each row's span is filled in (the rest holds whatever an earlier stamp left there).
      */
     #buildLocalMeans(elevationData, shape) {
         const reach = Math.max(1, Math.round(shape.size * SMOOTH_KERNEL_SHARE));
@@ -909,30 +945,18 @@ export class BrushEngine {
             const y = shape.minY + row;
             const y0 = Math.max(top, y - reach) - top;
             const y1 = Math.min(bottom, y + reach) - top + 1;
-            for (let col = 0; col < shape.cols; col++) {
-                const x = shape.minX + col;
+            // Only the row's span (see #computeRowSpans) can lie inside the brush circle, so only
+            // its averages are ever read; the corners of the box are skipped
+            const spanEnd = this.#spanEnd[row];
+            for (let x = this.#spanStart[row]; x <= spanEnd; x++) {
                 const x0 = Math.max(left, x - reach) - left;
                 const x1 = Math.min(right, x + reach) - left + 1;
                 const total = summed[y1 * areaWidth + x1] - summed[y0 * areaWidth + x1] - summed[y1 * areaWidth + x0] + summed[y0 * areaWidth + x0];
-                means[row * shape.cols + col] = total / ((x1 - x0) * (y1 - y0));
+                means[row * shape.cols + x - shape.minX] = total / ((x1 - x0) * (y1 - y0));
             }
         }
 
         return means;
-    }
-
-    /**
-     * How much of the surface texture the Roughen brush lays at a distance from its centre: all
-     * of it out to `edge`, then easing out to none at the brush's edge (a smooth curve, so the
-     * border of a roughened patch shows no ridge or step). Fixed, rather than following the
-     * feather setting, so every Roughen stroke gives ground the same texture.
-     */
-    static #roughenInfluence(distance, size, edge) {
-        if (distance <= edge) return 1;
-        if (size <= edge) return 0;
-
-        const across = (size - distance) / (size - edge);
-        return across * across * (3 - 2 * across);
     }
 
     /**

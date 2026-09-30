@@ -8,6 +8,25 @@ import { SpatialMath } from "../tools/SpatialMath.js";
 import { UpwindMargin } from "../tools/UpwindMargin.js";
 import { FILRODENSWMB } from "../config.js";
 
+/**
+ * Rows of every input and output a band of the layer painters needs beyond the band itself, above
+ * and below: the repaint margin they write around any area they paint (DISPLAY.REPAINT_MARGIN),
+ * plus the one row either side of every pixel they write that relief shading, the contour lines
+ * and the shoreline read (see LayerPainting). The two halos are part of the painters' design, so
+ * both must grow together if either reach ever does.
+ */
+export const PAINT_HALO_ROWS = FILRODENSWMB.DISPLAY.REPAINT_MARGIN + 1;
+
+// Extra rows of the coastline field kept either side of those a band of the detail pass can
+// read (see ProceduralEngine.detailJobForRows), covering the interpolation's second row and the
+// rounding of the landmass lookup
+const DETAIL_BAND_MARGIN_CELLS = 2;
+
+// The eight neighbours a jump flood pass reads, in the order it reads them (see
+// ProceduralEngine#executeJFAPass): the row above left to right, the two sides, the row below
+const JFA_ORDER_COL = Int8Array.of(-1, 0, 1, -1, 1, -1, 0, 1);
+const JFA_ORDER_ROW = Int8Array.of(-1, -1, -1, 0, 0, 1, 1, 1);
+
 export class ProceduralEngine {
     constructor(seed = null) {
         let seedNum = ProceduralEngine.#hashString("FILRODEN");
@@ -651,9 +670,11 @@ export class ProceduralEngine {
      * @param {object|null} [bounds] - Only the pixels in this area (inclusive) are worked out and
      *   written; the rest of `outBuffer` is left as it is. Every pixel's value depends only on its
      *   position, so an area comes out exactly as it would in a whole-map pass.
+     * @param {number} [rowOffset] - The map row `outBuffer` starts at: 0 for a whole-map buffer,
+     *   or the first row of a band worked out apart from the rest (see GenerationWorkers).
      * @returns {Float32Array} `outBuffer`.
      */
-    generateSurfaceTexture(width, height, params, outBuffer, bounds = null) {
+    generateSurfaceTexture(width, height, params, outBuffer, bounds = null, rowOffset = 0) {
         const settings = FILRODENSWMB.GENERATION.SURFACE_TEXTURE;
         const world = params?.terrain?.world ?? { zoom: 1, originX: 0, originY: 0, rootW: width, rootH: height };
         const zoom = world.zoom || 1;
@@ -668,7 +689,7 @@ export class ProceduralEngine {
             const baselineY = ((world.originY || 0) + y / zoom) * baselinePerWorld + settings.NOISE_OFFSET.Y;
             for (let x = area.minX; x <= area.maxX; x++) {
                 const baselineX = ((world.originX || 0) + x / zoom) * baselinePerWorld + settings.NOISE_OFFSET.X;
-                outBuffer[y * width + x] = this.#signedFbm(baselineX, baselineY, settings.OCTAVES, scale, extraOctaves);
+                outBuffer[(y - rowOffset) * width + x] = this.#signedFbm(baselineX, baselineY, settings.OCTAVES, scale, extraOctaves);
             }
         }
 
@@ -719,23 +740,8 @@ export class ProceduralEngine {
         const elevationData = outBuffer;
         const activeBounds = ProceduralEngine.resolveBounds(bounds, width, height);
 
-        const eScale = params.noise.elevation.scale;
-        const eOctaves = params.noise.elevation.octaves;
-        const eStretch = params.noise.elevation.stretch ?? 1;
-        const panX = params.noise.offsetX ?? 0;
-        const panY = params.noise.offsetY ?? 0;
-        const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
-        // Finer detail layers for a zoomed-in regional map; 0 for any other map
-        const extraOctaves = params.terrain?.extraOctaves ?? 0;
-
         // 1. Generate Base Elevation Noise
-        for (let y = activeBounds.minY; y <= activeBounds.maxY; y++) {
-            for (let x = activeBounds.minX; x <= activeBounds.maxX; x++) {
-                const worldX = x + panX;
-                const worldY = y + panY;
-                elevationData[y * width + x] = this.#fbm(worldX, worldY, eOctaves, eScale, extraOctaves);
-            }
-        }
+        this.#standardNoise(width, params, elevationData, activeBounds, 0);
 
         // 2. Apply Vector Deformations strictly within the active bounds
         if (tectonicFaults.length > 0) {
@@ -746,10 +752,51 @@ export class ProceduralEngine {
         }
 
         // 3. Apply Elevation Exponent & Pivot Map to Land/Sea Boundaries
-        for (let y = activeBounds.minY; y <= activeBounds.maxY; y++) {
-            for (let x = activeBounds.minX; x <= activeBounds.maxX; x++) {
-                const i = y * width + x;
-                let elevation = elevationData[i];
+        this.#stretchLand(width, params, elevationData, activeBounds, 0);
+
+        return elevationData;
+    }
+
+    /**
+     * Whole rows `rowStart` to `rowEnd` (exclusive) of the standard base terrain with no faults or
+     * rivers (as generateTopography makes it), into `outRows`, which holds just those rows. For
+     * one band of a whole-map pass shared between workers (see GenerationWorkers); every pixel
+     * depends only on its own position, so the band comes out exactly as in a whole-map pass.
+     */
+    generateTopographyRows(width, params, outRows, rowStart, rowEnd) {
+        const band = { minX: 0, maxX: width - 1, minY: rowStart, maxY: rowEnd - 1 };
+        this.#standardNoise(width, params, outRows, band, rowStart);
+        this.#stretchLand(width, params, outRows, band, rowStart);
+        return outRows;
+    }
+
+    /** Step 1 of generateTopography: the elevation noise over `bounds`, into a buffer starting at row `rowOffset`. */
+    #standardNoise(width, params, elevationData, bounds, rowOffset) {
+        const eScale = params.noise.elevation.scale;
+        const eOctaves = params.noise.elevation.octaves;
+        const panX = params.noise.offsetX ?? 0;
+        const panY = params.noise.offsetY ?? 0;
+        // Finer detail layers for a zoomed-in regional map; 0 for any other map
+        const extraOctaves = params.terrain?.extraOctaves ?? 0;
+
+        for (let y = bounds.minY; y <= bounds.maxY; y++) {
+            for (let x = bounds.minX; x <= bounds.maxX; x++) {
+                const worldX = x + panX;
+                const worldY = y + panY;
+                elevationData[(y - rowOffset) * width + x] = this.#fbm(worldX, worldY, eOctaves, eScale, extraOctaves);
+            }
+        }
+    }
+
+    /** Step 3 of generateTopography: stretches land above sea level and floors the sea bed at 0. */
+    #stretchLand(width, params, elevationData, bounds, rowOffset) {
+        const eStretch = params.noise.elevation.stretch ?? 1;
+        const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
+
+        for (let y = bounds.minY; y <= bounds.maxY; y++) {
+            for (let x = bounds.minX; x <= bounds.maxX; x++) {
+                const i = (y - rowOffset) * width + x;
+                const elevation = elevationData[i];
 
                 if (elevation > seaLevel) {
                     const landHeight = (elevation - seaLevel) / (1 - seaLevel);
@@ -760,8 +807,6 @@ export class ProceduralEngine {
                 }
             }
         }
-
-        return elevationData;
     }
 
     /**
@@ -990,15 +1035,67 @@ export class ProceduralEngine {
      * world pixels are simply map pixels.
      */
     generateGuidedTopography(width, height, params, landMasks, outBuffer) {
-        const elevationData = outBuffer;
+        const job = this.prepareGuidedDetail(width, height, params, landMasks);
+        return this.generateDetailRows(width, height, params, job, 0, height, outBuffer);
+    }
+
+    /**
+     * The first, map-wide part of generateGuidedTopography: the coastline distance field (and,
+     * under the current coastal profile, the mid-ocean ridges) that the per-pixel pass reads (see
+     * generateDetailRows). Plain data only, so it can be handed to workers.
+     *
+     * @returns {{frame: object, field: object, plates: null}} A detail job.
+     */
+    prepareGuidedDetail(width, height, params, landMasks) {
         const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES);
         const frame = ProceduralEngine.#resolveTerrainFrame(width, height, params);
         const land = validMasks.length > 0 ? this.#maskLand(validMasks, frame) : null;
         const field = this.#buildCoastDistanceField(width, height, params, frame, land, { findRidges: true });
+        return { frame, field, plates: null };
+    }
 
-        this.#applyGuidedDetail(width, height, params, frame, field, elevationData);
+    /**
+     * The per-pixel pass of guided and current tectonic terrain for whole rows `rowStart` to
+     * `rowEnd` (exclusive), from a detail job (see prepareGuidedDetail and
+     * prepareTectonicV2Detail). `outRows` holds just those rows, the first row first. Every pixel
+     * depends only on its position and the job, so a band comes out exactly as it does in a
+     * whole-map pass, which is what lets bands be shared between workers (see GenerationWorkers).
+     *
+     * @returns {Float32Array} `outRows`.
+     */
+    generateDetailRows(width, height, params, job, rowStart, rowEnd, outRows) {
+        this.#applyGuidedDetail(width, height, params, job.frame, job.field, outRows, job.plates, rowStart, rowEnd);
+        return outRows;
+    }
 
-        return elevationData;
+    /**
+     * A copy of a detail job holding only the rows of its coastline field that rows `rowStart` to
+     * `rowEnd` (exclusive) of the map can read, for handing one band to a worker without copying
+     * the whole field (tens of megabytes on a large map) to every worker.
+     *
+     * A pixel reads the field where its position lands after the domain warp moves it, so the
+     * rows kept reach beyond the band's own by the furthest the warp can move a sample, taken at
+     * twice what the noise can reach in theory, plus a couple of cells for the interpolation. The
+     * cells keep their row numbers (`rowOffset` records the first one kept), so every sample is
+     * computed exactly as it is from the whole field.
+     *
+     * @returns {object} A detail job for the band.
+     */
+    static detailJobForRows(job, params, rowStart, rowEnd) {
+        const { frame, field } = job;
+        const fracture = params.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
+        const warpReach = FILRODENSWMB.GENERATION.WARP.AMPLITUDE * frame.resolutionScale * Math.abs(fracture);
+        const firstY = frame.originY + rowStart / frame.zoom - warpReach;
+        const lastY = frame.originY + (rowEnd - 1) / frame.zoom + warpReach;
+        const offset = field.rowOffset ?? 0;
+        const firstRow = Math.max(offset, Math.floor((firstY - field.v0) * field.cellsPerPixel) - DETAIL_BAND_MARGIN_CELLS);
+        const lastRow = Math.min(offset + field.distances.length / field.width - 1, Math.floor((lastY - field.v0) * field.cellsPerPixel) + DETAIL_BAND_MARGIN_CELLS);
+        const rows = (array) => array?.slice((firstRow - offset) * field.width, (lastRow - offset + 1) * field.width) ?? null;
+
+        return {
+            ...job,
+            field: { ...field, distances: rows(field.distances), landmassReach: rows(field.landmassReach), rowOffset: firstRow },
+        };
     }
 
     /**
@@ -1023,16 +1120,25 @@ export class ProceduralEngine {
      * terrain, so a regional map finds the same plates, continents and ranges as its parent.
      */
     generateTectonicV2Topography(width, height, params, outBuffer) {
+        const job = this.prepareTectonicV2Detail(width, height, params);
+        return this.generateDetailRows(width, height, params, job, 0, height, outBuffer);
+    }
+
+    /**
+     * The first, map-wide part of generateTectonicV2Topography: the plates, the coastline
+     * distance field and the ridge field that the per-pixel pass reads (see generateDetailRows).
+     * Plain data only, so it can be handed to workers.
+     *
+     * @returns {{frame: object, field: object, plates: object}} A detail job.
+     */
+    prepareTectonicV2Detail(width, height, params) {
         const frame = ProceduralEngine.#resolveTerrainFrame(width, height, params);
         const continents = this.#continentNoise(params, frame);
         const plates = this.#buildPlateModel(params, frame, continents);
         const land = this.#plateLand(frame, plates, continents);
         const field = this.#buildCoastDistanceField(width, height, params, frame, land, { findRidges: false });
         if (ProceduralEngine.#ridgeStrengthOf(params) > 0) field.ridges = this.#buildPlateRidgeField(frame, plates);
-
-        this.#applyGuidedDetail(width, height, params, frame, field, outBuffer, plates);
-
-        return outBuffer;
+        return { frame, field, plates };
     }
 
     /**
@@ -1163,7 +1269,8 @@ export class ProceduralEngine {
      * top map, settings at their baseline scale, no extra octaves.
      *
      * @returns {{zoom: number, originX: number, originY: number, rootW: number, rootH: number,
-     *   resolutionScale: number, detailOctaves: number, fillEnclosedCoast: boolean, coastalBuffers: boolean}}
+     *   resolutionScale: number, detailOctaves: number, fillEnclosedCoast: boolean, coastalBuffers: boolean,
+     *   exactDistances: boolean}}
      */
     static #resolveTerrainFrame(width, height, params) {
         const terrain = params.terrain ?? {};
@@ -1180,6 +1287,7 @@ export class ProceduralEngine {
             detailOctaves: terrain.detailOctaves ?? 0,
             fillEnclosedCoast: terrain.fillEnclosedCoast === true,
             coastalBuffers: terrain.coastalBuffers === true,
+            exactDistances: terrain.exactDistances === true,
         };
     }
 
@@ -1226,6 +1334,8 @@ export class ProceduralEngine {
             cutEdges: { left: u0 > 0, top: v0 > 0, right: u1 < frame.rootW, bottom: v1 < frame.rootH },
             landmassReach: null,
             ridges: null,
+            // Whether nearest coastline cells are found exactly (see #nearestSeeds)
+            exactDistances: frame.exactDistances,
         };
 
         if (!land) {
@@ -1326,7 +1436,8 @@ export class ProceduralEngine {
     }
 
     /**
-     * Executes the Jump Flood Algorithm natively, eliminating Web Worker overhead.
+     * Finds the signed distance from every grid cell to the nearest coastline cell (see
+     * #nearestSeeds).
      *
      * Works in grid cells and returns distances in world pixels. When `fillEnclosedCoast` is set,
      * a grid with no coastline anywhere in it (entirely inside, or entirely outside, the land
@@ -1348,7 +1459,7 @@ export class ProceduralEngine {
         const ownershipGrid = this.#generateOwnershipGrid(grid, land);
 
         this.#initialiseJFABoundaries(seedGrid, ownershipGrid, width, height);
-        seedGrid = this.#runJumpFlood(seedGrid, width, height);
+        seedGrid = ProceduralEngine.#nearestSeeds(seedGrid, width, height, grid.exactDistances);
 
         const enclosedDistance = fillEnclosedCoast ? Math.max(width, height) : 0;
         this.#resolveAbsoluteDistances(seedGrid, distanceGrid, ownershipGrid, width, height, enclosedDistance);
@@ -1410,6 +1521,7 @@ export class ProceduralEngine {
             cellsPerPixel: 1 / cellSize,
             width: Math.max(1, Math.ceil(frame.rootW / cellSize)),
             height: Math.max(1, Math.ceil(frame.rootH / cellSize)),
+            exactDistances: frame.exactDistances,
         };
     }
 
@@ -1543,7 +1655,7 @@ export class ProceduralEngine {
             seedGrid[index * 2 + 1] = Math.floor(index / width);
         }
 
-        const flooded = this.#runJumpFlood(seedGrid, width, height);
+        const flooded = ProceduralEngine.#nearestSeeds(seedGrid, width, height, grid.exactDistances);
         const nearest = new Int32Array(total).fill(-1);
         for (let index = 0; index < total; index++) {
             const seedX = flooded[index * 2];
@@ -1582,7 +1694,7 @@ export class ProceduralEngine {
 
         if (!hasRidge) return null;
 
-        const flooded = this.#runJumpFlood(seedGrid, width, height);
+        const flooded = ProceduralEngine.#nearestSeeds(seedGrid, width, height, grid.exactDistances);
         const distances = new Float32Array(total);
         for (let index = 0; index < total; index++) {
             const x = index % width;
@@ -1594,6 +1706,138 @@ export class ProceduralEngine {
     }
 
     /**
+     * For every cell of a grid, the position of its nearest seed, as an x, y pair per cell (or -1
+     * if the grid has no seeds at all). `seedGrid` holds each seed cell's own position and -1
+     * elsewhere; it is not modified.
+     *
+     * Maps of the current terrain revision use an exact distance transform (see
+     * #exactNearestSeeds), which is both exact and several times faster. Legacy maps keep the
+     * jump flood (see #runJumpFlood), which very occasionally settles on a seed slightly farther
+     * than the nearest; switching them over would move their terrain by those near misses, so they
+     * keep it and regenerate exactly as they always have.
+     *
+     * @param {boolean} exact - Whether to use the exact transform.
+     * @returns {Int32Array} The nearest seed of every cell (a new array).
+     */
+    static #nearestSeeds(seedGrid, width, height, exact) {
+        return exact ? ProceduralEngine.#exactNearestSeeds(seedGrid, width, height) : ProceduralEngine.#runJumpFlood(seedGrid, width, height);
+    }
+
+    /**
+     * The exact nearest seed of every cell, by the two-pass Euclidean distance transform of
+     * Felzenszwalb and Huttenlocher, keeping track of which seed each distance comes from. It
+     * takes time in proportion to the number of cells (the jump flood takes that times the
+     * number of halving steps, around fourteen passes on a large map).
+     *
+     * 1. Down each column, the nearest seed in that column (#nearestInColumns).
+     * 2. Along each row, the nearest seed overall: a cell's squared distance to the seed nearest
+     *    column q is (x - q)^2 + (column distance at q)^2, a parabola in x for every column
+     *    holding a seed, and the nearest seed comes from the lowest parabola at x
+     *    (#nearestInRow).
+     *
+     * On an exact tie between two seeds the one in the lower column is kept, then (within a
+     * column) the one above, so the result never depends on anything but the seeds.
+     */
+    static #exactNearestSeeds(seedGrid, width, height) {
+        const { squared, seedRow } = ProceduralEngine.#nearestInColumns(seedGrid, width, height);
+        const flooded = new Int32Array(width * height * 2).fill(-1);
+        const envelope = { columns: new Int32Array(width), starts: new Float64Array(width + 1) };
+
+        for (let y = 0; y < height; y++) {
+            ProceduralEngine.#nearestInRow(y, width, squared, seedRow, envelope, flooded);
+        }
+
+        return flooded;
+    }
+
+    /**
+     * First pass of #exactNearestSeeds: for every cell, the row of the nearest seed in its own
+     * column and the squared distance to it (Infinity, with row -1, if the column has no seed).
+     * One sweep down each column finds the nearest seed above, one sweep up the nearest below;
+     * the one above is kept on a tie.
+     */
+    static #nearestInColumns(seedGrid, width, height) {
+        const total = width * height;
+        const squared = new Float64Array(total);
+        const seedRow = new Int32Array(total);
+
+        for (let x = 0; x < width; x++) {
+            let above = -1;
+            for (let y = 0; y < height; y++) {
+                const index = y * width + x;
+                if (seedGrid[index * 2] !== -1) above = y;
+                seedRow[index] = above;
+            }
+
+            let below = -1;
+            for (let y = height - 1; y >= 0; y--) {
+                const index = y * width + x;
+                if (seedGrid[index * 2] !== -1) below = y;
+                const fromAbove = seedRow[index] === -1 ? Infinity : y - seedRow[index];
+                const fromBelow = below === -1 ? Infinity : below - y;
+                if (fromBelow < fromAbove) seedRow[index] = below;
+                const nearest = Math.min(fromAbove, fromBelow);
+                squared[index] = nearest * nearest;
+            }
+        }
+
+        return { squared, seedRow };
+    }
+
+    /**
+     * Second pass of #exactNearestSeeds for row `y`: builds the lower envelope of the parabolas of
+     * the columns that hold a seed (`columns` lists them left to right; parabola k is lowest from
+     * `starts[k]` to `starts[k + 1]`), then reads each cell's nearest seed from it. A row whose
+     * columns hold no seed at all is left at -1.
+     */
+    static #nearestInRow(y, width, squared, seedRow, envelope, flooded) {
+        const row = y * width;
+        const { columns, starts } = envelope;
+        let last = -1;
+
+        for (let q = 0; q < width; q++) {
+            const columnSquared = squared[row + q];
+            if (columnSquared === Infinity) continue;
+
+            if (last === -1) {
+                last = 0;
+                columns[0] = q;
+                starts[0] = -Infinity;
+                starts[1] = Infinity;
+                continue;
+            }
+
+            // Where this column's parabola drops below the lowest so far, discarding every
+            // parabola it is already below from where that one took over
+            let crossing = ProceduralEngine.#parabolaCrossing(squared, row, columns[last], q, columnSquared);
+            while (crossing <= starts[last]) {
+                last--;
+                crossing = ProceduralEngine.#parabolaCrossing(squared, row, columns[last], q, columnSquared);
+            }
+
+            last++;
+            columns[last] = q;
+            starts[last] = crossing;
+            starts[last + 1] = Infinity;
+        }
+
+        if (last === -1) return;
+
+        let k = 0;
+        for (let x = 0; x < width; x++) {
+            while (starts[k + 1] < x) k++;
+            const seedX = columns[k];
+            flooded[(row + x) * 2] = seedX;
+            flooded[(row + x) * 2 + 1] = seedRow[row + seedX];
+        }
+    }
+
+    /** Where, along a row, the parabola of column `q` (height `heightQ`) crosses that of column `p` < `q`. */
+    static #parabolaCrossing(squared, row, p, q, heightQ) {
+        return (heightQ + q * q - (squared[row + p] + p * p)) / (2 * (q - p));
+    }
+
+    /**
      * Spreads seeds across a grid with the Jump Flood Algorithm: afterwards every cell holds the
      * position of (very nearly) its nearest seed, as an x, y pair per cell in `seedGrid`, or -1
      * if the grid had no seeds at all. Two closing passes at a step of one clean up the few cells
@@ -1601,17 +1845,28 @@ export class ProceduralEngine {
      *
      * @returns {Int32Array} The flooded seed grid (a new array; the input is not modified).
      */
-    #runJumpFlood(seedGrid, width, height) {
+    static #runJumpFlood(seedGrid, width, height) {
+        // Two working grids, written in turn, so a pass never allocates and the input is never
+        // written to
+        const buffers = [new Int32Array(seedGrid.length), new Int32Array(seedGrid.length)];
         let flooded = seedGrid;
+        let pass = 0;
+        const runPass = (step) => {
+            const output = buffers[pass++ % 2];
+            ProceduralEngine.#executeJFAPass(flooded, output, width, height, step);
+            flooded = output;
+        };
+
         let step = Math.max(width, height) / 2;
         while (step >= 1) {
             step = Math.floor(step);
-            flooded = this.#executeJFAPass(flooded, width, height, step);
+            runPass(step);
             step /= 2;
         }
 
-        flooded = this.#executeJFAPass(flooded, width, height, 1);
-        return this.#executeJFAPass(flooded, width, height, 1);
+        runPass(1);
+        runPass(1);
+        return flooded;
     }
 
     /**
@@ -1698,7 +1953,7 @@ export class ProceduralEngine {
         if (!field.landmassReach) return Infinity;
         const gridX = Math.round(Math.max(0, Math.min(field.width - 1, (worldX - field.u0) * field.cellsPerPixel)));
         const gridY = Math.round(Math.max(0, Math.min(field.height - 1, (worldY - field.v0) * field.cellsPerPixel)));
-        return field.landmassReach[gridY * field.width + gridX];
+        return field.landmassReach[(gridY - (field.rowOffset ?? 0)) * field.width + gridX];
     }
 
     /**
@@ -1812,7 +2067,7 @@ export class ProceduralEngine {
     #sampleCoastDistance(field, worldX, worldY) {
         const gridX = Math.max(0, Math.min(field.width - 1, (worldX - field.u0) * field.cellsPerPixel));
         const gridY = Math.max(0, Math.min(field.height - 1, (worldY - field.v0) * field.cellsPerPixel));
-        return this.#bilinearSample(field.distances, field.width, field.height, gridX, gridY);
+        return this.#bilinearSample(field.distances, field.width, field.height, gridX, gridY, field.rowOffset ?? 0);
     }
 
     /**
@@ -1923,61 +2178,67 @@ export class ProceduralEngine {
         }
     }
 
-    #executeJFAPass(inputGrid, width, height, step) {
-        const outputGrid = new Int32Array(inputGrid.length);
-        outputGrid.set(inputGrid);
-
-        const offsets = [
-            [-1, -1],
-            [0, -1],
-            [1, -1],
-            [-1, 0],
-            [1, 0],
-            [-1, 1],
-            [0, 1],
-            [1, 1],
-        ];
-
+    /**
+     * One pass of the jump flood: every cell takes, of its own seed and the seeds of the eight
+     * cells `step` away (in the order below), the nearest, keeping the earlier one on a tie.
+     *
+     * This is the innermost loop of every guided and tectonic generation (a 4000 x 2400 map runs
+     * fourteen passes over 9.6 million cells), so the eight neighbours are unrolled and the
+     * bounds tests are only made for the cells near the grid's edge. The result is exactly that of
+     * testing each neighbour in turn with its own bounds test.
+     */
+    static #executeJFAPass(input, output, width, height, step) {
         for (let y = 0; y < height; y++) {
+            const rowInside = y - step >= 0 && y + step < height;
             for (let x = 0; x < width; x++) {
-                this.#processSingleJFAPixel(x, y, width, height, step, inputGrid, outputGrid, offsets);
-            }
-        }
-        return outputGrid;
-    }
+                const current = (y * width + x) * 2;
+                let bestX = input[current];
+                let bestY = input[current + 1];
+                let bestDist = bestX !== -1 ? (x - bestX) * (x - bestX) + (y - bestY) * (y - bestY) : Infinity;
 
-    #processSingleJFAPixel(x, y, width, height, step, inputGrid, outputGrid, offsets) {
-        const currentIndex = (y * width + x) * 2;
-        let bestDist = Infinity;
-        let bestX = inputGrid[currentIndex];
-        let bestY = inputGrid[currentIndex + 1];
+                if (rowInside && x - step >= 0 && x + step < width) {
+                    // Every neighbour is on the grid
+                    const up = current - step * width * 2;
+                    const down = current + step * width * 2;
+                    const side = step * 2;
+                    for (let k = 0; k < 8; k++) {
+                        const neighbour = JFA_ORDER_ROW[k] < 0 ? up : JFA_ORDER_ROW[k] > 0 ? down : current;
+                        const index = neighbour + JFA_ORDER_COL[k] * side;
+                        const seedX = input[index];
+                        const seedY = input[index + 1];
+                        if (seedX !== -1 && seedY !== -1) {
+                            const dist = (x - seedX) * (x - seedX) + (y - seedY) * (y - seedY);
+                            if (dist < bestDist) {
+                                bestDist = dist;
+                                bestX = seedX;
+                                bestY = seedY;
+                            }
+                        }
+                    }
+                } else {
+                    for (let k = 0; k < 8; k++) {
+                        const nx = x + JFA_ORDER_COL[k] * step;
+                        const ny = y + JFA_ORDER_ROW[k] * step;
+                        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
 
-        if (bestX !== -1) {
-            bestDist = (x - bestX) ** 2 + (y - bestY) ** 2;
-        }
-
-        for (const [dx, dy] of offsets) {
-            const nx = x + dx * step;
-            const ny = y + dy * step;
-
-            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                const neighbourIndex = (ny * width + nx) * 2;
-                const seedX = inputGrid[neighbourIndex];
-                const seedY = inputGrid[neighbourIndex + 1];
-
-                if (seedX !== -1 && seedY !== -1) {
-                    const dist = (x - seedX) ** 2 + (y - seedY) ** 2;
-                    if (dist < bestDist) {
-                        bestDist = dist;
-                        bestX = seedX;
-                        bestY = seedY;
+                        const index = (ny * width + nx) * 2;
+                        const seedX = input[index];
+                        const seedY = input[index + 1];
+                        if (seedX !== -1 && seedY !== -1) {
+                            const dist = (x - seedX) * (x - seedX) + (y - seedY) * (y - seedY);
+                            if (dist < bestDist) {
+                                bestDist = dist;
+                                bestX = seedX;
+                                bestY = seedY;
+                            }
+                        }
                     }
                 }
+
+                output[current] = bestX;
+                output[current + 1] = bestY;
             }
         }
-
-        outputGrid[currentIndex] = bestX;
-        outputGrid[currentIndex + 1] = bestY;
     }
 
     /**
@@ -2034,7 +2295,7 @@ export class ProceduralEngine {
      * #shapeCoastalProfile), and stops Continent Scale from resizing the coastline noise (see
      * #coastlineNoiseScale).
      */
-    #applyGuidedDetail(width, height, params, frame, field, elevationData, plates = null) {
+    #applyGuidedDetail(width, height, params, frame, field, elevationData, plates = null, rowStart = 0, rowEnd = height) {
         const generation = FILRODENSWMB.GENERATION;
         const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
         const zoom = frame.zoom;
@@ -2087,7 +2348,7 @@ export class ProceduralEngine {
         // the current coastal profile, so the loop allocates nothing per pixel
         const pixel = { worldX: 0, worldY: 0, sampleX: 0, sampleY: 0, distance: 0, detailNoise: 0, landmassReach: 0, tectonic: 0 };
 
-        for (let y = 0; y < height; y++) {
+        for (let y = rowStart; y < rowEnd; y++) {
             for (let x = 0; x < width; x++) {
                 // Noise position in world pixels, including the map's pan, and the matching
                 // position in the coastline field (world pixels without the pan)
@@ -2095,7 +2356,8 @@ export class ProceduralEngine {
                 const worldY = (y + panY) / zoom;
                 const fieldX = frame.originX + x / zoom;
                 const fieldY = frame.originY + y / zoom;
-                const index = y * width + x;
+                // elevationData holds rows from rowStart on (see generateDetailRows)
+                const index = (y - rowStart) * width + x;
 
                 // 1. Apply Domain Warping
                 const warpX = (this.#fbm(worldX + warp.offsets.xx, worldY + warp.offsets.xy, generation.WARP.OCTAVES, warp.frequency) - 0.5) * fracture * warp.amplitude;
@@ -2397,9 +2659,14 @@ export class ProceduralEngine {
      */
     #computeEffectiveCoastDistance(worldX, worldY, macroDistance, boundary) {
         const coastalVariance = FILRODENSWMB.GENERATION.COASTAL_VARIANCE;
-        const boundaryNoise = this.#fbm(worldX + boundary.offsetX, worldY + boundary.offsetY, coastalVariance.OCTAVES, boundary.noiseScale, boundary.extraOctaves);
         const boundaryTaper = 1.0 - this.#smoothstep(0, boundary.band, Math.abs(macroDistance));
 
+        // Beyond the band the noise is multiplied by 0 and the distance comes back unchanged
+        // (it is not 0 there, so adding a zero cannot change its sign), so the noise, the most
+        // expensive part, is only read inside the band. About half of a typical map lies outside it.
+        if (boundaryTaper === 0) return macroDistance;
+
+        const boundaryNoise = this.#fbm(worldX + boundary.offsetX, worldY + boundary.offsetY, coastalVariance.OCTAVES, boundary.noiseScale, boundary.extraOctaves);
         return macroDistance + (boundaryNoise - 0.5) * 2 * boundary.amplitude * boundaryTaper;
     }
 
@@ -2467,20 +2734,43 @@ export class ProceduralEngine {
      *   its left and right edges (see UpwindMargin), as saved with the map, or null.
      */
     generateClimateData(elevationData, width, height, params, outMoisture, outTemperature, bounds = null, upwindMargin = null) {
-        const moistureData = outMoisture;
-        const temperatureData = outTemperature;
-
         const climateBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const climate = this.prepareClimate(width, height, params, upwindMargin);
+        this.#climateRows(climate, elevationData, outMoisture, outTemperature, climateBounds);
+        return { moistureData: outMoisture, temperatureData: outTemperature };
+    }
 
-        for (let y = climateBounds.minY; y <= climateBounds.maxY; y++) {
-            for (let x = climateBounds.minX; x <= climateBounds.maxX; x++) {
-                const index = y * width + x;
-                moistureData[index] = this.getMoistureAt(climate, elevationData, x, y);
-                temperatureData[index] = this.getTemperatureAt(climate, elevationData, x, y);
+    /**
+     * The climate of whole rows `rowStart` to `rowEnd` (exclusive), as generateClimateData
+     * computes it, for one band of a whole-map pass shared between workers (see
+     * GenerationWorkers). Moisture reads elevation only along its own row, so a band needs only
+     * its own rows of elevation. `elevationRows` and both outputs hold just those rows, the band's
+     * first row first.
+     *
+     * @param {Float32Array} elevationRows - Elevation of the band's rows.
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels (latitude runs over the whole map).
+     * @param {object} params - Derived map parameters.
+     * @param {Float32Array} outMoisture - Receives the band's moisture.
+     * @param {Float32Array} outTemperature - Receives the band's temperature.
+     * @param {number} rowStart - First row of the band.
+     * @param {number} rowEnd - Row after the band's last.
+     * @param {object|null} [upwindMargin] - As for generateClimateData.
+     */
+    generateClimateRows(elevationRows, width, height, params, outMoisture, outTemperature, rowStart, rowEnd, upwindMargin = null) {
+        const climate = { ...this.prepareClimate(width, height, params, upwindMargin), rowOffset: rowStart };
+        this.#climateRows(climate, elevationRows, outMoisture, outTemperature, { minX: 0, maxX: width - 1, minY: rowStart, maxY: rowEnd - 1 });
+    }
+
+    /** Fills moisture and temperature over `bounds`; buffers hold rows from `climate.rowOffset` on. */
+    #climateRows(climate, elevationData, outMoisture, outTemperature, bounds) {
+        for (let y = bounds.minY; y <= bounds.maxY; y++) {
+            const rowBase = (y - climate.rowOffset) * climate.width;
+            for (let x = bounds.minX; x <= bounds.maxX; x++) {
+                outMoisture[rowBase + x] = this.getMoistureAt(climate, elevationData, x, y);
+                outTemperature[rowBase + x] = this.getTemperatureAt(climate, elevationData, x, y);
             }
         }
-        return { moistureData, temperatureData };
     }
 
     /**
@@ -2524,6 +2814,9 @@ export class ProceduralEngine {
             // The parent's ground beyond a regional map's left and right edges, read when the
             // point upwind lies off the map; null for any other map, which reads its edge column
             upwindMargin: UpwindMargin.decode(upwindMargin),
+            // The row the elevation buffer starts at: 0 for a whole map, the band's first row for
+            // one band of a pass shared between workers (see generateClimateRows)
+            rowOffset: 0,
         };
     }
 
@@ -2554,7 +2847,7 @@ export class ProceduralEngine {
         const worldY = y + climate.panY;
         const moistureNoise = this.#fbm(worldX + climate.moistureOffset, worldY + climate.moistureOffset, climate.mOctaves, climate.mScale, climate.extraOctaves);
         let baseMoisture = moistureNoise + (climate.globalMoisture - 0.5);
-        const elevation = elevationData[y * climate.width + x];
+        const elevation = elevationData[(y - climate.rowOffset) * climate.width + x];
 
         if (elevation > climate.seaLevel) {
             const absLat = Math.abs(this.#latitudeAt(climate, y));
@@ -2565,7 +2858,7 @@ export class ProceduralEngine {
 
             const upwindX = Math.round(x + windDirectionX);
             const offMap = upwindX < 0 || upwindX >= climate.width;
-            const upwindElev = offMap && climate.upwindMargin ? UpwindMargin.sampleAt(climate.upwindMargin, upwindX, y) : elevationData[y * climate.width + Math.max(0, Math.min(climate.width - 1, upwindX))];
+            const upwindElev = offMap && climate.upwindMargin ? UpwindMargin.sampleAt(climate.upwindMargin, upwindX, y) : elevationData[(y - climate.rowOffset) * climate.width + Math.max(0, Math.min(climate.width - 1, upwindX))];
 
             const slope = elevation - upwindElev;
             baseMoisture += slope * 3;
@@ -2596,7 +2889,7 @@ export class ProceduralEngine {
         temperature += climate.globalTemp - 0.3;
         temperature += seasonImpact;
 
-        const elevation = elevationData[y * climate.width + x];
+        const elevation = elevationData[(y - climate.rowOffset) * climate.width + x];
         if (elevation > climate.seaLevel) {
             const altitude = (elevation - climate.seaLevel) / (1 - climate.seaLevel);
             temperature -= altitude * climate.altCooling;
@@ -2631,9 +2924,13 @@ export class ProceduralEngine {
      * @param {object|null} [bounds] - Area to repaint, or null for the whole map.
      * @param {number} [maxPeak] - The map's highest elevation.
      * @param {number} [minTrough] - The map's lowest elevation (0 unless something went below it).
+     * @param {number} [rowOffset] - The map row the buffers start at: 0 when they hold the whole
+     *   map, or the first row of a band painted apart from the rest (see LayerPainting). A band's
+     *   buffers must also hold the rows its painting reads and writes around it (see
+     *   PAINT_HALO_ROWS).
      * @returns {Uint8Array} outBuffer.
      */
-    paintTerrainAux(elevationData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, maxPeak = 1.0, minTrough = 0.0) {
+    paintTerrainAux(elevationData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, maxPeak = 1.0, minTrough = 0.0, rowOffset = 0) {
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const renderBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
         const light = ProceduralEngine.#resolveReliefLight(params, width, height);
@@ -2648,7 +2945,7 @@ export class ProceduralEngine {
 
         for (let y = renderBounds.minY; y <= renderBounds.maxY; y++) {
             for (let x = renderBounds.minX; x <= renderBounds.maxX; x++) {
-                const i = y * width + x;
+                const i = (y - rowOffset) * width + x;
                 const elevation = elevationData[i];
                 const lakeSurface = waterMask ? waterMask[i] : 0;
                 const isSea = elevation < seaLevel;
@@ -2659,7 +2956,7 @@ export class ProceduralEngine {
                 else if (isWater) depth = seaLevel > 0 ? ((lakeSurface - elevation) / seaLevel) * lakeScale : 0;
 
                 const o = i * 4;
-                outBuffer[o] = TerrainShading.encodeRelief(ProceduralEngine.#reliefChange(elevationData, x, y, width, height, light));
+                outBuffer[o] = TerrainShading.encodeRelief(ProceduralEngine.#reliefChange(elevationData, x, y, width, height, light, rowOffset));
                 outBuffer[o + 1] = TerrainShading.encodeDepth(depth, isWater);
                 outBuffer[o + 2] = isWater ? 0 : TerrainShading.encodeHeight((elevation - seaLevel) / landRange);
                 outBuffer[o + 3] = 255;
@@ -2713,14 +3010,15 @@ export class ProceduralEngine {
      *
      * The slope comes from the heights either side of the pixel (clamped at the map's edges).
      * The sea floor and lake beds are measured too, which shows their ridges, trenches and
-     * slopes through the water.
+     * slopes through the water. `elevationData` starts at map row `rowOffset` (see
+     * paintTerrainAux).
      */
-    static #reliefChange(elevationData, x, y, width, height, light) {
-        const row = y * width;
+    static #reliefChange(elevationData, x, y, width, height, light, rowOffset) {
+        const row = (y - rowOffset) * width;
         const left = elevationData[row + Math.max(0, x - 1)];
         const right = elevationData[row + Math.min(width - 1, x + 1)];
-        const up = elevationData[Math.max(0, y - 1) * width + x];
-        const down = elevationData[Math.min(height - 1, y + 1) * width + x];
+        const up = elevationData[(Math.max(0, y - 1) - rowOffset) * width + x];
+        const down = elevationData[(Math.min(height - 1, y + 1) - rowOffset) * width + x];
 
         // The surface normal of the ground, from its slope across and down the map
         const slopeX = ((right - left) / 2) * light.slopeScale;
@@ -2963,8 +3261,12 @@ export class ProceduralEngine {
      * Left `null` (the default) for callers that don't need the preview - the 3D view
      * generation, for one - and costs nothing extra when omitted beyond the one `if` check.
      * @param {Uint8Array} [outUnderwaterBuffer] - optional RGBA buffer for the beds' biomes.
+     * @param {number} [rowOffset] - The map row the buffers start at: 0 when they hold the whole
+     *   map, or the first row of a band painted apart from the rest (see LayerPainting). A band's
+     *   buffers must also hold the rows its painting reads and writes around it (see
+     *   PAINT_HALO_ROWS).
      */
-    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, outFallbackBuffer = null, outUnderwaterBuffer = null) {
+    createBiomesMap(elevationData, moistureData, temperatureData, biomeOverrideData, width, height, seaLevel, waterMask, params, outBuffer, bounds = null, outFallbackBuffer = null, outUnderwaterBuffer = null, rowOffset = 0) {
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const renderBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
         const [fbR, fbG, fbB] = FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR;
@@ -2973,7 +3275,7 @@ export class ProceduralEngine {
 
         for (let y = renderBounds.minY; y <= renderBounds.maxY; y++) {
             for (let x = renderBounds.minX; x <= renderBounds.maxX; x++) {
-                const i = y * width + x;
+                const i = (y - rowOffset) * width + x;
                 const bufferIndex = i * 4;
 
                 const overrideId = biomeOverrideData ? biomeOverrideData[i] : 0;
@@ -3156,15 +3458,20 @@ export class ProceduralEngine {
      *
      * The coast's shoreline is drawn on the same layer (see #drawShoreline), so it follows the
      * Contours switch. It is drawn even when the contour interval is off.
+     *
+     * @param {number} [rowOffset] - The map row the buffers start at: 0 when they hold the whole
+     *   map, or the first row of a band painted apart from the rest (see LayerPainting). A band's
+     *   buffers must also hold the rows its painting reads and writes around it (see
+     *   PAINT_HALO_ROWS).
      */
-    createContourMap(elevationData, width, height, interval, seaLevel, outBuffer, bounds = null) {
+    createContourMap(elevationData, width, height, interval, seaLevel, outBuffer, bounds = null, rowOffset = 0) {
         const baseBounds = ProceduralEngine.resolveBounds(bounds, width, height);
         const contourBounds = ProceduralEngine.getRepaintBounds(baseBounds, width, height);
 
         // Targeted erasure of the rendering zone instead of a full buffer wipe
         for (let y = contourBounds.minY; y <= contourBounds.maxY; y++) {
             for (let x = contourBounds.minX; x <= contourBounds.maxX; x++) {
-                const idx = (y * width + x) * 4;
+                const idx = ((y - rowOffset) * width + x) * 4;
                 outBuffer[idx] = 0;
                 outBuffer[idx + 1] = 0;
                 outBuffer[idx + 2] = 0;
@@ -3172,19 +3479,19 @@ export class ProceduralEngine {
             }
         }
 
-        if (interval > 0) ProceduralEngine.#drawContourLines(elevationData, width, height, interval, seaLevel, outBuffer, contourBounds);
-        ProceduralEngine.#drawShoreline(elevationData, width, height, seaLevel, outBuffer, contourBounds);
+        if (interval > 0) ProceduralEngine.#drawContourLines(elevationData, width, height, interval, seaLevel, outBuffer, contourBounds, rowOffset);
+        ProceduralEngine.#drawShoreline(elevationData, width, height, seaLevel, outBuffer, contourBounds, rowOffset);
         return outBuffer;
     }
 
     /** The contour lines themselves (see createContourMap). */
-    static #drawContourLines(elevationData, width, height, interval, seaLevel, outBuffer, contourBounds) {
+    static #drawContourLines(elevationData, width, height, interval, seaLevel, outBuffer, contourBounds, rowOffset) {
         const maxY = Math.min(contourBounds.maxY, height - 2);
         const maxX = Math.min(contourBounds.maxX, width - 2);
 
         for (let y = contourBounds.minY; y <= maxY; y++) {
             for (let x = contourBounds.minX; x <= maxX; x++) {
-                const index = y * width + x;
+                const index = (y - rowOffset) * width + x;
                 const elev = elevationData[index];
 
                 const currentStep = Math.floor(elev / interval);
@@ -3219,7 +3526,7 @@ export class ProceduralEngine {
      * Every pixel it writes lies inside `contourBounds`, and a pixel's shore status depends only
      * on its direct neighbours, which the repaint margin (DISPLAY.REPAINT_MARGIN) covers.
      */
-    static #drawShoreline(elevationData, width, height, seaLevel, outBuffer, contourBounds) {
+    static #drawShoreline(elevationData, width, height, seaLevel, outBuffer, contourBounds, rowOffset) {
         const shore = FILRODENSWMB.DISPLAY.SHORELINE;
         const dryAlpha = Math.round(shore.DRY_ALPHA * 255);
         const wetAlpha = Math.round(shore.WET_ALPHA * 255);
@@ -3227,9 +3534,9 @@ export class ProceduralEngine {
 
         for (let y = contourBounds.minY; y <= contourBounds.maxY; y++) {
             for (let x = contourBounds.minX; x <= contourBounds.maxX; x++) {
-                const index = y * width + x;
+                const index = (y - rowOffset) * width + x;
                 const wet = ProceduralEngine.#isWaterAt(water, index);
-                if (!ProceduralEngine.#isShore(water, width, height, x, y, wet)) continue;
+                if (!ProceduralEngine.#isShore(water, width, height, x, y, wet, index)) continue;
 
                 const colour = wet ? shore.WET_COLOUR : shore.DRY_COLOUR;
                 const o = index * 4;
@@ -3246,9 +3553,12 @@ export class ProceduralEngine {
         return water.elevationData[index] < water.seaLevel;
     }
 
-    /** Whether any of a pixel's four direct neighbours (inside the map) is on the other side of the water's edge. */
-    static #isShore(water, width, height, x, y, wet) {
-        const index = y * width + x;
+    /**
+     * Whether any of a pixel's four direct neighbours (inside the map) is on the other side of the
+     * water's edge. `index` is the pixel's place in the elevation buffer, which may start at a
+     * later row than the map (see createContourMap).
+     */
+    static #isShore(water, width, height, x, y, wet, index) {
         if (x > 0 && ProceduralEngine.#isWaterAt(water, index - 1) !== wet) return true;
         if (x < width - 1 && ProceduralEngine.#isWaterAt(water, index + 1) !== wet) return true;
         if (y > 0 && ProceduralEngine.#isWaterAt(water, index - width) !== wet) return true;
@@ -3283,8 +3593,12 @@ export class ProceduralEngine {
     /**
      * Bilinear interpolation for perfectly upscaling a low-resolution mesh into a high-resolution
      * grid, or for reading any full-resolution field at a continuous (sub-pixel) position.
+     *
+     * `rowOffset` is the grid row `mesh` starts at, for a field holding only some of its rows (see
+     * detailJobForRows); positions are still given in rows of the whole grid, so the result is
+     * exactly what the whole grid gives.
      */
-    #bilinearSample(mesh, width, height, x, y) {
+    #bilinearSample(mesh, width, height, x, y, rowOffset = 0) {
         const x1 = Math.floor(x);
         const y1 = Math.floor(y);
         const x2 = Math.min(x1 + 1, width - 1);
@@ -3293,10 +3607,12 @@ export class ProceduralEngine {
         const dx = x - x1;
         const dy = y - y1;
 
-        const p00 = mesh[y1 * width + x1];
-        const p10 = mesh[y1 * width + x2];
-        const p01 = mesh[y2 * width + x1];
-        const p11 = mesh[y2 * width + x2];
+        const row1 = (y1 - rowOffset) * width;
+        const row2 = (y2 - rowOffset) * width;
+        const p00 = mesh[row1 + x1];
+        const p10 = mesh[row1 + x2];
+        const p01 = mesh[row2 + x1];
+        const p11 = mesh[row2 + x2];
 
         const bottom = p00 * (1 - dx) + p10 * dx;
         const top = p01 * (1 - dx) + p11 * dx;

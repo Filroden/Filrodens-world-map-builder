@@ -23,6 +23,7 @@ import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 import { LandMaskGenerator } from "../generation/LandMaskGenerator.js";
 import { RandomLandMap } from "../generation/RandomLandMap.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
+import { LayerPainting } from "../canvas/LayerPainting.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -244,6 +245,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /** Runs the refreshes one at a time (see RefreshQueue and #createRefreshQueue). */
     #refreshes;
+
+    /** Paints the pixel layers, sharing whole-map repaints between workers (see LayerPainting). */
+    #layerPainting = new LayerPainting();
 
     /**
      * Mass Edit item types whose "Select" toggle lives in the same context panel fieldset
@@ -2378,52 +2382,27 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
         mark = timer.lap("Canvas repaint: peak scan", mark, `asked to repaint ${this.#describeRepaintArea(requestedBounds)}`);
 
-        const seaLevel = this.uiState["seaLevel"];
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
-        const waterMask = this.bufferWaterMask;
 
         // Only the pixels the painters write are copied to the canvas textures and uploaded to the GPU
         const uploadBounds = ProceduralEngine.getRepaintBounds(bounds, this.mapWidth, this.mapHeight);
         mark = timer.lap("Canvas repaint: settings", mark, `repainting ${this.#describeRepaintArea(bounds)}`);
 
-        // The terrain's packed relief, depth and height, relative to the cached peak and trough
-        const maxPeak = this.cachedMaxElevation || 1.0;
-        const minTrough = this.cachedMinElevation || 0;
-        engine.paintTerrainAux(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTerrainAux, bounds, maxPeak, minTrough);
-        mark = timer.lap("Canvas repaint: terrain painter", mark);
+        // The terrain's packed relief, depth and height are shaded relative to the cached peak and
+        // trough. A whole-map repaint may be shared between workers and finish later (see
+        // LayerPainting), so everything it paints into is taken now.
+        const target = this.#paintingTarget(currentSeed, params);
+        const painting = await this.#layerPainting.paint(target, bounds);
+        mark = this.#recordPainting(timer, mark, painting);
 
-        if (this.currentMoistureData && this.currentTemperatureData) {
-            engine.createBiomesMap(
-                this.currentElevationData,
-                this.currentMoistureData,
-                this.currentTemperatureData,
-                this.currentBiomeOverrides,
-                this.mapWidth,
-                this.mapHeight,
-                seaLevel,
-                waterMask,
-                params,
-                this.bufferSurfaceBiomes,
-                bounds,
-                this.bufferBiomeFallback,
-                this.bufferUnderwaterBiomes,
-            );
-            mark = timer.lap("Canvas repaint: biomes painter", mark);
-            // Kept current every repaint, but its layer stays hidden until the "Preview Rule
-            // Coverage" button is hovered (see #bindToolbarListeners) - no visibility toggle here.
-            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight, uploadBounds);
+        if (!this.#isOpen) return;
+
+        // Nothing is uploaded if a newer whole-map repaint took over while this one ran (it uploads
+        // its own layers) or the map's buffers were replaced meanwhile (by loading another map)
+        if (painting.current && target.outputs.terrainAux === this.bufferTerrainAux) {
+            this.#uploadLayers(uploadBounds, target, timer, mark);
+            mark = performance.now();
         }
-
-        this.#syncTerrainSettings();
-        this.canvasEngine.renderTerrain(this.#terrainBuffers(), this.mapWidth, this.mapHeight, uploadBounds);
-        mark = timer.lap("Canvas repaint: canvas textures", mark);
-
-        const contourInterval = this.uiState["contourInterval"];
-        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds);
-        mark = timer.lap("Canvas repaint: contours painter", mark);
-        this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight, uploadBounds);
-        mark = timer.lap("Canvas repaint: canvas textures", mark);
 
         if (!vectors) return;
 
@@ -2433,6 +2412,76 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this._repaintVectors();
         timer.lap("Canvas repaint: vector layers", mark);
+    }
+
+    /**
+     * Everything a repaint of the pixel layers paints from and into (see LayerPainting): the
+     * map's inputs and layer buffers as they are now, and the settings the painters read.
+     */
+    #paintingTarget(seed, params) {
+        const hasClimate = Boolean(this.currentMoistureData && this.currentTemperatureData);
+        return {
+            engine: new ProceduralEngine(seed),
+            seed,
+            width: this.mapWidth,
+            height: this.mapHeight,
+            settings: {
+                params,
+                seaLevel: this.uiState["seaLevel"],
+                contourInterval: this.uiState["contourInterval"],
+                maxPeak: this.cachedMaxElevation || 1.0,
+                minTrough: this.cachedMinElevation || 0,
+            },
+            inputs: {
+                elevation: this.currentElevationData,
+                waterMask: this.bufferWaterMask,
+                moisture: hasClimate ? this.currentMoistureData : null,
+                temperature: hasClimate ? this.currentTemperatureData : null,
+                overrides: this.currentBiomeOverrides,
+            },
+            outputs: {
+                terrainAux: this.bufferTerrainAux,
+                surfaceBiomes: this.bufferSurfaceBiomes,
+                biomeFallback: this.bufferBiomeFallback,
+                underwaterBiomes: this.bufferUnderwaterBiomes,
+                contours: this.bufferContours,
+            },
+        };
+    }
+
+    /**
+     * Records how long the painters took in the timing summary: each painter for a repaint on the
+     * main thread, or the three together for one shared between workers.
+     *
+     * @returns {number} The time to measure the next stage from.
+     */
+    #recordPainting(timer, mark, painting) {
+        if (painting.shared) return timer.lap("Canvas repaint: painters (shared)", mark);
+
+        timer.record("Canvas repaint: terrain painter", painting.timings.terrain);
+        timer.record("Canvas repaint: biomes painter", painting.timings.biomes);
+        timer.record("Canvas repaint: contours painter", painting.timings.contours);
+        return performance.now();
+    }
+
+    /**
+     * Copies the painted layers to the canvas and uploads them to the GPU (only `uploadBounds`,
+     * or everything when it is null). The rule-coverage preview is kept current every repaint,
+     * but its layer stays hidden until the "Preview Rule Coverage" button is hovered (see
+     * #bindToolbarListeners), so no visibility changes here.
+     */
+    #uploadLayers(uploadBounds, target, timer, mark) {
+        let since = mark;
+        if (target.inputs.moisture) {
+            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight, uploadBounds);
+        }
+
+        this.#syncTerrainSettings();
+        this.canvasEngine.renderTerrain(this.#terrainBuffers(), this.mapWidth, this.mapHeight, uploadBounds);
+        since = timer.lap("Canvas repaint: canvas textures", since);
+
+        this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight, uploadBounds);
+        timer.lap("Canvas repaint: canvas textures", since);
     }
 
     /**
@@ -2667,7 +2716,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             try {
                 // Hand off the mathematical heavy lifting to the Orchestrator
-                ProceduralOrchestrator.processTopographyPhase(this);
+                await ProceduralOrchestrator.processTopographyPhase(this);
 
                 // The App maintains control of the Climate and Canvas rendering pipelines
                 await this.#generateClimateNow(null);
@@ -2695,7 +2744,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             try {
                 // The climate is recomputed over a wider area than the one that changed, and the
                 // canvas has to be repainted over all of it
-                const climateBounds = ProceduralOrchestrator.processClimatePhase(this, activeBounds);
+                const climateBounds = await ProceduralOrchestrator.processClimatePhase(this, activeBounds);
                 await this.#generateFeaturesNow(climateBounds);
             } finally {
                 this.#endProcessing();

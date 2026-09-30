@@ -9,13 +9,22 @@ import { SpatialMath } from "./tools/SpatialMath.js";
 import { BufferDiff } from "./tools/BufferDiff.js";
 import { FILRODENSWMB } from "./config.js";
 import { TerrainVersion } from "./tools/TerrainVersion.js";
+import { GenerationWorkers } from "./tools/GenerationWorkers.js";
+import { BrushEngine } from "./tools/BrushEngine.js";
 
 export class ProceduralOrchestrator {
     /**
      * Executes the topography and history phases of map generation.
      * Note: Climate generation and Canvas rendering remain handled by the App controller.
+     *
+     * Asynchronous because the base terrain and the surface texture may be worked out in
+     * background workers (see GenerationWorkers); it must be awaited, since the brush history is
+     * replayed onto the base terrain only once that is complete.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @returns {Promise<void>}
      */
-    static processTopographyPhase(app) {
+    static async processTopographyPhase(app) {
         const { currentSeed, params } = MapStateManager.getMapParameters(app);
         const engine = new ProceduralEngine(currentSeed);
 
@@ -24,7 +33,11 @@ export class ProceduralOrchestrator {
         app.scratchUnavailable = false;
 
         // 1. Route Base Topography
-        this.#routeTopographyPass(app, engine, params);
+        await this.#routeTopographyPass(app, engine, params, currentSeed);
+
+        // The texture under every stroke that lays it, worked out in one shared pass rather than
+        // tile by tile as the replay reaches each stamp
+        await this.#prepareSurfaceTexture(app, this.#surfaceTextureAreaOfHistory(app));
 
         // 2. Replay History & Features
         this.rebuildFromHistory(app, engine, params, null, true);
@@ -120,11 +133,12 @@ export class ProceduralOrchestrator {
      * Flat ground just above sea level, carrying the full surface texture if the map was created
      * with it (see getBaseRoughness).
      */
-    static #generateFlatTopography(app, params) {
+    static async #generateFlatTopography(app, params) {
         const flatHeight = params.seaLevel + FILRODENSWMB.GENERATION.FLAT_HEIGHT;
         app.baseElevationData.fill(flatHeight);
         if (this.getBaseRoughness(app) === 0) return;
 
+        await this.#prepareSurfaceTexture(app, ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight));
         const texture = this.getSurfaceTexture(app);
         if (!texture) return;
 
@@ -197,6 +211,106 @@ export class ProceduralOrchestrator {
     }
 
     /**
+     * Works out, ahead of time and shared between workers (see GenerationWorkers), every tile of
+     * the surface texture overlapping `area` that has not been worked out yet. Tiles come out
+     * exactly as getSurfaceTexture works them out one by one, so this only saves time: a brush
+     * replay that reaches the area finds its tiles ready instead of working each out on the main
+     * thread as its first stamp arrives. Does nothing when the work would not be shared.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @param {object|null} area - The pixels needed (inclusive), or null for none.
+     * @returns {Promise<void>}
+     */
+    static async #prepareSurfaceTexture(app, area) {
+        if (!SpatialMath.isValidBounds(area)) return;
+
+        const texture = this.#surfaceTextureFor(app);
+        if (!texture) return;
+
+        const tileSize = FILRODENSWMB.GENERATION.SURFACE_TEXTURE.TILE_SIZE;
+        const tiles = this.#missingTextureTiles(texture, area, tileSize);
+        if (!tiles) return;
+
+        const { mapWidth: width, mapHeight: height } = app;
+        const params = { terrain: { world: texture.world } };
+        const rowStart = tiles.minTileY * tileSize;
+        const rowEnd = Math.min(height, (tiles.maxTileY + 1) * tileSize);
+        const minX = tiles.minTileX * tileSize;
+        const maxX = Math.min(width, (tiles.maxTileX + 1) * tileSize) - 1;
+
+        // Without workers there is nothing to gain by working the tiles out early: left alone,
+        // they are worked out as the brushes first need them, and only those they need
+        const pixels = (rowEnd - rowStart) * (maxX - minX + 1);
+        if (!GenerationWorkers.willShare(pixels)) return;
+
+        await GenerationWorkers.run({
+            pixels,
+            shared: () =>
+                GenerationWorkers.runBands(
+                    "surfaceTextureRows",
+                    rowEnd - rowStart,
+                    (start, end) => ({ seed: app.uiState.mapSeed, width, height, params, rowStart: rowStart + start, rowEnd: rowStart + end, minX, maxX }),
+                    (start, end, rows) => this.#adoptTextureRows(texture, rows, rowStart + start, rowStart + end, minX, maxX, width),
+                ),
+            alone: () => this.#fillSurfaceTextureTiles(app, texture, { minX, maxX, minY: rowStart, maxY: rowEnd - 1 }),
+        });
+
+        // Every tile in the box is now worked out, whichever way it was done
+        this.#markTextureTiles(texture, tiles);
+    }
+
+    /**
+     * The tiles of `area` not yet worked out, as the box of tiles that holds them all
+     * (`minTileX` to `maxTileX`, `minTileY` to `maxTileY`), or null if every tile is ready.
+     */
+    static #missingTextureTiles(texture, area, tileSize) {
+        let box = null;
+        for (let tileY = Math.floor(area.minY / tileSize); tileY <= Math.floor(area.maxY / tileSize); tileY++) {
+            for (let tileX = Math.floor(area.minX / tileSize); tileX <= Math.floor(area.maxX / tileSize); tileX++) {
+                if (texture.filled[tileY * texture.tilesAcross + tileX]) continue;
+                box = box ?? { minTileX: tileX, maxTileX: tileX, minTileY: tileY, maxTileY: tileY };
+                box.minTileX = Math.min(box.minTileX, tileX);
+                box.maxTileX = Math.max(box.maxTileX, tileX);
+                box.maxTileY = tileY;
+            }
+        }
+        return box;
+    }
+
+    /** Copies the columns minX to maxX of rows worked out by a worker into the texture. */
+    static #adoptTextureRows(texture, rows, rowStart, rowEnd, minX, maxX, width) {
+        for (let y = rowStart; y < rowEnd; y++) {
+            const from = (y - rowStart) * width;
+            texture.buffer.set(rows.subarray(from + minX, from + maxX + 1), y * width + minX);
+        }
+    }
+
+    /** Records every tile in a box of tiles as worked out. */
+    static #markTextureTiles(texture, tiles) {
+        for (let tileY = tiles.minTileY; tileY <= tiles.maxTileY; tileY++) {
+            texture.filled.fill(1, tileY * texture.tilesAcross + tiles.minTileX, tileY * texture.tilesAcross + tiles.maxTileX + 1);
+        }
+    }
+
+    /**
+     * The box around every brush stroke in the history that lays the surface texture (see
+     * BrushEngine.usesSurfaceTexture), within the map, or null if none does.
+     */
+    static #surfaceTextureAreaOfHistory(app) {
+        let area = null;
+        for (const stroke of app.brushEngine?.history ?? []) {
+            if (!BrushEngine.usesSurfaceTexture(stroke)) continue;
+            const bounds = SpatialMath.getVectorBounds(stroke, stroke.size);
+            if (bounds) area = area ? SpatialMath.mergeBounds(area, bounds) : bounds;
+        }
+        if (!area) return null;
+
+        const map = { minX: 0, maxX: app.mapWidth - 1, minY: 0, maxY: app.mapHeight - 1 };
+        const clipped = SpatialMath.intersectBounds(area, map);
+        return SpatialMath.isValidBounds(clipped) ? clipped : null;
+    }
+
+    /**
      * The open map's texture record (`app.surfaceTexture`): its buffer, which tiles have been
      * worked out, and what it was worked out for. A new record, with no tiles worked out, is made
      * whenever something the texture depends on has changed (reusing the old buffer if the size
@@ -236,34 +350,75 @@ export class ProceduralOrchestrator {
 
     /**
      * Directs the topography generation based on the active engine mode.
+     *
+     * Standard, guided and current tectonic terrain are generated in background workers where
+     * that is worthwhile (see GenerationWorkers), with exactly the result of generating them here.
+     * The legacy tectonic engine is not shared: it is kept exactly as it was for maps made with
+     * it, which are not made any more.
      */
-    static #routeTopographyPass(app, engine, params) {
+    static async #routeTopographyPass(app, engine, params, seed) {
         const mode = app.uiState.generationEngine || "standard";
+        const { mapWidth: width, mapHeight: height } = app;
 
         const t0 = performance.now();
 
         if (mode === "flat") {
-            this.#generateFlatTopography(app, params);
+            await this.#generateFlatTopography(app, params);
         } else if (mode === "advanced") {
             // Tectonic maps made under the current rules share guided terrain's pipeline; older
             // ones keep the original tectonic engine until they are updated (see TerrainVersion)
             if (TerrainVersion.usesCurrentCoastline(app.uiState)) {
-                engine.generateTectonicV2Topography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
+                await this.#generateDetailTerrain(app, engine, params, seed, engine.prepareTectonicV2Detail(width, height, params));
             } else {
-                engine.generateTectonicTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
+                engine.generateTectonicTopography(width, height, params, app.baseElevationData);
             }
         } else if (mode === "guided") {
-            // Synchronous like every other mode. This pass is not awaited by its caller, so making
-            // it async would defer the render-timer record below until after the brush history
-            // replay and report that time as topography, and turn any error into an unhandled
-            // rejection.
-            engine.generateGuidedTopography(app.mapWidth, app.mapHeight, params, app.landMasks, app.baseElevationData);
+            await this.#generateDetailTerrain(app, engine, params, seed, engine.prepareGuidedDetail(width, height, params, app.landMasks));
         } else {
-            engine.generateTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData, [], [], null);
+            await this.#generateStandardTerrain(app, engine, params, seed);
         }
 
         const t1 = performance.now();
         app.renderTimer.record("Base topography", t1 - t0, mode);
+    }
+
+    /**
+     * The per-pixel pass of guided or current tectonic terrain (see
+     * ProceduralEngine.generateDetailRows) into the base terrain, from a job prepared on the main
+     * thread. Each worker gets only the rows of the coastline field its band reads (see
+     * ProceduralEngine.detailJobForRows).
+     */
+    static async #generateDetailTerrain(app, engine, params, seed, job) {
+        const { mapWidth: width, mapHeight: height, baseElevationData: out } = app;
+
+        await GenerationWorkers.run({
+            pixels: width * height,
+            shared: () =>
+                GenerationWorkers.runBands(
+                    "detailRows",
+                    height,
+                    (rowStart, rowEnd) => ({ seed, width, height, params, job: ProceduralEngine.detailJobForRows(job, params, rowStart, rowEnd), rowStart, rowEnd }),
+                    (rowStart, rowEnd, rows) => out.set(rows, rowStart * width),
+                ),
+            alone: () => engine.generateDetailRows(width, height, params, job, 0, height, out),
+        });
+    }
+
+    /** Standard terrain (see ProceduralEngine.generateTopography) into the base terrain. */
+    static async #generateStandardTerrain(app, engine, params, seed) {
+        const { mapWidth: width, mapHeight: height, baseElevationData: out } = app;
+
+        await GenerationWorkers.run({
+            pixels: width * height,
+            shared: () =>
+                GenerationWorkers.runBands(
+                    "topographyRows",
+                    height,
+                    (rowStart, rowEnd) => ({ seed, width, params, rowStart, rowEnd }),
+                    (rowStart, rowEnd, rows) => out.set(rows, rowStart * width),
+                ),
+            alone: () => engine.generateTopography(width, height, params, out, [], [], null),
+        });
     }
 
     /**
@@ -600,6 +755,9 @@ export class ProceduralOrchestrator {
     /**
      * Executes the climate simulation phase.
      *
+     * Asynchronous because the whole map's climate may be worked out in background workers (see
+     * GenerationWorkers); a bounded run is always done here, being small.
+     *
      * A bounded run recomputes the moisture and temperature of a wider area than the one it is
      * given. Moisture depends on the elevation a fixed distance upwind on the same row (see
      * ProceduralEngine.getWindDistance), so an elevation change alters the moisture of pixels up
@@ -607,10 +765,10 @@ export class ProceduralOrchestrator {
      *
      * @param {object} app - The MapStudioApp instance.
      * @param {object|null} bounds - Area whose elevation changed, or null for the whole map.
-     * @returns {object|null} The area the climate was actually recomputed over, which is where
+     * @returns {Promise<object|null>} The area the climate was actually recomputed over, which is where
      *   moisture and temperature may have changed; null when the whole map was recomputed.
      */
-    static processClimatePhase(app, bounds = null) {
+    static async processClimatePhase(app, bounds = null) {
         const { currentSeed, params } = MapStateManager.getMapParameters(app);
         const engine = new ProceduralEngine(currentSeed);
 
@@ -622,12 +780,42 @@ export class ProceduralOrchestrator {
 
         const t0 = performance.now();
 
-        engine.generateClimateData(app.currentElevationData, app.mapWidth, app.mapHeight, params, app.currentMoistureData, app.currentTemperatureData, activeBounds, app.upwindMargin);
+        if (activeBounds) {
+            engine.generateClimateData(app.currentElevationData, app.mapWidth, app.mapHeight, params, app.currentMoistureData, app.currentTemperatureData, activeBounds, app.upwindMargin);
+        } else {
+            await this.#generateWholeClimate(app, engine, params, currentSeed);
+        }
 
         const t1 = performance.now();
         app.renderTimer.record("Climate", t1 - t0);
 
         return activeBounds;
+    }
+
+    /**
+     * The climate of the whole map, shared between workers where that is worthwhile (see
+     * GenerationWorkers). Moisture reads elevation only along its own row, so each worker gets
+     * just its band's rows of elevation (see ProceduralEngine.generateClimateRows).
+     */
+    static async #generateWholeClimate(app, engine, params, seed) {
+        // The buffers are taken once, so a band arriving after the map was replaced (by loading
+        // another) lands in the buffers this pass was asked to fill, never in differently sized ones
+        const { mapWidth: width, mapHeight: height, currentElevationData: elevation, currentMoistureData: moisture, currentTemperatureData: temperature } = app;
+
+        await GenerationWorkers.run({
+            pixels: width * height,
+            shared: () =>
+                GenerationWorkers.runBands(
+                    "climateRows",
+                    height,
+                    (rowStart, rowEnd) => ({ seed, width, height, params, elevationRows: elevation.slice(rowStart * width, rowEnd * width), rowStart, rowEnd, upwindMargin: app.upwindMargin ?? null }),
+                    (rowStart, rowEnd, band) => {
+                        moisture.set(band.moisture, rowStart * width);
+                        temperature.set(band.temperature, rowStart * width);
+                    },
+                ),
+            alone: () => engine.generateClimateData(elevation, width, height, params, moisture, temperature, null, app.upwindMargin),
+        });
     }
 
     /**

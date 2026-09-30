@@ -134,8 +134,12 @@ export class TerrainVersion {
      *
      * `currentRivers` selects the current river rules (see usesCurrentRivers).
      *
+     * `exactDistances` finds each point's nearest coastline (and ridge line) exactly, from the
+     * current revision on; a legacy map keeps the jump flood, whose rare near misses are part of
+     * its terrain.
+     *
      * @param {object} state - A uiState object.
-     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object, currentRivers: boolean}}
+     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object, currentRivers: boolean, exactDistances: boolean}}
      */
     static getTerrainParams(state) {
         const world = this.resolveWorld(state);
@@ -157,6 +161,7 @@ export class TerrainVersion {
             },
             faultFrame: isCurrent ? { zoom, originX: world.originX ?? 0, originY: world.originY ?? 0 } : { zoom: 1, originX: 0, originY: 0 },
             currentRivers: this.usesCurrentRivers(state),
+            exactDistances: isCurrent,
         };
     }
 
