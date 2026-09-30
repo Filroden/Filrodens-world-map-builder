@@ -1309,7 +1309,7 @@ export class ProceduralEngine {
      * world pixel (up to the zoom), so masks drawn on the regional map itself keep their detail.
      *
      * For a map that was never cropped the grid is exactly the map, one cell per pixel, so the
-     * field is identical to the one this pass has always built.
+     * field is the same as one built in the map's own pixels.
      *
      * Under the current coastal profile the grid also records, for every cell, how large the
      * nearest landmass is (see #measureLandmasses), so small islands can rise to proper hills.

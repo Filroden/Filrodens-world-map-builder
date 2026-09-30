@@ -252,8 +252,9 @@ export class MapDialogManager {
     /**
      * Shared Add/Edit dialogue for a single custom pin icon: name, a native file-picker path,
      * and a live preview of the raw SVG against a black background so the GM can confirm
-     * it's genuinely solid white before accepting (see the "why custom icons must be solid
-     * white" design note - this is a self-check, not an automated one).
+     * it's genuinely solid white before accepting. Pins are coloured by tinting their sprite,
+     * which multiplies every pixel by the pin's colour, so only white areas take the colour
+     * exactly (this is a visual self-check, not an automated one).
      */
     static async _promptPinIconDialog(icon, titleKey) {
         const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pin-icon.hbs", { icon });

@@ -1,5 +1,8 @@
-Copyright 2018-2021 Observable, Inc.
-Copyright 2021 Mapbox
+# ISC Licence (delaunator)
+
+Relevant files covered by this licence: `d3-delaunay.js` (the delaunator 5.1.0 code bundled into it)
+
+Copyright (c) 2026, Mapbox
 
 Permission to use, copy, modify, and/or distribute this software for any purpose
 with or without fee is hereby granted, provided that the above copyright notice

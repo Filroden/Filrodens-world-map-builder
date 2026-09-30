@@ -1,3 +1,7 @@
+# The Unlicense (robust-predicates)
+
+Relevant files covered by this licence: `d3-delaunay.js` (the robust-predicates 3.0.3 code bundled into it)
+
 This is free and unencumbered software released into the public domain.
 
 Anyone is free to copy, modify, publish, use, compile, sell, or

@@ -1,4 +1,4 @@
-/* d3-delaunay 6.0.4 (ISC licence, Copyright 2018-2021 Observable, Inc. and Copyright 2021 Mapbox), bundled into this single ES module together with its dependencies delaunator 5.1.0 (ISC licence, Copyright Mapbox) and robust-predicates 3.0.3 (Unlicense, public domain). See LICENSE, LICENSE-delaunator and LICENSE-robust-predicates in this folder. Source: https://github.com/d3/d3-delaunay */
+/* d3-delaunay 6.0.4 (ISC licence, Copyright 2018-2021 Observable, Inc. and Copyright 2021 Mapbox), bundled into this single ES module together with its dependencies delaunator 5.1.0 (ISC licence, Copyright Mapbox) and robust-predicates 3.0.3 (Unlicense, public domain). See licence-d3-delaunay.md, licence-delaunator.md and licence-robust-predicates.md in this folder. Source: https://github.com/d3/d3-delaunay */
 
 // node_modules/robust-predicates/esm/util.js
 var epsilon = 11102230246251565e-32;

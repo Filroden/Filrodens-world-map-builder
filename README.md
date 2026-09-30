@@ -20,10 +20,10 @@ Maps are saved in Journals and stored in a Journal Compendium. The procedural pl
 
 ### Main Features
 
-- **Advanced Procedural Generation**: The underlying engine calculates authentic topography using layered noise and geological stretch parameters. It dynamically simulates climate by mapping global temperature gradients and tracking geographical orographic lift (rain shadows) to accurately determine Whittaker biomes. Relief shading brings out the shape of hills, valleys and the seabed, and the sea and lakes are drawn as water you can see into, with their own biomes on the bed.
+- **Advanced Procedural Generation**: The underlying engine calculates authentic topography using layered noise and geological stretch parameters. It dynamically simulates climate by mapping global temperature gradients and tracking geographical orographic lift (rain shadows) to accurately determine Whittaker biomes. Relief shading brings out the shape of hills, valleys and the seabed, and the sea and lakes are drawn as water you can see into, with their own biomes on the bed. The heaviest calculations are shared across all of your computer's processor cores, so even large maps generate and load quickly.
 - **Custom Biome Auto-Generation**: Define your own biomes and give them auto-generation rules - ranges of elevation, moisture and temperature - so they appear automatically wherever the procedural generator produces a matching climate, with the built-in defaults always available as a guaranteed fallback. A hover preview shows exactly where a map is still relying on those defaults, so gaps in your rule coverage are easy to spot.
 - **Four terrain engines**: Choose from Standard, Flat, Advanced (Tectonics) or Guided. Advanced (Tectonics) lets tectonic plates decide where the continents lie, raising mountain ranges, trenches and mid-ocean ridges where they meet or part, while Guided builds the land inside shapes you draw. Both create natural coastlines, continental shelves and deep oceans, and look the same at any map size. Each engine has different strengths (see the wiki).
-- **Dynamic Hydrology Systems**: Rivers are carved procedurally using greedy downhill algorithms, naturally pooling into lakes until they overflow their basins, and freezing intelligently based on altitude and regional climate thresholds. Additional river sources can be placed manually, and procedurally generated sources can be removed.
+- **Dynamic Hydrology Systems**: Rivers are traced procedurally downhill, widening as they flow and as tributaries join them, meandering across flat plains and splitting into deltas where they reach the sea. They pool into lakes until they overflow their basins, and freeze based on altitude and regional climate thresholds. Additional river sources can be placed manually, and procedurally generated sources can be removed.
 - **Non-Destructive Vector Brush Engine**: Edit the terrain (raising, lowering, levelling, smoothing and roughening) or paint custom biomes with a responsive freehand brush tool. Under the hood, edits are saved as a spatial vector history rather than static pixels, preserving your exact strokes for future map scaling and regional zooming.
 - **Tectonic Features**: Draw mountain ranges (in three styles), subduction zones with their trenches and volcanic arcs, rift valleys, and hotspot chains of volcanic islands that age from active volcanoes to eroded islands, atolls and seamounts. Each feature is shaped by the terrain it crosses, so it blends into your map.
 - **Vector Information Layers**: You can add infrastructure (points of interest, routes, etc), regional polygons, labels and cartographic decorations to any map, fine-tuning their placement, size and style.
@@ -59,20 +59,16 @@ Filroden's World Map Builder can be opened from the *Scenes* sidebar. A new butt
 
 Please see the [Wiki](https://github.com/Filroden/Filrodens-world-map-builder/wiki) for more details on how to use the module.
 
-## Roadmap
-
-- Export map meta-data through scene flags linked grid coordinates which could be used by game systems and other modules.
-
 ## Third-Party Licences
 
-Filroden's World Map Builder is released under the [MIT Licence](LICENSE). It also includes the following third-party code and icons. Each is kept in its own folder together with its licence, and that licence covers every file in the folder.
+Filroden's World Map Builder is released under the [MIT Licence](LICENSE.md). It also includes the following third-party code and icons. Each is kept in its own folder together with its licence, and that licence covers every file in the folder.
 
 | Dependency | Folder | Licence file | Licence |
 | :--- | :--- | :--- | :--- |
-| [d3-delaunay](https://github.com/d3/d3-delaunay) 6.0.4 (bundled into a single file with the two dependencies below) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`LICENSE`](vendor/d3-delaunay/LICENSE) | ISC |
-| [delaunator](https://github.com/mapbox/delaunator) 5.1.0 (bundled with d3-delaunay) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`LICENSE-delaunator`](vendor/d3-delaunay/LICENSE-delaunator) | ISC |
-| [robust-predicates](https://github.com/mourner/robust-predicates) 3.0.3 (bundled with d3-delaunay) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`LICENSE-robust-predicates`](vendor/d3-delaunay/LICENSE-robust-predicates) | Unlicense (public domain) |
+| [d3-delaunay](https://github.com/d3/d3-delaunay) 6.0.4 (bundled into a single file with the two dependencies below) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`licence-d3-delaunay.md`](vendor/d3-delaunay/licence-d3-delaunay.md) | ISC |
+| [delaunator](https://github.com/mapbox/delaunator) 5.1.0 (bundled with d3-delaunay) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`licence-delaunator.md`](vendor/d3-delaunay/licence-delaunator.md) | ISC |
+| [robust-predicates](https://github.com/mourner/robust-predicates) 3.0.3 (bundled with d3-delaunay) | [`vendor/d3-delaunay/`](vendor/d3-delaunay/) | [`licence-robust-predicates.md`](vendor/d3-delaunay/licence-robust-predicates.md) | Unlicense (public domain) |
 | Simplex noise by Jonas Wagner (modified for speed, giving exactly the same values) | [`vendor/simplex-noise/`](vendor/simplex-noise/) | [`licence-simplex-noise.md`](vendor/simplex-noise/licence-simplex-noise.md) | MIT |
 | [three.js](https://threejs.org/) r185 (development build) and its OrbitControls add-on, used by the 3D view | [`vendor/three/`](vendor/three/) | [`licence-three.md`](vendor/three/licence-three.md) | MIT |
 | [Google Material Design icons](https://fonts.google.com/icons) (the interface icons) | [`assets/icons/`](assets/icons/) | [`icons-licence.md`](assets/icons/icons-licence.md) | Apache 2.0 |
-| [Pinhead icons](https://pinhead.ink/) (the point of interest icons) | [`assets/pinhead-icons/`](assets/pinhead-icons/) | [`PINHEAD-LICENSE.txt`](assets/pinhead-icons/PINHEAD-LICENSE.txt) | CC0 1.0 (public domain dedication) |
+| [Pinhead icons](https://pinhead.ink/) (the point of interest icons) | [`assets/pinhead-icons/`](assets/pinhead-icons/) | [`licence-pinhead-icons.md`](assets/pinhead-icons/licence-pinhead-icons.md) | CC0 1.0 (public domain dedication) |

@@ -1,6 +1,10 @@
-ISC License
+# ISC Licence (d3-delaunay)
 
-Copyright (c) 2026, Mapbox
+Relevant files covered by this licence: `d3-delaunay.js` (the d3-delaunay 6.0.4 code bundled into it)
+
+Copyright 2018-2021 Observable, Inc.
+
+Copyright 2021 Mapbox
 
 Permission to use, copy, modify, and/or distribute this software for any purpose
 with or without fee is hereby granted, provided that the above copyright notice
