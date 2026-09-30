@@ -1,17 +1,30 @@
 import { MapStateManager } from "./applications/MapStateManager.js";
 import { ProceduralEngine } from "./generation/ProceduralEngine.js";
 import { HydrologyEngine } from "./generation/HydrologyEngine.js";
+import { RiverNetwork } from "./generation/RiverNetwork.js";
+import { RiverSources } from "./generation/RiverSources.js";
 import { TectonicEngine } from "./generation/TectonicEngine.js";
+import { TectonicFeatureEngine } from "./generation/TectonicFeatureEngine.js";
 import { SpatialMath } from "./tools/SpatialMath.js";
 import { BufferDiff } from "./tools/BufferDiff.js";
 import { FILRODENSWMB } from "./config.js";
+import { TerrainVersion } from "./tools/TerrainVersion.js";
+import { GenerationWorkers } from "./tools/GenerationWorkers.js";
+import { BrushEngine } from "./tools/BrushEngine.js";
 
 export class ProceduralOrchestrator {
     /**
      * Executes the topography and history phases of map generation.
      * Note: Climate generation and Canvas rendering remain handled by the App controller.
+     *
+     * Asynchronous because the base terrain and the surface texture may be worked out in
+     * background workers (see GenerationWorkers); it must be awaited, since the brush history is
+     * replayed onto the base terrain only once that is complete.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @returns {Promise<void>}
      */
-    static processTopographyPhase(app) {
+    static async processTopographyPhase(app) {
         const { currentSeed, params } = MapStateManager.getMapParameters(app);
         const engine = new ProceduralEngine(currentSeed);
 
@@ -20,7 +33,11 @@ export class ProceduralOrchestrator {
         app.scratchUnavailable = false;
 
         // 1. Route Base Topography
-        this.#routeTopographyPass(app, engine, params);
+        await this.#routeTopographyPass(app, engine, params, currentSeed);
+
+        // The texture under every stroke that lays it, worked out in one shared pass rather than
+        // tile by tile as the replay reaches each stamp
+        await this.#prepareSurfaceTexture(app, this.#surfaceTextureAreaOfHistory(app));
 
         // 2. Replay History & Features
         this.rebuildFromHistory(app, engine, params, null, true);
@@ -113,29 +130,295 @@ export class ProceduralOrchestrator {
     }
 
     /**
-     * Directs the topography generation based on the active engine mode.
+     * Flat ground just above sea level, carrying the full surface texture if the map was created
+     * with it (see getBaseRoughness).
      */
-    static #routeTopographyPass(app, engine, params) {
+    static async #generateFlatTopography(app, params) {
+        const flatHeight = params.seaLevel + FILRODENSWMB.GENERATION.FLAT_HEIGHT;
+        app.baseElevationData.fill(flatHeight);
+        if (this.getBaseRoughness(app) === 0) return;
+
+        await this.#prepareSurfaceTexture(app, ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight));
+        const texture = this.getSurfaceTexture(app);
+        if (!texture) return;
+
+        const amplitude = ProceduralEngine.getSurfaceTextureAmplitude();
+        for (let i = 0; i < texture.length; i++) app.baseElevationData[i] = flatHeight + amplitude * texture[i];
+    }
+
+    /**
+     * How much surface texture the open map's base terrain carries, as a roughness from 0 to 255
+     * (see BrushLayerCache.reset): all of it on a Flat map created with textured ground, none on
+     * any other map, whose own detail is its texture.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @returns {number}
+     */
+    static getBaseRoughness(app) {
+        const textured = app.uiState.generationEngine === "flat" && app.uiState.flatTexture === true;
+        return textured ? FILRODENSWMB.GENERATION.SURFACE_TEXTURE.FULL_ROUGHNESS : 0;
+    }
+
+    /**
+     * The open map's surface texture (see ProceduralEngine.generateSurfaceTexture), holding at
+     * least the pixels in `bounds`.
+     *
+     * The texture is worked out in tiles (SURFACE_TEXTURE.TILE_SIZE), each the first time
+     * something asks for part of it, and kept until something it depends on changes: the seed,
+     * the map's size, or its place in the top map. A brush stamp asks only for the pixels under
+     * it, so a Roughen or Level stroke works out the texture where it paints and nowhere else,
+     * instead of making its first stamp wait for the whole map (several seconds on a large map).
+     * Only maps that use it (textured Flat ground, or the Roughen or Level brush) ever pay for it.
+     *
+     * The buffer covers the whole map, but only the tiles asked for so far hold the texture;
+     * callers must only read pixels inside the bounds they asked for.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @param {object|null} [bounds] - The pixels needed (inclusive), or null for the whole map.
+     * @returns {Float32Array|null} The texture, or null if the browser had no memory for it, in
+     *   which case the brushes that paint it leave the ground as it is.
+     */
+    static getSurfaceTexture(app, bounds = null) {
+        const texture = this.#surfaceTextureFor(app);
+        if (!texture) return null;
+
+        this.#fillSurfaceTextureTiles(app, texture, ProceduralEngine.resolveBounds(bounds, app.mapWidth, app.mapHeight));
+        return texture.buffer;
+    }
+
+    /**
+     * Works out the texture's tiles that overlap `area` and have not been worked out yet.
+     */
+    static #fillSurfaceTextureTiles(app, texture, area) {
+        const tileSize = FILRODENSWMB.GENERATION.SURFACE_TEXTURE.TILE_SIZE;
+        const params = { terrain: { world: texture.world } };
+
+        for (let tileY = Math.floor(area.minY / tileSize); tileY <= Math.floor(area.maxY / tileSize); tileY++) {
+            for (let tileX = Math.floor(area.minX / tileSize); tileX <= Math.floor(area.maxX / tileSize); tileX++) {
+                const tile = tileY * texture.tilesAcross + tileX;
+                if (texture.filled[tile]) continue;
+
+                const tileBounds = {
+                    minX: tileX * tileSize,
+                    minY: tileY * tileSize,
+                    maxX: Math.min(app.mapWidth, (tileX + 1) * tileSize) - 1,
+                    maxY: Math.min(app.mapHeight, (tileY + 1) * tileSize) - 1,
+                };
+                texture.engine.generateSurfaceTexture(app.mapWidth, app.mapHeight, params, texture.buffer, tileBounds);
+                texture.filled[tile] = 1;
+            }
+        }
+    }
+
+    /**
+     * Works out, ahead of time and shared between workers (see GenerationWorkers), every tile of
+     * the surface texture overlapping `area` that has not been worked out yet. Tiles come out
+     * exactly as getSurfaceTexture works them out one by one, so this only saves time: a brush
+     * replay that reaches the area finds its tiles ready instead of working each out on the main
+     * thread as its first stamp arrives. Does nothing when the work would not be shared.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @param {object|null} area - The pixels needed (inclusive), or null for none.
+     * @returns {Promise<void>}
+     */
+    static async #prepareSurfaceTexture(app, area) {
+        if (!SpatialMath.isValidBounds(area)) return;
+
+        const texture = this.#surfaceTextureFor(app);
+        if (!texture) return;
+
+        const tileSize = FILRODENSWMB.GENERATION.SURFACE_TEXTURE.TILE_SIZE;
+        const tiles = this.#missingTextureTiles(texture, area, tileSize);
+        if (!tiles) return;
+
+        const { mapWidth: width, mapHeight: height } = app;
+        const params = { terrain: { world: texture.world } };
+        const rowStart = tiles.minTileY * tileSize;
+        const rowEnd = Math.min(height, (tiles.maxTileY + 1) * tileSize);
+        const minX = tiles.minTileX * tileSize;
+        const maxX = Math.min(width, (tiles.maxTileX + 1) * tileSize) - 1;
+
+        // Without workers there is nothing to gain by working the tiles out early: left alone,
+        // they are worked out as the brushes first need them, and only those they need
+        const pixels = (rowEnd - rowStart) * (maxX - minX + 1);
+        if (!GenerationWorkers.willShare(pixels)) return;
+
+        await GenerationWorkers.run({
+            pixels,
+            shared: () =>
+                GenerationWorkers.runBands(
+                    "surfaceTextureRows",
+                    rowEnd - rowStart,
+                    (start, end) => ({ seed: app.uiState.mapSeed, width, height, params, rowStart: rowStart + start, rowEnd: rowStart + end, minX, maxX }),
+                    (start, end, rows) => this.#adoptTextureRows(texture, rows, rowStart + start, rowStart + end, minX, maxX, width),
+                ),
+            alone: () => this.#fillSurfaceTextureTiles(app, texture, { minX, maxX, minY: rowStart, maxY: rowEnd - 1 }),
+        });
+
+        // Every tile in the box is now worked out, whichever way it was done
+        this.#markTextureTiles(texture, tiles);
+    }
+
+    /**
+     * The tiles of `area` not yet worked out, as the box of tiles that holds them all
+     * (`minTileX` to `maxTileX`, `minTileY` to `maxTileY`), or null if every tile is ready.
+     */
+    static #missingTextureTiles(texture, area, tileSize) {
+        let box = null;
+        for (let tileY = Math.floor(area.minY / tileSize); tileY <= Math.floor(area.maxY / tileSize); tileY++) {
+            for (let tileX = Math.floor(area.minX / tileSize); tileX <= Math.floor(area.maxX / tileSize); tileX++) {
+                if (texture.filled[tileY * texture.tilesAcross + tileX]) continue;
+                box = box ?? { minTileX: tileX, maxTileX: tileX, minTileY: tileY, maxTileY: tileY };
+                box.minTileX = Math.min(box.minTileX, tileX);
+                box.maxTileX = Math.max(box.maxTileX, tileX);
+                box.maxTileY = tileY;
+            }
+        }
+        return box;
+    }
+
+    /** Copies the columns minX to maxX of rows worked out by a worker into the texture. */
+    static #adoptTextureRows(texture, rows, rowStart, rowEnd, minX, maxX, width) {
+        for (let y = rowStart; y < rowEnd; y++) {
+            const from = (y - rowStart) * width;
+            texture.buffer.set(rows.subarray(from + minX, from + maxX + 1), y * width + minX);
+        }
+    }
+
+    /** Records every tile in a box of tiles as worked out. */
+    static #markTextureTiles(texture, tiles) {
+        for (let tileY = tiles.minTileY; tileY <= tiles.maxTileY; tileY++) {
+            texture.filled.fill(1, tileY * texture.tilesAcross + tiles.minTileX, tileY * texture.tilesAcross + tiles.maxTileX + 1);
+        }
+    }
+
+    /**
+     * The box around every brush stroke in the history that lays the surface texture (see
+     * BrushEngine.usesSurfaceTexture), within the map, or null if none does.
+     */
+    static #surfaceTextureAreaOfHistory(app) {
+        let area = null;
+        for (const stroke of app.brushEngine?.history ?? []) {
+            if (!BrushEngine.usesSurfaceTexture(stroke)) continue;
+            const bounds = SpatialMath.getVectorBounds(stroke, stroke.size);
+            if (bounds) area = area ? SpatialMath.mergeBounds(area, bounds) : bounds;
+        }
+        if (!area) return null;
+
+        const map = { minX: 0, maxX: app.mapWidth - 1, minY: 0, maxY: app.mapHeight - 1 };
+        const clipped = SpatialMath.intersectBounds(area, map);
+        return SpatialMath.isValidBounds(clipped) ? clipped : null;
+    }
+
+    /**
+     * The open map's texture record (`app.surfaceTexture`): its buffer, which tiles have been
+     * worked out, and what it was worked out for. A new record, with no tiles worked out, is made
+     * whenever something the texture depends on has changed (reusing the old buffer if the size
+     * still fits, since every tile is written before it is read).
+     *
+     * @returns {object|null} The record, or null if the browser had no memory for it.
+     */
+    static #surfaceTextureFor(app) {
+        const world = TerrainVersion.getTerrainParams(app.uiState).world;
+        const key = [app.uiState.mapSeed, app.mapWidth, app.mapHeight, world.zoom, world.originX, world.originY, world.rootW, world.rootH].join("|");
+        if (app.surfaceTexture?.key === key) return app.surfaceTexture;
+        if (app.surfaceTextureUnavailable) return null;
+
+        try {
+            const tileSize = FILRODENSWMB.GENERATION.SURFACE_TEXTURE.TILE_SIZE;
+            const pixels = app.mapWidth * app.mapHeight;
+            const tilesAcross = Math.ceil(app.mapWidth / tileSize);
+            const buffer = app.surfaceTexture?.buffer?.length === pixels ? app.surfaceTexture.buffer : new Float32Array(pixels);
+            app.surfaceTexture = {
+                key,
+                buffer,
+                world,
+                tilesAcross,
+                filled: new Uint8Array(tilesAcross * Math.ceil(app.mapHeight / tileSize)),
+                engine: new ProceduralEngine(app.uiState.mapSeed),
+            };
+            return app.surfaceTexture;
+        } catch (error) {
+            if (!(error instanceof RangeError)) throw error;
+
+            app.surfaceTexture = null;
+            app.surfaceTextureUnavailable = true;
+            console.warn(`FWMB | Not enough memory for the surface texture (${error.message}). Textured ground and the Roughen brush are unavailable until the map is reloaded.`);
+            return null;
+        }
+    }
+
+    /**
+     * Directs the topography generation based on the active engine mode.
+     *
+     * Standard, guided and current tectonic terrain are generated in background workers where
+     * that is worthwhile (see GenerationWorkers), with exactly the result of generating them here.
+     * The legacy tectonic engine is not shared: it is kept exactly as it was for maps made with
+     * it, which are not made any more.
+     */
+    static async #routeTopographyPass(app, engine, params, seed) {
         const mode = app.uiState.generationEngine || "standard";
+        const { mapWidth: width, mapHeight: height } = app;
 
         const t0 = performance.now();
 
         if (mode === "flat") {
-            app.baseElevationData.fill(params.seaLevel + 0.05);
+            await this.#generateFlatTopography(app, params);
         } else if (mode === "advanced") {
-            engine.generateTectonicTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData);
+            // Tectonic maps made under the current rules share guided terrain's pipeline; older
+            // ones keep the original tectonic engine until they are updated (see TerrainVersion)
+            if (TerrainVersion.usesCurrentCoastline(app.uiState)) {
+                await this.#generateDetailTerrain(app, engine, params, seed, engine.prepareTectonicV2Detail(width, height, params));
+            } else {
+                engine.generateTectonicTopography(width, height, params, app.baseElevationData);
+            }
         } else if (mode === "guided") {
-            // Synchronous like every other mode. This pass is not awaited by its caller, so making
-            // it async would defer the render-timer record below until after the brush history
-            // replay and report that time as topography, and turn any error into an unhandled
-            // rejection.
-            engine.generateGuidedTopography(app.mapWidth, app.mapHeight, params, app.landMasks, app.baseElevationData);
+            await this.#generateDetailTerrain(app, engine, params, seed, engine.prepareGuidedDetail(width, height, params, app.landMasks));
         } else {
-            engine.generateTopography(app.mapWidth, app.mapHeight, params, app.baseElevationData, [], [], null);
+            await this.#generateStandardTerrain(app, engine, params, seed);
         }
 
         const t1 = performance.now();
         app.renderTimer.record("Base topography", t1 - t0, mode);
+    }
+
+    /**
+     * The per-pixel pass of guided or current tectonic terrain (see
+     * ProceduralEngine.generateDetailRows) into the base terrain, from a job prepared on the main
+     * thread. Each worker gets only the rows of the coastline field its band reads (see
+     * ProceduralEngine.detailJobForRows).
+     */
+    static async #generateDetailTerrain(app, engine, params, seed, job) {
+        const { mapWidth: width, mapHeight: height, baseElevationData: out } = app;
+
+        await GenerationWorkers.run({
+            pixels: width * height,
+            shared: () =>
+                GenerationWorkers.runBands(
+                    "detailRows",
+                    height,
+                    (rowStart, rowEnd) => ({ seed, width, height, params, job: ProceduralEngine.detailJobForRows(job, params, rowStart, rowEnd), rowStart, rowEnd }),
+                    (rowStart, rowEnd, rows) => out.set(rows, rowStart * width),
+                ),
+            alone: () => engine.generateDetailRows(width, height, params, job, 0, height, out),
+        });
+    }
+
+    /** Standard terrain (see ProceduralEngine.generateTopography) into the base terrain. */
+    static async #generateStandardTerrain(app, engine, params, seed) {
+        const { mapWidth: width, mapHeight: height, baseElevationData: out } = app;
+
+        await GenerationWorkers.run({
+            pixels: width * height,
+            shared: () =>
+                GenerationWorkers.runBands(
+                    "topographyRows",
+                    height,
+                    (rowStart, rowEnd) => ({ seed, width, params, rowStart, rowEnd }),
+                    (rowStart, rowEnd, rows) => out.set(rows, rowStart * width),
+                ),
+            alone: () => engine.generateTopography(width, height, params, out, [], [], null),
+        });
     }
 
     /**
@@ -241,6 +524,10 @@ export class ProceduralOrchestrator {
             const elevationChanged = BufferDiff.adoptChanges(app.currentElevationData, rebuilt, app.mapWidth, app.mapHeight);
             const overridesChanged = layer && app.currentBiomeOverrides ? BufferDiff.adoptChanges(app.currentBiomeOverrides, layer.overrides, app.mapWidth, app.mapHeight) : null;
             changed = elevationChanged && overridesChanged ? SpatialMath.mergeBounds(elevationChanged, overridesChanged) : elevationChanged || overridesChanged;
+
+            // Roughness only matters to the brushes, not to anything drawn or derived, so it is
+            // copied rather than compared
+            if (layer && app.currentRoughness) app.currentRoughness.set(layer.roughness);
         });
 
         app.renderTimer.record(replayed ? "Brush history replay" : "Brush layer reused", refreshMs, `${strokeCount} strokes`);
@@ -298,9 +585,11 @@ export class ProceduralOrchestrator {
     static #refreshBrushedLayer(app, seaLevel, baseChanged) {
         const brushEngine = app.brushEngine;
         if (!brushEngine) return { replayed: false, cached: true };
-        if (!baseChanged && brushEngine.isLayerCacheCurrent(seaLevel)) return { replayed: false, cached: true };
 
-        const cached = brushEngine.rebuildLayerCache(app.baseElevationData, seaLevel);
+        const baseRoughness = this.getBaseRoughness(app);
+        if (!baseChanged && brushEngine.isLayerCacheCurrent(seaLevel, baseRoughness)) return { replayed: false, cached: true };
+
+        const cached = brushEngine.rebuildLayerCache(app.baseElevationData, seaLevel, baseRoughness);
         return { replayed: cached, cached };
     }
 
@@ -320,6 +609,19 @@ export class ProceduralOrchestrator {
         this.#forEachBoundsRow(bounds, app.mapWidth, (start, end) => {
             app.currentElevationData.set(elevationSource.subarray(start, end), start);
         });
+
+        // The working roughness follows the working terrain, so the brushes painted live start
+        // from the same texture record a replay does
+        if (app.currentRoughness) {
+            const baseRoughness = this.getBaseRoughness(app);
+            this.#forEachBoundsRow(bounds, app.mapWidth, (start, end) => {
+                if (layer) {
+                    app.currentRoughness.set(layer.roughness.subarray(start, end), start);
+                } else {
+                    app.currentRoughness.fill(baseRoughness, start, end);
+                }
+            });
+        }
 
         // Painted biomes have no separate "base" layer: 0 is the sentinel createBiomesMap()
         // already treats as "no override, compute the biome normally", so with no strokes the
@@ -345,23 +647,53 @@ export class ProceduralOrchestrator {
      */
     static #replayIntoWorkingTerrain(app, seaLevel, bounds, layerUsable) {
         if (layerUsable) return;
-        app.brushEngine?.replayHistory(app.currentElevationData, app.currentBiomeOverrides, seaLevel, bounds);
+        app.brushEngine?.replayHistory(app.currentElevationData, app.currentBiomeOverrides, seaLevel, bounds, app.currentRoughness ?? null);
     }
 
     /**
-     * Applies the vector features that deform terrain on top of the replayed brush strokes: tectonic
-     * faults across both base and brushed terrain, then manual rivers carved into the final
-     * deformed topography. The order matters because rivers must cut the terrain faults have
-     * already reshaped.
+     * Applies the vector features that deform terrain on top of the replayed brush strokes: the
+     * tectonic features (see TectonicFeatureEngine), then any original fault lines, both across
+     * base and brushed terrain, then manual rivers carved into the final deformed topography. The
+     * order matters because rivers must cut the terrain faults have already reshaped.
+     *
+     * The features' results are kept in `app.tectonicFeatureCache` between rebuilds, so an edit
+     * only works out again the features it affects.
      */
     static #applyVectorDeformations(app, elevationData, engine, params, bounds) {
         if (app.tectonicFaults?.length > 0) {
-            TectonicEngine.applyTectonicFaults(elevationData, app.mapWidth, app.mapHeight, app.tectonicFaults, engine.simplex, bounds);
+            this.#applyTectonicFeatures(app, elevationData, engine, params, bounds);
+            TectonicEngine.applyTectonicFaults(elevationData, app.mapWidth, app.mapHeight, app.tectonicFaults, engine.simplex, bounds, params.terrain?.faultFrame);
         }
 
         if (app.manualRivers?.length > 0) {
-            HydrologyEngine.carveManualRivers(elevationData, app.mapWidth, app.mapHeight, app.manualRivers, engine.simplex, params.seaLevel, bounds);
+            HydrologyEngine.carveManualRivers(elevationData, app.mapWidth, app.mapHeight, app.manualRivers, engine.simplex, params.seaLevel, bounds, params.terrain?.currentRivers === true);
         }
+    }
+
+    /**
+     * Adds the tectonic features to `elevationData`.
+     *
+     * The features are worked out from the ground (the brushed terrain) around them, not only
+     * inside the bounds. When the whole map is being rebuilt, `elevationData` has just been reset
+     * to that ground everywhere, so it serves as the ground itself (the engine works out every
+     * change before adding any). A rebuild limited to part of the map leaves the rest of
+     * `elevationData` holding the previous faults, so the brushed layer is read instead.
+     */
+    static #applyTectonicFeatures(app, elevationData, engine, params, bounds) {
+        const terrain = params.terrain ?? {};
+        const world = terrain.world ?? { rootW: app.mapWidth, rootH: app.mapHeight };
+        const wholeMap = !bounds || (bounds.minX <= 0 && bounds.minY <= 0 && bounds.maxX >= app.mapWidth - 1 && bounds.maxY >= app.mapHeight - 1);
+        const ground = wholeMap ? elevationData : (app.brushEngine?.layerCache?.elevation ?? app.baseElevationData);
+        app.tectonicFeatureCache ??= {};
+        TectonicFeatureEngine.apply(elevationData, ground, app.tectonicFaults, {
+            width: app.mapWidth,
+            height: app.mapHeight,
+            simplex: engine.simplex,
+            seaLevel: params.seaLevel,
+            frame: { ...(terrain.faultFrame ?? { zoom: 1, originX: 0, originY: 0 }), rootSize: Math.max(world.rootW ?? app.mapWidth, world.rootH ?? app.mapHeight) },
+            bounds,
+            cache: app.tectonicFeatureCache,
+        });
     }
 
     /**
@@ -423,6 +755,9 @@ export class ProceduralOrchestrator {
     /**
      * Executes the climate simulation phase.
      *
+     * Asynchronous because the whole map's climate may be worked out in background workers (see
+     * GenerationWorkers); a bounded run is always done here, being small.
+     *
      * A bounded run recomputes the moisture and temperature of a wider area than the one it is
      * given. Moisture depends on the elevation a fixed distance upwind on the same row (see
      * ProceduralEngine.getWindDistance), so an elevation change alters the moisture of pixels up
@@ -430,10 +765,10 @@ export class ProceduralOrchestrator {
      *
      * @param {object} app - The MapStudioApp instance.
      * @param {object|null} bounds - Area whose elevation changed, or null for the whole map.
-     * @returns {object|null} The area the climate was actually recomputed over, which is where
+     * @returns {Promise<object|null>} The area the climate was actually recomputed over, which is where
      *   moisture and temperature may have changed; null when the whole map was recomputed.
      */
-    static processClimatePhase(app, bounds = null) {
+    static async processClimatePhase(app, bounds = null) {
         const { currentSeed, params } = MapStateManager.getMapParameters(app);
         const engine = new ProceduralEngine(currentSeed);
 
@@ -445,12 +780,42 @@ export class ProceduralOrchestrator {
 
         const t0 = performance.now();
 
-        engine.generateClimateData(app.currentElevationData, app.mapWidth, app.mapHeight, params, app.currentMoistureData, app.currentTemperatureData, activeBounds);
+        if (activeBounds) {
+            engine.generateClimateData(app.currentElevationData, app.mapWidth, app.mapHeight, params, app.currentMoistureData, app.currentTemperatureData, activeBounds, app.upwindMargin);
+        } else {
+            await this.#generateWholeClimate(app, engine, params, currentSeed);
+        }
 
         const t1 = performance.now();
         app.renderTimer.record("Climate", t1 - t0);
 
         return activeBounds;
+    }
+
+    /**
+     * The climate of the whole map, shared between workers where that is worthwhile (see
+     * GenerationWorkers). Moisture reads elevation only along its own row, so each worker gets
+     * just its band's rows of elevation (see ProceduralEngine.generateClimateRows).
+     */
+    static async #generateWholeClimate(app, engine, params, seed) {
+        // The buffers are taken once, so a band arriving after the map was replaced (by loading
+        // another) lands in the buffers this pass was asked to fill, never in differently sized ones
+        const { mapWidth: width, mapHeight: height, currentElevationData: elevation, currentMoistureData: moisture, currentTemperatureData: temperature } = app;
+
+        await GenerationWorkers.run({
+            pixels: width * height,
+            shared: () =>
+                GenerationWorkers.runBands(
+                    "climateRows",
+                    height,
+                    (rowStart, rowEnd) => ({ seed, width, height, params, elevationRows: elevation.slice(rowStart * width, rowEnd * width), rowStart, rowEnd, upwindMargin: app.upwindMargin ?? null }),
+                    (rowStart, rowEnd, band) => {
+                        moisture.set(band.moisture, rowStart * width);
+                        temperature.set(band.temperature, rowStart * width);
+                    },
+                ),
+            alone: () => engine.generateClimateData(elevation, width, height, params, moisture, temperature, null, app.upwindMargin),
+        });
     }
 
     /**
@@ -474,7 +839,58 @@ export class ProceduralOrchestrator {
 
         const t0 = performance.now();
 
-        // Bake procedural springs into permanent pins on first load or new map generation
+        // Where rivers rise, and (under the current rules) the custom rivers laid down first
+        const isCurrent = params.terrain?.currentRivers === true;
+        const springPins = isCurrent ? this.#currentSprings(app, engine, params) : this.#legacySprings(app, engine, params);
+        const pixelsPerBaseline = RiverNetwork.pixelsPerBaseline(app.mapWidth, app.mapHeight, params.terrain?.world);
+        const authored = isCurrent ? HydrologyEngine.authoredRivers(app.currentElevationData, app.mapWidth, app.mapHeight, app.manualRivers, pixelsPerBaseline) : [];
+
+        // generateRivers rewrites the water mask from scratch, so the previous one has to be
+        // kept aside to compare with. It goes in the shared scratch buffer, which nothing else
+        // is using at this point.
+        const previousWater = trackWaterChanges ? this.#tryGetScratchBuffer(app) : null;
+        previousWater?.set(app.bufferWaterMask);
+
+        // The network drawn last time, to find what changed and reuse its buffer (see #drawRivers)
+        const previousNetwork = app.currentRiverData?.network ?? null;
+
+        app.currentRiverData = engine.generateRivers(
+            app.currentElevationData,
+            app.currentMoistureData,
+            app.currentTemperatureData,
+            springPins,
+            app.mapWidth,
+            app.mapHeight,
+            params,
+            app.bufferRiverMap,
+            app.bufferWaterMask,
+            authored,
+        );
+
+        const t1 = performance.now();
+        app.renderTimer.record("Features (springs and rivers)", t1 - t0);
+
+        // Without the scratch buffer the old water is gone, so all that can be said is that any of
+        // it may have changed; the repaint then covers the whole map.
+        let waterBounds = null;
+        if (trackWaterChanges) {
+            waterBounds = previousWater ? BufferDiff.changedBounds(previousWater, app.bufferWaterMask, app.mapWidth, app.mapHeight) : ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight);
+        }
+
+        const riverBounds = this.#drawRivers(app, params, previousNetwork, trackWaterChanges, waterBounds);
+        app.renderTimer.record("Features (river channels)", performance.now() - t1);
+
+        if (!trackWaterChanges) return null;
+        return waterBounds && riverBounds ? SpatialMath.mergeBounds(waterBounds, riverBounds) : waterBounds || riverBounds;
+    }
+
+    /**
+     * The springs of a map made before the current river rules: procedural springs are baked
+     * into permanent pins the first time the map is generated, and every custom river gets a
+     * spring near its top so the trace runs down its trench (see HydrologyEngine).
+     * @returns {object[]} The spring pins to trace from.
+     */
+    static #legacySprings(app, engine, params) {
         if (!app.uiState.springsBaked) {
             if (app.uiState.generationEngine !== "flat") {
                 const newSprings = engine.bakeProceduralSprings(app.currentElevationData, app.currentMoistureData, app.mapWidth, app.mapHeight, params);
@@ -494,37 +910,78 @@ export class ProceduralOrchestrator {
             app.markDirty();
         }
 
-        const dynamicPins = [...app.mapPins];
-
-        // Ensure procedural water spawns exactly at the highest point of our manual carve
         const manualSprings = HydrologyEngine.getRiverSources(app.currentElevationData, app.mapWidth, app.manualRivers);
-        dynamicPins.push(...manualSprings);
+        return [...app.mapPins, ...manualSprings];
+    }
 
-        // generateRivers rewrites the water mask from scratch, so the previous one has to be
-        // kept aside to compare with. It goes in the shared scratch buffer, which nothing else
-        // is using at this point.
-        const previousWater = trackWaterChanges ? this.#tryGetScratchBuffer(app) : null;
-        previousWater?.set(app.bufferWaterMask);
+    /**
+     * The springs of a map under the current river rules (see RiverSources): the procedural
+     * springs placed afresh on the current terrain (kept on `app.proceduralSprings`, so the canvas
+     * can show them while editing), less those the user removed, plus the user's own. Flat maps
+     * have no procedural springs.
+     *
+     * Pins that a map made under the legacy rules baked for its springs are removed first, once,
+     * since the procedural springs now take their place (see RiverSources.findBakedPins).
+     * @returns {object[]} The spring pins to trace from.
+     */
+    static #currentSprings(app, engine, params) {
+        const baked = RiverSources.findBakedPins(app.mapPins, engine.seedNumber, params, app.mapWidth, app.mapHeight);
+        if (baked.length > 0) {
+            const retired = new Set(baked);
+            app.mapPins = app.mapPins.filter((pin) => !retired.has(pin));
+            app.markDirty();
+        }
+        app.uiState.springsBaked = true;
 
-        app.currentRiverData = engine.generateRivers(
-            app.currentElevationData,
-            app.currentMoistureData,
-            app.currentTemperatureData,
-            dynamicPins,
-            app.mapWidth,
-            app.mapHeight,
-            params,
-            app.bufferRiverMap,
-            app.bufferWaterMask,
+        const map = { elevation: app.currentElevationData, moisture: app.currentMoistureData, width: app.mapWidth, height: app.mapHeight };
+        app.proceduralSprings = app.uiState.generationEngine === "flat" ? [] : RiverSources.place(map, engine.seedNumber, params, app.mapPins);
+        const procedural = app.proceduralSprings.map((spring) => ({ x: spring.x, y: spring.y, type: "spring" }));
+        return [...procedural, ...app.mapPins];
+    }
+
+    /**
+     * Turns the traced rivers into the channels that are drawn (see RiverNetwork) and paints them
+     * into the river image the terrain shader draws them from (`app.bufferRivers`).
+     *
+     * On a tracked refresh only the area that can differ is repainted: every channel that is new
+     * or gone (a changed channel is both), and wherever the water changed, since a river is drawn
+     * across a pool but not across a lake (see RiverNetwork.rasterise). Anything else repaints
+     * the whole image.
+     *
+     * @param {object} app - The MapStudioApp instance.
+     * @param {object} params - The map's derived parameters.
+     * @param {object|null} previousNetwork - The network drawn before this refresh, if any.
+     * @param {boolean} isTracked - Whether this refresh is limited to an area (see processFeaturePhase).
+     * @param {object|null} waterBounds - Where the water changed, on a tracked refresh.
+     * @returns {object|null} Where the river image changed on a tracked refresh (null if nowhere);
+     *   null otherwise.
+     */
+    static #drawRivers(app, params, previousNetwork, isTracked, waterBounds) {
+        const previous = previousNetwork?.channels ?? null;
+        const network = RiverNetwork.build(
+            app.currentRiverData.vectors,
+            {
+                elevation: app.currentElevationData,
+                waterMask: app.bufferWaterMask,
+                width: app.mapWidth,
+                height: app.mapHeight,
+                seaLevel: params.seaLevel,
+                world: params.terrain?.world,
+            },
+            RiverNetwork.optionsFrom(params),
+            previousNetwork,
         );
+        app.currentRiverData.network = network;
 
-        const t1 = performance.now();
-        app.renderTimer.record("Features (springs and rivers)", t1 - t0);
+        const canLimit = isTracked && previous !== null;
+        if (!canLimit) {
+            RiverNetwork.rasterise(network, app.mapWidth, app.mapHeight, app.bufferRivers);
+            return isTracked ? ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight) : null;
+        }
 
-        if (!trackWaterChanges) return null;
-
-        // Without the scratch buffer the old water is gone, so all that can be said is that any of
-        // it may have changed; the repaint then covers the whole map.
-        return previousWater ? BufferDiff.changedBounds(previousWater, app.bufferWaterMask, app.mapWidth, app.mapHeight) : ProceduralEngine.resolveBounds(null, app.mapWidth, app.mapHeight);
+        const channelBounds = RiverNetwork.changedBounds(previous, network.channels, app.mapWidth, app.mapHeight);
+        const changed = channelBounds && waterBounds ? SpatialMath.mergeBounds(channelBounds, waterBounds) : channelBounds || waterBounds;
+        if (changed) RiverNetwork.rasterise(network, app.mapWidth, app.mapHeight, app.bufferRivers, changed);
+        return changed;
     }
 }

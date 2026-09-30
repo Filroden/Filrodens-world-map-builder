@@ -1,5 +1,7 @@
 import * as THREE from "../../vendor/three/three.module.js";
 import { OrbitControls } from "../../vendor/three/OrbitControls.js";
+import { FILRODENSWMB } from "../config.js";
+import { TerrainShading } from "../tools/TerrainShading.js";
 
 export class Scene3D {
     constructor(containerElement) {
@@ -56,41 +58,45 @@ export class Scene3D {
     }
 
     /**
-     * Ingests the 2D mathematical arrays and extrudes a 3D draped mesh.
-     * @param {Float32Array} elevationData - The raw topographical heights.
-     * @param {Uint8Array} biomePixelBuffer - The RGBA flat map to drape over the mesh.
-     * @param {number} width - Map pixel width.
-     * @param {number} height - Map pixel height.
-     * @param {number} seaLevel - The mathematical sea level threshold.
+     * Builds the 3D terrain: the map's elevation raised into a mesh, draped with the flat map's
+     * colours, under a sea surface.
+     *
+     * The drape is made from the same images and settings as the flat map (see
+     * TerrainShading.drape), so the layers, the biomes on the sea bed, the water's colour by
+     * depth and the map's tint all match; only relief shading is left out, since the scene's
+     * light shades the real slopes. Rivers (procedural and custom alike) come with it, from the
+     * same river image the flat map draws them from, so they lie on the ground like any other
+     * colour.
+     *
+     * The mesh follows the ground, except that lakes are raised flat to their surface and
+     * surface biomes over the sea (Pack Ice and the like) to just above the sea's surface, so
+     * both read as lying on the water rather than showing through it.
+     * @param {object} map
+     * @param {Float32Array} map.elevation - The map's elevation.
+     * @param {number} map.width - Map pixel width.
+     * @param {number} map.height - Map pixel height.
+     * @param {number} map.seaLevel
+     * @param {Float32Array} map.waterMask - Each lake pixel's surface elevation, 0 elsewhere.
+     * @param {{aux: Uint8Array, surface: Uint8Array, underwater: Uint8Array, rivers: Uint8Array}} map.terrain - The images the flat map is painted from.
+     * @param {object} map.settings - The flat map's shading settings (see TerrainShading.defaultSettings).
      */
-    /**
-     * Ingests the 2D mathematical arrays and extrudes a 3D draped mesh.
-     */
-    render3DMap(elevationData, biomePixelBuffer, width, height, seaLevel, riverVectors, waterMask) {
-        // Clean up existing meshes if we are regenerating
-        if (this.mesh) {
-            this.mesh.geometry.dispose();
-            this.mesh.material.map.dispose();
-            this.mesh.material.dispose();
-            this.scene.remove(this.mesh);
-        }
-        if (this.water) {
-            this.water.geometry.dispose();
-            this.water.material.dispose();
-            this.scene.remove(this.water);
-        }
-        if (this.riverGroup) {
-            this.riverGroup.children.forEach((child) => {
-                child.geometry.dispose();
-                child.material.dispose();
-            });
-            this.scene.remove(this.riverGroup);
-        }
+    render3DMap({ elevation, width, height, seaLevel, waterMask, terrain, settings }) {
+        this.#disposeTerrain();
+        const config = FILRODENSWMB.DISPLAY.THREE_D;
 
-        // 1. Build the DataTexture from the Biome Buffer
-        const texture = new THREE.DataTexture(biomePixelBuffer, width, height, THREE.RGBAFormat);
+        // 1. The drape, with the rivers painted in
+        const drape = new Uint8Array(width * height * 4);
+        TerrainShading.drape(terrain.aux, terrain.surface, terrain.underwater, settings, drape, terrain.rivers);
+
+        // Mipmaps and anisotropic filtering keep thin features such as rivers from breaking up
+        // into dots when the terrain is seen from afar or at a low angle.
+        const texture = new THREE.DataTexture(drape, width, height, THREE.RGBAFormat);
         texture.flipY = true;
         texture.colorSpace = THREE.SRGBColorSpace;
+        texture.generateMipmaps = true;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
         texture.needsUpdate = true;
 
         const material = new THREE.MeshStandardMaterial({
@@ -100,30 +106,24 @@ export class Scene3D {
             side: THREE.DoubleSide,
         });
 
-        // 2. Build the optimised Mesh Geometry
+        // 2. The mesh, sampling the map at each vertex
         const geoWidth = Math.min(width, 400);
         const geoHeight = Math.min(height, 400);
         const geometry = new THREE.PlaneGeometry(width, height, geoWidth, geoHeight);
         geometry.rotateX(-Math.PI / 2);
 
-        // 3. Displace Vertices
+        const surfaceOn = settings.landBiomes;
         const pos = geometry.attributes.position;
-        const altitudeMultiplier = 40;
-
         for (let i = 0; i < pos.count; i++) {
-            const vx = pos.getX(i);
-            const vz = pos.getZ(i);
+            const mapX = Math.max(0, Math.min(Math.round(pos.getX(i) + width / 2), width - 1));
+            const mapY = Math.max(0, Math.min(Math.round(pos.getZ(i) + height / 2), height - 1));
+            const index = mapY * width + mapX;
 
-            const mapX = Math.round(vx + width / 2);
-            const mapY = Math.round(vz + height / 2);
-
-            const safeX = Math.max(0, Math.min(mapX, width - 1));
-            const safeY = Math.max(0, Math.min(mapY, height - 1));
-
-            const elevIndex = safeY * width + safeX;
-            const displayElev = (elevationData[elevIndex] - seaLevel) * altitudeMultiplier;
-
-            pos.setY(i, displayElev);
+            const lakeSurface = waterMask?.[index] > 0 ? waterMask[index] : -Infinity;
+            let y = (Math.max(elevation[index], lakeSurface) - seaLevel) * config.ALTITUDE_SCALE;
+            const onTheSea = y < 0 && terrain.aux[index * 4 + 1] > 0;
+            if (onTheSea && surfaceOn && terrain.surface[index * 4 + 3] > 0) y = config.SURFACE_LIFT;
+            pos.setY(i, y);
         }
 
         geometry.computeVertexNormals();
@@ -132,93 +132,49 @@ export class Scene3D {
         this.mesh.receiveShadow = true;
         this.scene.add(this.mesh);
 
-        // 4. Render the Global Ocean Plane
-        const waterGeo = new THREE.PlaneGeometry(width * 1.5, height * 1.5);
-        waterGeo.rotateX(-Math.PI / 2);
-        const waterMat = new THREE.MeshStandardMaterial({
-            color: 0x5cb8ff,
-            transparent: true,
-            opacity: 0.35,
-            depthWrite: false,
-            roughness: 0.1,
-            metalness: 0.2,
-        });
-
-        this.water = new THREE.Mesh(waterGeo, waterMat);
-        this.water.position.y = 0;
-        this.water.receiveShadow = true;
-        this.scene.add(this.water);
-
-        // 5. Render 3D Topographical River Vectors
-        if (riverVectors && riverVectors.length > 0) {
-            this.riverGroup = new THREE.Group();
-
-            const waterColor = new THREE.Color(0x78aad2);
-            const frozenColor = new THREE.Color(0xe1ebf0);
-            const matWater = new THREE.LineBasicMaterial({ color: waterColor });
-            const matIce = new THREE.LineBasicMaterial({ color: frozenColor });
-
-            for (const river of riverVectors) {
-                if (!river.path || river.path.length < 2) continue;
-
-                let currentPoints = [];
-                let currentIsFrozen = null;
-
-                for (const point of river.path) {
-                    const safeX = Math.max(0, Math.min(Math.round(point.x), width - 1));
-                    const safeY = Math.max(0, Math.min(Math.round(point.y), height - 1));
-                    const elevIndex = safeY * width + safeX;
-
-                    // Check if this exact coordinate is mathematically submerged
-                    const isWater = waterMask && waterMask[elevIndex] > 0;
-
-                    // Break the vector path if it hits a lake or the ocean
-                    if (point.isLake || isWater) {
-                        if (currentPoints.length > 1) {
-                            const geo = new THREE.BufferGeometry().setFromPoints(currentPoints);
-                            this.riverGroup.add(new THREE.Line(geo, currentIsFrozen ? matIce : matWater));
-                        }
-                        currentPoints = [];
-                        continue;
-                    }
-
-                    // Map 2D pixel coordinates to the 3D plane
-                    const vx = point.x - width / 2;
-                    const vz = point.y - height / 2;
-
-                    const displayElev = (elevationData[elevIndex] - seaLevel) * altitudeMultiplier;
-                    const vec3 = new THREE.Vector3(vx, displayElev + 0.25, vz);
-
-                    if (currentPoints.length === 0) {
-                        currentIsFrozen = point.isFrozen;
-                        currentPoints.push(vec3);
-                    } else if (point.isFrozen === currentIsFrozen) {
-                        currentPoints.push(vec3);
-                    } else {
-                        currentPoints.push(vec3);
-                        const geo = new THREE.BufferGeometry().setFromPoints(currentPoints);
-                        this.riverGroup.add(new THREE.Line(geo, currentIsFrozen ? matIce : matWater));
-                        currentPoints = [vec3];
-                        currentIsFrozen = point.isFrozen;
-                    }
-                }
-
-                if (currentPoints.length > 1) {
-                    const geo = new THREE.BufferGeometry().setFromPoints(currentPoints);
-                    this.riverGroup.add(new THREE.Line(geo, currentIsFrozen ? matIce : matWater));
-                }
-            }
-
-            this.riverGroup.children.forEach((child) => {
-                child.castShadow = false;
+        // 3. The sea's surface, in the water's tinted colour. The water's colour over the bed is
+        // already in the drape, so the surface is faint: fainter for clearer water.
+        if (settings.water) {
+            const waterGeo = new THREE.PlaneGeometry(width * 1.5, height * 1.5);
+            waterGeo.rotateX(-Math.PI / 2);
+            const colour = TerrainShading.waterColour(0.5, settings);
+            const opacity = config.WATER_OPACITY / Math.max(settings.clarity, 0.1);
+            const waterMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color().setRGB(colour[0], colour[1], colour[2], THREE.SRGBColorSpace),
+                transparent: true,
+                opacity: Math.min(config.WATER_MAX_OPACITY, Math.max(config.WATER_MIN_OPACITY, opacity)),
+                depthWrite: false,
+                roughness: 0.1,
+                metalness: 0.2,
             });
-            this.scene.add(this.riverGroup);
+
+            this.water = new THREE.Mesh(waterGeo, waterMat);
+            this.water.position.y = 0;
+            this.water.receiveShadow = true;
+            this.scene.add(this.water);
         }
 
-        // 6. Position Camera
+        // 4. Position Camera
         this.camera.position.set(0, Math.max(width, height) * 0.8, Math.max(width, height) * 0.8);
         this.controls.target.set(0, 0, 0);
         this.controls.update();
+    }
+
+    /** Removes the terrain and sea, freeing their GPU memory. */
+    #disposeTerrain() {
+        if (this.mesh) {
+            this.mesh.geometry.dispose();
+            this.mesh.material.map?.dispose();
+            this.mesh.material.dispose();
+            this.scene.remove(this.mesh);
+            this.mesh = null;
+        }
+        if (this.water) {
+            this.water.geometry.dispose();
+            this.water.material.dispose();
+            this.scene.remove(this.water);
+            this.water = null;
+        }
     }
 
     #onWindowResize() {
@@ -240,15 +196,7 @@ export class Scene3D {
         window.removeEventListener("resize", this.resizeHandler);
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
 
-        if (this.mesh) {
-            this.mesh.geometry.dispose();
-            if (this.mesh.material.map) this.mesh.material.map.dispose();
-            this.mesh.material.dispose();
-        }
-        if (this.water) {
-            this.water.geometry.dispose();
-            this.water.material.dispose();
-        }
+        this.#disposeTerrain();
 
         if (this.renderer) {
             this.renderer.dispose();

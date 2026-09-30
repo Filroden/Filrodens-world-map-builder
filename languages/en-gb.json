@@ -11,5 +11,6 @@
     "FILRODENSWMB.UI.FontColor": "Font Colour",
     "FILRODENSWMB.JOURNAL.StandardPalette": "No custom biome colours applied. Standard palette active.",
     "FILRODENSWMB.UI.EngineStandardHint": "Uses standard noise generation to create quick, randomised terrain.",
-    "FILRODENSWMB.UI.ImportSettingsEmpty": "That file didn't contain any recognised custom biomes or quick styles."
+    "FILRODENSWMB.UI.ImportSettingsEmpty": "That file didn't contain any recognised custom biomes or quick styles.",
+    "FILRODENSWMB.UI.FaultSpacingHint": "The typical distance between volcanoes, in island sizes. Low values merge neighbouring volcanoes into larger islands."
 }

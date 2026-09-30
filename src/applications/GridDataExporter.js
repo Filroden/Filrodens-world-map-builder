@@ -1,12 +1,14 @@
 import { FILRODENSWMB } from "../config.js";
 import { GridAggregator, VoteTally } from "../generation/GridAggregator.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
+import { RiverNetwork } from "../generation/RiverNetwork.js";
 import { MapStateManager } from "./MapStateManager.js";
 
 /**
  * Builds the per-grid-cell exploration data layer written to
- * `scene.flags["filrodens-world-map-builder"].gridData` at export time (see
- * `design/GRID-DATA-SCHEMA.md` for the full field reference this class implements).
+ * `scene.flags["filrodens-world-map-builder"].gridData` at export time. Every field is documented,
+ * for the modules and game systems that read it, on the module wiki's "Grid Cell Data" page, so a
+ * change to what this class writes needs that page updating to match.
  *
  * The payload gives every cell of the Scene's configured grid a dominant biome, terrain band,
  * moisture band, temperature band, river/coastal flags, and which regions, points of interest,
@@ -71,7 +73,7 @@ export class GridDataExporter {
         return {
             schemaVersion: FILRODENSWMB.GRID_DATA.SCHEMA_VERSION,
             generatedAt: new Date().toISOString(),
-            grid: { type: gridType.value, typeName: gridType.name, size: app.uiState.gridSize },
+            grid: { type: gridType.value, typeName: gridType.name, size: MapStateManager.gridSizeOf(app.uiState.gridSize) },
             bounds: { iMin: i0, iMax: i1 - 1, jMin: j0, jMax: j1 - 1 },
             cells,
         };
@@ -83,14 +85,14 @@ export class GridDataExporter {
      */
     static #buildGrid(uiState) {
         if (uiState.gridType === "square") {
-            return new foundry.grid.SquareGrid({ size: uiState.gridSize });
+            return new foundry.grid.SquareGrid({ size: MapStateManager.gridSizeOf(uiState.gridSize) });
         }
 
         // FWMB only ever exports the odd-offset hex variants (HEXODDR for hexR, HEXODDQ for hexC -
         // see FILRODENSWMB.GRID_TYPES), so `even` is always false here. `columns` selects the
         // orientation: true for flat-top/column-offset hexes (hexC), false for pointy-top/
         // row-offset hexes (hexR).
-        return new foundry.grid.HexagonalGrid({ size: uiState.gridSize, columns: uiState.gridType === "hexC", even: false });
+        return new foundry.grid.HexagonalGrid({ size: MapStateManager.gridSizeOf(uiState.gridSize), columns: uiState.gridType === "hexC", even: false });
     }
 
     /** Reverse lookup from a built-in biome's numeric id (FILRODENSWMB.BIOME_IDS) back to its string key. */
@@ -222,10 +224,11 @@ export class GridDataExporter {
         // Reuses the exact same priority chain (paint override -> custom rule match -> built-in
         // default) that already resolves the biome for the live biome layer and the on-canvas
         // hover readout, so the exported biome can never disagree with what's visibly on the map.
-        // Its own `isWater` flag isn't used here - it also covers lakes (via the water mask), but
-        // `isCoastal` below is specifically about the ocean shoreline (see the schema doc), which
-        // the terrain band below already answers precisely.
-        const { lookupKey } = ProceduralEngine.resolveBiomeLookup(
+        // Under water it reports the biome seen from above (the surface biome, such as Pack Ice,
+        // if there is one, otherwise the bed's). `isCoastal` below is specifically about the
+        // ocean shoreline (see the schema doc), which the terrain band below already answers
+        // precisely, so the lookup's own land/water split is not used for it.
+        const { visible: lookupKey } = ProceduralEngine.resolveBiomeLookup(
             overrideId,
             elevation,
             moisture,
@@ -235,7 +238,7 @@ export class GridDataExporter {
             pixelIndex,
             params.customBiomeRules,
             params.biomePalette,
-            params.solidOverWater
+            params.biomeSides
         );
         const terrainBand = GridDataExporter.#classifyTerrainBand(elevation, params.seaLevel);
         const isOceanPixel = terrainBand === "deepOcean" || terrainBand === "shallowOcean";
@@ -252,7 +255,30 @@ export class GridDataExporter {
         stats.sampleCount++;
         if (isOceanPixel) stats.hasOceanSample = true;
         else stats.hasLandSample = true;
-        if (app.bufferRiverMap?.[pixelIndex]) stats.hasRiver = true;
+        if (!stats.hasRiver && GridDataExporter.#showsRiver(app, pixelIndex, elevation, params.seaLevel)) stats.hasRiver = true;
+    }
+
+    /**
+     * Whether the map shows a river at a pixel, for `hasRiver`: the pixel's centre lies inside a
+     * drawn river channel (at the width it is drawn, with its meanders and deltas, see
+     * RiverNetwork.isInChannel) where the map draws it - on dry ground, or across a pool - or the
+     * pixel is part of a lake a river formed.
+     *
+     * The channel comes from the river image the terrain is painted with (`bufferRivers`), so
+     * the export agrees with what the map shows. The river's traced path (`bufferRiverMap`, one
+     * pixel wide) is no longer used for the river itself: a wide river or delta covered cells the
+     * path missed, and a path could cross a cell where no channel is drawn. It still marks the
+     * lakes rivers fill, as it always has.
+     */
+    static #showsRiver(app, pixelIndex, elevation, seaLevel) {
+        const lake = app.bufferWaterMask?.[pixelIndex] > 0;
+        if (lake && app.bufferRiverMap?.[pixelIndex]) return true;
+
+        const image = app.bufferRivers;
+        if (!image || !RiverNetwork.isInChannel(image, pixelIndex)) return false;
+
+        const dry = elevation >= seaLevel && !lake;
+        return dry || RiverNetwork.isOverPool(image, pixelIndex);
     }
 
     /** Integer pixel coordinates of a polygon's vertex average, clamped onto the raster. */
@@ -308,7 +334,7 @@ export class GridDataExporter {
     /**
      * Named custom (hand-drawn) rivers passing through this cell - not procedural rivers, which
      * are traced automatically from spring pins at generation time and never get a name of their
-     * own, only rasterised into `bufferRiverMap` alongside everything else `hasRiver` reports.
+     * own, only drawn into the river image alongside everything else `hasRiver` reports.
      * `hasRiver` can be true here with `rivers` empty (a procedural river, or a lake overflow
      * channel, with no custom river drawn through this particular cell); the reverse - a custom
      * river listed here while `hasRiver` is false - shouldn't normally happen (drawing a custom
@@ -384,8 +410,8 @@ export class GridDataExporter {
     /**
      * Normalises a winning `resolveBiomeLookup` key - a built-in biome's string key, a built-in
      * biome's numeric id (from a hand-painted override), or a custom biome's numeric id - into the
-     * schema's uniform `{id, name, code}` shape. `id` is always written out as a string (per
-     * design/GRID-DATA-SCHEMA.md's id-format note), even though a custom biome's real internal id
+     * schema's uniform `{id, name, code}` shape. `id` is always written out as a string (the
+     * published schema promises a string id for every biome), even though a custom biome's real internal id
      * is numeric, so a consumer never has to branch on whether `biome.id` happens to be a number
      * or a string depending on which kind of biome a cell resolved to. Only ever called once per
      * cell, on the vote's winning value, not once per sampled pixel.

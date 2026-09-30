@@ -35,7 +35,10 @@
             <input type="checkbox" class="fwmb-checkbox" name="applyThickness" />
             {{localize "FILRODENSWMB.UI.LineThickness"}}
         </label>
-        <input type="number" name="massThickness" value="{{defaults.thickness}}" min="1" max="10" />
+        <div class="fwmb-slider-group">
+            <input type="range" name="massThickness" value="{{defaults.thickness}}" min="1" max="10" step="1" />
+            <output>{{defaults.thickness}}</output>
+        </div>
     </div>
 
     <div class="form-group">
@@ -87,7 +90,7 @@
                 {{localize "FILRODENSWMB.UI.FontSize"}}
             </label>
             <div class="fwmb-slider-group">
-                <input type="range" name="labelFontSize" value="{{labelDefaults.fontSize}}" min="0.2" max="5.0" step="0.1" oninput="this.nextElementSibling.value = this.value" />
+                <input type="range" name="labelFontSize" value="{{labelDefaults.fontSize}}" min="0.2" max="5.0" step="0.1" />
                 <output>{{labelDefaults.fontSize}}</output>
             </div>
         </div>
@@ -102,10 +105,10 @@
 
         <div class="form-group">
             <label class="fwmb-mass-edit-label">
-                <input type="checkbox" class="fwmb-checkbox" name="applyLabelMaxWidth" />
+                <input type="checkbox" class="fwmb-checkbox" name="applyLabelMaxChars" />
                 {{localize "FILRODENSWMB.UI.MaxWidth"}}
             </label>
-            <input type="number" name="labelMaxWidth" value="{{labelDefaults.maxWidth}}" min="0" step="10" placeholder="0" />
+            <input type="number" name="labelMaxChars" value="{{labelDefaults.maxChars}}" min="0" step="1" placeholder="0" />
         </div>
 
         <div class="form-group">

@@ -1,23 +1,60 @@
 import { FILRODENSWMB } from "../config.js";
 import { StudioCanvas } from "../canvas/StudioCanvas.js";
+import { CanvasHints } from "../canvas/CanvasHints.js";
+import { LabelWidth } from "../tools/LabelWidth.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
+import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { RenderTimer } from "../tools/RenderTimer.js";
 import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
 import { Scene3D } from "../canvas/Scene3D.js";
 import { SceneExporter } from "./SceneExporter.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
+import { RefreshQueue } from "../tools/RefreshQueue.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { TerrainUpgrade } from "./TerrainUpgrade.js";
+import { RiverSources } from "../generation/RiverSources.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
+import { LandMaskGenerator } from "../generation/LandMaskGenerator.js";
+import { RandomLandMap } from "../generation/RandomLandMap.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
+import { LayerPainting } from "../canvas/LayerPainting.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
+
+/**
+ * Longest the processing overlay waits for the browser to paint it before the work it announces
+ * starts anyway (see #startProcessing). A browser can stop producing frames for a while (a window
+ * minimised or covered, or a graphics card under strain), and refreshes run one at a time, so
+ * waiting for a frame alone could hold every later refresh and save up for as long as that lasts.
+ */
+const OVERLAY_PAINT_WAIT_MAX_MS = 250;
+
+// Brush size assumed when outlining an Undo/Redo preview for a stroke recorded without one
+const DEFAULT_STROKE_PREVIEW_SIZE = 20;
+
+// Margin (in map pixels) around a vector entity's points in an Undo/Redo preview, so a single
+// pin or a thin line still gets a visible outline
+const VECTOR_PREVIEW_PADDING = 50;
+
+/**
+ * The kinds of refresh the map runs through its refresh queue (see RefreshQueue):
+ *   TERRAIN         - generateTerrain: a full generation, or a refresh of what changed when nothing
+ *                     the base terrain depends on has changed.
+ *   CHANGED_TERRAIN - a refresh of what changed after brush strokes, undo or redo, or edits to
+ *                     faults and rivers (see #refreshChangedTerrain).
+ *   CLIMATE         - generateClimate: the climate, then the rivers and the canvas.
+ *   FEATURES        - generateFeatures: the rivers, then the canvas.
+ */
+const REFRESH = Object.freeze({ TERRAIN: "terrain", CHANGED_TERRAIN: "changedTerrain", CLIMATE: "climate", FEATURES: "features" });
 
 export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static DEFAULT_OPTIONS = {
@@ -97,6 +134,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             exportPng(e, t)                 { this._onExportPng(e, t); },
             exportScene(e, t)               { this._onExportScene(e, t); },
             exportSettings(e, t)            { this._onExportSettings(e, t); },
+            generateRandomLandMap(e, t)     { this._onGenerateRandomLandMap(e, t); },
+            generateRandomLandMask(e, t)    { this._onGenerateRandomLandMask(e, t); },
             generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
             importMapJson(e, t)             { this._onImportMapJson(e, t); },
             importSettings(e, t)            { this._onImportSettings(e, t); },
@@ -112,6 +151,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             resetReferenceScale(e, t)       { this._onResetReferenceScale(e, t); },
             resetZoom(e, t)                 { this._onResetZoom(e, t); },
             saveMap(e, t)                   { this._onSaveMap(e, t); },
+            saveMapAs(e, t)                 { this._onSaveMapAs(e, t); },
             selectRegionLayer(e, t)         { this._onSelectRegionLayer(e, t); },
             setBrushBiome(e, t)             { this._onSetBrushBiome(e, t); },
             setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
@@ -125,12 +165,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
             toggleGrid(e, t)                { this._onToggleGrid(e, t); },
             toggleLayer(e, t)               { this._onToggleLayer(e, t); },
+            toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
             toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
             togglePinDropdown(e, t)         { this._onTogglePinDropdown(e, t); },
             toggleRegionSmoothing(e, t)     { this._onToggleRegionSmoothing(e, t); },
+            toggleTerrainLayer(e, t)        { this._onToggleTerrainLayer(e, t); },
             toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
             toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
             undoBrush(e, t)                 { this._onUndoBrush(e, t); },
+            updateMapTerrain(e, t)          { this._onUpdateMapTerrain(e, t); },
             zoomIn(e, t)                    { this._onZoomIn(e, t); },
             zoomOut(e, t)                   { this._onZoomOut(e, t); },
             zoomToFeature(e, t)             { this._onZoomToFeature(e, t); },
@@ -145,7 +188,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         context: {
             template: "modules/filrodens-world-map-builder/templates/context.hbs",
             classes: ["fwmb-context-panel"],
-            scrollable: [".fwmb-scrollable", "#fwmb-scroll-auto-labels", "#fwmb-scroll-custom-labels", "#fwmb-scroll-rivers", "#fwmb-scroll-faults", "#fwmb-scroll-pins", "#fwmb-scroll-routes"],
+            scrollable: [".fwmb-scrollable", "#fwmb-scroll-auto-labels", "#fwmb-scroll-custom-labels", "#fwmb-scroll-rivers", "#fwmb-scroll-faults", "#fwmb-scroll-pins", "#fwmb-scroll-routes", "#fwmb-scroll-region-layers"],
         },
         map: {
             template: "modules/filrodens-world-map-builder/templates/map.hbs",
@@ -156,6 +199,62 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             classes: ["fwmb-edit-toolbar"],
         },
     };
+
+    /** Whether close() has started, and may still be asking about unsaved changes (see close). */
+    #closing = false;
+
+    /**
+     * Whether close() has gone past the point of no return and destroyed the canvas. Work that
+     * was already running when the window closed (a refresh part-way through, say) checks this
+     * before it draws, since there is nothing left to draw on.
+     */
+    #shutDown = false;
+
+    /** The save under way, or null (see saveCurrentMap). */
+    #activeSave = null;
+
+    /**
+     * The terrain's layers and the two map-control buttons that group them. Each group button
+     * opens a list of its layers. The layers are terrain shader settings (see TerrainShading),
+     * so switching one redraws without repainting. The keys are the setting names the shader
+     * takes; the values are the localisation keys of their names.
+     */
+    static #TERRAIN_LAYER_GROUPS = Object.freeze({
+        terrain: {
+            icon: "elevation",
+            tooltip: "FILRODENSWMB.UI.LayerTerrain",
+            layers: { elevation: "FILRODENSWMB.UI.LayerElevation", relief: "FILRODENSWMB.UI.LayerRelief", water: "FILRODENSWMB.UI.LayerWater" },
+        },
+        biomes: {
+            icon: "forest",
+            tooltip: "FILRODENSWMB.UI.LayerBiomes",
+            layers: { landBiomes: "FILRODENSWMB.UI.LayerLandBiomes", seaBiomes: "FILRODENSWMB.UI.LayerSeaBiomes" },
+        },
+    });
+
+    /** The terrain layer (or layers) each tool switches on when it is picked, so its work is visible. */
+    static #TOOL_TERRAIN_LAYERS = Object.freeze({
+        terrain: ["elevation"],
+        biomes: ["landBiomes", "seaBiomes"],
+        // Rivers are drawn as part of the Water layer
+        features: ["water"],
+    });
+
+    /**
+     * Which terrain layers are shown. They are not saved with the map: every map opens with all
+     * of them on, so a layer switched off for an export can never look like lost work the next
+     * time the map is opened.
+     */
+    #terrainLayers = MapStudioApp.#allTerrainLayers(true);
+
+    /** The terrain layer list that is open, or null (see _onToggleLayerMenu). */
+    #openLayerMenu = null;
+
+    /** Runs the refreshes one at a time (see RefreshQueue and #createRefreshQueue). */
+    #refreshes;
+
+    /** Paints the pixel layers, sharing whole-map repaints between workers (see LayerPainting). */
+    #layerPainting = new LayerPainting();
 
     /**
      * Mass Edit item types whose "Select" toggle lives in the same context panel fieldset
@@ -215,6 +314,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.currentTemperatureData = null;
         this.currentRiverData = null;
         this.tectonicFaults = [];
+        // Each tectonic feature's last worked-out change to the terrain, reused while neither it
+        // nor the ground under it changes (see TectonicFeatureEngine). Emptied whenever another
+        // map is loaded or created, so it never holds a previous map's features.
+        this.tectonicFeatureCache = {};
         this.activeFaultId = null;
         this.manualRivers = [];
         this.activeRiverId = null;
@@ -223,6 +326,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // cloned into saved map payloads) since whether this panel is expanded has nothing to
         // do with any particular map.
         this._builtinPinIconsExpanded = false;
+        // Which collapsible list sections in the tool panels the GM has collapsed, by their
+        // data-section key (see #bindCollapsibleFieldsets). Studio-session UI state like the flag
+        // above: every section starts open whenever the Studio is opened.
+        this._collapsedSections = new Set();
         // Mass Edit selection tool state - also Studio-session UI state, not map data, for the
         // same reason: which items are checked for a batch edit has nothing to do with the map
         // itself, and should reset (not persist) whenever the Studio app is reopened.
@@ -267,16 +374,28 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.cachedMaxElevation = null;
 
         // The lowest elevation the canvas was last shaded against, alongside cachedMaxElevation
-        // above - see ProceduralOrchestrator.planRepaint. Stays null (read as 0 by #paintOceanPixel
-        // until a repaint sets it) until hand-edited terrain is actually allowed to go negative.
+        // above (see ProceduralOrchestrator.planRepaint). Sea depth is measured down to it, so a
+        // trench below 0 reads as the deepest water. Null until the first repaint, and read as 0
+        // until then.
         this.cachedMinElevation = null;
         this.brushEngine = null;
 
         this.currentSaveId = null;
         this.currentSaveName = null;
         this.currentParentId = null;
+
+        // What updating the open map to the current terrain rules would change, or null if it is
+        // already current or would not change (see TerrainUpgrade). Drives the Update Map button.
+        this.terrainUpgrade = null;
+        // Size of the map at the top of the open map's chain of crops, when the open map is a
+        // legacy regional map (which did not record it) and it could be found by following its
+        // parent maps. Used to correct its wind distance, and passed on to regional maps cut from it.
+        this.legacyRootSize = null;
+        // The parent map's ground beyond a regional map's left and right edges, which its climate
+        // reads when it looks upwind past its own edge (see UpwindMargin); null for any other map.
+        // Kept as saved, and passed on (and extended) to regional maps cut from this one.
+        this.upwindMargin = null;
         this.isDirty = false;
-        this.isSaving = false;
 
         MapStateManager.allocateBuffers(this);
         this.hasBooted = false;
@@ -289,14 +408,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Collects per-phase timings during a full render for the summary logged when it finishes
         this.renderTimer = new RenderTimer();
 
-        this.debouncedGenerateTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
-        this.debouncedGenerateClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
-        this.debouncedGenerateFeatures = foundry.utils.debounce(this.generateFeatures.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.FEATURES);
+        this.#refreshes = this.#createRefreshQueue();
 
-        this.debouncedCanvasTerrain = foundry.utils.debounce(this.generateTerrain.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
-        this.debouncedCanvasClimate = foundry.utils.debounce(this.generateClimate.bind(this), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        // Each of these runs a moment after the edit that scheduled it, by which time the window
+        // may have been closed; see #whileOpen
+        this.debouncedGenerateTerrain = foundry.utils.debounce(this.#whileOpen(() => this.generateTerrain()), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
+        this.debouncedGenerateClimate = foundry.utils.debounce(this.#whileOpen((bounds) => this.generateClimate(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
+        this.debouncedGenerateFeatures = foundry.utils.debounce(this.#whileOpen((bounds) => this.generateFeatures(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.FEATURES);
 
-        this.debouncedHistoryRebuild = foundry.utils.debounce(() => this.#refreshChangedTerrain("Brush stroke rebuild"), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedCanvasTerrain = foundry.utils.debounce(this.#whileOpen(() => this.generateTerrain()), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedCanvasClimate = foundry.utils.debounce(this.#whileOpen((bounds) => this.generateClimate(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+
+        this.debouncedRepaintCanvas = foundry.utils.debounce(this.#whileOpen(() => this._repaintCanvas()), FILRODENSWMB.UI.DEBOUNCE_MS.DISPLAY);
+
+        this.debouncedHistoryRebuild = foundry.utils.debounce(this.#whileOpen(() => this.#requestChangedTerrain("Brush stroke rebuild")), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
         // Every refresh that uses the scratch buffer restarts this timer. The buffer is only ever
         // used inside single synchronous steps and refilled before each use, so it can be dropped
@@ -304,6 +429,68 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedReleaseScratch = foundry.utils.debounce(() => {
             this.bufferScratch = null;
         }, FILRODENSWMB.UI.DEBOUNCE_MS.SCRATCH_RELEASE);
+    }
+
+    /**
+     * The queue every refresh of the terrain, climate, rivers and canvas goes through, so that
+     * only one runs at a time (see RefreshQueue). The public generate methods and
+     * #requestChangedTerrain put requests on it; each kind runs the matching private method,
+     * which runs its later stages directly rather than through the queue.
+     */
+    #createRefreshQueue() {
+        const latest = (_waiting, next) => next;
+        return new RefreshQueue(
+            {
+                [REFRESH.TERRAIN]: { run: () => this.#generateTerrainNow(), merge: latest },
+                [REFRESH.CHANGED_TERRAIN]: { run: ({ title }) => this.#refreshChangedTerrain(title), merge: latest },
+                [REFRESH.CLIMATE]: { run: ({ bounds }) => this.#generateClimateNow(bounds), merge: (waiting, next) => this.#mergeClimateRequests(waiting, next) },
+                [REFRESH.FEATURES]: { run: ({ bounds }) => this.#generateFeaturesNow(bounds), merge: (waiting, next) => ({ bounds: waiting.bounds && next.bounds ? SpatialMath.mergeBounds(waiting.bounds, next.bounds) : null }) },
+            },
+            { isStopped: () => this.#shutDown },
+        );
+    }
+
+    /**
+     * Merges two waiting climate refreshes. Both with an area: the area covering both. Otherwise
+     * the merged refresh has no area of its own, which means the area painted since the last
+     * refresh (pendingTerrainBounds), or the whole map if none was recorded (see
+     * #generateClimateNow). The other request's area is added to that record, so it is covered
+     * either way.
+     */
+    #mergeClimateRequests(waiting, next) {
+        if (waiting.bounds && next.bounds) return { bounds: SpatialMath.mergeBounds(waiting.bounds, next.bounds) };
+
+        const area = waiting.bounds ?? next.bounds;
+        if (area) this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, area);
+        return { bounds: null };
+    }
+
+    /**
+     * Asks for the terrain to be brought in line with the brush history and the vector features
+     * (see #refreshChangedTerrain), after any refresh already running.
+     *
+     * @param {string} title - Names the run in the console timing summary.
+     * @returns {Promise<void>}
+     */
+    #requestChangedTerrain(title) {
+        return this.#refreshes.request(REFRESH.CHANGED_TERRAIN, { title });
+    }
+
+    /** Whether the window is open and its canvas can still be drawn on. */
+    get #isOpen() {
+        return this.rendered && !this.#shutDown;
+    }
+
+    /**
+     * Wraps work scheduled for later (a debounced refresh) so that it only runs while the window
+     * is open. Closing the window removes its element and destroys its canvas, so a refresh that
+     * fires afterwards would fail part-way, and there is nothing left for it to update.
+     *
+     * @param {Function} work - The work to run, given whatever arguments the wrapper receives.
+     * @returns {Function} A function that runs `work` if the window is still open.
+     */
+    #whileOpen(work) {
+        return (...args) => (this.#isOpen ? work(...args) : undefined);
     }
 
     markDirty() {
@@ -356,8 +543,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
         }
 
-        context.biomeList = Object.entries(FILRODENSWMB.BIOME_IDS)
-            .filter(([key, id]) => id !== FILRODENSWMB.BIOME_IDS.ERASER && id !== 1 && id !== 2 && !key.toLowerCase().startsWith("custom"))
+        // Every paintable biome, built-in (Deep and Shallow Ocean included, now that they are
+        // drawn as the sea bed) then custom, each with its placement
+        const builtInBiomes = Object.entries(FILRODENSWMB.BIOME_IDS)
+            .filter(([key, id]) => id !== FILRODENSWMB.BIOME_IDS.ERASER && !key.toLowerCase().startsWith("custom"))
             .map(([key, id]) => {
                 const defaultRgb = FILRODENSWMB.BIOMES[key] || [0, 0, 0];
                 const currentRgb = this.customBiomeColors[key] || defaultRgb;
@@ -368,24 +557,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     label: `FILRODENSWMB.BIOMES.${key}`,
                     hex: ColorMath.rgbToHex(currentRgb),
                     isCustom: false,
+                    placement: BiomePlacement.placementOfBuiltIn(key),
                 };
             });
 
-        // Map custom biomes and append them to the UI list
         const customBiomesMapped = (this.uiState.customBiomes || []).map((cb) => ({
             id: cb.id,
             key: `custom_${cb.id}`,
             label: cb.name,
             hex: ColorMath.rgbToHex(cb.color),
             isCustom: true,
+            placement: BiomePlacement.placementOfCustom(cb),
         }));
 
-        context.biomeList = [...context.biomeList, ...customBiomesMapped];
+        context.biomeList = [...builtInBiomes, ...customBiomesMapped];
+        context.biomeGroups = MapStudioApp.#groupBiomesByPlacement(context.biomeList);
+        context.layerGroups = this.#layerGroupsContext();
 
-        context.tectonicTypes = Object.entries(FILRODENSWMB.TECTONICS?.LABELS || {}).map(([id, label]) => ({
-            id: id,
-            label: label,
-        }));
+        // The fault types on offer depend on the map's terrain version (see
+        // TectonicFeatureEngine.typeOptions); a type left over from a map of the other version is
+        // replaced by that version's default, so the toolbar never draws a type it cannot offer
+        context.tectonicTypes = TectonicFeatureEngine.typeOptions(this.#isCurrentTerrain());
+        this.uiState.faultType = this.#resolveFaultType();
+        context.faultIsRange = this.uiState.faultType === FILRODENSWMB.TECTONICS.FEATURES.TYPES.RANGE;
+        context.rangeStyles = Object.entries(FILRODENSWMB.TECTONICS.FEATURES.RANGE_STYLES).map(([id, label]) => ({ id, label }));
 
         const alphaSort = (a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
 
@@ -394,10 +589,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         context.uiState = this.uiState;
         context.currentSaveName = this.currentSaveName;
+        context.terrainUpgradeAvailable = this.terrainUpgrade !== null;
+        context.canCreateRegionalMap = TerrainVersion.canCreateRegionalMap(this.uiState);
+        context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
+        context.engineLabels = this.#getEngineLabels();
 
         context.infrastructureIcons = getPinIconPickerList(this.uiState.activeIcon);
         context.builtinPinIcons = getBuiltinPinIconList();
         context.builtinPinIconsExpanded = this._builtinPinIconsExpanded;
+        // Read by the templates as collapsedSections.<key>, so a section drawn again stays as the
+        // GM left it rather than springing open
+        context.collapsedSections = Object.fromEntries([...this._collapsedSections].map((key) => [key, true]));
         context.customPinIcons = getCustomPinIconList();
 
         const activeIconEntry = context.infrastructureIcons.find((icon) => icon.key === this.uiState.activeIcon);
@@ -488,6 +690,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             context.regionLayers = [...(this.regionLayers || [])].sort(alphaSort).map((layer) => ({
                 ...layer,
                 isActive: layer.id === this.activeRegionLayerId,
+                // Region layer keys hold a dot, so the template cannot look them up in
+                // collapsedSections by path; the layer carries its own flag instead
+                collapsed: this._collapsedSections.has(`regionLayer.${layer.id}`),
                 regions: [...(layer.regions || [])].sort(alphaSort).map((r) => ({ ...r, massEditSelected: this.massEditSelection.region.has(r.id) })),
             }));
 
@@ -511,6 +716,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
         this.#updateHistoryButtons();
+        this.#updateCanvasHint();
 
         const mapContainer = this.element.querySelector(".fwmb-map-container");
         const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
@@ -521,12 +727,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #bindGlobalListeners() {
-        this.element.addEventListener("input", (event) => {
-            if (event.target.type === "range") {
-                const output = event.target.parentElement.querySelector("output");
-                if (output) output.value = event.target.value;
-            }
-        });
+        // Range sliders' value displays and filled tracks are kept up to date module-wide, for
+        // this window and every dialogue alike, by the listeners registered in main.js (see
+        // RangeDisplay).
 
         if (!this.element.dataset.hasDblClickListener) {
             this.element.addEventListener("dblclick", (event) => {
@@ -535,7 +738,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     const defaultVal = this.defaultUiState[target.name];
                     if (defaultVal !== undefined && target.value !== String(defaultVal)) {
                         target.value = defaultVal;
-                        if (target.nextElementSibling?.tagName === "OUTPUT") target.nextElementSibling.value = defaultVal;
+                        // The input event refreshes the value display and filled track (see
+                        // RangeDisplay), and triggers regeneration as a drag would.
                         target.dispatchEvent(new Event("input", { bubbles: true }));
                     }
                 }
@@ -574,27 +778,54 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!container || this.canvasEngine) return;
 
         this.canvasEngine = new StudioCanvas(container);
-        this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        this.brushEngine = this.#createBrushEngine();
         this.#wireBrushCallbacks();
 
-        this.canvasEngine.onCropUpdate = (cropBox) => {
-            const targetWidth = this.uiState.regionalTargetWidth;
-            const zoomScale = targetWidth / cropBox.width;
-            const calcHeight = Math.round(cropBox.height * zoomScale);
+        this.canvasEngine.onCropUpdate = (cropBox) => this.#showCropReadouts(cropBox);
+        this.canvasEngine.onCropRelease = (cropBox) => this.#snapCrop(cropBox);
+    }
 
-            this.uiState.regionalTargetHeight = calcHeight;
-            const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
-            if (heightInput) heightInput.value = calcHeight;
+    /**
+     * Moves the crop to the one the regional map will actually use (see
+     * RegionalExtractor.planCrop): snapped to the parent's grid so the two grids line up, and
+     * sized for the requested width. Done when a drag of the crop ends, when the crop tool opens
+     * and when the requested width changes, so the outline always shows what will be made.
+     */
+    #snapCrop(cropBox) {
+        // Written as !(value > 0) on purpose: a missing or NaN value also fails the check,
+        // whereas the equivalent-looking value <= 0 would let it through
+        if (!this.canvasEngine || !cropBox || !(cropBox.width > 0) || !(cropBox.height > 0)) return; // NOSONAR
+        this.canvasEngine.setCropBox(this.#planCrop(cropBox).cropBox);
+    }
 
-            const latRange = Math.abs(this.uiState.latTop - this.uiState.latBottom);
-            const newLatTop = this.uiState.latTop - (cropBox.y / this.mapHeight) * latRange;
-            const newLatBottom = this.uiState.latTop - ((cropBox.y + cropBox.height) / this.mapHeight) * latRange;
+    /** The regional map the crop makes (see RegionalExtractor.planCrop). */
+    #planCrop(cropBox) {
+        return RegionalExtractor.planCrop(cropBox, this.uiState.regionalTargetWidth, { type: this.uiState.gridType, size: this.uiState.gridSize }, this.mapWidth, this.mapHeight);
+    }
 
-            const latTopEl = this.element.querySelector("#fwmb-readout-lat-top");
-            const latBottomEl = this.element.querySelector("#fwmb-readout-lat-bottom");
-            if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;
-            if (latBottomEl) latBottomEl.innerHTML = `${newLatBottom.toFixed(2)}&deg;`;
-        };
+    /**
+     * Shows the height and latitude range of the regional map the crop will make, as
+     * RegionalExtractor.planCrop works them out, for the crop as it will be snapped. While a
+     * crop is being dragged these show where it will snap to when released.
+     */
+    #showCropReadouts(cropBox) {
+        // Written as !(value > 0) on purpose: a missing or NaN value also fails the check,
+        // whereas the equivalent-looking value <= 0 would let it through
+        if (!cropBox || !(cropBox.width > 0) || !(cropBox.height > 0)) return; // NOSONAR
+        const plan = this.#planCrop(cropBox);
+
+        this.uiState.regionalTargetHeight = plan.targetHeight;
+        const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
+        if (heightInput) heightInput.value = plan.targetHeight;
+
+        const latRange = Math.abs(this.uiState.latTop - this.uiState.latBottom);
+        const newLatTop = this.uiState.latTop - (plan.cropBox.y / this.mapHeight) * latRange;
+        const newLatBottom = this.uiState.latTop - ((plan.cropBox.y + plan.cropBox.height) / this.mapHeight) * latRange;
+
+        const latTopEl = this.element.querySelector("#fwmb-readout-lat-top");
+        const latBottomEl = this.element.querySelector("#fwmb-readout-lat-bottom");
+        if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;
+        if (latBottomEl) latBottomEl.innerHTML = `${newLatBottom.toFixed(2)}&deg;`;
     }
 
     #bindToolbarListeners() {
@@ -695,7 +926,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #syncFaultLiveEdits(name) {
-        if (!["faultType", "faultThickness", "faultStrength"].includes(name) || !this.activeFaultId) return;
+        if (!["faultType", "faultThickness", "faultStrength", "faultStyle"].includes(name)) return;
+        // The range style only shows while a range is chosen, so switching to or from one redraws the toolbar
+        if (name === "faultType") this.render({ parts: ["editToolbar"] });
+        if (!this.activeFaultId) return;
 
         const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
         if (!fault) return;
@@ -703,13 +937,44 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         fault.type = this.uiState.faultType;
         fault.thickness = this.uiState.faultThickness;
         fault.strength = this.uiState.faultStrength;
+        MapStudioApp.#applyFeatureFields(fault, this.uiState);
 
         if (name === "faultType") {
-            fault.color = FILRODENSWMB.TECTONICS?.COLORS?.[this.uiState.faultType] || 0xffffff;
+            fault.color = TectonicFeatureEngine.colorOf(this.uiState.faultType);
         }
 
         this._repaintVectors();
         this.requestTerrainUpdate();
+    }
+
+    /**
+     * Marks a fault as a tectonic feature (see TectonicFeatureEngine) when its type is one, and
+     * gives a mountain range its style; a fault of an original type keeps the original maths.
+     */
+    static #applyFeatureFields(fault, uiState) {
+        if (!TectonicFeatureEngine.isFeatureType(fault.type)) {
+            delete fault.revision;
+            return;
+        }
+        fault.revision = FILRODENSWMB.TECTONICS.FEATURES.REVISION;
+        if (fault.type === FILRODENSWMB.TECTONICS.FEATURES.TYPES.RANGE) fault.style = uiState.faultStyle ?? FILRODENSWMB.TECTONICS.FEATURES.RANGE.DEFAULT_STYLE;
+    }
+
+    /** Whether the open map is at the current terrain version, which draws tectonic features. */
+    #isCurrentTerrain() {
+        return TerrainVersion.getVersion(this.uiState) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+    }
+
+    /**
+     * The fault type new faults are drawn with: the one chosen in the toolbar if this map's
+     * version offers it, otherwise that version's default (a range on a current map, a convergent
+     * fault on an older one).
+     */
+    #resolveFaultType() {
+        const current = this.#isCurrentTerrain();
+        const offered = TectonicFeatureEngine.typeOptions(current).map((option) => option.id);
+        if (offered.includes(this.uiState.faultType)) return this.uiState.faultType;
+        return current ? FILRODENSWMB.TECTONICS.FEATURES.DEFAULT_TYPE : FILRODENSWMB.TECTONICS.TYPES.CONVERGENT;
     }
 
     #syncRouteLiveEdits(name, target) {
@@ -791,15 +1056,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #syncCropLiveEdits(name) {
         if (name !== "regionalTargetWidth" || !this.canvasEngine) return;
 
-        const cropBox = this.canvasEngine.getCropData();
-        if (cropBox && cropBox.width > 0) {
-            const zoomScale = this.uiState.regionalTargetWidth / cropBox.width;
-            const calcHeight = Math.round(cropBox.height * zoomScale);
-            this.uiState.regionalTargetHeight = calcHeight;
-
-            const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
-            if (heightInput) heightInput.value = calcHeight;
-        }
+        this.#snapCrop(this.canvasEngine.getCropData());
     }
 
     /**
@@ -807,18 +1064,44 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * only ever reflects whatever the last-rendered context said), which would otherwise slam
      * it shut the moment any action inside it - a checkbox, Hide/Reveal all - triggers a
      * context re-render. Tracking `open` in JS and feeding it back through the render context
-     * (see `builtinPinIconsExpanded` in _preparePartContext) keeps it open until the GM
-     * actually collapses it themselves. Assigning `ontoggle` (rather than addEventListener)
-     * is deliberate: re-running this after every render always replaces any previous handler,
-     * so the same element never ends up with duplicate listeners.
+     * (see `builtinPinIconsExpanded` and `collapsedSections` in _preparePartContext) keeps it as
+     * the GM left it until they toggle it themselves. Assigning `ontoggle` and `onclick`
+     * (rather than addEventListener) is deliberate: re-running this after every render always
+     * replaces any previous handler, so the same element never ends up with duplicate listeners.
+     *
+     * The collapsible list sections (tool panel lists and region layers) are marked with
+     * data-section. They are open by default, so only the collapsed ones are remembered.
      */
     #bindCollapsibleFieldsets() {
         const builtinIconsDetails = this.element.querySelector("#fwmb-builtin-pin-icons");
-        if (!builtinIconsDetails) return;
+        if (builtinIconsDetails) {
+            builtinIconsDetails.ontoggle = () => {
+                this._builtinPinIconsExpanded = builtinIconsDetails.open;
+            };
+        }
 
-        builtinIconsDetails.ontoggle = () => {
-            this._builtinPinIconsExpanded = builtinIconsDetails.open;
-        };
+        for (const section of this.element.querySelectorAll("details[data-section]")) {
+            section.ontoggle = () => this.#rememberSectionState(section);
+            section.querySelector(":scope > summary").onclick = MapStudioApp.#keepSummaryControlsFromToggling;
+        }
+    }
+
+    /** Records whether a collapsible list section is collapsed (see #bindCollapsibleFieldsets). */
+    #rememberSectionState(section) {
+        const key = section.dataset.section;
+        if (section.open) this._collapsedSections.delete(key);
+        else this._collapsedSections.add(key);
+    }
+
+    /**
+     * A click anywhere in a <summary> toggles its <details>, including a click on a button or
+     * link inside it (a region layer's Edit and Delete buttons, a list's Mass Edit toggle). Those
+     * controls should only do their own job, so their clicks have the toggle cancelled. Cancelling
+     * the default does not stop the click reaching the application's own data-action handling,
+     * which listens further up the page.
+     */
+    static #keepSummaryControlsFromToggling(event) {
+        if (event.target.closest("[data-action], button, a")) event.preventDefault();
     }
 
     #bindContextPanelListeners() {
@@ -853,6 +1136,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const name = target.name || "";
 
+        // The resolution fields describe the next map Create New Map will build, not the open
+        // map, so changing them neither marks the map unsaved nor regenerates anything
+        if (MapStudioApp.#NEW_MAP_SIZE_INPUTS.has(name)) return this.#recordNewMapSize(target, name);
+
         // Skip marking dirty for temporary visual overlays
         if (!name.startsWith("reference")) this.markDirty();
 
@@ -869,7 +1156,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (name === "referenceAlpha") return this.#updateReferenceAlpha(target);
         if (name === "gridType" || name === "gridSize") return this.#updateGridSettings();
         if (name === "biomeAlphaActive" || name === "biomeAlphaInactive") return this.#updateBiomeAlphas();
-        if (name === "contourInterval") return this.#updateContours();
+        if (name === "contourInterval") return this.debouncedRepaintCanvas();
+        // Relief strength and the water settings are terrain shader settings, so moving them
+        // redraws without repainting
+        if (MapStudioApp.#TERRAIN_SHADER_INPUTS.has(name)) return this.#updateTerrainShaderInputs();
 
         // 2. Custom biome colour handler (uses dataset instead of name)
         if (target.type === "color" && target.dataset.biome) return this.#updateBiomeColor(target);
@@ -907,9 +1197,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateBiomeOpacity();
     }
 
-    #updateContours() {
+    /** The Create New Map resolution fields (see #recordNewMapSize). */
+    static #NEW_MAP_SIZE_INPUTS = new Set(["mapWidth", "mapHeight"]);
+
+    /**
+     * Keeps a typed resolution in the UI state as soon as it is entered.
+     *
+     * The context panel is drawn from the UI state, so any redraw before Create New Map (a new
+     * random seed, switching tools and back) would otherwise put the fields back to the size of
+     * the open map and lose what was typed. The open map's real size lives in mapWidth and
+     * mapHeight on the app itself, which is what saves and the canvas use, so holding the typed
+     * size here changes nothing about the open map. A field left blank or unreadable is ignored;
+     * Create New Map falls back to the default size for it.
+     */
+    #recordNewMapSize(target, name) {
+        const size = Number.parseInt(target.value, 10);
+        if (!Number.isNaN(size)) this.uiState[name] = size;
+    }
+
+    /** The map settings the terrain shader reads directly (see #syncTerrainSettings). */
+    static #TERRAIN_SHADER_INPUTS = new Set(["reliefShading", "seabedRelief", "waterClarity", "waterHue", "waterSaturation"]);
+
+    #updateTerrainShaderInputs() {
         MapStateManager.getMapParameters(this);
-        this._repaintCanvas();
+        this.#syncTerrainSettings();
     }
 
     #updateBiomeColor(target) {
@@ -931,7 +1242,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #routeProceduralGenerators(target) {
         if (
             target.matches(
-                'input[name="seaLevel"], input[name="tectonicPlates"], input[name="coastlineFracture"], input[name="continentalGrouping"], input[name="shelfRange"], input[name="continentScale"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]',
+                'input[name="seaLevel"], input[name="tectonicPlates"], input[name="coastlineFracture"], input[name="continentalGrouping"], input[name="shelfRange"], input[name="coastalPlain"], input[name="continentScale"], input[name="oceanScale"], input[name="oceanRidges"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]',
             )
         ) {
             this.debouncedGenerateTerrain();
@@ -941,7 +1252,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             )
         ) {
             this.debouncedGenerateClimate();
-        } else if (target.matches('input[name="riverDensity"], input[name="maxLakeSize"], input[name="springAltOffset"], input[name="springMoistMin"], input[name="meanderJitter"]')) {
+        } else if (target.matches('input[name="riverDensity"], input[name="springAltOffset"], input[name="springMoistMin"], input[name="riverMeander"], input[name="riverWidthScale"]')) {
             this.debouncedGenerateFeatures();
         }
     }
@@ -980,9 +1291,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             // biome is under the cursor right now".
             const overrideId = this.currentBiomeOverrides ? this.currentBiomeOverrides[index] : 0;
             const { params } = MapStateManager.getDerivedMapParameters(this.uiState, this.customBiomeColors);
-            const { lookupKey } = ProceduralEngine.resolveBiomeLookup(
+            // The biome seen from above: under water that is the surface biome (such as Pack
+            // Ice) when there is one, otherwise the bed's
+            const { visible: lookupKey } = ProceduralEngine.resolveBiomeLookup(
                 overrideId, elev, mois, temp, seaLevel, this.bufferWaterMask, index, params.customBiomeRules, params.biomePalette,
-                params.solidOverWater,
+                params.biomeSides,
             );
 
             // Deliberately left uncapped: a value past 100% (or below 0%) is the honest readout for
@@ -996,6 +1309,23 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.element.querySelector("#fwmb-readout-temp").textContent = Math.round(temp * 100) + "%";
             this.element.querySelector("#fwmb-readout-biome").textContent = this.#getBiomeDisplayName(lookupKey);
         };
+    }
+
+    /**
+     * Splits a biome list into one group per placement (for the brush's biome select, one
+     * optgroup each), in the order the placements are listed in FILRODENSWMB.BIOME_PLACEMENT.
+     * Biomes keep their order within a group (built-in first, then custom); a placement with no
+     * biomes is left out.
+     * @param {Array<{placement: string}>} biomeList
+     * @returns {Array<{label: string, biomes: object[]}>} `label` is a localisation key.
+     */
+    static #groupBiomesByPlacement(biomeList) {
+        return Object.values(FILRODENSWMB.BIOME_PLACEMENT)
+            .map((placement) => ({
+                label: BiomePlacement.labelOf(placement),
+                biomes: biomeList.filter((biome) => biome.placement === placement),
+            }))
+            .filter((group) => group.biomes.length > 0);
     }
 
     /**
@@ -1032,15 +1362,42 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async close(options) {
-        const canClose = await this.#gateUnsavedChanges();
+        // A second close while the first is still asking about unsaved changes, or still
+        // closing, must not shut the window down twice
+        if (this.#closing) return;
+        this.#closing = true;
+
+        let canClose = false;
+        try {
+            // A save already under way decides whether there are unsaved changes left, so it is
+            // allowed to finish before the user is asked about them
+            if (this.#activeSave) await this.#activeSave;
+            canClose = await this.#gateUnsavedChanges();
+        } finally {
+            if (!canClose) this.#closing = false;
+        }
         if (!canClose) return; // Abort closure entirely
 
+        this.#shutDown = true;
+        this.#closeLayerMenu();
         if (this.canvasEngine) this.canvasEngine.destroy();
         if (this.scene3D) this.scene3D.destroy();
 
         // The scratch buffer is recreated whenever it is needed, so it can go with the window
         this.bufferScratch = null;
         return super.close(options);
+    }
+
+    /**
+     * A brush engine for the open map's size, given the map's surface texture for the Roughen
+     * and Level brushes (see ProceduralOrchestrator.getSurfaceTexture). The texture is only
+     * worked out where one of those brushes needs it, when it first does.
+     */
+    #createBrushEngine() {
+        const brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        brushEngine.surfaceTexture = (bounds) => ProceduralOrchestrator.getSurfaceTexture(this, bounds);
+        brushEngine.surfaceTextureAmplitude = ProceduralEngine.getSurfaceTextureAmplitude();
+        return brushEngine;
     }
 
     #wireBrushCallbacks() {
@@ -1060,6 +1417,31 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.canvasEngine.onRightClick = () => this.#handleRightClick();
         this.canvasEngine.onDoubleClick = (hitData) => this.#handleCanvasDoubleClick(hitData);
+        this.canvasEngine.onHeldItemChange = () => this.#updateCanvasHint();
+    }
+
+    /**
+     * Refreshes the list of canvas actions in the map's corner (see CanvasHints) for the current
+     * tool, mode, and whatever the pointer holds. Called after every render, since tool and mode
+     * changes all end in one, and whenever the pointer picks up or lets go of an item.
+     */
+    #updateCanvasHint() {
+        const element = this.element?.querySelector(".fwmb-map-hint");
+        if (!element) return;
+
+        const context = CanvasHints.resolveContext({
+            is3DView: !!this.scene3D,
+            isEditMode: !!this.uiState.isEditMode,
+            activeTool: this.activeTool,
+            isCropMode: !!this.canvasEngine?.isCropMode,
+            isReferenceMode: !!this.canvasEngine?.isReferenceMode,
+            featureMode: this.uiState.activeFeatureMode,
+            infraMode: this.uiState.activeInfraMode,
+            isMaskDrawing: this.#isMaskDrawingMode(),
+            heldItem: this.canvasEngine?.heldItem ?? null,
+        });
+
+        CanvasHints.render(element, CanvasHints.getKeys(context), (key) => game.i18n.localize(key));
     }
 
     #handleCanvasDoubleClick(hitData) {
@@ -1175,8 +1557,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Strict nullish check, not `||`: the Eraser Biome's paint value is a genuine 0, which
         // `||` would silently coerce back to the default Grassland fallback below.
         const paintValue = layer === "biome" ? (this.uiState.brushBiome ?? FILRODENSWMB.BIOME_IDS.GRASSLAND) : null;
+        // Where the painted biome may appear (land, sea or both), recorded on the stroke so it
+        // replays the same way whatever later happens to the biome's placement
+        const paintSides = layer === "biome" ? BiomePlacement.buildSidesTable(this.uiState.customBiomes)[paintValue] : null;
 
-        this.brushEngine.startStroke(layer, tool, size, strength, feather, paintValue);
+        this.brushEngine.startStroke(layer, tool, size, strength, feather, paintValue, paintSides);
         this.#applyBrushStroke(x, y);
     }
 
@@ -1253,11 +1638,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
 
         if (this.activeTool === "features") {
-            this.canvasEngine.renderFeaturePins(this.mapPins, isEdit);
-
-            if (this.currentRiverData?.vectors) {
-                this.canvasEngine.renderProceduralRivers(this.currentRiverData.vectors, this.bufferWaterMask);
-            }
+            this.canvasEngine.renderFeaturePins(this.mapPins, isEdit, this.proceduralSprings);
 
             if (this.canvasEngine.renderFaultLines) {
                 this.canvasEngine.renderFaultLines(this.tectonicFaults, isEdit, this.activeFaultId);
@@ -1282,7 +1663,47 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    /**
+     * Removes a procedural spring (see RiverSources) by adding a pin that removes it, since
+     * procedural springs are placed afresh on every refresh and are not stored themselves.
+     * @returns {boolean} Whether `target` was a procedural spring.
+     */
+    #removeProceduralSpring(target) {
+        const index = this.proceduralSprings?.indexOf(target) ?? -1;
+        if (index < 0 || this.activeTool !== "features") return false;
+
+        MapStateManager.pushVectorState(this);
+        this.mapPins.push(RiverSources.removalPin(target));
+        this.proceduralSprings.splice(index, 1);
+        this._repaintVectors();
+        this.debouncedCanvasClimate();
+        this.render({ parts: ["context"] });
+        this.markDirty();
+        return true;
+    }
+
+    /**
+     * Turns every procedural spring the user dragged into their own spring where they dropped
+     * it, and removes the procedural one from where it was (see #removeProceduralSpring).
+     */
+    #adoptMovedSprings() {
+        for (const spring of this.proceduralSprings ?? []) {
+            if (spring.x === spring.homeX && spring.y === spring.homeY) continue;
+            this.mapPins.push(RiverSources.removalPin({ x: spring.homeX, y: spring.homeY }));
+            this.mapPins.push({ id: foundry.utils.randomID(), name: "River Source", x: spring.x, y: spring.y, type: "spring", radius: FILRODENSWMB.DISPLAY.PIN_RADIUS, visibility: "all" });
+            spring.homeX = spring.x;
+            spring.homeY = spring.y;
+        }
+    }
+
     #handleInfraDragEnd() {
+        if (this.activeTool === "features") this.#adoptMovedSprings();
+
+        // A region's label is drawn on the labels layer, which the drag itself does not redraw
+        // outside the Labels tool (see #handleInfraDrag). A label not yet placed sits at its
+        // region's centre, so redrawing once on release brings it to the region's new centre.
+        if (this.activeTool === "regions") this._repaintVectors();
+
         this.render({ parts: ["context"] });
         this.markDirty();
 
@@ -1386,6 +1807,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #handleInfraDeleteNode(target) {
         if (!["infrastructure", "regions", "features", "scene"].includes(this.activeTool)) return;
         if (target.icon && this.activeTool !== "infrastructure") return;
+        if (this.#removeProceduralSpring(target)) return;
 
         // 1. Locate the target and its specific deletion instructions
         const match = this.#findNodeToDelete(target);
@@ -1565,7 +1987,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #handleSceneClick(x, y) {
         // Guard clause: Only process clicks if we are actively drawing a land/ocean masks
-        if (this.uiState.sceneMode !== "addMask" && this.uiState.sceneMode !== "subtractMask") return;
+        if (!this.#isMaskDrawingMode()) return;
 
         // Reject clicks outside the visual 200px buffer
         const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
@@ -1580,14 +2002,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // If no mask is currently active, initialise a new one
         if (!this.activeLandMaskId) {
-            const isSubtract = this.uiState.sceneMode === "subtractMask";
-
-            const newMask = {
-                id: foundry.utils.randomID(),
-                name: isSubtract ? `Ocean Hole ${this.landMasks.length + 1}` : `Landmass ${this.landMasks.length + 1}`,
-                operation: isSubtract ? "subtract" : "add",
-                points: [],
-            };
+            const newMask = this.#createLandMask(this.#selectedMaskOperation(), []);
             this.landMasks.push(newMask);
             this.activeLandMaskId = newMask.id;
         }
@@ -1600,6 +2015,99 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this._repaintVectors();
             this.render({ parts: ["context"] });
         }
+    }
+
+    /** The land mask operation the Add Land / Remove Land toggle currently selects. */
+    #selectedMaskOperation() {
+        return this.uiState.sceneMode === "subtractMask" ? "subtract" : "add";
+    }
+
+    /**
+     * Builds a new land mask with the default name for its operation ("Landmass n" or
+     * "Ocean Hole n", numbered by the masks already on the map). It is not added to the map.
+     *
+     * @param {"add"|"subtract"} operation
+     * @param {Array<{x: number, y: number}>} points
+     */
+    #createLandMask(operation, points) {
+        const number = this.landMasks.length + 1;
+        return {
+            id: foundry.utils.randomID(),
+            name: operation === "subtract" ? `Ocean Hole ${number}` : `Landmass ${number}`,
+            operation,
+            points,
+        };
+    }
+
+    /**
+     * Adds one random land mask of the type the Add Land / Remove Land toggle selects (see
+     * LandMaskGenerator). The new mask is added to the existing ones as a single undo step, so it
+     * can be undone, edited node by node, or built on like a hand-drawn mask.
+     *
+     * A mask being drawn is finished first (or discarded if it is not yet a shape), exactly as
+     * switching mode does, so the random mask never joins it. A Remove Land shape is only made
+     * over existing land, since a hole in open sea would change nothing; with no land on the map
+     * the user is told why nothing happened instead.
+     */
+    _onGenerateRandomLandMask(_event, _target) {
+        if (!this.#isMaskDrawingMode()) return;
+
+        const finishedMaskNeedsTerrain = this.activeLandMaskId ? this._finishActiveLandMask() : false;
+        const operation = this.#selectedMaskOperation();
+        const points = LandMaskGenerator.generatePolygon({
+            mapWidth: this.mapWidth,
+            mapHeight: this.mapHeight,
+            operation,
+            existingMasks: this.landMasks,
+        });
+
+        if (!points) {
+            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.RandomLandMaskNoLand"));
+            this.#refreshAfterLandMaskChange(finishedMaskNeedsTerrain);
+            return;
+        }
+
+        MapStateManager.pushVectorState(this);
+        this.landMasks.push(this.#createLandMask(operation, points));
+        this.#refreshAfterLandMaskChange(true);
+    }
+
+    /**
+     * Adds a random set of land masks covering the whole map (see RandomLandMap): landmasses as
+     * Add Land masks and the lakes and inland seas inside them as Remove Land masks. They are
+     * added after the existing masks as a single undo step, so they can be undone, edited node by
+     * node, or built on like hand-drawn masks. As the new masks come last, they decide the land
+     * wherever they cover it; existing land elsewhere stays.
+     *
+     * A mask being drawn is finished first (or discarded if it is not yet a shape), exactly as
+     * switching mode does.
+     */
+    _onGenerateRandomLandMap(_event, _target) {
+        if (!this.#isMaskDrawingMode()) return;
+        if (this.activeLandMaskId) this._finishActiveLandMask();
+
+        const masks = RandomLandMap.generate({ mapWidth: this.mapWidth, mapHeight: this.mapHeight });
+
+        MapStateManager.pushVectorState(this);
+        for (const { operation, points } of masks) {
+            this.landMasks.push(this.#createLandMask(operation, points));
+        }
+        this.#refreshAfterLandMaskChange(true);
+    }
+
+    /** Whether the Add Land or Remove Land toggle is selected (rather than the crop tool). */
+    #isMaskDrawingMode() {
+        return this.uiState.sceneMode === "addMask" || this.uiState.sceneMode === "subtractMask";
+    }
+
+    /** Redraws the land masks and their list, and regenerates the terrain when asked to. */
+    #refreshAfterLandMaskChange(needsTerrain) {
+        this._repaintVectors();
+        if (needsTerrain) {
+            this.requestTerrainUpdate();
+            this.markDirty();
+        }
+        this.render({ parts: ["context"] });
     }
 
     #handleFeatureClick(x, y) {
@@ -1633,21 +2141,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             activeEntity = this.activeFaultId ? this.tectonicFaults.find((f) => f.id === this.activeFaultId) : null;
             const oldBounds = SpatialMath.getVectorBounds(activeEntity);
             if (this.activeFaultId) {
-                const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
-                if (fault) fault.points.push(finalPos);
+                const existing = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
+                if (existing) existing.points.push(finalPos);
             } else {
                 this.activeFaultId = foundry.utils.randomID();
-                this.tectonicFaults.push({
+                const type = this.#resolveFaultType();
+                const fault = {
                     id: this.activeFaultId,
                     name: `Fault ${this.tectonicFaults.length + 1}`,
                     description: "",
                     points: [finalPos],
-                    type: this.uiState.faultType,
+                    type,
                     thickness: this.uiState.faultThickness,
                     strength: this.uiState.faultStrength,
-                    color: FILRODENSWMB.TECTONICS?.COLORS?.[this.uiState.faultType] || 0xffffff,
+                    color: TectonicFeatureEngine.colorOf(type),
                     visibility: "all",
-                });
+                };
+                MapStudioApp.#applyFeatureFields(fault, this.uiState);
+                this.tectonicFaults.push(fault);
             }
             activeEntity = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
             const newBounds = SpatialMath.getVectorBounds(activeEntity);
@@ -1679,6 +2190,165 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.markDirty();
     }
 
+    /** Every terrain layer, all on or all off. */
+    static #allTerrainLayers(isOn) {
+        const layers = {};
+        for (const group of Object.values(MapStudioApp.#TERRAIN_LAYER_GROUPS)) {
+            for (const key of Object.keys(group.layers)) layers[key] = isOn;
+        }
+        return layers;
+    }
+
+    /** The terrain images the painters fill, as the canvas's terrain shader takes them. */
+    #terrainBuffers() {
+        return { surface: this.bufferSurfaceBiomes, underwater: this.bufferUnderwaterBiomes, aux: this.bufferTerrainAux, rivers: this.bufferRivers };
+    }
+
+    /**
+     * Sends the terrain shader the settings that come from the app rather than from the painted
+     * images: which terrain layers are shown, the relief strength and the map's water settings.
+     * (Biome opacity is sent by #updateBiomeOpacity, since it also depends on the active tool.)
+     */
+    #syncTerrainSettings() {
+        this.canvasEngine?.setTerrainSettings(this.#terrainSettings());
+    }
+
+    /** The terrain shading settings that come from the app (see TerrainShading.defaultSettings). */
+    #terrainSettings() {
+        const water = FILRODENSWMB.DISPLAY.WATER;
+        const hue = Math.min(water.HUE_MAX, Math.max(water.HUE_MIN, this.uiState.waterHue ?? water.HUE));
+        return {
+            ...this.#terrainLayers,
+            reliefStrength: this.uiState.reliefShading ?? FILRODENSWMB.DISPLAY.RELIEF_SHADING,
+            seabedRelief: this.uiState.seabedRelief ?? water.SEABED_RELIEF,
+            clarity: this.uiState.waterClarity ?? water.CLARITY,
+            hueShift: hue - water.BASE_HUE,
+            saturation: this.uiState.waterSaturation ?? water.SATURATION,
+        };
+    }
+
+    /**
+     * Whether all, some or none of a group's layers are on.
+     * @returns {"on"|"partial"|"off"}
+     */
+    #layerGroupState(groupId) {
+        const keys = Object.keys(MapStudioApp.#TERRAIN_LAYER_GROUPS[groupId].layers);
+        const onCount = keys.filter((key) => this.#terrainLayers[key]).length;
+        if (onCount === keys.length) return "on";
+        return onCount === 0 ? "off" : "partial";
+    }
+
+    /** The map controls' terrain layer groups, for map.hbs. */
+    #layerGroupsContext() {
+        const ariaChecked = { on: "true", partial: "mixed", off: "false" };
+        return Object.entries(MapStudioApp.#TERRAIN_LAYER_GROUPS).map(([id, group]) => {
+            const state = this.#layerGroupState(id);
+            return {
+                id,
+                icon: group.icon,
+                tooltip: group.tooltip,
+                state,
+                allChecked: ariaChecked[state],
+                items: Object.entries(group.layers).map(([key, label]) => ({ key, label, checked: this.#terrainLayers[key] ? "true" : "false" })),
+            };
+        });
+    }
+
+    /**
+     * Brings the terrain layer buttons and lists in the map controls in line with
+     * #terrainLayers, in place, so an open list stays open while it is being ticked.
+     */
+    #refreshLayerGroupControls() {
+        if (!this.element) return;
+        for (const group of this.#layerGroupsContext()) {
+            const container = this.element.querySelector(`.fwmb-layer-group[data-layer-group="${group.id}"]`);
+            if (!container) continue;
+
+            const button = container.querySelector('[data-action="toggleLayerMenu"]');
+            button?.classList.toggle("active", group.state === "on");
+            button?.classList.toggle("partial", group.state === "partial");
+            container.querySelector('[data-terrain-layer="all"]')?.setAttribute("aria-checked", group.allChecked);
+            for (const item of group.items) {
+                container.querySelector(`[data-terrain-layer="${item.key}"]`)?.setAttribute("aria-checked", item.checked);
+            }
+        }
+    }
+
+    /**
+     * Shows or hides terrain layers and redraws.
+     * @param {object} changes - Layer key -> whether it is shown.
+     */
+    #setTerrainLayers(changes) {
+        this.#terrainLayers = { ...this.#terrainLayers, ...changes };
+        this.#syncTerrainSettings();
+        this.#refreshLayerGroupControls();
+    }
+
+    /** Opens or closes a terrain layer group's list (a click on the group's button). */
+    _onToggleLayerMenu(_event, target) {
+        const container = target.closest(".fwmb-layer-group");
+        if (!container) return;
+        if (this.#openLayerMenu === container) {
+            this.#closeLayerMenu();
+            return;
+        }
+
+        this.#closeLayerMenu();
+        container.querySelector(".fwmb-layer-menu")?.classList.remove("fwmb-hidden");
+        target.setAttribute("aria-expanded", "true");
+        container.closest(".fwmb-map-controls")?.classList.add("fwmb-menu-open");
+        this.#openLayerMenu = container;
+
+        const doc = this.element.ownerDocument;
+        doc.addEventListener("pointerdown", this.#onPointerDownOutsideMenu, true);
+        doc.addEventListener("keydown", this.#onMenuKeyDown, true);
+        container.querySelector('[role="menuitemcheckbox"]')?.focus();
+    }
+
+    /** Closes the open terrain layer list, if any. */
+    #closeLayerMenu() {
+        const container = this.#openLayerMenu;
+        if (!container) return;
+
+        container.querySelector(".fwmb-layer-menu")?.classList.add("fwmb-hidden");
+        container.querySelector('[data-action="toggleLayerMenu"]')?.setAttribute("aria-expanded", "false");
+        container.closest(".fwmb-map-controls")?.classList.remove("fwmb-menu-open");
+        this.#openLayerMenu = null;
+
+        const doc = container.ownerDocument;
+        doc.removeEventListener("pointerdown", this.#onPointerDownOutsideMenu, true);
+        doc.removeEventListener("keydown", this.#onMenuKeyDown, true);
+    }
+
+    /** A click anywhere outside the open list (its button included, which toggles it itself) closes it. */
+    #onPointerDownOutsideMenu = (event) => {
+        if (this.#openLayerMenu && !this.#openLayerMenu.contains(event.target)) this.#closeLayerMenu();
+    };
+
+    /** Escape closes the open list and returns focus to its button. */
+    #onMenuKeyDown = (event) => {
+        if (event.key !== "Escape" || !this.#openLayerMenu) return;
+        event.stopPropagation();
+        const button = this.#openLayerMenu.querySelector('[data-action="toggleLayerMenu"]');
+        this.#closeLayerMenu();
+        button?.focus();
+    };
+
+    /** Ticks or unticks a layer in a terrain layer list, or all of the group's layers ("all"). */
+    _onToggleTerrainLayer(_event, target) {
+        const layer = target.dataset.terrainLayer;
+        const group = MapStudioApp.#TERRAIN_LAYER_GROUPS[target.dataset.layerGroup];
+        if (!layer || !group) return;
+
+        if (layer === "all") {
+            // "All" turns every layer of the group on, unless they already are, in which case it turns them all off
+            const turnOn = this.#layerGroupState(target.dataset.layerGroup) !== "on";
+            this.#setTerrainLayers(Object.fromEntries(Object.keys(group.layers).map((key) => [key, turnOn])));
+            return;
+        }
+        this.#setTerrainLayers({ [layer]: !this.#terrainLayers[layer] });
+    }
+
     #updateBiomeOpacity() {
         if (!this.canvasEngine) return;
         const isActive = this.activeTool === "biomes";
@@ -1701,9 +2371,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      *   it moved, because land is shaded relative to it. The live brush leaves this off and
      *   repaints just the stamp area on every pointer move, where reading every elevation each
      *   time would be wasted work.
+     * @param {boolean} [options.vectors] - Whether to redraw the vector layers (pins, routes,
+     *   regions, labels) as well. The live brush leaves this off: painting changes none of
+     *   them, and redrawing them rebuilds every label's text and every pin's icon, which on every
+     *   pointer move creates canvases and GPU textures far faster than the browser frees them.
      */
-    async _repaintCanvas(requestedBounds = null, { verifyPeak = false } = {}) {
-        if (!this.currentElevationData) return;
+    async _repaintCanvas(requestedBounds = null, { verifyPeak = false, vectors = true } = {}) {
+        if (!this.currentElevationData || !this.#isOpen) return;
 
         // Each stage is timed for the full-render summary (see RenderTimer)
         const timer = this.renderTimer;
@@ -1719,65 +2393,29 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
         mark = timer.lap("Canvas repaint: peak scan", mark, `asked to repaint ${this.#describeRepaintArea(requestedBounds)}`);
 
-        const seaLevel = this.uiState["seaLevel"];
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
-        const waterMask = this.bufferWaterMask;
 
         // Only the pixels the painters write are copied to the canvas textures and uploaded to the GPU
         const uploadBounds = ProceduralEngine.getRepaintBounds(bounds, this.mapWidth, this.mapHeight);
         mark = timer.lap("Canvas repaint: settings", mark, `repainting ${this.#describeRepaintArea(bounds)}`);
 
-        engine.createBaseMap(this.currentElevationData, this.mapWidth, this.mapHeight, seaLevel, this.bufferBase, bounds);
-        mark = timer.lap("Canvas repaint: base painter", mark);
-        this.canvasEngine.renderPixelBuffer("base", this.bufferBase, this.mapWidth, this.mapHeight, uploadBounds);
+        // The terrain's packed relief, depth and height are shaded relative to the cached peak and
+        // trough. A whole-map repaint may be shared between workers and finish later (see
+        // LayerPainting), so everything it paints into is taken now.
+        const target = this.#paintingTarget(currentSeed, params);
+        const painting = await this.#layerPainting.paint(target, bounds);
+        mark = this.#recordPainting(timer, mark, painting);
 
-        const baseBtn = this.element.querySelector('[data-layer="base"]');
-        this.canvasEngine.toggleLayer("base", baseBtn ? baseBtn.classList.contains("active") : true);
-        mark = timer.lap("Canvas repaint: canvas textures", mark);
+        if (!this.#isOpen) return;
 
-        // Pass the cached peak and trough into the coloriser
-        const maxPeak = this.cachedMaxElevation || 1.0;
-        const minTrough = this.cachedMinElevation || 0;
-        engine.colorize(this.currentElevationData, this.currentTemperatureData, this.mapWidth, this.mapHeight, seaLevel, waterMask, params, this.bufferTopography, bounds, maxPeak, minTrough);
-        mark = timer.lap("Canvas repaint: topography painter", mark);
-        this.canvasEngine.renderPixelBuffer("topography", this.bufferTopography, this.mapWidth, this.mapHeight, uploadBounds);
-
-        const topoBtn = this.element.querySelector('[data-layer="topography"]');
-        this.canvasEngine.toggleLayer("topography", topoBtn ? topoBtn.classList.contains("active") : true);
-        mark = timer.lap("Canvas repaint: canvas textures", mark);
-
-        if (this.currentMoistureData && this.currentTemperatureData) {
-            engine.createBiomesMap(
-                this.currentElevationData,
-                this.currentMoistureData,
-                this.currentTemperatureData,
-                this.currentBiomeOverrides,
-                this.mapWidth,
-                this.mapHeight,
-                seaLevel,
-                waterMask,
-                params,
-                this.bufferBiomes,
-                bounds,
-                this.bufferBiomeFallback,
-            );
-            mark = timer.lap("Canvas repaint: biomes painter", mark);
-            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight, uploadBounds);
-            // Kept current every repaint, but its layer stays hidden until the "Preview Rule
-            // Coverage" button is hovered (see #bindToolbarListeners) - no visibility toggle here.
-            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight, uploadBounds);
-
-            const biomesBtn = this.element.querySelector('[data-layer="biomes"]');
-            this.canvasEngine.toggleLayer("biomes", biomesBtn ? biomesBtn.classList.contains("active") : true);
+        // Nothing is uploaded if a newer whole-map repaint took over while this one ran (it uploads
+        // its own layers) or the map's buffers were replaced meanwhile (by loading another map)
+        if (painting.current && target.outputs.terrainAux === this.bufferTerrainAux) {
+            this.#uploadLayers(uploadBounds, target, timer, mark);
+            mark = performance.now();
         }
-        mark = timer.lap("Canvas repaint: canvas textures", mark);
 
-        const contourInterval = this.uiState["contourInterval"];
-        engine.createContourMap(this.currentElevationData, this.mapWidth, this.mapHeight, contourInterval, seaLevel, this.bufferContours, bounds);
-        mark = timer.lap("Canvas repaint: contours painter", mark);
-        this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight, uploadBounds);
-        mark = timer.lap("Canvas repaint: canvas textures", mark);
+        if (!vectors) return;
 
         if (this.canvasEngine) {
             this.canvasEngine.clearInteractiveTargets();
@@ -1785,6 +2423,76 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this._repaintVectors();
         timer.lap("Canvas repaint: vector layers", mark);
+    }
+
+    /**
+     * Everything a repaint of the pixel layers paints from and into (see LayerPainting): the
+     * map's inputs and layer buffers as they are now, and the settings the painters read.
+     */
+    #paintingTarget(seed, params) {
+        const hasClimate = Boolean(this.currentMoistureData && this.currentTemperatureData);
+        return {
+            engine: new ProceduralEngine(seed),
+            seed,
+            width: this.mapWidth,
+            height: this.mapHeight,
+            settings: {
+                params,
+                seaLevel: this.uiState["seaLevel"],
+                contourInterval: this.uiState["contourInterval"],
+                maxPeak: this.cachedMaxElevation || 1.0,
+                minTrough: this.cachedMinElevation || 0,
+            },
+            inputs: {
+                elevation: this.currentElevationData,
+                waterMask: this.bufferWaterMask,
+                moisture: hasClimate ? this.currentMoistureData : null,
+                temperature: hasClimate ? this.currentTemperatureData : null,
+                overrides: this.currentBiomeOverrides,
+            },
+            outputs: {
+                terrainAux: this.bufferTerrainAux,
+                surfaceBiomes: this.bufferSurfaceBiomes,
+                biomeFallback: this.bufferBiomeFallback,
+                underwaterBiomes: this.bufferUnderwaterBiomes,
+                contours: this.bufferContours,
+            },
+        };
+    }
+
+    /**
+     * Records how long the painters took in the timing summary: each painter for a repaint on the
+     * main thread, or the three together for one shared between workers.
+     *
+     * @returns {number} The time to measure the next stage from.
+     */
+    #recordPainting(timer, mark, painting) {
+        if (painting.shared) return timer.lap("Canvas repaint: painters (shared)", mark);
+
+        timer.record("Canvas repaint: terrain painter", painting.timings.terrain);
+        timer.record("Canvas repaint: biomes painter", painting.timings.biomes);
+        timer.record("Canvas repaint: contours painter", painting.timings.contours);
+        return performance.now();
+    }
+
+    /**
+     * Copies the painted layers to the canvas and uploads them to the GPU (only `uploadBounds`,
+     * or everything when it is null). The rule-coverage preview is kept current every repaint,
+     * but its layer stays hidden until the "Preview Rule Coverage" button is hovered (see
+     * #bindToolbarListeners), so no visibility changes here.
+     */
+    #uploadLayers(uploadBounds, target, timer, mark) {
+        let since = mark;
+        if (target.inputs.moisture) {
+            this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight, uploadBounds);
+        }
+
+        this.#syncTerrainSettings();
+        this.canvasEngine.renderTerrain(this.#terrainBuffers(), this.mapWidth, this.mapHeight, uploadBounds);
+        since = timer.lap("Canvas repaint: canvas textures", since);
+
+        this.canvasEngine.renderPixelBuffer("contours", this.bufferContours, this.mapWidth, this.mapHeight, uploadBounds);
+        timer.lap("Canvas repaint: canvas textures", since);
     }
 
     /**
@@ -1802,18 +2510,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     _repaintVectors() {
-        if (!this.canvasEngine) return;
+        if (!this.canvasEngine || !this.#isOpen) return;
 
         this.canvasEngine.clearInteractiveTargets();
         const isEditModeActive = this.canvasEngine.isEditMode;
 
-        // 1. Render Rivers, Springs & Faults
+        // 1. Render Springs, Faults and custom river guides
         const showPins = this.activeTool === "features" && isEditModeActive;
-        this.canvasEngine.renderFeaturePins(this.mapPins, showPins);
-
-        if (this.currentRiverData?.vectors) {
-            this.canvasEngine.renderProceduralRivers(this.currentRiverData.vectors, this.bufferWaterMask);
-        }
+        this.canvasEngine.renderFeaturePins(this.mapPins, showPins, this.proceduralSprings);
 
         if (this.canvasEngine.renderFaultLines) {
             const isFaultEdit = this.activeTool === "features" && isEditModeActive;
@@ -1857,9 +2561,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.currentElevationData) return;
 
         const seaLevel = this.uiState["seaLevel"];
-        const strokeBounds = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel);
+        const strokeBounds = this.brushEngine.applyBrush(x, y, this.currentElevationData, this.currentBiomeOverrides, this.currentSpringOverrides, seaLevel, this.currentRoughness);
 
-        if (!strokeBounds) return;
+        // A pointer move shorter than the brush's step spacing stamps nothing yet (the brush
+        // waits until it has travelled a full step) and reports that as empty bounds. Nothing
+        // changed, so nothing is repainted: the painters read empty bounds as the whole map, so
+        // on a large map every short pointer move used to repaint all of it.
+        if (!SpatialMath.isValidBounds(strokeBounds)) return;
 
         // Biome overrides do not alter topography or climate math, so a biome stroke only has to
         // repaint the biome layer where it painted. It must not touch pendingTerrainBounds: that
@@ -1878,20 +2586,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 seaLevel,
                 this.bufferWaterMask,
                 params,
-                this.bufferBiomes,
+                this.bufferSurfaceBiomes,
                 strokeBounds,
                 this.bufferBiomeFallback,
+                this.bufferUnderwaterBiomes,
             );
 
             const uploadBounds = ProceduralEngine.getRepaintBounds(strokeBounds, this.mapWidth, this.mapHeight);
-            this.canvasEngine.renderPixelBuffer("biomes", this.bufferBiomes, this.mapWidth, this.mapHeight, uploadBounds);
+            this.canvasEngine.renderTerrain(this.#terrainBuffers(), this.mapWidth, this.mapHeight, uploadBounds);
             this.canvasEngine.renderPixelBuffer("biomeFallback", this.bufferBiomeFallback, this.mapWidth, this.mapHeight, uploadBounds);
             return;
         }
 
         // Accumulate the bounds for the deferred procedural generation
         this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, strokeBounds);
-        this._repaintCanvas(strokeBounds);
+        this._repaintCanvas(strokeBounds, { vectors: false });
         if (this.activeTool === "terrain" && this.#hasVectorTerrainFeatures()) {
             this.debouncedHistoryRebuild();
         } else {
@@ -1926,7 +2635,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const staleArea = SpatialMath.mergeBounds(rebuiltArea, this.pendingTerrainBounds);
                 this.pendingTerrainBounds = null;
 
-                if (SpatialMath.isValidBounds(staleArea)) await this.generateClimate(staleArea);
+                if (SpatialMath.isValidBounds(staleArea)) await this.#generateClimateNow(staleArea);
                 else await this.#refreshRivers();
             } finally {
                 this.#endProcessing();
@@ -1958,7 +2667,40 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
     }
 
-    async generateTerrain() {
+    /**
+     * Regenerates the map from its settings, or refreshes only what changed when nothing the base
+     * terrain depends on has changed, after any refresh already running (see RefreshQueue).
+     *
+     * @returns {Promise<void>} Settles once the generation has run.
+     */
+    generateTerrain() {
+        return this.#refreshes.request(REFRESH.TERRAIN);
+    }
+
+    /**
+     * Recomputes the climate over an area (or, with none, over the area painted since the last
+     * refresh, or else the whole map), then the rivers and the canvas, after any refresh already
+     * running (see RefreshQueue).
+     *
+     * @param {object|null} [bounds] - The area to refresh.
+     * @returns {Promise<void>}
+     */
+    generateClimate(bounds = null) {
+        return this.#refreshes.request(REFRESH.CLIMATE, { bounds });
+    }
+
+    /**
+     * Retraces the rivers and repaints the canvas over an area (or, with none, the whole map),
+     * after any refresh already running (see RefreshQueue).
+     *
+     * @param {object|null} [bounds] - The area to refresh.
+     * @returns {Promise<void>}
+     */
+    generateFeatures(bounds = null) {
+        return this.#refreshes.request(REFRESH.FEATURES, { bounds });
+    }
+
+    async #generateTerrainNow() {
         // Any full generation, whichever path triggered it, satisfies changes deferred by the
         // pause toggle. Clearing before the generation reads state means an edit made while it
         // runs re-flags itself instead of being lost.
@@ -1985,10 +2727,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             try {
                 // Hand off the mathematical heavy lifting to the Orchestrator
-                ProceduralOrchestrator.processTopographyPhase(this);
+                await ProceduralOrchestrator.processTopographyPhase(this);
 
                 // The App maintains control of the Climate and Canvas rendering pipelines
-                await this.generateClimate(null);
+                await this.#generateClimateNow(null);
 
                 ProceduralOrchestrator.rememberGenerationInputs(this, inputs);
             } finally {
@@ -1997,7 +2739,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
     }
 
-    async generateClimate(bounds = null) {
+    async #generateClimateNow(bounds = null) {
         if (!this.currentElevationData) return;
 
         // Resolve active bounds before clearing pending state
@@ -2013,15 +2755,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             try {
                 // The climate is recomputed over a wider area than the one that changed, and the
                 // canvas has to be repainted over all of it
-                const climateBounds = ProceduralOrchestrator.processClimatePhase(this, activeBounds);
-                await this.generateFeatures(climateBounds);
+                const climateBounds = await ProceduralOrchestrator.processClimatePhase(this, activeBounds);
+                await this.#generateFeaturesNow(climateBounds);
             } finally {
                 this.#endProcessing();
             }
         });
     }
 
-    async generateFeatures(requestedBounds = null) {
+    async #generateFeaturesNow(requestedBounds = null) {
         if (!this.currentElevationData) return;
 
         const bounds = this.#resolveRefreshBounds(requestedBounds);
@@ -2084,18 +2826,32 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState.generationEngine = payload.generationEngine || "standard";
 
+        // The terrain rules this map was built with, so it regenerates exactly as it was saved.
+        // A map saved before the revision number existed has none, and reads as the legacy
+        // revision (see TerrainVersion). Only regional maps carry a world description.
+        this.uiState.terrainVersion = TerrainVersion.getVersion(payload);
+        this.uiState.world = payload.world ?? null;
+        this.upwindMargin = payload.upwindMargin ?? null;
+        this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
+        this.terrainUpgrade = null;
+
         this.mapWidth = payload.mapWidth;
         this.mapHeight = payload.mapHeight;
 
         this.uiState.mapWidth = this.mapWidth;
         this.uiState.mapHeight = this.mapHeight;
         this.uiState.gridType = payload.gridType || "square";
-        this.uiState.gridSize = payload.gridSize || 100;
+        // Raised to the smallest grid Foundry allows: a map saved with a smaller grid (the slider
+        // used to go down to 10) would otherwise export a scene whose grid Foundry enlarges, while
+        // its grid data describes the smaller cells
+        this.uiState.gridSize = MapStateManager.gridSizeOf(payload.gridSize || 100);
         this.uiState.gridVisible = payload.gridVisible ?? false;
 
         MapStateManager.allocateBuffers(this);
+        // Every terrain layer is on when a map opens (see #terrainLayers)
+        this.#setTerrainLayers(MapStudioApp.#allTerrainLayers(true));
 
-        this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        this.brushEngine = this.#createBrushEngine();
 
         const p = payload.params;
         const c = p.cartography || {};
@@ -2105,7 +2861,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.coastlineFracture = p.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
         this.uiState.continentalGrouping = p.continentalGrouping ?? FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING;
         this.uiState.shelfRange = p.shelfRange ?? FILRODENSWMB.GENERATION.SHELF_RANGE;
+        this.uiState.coastalPlain = p.coastalPlain ?? FILRODENSWMB.GENERATION.COASTAL_PLAIN;
+        this.uiState.flatTexture = p.flatTexture === true;
         this.uiState.continentScale = p.continentScale ?? FILRODENSWMB.GENERATION.CONTINENT_SCALE;
+        // Maps saved before Ocean Scale existed used Continent Scale for the sea too, so an
+        // updated map starts with the same value on both sides.
+        this.uiState.oceanScale = p.oceanScale ?? this.uiState.continentScale;
+        this.uiState.oceanRidges = p.oceanRidges ?? FILRODENSWMB.GENERATION.OCEAN_RIDGES;
         this.uiState.globalTemp = p.globalTemp;
         this.uiState.seasonOffset = p.seasonOffset;
         this.uiState.latTop = p.latTop;
@@ -2119,6 +2881,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState["noise.moistureOffset"] = p.noise.moistureOffset ?? FILRODENSWMB.NOISE.OFFSET_MOISTURE;
         this.uiState["noise.tempOffset"] = p.noise.tempOffset ?? FILRODENSWMB.NOISE.OFFSET_TEMP;
         this.uiState.windDistance = p.climate?.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE;
+
+        // Read after the wind distance, which is what identifies a legacy regional map
+        this.legacyRootSize = TerrainVersion.isLegacyRegional(this.uiState) ? await TerrainUpgrade.resolveLegacyRootSize(payload) : null;
+
         this.uiState["noise.elevation.scale"] = 1 / p.noise.elevation.scale;
         this.uiState["noise.elevation.octaves"] = p.noise.elevation.octaves;
         this.uiState["noise.elevation.stretch"] = p.noise.elevation.stretch;
@@ -2142,11 +2908,19 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
         this.uiState.springMoistMin = p.hydrology?.springMoistMin ?? FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN;
         this.uiState.meanderJitter = p.hydrology?.meanderJitter ?? FILRODENSWMB.HYDROLOGY.MEANDER_JITTER;
+        this.uiState.riverMeander = p.hydrology?.riverMeander ?? MapStateManager.riverMeanderFromJitter(this.uiState.meanderJitter);
+        this.uiState.riverWidthScale = p.hydrology?.riverWidthScale ?? FILRODENSWMB.HYDROLOGY.CHANNELS.WIDTH;
         this.uiState.altCooling = p.climate?.altCooling ?? FILRODENSWMB.CLIMATE.ALTITUDE_COOLING;
         this.uiState.freezingThreshold = p.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
         this.uiState.contourInterval = p.display?.contourInterval ?? 0.1;
+        this.uiState.reliefShading = p.display?.reliefShading ?? FILRODENSWMB.DISPLAY.RELIEF_SHADING;
+        this.uiState.seabedRelief = p.display?.seabedRelief ?? FILRODENSWMB.DISPLAY.WATER.SEABED_RELIEF;
+        this.uiState.waterClarity = p.display?.waterClarity ?? FILRODENSWMB.DISPLAY.WATER.CLARITY;
+        this.uiState.waterHue = p.display?.waterHue ?? FILRODENSWMB.DISPLAY.WATER.HUE;
+        this.uiState.waterSaturation = p.display?.waterSaturation ?? FILRODENSWMB.DISPLAY.WATER.SATURATION;
         this.uiState.biomeAlphaActive = p.display?.biomeAlphaActive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE;
         this.uiState.biomeAlphaInactive = p.display?.biomeAlphaInactive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
+        this.uiState.regionOpacity = p.display?.regionOpacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY;
         this.uiState.cartographyScaleEnable = c.scaleEnable ?? this.defaultUiState.cartographyScaleEnable;
         this.uiState.cartographyScaleUnits = c.scaleUnits ?? this.defaultUiState.cartographyScaleUnits;
         this.uiState.cartographyScaleInterval = c.scaleInterval ?? this.defaultUiState.cartographyScaleInterval;
@@ -2209,6 +2983,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.customBiomeColors = p.customColors || {};
 
         this.tectonicFaults = payload.tectonicFaults || [];
+        this.tectonicFeatureCache = {};
 
         this.manualRivers = payload.manualRivers || [];
         if (payload.manualRivers) {
@@ -2240,6 +3015,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.landMasks = payload.landMasks || [];
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
+
+        // Label widths saved in pixels (before widths were measured in characters) become
+        // characters, rounded up so no label wraps earlier than before (see LabelWidth). The map
+        // is not marked as changed: until it is saved, the same conversion runs on every load.
+        LabelWidth.migrateMap(
+            { mapLabels: this.mapLabels, mapPins: this.mapPins, mapRoutes: this.mapRoutes, regionLayers: this.regionLayers, customLabelStyles: this.uiState.customLabelStyles },
+            LabelWidth.rootFontSize(),
+        );
 
         // brushEngine.history is loaded in full, uncapped: it's the permanent replay log this
         // map's terrain/biomes get rebuilt from (see generateTerrain() below and
@@ -2284,7 +3067,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 icon: this.uiState.activeIcon,
                 x: finalPos.x,
                 y: finalPos.y,
-                scale: this.uiState.pinScale ?? FILRODENSWMB.PINS?.DEFAULT_SCALE ?? 1,
+                scale: this.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
                 visibility: "all",
                 color: this.uiState.pinColor || "#ffffff",
                 label: {
@@ -2335,7 +3118,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             fontFamily: this.uiState.labelFontFamily,
             fontSize: this.uiState.labelFontSize,
             fillColor: this.uiState.labelFillColor,
-            maxWidth: this.uiState.labelMaxWidth,
+            maxChars: this.uiState.labelMaxChars,
             justify: this.uiState.labelJustify,
             visibility: "all",
         });
@@ -2429,27 +3212,66 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Context-aware Quick Save.
-     * Creates a new journal if none exists, otherwise overwrites the current ID.
+     * Saves the map to the compendium.
+     *
+     * A plain save overwrites the saved map that is open, or asks for a name and creates a new
+     * saved map when the open map has never been saved. "Save as" always asks for a name and
+     * creates a new saved map, which then becomes the one that is open: the map it was loaded
+     * from is left exactly as it was last saved, and later plain saves go to the new copy.
+     *
+     * Only one save runs at a time; asking again while one is under way does nothing and reports
+     * no save. The save under way is kept so that closing the window can wait for it.
+     *
+     * @param {object} [options]
+     * @param {boolean} [options.asNew=false] - Save as a new saved map ("Save as").
+     * @param {string|null} [options.promptTitle=null] - Title for the name prompt, when there is
+     *   one, in place of "Save As..." (so a save asked for as one step of something else says so).
+     * @returns {Promise<boolean>} True if the map was saved.
      */
-    async saveCurrentMap() {
-        if (this.isSaving) return false;
-        this.isSaving = true;
+    async saveCurrentMap({ asNew = false, promptTitle = null } = {}) {
+        if (this.#activeSave) return false;
 
+        this.#activeSave = this.#performSave(asNew, promptTitle);
+        try {
+            return await this.#activeSave;
+        } finally {
+            this.#activeSave = null;
+        }
+    }
+
+    /**
+     * The name offered when a map is saved under a new name: the open map's name marked as a
+     * copy (so accepting it cannot be confused with the original in the saved maps list), or a
+     * name made from the seed for a map that has never been saved.
+     */
+    #defaultSaveName() {
+        if (this.currentSaveName) return game.i18n.format("FILRODENSWMB.UI.SaveAsCopyName", { name: this.currentSaveName });
+
+        const { currentSeed } = MapStateManager.getMapParameters(this);
+        const hash = currentSeed || this.#generateRandomSeed();
+        return `Terrain Map (${hash})`;
+    }
+
+    /**
+     * Saves the map (see saveCurrentMap).
+     *
+     * @param {boolean} asNew - Create a new saved map rather than overwrite the open one.
+     * @param {string|null} [promptTitle] - Title for the name prompt, or null for "Save As...".
+     */
+    async #performSave(asNew, promptTitle = null) {
         let mapName = this.currentSaveName;
+        const createsNewMap = asNew || !this.currentSaveId;
+
+        // 1. Ask for the name BEFORE locking the UI. This sits outside the try block below: its
+        // finally releases the processing overlay, and a cancelled prompt has not claimed it, so
+        // releasing it here would hide the overlay of a refresh that is still running.
+        if (createsNewMap) {
+            mapName = (await MapDialogManager._promptTextValue(promptTitle ?? game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), this.#defaultSaveName()))?.trim();
+
+            if (!mapName) return false; // User cancelled the save prompt (or left the name blank)
+        }
 
         try {
-            // 1. Prompt the user BEFORE locking the UI
-            if (!this.currentSaveId) {
-                const { currentSeed } = MapStateManager.getMapParameters(this);
-                const hash = currentSeed || this.#generateRandomSeed();
-                const defaultName = `Terrain Map (${hash})`;
-
-                mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), defaultName);
-
-                if (!mapName) return false; // User cancelled the save prompt
-            }
-
             // 2. Lock the UI and show the spinner
             await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.SavingMap"));
             this.currentSaveName = mapName;
@@ -2458,6 +3280,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const payload = {
                 seed: currentSeed,
                 generationEngine: this.uiState.generationEngine,
+                terrainVersion: this.uiState.terrainVersion,
+                world: this.uiState.world,
+                upwindMargin: this.upwindMargin ?? null,
+                terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
                 springsBaked: this.uiState.springsBaked,
                 mapWidth: this.mapWidth,
                 mapHeight: this.mapHeight,
@@ -2482,20 +3308,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 parentId: this.currentParentId,
             };
 
-            const journal = await saveMapData(this.currentSaveName, payload, this.currentSaveId);
+            const journal = await saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId);
 
             if (journal) {
                 this.currentSaveId = journal.id;
                 this.isDirty = false; // Successfully saved, map is no longer dirty
                 ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
-                this.render({ parts: ["toolbar"] });
+                // A new saved map also belongs in the saved maps list, if it is showing
+                this.render({ parts: createsNewMap && this.activeTool === "manage" ? ["toolbar", "context"] : ["toolbar"] });
                 return true;
             } else {
                 ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
                 return false;
             }
         } finally {
-            this.isSaving = false;
             this.#endProcessing();
         }
     }
@@ -2507,16 +3333,30 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async #startProcessing(message) {
         this.processingTasks = (this.processingTasks || 0) + 1;
 
-        const overlay = this.element.querySelector(".fwmb-processing-overlay");
+        // A task already under way (a save, say) can reach here after the window has closed,
+        // when there is no overlay left to show
+        const overlay = this.element?.querySelector(".fwmb-processing-overlay");
         if (overlay) {
             const textEl = overlay.querySelector(".fwmb-processing-text");
             if (textEl) textEl.textContent = message;
             overlay.classList.remove("fwmb-hidden");
         }
 
-        // Force browser to paint the DOM before locking the main thread
-        const activeWindow = this.element.ownerDocument.defaultView || window;
-        await new Promise((resolve) => activeWindow.requestAnimationFrame(() => activeWindow.setTimeout(resolve, 0)));
+        // Give the browser the chance to paint the overlay before the main thread is locked: the
+        // frame after next is when it has been painted. The wait is capped (see
+        // OVERLAY_PAINT_WAIT_MAX_MS), since without frames it would never end.
+        const activeWindow = this.element?.ownerDocument.defaultView || window;
+        await new Promise((resolve) => {
+            let settled = false;
+            const finish = (painted) => {
+                if (settled) return;
+                settled = true;
+                if (!painted) console.warn(`FWMB | The window did not repaint within ${OVERLAY_PAINT_WAIT_MAX_MS}ms, so "${message}" is going ahead without waiting for it.`);
+                resolve();
+            };
+            activeWindow.requestAnimationFrame(() => activeWindow.setTimeout(() => finish(true), 0));
+            activeWindow.setTimeout(() => finish(false), OVERLAY_PAINT_WAIT_MAX_MS);
+        });
     }
 
     /**
@@ -2526,7 +3366,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.processingTasks = Math.max(0, (this.processingTasks || 0) - 1);
         if (this.processingTasks > 0) return;
 
-        const overlay = this.element.querySelector(".fwmb-processing-overlay");
+        const overlay = this.element?.querySelector(".fwmb-processing-overlay");
         if (overlay) overlay.classList.add("fwmb-hidden");
     }
 
@@ -2581,7 +3421,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Identifies the spatial bounds of the next Undo or Redo action.
+     * Outlines on the canvas the area the next Undo or Redo would change, labelled with what it
+     * would undo or redo.
      */
     #previewActionBounds(direction) {
         if (!this.canvasEngine) return;
@@ -2589,122 +3430,132 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const ledger = direction === "undo" ? this.globalHistoryLedger : this.globalRedoLedger;
         const actionType = ledger.at(-1);
 
-        if (!actionType) return;
+        let preview = null;
+        if (actionType === "raster") preview = this.#rasterActionPreview(direction);
+        else if (actionType === "vector") preview = this.#vectorActionPreview(direction);
+        if (!preview?.bounds) return;
 
-        let targetBounds = null;
-        let actionLabel = "";
+        const prefixKey = direction === "undo" ? "FILRODENSWMB.UI.ActionUndo" : "FILRODENSWMB.UI.ActionRedo";
+        const prefix = game.i18n.localize(prefixKey);
+        this.canvasEngine.showActionPreview(preview.bounds, `${prefix} ${preview.label}`);
+    }
 
-        if (actionType === "raster") {
-            const stack = direction === "undo" ? this.brushEngine.history : this.brushEngine.redoStack;
-            const targetStroke = stack.at(-1);
+    /**
+     * The area and label of the brush stroke the next Undo or Redo would step through.
+     *
+     * @returns {{bounds: object, label: string}|null} Null when there is no stroke to step through.
+     */
+    #rasterActionPreview(direction) {
+        const stack = direction === "undo" ? this.brushEngine.history : this.brushEngine.redoStack;
+        const targetStroke = stack.at(-1);
+        if (!targetStroke?.points?.length) return null;
 
-            if (targetStroke?.points && targetStroke.points.length > 0) {
-                targetBounds = this.#calculatePointBounds(targetStroke.points, targetStroke.size || 20);
+        // Map the raster layer to its localisation key
+        const isBiome = targetStroke.layer === "biome";
+        const locKey = isBiome ? "FILRODENSWMB.UI.ActionBiomeBrush" : "FILRODENSWMB.UI.ActionTerrainBrush";
+        const fallback = isBiome ? "Biome Brush" : "Terrain Brush";
 
-                // Map the raster layer to its localisation key
-                const isBiome = targetStroke.layer === "biome";
-                const locKey = isBiome ? "FILRODENSWMB.UI.ActionBiomeBrush" : "FILRODENSWMB.UI.ActionTerrainBrush";
-                const fallback = isBiome ? "Biome Brush" : "Terrain Brush";
+        return {
+            bounds: this.#calculatePointBounds(targetStroke.points, targetStroke.size || DEFAULT_STROKE_PREVIEW_SIZE),
+            label: game.i18n.localize(locKey) || fallback,
+        };
+    }
 
-                actionLabel = game.i18n.localize(locKey) || fallback;
-            }
-        } else if (actionType === "vector") {
-            const stack = direction === "undo" ? this.pinHistory : this.pinRedoStack;
-            const targetSnapshot = stack.at(-1);
+    /**
+     * The area and label of the vector edit the next Undo or Redo would restore, found by
+     * comparing the map's current vector state with the snapshot it would restore.
+     *
+     * @returns {{bounds: object|null, label: string}|null} Null when there is no snapshot to restore or nothing differs.
+     */
+    #vectorActionPreview(direction) {
+        const stack = direction === "undo" ? this.pinHistory : this.pinRedoStack;
+        const targetSnapshot = stack.at(-1);
+        if (!targetSnapshot) return null;
 
-            if (targetSnapshot) {
-                const currentState = MapStateManager.getVectorStateSnapshot(this);
-                const diffResult = this.#diffVectorSnapshots(currentState, targetSnapshot);
-
-                if (diffResult) {
-                    targetBounds = diffResult.bounds;
-                    actionLabel = diffResult.label;
-                }
-            }
-        }
-
-        if (targetBounds) {
-            const prefixKey = direction === "undo" ? "FILRODENSWMB.UI.ActionUndo" : "FILRODENSWMB.UI.ActionRedo";
-            const prefix = game.i18n.localize(prefixKey);
-
-            this.canvasEngine.showActionPreview(targetBounds, `${prefix} ${actionLabel}`);
-        }
+        return this.#diffVectorSnapshots(MapStateManager.getVectorStateSnapshot(this), targetSnapshot);
     }
 
     /**
      * Compares two global state snapshots to find the specific entity that changed.
+     *
+     * @returns {{bounds: object|null, label: string}|null} The changed entity's padded bounds and its label, or null when nothing differs.
      */
     #diffVectorSnapshots(current, target) {
-        let changedEntity = null;
-        let entityKey = null;
+        const change = MapStudioApp.#firstChangedEntity(current, target);
+        if (!change) return null;
 
+        return {
+            bounds: this.#calculatePointBounds(MapStudioApp.#entityPoints(change.entity), VECTOR_PREVIEW_PADDING),
+            label: this.#getActionLabel(change.key, change.entity),
+        };
+    }
+
+    /**
+     * Finds the first entity that differs between two vector state snapshots. The snapshots'
+     * lists (pins, rivers, region layers and so on) are compared in order, and the first list
+     * holding a difference decides the result.
+     *
+     * @returns {{key: string, entity: object}|null} The list the change is in and the changed entity, or null when nothing differs.
+     */
+    static #firstChangedEntity(current, target) {
         for (const key of Object.keys(current)) {
             if (!Array.isArray(current[key]) || !Array.isArray(target[key])) continue;
 
-            const currentMap = new Map(current[key].map((item, idx) => [item.id || `idx_${idx}`, item]));
-            const targetMap = new Map(target[key].map((item, idx) => [item.id || `idx_${idx}`, item]));
-
-            for (const [id, targetItem] of targetMap.entries()) {
-                const currentItem = currentMap.get(id);
-
-                if (!currentItem || JSON.stringify(currentItem) !== JSON.stringify(targetItem)) {
-                    changedEntity = currentItem || targetItem;
-                    entityKey = key;
-
-                    if (changedEntity.regions && Array.isArray(changedEntity.regions)) {
-                        const cRegs = new Map((currentItem?.regions || []).map((r, i) => [r.id || `idx_${i}`, r]));
-                        const tRegs = new Map((targetItem?.regions || []).map((r, i) => [r.id || `idx_${i}`, r]));
-                        let changedReg = null;
-
-                        for (const [rId, tReg] of tRegs.entries()) {
-                            const cReg = cRegs.get(rId);
-                            if (!cReg || JSON.stringify(cReg) !== JSON.stringify(tReg)) {
-                                changedReg = cReg || tReg;
-                                break;
-                            }
-                        }
-                        if (!changedReg) {
-                            for (const [rId, cReg] of cRegs.entries()) {
-                                if (!tRegs.has(rId)) {
-                                    changedReg = cReg;
-                                    break;
-                                }
-                            }
-                        }
-                        if (changedReg) changedEntity = changedReg;
-                    }
-                    break;
-                }
-            }
-
-            if (!changedEntity) {
-                for (const [id, currentItem] of currentMap.entries()) {
-                    if (!targetMap.has(id)) {
-                        changedEntity = currentItem;
-                        entityKey = key;
-                        break;
-                    }
-                }
-            }
-
-            if (changedEntity) break;
+            const change = MapStudioApp.#firstChangedItem(current[key], target[key]);
+            if (change) return { key, entity: MapStudioApp.#narrowToRegion(change) };
         }
+        return null;
+    }
 
-        if (!changedEntity) return null;
+    /**
+     * Finds the first item that differs between two versions of a list. Items are matched by id
+     * (or, lacking one, by position). An item in `target` that is missing from `current` or
+     * differs from it is found first, and the current version is reported where both exist, since
+     * that is what is on the canvas now. Failing that, an item in `current` that `target` no longer
+     * has is reported.
+     *
+     * @returns {{item: object, currentItem: object|undefined, targetItem: object|undefined}|null}
+     *   The item to report and both versions of it (either may be missing), or null when the lists match.
+     */
+    static #firstChangedItem(currentItems, targetItems) {
+        const currentById = MapStudioApp.#itemsById(currentItems);
+        const targetById = MapStudioApp.#itemsById(targetItems);
 
-        let points = [];
-        if (changedEntity.points) {
-            points = changedEntity.points;
-        } else if (changedEntity.regions) {
-            points = changedEntity.regions.flatMap((r) => r.points || []);
-        } else if (changedEntity.x !== undefined && changedEntity.y !== undefined) {
-            points = [changedEntity];
+        for (const [id, targetItem] of targetById) {
+            const currentItem = currentById.get(id);
+            if (!currentItem || JSON.stringify(currentItem) !== JSON.stringify(targetItem)) {
+                return { item: currentItem || targetItem, currentItem, targetItem };
+            }
         }
+        for (const [id, currentItem] of currentById) {
+            if (!targetById.has(id)) return { item: currentItem, currentItem, targetItem: undefined };
+        }
+        return null;
+    }
 
-        return {
-            bounds: this.#calculatePointBounds(points, 50),
-            label: this.#getActionLabel(entityKey, changedEntity),
-        };
+    /** Keys a list's items by id, or by position for an item without one. */
+    static #itemsById(items) {
+        return new Map(items.map((item, index) => [item.id || `idx_${index}`, item]));
+    }
+
+    /**
+     * When the changed item is a region layer that exists in the target snapshot, narrows the
+     * change to the region inside it that differs, so the preview outlines that region rather than
+     * the whole layer. A layer the target no longer has at all is left whole: every one of its
+     * regions would go, so the whole layer is the area affected.
+     */
+    static #narrowToRegion({ item, currentItem, targetItem }) {
+        if (!targetItem || !Array.isArray(item.regions)) return item;
+
+        return MapStudioApp.#firstChangedItem(currentItem?.regions || [], targetItem.regions || [])?.item ?? item;
+    }
+
+    /** The points that outline a vector entity: its own points, its regions' points, or the entity itself when it is a single point. */
+    static #entityPoints(entity) {
+        if (entity.points) return entity.points;
+        if (entity.regions) return entity.regions.flatMap((region) => region.points || []);
+        if (entity.x !== undefined && entity.y !== undefined) return [entity];
+        return [];
     }
 
     /**
@@ -2781,68 +3632,120 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return JSON.stringify([this.tectonicFaults, this.manualRivers, guidedMasks]);
     }
 
+    /**
+     * Steps one action back (undo) or forward (redo) through the global history. The ledger
+     * records the order of vector and brush (raster) actions, each of which keeps its own stack of
+     * states. An entry whose stack has nothing left to step through is dropped and the next one
+     * tried, so a single Undo or Redo always changes something while anything is left.
+     */
     async #processHistoryStep(isUndo) {
-        // Dynamically assign the source and target stacks based on the direction
+        // Dynamically assign the source and target ledgers based on the direction
         const sourceLedger = isUndo ? this.globalHistoryLedger : this.globalRedoLedger;
         const targetLedger = isUndo ? this.globalRedoLedger : this.globalHistoryLedger;
-        const sourcePinStack = isUndo ? this.pinHistory : this.pinRedoStack;
-        const targetPinStack = isUndo ? this.pinRedoStack : this.pinHistory;
 
         let action = sourceLedger?.pop();
-
         while (action) {
-            if (action === "vector") {
-                if (sourcePinStack.length > 0) {
-                    const previousTerrainInputs = this.#serialiseTerrainInputs();
-                    const previousFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
-                    const previousCustomBiomes = JSON.stringify(this.uiState.customBiomes);
-
-                    targetPinStack.push(MapStateManager.getVectorStateSnapshot(this));
-                    const state = sourcePinStack.pop();
-                    MapStateManager.restoreVectorStateSnapshot(this, state);
-
-                    targetLedger.push("vector");
-
-                    const currentFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
-
-                    // Faults, manual rivers and (in guided mode) land masks all change the
-                    // elevation data, so an undo/redo that alters any of them needs a terrain
-                    // regeneration, not just a repaint.
-                    if (previousTerrainInputs !== this.#serialiseTerrainInputs()) {
-                        // The pixel layers only change once the terrain is regenerated, so only
-                        // the vector layers need redrawing now
-                        this._repaintVectors();
-                        this.requestTerrainUpdate(null, this.debouncedGenerateTerrain);
-                    } else if (previousFeaturePins !== currentFeaturePins) {
-                        this._repaintCanvas();
-                        this.debouncedGenerateClimate();
-                    } else if (previousCustomBiomes !== JSON.stringify(this.uiState.customBiomes)) {
-                        // A custom biome's name/colour/rules changing affects only how the biome
-                        // layer paints (ProceduralEngine reads uiState.customBiomes fresh every
-                        // repaint via MapStateManager.getMapParameters) - no elevation/moisture/
-                        // temperature data changed, so a full terrain/climate regenerate would be
-                        // wasted work, unlike the fault/river/pin branches above.
-                        this._repaintCanvas();
-                    } else {
-                        this._repaintVectors();
-                    }
-                    break;
-                }
-            } else if (action === "raster") {
-                // Dynamically trigger the brush engine's internal undo or redo
-                const brushAction = isUndo ? this.brushEngine?.undo() : this.brushEngine?.redo();
-
-                if (this.baseElevationData && brushAction) {
-                    targetLedger.push("raster");
-                    await this.#refreshChangedTerrain(isUndo ? "Brush undo" : "Brush redo");
-                    break;
-                }
-            }
+            const stepped = await this.#stepHistoryAction(action, isUndo, targetLedger);
+            if (stepped) break;
             action = sourceLedger?.pop();
         }
 
         this.render({ parts: ["context"] });
         this.markDirty();
+    }
+
+    /**
+     * Steps one ledger entry, recording it on `targetLedger` when it changed something.
+     *
+     * @returns {Promise<boolean>} Whether anything was stepped through.
+     */
+    async #stepHistoryAction(action, isUndo, targetLedger) {
+        if (action === "vector") return this.#stepVectorHistory(isUndo, targetLedger);
+        if (action === "raster") return this.#stepRasterHistory(isUndo, targetLedger);
+        return false;
+    }
+
+    /**
+     * Restores the previous (undo) or next (redo) vector state snapshot, then refreshes whatever
+     * the change affects (see #refreshAfterVectorStep).
+     *
+     * @returns {boolean} Whether there was a snapshot to restore.
+     */
+    #stepVectorHistory(isUndo, targetLedger) {
+        const sourcePinStack = isUndo ? this.pinHistory : this.pinRedoStack;
+        const targetPinStack = isUndo ? this.pinRedoStack : this.pinHistory;
+        if (sourcePinStack.length === 0) return false;
+
+        const before = this.#vectorRefreshInputs();
+        targetPinStack.push(MapStateManager.getVectorStateSnapshot(this));
+        MapStateManager.restoreVectorStateSnapshot(this, sourcePinStack.pop());
+        targetLedger.push("vector");
+
+        this.#refreshAfterVectorStep(before, this.#vectorRefreshInputs());
+        return true;
+    }
+
+    /**
+     * Serialises the parts of the vector state that decide how much must be refreshed after it
+     * changes (see #refreshAfterVectorStep), so a before and after can be compared.
+     */
+    #vectorRefreshInputs() {
+        return {
+            terrain: this.#serialiseTerrainInputs(),
+            featurePins: JSON.stringify(this.mapPins.filter((p) => !p.icon)),
+            customBiomes: JSON.stringify(this.uiState.customBiomes),
+        };
+    }
+
+    /**
+     * Refreshes the map after a vector undo/redo, doing only as much work as the change needs.
+     * The checks run from the most to the least expensive refresh, and the first that applies
+     * covers the ones after it.
+     */
+    #refreshAfterVectorStep(before, after) {
+        // Faults, manual rivers and (in guided mode) land masks all change the elevation data,
+        // so an undo/redo that alters any of them needs a terrain regeneration, not just a repaint.
+        if (before.terrain !== after.terrain) {
+            // The pixel layers only change once the terrain is regenerated, so only the vector
+            // layers need redrawing now
+            this._repaintVectors();
+            this.requestTerrainUpdate(null, this.debouncedGenerateTerrain);
+            return;
+        }
+
+        // Feature pins (those without an icon) shape the climate
+        if (before.featurePins !== after.featurePins) {
+            this._repaintCanvas();
+            this.debouncedGenerateClimate();
+            return;
+        }
+
+        // A custom biome's name, colour or rules changing affects only how the biome layer
+        // paints (ProceduralEngine reads uiState.customBiomes fresh on every repaint through
+        // MapStateManager.getMapParameters). No elevation, moisture or temperature data changed,
+        // so regenerating the terrain or climate would be wasted work.
+        if (before.customBiomes !== after.customBiomes) {
+            this._repaintCanvas();
+            return;
+        }
+
+        this._repaintVectors();
+    }
+
+    /**
+     * Steps the brush engine's own undo or redo, then regenerates the terrain it affects. The
+     * brush engine steps even when no terrain exists yet, so its stacks stay in line with the
+     * ledger, but the entry only counts as stepped through when there is terrain to refresh.
+     *
+     * @returns {Promise<boolean>} Whether a stroke was stepped through onto existing terrain.
+     */
+    async #stepRasterHistory(isUndo, targetLedger) {
+        const brushAction = isUndo ? this.brushEngine?.undo() : this.brushEngine?.redo();
+        if (!this.baseElevationData || !brushAction) return false;
+
+        targetLedger.push("raster");
+        await this.#requestChangedTerrain(isUndo ? "Brush undo" : "Brush redo");
+        return true;
     }
 
     // --- Action Handlers ---
@@ -2913,7 +3816,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateReferenceLayer();
     }
 
-    async _onApplyFeatureMath(event, target) {
+    async _onApplyFeatureMath(_event, _target) {
         if (!this.hasPendingFeatureMath) return;
 
         // generateTerrain clears the pending flag itself, before it reads any state
@@ -2957,6 +3860,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.mapHeight = newHeight;
 
         MapStateManager.allocateBuffers(this);
+        // A new map opens with every terrain layer on (see #terrainLayers)
+        this.#setTerrainLayers(MapStudioApp.#allTerrainLayers(true));
 
         this.defaultUiState = MapStateManager.buildDefaultUiState(newWidth, newHeight);
         this.uiState = foundry.utils.deepClone(this.defaultUiState);
@@ -2964,6 +3869,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Inject the engine choice into the wiped state
         this.uiState.generationEngine = newEngine;
+        // Textured ground is chosen when a Flat map is created (the checkbox only shows while the
+        // open map is Flat, so a map switched to Flat from another engine starts smooth)
+        this.uiState.flatTexture = newEngine === "flat" && formData.flatTexture === true;
+
+        // A new map is built with the current terrain rules, so there is nothing to update
+        this.terrainUpgrade = null;
+        this.legacyRootSize = null;
+        // A new map is not a crop of anything, so has no parent ground beyond its edges
+        this.upwindMargin = null;
 
         // Reset biome colours to defaults so the DOM sync catches them
         this.customBiomeColors = {};
@@ -2975,9 +3889,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // 1. Reset all history and spatial arrays except for the land masks, which are preserved if switching to Guided Mode
         this.markDirty();
-        this.brushEngine = new BrushEngine(this.mapWidth, this.mapHeight);
+        this.brushEngine = this.#createBrushEngine();
         this.manualRivers = [];
         this.tectonicFaults = [];
+        this.tectonicFeatureCache = {};
         this.mapPins = [];
         this.mapRoutes = [];
         this.regionLayers = [];
@@ -3118,10 +4033,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #ensureToolLayerVisible(newTool) {
+        const terrainLayers = MapStudioApp.#TOOL_TERRAIN_LAYERS[newTool];
+        if (terrainLayers) {
+            this.#setTerrainLayers(Object.fromEntries(terrainLayers.map((key) => [key, true])));
+            return;
+        }
+
         const toolLayerMap = {
-            terrain: "topography",
-            biomes: "biomes",
-            features: "features",
             infrastructure: "infrastructure",
             regions: "regions",
             labels: "labels",
@@ -3143,15 +4061,27 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.setReferenceMode(newTool === "reference");
 
         if (this.canvasEngine.setCropMode) {
-            const isCropAllowed = ["standard", "flat"].includes(this.uiState.generationEngine);
-            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode && isCropAllowed);
+            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode && this.#isCropToolSelected());
         }
+    }
+
+    /**
+     * Whether the Scene tool's edit mode is currently set to the regional map crop, as opposed
+     * to something else that takes clicks on the canvas. Standard, flat and tectonic maps have
+     * nothing else, so it is always the crop for them. Guided maps share the edit mode with land mask drawing,
+     * so it is the crop only once the crop button has been chosen (and only if a regional map
+     * can be made from this map at all; see TerrainVersion.canCreateRegionalMap).
+     */
+    #isCropToolSelected() {
+        if (!TerrainVersion.canCreateRegionalMap(this.uiState)) return false;
+        if (this.uiState.generationEngine !== "guided") return true;
+        return this.uiState.sceneMode === "crop";
     }
 
     /**
      * Extracts the currently active canvas state to a PNG.
      */
-    async _onExportPng(event, target) {
+    async _onExportPng(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
             ui.notifications.warn("No map is currently generated to export.");
             return;
@@ -3166,7 +4096,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Prompts the user with the export configuration dialogue before triggering the async build pipeline.
      */
-    async _onExportScene(event, target) {
+    async _onExportScene(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
             ui.notifications.warn("No map is currently generated to export.");
             return;
@@ -3182,7 +4112,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             window: { title: game.i18n.localize("FILRODENSWMB.UI.ExportScene") || "Export to Scene" },
             content: content,
             ok: {
-                callback: (event, button, dialog) => {
+                callback: (event, button, _dialog) => {
                     return {
                         sceneName: button.form.elements["sceneName"].value.trim() || defaultName,
                         exportFolder: button.form.elements["exportFolder"].value.trim() || defaultFolder,
@@ -3264,8 +4194,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     /**
      * Executes the regional map extraction pipeline.
+     *
+     * The open map must be saved, with no unsaved changes, before a regional map is cut from it
+     * (see MapDialogManager.promptSaveBeforeRegionalMap): the regional map is listed under the
+     * saved map it came from, and is built from the map as it is now, which must be what was saved.
+     * Each prompt on the way is titled for what it saves (the unsaved or changed map, then the
+     * regional map), so the two name prompts of a never-saved map don't read as the same question.
      */
-    async _onGenerateRegionalMap(event, target) {
+    async _onGenerateRegionalMap(_event, _target) {
         if (!this.canvasEngine) return;
 
         // 1. Validate Crop Box
@@ -3275,8 +4211,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             return;
         }
 
+        // 1a. Make sure there is a saved parent that matches the map as it is now
+        const neverSaved = !this.currentSaveId;
+        if (neverSaved || this.isDirty) {
+            if (!(await MapDialogManager.promptSaveBeforeRegionalMap(neverSaved))) return;
+            if (!(await this.saveCurrentMap({ promptTitle: game.i18n.localize("FILRODENSWMB.UI.SaveUnsavedMap") }))) return;
+        }
+
         // 2. Prompt for save name
-        const mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), `${this.currentSaveName || "Map"} (Region)`);
+        const mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveRegionalMap"), game.i18n.localize("FILRODENSWMB.UI.Name"), `${this.currentSaveName || "Map"} (Region)`);
 
         if (!mapName) return;
 
@@ -3303,7 +4246,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Opens a system file dialogue, validates the JSON payload, and imports it to the database.
      */
-    async _onImportMapJson(event, target) {
+    async _onImportMapJson(_event, _target) {
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".json";
@@ -3352,7 +4295,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * file, then downloads the result. Mirrors #handleMapExport's Blob-download pattern - a
      * client-side file save, no server round trip.
      */
-    async _onExportSettings(event, target) {
+    async _onExportSettings(_event, _target) {
         const categories = MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key, labelKey }) => {
             const count = (this.uiState[key] || []).length;
 
@@ -3425,7 +4368,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * and silently skipped, so re-importing the same file (or two files that overlap) doesn't
      * pile up repeat copies of every style.
      */
-    async _onImportSettings(event, target) {
+    async _onImportSettings(_event, _target) {
         const input = document.createElement("input");
         input.type = "file";
         input.accept = ".json";
@@ -3521,6 +4464,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const validEntries = entries.filter((entry) => entry && typeof entry === "object" && typeof entry.name === "string");
             if (validEntries.length === 0) continue;
 
+            // A settings file exported before label widths were measured in characters holds
+            // pixel widths; convert them first, so they also compare correctly as duplicates
+            if (key === "customLabelStyles") validEntries.forEach((entry) => LabelWidth.migrateLabel(entry, LabelWidth.rootFontSize()));
+
             const existing = this.uiState[key] || [];
             const knownSignatures = new Set(existing.map((entry) => this.#styleEntrySignature(entry)));
 
@@ -3595,7 +4542,67 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             this.render({ parts: ["toolbar", "context"] });
             this.isDirty = false;
+
+            // Offered only once the map is fully generated and marked clean: the check reads the
+            // generated climate, and an update applied here must leave the map marked unsaved.
+            await this.#offerTerrainUpgrade();
         }
+    }
+
+    /**
+     * Works out whether the map just loaded would change under the current terrain rules and, if
+     * so, offers to update it. A map whose owner chose "don't ask again" is not asked, but the
+     * Update Map button (see _onUpdateMapTerrain) stays available for it.
+     */
+    async #offerTerrainUpgrade() {
+        this.terrainUpgrade = await this.#assessTerrainUpgrade();
+        if (!this.terrainUpgrade) return;
+
+        this.render({ parts: ["context"] });
+        if (this.uiState.terrainUpgradeDismissed) return;
+
+        const choice = await MapDialogManager.promptTerrainUpgrade(this.terrainUpgrade, true);
+        if (choice.apply) await this.#applyTerrainUpgrade();
+        else if (choice.dismiss) await TerrainUpgrade.dismiss(this);
+    }
+
+    /**
+     * What updating the open map would change (see TerrainUpgrade.assess), with the processing
+     * overlay shown while it is measured. Only the maps TerrainVersion.isUpgradeCandidate names
+     * can change, so every other map is answered at once without measuring anything.
+     */
+    async #assessTerrainUpgrade() {
+        if (!TerrainVersion.isUpgradeCandidate(this.uiState, this.tectonicFaults)) return null;
+
+        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.CheckingTerrainUpdate"));
+        try {
+            return TerrainUpgrade.assess(this);
+        } finally {
+            this.#endProcessing();
+        }
+    }
+
+    /**
+     * Updates the open map to the current terrain rules, regenerates it and leaves it marked as
+     * unsaved, so the update is kept only if the map is saved.
+     */
+    async #applyTerrainUpgrade() {
+        const { plan } = this.terrainUpgrade;
+        this.terrainUpgrade = null;
+
+        await TerrainUpgrade.apply(this, plan);
+        this.render({ parts: ["context"] });
+        ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApplied"));
+    }
+
+    /**
+     * The Update Map button: the same offer as on load, without the "don't ask again" option.
+     */
+    async _onUpdateMapTerrain(_event, _target) {
+        if (!this.terrainUpgrade) return;
+
+        const choice = await MapDialogManager.promptTerrainUpgrade(this.terrainUpgrade, false);
+        if (choice.apply) await this.#applyTerrainUpgrade();
     }
 
     async #handleMapDelete(mapId) {
@@ -3719,32 +4726,34 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateReferenceLayer();
     }
 
-    async _onRandomizeSeed(event, target) {
+    async _onRandomizeSeed(_event, _target) {
         this.uiState.mapSeed = this.#generateRandomSeed();
         this.render({ parts: ["context"] });
     }
 
     /**
-     * Generates a random 6-character alphanumeric seed (uppercased) - the one place this logic
-     * lives, so anywhere a blank or randomised map seed is needed (this button, an auto-generated
+     * Generates a random 6-character alphanumeric seed (uppercased). This is the one place this
+     * logic lives, so anywhere a blank or randomised map seed is needed (this button, an auto-generated
      * default map name, a blank seed left on the Create/Convert Map dialogue) goes through the same
      * approach rather than each call site inventing its own.
      */
     #generateRandomSeed() {
-        return Math.random().toString(36).substring(2, 8).toUpperCase();
+        // Math.random() is enough here: a seed only needs to differ from map to map, and nothing
+        // depends on it being unpredictable
+        return Math.random().toString(36).substring(2, 8).toUpperCase(); // NOSONAR
     }
 
-    async _onRedoBrush(event, target) {
+    async _onRedoBrush(_event, _target) {
         await this.#processHistoryStep(false);
     }
 
-    _onRemoveReferenceImage(event, target) {
+    _onRemoveReferenceImage(_event, _target) {
         this.uiState.referenceImage = "";
         this.#updateReferenceLayer();
         this.render({ parts: ["context"] });
     }
 
-    _onResetNoisePan(event, target) {
+    _onResetNoisePan(_event, _target) {
         this.uiState["noise.offsetX"] = this.defaultUiState["noise.offsetX"];
         this.uiState["noise.offsetY"] = this.defaultUiState["noise.offsetY"];
         this.render({ parts: ["context"] });
@@ -3752,31 +4761,37 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.debouncedGenerateTerrain();
     }
 
-    _onResetNoiseScale(event, target) {
+    _onResetNoiseScale(_event, _target) {
         this.uiState["noise.elevation.scale"] = this.defaultUiState["noise.elevation.scale"];
         this.render({ parts: ["context"] });
         this.markDirty();
         this.debouncedGenerateTerrain();
     }
 
-    _onResetReferencePan(event, target) {
+    _onResetReferencePan(_event, _target) {
         this.uiState.referenceX = this.mapWidth / 2;
         this.uiState.referenceY = this.mapHeight / 2;
         this.#updateReferenceLayer();
     }
 
-    _onResetReferenceScale(event, target) {
+    _onResetReferenceScale(_event, _target) {
         this.uiState.referenceScale = 1;
         this.#updateReferenceLayer();
     }
 
-    _onResetZoom(event, target) {
+    _onResetZoom(_event, _target) {
         this.canvasEngine?.resetCamera();
     }
 
     async _onSaveMap(event, target) {
         if (target) target.disabled = true;
         await this.saveCurrentMap();
+        if (target) target.disabled = false;
+    }
+
+    async _onSaveMapAs(event, target) {
+        if (target) target.disabled = true;
+        await this.saveCurrentMap({ asNew: true });
         if (target) target.disabled = false;
     }
 
@@ -3926,13 +4941,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (needsTerrain) this.requestTerrainUpdate();
         }
 
+        // The crop takes over canvas clicks while it is showing, so it is shown only in its own
+        // mode, never while land masks are being drawn
+        this.canvasEngine?.setCropMode?.(this.uiState.isEditMode && this.activeTool === "scene" && this.#isCropToolSelected());
+
         this.render({ parts: ["toolbar", "editToolbar"] });
     }
 
     /**
      * Toggles the interactive 3D topography visualisation.
      */
-    async _onThreeDView(event, target) {
+    async _onThreeDView(_event, _target) {
         const overlay = this.element.querySelector("#fwmb-3d-overlay");
 
         if (!overlay || !this.currentElevationData) return;
@@ -3957,6 +4976,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (contextPanel) contextPanel.style.display = "";
             if (editToolbar) editToolbar.style.display = ""; // Restores standard CSS flow
 
+            this.#updateCanvasHint();
             return;
         }
 
@@ -3981,33 +5001,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (contextPanel) contextPanel.style.display = "none";
         if (editToolbar) editToolbar.style.display = "none"; // Destroys the bottom margin bug!
 
-        // 4. Generate 3D Scene
-        const { currentSeed, params } = MapStateManager.getMapParameters(this);
-        const engine = new ProceduralEngine(currentSeed);
-        const seaLevel = this.uiState["seaLevel"];
-        const waterMask = this.currentRiverData ? this.currentRiverData.waterMask : null;
-
-        const biomeBuffer = new Uint8Array(this.mapWidth * this.mapHeight * 4);
-        engine.createBiomesMap(
-            this.currentElevationData,
-            this.currentMoistureData,
-            this.currentTemperatureData,
-            this.currentBiomeOverrides,
-            this.mapWidth,
-            this.mapHeight,
-            seaLevel,
-            waterMask,
-            params,
-            biomeBuffer,
-        );
-
+        // 4. Generate 3D Scene. The terrain images the flat map was last painted from are
+        // current (any pending generation has just run), so the 3D view is built from the same
+        // images and settings and matches the flat map's layers and water.
         this.scene3D = new Scene3D(overlay);
-        const riverVectors = this.currentRiverData ? this.currentRiverData.vectors : null;
+        this.scene3D.render3DMap({
+            elevation: this.currentElevationData,
+            width: this.mapWidth,
+            height: this.mapHeight,
+            seaLevel: this.uiState["seaLevel"],
+            waterMask: this.bufferWaterMask,
+            terrain: this.#terrainBuffers(),
+            settings: this.#terrainSettings(),
+        });
 
-        this.scene3D.render3DMap(this.currentElevationData, biomeBuffer, this.mapWidth, this.mapHeight, seaLevel, riverVectors, waterMask);
+        // The 3D view has its own camera gestures; no render follows this, so refresh directly
+        this.#updateCanvasHint();
     }
 
-    _onToggleEditMode(event, target) {
+    _onToggleEditMode(_event, _target) {
         const toolbar = this.element.querySelector(".fwmb-edit-toolbar");
         if (!toolbar) return;
 
@@ -4039,9 +5051,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.setEditMode(isActivating);
 
             if (this.canvasEngine.setCropMode) {
-                // Only enable the crop tool for standard and flat maps
-                const isCropAllowed = ["standard", "flat"].includes(this.uiState.generationEngine);
-                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene" && isCropAllowed);
+                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene" && this.#isCropToolSelected());
             }
         }
 
@@ -4063,6 +5073,25 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /**
      * Toggles visibility of the WebGL layers.
      */
+    /**
+     * The names shown in the engine list for the engines that have had more than one version,
+     * with their version (for example "Guided v2"). The open map's own engine shows the version
+     * the map was made with; any other engine shows the version a new map would get, since
+     * choosing it creates a new map.
+     */
+    #getEngineLabels() {
+        const current = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        const labelFor = (engine, nameKey) => {
+            const version = this.uiState.generationEngine === engine ? (TerrainVersion.getDisplayVersion(this.uiState) ?? current) : current;
+            return game.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: game.i18n.localize(nameKey), version });
+        };
+
+        return {
+            advanced: labelFor("advanced", "FILRODENSWMB.UI.EngineNameTectonics"),
+            guided: labelFor("guided", "FILRODENSWMB.UI.EngineNameGuided"),
+        };
+    }
+
     _onToggleLayer(event, target) {
         const layerId = target.dataset.layer;
         if (!layerId || !this.canvasEngine) return;
@@ -4072,7 +5101,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.toggleLayer(layerId, isVisible);
     }
 
-    _onToggleLiveFeatureUpdates(event, target) {
+    _onToggleLiveFeatureUpdates(_event, _target) {
         this.uiState.liveFeatureUpdates = !this.uiState.liveFeatureUpdates;
 
         // If turned back on while changes are pending, immediately process them
@@ -4286,15 +5315,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return states[(currentIdx + 1) % states.length];
     }
 
-    async _onUndoBrush(event, target) {
+    async _onUndoBrush(_event, _target) {
         await this.#processHistoryStep(true);
     }
 
-    _onZoomIn(event, target) {
+    _onZoomIn(_event, _target) {
         this.canvasEngine?.zoomCamera(FILRODENSWMB.UI.ZOOM.FACTOR);
     }
 
-    _onZoomOut(event, target) {
+    _onZoomOut(_event, _target) {
         this.canvasEngine?.zoomCamera(1 / FILRODENSWMB.UI.ZOOM.FACTOR);
     }
 

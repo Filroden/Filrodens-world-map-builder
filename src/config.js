@@ -37,12 +37,57 @@ export const FILRODENSWMB = {
         MAP_HEIGHT: 1000,
     },
     GENERATION: {
+        // How far above sea level a Flat map's ground sits
+        FLAT_HEIGHT: 0.05,
+        // Surface texture: the fine, rolling roughness a Flat map can start with and the Roughen
+        // brush paints (see ProceduralEngine.generateSurfaceTexture and BrushEngine#stampTerrain).
+        // It is a property of the ground rather than of a stroke, so it is laid out in the top
+        // map's pixels and matches between a map and its regional maps.
+        SURFACE_TEXTURE: {
+            // Its greatest height either side of the ground it roughens, as a share of
+            // FLAT_HEIGHT, so textured Flat ground always stays well above sea level
+            AMPLITUDE_SHARE: 0.4,
+            // Elsewhere it never moves ground by more than this share of the ground's own height
+            // above, or depth below, sea level, so it fades out towards the coast instead of
+            // moving the coastline (see BrushEngine#textureAmplitudeAt)
+            COAST_SHARE: 0.8,
+            // Wavelength of its coarsest layer, in pixels of a BASELINE_DIMENSION map (scaled to
+            // the map's size like the coastline settings, so it looks the same at any size).
+            // Kept short: a layer much wider than a brush makes Roughen look as if it pushes the
+            // ground up or down rather than roughening it.
+            WAVELENGTH: 30,
+            OCTAVES: 4,
+            // Arbitrary offsets, as for the other noise fields, so the texture comes from a region
+            // of the noise no other field reads
+            NOISE_OFFSET: { X: -7300, Y: 4100 },
+            // The outer share of the Roughen brush's radius across which it eases out, so a
+            // roughened patch blends into the ground around it instead of ending in a step
+            EDGE: 0.5,
+            // The roughness (see BrushLayerCache) of ground carrying all of the texture: roughness
+            // is stored as a byte per pixel, from 0 (none) to this
+            FULL_ROUGHNESS: 255,
+            // Edge of the square tiles the texture is worked out in, in map pixels. Only the tiles
+            // a brush touches are worked out (see ProceduralOrchestrator.getSurfaceTexture), so
+            // the first Roughen stroke on a large map does not wait for the whole map's texture;
+            // small enough that a stamp works out little it does not use, large enough that the
+            // per-tile bookkeeping costs nothing noticeable.
+            TILE_SIZE: 64,
+        },
         TECTONIC_PLATES: 10,
-        COASTLINE_FRACTURE: 0.3,
+        COASTLINE_FRACTURE: 0.2,
+        // The Coastline Fracture slider's step (tools-terrain.hbs uses the same value). Values
+        // worked out in code for the slider, such as the one a map is given when it is updated
+        // to the current terrain rules, are rounded to it so the slider can show them exactly.
+        COASTLINE_FRACTURE_STEP: 0.05,
         CONTINENTAL_GROUPING: 0.4,
         COASTAL_BAND: 30,
         CONTINENT_SCALE: 150,
+        OCEAN_SCALE: 150,
+        // The Mid-Ocean Ridges setting's default (0 is none, 1 the full height in
+        // COASTAL_PROFILE.OCEAN_RIDGES)
+        OCEAN_RIDGES: 0.5,
         SHELF_RANGE: 0.15,
+        COASTAL_PLAIN: 0.05,
         OCEAN_DEPTH_CAP: 0.9,
         MASK_BLEND_WIDTH: 0.25,
         WARP: {
@@ -60,6 +105,36 @@ export const FILRODENSWMB = {
             GUIDED_MACRO: 0.5,
             GUIDED_DETAIL: 0.5,
         },
+        // Tectonic terrain under the current rules (ProceduralEngine.generateTectonicV2Topography)
+        TECTONICS_V2: {
+            // Plates draw from a random stream of their own, this far from the map's seed
+            PLATE_SEED_OFFSET: 3,
+            // A plate's buoyancy: how far it leans towards what the continent noise says at its
+            // centre (per unit of noise above or below the land threshold), and the size of the
+            // random part added to that (see ProceduralEngine#buildPlateModel)
+            BUOYANCY_ALIGNMENT: 1.5,
+            BUOYANCY_RANDOMNESS: 0.75,
+            // Multipliers mixing the seed and a plate's number into its buoyancy hash
+            BUOYANCY_SEED_MULTIPLIER: 31,
+            BUOYANCY_PLATE_MULTIPLIER: 7919,
+            // How strongly a plate's buoyancy (-1 to 1) pushes its area towards ocean or land,
+            // against the continent noise and the Continental Grouping threshold
+            PLATE_WEIGHT: 0.45,
+            // Added to Continental Grouping before it is used as the land threshold. The slider
+            // keeps the range and default the original tectonic engine uses, but that threshold
+            // turned about two thirds of a map into land here; this brings the default to
+            // roughly a third, with the rest of the slider's range still running from mostly
+            // land to open ocean.
+            GROUPING_OFFSET: 0.35,
+            // Height of the mountain ranges (and depth of the rift valleys) plate boundaries
+            // raise on land, as a share of the land's full height
+            RIDGE_WEIGHT: 0.6,
+            // Depth of the trenches colliding plates cut at sea, as a share of the ocean depth
+            TRENCH_DEPTH: 0.12,
+            // The boundary relief the plate mesh gives colliding plates (see
+            // ProceduralEngine#calculateTectonicBoundaries), used to scale trenches to 0-1
+            CONVERGENT_RELIEF: 0.8,
+        },
         TECTONIC_MESH: {
             WIDTH: 100,
             HEIGHT: 100,
@@ -72,8 +147,9 @@ export const FILRODENSWMB = {
         // Lets tapered, independent noise perturb the guided-mode coastline itself (see
         // ProceduralEngine#computeEffectiveCoastDistance), instead of noise being suppressed to
         // zero exactly at the drawn edge. BAND_RATIO/AMPLITUDE_RATIO are expressed relative to
-        // CONTINENT_SCALE rather than fixed pixel values, so the effect scales sensibly if that
-        // slider is retuned - calibrated against CONTINENT_SCALE's default of 150.
+        // CONTINENT_SCALE, calibrated against its default of 150. Legacy maps multiply them by the
+        // map's own Continent Scale; from terrain revision 2 on they are multiplied by the default
+        // instead, so Continent Scale shapes the relief without also changing the coastline.
         COASTAL_VARIANCE: {
             BAND_RATIO: 0.53,
             AMPLITUDE_RATIO: 1.33,
@@ -83,6 +159,144 @@ export const FILRODENSWMB = {
             // field samples a different region of the simplex field than the domain warp does.
             NOISE_OFFSET: { X: 4000, Y: 4000 },
         },
+        // The most cells the guided-mode coastline distance field may have. The field covers the
+        // map plus a margin at up to one cell per map pixel; on a zoomed-in regional map that
+        // would otherwise grow with the square of the zoom, so beyond this size its cells are
+        // made coarser instead (the field is smooth, so it is sampled between cells without
+        // visible steps). A map that was never cropped always gets one cell per pixel.
+        COAST_FIELD_MAX_CELLS: 4000000,
+        // How guided terrain rises from the coast and the seabed falls away from it, from terrain
+        // revision 2 on (see ProceduralEngine#shapeCoastalProfile). Continental Shelf and Coastal
+        // Plains each set the width of a band along the coast: shallow shelf on the sea side, low
+        // plain on the land side. Beyond them, Continent Scale sets how far it takes the land to
+        // reach its full height, and Ocean Scale how far it takes the seabed to reach the
+        // abyssal plain.
+        COASTAL_PROFILE: {
+            // Width of each band, in pixels of a BASELINE_DIMENSION map, for a slider value of 1
+            // (the sliders' maximum).
+            BUFFER_WIDTH: 100,
+            // How much the band widths wander along the coast (0.4 is 40% either way), so the
+            // bands do not trace the coastline exactly, and how long that wandering is, in
+            // pixels of a BASELINE_DIMENSION map.
+            BUFFER_VARIATION: 0.4,
+            BUFFER_VARIATION_LENGTH: 90,
+            BUFFER_VARIATION_OCTAVES: 3,
+            BUFFER_VARIATION_OFFSET: { X: 9100, Y: -7300 },
+            // Share of the land's full height reached at the inland edge of the coastal plain.
+            PLAIN_RISE: 0.06,
+            // Share of the usual land detail noise kept on the coastal plain, so it reads as low,
+            // gently rolling ground rather than a flat sheet.
+            PLAIN_DETAIL: 0.6,
+            // Landmasses too small to rise fully over Continent Scale rise over their own size
+            // instead: the distance from their coast to their middle, less any coastal plain,
+            // times LANDMASS_RISE_FACTOR (above 1 so the middle stops a little short of the full
+            // height). The coastal plain may take up at most PLAIN_SHARE_OF_LANDMASS of that
+            // distance, so a small island is never all plain. LANDMASS_MIN_RISE, in pixels of a
+            // BASELINE_DIMENSION map, stops the tiniest islets turning into spikes.
+            LANDMASS_RISE_FACTOR: 1.25,
+            PLAIN_SHARE_OF_LANDMASS: 0.4,
+            LANDMASS_MIN_RISE: 10,
+            // Shares of the full ocean depth (OCEAN_DEPTH_CAP below sea level) at the outer edge
+            // of the shelf and on the abyssal plain.
+            SHELF_DEPTH: 0.08,
+            ABYSS_DEPTH: 0.85,
+            // The continental slope: the share of Ocean Scale over which the seabed falls
+            // from the shelf edge to the abyssal plain, and how sharply (a higher exponent falls
+            // faster at first and levels out sooner).
+            SLOPE_REACH: 0.6,
+            SLOPE_EXPONENT: 4,
+            // Amplitude of the detail noise on the seabed: on the shelf, and the extra it gains
+            // out on the abyssal plain.
+            SHELF_NOISE: 0.04,
+            ABYSS_NOISE: 0.08,
+            // Mid-ocean ridges, raised along the line through the ocean equally far from two
+            // continents (see ProceduralEngine#buildRidgeField and #ridgeLift). Lengths are in
+            // pixels of a BASELINE_DIMENSION map; heights are shares of the full ocean depth.
+            OCEAN_RIDGES: {
+                // Size of a cell of the grid the ridge lines are found on (the whole map at the
+                // top of the chain of crops, whatever this map's own size or zoom)
+                CELL_SIZE: 4,
+                // Only landmasses whose middle lies at least this far from their coast divide the
+                // ocean; smaller islands would each sit inside their own ring of ridges
+                MIN_LANDMASS_REACH: 25,
+                // Height of the crest above the abyssal plain with the setting at 1
+                HEIGHT: 0.6,
+                // Distance from the crest at which the flanks reach the abyssal plain
+                HALF_WIDTH: 90,
+                // The rift valley along the crest: its width, and its depth as a share of the
+                // ridge's height
+                RIFT_WIDTH: 4,
+                RIFT_DEPTH: 0.2,
+                // How far, and over what length, the crest wanders from side to side (the finer
+                // layers make it kink on a small scale too, rather than bending smoothly)
+                WANDER: 16,
+                WANDER_LENGTH: 70,
+                WANDER_OCTAVES: 5,
+                // How much, and over what length, the crest's height varies along the ridge
+                HEIGHT_VARIATION: 0.35,
+                HEIGHT_VARIATION_LENGTH: 120,
+                HEIGHT_VARIATION_OCTAVES: 2,
+                NOISE_OFFSET: { X: 6200, Y: -2900 },
+                // Abyssal hills: low, narrow hills running parallel to the ridge across its flanks
+                // and out onto the abyssal plain, as the seabed breaks into blocks while it
+                // spreads away from the crest (see ProceduralEngine#abyssalHills)
+                ABYSSAL_HILLS: {
+                    // Their greatest height with the setting at 1, as a share of the full ocean depth
+                    HEIGHT: 0.035,
+                    // How far from the crest they reach, as a multiple of HALF_WIDTH
+                    REACH: 1.4,
+                    // Spacing of the hills across the ridge
+                    WAVELENGTH: 18,
+                    OCTAVES: 3,
+                    // Over what length along the ridge a hill ends and the next begins (roughly
+                    // ALONG_LENGTH divided by ALONG_SPAN)
+                    ALONG_LENGTH: 200,
+                    ALONG_SPAN: 4,
+                    NOISE_OFFSET: { X: -4100, Y: 8300 },
+                },
+            },
+        },
+    },
+    // Which revision of the terrain generation rules a saved map was built with. Generation is
+    // re-run from the saved settings every time a map is opened (no terrain pixels are stored),
+    // so a change to the rules that alters the output of existing settings would silently change
+    // every saved map. Instead, each map records the revision it was made with, and anything that
+    // differs between revisions is decided from that number (see TerrainVersion).
+    //   1 - every map saved before the number existed. Regional maps store a wind distance that
+    //       was scaled by the crop's zoom on top of the scaling getWindDistance already applies,
+    //       and add no extra terrain detail when zoomed in.
+    //   2 - regional maps store a wind distance that makes their wind reach exactly their
+    //       parent's enlarged by the zoom, whatever the crop's shape, and add finer terrain,
+    //       moisture and temperature detail (extra noise octaves) in proportion to how far they
+    //       are zoomed in. Guided terrain is worked out in the pixels of the map at the top of
+    //       its chain of crops (so a regional map matches its parent), and its pixel-sized
+    //       settings are scaled to the map's size (so a slider value looks the same at any
+    //       resolution; see COASTLINE_ENGINES). Its coastal profile is rebuilt: Continental Shelf
+    //       and the new Coastal Plains are bands of set width along the coast, the seabed beyond
+    //       the shelf falls steeply to an abyssal plain, and Continent Scale no longer changes the
+    //       coastline itself (see GENERATION.COASTAL_PROFILE). Tectonic terrain is rebuilt on
+    //       the same pipeline, with its land placed by tectonic plates. Fault lines read their
+    //       noise, and space their hotspot volcanoes, in the top map's pixels, so a regional
+    //       map's faults match its parent's (on a map that was never cropped this changes nothing).
+    TERRAIN_VERSION: {
+        LEGACY: 1,
+        // Revision 2 also brings the current river rules: rivers follow the slope's own direction
+        // and join a river they run beside, and custom rivers carve a channel with wider, gentler
+        // banks (see TerrainVersion.usesCurrentRivers)
+        CURRENT: 2,
+        // Engines that build their terrain outward from a coastline, and so use the coastline
+        // rules of the current revision: settings measured in pixels of a map BASELINE_DIMENSION
+        // pixels across and scaled to the actual map (before, they were fixed pixel counts, so
+        // the same values gave smoother, straighter coastlines on bigger maps), and the coastal
+        // profile described in GENERATION.COASTAL_PROFILE. For the tectonic engine ("advanced")
+        // the current revision is a different engine altogether: the guided pipeline with land
+        // placed by tectonic plates (ProceduralEngine.generateTectonicV2Topography), where
+        // revision 1 kept the original tectonic engine (generateTectonicTopography).
+        COASTLINE_ENGINES: ["guided", "advanced"],
+        // Coastline engines whose legacy revision was a different engine altogether, so updating
+        // one of their maps builds new terrain from the same settings rather than refining it
+        // (and no setting can be converted to keep its old look)
+        REPLACED_ENGINES: ["advanced"],
     },
     LIMITS: {
         HISTORY_MAX: 100,
@@ -92,11 +306,79 @@ export const FILRODENSWMB = {
         NOISE_SCALE_STEP: 50,
         OVERFLOW_BUFFER: 100,
         BASELINE_DIMENSION: 1000,
+        // The smallest grid size, in pixels. Foundry will not make a scene with a smaller grid
+        // (its CONST.GRID_MIN_SIZE): a smaller size is raised to this when the scene is created,
+        // so the map's own grid, and the grid data exported with the scene, must never go below it.
+        MIN_GRID_SIZE: 20,
         CUSTOM_BIOME_START_ID: 14,
         // The fewest nodes a polygon (region or guided-mode land mask) needs to enclose an area.
         // A shape still below this when the user finishes drawing it is discarded, since it could
         // never be selected or edited as a shape, and terrain generation ignores land masks below it.
         MIN_POLYGON_VERTICES: 3,
+    },
+    // The random land mask button in Guided mode (see LandMaskGenerator). Sizes are fractions of
+    // the map's shorter side, so a shape covers the same share of any map.
+    RANDOM_LAND_MASK: {
+        // Radius of an Add Land shape: MIN_RADIUS + RADIUS_RANGE * r^RADIUS_SKEW for a random r,
+        // so most shapes are islands and fewer are continents
+        MIN_RADIUS: 0.12,
+        RADIUS_RANGE: 0.36,
+        RADIUS_SKEW: 1.3,
+        // Remove Land shapes are smaller, so a hole bites into the land rather than erasing it
+        SUBTRACT_RADIUS_SCALE: 0.6,
+        // Up to this stretch along a random axis, weighted towards round shapes
+        MAX_STRETCH: 1.2,
+        // Share of Add Land shapes centred on a map edge, so they run into the canvas buffer
+        EDGE_SHARE: 0.3,
+        // Where along an edge (as a fraction of its length) an edge-hugging shape is centred, and
+        // how far its centre sits beyond the edge (negative) or inside it, in radii
+        EDGE_SPAN: { MIN: 0.1, MAX: 0.9 },
+        EDGE_OFFSET: { MIN: -0.6, MAX: 0.3 },
+        // Where inside the map a shape that does not hug an edge is centred, as a fraction of each side
+        INTERIOR_SPAN: { MIN: 0.12, MAX: 0.88 },
+        // Nodes for the smallest and the largest shape on a BASELINE_DIMENSION map. The count grows
+        // with the square root of the map's size, so larger maps get more detailed outlines
+        // without the node count (and the work of editing them) growing with the map's area.
+        NODES: { MIN: 14, MAX: 40 },
+        MIN_NODES: 8,
+        // The turning walk: the typical deviation (radians) of each turn from an even share of a
+        // full circle, and the range of step lengths (relative to each other)
+        TURN_DEVIATION: { MIN: 0.35, MAX: 0.8 },
+        STEP_LENGTH: { MIN: 0.4, MAX: 1.3 },
+        // Walks tried before settling for one whose edges cross (a crossing is harmless but
+        // turns any area the outline loops over twice into sea)
+        MAX_SHAPE_ATTEMPTS: 6,
+        // Random spots tried when looking for existing land to place a Remove Land shape over
+        MAX_LAND_SEARCH_ATTEMPTS: 200,
+        // Nodes closer together than this (pixels) are merged, which tidies nodes clamped onto
+        // the edge of the canvas buffer
+        MIN_NODE_SPACING: 1,
+    },
+    // The random map button in Guided mode (see RandomLandMap)
+    RANDOM_LAND_MAP: {
+        // Spacing (pixels) of the Voronoi cells on a BASELINE_DIMENSION map. It grows with the
+        // square root of the map's size, so a larger map has more cells and more detailed
+        // coastlines, but the node count grows with its side rather than its area. The cells are
+        // coarse on purpose: Coastline Fracture adds the fine detail when the terrain is generated.
+        CELL_SPACING: 55,
+        // How many regions the cells are grouped into, and how fast each can grow relative to the
+        // others (a wider range gives a wider mix of region sizes)
+        GROUPS: { MIN: 8, MAX: 16 },
+        GROWTH_RATE: { MIN: 0.3, MAX: 2.5 },
+        // Share of the map (inside the canvas) to make land, chosen at random in this range
+        LAND_SHARE: { MIN: 0.55, MAX: 0.7 },
+        // A region is skipped when making it land would overshoot the land share by more than this
+        LAND_OVERSHOOT: 0.06,
+        // Regions are made land largest first, their sizes scaled by a random factor in this range
+        // so a smaller region sometimes wins; land is therefore usually, not always, the larger
+        SIZE_JITTER: { MIN: 0.5, MAX: 1.5 },
+        // Share of coastal cells swapped between land and sea, for ragged coasts, small islands
+        // and lakes
+        COAST_RAGGING: 0.15,
+        // Decimal places Voronoi corners are matched to when outlines are traced. Neighbouring
+        // cells share corners, but a corner cut by the canvas edge is computed separately for
+        // each cell and can differ in the last digits.
+        CORNER_PRECISION: 2,
     },
     UI: {
         RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
@@ -109,9 +391,74 @@ export const FILRODENSWMB = {
         // trigger a terrain regeneration.
         NODE_DRAG_THRESHOLD_PX: 4,
         WHEEL: {
-            SCALE_FACTOR: 1.05,
             ROTATION_STEP: 5,
             CAMERA_FACTOR: 1.1,
+        },
+        // Resizing a held label, pin or decoration with Shift + mouse wheel (see
+        // StudioCanvas#resizeHeldItem). Each notch moves the stored value by one STEP inside the
+        // same range, and on the same step, as the item's edit dialogue slider, so a wheel-resized
+        // value always sits on a slider position and opening the dialogue never rounds it to
+        // something else.
+        WHEEL_RESIZE: {
+            LABEL_FONT_SIZE: { MIN: 0.2, MAX: 5, STEP: 0.1 },
+            PIN_SCALE: { MIN: 0.2, MAX: 4, STEP: 0.1 },
+            DECORATION_SCALE: { MIN: 0.05, MAX: 5, STEP: 0.05 },
+        },
+        // The rotation of labels and decorations, in degrees, as their edit dialogues' Rotation
+        // slider shows it. Stored angles are kept inside this range (see
+        // CanvasTransforms.normalizeAngle), with 0 (level) in the middle so small tilts either way
+        // sit close to it. The wheel's ROTATION_STEP is a whole number of STEPs, so wheel changes
+        // land exactly on slider positions.
+        ROTATION: { MIN: -180, MAX: 180, STEP: 1 },
+        // Entity types whose nodes move the whole shape when dragged with Shift held (see
+        // StudioCanvas#beginShapeDrag). Lines (routes, fault lines, rivers) are deliberately left
+        // out: they follow the terrain and each other, so moving one as a whole rarely lands it
+        // anywhere that makes sense, and dragging their nodes is the better tool.
+        SHAPE_DRAG_TYPES: ["region", "landMask"],
+        // The cyan box drawn around a feature: the undo/redo preview, the zoom-to-feature flash and
+        // the box around a shape being dragged with Shift all share this look (see
+        // StudioCanvas#drawHighlightBox). Widths and the corner radius are in screen pixels.
+        HIGHLIGHT: {
+            COLOR: 0x00e5ff,
+            LINE_WIDTH: 4,
+            FILL_ALPHA: 0.15,
+            CORNER_RADIUS: 12,
+            // Opacity of the box while a shape is held
+            HELD_ALPHA: 0.75,
+            // The fade after a zoom-to-feature, or on letting go of a shape: its length in frames
+            // (about 1.5 s at 60 fps), and how much the box grows as it fades.
+            FADE_FRAMES: 90,
+            FADE_GROWTH: 0.15,
+        },
+        // The list of canvas actions in the map's bottom corner (see CanvasHints). Each context
+        // lists the suffixes of its `FILRODENSWMB.UI.Hint…` localisation keys, in display order.
+        // Every hint names the thing it acts on (a pin, the crop area, the whole region), so each
+        // reads on its own. COMMON is shown ahead of every context except a held item, whose own
+        // list replaces the whole hint while the pointer holds it. Keep these lists in step with
+        // the pointer and wheel handling in StudioCanvas and the tool click handlers in MapStudioApp.
+        CANVAS_HINTS: {
+            COMMON: ["Pan", "Zoom"],
+            CONTEXTS: {
+                view: [],
+                // The 3D view's orbit camera: left-drag rotates, right-drag pans, scroll zooms
+                view3d: ["Rotate3D"],
+                reference: ["ReferenceMove", "ReferenceResize"],
+                crop: ["CropDraw", "CropMove", "CropResize"],
+                terrain: ["PaintTerrain"],
+                biomes: ["PaintBiomes"],
+                spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
+                line: ["AddPoint", "FinishLine", "MovePoint", "InsertPoint", "DeletePoint", "EditLine"],
+                region: ["AddPoint", "FinishRegion", "MovePoint", "MoveRegion", "InsertPoint", "DeletePoint", "EditRegion"],
+                mask: ["AddPoint", "FinishMask", "MovePoint", "MoveMask", "InsertPoint", "DeletePoint", "EditMask"],
+                pin: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
+                labels: ["PlaceLabel", "MoveLabel", "RotateLabel", "ResizeLabel", "EditLabel"],
+                cartography: ["MoveDecoration", "RotateDecoration", "ResizeDecoration", "EditDecoration"],
+                heldLabel: ["RotateHeldLabel", "ResizeHeldLabel"],
+                heldDecoration: ["RotateHeldDecoration", "ResizeHeldDecoration"],
+                heldPin: ["ResizeHeldPin"],
+                heldRegion: ["DropRegion"],
+                heldMask: ["DropMask"],
+            },
         },
         ZOOM: {
             FACTOR: 1.25,
@@ -136,6 +483,10 @@ export const FILRODENSWMB = {
             CLIMATE: 800,
             FEATURES: 600,
             CANVAS: 2000,
+            // Repainting the map after a display slider moves (contours, relief shading). Short,
+            // since nothing is regenerated, but long enough that dragging a slider does not
+            // repaint the whole map for every step it passes through.
+            DISPLAY: 300,
             // How long after the last refresh the rebuild scratch buffer (a map-sized float raster
             // used to compare the rebuilt terrain and water with the live ones) is released.
             // It is recreated on demand, so this only trades a short allocation on the next edit
@@ -148,11 +499,122 @@ export const FILRODENSWMB = {
         GRID_ALPHA: 0.15,
         BIOME_ALPHA_ACTIVE: 0.85,
         BIOME_ALPHA_INACTIVE: 0.65,
+        REGION_OPACITY: 0.5,
         RIVER_WIDTH: 2,
-        RIVER_ALPHA: 0.9,
         PIN_RADIUS: 6,
         PIN_ALPHA: 0.4,
+        // Procedural springs, shown as rings while editing Features (screen pixels for the line)
+        PROCEDURAL_SPRING: {
+            COLOUR: 0xff0000,
+            ALPHA: 0.9,
+            LINE_WIDTH: 2,
+            HIT_RADIUS: 10,
+        },
         CONTOUR_INTERVAL: 0.1,
+        // Relief shading of the terrain (see ProceduralEngine#reliefChange and TerrainShading): its default
+        // strength (0 is off; each map sets its own) and the compass bearing the light comes from.
+        // The bearing is fixed as part of the module's look rather than offered as a setting:
+        // 315 (the north-west) is the usual choice for maps, and light from the south or east
+        // makes hills read as sunken, so other angles gain little.
+        RELIEF_SHADING: 0.5,
+        LIGHT_DIRECTION: 315,
+        RELIEF: {
+            // How high the light stands above the horizon, in degrees
+            ALTITUDE: 45,
+            // How much slopes are steepened before shading, per pixel of a BASELINE_DIMENSION
+            // map; elevations run from 0 to 1, so real slopes are far too gentle to shade visibly
+            EXAGGERATION: 100,
+            // Limits on how far shading can darken or brighten a pixel (as multiples of its colour)
+            MIN_FACTOR: 0.35,
+            MAX_FACTOR: 1.6,
+        },
+        // How the terrain is drawn (see TerrainShading, which holds the maths, and
+        // TerrainCompositor, which runs it on the GPU). Colours are 0-255 RGB.
+        TERRAIN: {
+            // The elevation layer on land: a grey that darkens with height, from GREY_LOW at sea
+            // level to GREY_LOW - GREY_RANGE at the map's highest point, never below GREY_MIN
+            GREY_LOW: 200,
+            GREY_RANGE: 140,
+            GREY_MIN: 60,
+            // The ground under water (sea and lake beds) before any biome is laid on it
+            SEDIMENT: [172, 168, 158],
+            // The flat colours shown when the Elevation layer is switched off
+            BASE_LAND: [212, 184, 114],
+            BASE_SEA: [26, 75, 132],
+            // How strongly the flat sea colour covers the bed when Elevation is off (it carries no depth)
+            FLAT_WATER_ALPHA: 0.6,
+        },
+        // The water drawn over the sea and lakes (see TerrainShading.waterColour and waterAlpha).
+        WATER: {
+            // The water's colour starts at SHALLOW_COLOUR (depth 0) and each channel falls by
+            // DEEP_SLOPE over the full depth, never below DEEP_COLOUR. Depth is a share of the
+            // way from sea level to the map's lowest point.
+            SHALLOW_COLOUR: [100, 150, 200],
+            DEEP_SLOPE: [80, 120, 120],
+            DEEP_COLOUR: [20, 30, 80],
+            // Over the first TURQUOISE_DEPTH of depth the colour leans towards TURQUOISE, by up
+            // to TURQUOISE_MIX at the shore, so shallows over a pale bed read as clear water
+            TURQUOISE: [40, 170, 190],
+            TURQUOISE_DEPTH: 0.2,
+            TURQUOISE_MIX: 0.6,
+            // How much of the bed shows through: T = (1 - VEIL) * (FLOOR + (1 - FLOOR) * e^(-ABSORPTION * depth)).
+            // VEIL makes even the shoreline look wet; FLOOR is the share of the bed that always
+            // shows, so the deep sea floor's ridges stay readable.
+            VEIL: 0.3,
+            FLOOR: 0.06,
+            ABSORPTION: 7,
+            // Lakes are far shallower than the sea (a few thousandths of the elevation range), so
+            // their depth is scaled up by this much to give them a visible range of depth
+            LAKE_DEPTH_SCALE: 10,
+            // Defaults of the map's water settings: the share of relief shading still seen on the
+            // water's surface, the water's clarity (1 is the default depth of view; higher sees
+            // deeper), and the tint as a hue in degrees and a saturation multiplier. BASE_HUE is
+            // the hue of the colours above, so a tint of BASE_HUE leaves them exactly as they are;
+            // the tint is limited to HUE_MIN-HUE_MAX (blue-greens through blues to blue-violets),
+            // so the sea always reads as water.
+            SEABED_RELIEF: 0.75,
+            CLARITY: 1,
+            BASE_HUE: 210,
+            HUE: 210,
+            HUE_MIN: 170,
+            HUE_MAX: 260,
+            SATURATION: 1,
+        },
+        // Rivers, drawn by the terrain shader from the river image (see RiverNetwork.rasterise and
+        // TerrainShading). FIELD_RANGE is how far either side of a river's edge the image's
+        // distance field reaches, in map pixels. A river is water of depth DEPTH_SHALLOW at its
+        // edge to DEPTH_DEEP DEPTH_RANGE map pixels in (the same depth scale as a lake's), covering
+        // its bed at least MIN_ALPHA; a frozen river is ICE_COLOUR.
+        RIVER: {
+            FIELD_RANGE: 4,
+            DEPTH_SHALLOW: 0.08,
+            DEPTH_DEEP: 0.3,
+            DEPTH_RANGE: 3,
+            MIN_ALPHA: 0.7,
+            ICE_COLOUR: [225, 235, 240],
+        },
+        // The shoreline drawn on the contour layer where dry ground meets the sea or a lake (see
+        // ProceduralEngine#drawShoreline): the dry pixel darkened, the water pixel lightened
+        SHORELINE: {
+            DRY_COLOUR: [20, 25, 30],
+            DRY_ALPHA: 0.35,
+            WET_COLOUR: [235, 245, 250],
+            WET_ALPHA: 0.45,
+        },
+        // The 3D view (see Scene3D).
+        THREE_D: {
+            // How far up the terrain stands: the height in map pixels of one whole unit of elevation.
+            ALTITUDE_SCALE: 40,
+            // The sea's surface. The water's colour over the bed is already painted into the
+            // terrain, so the surface only adds a faint sheen: this opacity at the default water
+            // clarity, less for clearer water and more for murkier.
+            WATER_OPACITY: 0.2,
+            WATER_MIN_OPACITY: 0.05,
+            WATER_MAX_OPACITY: 0.5,
+            // How far above the sea's surface a surface biome (Pack Ice and the like) is raised,
+            // so the surface does not cover it.
+            SURFACE_LIFT: 0.05,
+        },
         // How far past a repaint area the colour, biome and contour painters also write: each pixel
         // there depends on its neighbours (contour lines sit between two pixels), so the ring just
         // outside the area is redrawn with it. See ProceduralEngine.getRepaintBounds.
@@ -168,23 +630,124 @@ export const FILRODENSWMB = {
     },
     HYDROLOGY: {
         RIVER_DENSITY: 40,
+        // The largest lake: MAX_LAKE_SIZE is the legacy limit in pixels, set per map (maps made
+        // before the current river rules keep theirs, and a river ends in a lake that reaches
+        // it). The current limits are in square pixels of a BASELINE_DIMENSION map, so they hold
+        // the same share of the world at any size or zoom: MAX_LAKE_AREA for any lake, and
+        // LOOP_LAKE_AREA for a lake that floods its own river's course on flat ground. A lake that
+        // reaches its limit is breached and the river flows on, if a way out lower than the lake
+        // lies within BREACH_AREA of it (see ProceduralEngine#breachBasin).
         MAX_LAKE_SIZE: 8000,
+        MAX_LAKE_AREA: 3000,
+        LOOP_LAKE_AREA: 20,
+        BREACH_AREA: 30000,
         SPRING_ALTITUDE_OFFSET: 0.25,
         SPRING_MOISTURE_MIN: 0.45,
+        // The legacy River Meander: random noise on the river trace, up to MEANDER_JITTER_MAX.
+        // Only maps made before the current river rules still use it (see
+        // TerrainVersion.usesCurrentRivers); the current setting is CHANNELS.MEANDER.
         MEANDER_JITTER: 0,
+        MEANDER_JITTER_MAX: 0.02,
+        // Custom rivers under the current river rules: the valley reaches MANUAL_RIVER_VALLEY_SPREAD
+        // times the channel's half-width either side of the line (see HydrologyEngine#carveValley),
+        // and the river drawn along it starts MANUAL_RIVER_START_SHARE as wide as its Width.
+        // MANUAL_RIVER_DEPTHS gives the depth for each Width (MANUAL_RIVER_DEFAULT_DEPTH for any
+        // other), of which the valley is MANUAL_RIVER_VALLEY_DEPTH as deep as the legacy trench.
+        MANUAL_RIVER_VALLEY_SPREAD: 5,
+        MANUAL_RIVER_VALLEY_DEPTH: 0.4,
+        MANUAL_RIVER_START_SHARE: 0.5,
+        MANUAL_RIVER_DEFAULT_DEPTH: 0.025,
         MANUAL_RIVER_DEPTHS: {
             2: 0.015,
             4: 0.025,
             6: 0.035,
             8: 0.05,
         },
+        // A river running downhill follows the slope measured STREAM_GRADIENT_REACH pixels either
+        // side of it, and may lag up to STREAM_SLACK pixels behind (see ProceduralEngine#followSlope)
+        STREAM_GRADIENT_REACH: 1.5,
+        STREAM_SLACK: 0.75,
+        // Procedural springs under the current river rules: RIVER_DENSITY * SPRING_CANDIDATES
+        // places are tried across the world (see RiverSources)
+        SPRING_CANDIDATES: 10,
         MAX_PATH_LENGTH: 5,
         MAX_RIVER_LENGTH_MULT: 1.5,
+        // A lake smaller than this (in square pixels of a BASELINE_DIMENSION map) is a pool the
+        // river is drawn across, rather than a lake it stops at (see RiverNetwork)...
+        POOL_AREA: 6,
+        // ... or one no wider than this, in pixels of a BASELINE_DIMENSION map from the shore to
+        // its middle (a string of water along a valley)
+        POOL_WIDTH: 1.5,
+        // How the traced rivers are drawn (see RiverNetwork). Lengths and widths are in pixels of
+        // a BASELINE_DIMENSION map unless they say otherwise.
+        CHANNELS: {
+            // Width: SOURCE_WIDTH + FLOW_WIDTH * sqrt(flow), where flow is the length of river
+            // upstream (tributaries included), times the slope factor, times WIDTH (the setting)
+            SOURCE_WIDTH: 0.8,
+            FLOW_WIDTH: 0.08,
+            WIDTH: 1,
+            // Slope, as elevation per baseline pixel measured over SLOPE_WINDOW either side:
+            // at or below FLAT_SLOPE the river is FLAT_FACTOR as wide, at or above STEEP_SLOPE
+            // STEEP_FACTOR as wide, in between in proportion
+            SLOPE_WINDOW: 6,
+            FLAT_SLOPE: 0.0004,
+            STEEP_SLOPE: 0.006,
+            FLAT_FACTOR: 1.35,
+            STEEP_FACTOR: 0.75,
+            // Over the last MOUTH_LENGTH before the sea a river widens by up to MOUTH_WIDENING
+            // times (on a flat coast)
+            MOUTH_LENGTH: 12,
+            MOUTH_WIDENING: 1.5,
+            // Never narrower than this half-width, in map pixels
+            MIN_RADIUS: 0.6,
+            // Smoothing of the pixel steps, and of the direction meanders are measured across
+            SMOOTHING: 1.6,
+            GUIDE_SMOOTHING: 6,
+            // Gentle wander everywhere: its size and wavelength
+            WANDER: 0.8,
+            WANDER_WAVELENGTH: 40,
+            // Meanders on flat ground: MEANDER is the setting (0 none, 1 default). On flat ground
+            // the river swings up to MEANDER_ANGLE radians either way (about 1.9 closes loops),
+            // over a wavelength of MEANDER_WAVELENGTH river widths (at least MEANDER_MIN_WAVELENGTH)
+            MEANDER: 1,
+            // Meanders are full at or below MEANDER_FLAT_SLOPE and gone at MEANDER_STEEP_SLOPE
+            MEANDER_FLAT_SLOPE: 0.0003,
+            MEANDER_STEEP_SLOPE: 0.0016,
+            MEANDER_ANGLE: 1.6,
+            MEANDER_WAVELENGTH: 16,
+            MEANDER_MIN_WAVELENGTH: 18,
+            // How much one bend differs from the next in size and length (0 all alike)
+            MEANDER_VARIETY: 0.6,
+            MEANDER_ROUNDNESS: 0.2,
+            MEANDER_RETURN: 0.6,
+            // Deltas (DELTA is the setting, 0 none, 1 default): a river carrying at least
+            // DELTA_MIN_FLOW whose last stretch is at least DELTA_FLATNESS flat (on the meander
+            // measure) splits DELTA_LENGTH * sqrt(flow) before the sea into up to DELTA_BRANCHES
+            // branches fanning out up to DELTA_ANGLE radians from its course, each
+            // DELTA_BRANCH_WIDTH as wide as the river at the fork
+            DELTA: 1,
+            DELTA_MIN_FLOW: 250,
+            DELTA_FLATNESS: 0.5,
+            DELTA_LENGTH: 2.2,
+            DELTA_BRANCHES: 5,
+            DELTA_ANGLE: 0.8,
+            DELTA_BRANCH_WIDTH: 0.5,
+            // (the river's drawn line must end within this many steps of its mouth)
+            DELTA_REACH_SLACK: 3,
+            // How much higher (elevation) than its own ground a bend may be pushed
+            MEANDER_CLIMB: 0.004,
+            // Spacing of the points while bending, and of the points drawn, in map pixels
+            SPACING: 0.75,
+            DRAWN_SPACING: 1.5,
+        },
     },
     CLIMATE: {
         WIND_DISTANCE: 40,
         ALTITUDE_COOLING: 0.4,
         FREEZING_THRESHOLD: 0.2,
+        // The sea bed deeper than this share of the sea level is Deep Ocean, shallower is
+        // Shallow Ocean (the built-in default for the bed under the sea)
+        DEEP_OCEAN_DEPTH: 0.5,
         THRESHOLDS: {
             TEMPERATURE: {
                 ARCTIC: 0.2,
@@ -213,10 +776,10 @@ export const FILRODENSWMB = {
         },
     },
     // Thresholds used by GridDataExporter to classify each Scene grid cell's terrain, moisture and
-    // temperature into the coarse bands documented in design/GRID-DATA-SCHEMA.md. Keeping these as
-    // named constants, rather than literals inside the exporter, is what keeps that document and
-    // the actual export in agreement - if a threshold changes here, the doc's tables need updating
-    // to match, but there is only ever one place that defines the real cut-points.
+    // temperature into the coarse bands published on the module wiki's "Grid Cell Data" page.
+    // Keeping these as named constants, rather than literals inside the exporter, means there is
+    // only ever one place that defines the real cut-points. If a threshold changes here, that
+    // page's band tables need updating to match, since other modules rely on them.
     GRID_DATA: {
         // Bump only for a breaking change to the flag's shape (a field removed, renamed, or
         // reinterpreted). Adding a new optional field to a cell does not require a bump - existing
@@ -305,6 +868,25 @@ export const FILRODENSWMB = {
         SAVANNA: 11,
         SUBTROPICAL_DESERT: 12,
         PACK_ICE: 13,
+    },
+    // Where a biome may appear, relative to water. Every biome has exactly one of these; see
+    // BiomePlacement for how each one maps onto the three places a biome can be drawn (dry
+    // land, the bed under water, and the surface of the water). The values are saved with
+    // custom biomes, so they must never be renamed.
+    BIOME_PLACEMENT: {
+        LAND: "land",
+        UNDERWATER: "underwater",
+        OVERWATER: "overwater",
+        LAND_UNDERWATER: "landUnderwater",
+        LAND_OVERWATER: "landOverwater",
+    },
+    // Placement of the built-in biomes that are not land-only. Every built-in biome missing
+    // from this list is land-only. Deep and Shallow Ocean are the default beds under the sea
+    // (the water itself is drawn over them); Pack Ice floats on the surface.
+    BUILT_IN_BIOME_PLACEMENT: {
+        DEEP_OCEAN: "underwater",
+        SHALLOW_OCEAN: "underwater",
+        PACK_ICE: "overwater",
     },
     COMPENDIUM: {
         NAME: "fwmb-maps",
@@ -408,6 +990,198 @@ export const FILRODENSWMB = {
             divergent: "#06b6d4",
             slip: "#f59e0b",
             hotspot: "#d97706",
+        },
+        // Tectonic features: the fault types of maps at the current terrain version (see
+        // TectonicFeatureEngine). A fault saved with `revision` at or above REVISION is a feature;
+        // any other fault keeps the original TectonicEngine maths.
+        FEATURES: {
+            REVISION: 2,
+            TYPES: {
+                RANGE: "range",
+                SUBDUCTION: "subduction",
+                RIFT: "rift",
+                HOTSPOT: "hotspot",
+            },
+            LABELS: {
+                range: "FILRODENSWMB.TECTONICS.Range",
+                subduction: "FILRODENSWMB.TECTONICS.Subduction",
+                rift: "FILRODENSWMB.TECTONICS.Rift",
+                hotspot: "FILRODENSWMB.TECTONICS.HotspotChain",
+            },
+            COLORS: {
+                range: "#ef4444",
+                subduction: "#a855f7",
+                rift: "#06b6d4",
+                hotspot: "#d97706",
+            },
+            DEFAULT_TYPE: "range",
+            // How far each type can change the terrain from its line, as a multiple of its
+            // thickness, so a regional crop keeps every feature that reaches into it. A hotspot
+            // chain's volcanoes stray from the line and stand on aprons much wider than their
+            // islands, so it reaches furthest.
+            REACH: {
+                range: 1.4,
+                subduction: 1.2,
+                rift: 2,
+                hotspot: 4,
+            },
+            // Converting an original fault when a map is updated to the current terrain version:
+            // the feature type each original type becomes (slip faults have none and are removed),
+            // and how its width changes. A rift's floor is narrower than an original divergent
+            // fault's valley, and a hotspot chain's islands are a share of its thickness
+            // (HOTSPOT.ISLAND_SHARE), where an original chain's volcanoes were its full thickness.
+            CONVERSION: {
+                convergent: { type: "range", thicknessScale: 1 },
+                divergent: { type: "rift", thicknessScale: 1.3 },
+                hotspot: { type: "hotspot", thicknessScale: 1.6, reverse: true },
+            },
+            RANGE_STYLES: {
+                simple: "FILRODENSWMB.TECTONICS.StyleSimple",
+                fold: "FILRODENSWMB.TECTONICS.StyleFold",
+                rugged: "FILRODENSWMB.TECTONICS.StyleRugged",
+            },
+            // Every width and length below is in pixels of a BASELINE_DIMENSION map unless it is
+            // a share of the feature's own width; heights are shares of the land's height range
+            // (1 - sea level) unless stated otherwise.
+            LINE: {
+                // Points per span between two control points, matching StudioCanvas#getSplinePoints
+                // so the terrain follows the curve the canvas draws
+                SPLINE_RESOLUTION: 20,
+                // The line field is worked out exactly on a grid this many cells across the
+                // feature's reach, and interpolated between (see LineField)
+                GRID_CELLS_PER_REACH: 24,
+                MAX_GRID_STEP: 12,
+                // The distance along the line is blurred over this share of the reach, so it does
+                // not jump on the inside of a bend
+                ALONG_SMOOTHING: 0.25,
+            },
+            RANGE: {
+                // Share of the half-width that stays at full height before the fronts fall away
+                PLATEAU: 0.2,
+                // How much the crest stands above the rest of the plateau
+                CREST: 0.35,
+                FRONT_NOISE: 0.15,
+                FRONT_NOISE_LENGTH: 30,
+                WANDER: 0.18,
+                WANDER_LENGTH: 180,
+                WIDTH_VARIATION: 0.25,
+                WIDTH_VARIATION_LENGTH: 140,
+                HEIGHT_VARIATION: 0.3,
+                HEIGHT_VARIATION_LENGTH: 110,
+                // Fade-in and fade-out at the ends, as multiples of the half-width
+                END_TAPER: 1.5,
+                // How far the range reaches, as a multiple of the half-width (with margin)
+                REACH: 1.4,
+                // Radius of the local mean the ground's own relief is measured against
+                RELIEF_RADIUS: 6,
+                STYLES: {
+                    // Simple builds its own rolling hills as well as enlarging the ground's, so it has
+                    // relief even where the ground has none (a Flat map)
+                    simple: { amplify: 1.8, valleyFloor: 0.45, spur: 0, fold: 0, peaks: 0, hills: 1, hillScale: 40 },
+                    fold: { amplify: 1.8, valleyFloor: 0.55, spur: 0, fold: 0.6, peaks: 0.4, hills: 0, foldAcross: 20, foldAlong: 120, peakScale: 50 },
+                    rugged: { amplify: 1.2, valleyFloor: 0.45, spur: 0.5, fold: 0, peaks: 0.35, hills: 0, spurAlong: 11, spurAcross: 45, peakScale: 30 },
+                },
+                DEFAULT_STYLE: "simple",
+            },
+            SUBDUCTION: {
+                DEFAULT_ARC_DISTANCE: 0.65,
+                DEFAULT_TRENCH_DEPTH: 0.35,
+                // Trench depth is a share of the sea level (the ocean's depth range)
+                OUTER_RISE: { HEIGHT: 0.12, AT: -0.45, WIDTH: 0.22 },
+                TRENCH: { AT: -0.04, OUTER_WIDTH: 0.14, INNER_WIDTH: 0.07, NOISE: 0.2, NOISE_LENGTH: 60 },
+                FOREARC: { HEIGHT: 0.22, RIDGES: 0.15, RIDGE_ALONG: 40, RIDGE_ACROSS: 6 },
+                ARC: { HEIGHT: 0.55, WIDTH: 0.15, NOISE: 0.35, NOISE_LENGTH: 25 },
+                WANDER: 0.12,
+                WANDER_LENGTH: 160,
+                // The width narrows along the line by up to this share of the width set, and never
+                // grows past it
+                WIDTH_VARIATION: 0.35,
+                WIDTH_VARIATION_LENGTH: 140,
+                END_TAPER: 0.8,
+                REACH: 1.2,
+                // Arc volcanoes: radius and spacing as shares of the width and of the radius
+                VOLCANO_RADIUS: 0.12,
+                VOLCANO_SPACING: 2.4,
+                VOLCANO_HEIGHT: 1.1,
+                VOLCANO_PULSES: 0.8,
+                VOLCANO_PULSE_LENGTH: 12,
+            },
+            RIFT: {
+                FLOOR: 0.35,
+                WALL_END: 0.75,
+                SHOULDER: 0.35,
+                INFILL: 0.4,
+                DEFAULT_FLOOR_TEXTURE: 0.5,
+                FLOOR_TEXTURE_HEIGHT: 0.12,
+                FLOOR_TEXTURE_LENGTH: 9,
+                // Length over which the master fault swaps sides
+                SEGMENT_LENGTH: 110,
+                MASTER_WALL_WIDTH: 0.06,
+                RAMP_STEPS: 3,
+                RAMP_STEP_WIDTH: 0.05,
+                WALL_NOISE: 0.08,
+                WALL_NOISE_LENGTH: 20,
+                TILT: 0.25,
+                BASIN_VARIATION: 0.3,
+                BASIN_LENGTH: 70,
+                WANDER: 0.15,
+                WANDER_LENGTH: 150,
+                // The width narrows along the rift by up to this share of the width set, and never
+                // grows past it
+                WIDTH_VARIATION: 0.4,
+                WIDTH_VARIATION_LENGTH: 120,
+                // Rolling hills on the shoulders, as a share of the depth, so they are not smooth
+                SHOULDER_TEXTURE: 0.15,
+                SHOULDER_TEXTURE_LENGTH: 30,
+                END_TAPER: 1.2,
+                REACH: 2,
+                RELIEF_RADIUS: 6,
+                VOLCANO_RADIUS: 0.55,
+                VOLCANO_SPACING: 1.6,
+                VOLCANO_HEIGHT: 1.4,
+            },
+            HOTSPOT: {
+                DEFAULT_SPACING: 1.8,
+                DEFAULT_SPACING_TREND: 0,
+                DEFAULT_SCATTER: 0.5,
+                DEFAULT_VARIATION: 1,
+                DEFAULT_PULSES: 1,
+                DEFAULT_VENTS: 0.5,
+                DEFAULT_DROWNED: 0.5,
+                PULSE_LENGTH: 9,
+                // A young island's typical radius at sea level, as a share of the chain's thickness
+                // (the band its volcanoes lie in, which the canvas shows around the line)
+                ISLAND_SHARE: 0.3,
+            },
+            VOLCANO: {
+                // Stations along a line (see Volcanoes.walkStations)
+                QUIET_ACTIVITY: 0.18,
+                STEP_SPREAD: 0.7,
+                PAUSE_THRESHOLD: 0.8,
+                PAUSE_THRESHOLD_SPREAD: 0.15,
+                PAUSE_LENGTH: 1.5,
+                BUSY_CROWDING: 0.3,
+                MAX_STEP: 4,
+                MIN_STEP: 0.25,
+                // Shield profile: a convex shield over a long concave apron
+                SHIELD_SHARE: 0.55,
+                SHIELD_WEIGHT: 0.62,
+                // Share of the footprint searched around a volcano's centre for its foot
+                FOOT_RING_SAMPLES: 24,
+                BLEND: 0.008,
+                LAGOON_DEPTH: 0.01,
+                REEF_HEIGHT: 0.004,
+                // Lava flows and slumps over a shield, as a share of its rise from the seabed (so a
+                // large volcano is as textured as a small one), plus a floor so small ones still show them
+                FLOW_NOISE: 0.05,
+                FLOW_NOISE_MIN: 0.012,
+                FLOW_NOISE_LENGTH: 7,
+                EROSION_NOISE_LENGTH: 4,
+                STRATO_WOBBLE: 0.16,
+                STRATO_WOBBLE_LENGTH: 11,
+                STRATO_GULLY_LENGTH: 4,
+                ANGLE_SAMPLES: 32,
+            },
         },
     },
     ENTITY_CONFIG: {

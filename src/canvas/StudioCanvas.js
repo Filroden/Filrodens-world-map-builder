@@ -1,9 +1,45 @@
 import { FILRODENSWMB } from "../config.js";
 import { resolvePinIconPath } from "../data/pinIcons.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { getRegionUploadResource } from "./RegionUploadResource.js";
+import { TerrainCompositor } from "./TerrainCompositor.js";
+import { CanvasTransforms } from "../tools/CanvasTransforms.js";
+import { LabelWidth } from "../tools/LabelWidth.js";
+
+/** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
+const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br: "nwse-resize", tr: "nesw-resize", bl: "nesw-resize" });
+
+/**
+ * Entities whose nodes may be dragged into the buffer around the map, so lines and outlines can
+ * span well outside the visible map. Single-point markers (pins, labels, decorations) and manual
+ * river nodes stay confined to the map itself, the same rule applied when these nodes are first
+ * created (see MapStudioApp's click handlers).
+ */
+const BUFFERED_NODE_TYPES = Object.freeze(["route", "region", "landMask", "fault"]);
+
+// Shortest time between two brush stamps sent to the app while the pointer moves with the button
+// held, however often the browser reports pointer moves
+const BRUSH_MOVE_INTERVAL_MS = 100;
+
+// Furthest (in screen pixels) the pointer may travel between pressing and releasing the right
+// button for it to count as a right-click rather than the end of a pan
+const RIGHT_CLICK_MAX_TRAVEL_PX = 5;
+
+const POINTER_BUTTON = Object.freeze({ PRIMARY: 0, MIDDLE: 1, SECONDARY: 2 });
+
+// Hex grid geometry: a hexagon's six corners lie 60 degrees apart, and a row grid's hexes are
+// turned a further 30 degrees so they stand pointy-topped. Staggered rows (or columns) of hexes
+// sit one and a half radii apart.
+const HEX_CORNERS = 6;
+const HEX_CORNER_ANGLE_DEG = 60;
+const POINTY_TOP_TURN_DEG = 30;
+const HEX_STAGGERED_SPACING = 1.5;
 
 export class StudioCanvas {
+    /** Whether destroy() has run (see destroy). */
+    #destroyed = false;
+
     constructor(htmlContainer) {
         this.container = htmlContainer;
 
@@ -26,9 +62,9 @@ export class StudioCanvas {
 
         // Initialise a strict z-index hierarchy of layers
         this.layers = {
-            base: new PIXI.Container(),
-            topography: new PIXI.Container(),
-            biomes: new PIXI.Container(),
+            // Elevation, relief shading, water and biomes, drawn together by one shader (see
+            // TerrainCompositor); which of them show is a shader setting, not layer visibility
+            terrain: new PIXI.Container(),
             // Companion highlight layer for the "Preview Rule Coverage" hover button - painted
             // alongside `biomes` on every repaint, but hidden until hovered.
             biomeFallback: new PIXI.Container(),
@@ -42,10 +78,11 @@ export class StudioCanvas {
             cartography: new PIXI.Container(),
         };
 
-        this.layers.biomes.alpha = FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
+        this.terrainCompositor = new TerrainCompositor(PIXI);
         this.layers.biomeFallback.visible = false;
 
-        // Vector Graphics Engine for non-pixel entities (Rivers, Roads, Borders)
+        // Vector Graphics Engine for non-pixel entities (custom river and fault guides, spring pins).
+        // Rivers themselves are drawn by the terrain shader (see TerrainCompositor).
         this.haloGraphics = new PIXI.Graphics();
         this.haloGraphics.filters = [new PIXI.AlphaFilter(0.15)];
         this.layers.features.addChild(this.haloGraphics);
@@ -55,9 +92,6 @@ export class StudioCanvas {
 
         this.faultGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.faultGraphics);
-
-        this.proceduralRiverGraphics = new PIXI.Graphics();
-        this.layers.features.addChild(this.proceduralRiverGraphics);
 
         this.featurePinGraphics = new PIXI.Graphics();
         this.layers.features.addChild(this.featurePinGraphics);
@@ -78,6 +112,11 @@ export class StudioCanvas {
 
         // --- Global Drag Handling ---
         this.activeDrag = null;
+        // What the pointer holds, for the canvas hint: null, "label", "decoration", "pin",
+        // "region" or "mask" (see #heldItemKind)
+        this.heldItem = null;
+        // The highlight box around a shape being dragged with Shift (see #drawShapeDragBox)
+        this.shapeDragBox = null;
         this.interactiveTargets = [];
 
         // Instantiate the grid layer
@@ -97,12 +136,12 @@ export class StudioCanvas {
         this.cropStart = { x: 0, y: 0 };
         this.cropOriginalBox = null;
         this.onCropUpdate = null;
+        // Called with the crop when a drag of it ends, so the app can snap it (see setCropBox)
+        this.onCropRelease = null;
 
         // Add them to the zooming stage in ascending order
         this.stage.addChild(
-            this.layers.base,
-            this.layers.topography,
-            this.layers.biomes,
+            this.layers.terrain,
             this.layers.biomeFallback,
             this.layers.contours,
             this.layers.landMasks,
@@ -220,24 +259,14 @@ export class StudioCanvas {
             return;
         }
 
-        // --- Label & Decoration Transformation Intercept ---
+        // --- Held Item Transformation Intercept ---
+        // While a label, decoration or pin is held with the left button, the wheel changes that
+        // item instead of the camera, so a slip of the wheel mid-drag never moves the view.
         const dragWrapper = this.activeDrag ? this.interactiveTargets.find((t) => t.target === this.activeDrag.target) : null;
-        const isTransformable = dragWrapper?.isLabel || dragWrapper?.isDecoration;
 
-        if (isTransformable) {
+        if (StudioCanvas.#isWheelTransformable(dragWrapper)) {
             e.preventDefault();
-            this.#beginDragOnce();
-            const target = this.activeDrag.target;
-
-            if (e.shiftKey && dragWrapper.isDecoration) {
-                const scale = isZoomIn ? config.SCALE_FACTOR : 1 / config.SCALE_FACTOR;
-                target.scale = (target.scale || 1) * scale;
-            } else if (!e.shiftKey) {
-                const rotation = isZoomIn ? -config.ROTATION_STEP : config.ROTATION_STEP;
-                target.rotation = (target.rotation || 0) + rotation;
-            }
-
-            if (this.onInfraDrag) this.onInfraDrag();
+            this.#transformHeldItem(dragWrapper, e.shiftKey, isZoomIn);
             return;
         }
 
@@ -259,6 +288,54 @@ export class StudioCanvas {
 
         this.#updateNodeScales();
         if (this.isCropMode) this.#drawCropOverlay();
+    }
+
+    /** Whether the wheel changes a held item rather than the camera (see #transformHeldItem). */
+    static #isWheelTransformable(wrapper) {
+        return !!(wrapper?.isLabel || wrapper?.isDecoration || wrapper?.isIconPin);
+    }
+
+    /**
+     * Applies one wheel notch to the held item: Shift resizes it, a plain notch rotates it.
+     * Labels and decorations rotate; pins have no rotation, so a plain notch does nothing to them.
+     * Rotation is kept between -180 and 180 degrees, the range of the edit dialogues' Rotation
+     * slider (see CanvasTransforms.normalizeAngle). Every item resizes in the same steps as its
+     * edit dialogue slider (see CanvasTransforms.stepValue).
+     *
+     * The first change counts as the start of a drag even if the item has not moved, so the
+     * state before it is recorded for undo, exactly as for a move.
+     */
+    #transformHeldItem(wrapper, isResize, isGrow) {
+        if (!isResize && wrapper.isIconPin) return;
+
+        this.#beginDragOnce();
+
+        if (isResize) {
+            this.#resizeHeldItem(wrapper, isGrow);
+        } else {
+            const rotation = isGrow ? -FILRODENSWMB.UI.WHEEL.ROTATION_STEP : FILRODENSWMB.UI.WHEEL.ROTATION_STEP;
+            wrapper.target.rotation = CanvasTransforms.normalizeAngle((wrapper.target.rotation || 0) + rotation);
+        }
+
+        if (this.onInfraDrag) this.onInfraDrag();
+    }
+
+    /**
+     * Resizes the held item by one wheel notch. A label's size is its font size (in rem, the value
+     * its edit dialogue shows); a pin's and a decoration's is their scale.
+     */
+    #resizeHeldItem(wrapper, isGrow) {
+        const target = wrapper.target;
+        const steps = isGrow ? 1 : -1;
+        const { LABEL_FONT_SIZE, PIN_SCALE, DECORATION_SCALE } = FILRODENSWMB.UI.WHEEL_RESIZE;
+
+        if (wrapper.isLabel) {
+            target.fontSize = CanvasTransforms.stepValue(target.fontSize || 1, steps, LABEL_FONT_SIZE);
+        } else if (wrapper.isIconPin) {
+            target.scale = CanvasTransforms.stepValue(target.scale || FILRODENSWMB.PINS.DEFAULT_SCALE, steps, PIN_SCALE);
+        } else {
+            target.scale = CanvasTransforms.stepValue(target.scale || 1, steps, DECORATION_SCALE);
+        }
     }
 
     #handlePointerDown(e, canvasElement) {
@@ -286,16 +363,22 @@ export class StudioCanvas {
             return;
         }
 
-        if (this.isEditMode && e.shiftKey && this.onInfraInsertNode) {
+        const hit = this.#getHitTarget(coords.x, coords.y);
+        const grabbedTarget = hit ? hit.target : null;
+
+        // Shift pressed on a node of a region or land mask picks up the whole shape (see
+        // #beginShapeDrag); Shift pressed anywhere else inserts a node on the nearest line or
+        // outline. Inserting a node on top of an existing node is never useful, so giving that
+        // press to the shape drag takes nothing away.
+        const isShapeGrab = e.shiftKey && !!hit?.shape;
+
+        if (this.isEditMode && e.shiftKey && !isShapeGrab && this.onInfraInsertNode) {
             e.preventDefault();
             e.stopPropagation();
             this.activeDrag = null;
             this.onInfraInsertNode(coords.x, coords.y);
             return;
         }
-
-        const hit = this.#getHitTarget(coords.x, coords.y);
-        const grabbedTarget = hit ? hit.target : null;
 
         if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
             e.preventDefault();
@@ -305,17 +388,16 @@ export class StudioCanvas {
             return;
         }
 
-        const rootApp = this.container.closest(".fwmb-layout") || document;
-        const isEraserActive = !!rootApp.querySelector('.fwmb-brush-tools button.active[data-tool="erasePin"]');
-
-        if (grabbedTarget && !isEraserActive) {
+        if (grabbedTarget) {
             e.preventDefault();
             e.stopPropagation();
             // The drag is only "armed" here. It becomes a real drag - recording its undo snapshot
             // and moving the item - once the pointer has travelled past the drag threshold (see
             // #beginDragOnce), so a plain click or double-click on an item changes nothing.
             this.activeDrag = { target: grabbedTarget, entityType: hit.entityType, originX: e.clientX, originY: e.clientY, started: false };
+            if (isShapeGrab) this.#beginShapeDrag(hit.shape, coords);
             canvasElement.style.cursor = "grabbing";
+            this.#setHeldItem(StudioCanvas.#heldItemKind(hit, this.activeDrag));
             return;
         }
 
@@ -341,69 +423,99 @@ export class StudioCanvas {
         e.stopPropagation();
     }
 
+    /**
+     * Routes a pointer move to whichever interaction is under way, in priority order: a crop box
+     * being drawn or moved, the crop tool's hover cursor, panning the reference image, panning the
+     * map, dragging a node or shape, painting with the brush, and finally plain hovering.
+     */
     #handlePointerMove(e, canvasElement) {
         const coords = this.#getMapCoordinates(e, canvasElement);
 
-        if (this.activeCropAction) return this.#processCropDrag(coords);
-
-        if (this.isCropMode && !this.activeCropAction) {
-            const zone = this.#getCropHitZone(coords.x, coords.y);
-            if (zone === "center") canvasElement.style.cursor = "move";
-            else if (zone === "tl" || zone === "br") canvasElement.style.cursor = "nwse-resize";
-            else if (zone === "tr" || zone === "bl") canvasElement.style.cursor = "nesw-resize";
-            else canvasElement.style.cursor = "crosshair";
+        if (this.activeCropAction) {
+            this.#processCropDrag(coords);
             return;
         }
-
+        if (this.isCropMode) {
+            this.#showCropCursor(coords, canvasElement);
+            return;
+        }
         if (this.isDraggingReference) {
-            const dx = coords.x - this.dragStart.x;
-            const dy = coords.y - this.dragStart.y;
-            this.dragStart = { x: coords.x, y: coords.y };
-            if (this.onReferencePan) this.onReferencePan(dx, dy);
+            this.#panReference(coords);
             return;
         }
-
-        // --- MAP PANNING ---
         if (this.isDragging) {
-            const dx = e.clientX - this.dragStart.x;
-            const dy = e.clientY - this.dragStart.y;
-            this.stage.position.x = this.stageStart.x + dx;
-            this.stage.position.y = this.stageStart.y + dy;
+            this.#panMap(e);
             return;
         }
-
-        // --- NODE DRAGGING ---
         if (this.activeDrag) {
-            if (!this.activeDrag.started && !this.#hasExceededDragThreshold(e)) return;
-            this.#beginDragOnce();
-
-            // Line/polygon nodes (routes, regions, land masks, fault lines) may be dragged into the
-            // buffer so they can span well outside the visible map. Single-point markers (pins,
-            // labels, decorations) and manual river nodes stay confined to the map itself - the same
-            // rule applied when these nodes are first created (see MapStudioApp's click handlers).
-            const bufferedTypes = ["route", "region", "landMask", "fault"];
-            const buffer = bufferedTypes.includes(this.activeDrag.entityType) ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
-            this.activeDrag.target.x = Math.max(-buffer, Math.min(coords.x, this.mapWidth + buffer));
-            this.activeDrag.target.y = Math.max(-buffer, Math.min(coords.y, this.mapHeight + buffer));
-            if (this.onInfraDrag) this.onInfraDrag();
+            this.#dragHeldItem(e, coords);
             return;
         }
-
         if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
-            const now = performance.now();
-            if (now - this.lastBrushTime > 100) {
-                this.onBrushMove(coords.x, coords.y);
-                this.lastBrushTime = now;
-            }
+            this.#paintBrushMove(coords);
             return;
         }
 
-        if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+        this.#hover(e, coords, canvasElement);
+    }
 
-        if (this.isEditMode && !this.isDragging && !this.activeDrag) {
-            const hit = this.#getHitTarget(coords.x, coords.y);
-            canvasElement.style.cursor = hit ? "grab" : "crosshair";
+    /** Shows which part of the crop box (a corner, the middle, or outside) the pointer is over. */
+    #showCropCursor(coords, canvasElement) {
+        const zone = this.#getCropHitZone(coords.x, coords.y);
+        canvasElement.style.cursor = CROP_ZONE_CURSORS[zone] ?? "crosshair";
+    }
+
+    /** Moves the reference image by how far the pointer has moved since the last move. */
+    #panReference(coords) {
+        const dx = coords.x - this.dragStart.x;
+        const dy = coords.y - this.dragStart.y;
+        this.dragStart = { x: coords.x, y: coords.y };
+        if (this.onReferencePan) this.onReferencePan(dx, dy);
+    }
+
+    /** Moves the map with the pointer, measured in screen pixels from where the pan started. */
+    #panMap(e) {
+        const dx = e.clientX - this.dragStart.x;
+        const dy = e.clientY - this.dragStart.y;
+        this.stage.position.x = this.stageStart.x + dx;
+        this.stage.position.y = this.stageStart.y + dy;
+    }
+
+    /**
+     * Moves the node or shape the pointer holds. Nothing moves until the pointer has travelled
+     * past the drag threshold, so a click on an item does not nudge it.
+     */
+    #dragHeldItem(e, coords) {
+        if (!this.activeDrag.started && !this.#hasExceededDragThreshold(e)) return;
+        this.#beginDragOnce();
+
+        if (this.activeDrag.shapeDrag) {
+            this.#moveDraggedShape(coords);
+            return;
         }
+
+        const buffer = BUFFERED_NODE_TYPES.includes(this.activeDrag.entityType) ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
+        this.activeDrag.target.x = Math.max(-buffer, Math.min(coords.x, this.mapWidth + buffer));
+        this.activeDrag.target.y = Math.max(-buffer, Math.min(coords.y, this.mapHeight + buffer));
+        if (this.onInfraDrag) this.onInfraDrag();
+    }
+
+    /** Paints a brush stamp at the pointer, at most once every BRUSH_MOVE_INTERVAL_MS. */
+    #paintBrushMove(coords) {
+        const now = performance.now();
+        if (now - this.lastBrushTime <= BRUSH_MOVE_INTERVAL_MS) return;
+
+        this.onBrushMove(coords.x, coords.y);
+        this.lastBrushTime = now;
+    }
+
+    /** Reports the pointer's position and, while editing, shows whether anything under it can be picked up. */
+    #hover(e, coords, canvasElement) {
+        if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+        if (!this.isEditMode) return;
+
+        const hit = this.#getHitTarget(coords.x, coords.y);
+        canvasElement.style.cursor = StudioCanvas.#hoverCursor(hit, e.shiftKey);
     }
 
     /**
@@ -424,6 +536,140 @@ export class StudioCanvas {
 
         this.activeDrag.started = true;
         if (this.onInfraDragStart) this.onInfraDragStart();
+    }
+
+    /**
+     * The cursor over the canvas while editing and not dragging: "move" over a node that would
+     * drag its whole shape with Shift held (see #beginShapeDrag), "grab" over anything else that
+     * can be picked up, and the crosshair elsewhere.
+     */
+    static #hoverCursor(hit, isShiftHeld) {
+        if (!hit) return "crosshair";
+        return isShiftHeld && hit.shape ? "move" : "grab";
+    }
+
+    /**
+     * What the pointer is holding, for the canvas hint (see CanvasHints): a region or land mask
+     * ("mask") dragged whole with Shift, or a label, decoration or pin, whose wheel gestures
+     * differ from the tool's own. Nodes and anything else give null, since the tool's hint
+     * already covers them.
+     */
+    static #heldItemKind(hit, activeDrag) {
+        if (activeDrag?.shapeDrag) return hit.entityType === "landMask" ? "mask" : "region";
+        if (hit.isLabel) return "label";
+        if (hit.isDecoration) return "decoration";
+        if (hit.isIconPin) return "pin";
+        return null;
+    }
+
+    /** Tells the app what the pointer now holds, when that changes (see #heldItemKind). */
+    #setHeldItem(kind) {
+        if (this.heldItem === kind) return;
+        this.heldItem = kind;
+        if (this.onHeldItemChange) this.onHeldItemChange(kind);
+    }
+
+    /**
+     * Starts moving a whole region or land mask: records where its points start (see
+     * CanvasTransforms.beginShapeDrag) and shows the highlight box around it straight away, so
+     * pressing with Shift shows what will move before anything does.
+     */
+    #beginShapeDrag(shape, coords) {
+        this.activeDrag.shapeDrag = CanvasTransforms.beginShapeDrag(shape, coords);
+        this.#drawShapeDragBox(this.activeDrag.shapeDrag.bounds);
+    }
+
+    /**
+     * Moves the shape being dragged with Shift so it follows the pointer. Shapes may reach into the
+     * buffer around the map, as their nodes can when dragged one at a time.
+     */
+    #moveDraggedShape(coords) {
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+        const limits = { minX: -buffer, minY: -buffer, maxX: this.mapWidth + buffer, maxY: this.mapHeight + buffer };
+        const drag = this.activeDrag.shapeDrag;
+        const offset = CanvasTransforms.moveShape(drag, coords, limits);
+
+        const { minX, minY, maxX, maxY } = drag.bounds;
+        this.#drawShapeDragBox({ minX: minX + offset.dx, minY: minY + offset.dy, maxX: maxX + offset.dx, maxY: maxY + offset.dy });
+
+        if (this.onInfraDrag) this.onInfraDrag();
+    }
+
+    /**
+     * Draws (or redraws) the highlight box around the shape being dragged with Shift. It is a
+     * direct child of the stage, above every layer, so redrawing the vector layers while the
+     * shape moves leaves it in place.
+     */
+    #drawShapeDragBox(bounds) {
+        if (!this.shapeDragBox || this.shapeDragBox.destroyed) {
+            this.shapeDragBox = new PIXI.Graphics();
+            this.shapeDragBox.alpha = FILRODENSWMB.UI.HIGHLIGHT.HELD_ALPHA;
+        }
+
+        const width = bounds.maxX - bounds.minX;
+        const height = bounds.maxY - bounds.minY;
+        this.shapeDragBox.clear();
+        this.#drawHighlightBox(this.shapeDragBox, width, height);
+        this.shapeDragBox.x = bounds.minX + width / 2;
+        this.shapeDragBox.y = bounds.minY + height / 2;
+
+        // Re-adding keeps it on top of anything added to the stage since it was first drawn
+        this.stage.addChild(this.shapeDragBox);
+    }
+
+    /** Lets go of the shape-drag box: it fades out the same way as the zoom-to-feature box. */
+    #releaseShapeDragBox() {
+        if (!this.shapeDragBox) return;
+        this.#fadeOutHighlight(this.shapeDragBox);
+        this.shapeDragBox = null;
+    }
+
+    /**
+     * Draws the shared highlight box (see FILRODENSWMB.UI.HIGHLIGHT) centred on the graphics
+     * object's origin, around a feature `width` by `height` map pixels. Line width, padding and
+     * corner radius are divided by the current zoom so the box looks the same at any zoom.
+     */
+    #drawHighlightBox(graphics, width, height) {
+        const { COLOR, LINE_WIDTH, FILL_ALPHA, CORNER_RADIUS } = FILRODENSWMB.UI.HIGHLIGHT;
+        const invScale = 1 / (this.stage.scale.x || 1);
+        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale;
+
+        graphics.lineStyle(LINE_WIDTH * invScale, COLOR, 1);
+        graphics.beginFill(COLOR, FILL_ALPHA);
+        graphics.drawRoundedRect(-width / 2 - pad, -height / 2 - pad, width + pad * 2, height + pad * 2, CORNER_RADIUS * invScale);
+        graphics.endFill();
+    }
+
+    /**
+     * Fades a highlight out while growing it slightly, then destroys it. Runs on the PIXI ticker
+     * and stops by itself if the canvas is torn down first.
+     */
+    #fadeOutHighlight(displayObject) {
+        const { FADE_FRAMES, FADE_GROWTH } = FILRODENSWMB.UI.HIGHLIGHT;
+        const startAlpha = displayObject.alpha;
+        let elapsed = 0;
+
+        const tick = () => {
+            // Safety escape if the user closes the app mid-animation
+            if (displayObject.destroyed) {
+                this.app.ticker.remove(tick);
+                return;
+            }
+
+            elapsed++;
+            const progress = elapsed / FADE_FRAMES;
+
+            // Ease-out fade combined with a gentle outward expansion
+            displayObject.alpha = startAlpha * (1 - Math.pow(progress, 2));
+            displayObject.scale.set(1 + progress * FADE_GROWTH);
+
+            if (elapsed >= FADE_FRAMES) {
+                displayObject.destroy();
+                this.app.ticker.remove(tick);
+            }
+        };
+
+        this.app.ticker.add(tick);
     }
 
     #processCropDrag(coords) {
@@ -476,46 +722,64 @@ export class StudioCanvas {
         }
     }
 
+    /**
+     * Ends whatever the released button was doing: the right or middle button ends a pan (a
+     * right-button release that barely moved counts as a right-click), and the primary button ends
+     * a crop, a reference pan, a node or shape drag, or a brush stroke.
+     */
     #handlePointerUp(e, canvasElement) {
         if (canvasElement.hasPointerCapture(e.pointerId)) {
             canvasElement.releasePointerCapture(e.pointerId);
         }
 
-        if (e.button === 2 || e.button === 1) {
-            this.isDragging = false;
-            if (e.button === 2 && this.dragStart) {
-                const dist = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
-                if (dist < 5 && this.onRightClick) this.onRightClick();
-            }
-            canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
+        if (e.button === POINTER_BUTTON.SECONDARY || e.button === POINTER_BUTTON.MIDDLE) {
+            this.#endPan(e, canvasElement);
             return;
         }
-
-        if (e.button === 0) {
-            if (this.activeCropAction) {
-                this.activeCropAction = null;
-                canvasElement.style.cursor = "crosshair";
-                return;
-            }
-            if (this.isDraggingReference) {
-                this.isDraggingReference = false;
-                canvasElement.style.cursor = "crosshair";
-                return;
-            }
-            if (this.activeDrag) {
-                const wasDragged = this.activeDrag.started;
-                this.activeDrag = null;
-                canvasElement.style.cursor = "crosshair";
-                if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
-                return;
-            }
-            if (this.isEditMode && this.onBrushEnd) {
-                this.onBrushEnd();
-            }
-        }
+        if (e.button === POINTER_BUTTON.PRIMARY) this.#endPrimaryAction(canvasElement);
     }
 
-    #handlePointerLeave(e, canvasElement) {
+    /** Ends a map pan, treating a right-button release close to where it was pressed as a right-click. */
+    #endPan(e, canvasElement) {
+        this.isDragging = false;
+        if (e.button === POINTER_BUTTON.SECONDARY && this.dragStart) {
+            const travel = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
+            if (travel < RIGHT_CLICK_MAX_TRAVEL_PX && this.onRightClick) this.onRightClick();
+        }
+        canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
+    }
+
+    /** Ends the primary-button interaction under way, the first of those listed on #handlePointerUp that applies. */
+    #endPrimaryAction(canvasElement) {
+        if (this.activeCropAction) {
+            this.activeCropAction = null;
+            canvasElement.style.cursor = "crosshair";
+            if (this.cropBox && this.onCropRelease) this.onCropRelease({ ...this.cropBox });
+            return;
+        }
+        if (this.isDraggingReference) {
+            this.isDraggingReference = false;
+            canvasElement.style.cursor = "crosshair";
+            return;
+        }
+        if (this.activeDrag) {
+            this.#endDrag(canvasElement);
+            return;
+        }
+        if (this.isEditMode && this.onBrushEnd) this.onBrushEnd();
+    }
+
+    /** Lets go of the node or shape being dragged, telling the app only if it actually moved. */
+    #endDrag(canvasElement) {
+        const wasDragged = this.activeDrag.started;
+        this.activeDrag = null;
+        this.#releaseShapeDragBox();
+        this.#setHeldItem(null);
+        canvasElement.style.cursor = "crosshair";
+        if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
+    }
+
+    #handlePointerLeave(_e, _canvasElement) {
         if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
             this.onCanvasHover(null, null);
         }
@@ -562,7 +826,16 @@ export class StudioCanvas {
             activeWindow.cancelAnimationFrame(this.animationFrameId);
         }
         if (this.resizeObserver) this.resizeObserver.disconnect();
-        if (this.app) this.app.destroy(true, { children: true, texture: true, baseTexture: true });
+
+        // Destroying a PIXI application twice fails part-way (its resize plugin has already been
+        // torn down), so it is only ever destroyed once
+        if (this.app && !this.#destroyed) {
+            // The terrain's mesh and textures go first: destroying them again after the stage
+            // has already destroyed its children would fail on the mesh's released geometry
+            this.terrainCompositor.destroy();
+            this.app.destroy(true, { children: true, texture: true, baseTexture: true });
+        }
+        this.#destroyed = true;
     }
 
     /**
@@ -583,7 +856,7 @@ export class StudioCanvas {
      */
     renderPixelBuffer(layerId, pixelBuffer, width, height, bounds = null) {
         const targetLayer = this.layers[layerId];
-        if (!targetLayer) return;
+        if (!targetLayer || this.#destroyed) return;
 
         this.mapWidth = width;
         this.mapHeight = height;
@@ -593,7 +866,7 @@ export class StudioCanvas {
         let sprite = this.layerSprites[layerId];
 
         // Setup the persistent sprite if it does not exist or resolution has changed
-        if (!sprite || sprite.width !== width || sprite.height !== height) {
+        if (sprite?.width !== width || sprite.height !== height) {
             if (sprite) sprite.destroy(true);
 
             // The texture keeps its own copy of the pixels, decoupled from the engine's buffer
@@ -622,23 +895,47 @@ export class StudioCanvas {
     }
 
     /**
-     * Renders procedural, non-interactive water vectors.
+     * Sends the terrain's images (see TerrainShading) to the GPU and draws them on the terrain
+     * layer. As with renderPixelBuffer, `bounds` limits the upload to the rows that changed.
+     *
+     * @param {{surface: Uint8Array, underwater: Uint8Array, aux: Uint8Array, rivers: Uint8Array}} buffers - RGBA images of the whole map.
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @param {object|null} bounds - The pixels that changed since the last call.
      */
-    renderProceduralRivers(rivers, waterMask) {
-        if (!this.proceduralRiverGraphics) return;
+    renderTerrain(buffers, width, height, bounds = null) {
+        if (this.#destroyed) return;
 
-        this.proceduralRiverGraphics.clear();
-        this.proceduralRiverGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
+        this.mapWidth = width;
+        this.mapHeight = height;
+        this.#updateGlobalMask();
 
-        if (rivers && rivers.length > 0) {
-            this.#drawRivers(rivers, waterMask);
+        if (this.terrainCompositor.update(buffers, width, height, bounds)) {
+            this.layers.terrain.removeChildren();
+            this.layers.terrain.addChild(this.terrainCompositor.displayObject);
+        }
+
+        if (!this.hasGeneratedMap) {
+            this.resetCamera();
+            this.hasGeneratedMap = true;
         }
     }
 
     /**
-     * Renders interactive feature pins (like Springs and Blockers).
+     * Changes how the terrain is drawn (see TerrainCompositor.setSettings): the layer switches,
+     * biome opacity, relief strength and water settings. Nothing is repainted.
+     * @param {object} changes
      */
-    renderFeaturePins(mapPins, isFeatureEdit) {
+    setTerrainSettings(changes) {
+        this.terrainCompositor.setSettings(changes);
+    }
+
+    /**
+     * Renders interactive feature pins (like Springs and Blockers), and, while editing, the
+     * procedural springs placed on the current terrain (see RiverSources) as rings, so they can
+     * be moved or removed like the user's own.
+     */
+    renderFeaturePins(mapPins, isFeatureEdit, proceduralSprings = []) {
         if (!this.featurePinGraphics) return;
 
         this.featurePinGraphics.clear();
@@ -647,37 +944,22 @@ export class StudioCanvas {
         if (mapPins && mapPins.length > 0) {
             this.#drawMapPins(mapPins, isFeatureEdit);
         }
+        if (isFeatureEdit) this.#drawProceduralSprings(proceduralSprings);
     }
 
-    #drawRivers(rivers, waterMask) {
-        const waterColor = 0x78aad2;
-        const frozenColor = 0xe1ebf0;
-
-        for (const river of rivers) {
-            if (!river.path || river.path.length < 2) continue;
-            this.#drawSingleRiver(river.path, waterColor, frozenColor, waterMask);
+    /** Draws the procedural springs as rings, each a target that can be dragged or removed. */
+    #drawProceduralSprings(springs) {
+        const style = FILRODENSWMB.DISPLAY.PROCEDURAL_SPRING;
+        const radius = FILRODENSWMB.DISPLAY.PIN_RADIUS;
+        const scale = this.stage.scale.x || 1;
+        for (const spring of springs) {
+            const x = spring.x + 0.5;
+            const y = spring.y + 0.5;
+            this.featurePinGraphics.lineStyle({ width: style.LINE_WIDTH / scale, color: style.COLOUR, alpha: style.ALPHA });
+            this.featurePinGraphics.drawCircle(x, y, radius);
+            this.interactiveTargets.push({ target: spring, x, y, radius: Math.max(radius, style.HIT_RADIUS), entityType: "proceduralSpring", entityId: spring.id });
         }
-    }
-
-    #drawSingleRiver(path, waterColor, frozenColor, waterMask) {
-        if (!path || path.length === 0) return;
-
-        let currentIsFrozen = path[0].isFrozen;
-        this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-        this.proceduralRiverGraphics.moveTo(path[0].x, path[0].y);
-
-        for (let i = 1; i < path.length; i++) {
-            const point = path[i];
-
-            // If the climate crosses the freezing threshold, snap the line and change colours
-            if (point.isFrozen !== currentIsFrozen) {
-                currentIsFrozen = point.isFrozen;
-                this.proceduralRiverGraphics.lineStyle(2, currentIsFrozen ? frozenColor : waterColor, 0.9);
-                this.proceduralRiverGraphics.moveTo(point.x, point.y);
-            } else {
-                this.proceduralRiverGraphics.lineTo(point.x, point.y);
-            }
-        }
+        this.featurePinGraphics.lineStyle(0);
     }
 
     /**
@@ -752,12 +1034,10 @@ export class StudioCanvas {
     }
 
     /**
-     * Dynamically adjusts the alpha transparency of the Biome layer.
+     * Sets the opacity of the biomes over the ground (a terrain shader setting).
      */
     setBiomeOpacity(alphaValue) {
-        if (this.layers.biomes) {
-            this.layers.biomes.alpha = alphaValue;
-        }
+        this.setTerrainSettings({ biomeAlpha: alphaValue });
     }
 
     /**
@@ -775,67 +1055,89 @@ export class StudioCanvas {
 
         if (!isVisible || type === "none") return;
 
-        // 1. Initialise the masking container if it does not exist
+        this.#maskGridToMap();
+
+        // Configure the drawing line styles
+        this.gridLayer.lineStyle(1, 0xffffff, FILRODENSWMB.DISPLAY.GRID_ALPHA);
+
+        const cellSize = Math.max(FILRODENSWMB.LIMITS.MIN_GRID_SIZE, Number(size));
+        if (type === "square") this.#drawSquareGrid(cellSize);
+        else if (type === "hexR" || type === "hexC") this.#drawHexGrid(cellSize, type === "hexR");
+    }
+
+    /**
+     * Clips the grid layer to the map, so hexes drawn past the edges (see #drawHexGrid) are cut
+     * off cleanly at the map's border. The mask is created the first time and reused after.
+     */
+    #maskGridToMap() {
         if (!this.gridMask) {
             this.gridMask = new PIXI.Graphics();
             this.stage.addChild(this.gridMask);
         }
 
-        // 2. Build the bounding-box clipping mask to capture edge overflows
         this.gridMask.beginFill(0xffffff);
         this.gridMask.drawRect(0, 0, this.mapWidth, this.mapHeight);
         this.gridMask.endFill();
         this.gridLayer.mask = this.gridMask;
+    }
 
-        // 3. Configure the drawing line styles
-        this.gridLayer.lineStyle(1, 0xffffff, FILRODENSWMB.DISPLAY.GRID_ALPHA);
+    /** Draws square grid lines every `cellSize` map pixels, starting at the map's top-left corner. */
+    #drawSquareGrid(cellSize) {
+        for (let x = 0; x <= this.mapWidth; x += cellSize) {
+            this.gridLayer.moveTo(x, 0).lineTo(x, this.mapHeight);
+        }
+        for (let y = 0; y <= this.mapHeight; y += cellSize) {
+            this.gridLayer.moveTo(0, y).lineTo(this.mapWidth, y);
+        }
+    }
 
-        const width = this.mapWidth;
-        const height = this.mapHeight;
-        const s = Math.max(10, Number(size));
+    /**
+     * Draws a hex grid whose hexes are `cellSize` map pixels across their flat sides. Row grids
+     * (`isRow`) have pointy-topped hexes in rows, every other row shifted by half a hex; column
+     * grids have flat-topped hexes in columns, every other column shifted.
+     *
+     * Hexes start one column and one row before the map and run one hex past its far edges, so
+     * the partial hexes along every edge are drawn complete and then clipped by the grid mask
+     * (see #maskGridToMap), rather than left open.
+     */
+    #drawHexGrid(cellSize, isRow) {
+        const radius = cellSize / Math.sqrt(3);
+        const spacing = {
+            x: isRow ? cellSize : radius * HEX_STAGGERED_SPACING,
+            y: isRow ? radius * HEX_STAGGERED_SPACING : cellSize,
+        };
 
-        if (type === "square") {
-            for (let x = 0; x <= width; x += s) {
-                this.gridLayer.moveTo(x, 0).lineTo(x, height);
-            }
-            for (let y = 0; y <= height; y += s) {
-                this.gridLayer.moveTo(0, y).lineTo(width, y);
-            }
-        } else if (type === "hexR" || type === "hexC") {
-            const isRow = type === "hexR";
-            const r = s / Math.sqrt(3);
-            const widthDist = isRow ? s : r * 1.5;
-            const heightDist = isRow ? r * 1.5 : s;
-
-            // Intentionally sampling from column -1 to guarantee edge completion
-            for (let col = -1; col * widthDist < width + s; col++) {
-                for (let row = -1; row * heightDist < height + s; row++) {
-                    let cx, cy;
-
-                    if (isRow) {
-                        const offset = row % 2 === 0 ? 0 : s / 2;
-                        cx = col * widthDist + offset;
-                        cy = row * heightDist;
-                    } else {
-                        const offset = col % 2 === 0 ? 0 : s / 2;
-                        cx = col * widthDist;
-                        cy = row * heightDist + offset;
-                    }
-
-                    // Draw the 6 structural vertices of the Hexagon
-                    for (let i = 0; i < 6; i++) {
-                        const angle_deg = 60 * i - (isRow ? 30 : 0);
-                        const angle_rad = (Math.PI / 180) * angle_deg;
-                        const px = cx + r * Math.cos(angle_rad);
-                        const py = cy + r * Math.sin(angle_rad);
-
-                        if (i === 0) this.gridLayer.moveTo(px, py);
-                        else this.gridLayer.lineTo(px, py);
-                    }
-                    this.gridLayer.closePath();
-                }
+        for (let col = -1; col * spacing.x < this.mapWidth + cellSize; col++) {
+            for (let row = -1; row * spacing.y < this.mapHeight + cellSize; row++) {
+                const centre = StudioCanvas.#hexCentre(col, row, spacing, cellSize, isRow);
+                this.#drawHexagon(centre, radius, isRow);
             }
         }
+    }
+
+    /** The centre of the hex at `col`, `row`: every odd row (row grids) or odd column (column grids) is shifted by half a hex. */
+    static #hexCentre(col, row, spacing, cellSize, isRow) {
+        if (isRow) {
+            const offset = row % 2 === 0 ? 0 : cellSize / 2;
+            return { x: col * spacing.x + offset, y: row * spacing.y };
+        }
+
+        const offset = col % 2 === 0 ? 0 : cellSize / 2;
+        return { x: col * spacing.x, y: row * spacing.y + offset };
+    }
+
+    /** Draws one hexagon's outline through its six corners, turned so row grids' hexes are pointy-topped. */
+    #drawHexagon(centre, radius, isRow) {
+        for (let i = 0; i < HEX_CORNERS; i++) {
+            const angleDeg = HEX_CORNER_ANGLE_DEG * i - (isRow ? POINTY_TOP_TURN_DEG : 0);
+            const angleRad = (Math.PI / 180) * angleDeg;
+            const px = centre.x + radius * Math.cos(angleRad);
+            const py = centre.y + radius * Math.sin(angleRad);
+
+            if (i === 0) this.gridLayer.moveTo(px, py);
+            else this.gridLayer.lineTo(px, py);
+        }
+        this.gridLayer.closePath();
     }
 
     /**
@@ -1032,7 +1334,10 @@ export class StudioCanvas {
         const sortedRoutes = [...routes].sort((a, b) => a.thickness - b.thickness);
 
         this.routeGraphics.clear();
-        this.pinContainer.removeChildren().forEach((c) => c.destroy(true));
+        // Pin icons come from PIXI's shared texture cache (Texture.from), so the sprites are
+        // destroyed without their textures. Destroying the texture as well would force the next
+        // redraw to load and rasterise every icon again, creating fresh GPU textures each time.
+        this.pinContainer.removeChildren().forEach((c) => c.destroy());
         this.nodeContainer.removeChildren().forEach((c) => c.destroy(true));
 
         // 1. Render Routes (Bottom Layer)
@@ -1097,38 +1402,9 @@ export class StudioCanvas {
 
             if (isEditMode) {
                 // The hit radius must expand to match the new size
-                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2, entityType: "pin", entityId: pin.id });
-            } else if (!this.isEditMode && (pin.name || pin.description)) {
-                // Keep PIXI hover events for tooltips ONLY when the global canvas is not in ANY edit mode
-                sprite.eventMode = "static";
-                sprite.interactive = true;
-                sprite.cursor = "help";
-
-                sprite.on("pointerover", () => {
-                    const tooltip = document.getElementById("fwmb-infra-tooltip");
-                    if (!tooltip) return;
-
-                    let html = ``;
-                    if (pin.name) html += `<strong>${pin.name}</strong>`;
-                    if (pin.description) html += `<span>${pin.description.replaceAll("\n", "<br>")}</span>`;
-
-                    tooltip.innerHTML = html;
-                    tooltip.classList.remove("fwmb-hidden");
-                });
-
-                sprite.on("pointermove", (e) => {
-                    const tooltip = document.getElementById("fwmb-infra-tooltip");
-                    if (!tooltip) return;
-
-                    const evt = e.data.originalEvent;
-                    tooltip.style.left = `${evt.clientX}px`;
-                    tooltip.style.top = `${evt.clientY - 15}px`;
-                });
-
-                sprite.on("pointerout", () => {
-                    const tooltip = document.getElementById("fwmb-infra-tooltip");
-                    if (tooltip) tooltip.classList.add("fwmb-hidden");
-                });
+                // isIconPin: a map pin with an icon, which can be resized with the wheel while held
+                // (see #transformHeldItem), unlike the Terrain Features tool's river source pins
+                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2, entityType: "pin", entityId: pin.id, isIconPin: true });
             }
 
             this.pinContainer.addChild(sprite);
@@ -1286,44 +1562,12 @@ export class StudioCanvas {
         this.#updateNodeScales();
 
         // --- Animated Target Highlight ---
-        const invScale = 1 / targetScale;
-        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale; // Maintain constant visual padding at any zoom
-
         const highlight = new PIXI.Graphics();
-        highlight.lineStyle(4 * invScale, 0x00e5ff, 1);
-        highlight.beginFill(0x00e5ff, 0.15);
-        highlight.drawRoundedRect(-trueWidth / 2 - pad, -trueHeight / 2 - pad, trueWidth + pad * 2, trueHeight + pad * 2, 12 * invScale);
-        highlight.endFill();
-
+        this.#drawHighlightBox(highlight, trueWidth, trueHeight);
         highlight.x = centerX;
         highlight.y = centerY;
         this.stage.addChild(highlight);
-
-        // Fire a self-cleaning animation loop directly into the PIXI ticker
-        let elapsed = 0;
-        const duration = 90; // Approx 1.5 seconds at 60fps
-
-        const tick = () => {
-            // Safety escape if the user closes the app mid-animation
-            if (highlight.destroyed) {
-                this.app.ticker.remove(tick);
-                return;
-            }
-
-            elapsed++;
-            const progress = elapsed / duration;
-
-            // Ease-out fade combined with a gentle outward expansion
-            highlight.alpha = 1 - Math.pow(progress, 2);
-            highlight.scale.set(1 + progress * 0.15);
-
-            if (elapsed >= duration) {
-                highlight.destroy();
-                this.app.ticker.remove(tick);
-            }
-        };
-
-        this.app.ticker.add(tick);
+        this.#fadeOutHighlight(highlight);
     }
 
     async updateReferenceImage(url, x, y, scale, alpha) {
@@ -1377,7 +1621,7 @@ export class StudioCanvas {
         this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
 
         // Extract native OS root font size to mimic CSS 'rem' behaviour
-        const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+        const rootFontSize = LabelWidth.rootFontSize();
 
         // Dynamically scale vectors based on the canvas dimensions
         const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
@@ -1413,11 +1657,13 @@ export class StudioCanvas {
                 dropShadowDistance: 2,
             };
 
-            // 2. Apply Word Wrapping & Justification
-            const rawMaxWidth = labelData.maxWidth || 0;
-            if (rawMaxWidth > 0) {
+            // 2. Apply Word Wrapping & Justification. The maximum width is a number of characters
+            // of this label's own font and size (see LabelWidth), so resizing the label or changing
+            // its font keeps its line breaks.
+            const wrapWidth = LabelWidth.wrapWidth(labelData, size, resScale);
+            if (wrapWidth > 0) {
                 styleConfig.wordWrap = true;
-                styleConfig.wordWrapWidth = rawMaxWidth * resScale;
+                styleConfig.wordWrapWidth = wrapWidth;
                 styleConfig.align = labelData.justify || "left";
             }
 
@@ -1665,6 +1911,9 @@ export class StudioCanvas {
             reference: this.layers.reference.visible,
             cartography: this.layers.cartography.visible,
             landMasks: this.layers.landMasks.visible,
+            terrain: this.layers.terrain.visible,
+            contours: this.layers.contours.visible,
+            features: this.layers.features.visible,
         };
 
         this.layers.reference.visible = false;
@@ -1676,9 +1925,7 @@ export class StudioCanvas {
         if (passType === "player") {
             this.gridLayer.visible = false;
         } else if (passType === "gm") {
-            this.layers.base.visible = false;
-            this.layers.topography.visible = false;
-            this.layers.biomes.visible = false;
+            this.layers.terrain.visible = false;
             this.layers.contours.visible = false;
             this.layers.features.visible = false;
             this.gridLayer.visible = false;
@@ -1711,11 +1958,10 @@ export class StudioCanvas {
         this.layers.reference.visible = originalVisibility.reference;
         this.layers.cartography.visible = originalVisibility.cartography;
         this.layers.landMasks.visible = originalVisibility.landMasks;
-        this.layers.base.visible = true;
-        this.layers.topography.visible = true;
-        this.layers.biomes.visible = true;
-        this.layers.contours.visible = true;
-        this.layers.features.visible = true;
+        // Each layer goes back to how the person had it, rather than always to visible
+        this.layers.terrain.visible = originalVisibility.terrain;
+        this.layers.contours.visible = originalVisibility.contours;
+        this.layers.features.visible = originalVisibility.features;
 
         return new Promise((resolve) => {
             canvas.toBlob((blob) => {
@@ -1794,11 +2040,25 @@ export class StudioCanvas {
 
             this.#drawCropOverlay();
             if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+            if (this.onCropRelease) this.onCropRelease({ ...this.cropBox });
         }
     }
 
     getCropData() {
         return this.cropBox;
+    }
+
+    /**
+     * Replaces the crop (while the crop tool is showing) and redraws it, as when the app snaps a
+     * crop the user has drawn to the one a regional map will actually use.
+     *
+     * @param {{x: number, y: number, width: number, height: number}} box - The crop, in map pixels.
+     */
+    setCropBox(box) {
+        if (!this.isCropMode || !box) return;
+        this.cropBox = { x: box.x, y: box.y, width: box.width, height: box.height };
+        this.#drawCropOverlay();
+        if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
     }
 
     #drawCropOverlay() {
@@ -1913,6 +2173,8 @@ export class StudioCanvas {
                     cap: PIXI.LINE_CAP.ROUND,
                 });
                 this.#drawVectorPath(this.faultGraphics, spline, "solid", 3);
+                // A reversed feature is laid out from its last point to its first, and its markers follow suit
+                if (TectonicFeatureEngine.isFeature(fault)) this.#drawFeatureMarkers(fault.type, fault.reversed ? [...spline].reverse() : spline, colorHex);
             }
 
             // 2. Draw Edit Nodes LAST so they always render on top of the geometry
@@ -1921,6 +2183,91 @@ export class StudioCanvas {
                 this.#renderEditNodes(fault.points, this.faultGraphics, isActive, fault, "fault");
             }
         });
+    }
+
+    /**
+     * Marks a tectonic feature's line with the symbol geological maps use for it, so its type and
+     * the direction it was drawn in (which decides which plate a subduction zone's volcanoes stand
+     * on, and which end of a hotspot chain is youngest) can be read on the map:
+     *   - subduction: triangles on the overriding plate's side (anticlockwise from the drawing
+     *     direction, the left-hand side on screen), pointing towards it;
+     *   - mountain range: triangles on both sides, as for a thrust belt;
+     *   - rift: short ticks on both sides, as for normal faults;
+     *   - hotspot chain: arrowheads pointing along the line towards its youngest end.
+     *
+     * Markers are drawn at a fixed spacing along the spline, sized for the screen at the current
+     * zoom, and skip the line's ends so they never sit on an edit node.
+     *
+     * @param {string} type - The feature type.
+     * @param {{x: number, y: number}[]} spline - The drawn line.
+     * @param {number} color - The line's colour.
+     */
+    #drawFeatureMarkers(type, spline, color) {
+        const scale = this.stage.scale.x || 1;
+        const size = FEATURE_MARKER.SIZE / scale;
+        const spacing = FEATURE_MARKER.SPACING / scale;
+        const graphics = this.faultGraphics;
+        const types = FILRODENSWMB.TECTONICS.FEATURES.TYPES;
+
+        this.#forEachAlongSpline(spline, spacing, (x, y, dx, dy) => {
+            // Left of (dx, dy) on screen (y pointing down) is (dy, -dx)
+            const nx = dy;
+            const ny = -dx;
+            if (type === types.SUBDUCTION) this.#drawMarkerTriangle(graphics, x, y, nx, ny, dx, dy, size, color);
+            else if (type === types.RANGE) {
+                this.#drawMarkerTriangle(graphics, x, y, nx, ny, dx, dy, size, color);
+                this.#drawMarkerTriangle(graphics, x, y, -nx, -ny, dx, dy, size, color);
+            } else if (type === types.RIFT) this.#drawMarkerTicks(graphics, x, y, nx, ny, size, color);
+            else if (type === types.HOTSPOT) this.#drawMarkerArrow(graphics, x, y, dx, dy, size, color);
+        });
+    }
+
+    /** Calls fn(x, y, dx, dy) every `spacing` pixels along the spline, leaving its ends clear. */
+    #forEachAlongSpline(spline, spacing, fn) {
+        let travelled = 0;
+        let next = spacing / 2;
+        for (let i = 0; i < spline.length - 1; i++) {
+            const a = spline[i];
+            const b = spline[i + 1];
+            const length = Math.hypot(b.x - a.x, b.y - a.y);
+            if (length === 0) continue;
+            const dx = (b.x - a.x) / length;
+            const dy = (b.y - a.y) / length;
+            while (next <= travelled + length) {
+                const along = next - travelled;
+                fn(a.x + dx * along, a.y + dy * along, dx, dy);
+                next += spacing;
+            }
+            travelled += length;
+        }
+    }
+
+    /** A filled triangle standing on the line at (x, y), pointing towards (nx, ny). */
+    #drawMarkerTriangle(graphics, x, y, nx, ny, dx, dy, size, color) {
+        const half = size * FEATURE_MARKER.TRIANGLE_BASE;
+        graphics.lineStyle(0);
+        graphics.beginFill(color, FEATURE_MARKER.ALPHA);
+        graphics.drawPolygon([x - dx * half, y - dy * half, x + dx * half, y + dy * half, x + nx * size, y + ny * size]);
+        graphics.endFill();
+    }
+
+    /** A short tick either side of the line at (x, y). */
+    #drawMarkerTicks(graphics, x, y, nx, ny, size, color) {
+        graphics.lineStyle({ width: FEATURE_MARKER.TICK_WIDTH / (this.stage.scale.x || 1), color, alpha: FEATURE_MARKER.ALPHA });
+        graphics.moveTo(x + nx * size * FEATURE_MARKER.TICK_GAP, y + ny * size * FEATURE_MARKER.TICK_GAP);
+        graphics.lineTo(x + nx * size, y + ny * size);
+        graphics.moveTo(x - nx * size * FEATURE_MARKER.TICK_GAP, y - ny * size * FEATURE_MARKER.TICK_GAP);
+        graphics.lineTo(x - nx * size, y - ny * size);
+    }
+
+    /** An arrowhead on the line at (x, y), pointing along (dx, dy). */
+    #drawMarkerArrow(graphics, x, y, dx, dy, size, color) {
+        const back = size * FEATURE_MARKER.ARROW_LENGTH;
+        const half = size * FEATURE_MARKER.TRIANGLE_BASE;
+        graphics.lineStyle(0);
+        graphics.beginFill(color, FEATURE_MARKER.ALPHA);
+        graphics.drawPolygon([x + dx * size, y + dy * size, x - dx * back + dy * half, y - dy * back - dx * half, x - dx * back - dy * half, y - dy * back + dx * half]);
+        graphics.endFill();
     }
 
     renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null) {
@@ -1984,6 +2331,10 @@ export class StudioCanvas {
         if (!points || points.length === 0) return;
 
         const hitRadius = 10 / (this.stage.scale.x || 1);
+        // Nodes of shapes that can be moved whole (Shift + drag) carry the shape itself, so the
+        // drag can reach every point and the label (see #beginShapeDrag). A shape still being
+        // drawn is not offered: its outline is not finished, and right-click would end it anyway.
+        const shape = FILRODENSWMB.UI.SHAPE_DRAG_TYPES.includes(entityType) && !isActive ? parentEntity : null;
 
         points.forEach((pt, index) => {
             const isLast = isActive && index === points.length - 1;
@@ -1996,6 +2347,7 @@ export class StudioCanvas {
                 entityType: entityType,
                 entityId: parentEntity.id,
                 layerId: layerId,
+                shape,
             });
         });
     }
@@ -2107,18 +2459,12 @@ export class StudioCanvas {
 
         const invScale = 1 / (this.stage.scale.x || 1);
         const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale;
-
-        const boxWidth = trueWidth + pad * 2;
-        const boxHeight = trueHeight + pad * 2;
         const boxX = -trueWidth / 2 - pad;
         const boxY = -trueHeight / 2 - pad;
 
         // 1. Draw the bounding box
         const graphics = new PIXI.Graphics();
-        graphics.lineStyle(4 * invScale, 0x00e5ff, 1);
-        graphics.beginFill(0x00e5ff, 0.15);
-        graphics.drawRoundedRect(boxX, boxY, boxWidth, boxHeight, 12 * invScale);
-        graphics.endFill();
+        this.#drawHighlightBox(graphics, trueWidth, trueHeight);
         this.actionPreview.addChild(graphics);
 
         // 2. Add the dynamic text label
@@ -2186,3 +2532,15 @@ export class StudioCanvas {
         }
     }
 }
+
+// Tectonic feature line markers (see StudioCanvas#drawFeatureMarkers): sizes and spacing in screen
+// pixels at the zoom they are drawn at, shapes as shares of the marker size
+const FEATURE_MARKER = {
+    SIZE: 9,
+    SPACING: 48,
+    TRIANGLE_BASE: 0.6,
+    ARROW_LENGTH: 0.6,
+    TICK_GAP: 0.2,
+    TICK_WIDTH: 2,
+    ALPHA: 0.9,
+};

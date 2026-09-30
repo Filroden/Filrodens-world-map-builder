@@ -2,21 +2,24 @@
     <div class="fwmb-brush-settings">
         {{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs"}}
 
-        <div class="fwmb-brush-setting">
-            <label>{{localize "FILRODENSWMB.UI.BrushStrength"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="brushStrength" value="{{lookup uiState 'brushStrength'}}" min="0.01" max="0.05" step="0.01" />
-                <output>{{lookup uiState 'brushStrength'}}</output>
+        {{#unless (eq uiState.terrainBrushTool "roughen")}}
+            <!-- Roughen always lays the same texture, so it has no strength or feather -->
+            <div class="fwmb-brush-setting">
+                <label>{{localize "FILRODENSWMB.UI.BrushStrength"}}</label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="brushStrength" value="{{lookup uiState 'brushStrength'}}" min="0.01" max="0.05" step="0.01" />
+                    <output>{{lookup uiState 'brushStrength'}}</output>
+                </div>
             </div>
-        </div>
 
-        <div class="fwmb-brush-setting">
-            <label>{{localize "FILRODENSWMB.UI.BrushFeather"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="brushFeather" value="{{lookup uiState 'brushFeather'}}" min="0" max="0.8" step="0.1" />
-                <output>{{lookup uiState 'brushFeather'}}</output>
+            <div class="fwmb-brush-setting">
+                <label>{{localize "FILRODENSWMB.UI.BrushFeather"}}</label>
+                <div class="fwmb-slider-group">
+                    <input type="range" name="brushFeather" value="{{lookup uiState 'brushFeather'}}" min="0" max="0.8" step="0.1" />
+                    <output>{{lookup uiState 'brushFeather'}}</output>
+                </div>
             </div>
-        </div>
+        {{/unless}}
     </div>
 
     <div class="fwmb-divider-vertical"></div>
@@ -30,6 +33,9 @@
         </button>
         <button type="button" data-action="setBrushTool" data-tool="smooth" class="fwmb-btn {{#if (eq uiState.terrainBrushTool 'smooth')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSmooth'}}">
             <i class="fwmb-icon landscape"></i>
+        </button>
+        <button type="button" data-action="setBrushTool" data-tool="roughen" class="fwmb-btn {{#if (eq uiState.terrainBrushTool 'roughen')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRoughen'}}">
+            <i class="fwmb-icon scatter-plot"></i>
         </button>
         <button type="button" data-action="setBrushTool" data-tool="slopeUp" class="fwmb-btn {{#if (eq uiState.terrainBrushTool 'slopeUp')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSlopeUp'}}">
             <i class="fwmb-icon slope"></i>

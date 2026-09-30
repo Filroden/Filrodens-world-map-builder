@@ -1,0 +1,28 @@
+{{!--
+    A labelled range slider: the name, an optional info icon and the current value sit on a line
+    above the slider, so the slider itself can take the full width of its container.
+
+    Parameters (all passed as hash arguments to the partial):
+      name: the input's name, which is also the uiState key it reads and writes
+      label: localisation key for the slider's name
+      hint: optional localisation key for the info icon's tooltip
+      value: the current value
+      min, max, step
+      display: optional text to show as the value when first drawn, if it should be formatted
+                differently from the raw value (for example with thousands separators); once the
+                slider moves, the raw value is shown
+      class: optional extra classes for the wrapper
+
+    The value display and the slider's filled portion are kept in step with the slider by
+    RangeDisplay (see src/tools/RangeDisplay.js), which finds the value through .fwmb-range.
+--}}
+<div class="fwmb-range{{#if class}} {{class}}{{/if}}">
+    <div class="fwmb-range-header">
+        <label class="fwmb-range-label">
+            <span class="fwmb-range-name">{{localize label}}</span>
+            {{#if hint}}<i class="fwmb-icon info" data-tooltip="{{localize hint}}"></i>{{/if}}
+        </label>
+        <output class="fwmb-range-value">{{#if display}}{{display}}{{else}}{{value}}{{/if}}</output>
+    </div>
+    <input type="range" class="fwmb-range-input" name="{{name}}" value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}" aria-label="{{localize label}}" />
+</div>

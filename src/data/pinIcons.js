@@ -195,9 +195,10 @@ export async function updateCustomPinIcon(id, { name, path }) {
 }
 
 /**
- * Removes a custom icon's registry entry. Deliberately does not touch the referenced file -
- * it was never uploaded or owned by the module (see the "live reference, not a copy" design
- * decision) - and does not check usage; call findPinIconUsage()/revertPinIconUsage() first.
+ * Removes a custom icon's registry entry. Deliberately does not touch the referenced file: a
+ * custom icon is only a reference to an SVG the GM already has in their Foundry data, never
+ * uploaded or copied by the module, so the file is not the module's to delete. It also does not
+ * check usage; call findPinIconUsage()/revertPinIconUsage() first.
  */
 export async function removeCustomPinIconEntry(id) {
     const icons = getCustomPinIcons().filter((entry) => entry.id !== id);

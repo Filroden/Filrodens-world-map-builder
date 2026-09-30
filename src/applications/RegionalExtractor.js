@@ -1,27 +1,42 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
+import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
+import { BrushEngine } from "../tools/BrushEngine.js";
+import { UpwindMargin } from "../tools/UpwindMargin.js";
+import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 
 export class RegionalExtractor {
     /**
      * Orchestrates the mathematical scaling and data translation for a regional crop.
      * Returns a perfectly formatted payload ready to be saved to the database.
      */
-    static createPayload(app, cropBox) {
+    static createPayload(app, drawnCropBox) {
         const state = foundry.utils.deepClone(app.uiState);
+        // Read before the state is scaled to the crop: the parent's own wind reach decides how
+        // much of its ground beyond the crop the regional map's climate needs
+        const upwindMargin = this.#buildUpwindMargin(app, state);
 
-        // 1. Calculate Grid Snapping & Scale Factors
-        const baseTargetWidth = state.regionalTargetWidth;
-        const tempZoomScale = baseTargetWidth / cropBox.width;
-
-        const targetGridSize = Math.max(10, Math.round(state.gridSize * tempZoomScale));
-        const targetWidth = Math.max(targetGridSize, Math.round(baseTargetWidth / targetGridSize) * targetGridSize);
-
-        const zoomScale = targetWidth / cropBox.width;
-        const rawHeight = cropBox.height * zoomScale;
-        const targetHeight = Math.max(targetGridSize, Math.round(rawHeight / targetGridSize) * targetGridSize);
+        // 1. Size, zoom and grid. From here on the crop is the one the regional map actually
+        // shows, snapped from the drawn one so its grid lines up with the parent's (see planCrop)
+        const { cropBox, zoomScale, targetWidth, targetHeight, gridSize } = this.planCrop(drawnCropBox, state.regionalTargetWidth, { type: state.gridType, size: state.gridSize }, app.mapWidth ?? state.mapWidth, app.mapHeight ?? state.mapHeight);
 
         // 2. Mutate Map State Properties
-        this.#applyScaleToState(state, cropBox, zoomScale, targetWidth, targetHeight, app.mapHeight);
+        // A legacy regional parent does not record the size of the map at the top of its chain;
+        // app.legacyRootSize holds it if it was found when the parent was loaded.
+        const rootSize = app.legacyRootSize ?? null;
+        const world = TerrainVersion.deriveChildWorld(state, cropBox, zoomScale, rootSize);
+        const windDistance = TerrainVersion.getRegionalWindDistance(state, cropBox, rootSize);
+        this.#applyScaleToState(state, cropBox, zoomScale, targetWidth, targetHeight, app.mapHeight, gridSize);
+
+        // A regional map is always built with the current terrain rules, whatever revision its
+        // parent was made with, so it gets the corrected wind distance and the extra detail.
+        // Both the world description and the wind distance are worked out from the parent's
+        // unscaled state, since #applyScaleToState overwrites the size they are derived from.
+        state.terrainVersion = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        state.world = world;
+        state.windDistance = windDistance;
 
         // 3. Derive Map Parameters
         const { currentSeed, params: newParams } = MapStateManager.getDerivedMapParameters(state, app.customBiomeColors);
@@ -41,6 +56,8 @@ export class RegionalExtractor {
         return {
             seed: currentSeed,
             generationEngine: state.generationEngine,
+            terrainVersion: state.terrainVersion,
+            world: state.world,
             springsBaked: true,
             mapWidth: targetWidth,
             mapHeight: targetHeight,
@@ -50,19 +67,118 @@ export class RegionalExtractor {
             customBiomes: state.customBiomes,
             customRouteStyles: state.customRouteStyles,
             customLabelStyles: state.customLabelStyles,
-            history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight),
-            tectonicFaults: translate(app.tectonicFaults),
-            manualRivers: translate(app.manualRivers),
-            mapPins: translate(app.mapPins),
+            history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
+            tectonicFaults: this.#translateFaults(app.tectonicFaults ?? [], cropBox, zoomScale, targetWidth, targetHeight),
+            manualRivers: this.#scaleRiverWidths(translate(app.manualRivers), zoomScale),
+            mapPins: [...translate(app.mapPins), ...this.#riverInflows(app, cropBox, zoomScale, targetWidth, targetHeight)],
             mapRoutes: translate(app.mapRoutes),
             regionLayers: newRegions,
             mapLabels: translate(app.mapLabels),
+            landMasks: state.generationEngine === "guided" ? this.#translateLandMasks(app.landMasks ?? [], cropBox, zoomScale) : [],
             mapDecorations: translate(app.mapDecorations),
+            upwindMargin: upwindMargin(cropBox, zoomScale),
             parentId: app.currentSaveId,
         };
     }
 
-    static #applyScaleToState(state, cropBox, zoomScale, targetWidth, targetHeight, originalMapHeight) {
+    /**
+     * The parent's ground either side of the crop, which the regional map's climate reads when
+     * it looks upwind past its own left or right edge (see UpwindMargin). Returns a function of
+     * the crop and zoom, since those are settled after the parent's settings are read here.
+     */
+    static #buildUpwindMargin(app, parentState) {
+        const { params } = MapStateManager.getDerivedMapParameters(parentState, app.customBiomeColors ?? {});
+        const parent = {
+            elevation: app.currentElevationData ?? null,
+            width: app.mapWidth,
+            height: app.mapHeight,
+            windDistance: ProceduralEngine.getWindDistance(app.mapWidth, params),
+            margin: app.upwindMargin ?? null,
+        };
+        return (cropBox, zoomScale) => UpwindMargin.build(parent, cropBox, zoomScale);
+    }
+
+    /**
+     * Works out the regional map a drawn crop makes: its size, its zoom, its grid, and the part of
+     * the parent it actually shows.
+     *
+     * Foundry always starts a scene's grid at the scene's top-left corner, and the grid itself
+     * cannot be shifted. So a regional map's grid lines up with its parent's only when the crop's
+     * top-left corner sits on a point of the parent's grid and the regional grid is exactly the
+     * parent's scaled by the zoom. The crop is therefore snapped:
+     * - Its top-left corner moves to the nearest point where the parent's grid pattern starts
+     *   again (see #gridPeriod): a cell corner on a square grid; on a hex grid, the same place in
+     *   the pattern, which repeats every two rows (or columns).
+     * - The regional grid is the parent's at the requested zoom, rounded to a whole pixel, and
+     *   the zoom becomes that grid divided by the parent's, so the two scale exactly.
+     * - The regional map is the requested width, and its height is the crop's at that zoom to the
+     *   nearest pixel; the crop's size follows (a fraction of a percent from what was drawn).
+     * - The crop is kept inside the parent, by moving it back a whole grid period if needed.
+     * The zoom is the same across and down, so the latitude range matches the terrain.
+     *
+     * A gridless parent has nothing to line up with: the zoom is the requested width divided by
+     * the crop's, and the crop keeps its corner (its height moves by under a pixel).
+     *
+     * Regional maps used to be rounded to whole grid cells instead, with the width rounded
+     * (changing the zoom) and the height rounded separately. That never lined the grids up (the
+     * corner was not snapped), changed the requested width, left a grid that did not fit the
+     * rounded size, and stretched or squeezed latitude down the map against its terrain: a
+     * 125 x 100 crop at 800 wide, with a 50 pixel grid, made a 960 x 640 map showing 83 rows of the
+     * parent's terrain under 100 rows' worth of latitude.
+     *
+     * @param {{x: number, y: number, width: number, height: number}} cropBox - The crop as drawn, in the parent's pixels.
+     * @param {number} baseTargetWidth - The requested width of the regional map.
+     * @param {{type: string, size: number}} grid - The parent's grid type ("none", "square", "hexR" or "hexC") and size.
+     * @param {number} mapWidth - The parent's width.
+     * @param {number} mapHeight - The parent's height.
+     * @returns {{cropBox: {x: number, y: number, width: number, height: number}, zoomScale: number, targetWidth: number, targetHeight: number, gridSize: number}}
+     *   The crop the regional map shows, the zoom, the regional map's size and its grid size.
+     */
+    static planCrop(cropBox, baseTargetWidth, grid, mapWidth, mapHeight) {
+        const parentGrid = Math.max(this.#MIN_GRID, Number(grid.size) || this.#MIN_GRID);
+        const period = this.#gridPeriod(grid.type, parentGrid);
+        const requestedWidth = Math.max(1, Math.round(baseTargetWidth));
+
+        // The zoom: exactly regional grid / parent grid when there is a grid to line up
+        const gridSize = Math.max(this.#MIN_GRID, Math.round((parentGrid * requestedWidth) / cropBox.width));
+        const zoomScale = period ? gridSize / parentGrid : requestedWidth / cropBox.width;
+
+        // The size, no larger than the parent can show at this zoom
+        const targetWidth = Math.min(requestedWidth, Math.max(1, Math.floor(mapWidth * zoomScale + 1e-9)));
+        const targetHeight = Math.min(Math.max(1, Math.floor(mapHeight * zoomScale + 1e-9)), Math.max(1, Math.round(cropBox.height * zoomScale)));
+        const width = targetWidth / zoomScale;
+        const height = targetHeight / zoomScale;
+
+        const x = period ? this.#snapToPeriod(cropBox.x, period.x, mapWidth - width) : Math.max(0, Math.min(mapWidth - width, cropBox.x));
+        const y = period ? this.#snapToPeriod(cropBox.y, period.y, mapHeight - height) : Math.max(0, Math.min(mapHeight - height, cropBox.y + (cropBox.height - height) / 2));
+
+        return { cropBox: { x, y, width, height }, zoomScale, targetWidth, targetHeight, gridSize };
+    }
+
+    /** The smallest grid size Foundry allows (see FILRODENSWMB.LIMITS.MIN_GRID_SIZE). */
+    static #MIN_GRID = FILRODENSWMB.LIMITS.MIN_GRID_SIZE;
+
+    /**
+     * How far apart, across and down, the points are where a grid's pattern starts again, in the
+     * grid's own pixels; null for a gridless map. A square grid repeats every cell. A hex grid's
+     * size is the distance between its flat sides, and its offset rows (or columns) make the
+     * pattern repeat every two of them: two rows of pointed-top hexes are 1.5 hex heights, which
+     * is size x sqrt(3), apart (and likewise across for flat-topped columns).
+     */
+    static #gridPeriod(type, size) {
+        if (type === "square") return { x: size, y: size };
+        if (type === "hexR") return { x: size, y: size * Math.sqrt(3) };
+        if (type === "hexC") return { x: size * Math.sqrt(3), y: size };
+        return null;
+    }
+
+    /** The multiple of `step` nearest `value`, between 0 and `limit` (moving back a step if needed). */
+    static #snapToPeriod(value, step, limit) {
+        const last = Math.max(0, Math.floor(limit / step + 1e-9));
+        return Math.min(last, Math.max(0, Math.round(value / step))) * step;
+    }
+
+    static #applyScaleToState(state, cropBox, zoomScale, targetWidth, targetHeight, originalMapHeight, gridSize) {
         state.mapWidth = targetWidth;
         state.mapHeight = targetHeight;
 
@@ -70,7 +186,9 @@ export class RegionalExtractor {
         state["noise.offsetY"] = (state["noise.offsetY"] + cropBox.y) * zoomScale;
         state["noise.moistureOffset"] = (state["noise.moistureOffset"] || FILRODENSWMB.NOISE.OFFSET_MOISTURE) * zoomScale;
         state["noise.tempOffset"] = (state["noise.tempOffset"] || FILRODENSWMB.NOISE.OFFSET_TEMP) * zoomScale;
-        state.windDistance = (state.windDistance || FILRODENSWMB.CLIMATE.WIND_DISTANCE) * zoomScale;
+        // The wind distance is not scaled here. It is set by createPayload from
+        // TerrainVersion.getRegionalWindDistance, because the right value depends on the crop's
+        // shape rather than its zoom (getWindDistance already scales it by the map's size).
 
         state["noise.elevation.scale"] *= zoomScale;
         state["noise.moisture.scale"] *= zoomScale;
@@ -80,7 +198,7 @@ export class RegionalExtractor {
         const latRange = Math.abs(originalLatTop - state.latBottom);
         state.latTop = originalLatTop - (cropBox.y / originalMapHeight) * latRange;
         state.latBottom = originalLatTop - ((cropBox.y + cropBox.height) / originalMapHeight) * latRange;
-        state.gridSize = Math.max(10, Math.round(state.gridSize * zoomScale));
+        state.gridSize = gridSize;
 
         if (state.cartographyScaleEnable && state.cartographyScaleX !== undefined) {
             state.cartographyScaleX = (state.cartographyScaleX - cropBox.x) * zoomScale;
@@ -92,10 +210,30 @@ export class RegionalExtractor {
         }
     }
 
-    static #translateHistory(history, cropBox, zoomScale, targetWidth, targetHeight) {
+    /**
+     * The elevation each of the parent's slope and Level strokes anchors to (see
+     * BrushEngine.resolveAnchors), or an empty map if the parent's terrain is not available.
+     */
+    static #resolveAnchors(app, seaLevel) {
+        const engine = app.brushEngine;
+        if (!engine?.resolveAnchors || !app.baseElevationData) return new Map();
+        return engine.resolveAnchors(app.baseElevationData, seaLevel, ProceduralOrchestrator.getBaseRoughness(app));
+    }
+
+    /**
+     * Converts the brush strokes into the regional map's pixels, keeping those that reach into
+     * the crop. A slope or Level stroke also keeps the elevation it anchored to on the parent
+     * (`anchors`, see BrushEngine.resolveAnchors), since the regional map cannot find it itself
+     * when the stroke starts outside the crop. A slope stroke also records how many regional
+     * pixels one pixel of the map it was painted on spans (`scale`, compounding through each crop),
+     * so it climbs to the same height over the same stretch of the world (see BrushEngine).
+     */
+    static #translateHistory(history, cropBox, zoomScale, targetWidth, targetHeight, anchors = new Map()) {
         const newHistory = [];
         for (const stroke of history) {
             const translatedStroke = foundry.utils.deepClone(stroke);
+            if (anchors.has(stroke)) translatedStroke.anchor = anchors.get(stroke);
+            if (BrushEngine.isSlope(stroke)) translatedStroke.scale = (stroke.scale ?? 1) * zoomScale;
             translatedStroke.size *= zoomScale;
             let isVisible = false;
 
@@ -110,6 +248,130 @@ export class RegionalExtractor {
             if (isVisible) newHistory.push(translatedStroke);
         }
         return newHistory;
+    }
+
+    /**
+     * Converts fault lines and hotspot chains into the regional map's pixels, scaling their
+     * thickness with the crop as brush sizes are, so a fault is as wide in the world on the
+     * regional map as on its parent. (Its noise and its hotspot spacing follow the zoom in
+     * TectonicEngine, so the two together make the fault look the same.)
+     *
+     * A fault is kept when its width reaches into the crop anywhere, not only when one of its
+     * points lies inside: a fault crossing the crop between two points outside it, or running
+     * just outside its edge, still deforms the terrain inside.
+     */
+    static #translateFaults(faults, cropBox, zoomScale, targetWidth, targetHeight) {
+        const translated = [];
+
+        for (const fault of faults) {
+            const scaled = foundry.utils.deepClone(fault);
+            scaled.thickness = (fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS) * zoomScale;
+            scaled.points = (fault.points ?? []).map((point) => ({
+                ...point,
+                x: (point.x - cropBox.x) * zoomScale,
+                y: (point.y - cropBox.y) * zoomScale,
+            }));
+
+            // A tectonic feature reaches further from its line than its thickness (a rift's shoulders,
+            // a hotspot chain's volcanoes), so each fault is kept by its own reach. A kept fault
+            // keeps its whole line, even the parts far outside the crop: a feature is laid out along
+            // its whole length (a hotspot chain's volcanoes, a range's taper towards its ends), so
+            // cutting the line would change the part inside the crop.
+            if (this.#reachesCrop(scaled.points, TectonicFeatureEngine.reachOf(scaled), targetWidth, targetHeight)) translated.push(scaled);
+        }
+
+        return translated;
+    }
+
+    /**
+     * Whether a line of points, widened by `reach` on every side, overlaps the regional map. The
+     * test uses the line's bounding box, so it may keep a line that passes near a corner without
+     * entering; that costs nothing, since a fault outside the map changes no pixel.
+     */
+    static #reachesCrop(points, reach, targetWidth, targetHeight) {
+        if (points.length === 0) return false;
+
+        const xs = points.map((point) => point.x);
+        const ys = points.map((point) => point.y);
+        return Math.max(...xs) + reach >= 0 && Math.min(...xs) - reach <= targetWidth && Math.max(...ys) + reach >= 0 && Math.min(...ys) - reach <= targetHeight;
+    }
+
+    /**
+     * Converts every land mask into the regional map's pixels, keeping all of them.
+     *
+     * Unlike other vector features, a land mask cannot be dropped just because none of its points
+     * falls inside the crop: a crop taken from the middle of a large continent has no mask points
+     * inside it at all, yet the continent's mask is exactly what makes it land. Masks wholly
+     * outside the crop still shape it too, since guided terrain is shaped by coastlines up to
+     * Continent Scale away. Keeping them all is what lets the regional map build the same
+     * coastline its parent did (see ProceduralEngine.generateGuidedTopography); the terrain
+     * pass works out which ones are near enough to matter.
+     */
+    static #translateLandMasks(landMasks, cropBox, zoomScale) {
+        return landMasks.map((mask) => {
+            const translated = foundry.utils.deepClone(mask);
+            translated.points = translated.points.map((point) => ({
+                x: (point.x - cropBox.x) * zoomScale,
+                y: (point.y - cropBox.y) * zoomScale,
+            }));
+            return translated;
+        });
+    }
+
+    /**
+     * Records on each custom river how much wider than its Width it is drawn and carved
+     * (`widthScale`, compounding through crops of crops), so it is as wide in the world as on
+     * the parent map. The Width itself stays as it was, since it also picks the channel's depth
+     * (see HydrologyEngine).
+     */
+    static #scaleRiverWidths(rivers, zoomScale) {
+        for (const river of rivers) river.widthScale = (river.widthScale ?? 1) * zoomScale;
+        return rivers;
+    }
+
+    /**
+     * A spring for every river that flows into the crop from outside it, placed where the river
+     * crosses the crop's edge and carrying the flow the river has gathered by then (`inflow`, in
+     * baseline pixels of river upstream, see RiverNetwork). Without these, the regional map would
+     * only have the rivers whose sources lie inside it: a great river crossing the region would
+     * vanish, and the rest would all start as narrow streams.
+     *
+     * Only a river's first entry into the crop gets a spring. If it leaves and comes back, its
+     * return is traced from the first spring anyway, or joins the river that spring starts. A
+     * custom river needs none where it enters along its own line: the line is carried over.
+     *
+     * @returns {object[]} Spring pins, in the regional map's pixels.
+     */
+    static #riverInflows(app, cropBox, zoomScale, targetWidth, targetHeight) {
+        const rivers = app.currentRiverData?.vectors ?? [];
+        const flows = app.currentRiverData?.network?.flows;
+        if (!flows) return [];
+
+        const inside = (point) => point.x >= cropBox.x && point.x < cropBox.x + cropBox.width && point.y >= cropBox.y && point.y < cropBox.y + cropBox.height;
+        const pins = [];
+        for (const river of rivers) {
+            const entry = river.path.findIndex((point, i) => i > 0 && inside(point) && !inside(river.path[i - 1]));
+            // A custom river entering along its own line is carried over as a custom river
+            if (entry < 0 || entry < (river.authored ?? 0)) continue;
+
+            const point = river.path[entry];
+            pins.push({
+                id: foundry.utils.randomID(),
+                name: game.i18n.localize("FILRODENSWMB.UI.RiverInflow"),
+                x: this.#clampInside((point.x - cropBox.x) * zoomScale, targetWidth),
+                y: this.#clampInside((point.y - cropBox.y) * zoomScale, targetHeight),
+                type: "spring",
+                radius: FILRODENSWMB.DISPLAY.PIN_RADIUS,
+                visibility: "all",
+                inflow: flows.get(river.id)?.[entry] ?? 0,
+            });
+        }
+        return pins;
+    }
+
+    /** A coordinate kept a pixel inside the map, so a spring on the edge is traced from a real pixel. */
+    static #clampInside(value, size) {
+        return Math.min(size - 2, Math.max(1, Math.round(value)));
     }
 
     static #translateVectorList(list, cropBox, zoomScale, targetWidth, targetHeight) {

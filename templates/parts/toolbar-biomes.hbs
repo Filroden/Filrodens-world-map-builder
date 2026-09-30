@@ -22,13 +22,17 @@
                      keeps it out of the dropdown itself; it only ever appears as the current
                      value, set programmatically by the Eraser toolbar icon. --}}
                 <option value="0" disabled hidden {{#if (eq uiState.brushBiome 0)}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ToolEraseBiome"}}</option>
-                {{#each biomeList}}
-                    <option value="{{this.id}}" {{#if (eq ../uiState.brushBiome this.id)}}selected{{/if}}>
-                        <div class="fwmb-swatch small" style="background-color: {{this.hex}};"></div>
-                        {{#if this.isCustom}}{{this.label}}{{else}}{{localize this.label}}{{/if}}
-                    </option>
+                {{#each biomeGroups}}
+                    <optgroup label="{{localize this.label}}">
+                        {{#each this.biomes}}
+                            <option value="{{this.id}}" {{#if (eq @root.uiState.brushBiome this.id)}}selected{{/if}}>
+                                <div class="fwmb-swatch small" style="background-color: {{this.hex}};"></div>
+                                {{#if this.isCustom}}{{this.label}}{{else}}{{localize this.label}}{{/if}}
+                            </option>
+                        {{/each}}
+                    </optgroup>
                 {{/each}}
             </select>
         </div>
     </div>
-</div>
+</div>

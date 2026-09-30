@@ -1,9 +1,23 @@
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
+import { RiverNetwork } from "./RiverNetwork.js";
+
+/** Spacing, in map pixels, of the points a custom river's spline is sampled at. */
+const SPLINE_STEP = 0.25;
 
 /**
- * Dedicated engine to manage manual hydrological vector deformations,
- * enforcing monotonic downhill flow and organic bank generation.
+ * Custom rivers: the line the user draws, the ground shaped around it, and (under the legacy
+ * river rules) the spring a procedural river is traced from along it.
+ *
+ * Two sets of rules, chosen by the map's terrain revision (see TerrainVersion.usesCurrentRivers):
+ *
+ * - Legacy: a trench is carved along the line, down to a bed that never rises, and a spring is
+ *   placed near its top (getRiverSources) so the procedural trace runs down the trench. The
+ *   drawn river is wherever that trace goes.
+ * - Current: the line itself is the river (authoredRivers, traced by ProceduralEngine before any
+ *   spring), and the ground is shaped into a valley around it (#carveValley) that keeps the
+ *   ground's own texture, so the river looks like any procedural river and sits where it was
+ *   drawn.
  */
 export class HydrologyEngine {
     static MATH = {
@@ -11,17 +25,50 @@ export class HydrologyEngine {
     };
 
     /**
-     * Iterates through all manual rivers and carves their physical trenches into the elevation data.
+     * Shapes the ground along every custom river.
+     *
+     * @param {boolean} [valley] - Shape the current valley (see #carveValley) rather than the
+     *   legacy trench. Maps made before the current river rules keep the trench, so their terrain
+     *   stays as it was.
      */
-    static carveManualRivers(elevationData, width, height, rivers, simplex, seaLevel, activeBounds = null) {
+    static carveManualRivers(elevationData, width, height, rivers, simplex, seaLevel, activeBounds = null, valley = false) {
         if (!rivers || rivers.length === 0) return;
         for (const river of rivers) {
-            this.#carveSingleRiver(elevationData, width, height, river, simplex, seaLevel, activeBounds);
+            if (valley) this.#carveValley(elevationData, width, height, river, seaLevel, activeBounds);
+            else this.#carveSingleRiver(elevationData, width, height, river, simplex, seaLevel, activeBounds);
         }
     }
 
     /**
-     * Dynamically identifies the highest point of each manual river to act as a spring for the procedural water algorithm.
+     * The custom rivers as paths of whole pixels, under the current river rules (see
+     * ProceduralEngine#traceAuthored). Each follows its spline from its higher end to its lower
+     * end, stopping where it leaves the map. Its inflow (see RiverNetwork.inflowForWidth) makes
+     * the drawn river start MANUAL_RIVER_START_SHARE as wide as the Width it was drawn with.
+     *
+     * @param {Float32Array} elevationData - The terrain, with the custom rivers already carved.
+     * @param {number} width
+     * @param {number} height
+     * @param {object[]} rivers - The custom rivers.
+     * @param {number} pixelsPerBaseline - Map pixels per pixel of a BASELINE_DIMENSION map.
+     * @returns {{id: string, pixels: {x: number, y: number}[], inflow: number}[]}
+     */
+    static authoredRivers(elevationData, width, height, rivers, pixelsPerBaseline) {
+        const authored = [];
+        for (const river of rivers ?? []) {
+            if (!river.points || river.points.length < 2) continue;
+            const path = this.#getSplinePoints(river.points, SPLINE_STEP);
+            this.#ensureDownhillFlow(elevationData, width, path);
+            const pixels = this.#pixelPath(path, width, height);
+            if (pixels.length < 2) continue;
+            const drawnWidth = river.width * (river.widthScale ?? 1) * FILRODENSWMB.HYDROLOGY.MANUAL_RIVER_START_SHARE;
+            authored.push({ id: river.id, pixels, inflow: RiverNetwork.inflowForWidth(drawnWidth, pixelsPerBaseline) });
+        }
+        return authored;
+    }
+
+    /**
+     * Dynamically identifies the highest point of each manual river to act as a spring for the
+     * procedural water algorithm (legacy river rules only).
      */
     static getRiverSources(elevationData, width, rivers) {
         const sources = [];
@@ -60,7 +107,7 @@ export class HydrologyEngine {
     static #carveSingleRiver(elevationData, width, height, river, simplex, seaLevel, activeBounds = null) {
         if (!river.points || river.points.length < 2) return;
 
-        const path = this.#getSplinePoints(river.points, 0.25);
+        const path = this.#getSplinePoints(river.points, SPLINE_STEP);
         if (path.length === 0) return;
 
         this.#ensureDownhillFlow(elevationData, width, path);
@@ -79,6 +126,112 @@ export class HydrologyEngine {
 
             this.#carveRiverCrossSection(elevationData, width, height, path[i], currentRadius, currentRadiusSq, bedProfile[i], activeBounds);
         }
+    }
+
+    /**
+     * The current custom river valley. The line's floor is brought down to a bed worked out as the
+     * legacy trench's is (the ground less a depth, never rising downstream, never below sea level
+     * before the coast), with MANUAL_RIVER_VALLEY_DEPTH of the trench's depth, since the river is
+     * drawn along the line and the valley only has to hold it; but rather than setting the ground to that bed, each point of
+     * the line works out how far its own ground has to come down to reach it, and lowers the
+     * ground around it by that much: fully within the channel (the river's half-width, tapering
+     * from a pixel at the source as the legacy trench does), then less and less along a cosine
+     * out to MANUAL_RIVER_VALLEY_SPREAD times that. Lowering by an amount, instead of blending
+     * towards a flat bed, keeps the ground's own texture (the fine roughness of the terrain) all
+     * the way down, and the gentle cosine keeps relief shading from drawing the valley's sides as
+     * a hard dark line.
+     *
+     * Where the lowerings of neighbouring points overlap, the deepest is used, once. Applying
+     * them one after another would lower an overlap repeatedly and dig the valley ever deeper
+     * wherever the line bends.
+     *
+     * A regional map's custom rivers carry `widthScale` (see RegionalExtractor), so the valley is
+     * as wide in the world as on the parent map.
+     */
+    static #carveValley(elevationData, width, height, river, seaLevel, activeBounds) {
+        if (!river.points || river.points.length < 2) return;
+        const path = this.#getSplinePoints(river.points, SPLINE_STEP);
+        if (path.length === 0) return;
+        this.#ensureDownhillFlow(elevationData, width, path);
+
+        const hydrology = FILRODENSWMB.HYDROLOGY;
+        const depth = (hydrology.MANUAL_RIVER_DEPTHS?.[river.width] || hydrology.MANUAL_RIVER_DEFAULT_DEPTH) * hydrology.MANUAL_RIVER_VALLEY_DEPTH;
+        const scale = river.widthScale ?? 1;
+        const bed = this.#buildMonotonicBedProfile(elevationData, width, path, depth, seaLevel);
+
+        const lowering = this.#valleyLowering(elevationData, width, height, path, bed, (river.width / 2) * scale, scale);
+        const box = SpatialMath.intersectBounds(lowering.box, activeBounds);
+        if (!SpatialMath.isValidBounds(box)) return;
+
+        for (let y = box.minY; y <= box.maxY; y++) {
+            for (let x = box.minX; x <= box.maxX; x++) {
+                const amount = lowering.values[(y - lowering.box.minY) * lowering.boxWidth + (x - lowering.box.minX)];
+                // Only ever lowers, and never clamps (see #carveRiverCrossSection)
+                if (amount > 0) elevationData[y * width + x] -= amount;
+            }
+        }
+    }
+
+    /**
+     * How far every pixel near a custom river's line comes down (see #carveValley), in a buffer
+     * covering just the valley's box.
+     * @returns {{values: Float32Array, box: object, boxWidth: number}}
+     */
+    static #valleyLowering(elevationData, width, height, path, bed, targetRadius, scale) {
+        const spread = FILRODENSWMB.HYDROLOGY.MANUAL_RIVER_VALLEY_SPREAD;
+        const startRadius = scale;
+        const radii = path.map((_, i) => startRadius + (targetRadius - startRadius) * (path.length > 1 ? i / (path.length - 1) : 1));
+        const reach = Math.max(...radii) * spread;
+        const box = {
+            minX: Math.max(0, Math.floor(Math.min(...path.map((p) => p.x)) - reach)),
+            minY: Math.max(0, Math.floor(Math.min(...path.map((p) => p.y)) - reach)),
+            maxX: Math.min(width - 1, Math.ceil(Math.max(...path.map((p) => p.x)) + reach)),
+            maxY: Math.min(height - 1, Math.ceil(Math.max(...path.map((p) => p.y)) + reach)),
+        };
+        const boxWidth = box.maxX - box.minX + 1;
+        const values = new Float32Array(boxWidth * (box.maxY - box.minY + 1));
+
+        for (let i = 0; i < path.length; i++) {
+            const drop = this.#sampleElevation(elevationData, width, path[i]) - bed[i];
+            if (drop > 0) this.#stampLowering(values, box, boxWidth, path[i], radii[i], radii[i] * spread, drop);
+        }
+        return { values, box, boxWidth };
+    }
+
+    /** Records one point's lowering: `drop` within `core` of it, easing to 0 at `outer` (pixel centres). */
+    static #stampLowering(values, box, boxWidth, pt, core, outer, drop) {
+        const minX = Math.max(box.minX, Math.floor(pt.x - outer));
+        const maxX = Math.min(box.maxX, Math.ceil(pt.x + outer));
+        const minY = Math.max(box.minY, Math.floor(pt.y - outer));
+        const maxY = Math.min(box.maxY, Math.ceil(pt.y + outer));
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+                const distance = Math.hypot(x + 0.5 - pt.x, y + 0.5 - pt.y);
+                if (distance >= outer) continue;
+                const t = Math.max(0, (distance - core) / (outer - core));
+                const amount = drop * 0.5 * (1 + Math.cos(Math.PI * t));
+                const at = (y - box.minY) * boxWidth + (x - box.minX);
+                if (amount > values[at]) values[at] = amount;
+            }
+        }
+    }
+
+    /** The pixels a sampled spline passes through, in order, from its start until it leaves the map. */
+    static #pixelPath(path, width, height) {
+        const pixels = [];
+        for (const point of path) {
+            const x = Math.floor(point.x);
+            const y = Math.floor(point.y);
+            const inside = x >= 0 && y >= 0 && x < width && y < height;
+            if (!inside) {
+                if (pixels.length > 0) break;
+                continue;
+            }
+            const last = pixels.at(-1);
+            if (last?.x === x && last.y === y) continue;
+            pixels.push({ x, y });
+        }
+        return pixels;
     }
 
     /**

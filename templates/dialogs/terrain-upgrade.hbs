@@ -1,0 +1,109 @@
+<div class="fwmb-dialog-content">
+    {{#if isRegional}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntro"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            {{#if changesTerrain}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTerrain"}}</li>
+            {{/if}}
+            {{#if changesBiomes}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateBiomes"}}</li>
+            {{/if}}
+            {{#if changesFaults}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFaults"}}</li>
+            {{/if}}
+            {{#if convertsFaults}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFeatures"}}</li>
+            {{/if}}
+            {{#if removesSlip}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
+            {{#if changesRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{/if}}
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+        </ul>
+    {{else if isRivers}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroRivers"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+        </ul>
+    {{else if isFaults}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroFaults"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFeatures"}}</li>
+            {{#if removesSlip}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
+            {{#if changesRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{/if}}
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+        </ul>
+    {{else if isTectonics}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroTectonics"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTectonicsLand"}}</li>
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateTectonicsFeatures"}}</li>
+            {{#if convertsFaults}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFeatures"}}</li>
+            {{/if}}
+            {{#if removesSlip}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
+            {{#if changesRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{/if}}
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+        </ul>
+    {{else}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroCoastline"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            <li>{{localize "FILRODENSWMB.UI.TerrainUpdateProfile"}}</li>
+            {{#if resized}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateCoastlines"}}</li>
+            {{/if}}
+            {{#if fractureChanges}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFracture" before=fracture.before after=fracture.after}}</li>
+            {{/if}}
+            {{#if convertsFaults}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateFeatures"}}</li>
+            {{/if}}
+            {{#if removesSlip}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateSlip"}}</li>
+            {{/if}}
+            {{#if changesRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateRivers"}}</li>
+            {{/if}}
+            {{#if changesChannels}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
+            {{/if}}
+        </ul>
+    {{/if}}
+
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TerrainUpdateNotSaved"}}</p>
+
+    {{#if allowDismiss}}
+        <div class="fwmb-divider"></div>
+
+        <div class="form-group stacked">
+            <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.TerrainUpdateDismissHint'}}">
+                <input type="checkbox" name="dismissUpgrade" class="fwmb-checkbox" />
+                <strong>{{localize "FILRODENSWMB.UI.TerrainUpdateDismiss"}}</strong>
+            </label>
+        </div>
+    {{/if}}
+</div>

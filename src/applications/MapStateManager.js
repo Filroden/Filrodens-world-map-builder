@@ -1,5 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
+import { BiomePlacement } from "../generation/BiomePlacement.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
 
 export class MapStateManager {
     /**
@@ -15,26 +17,35 @@ export class MapStateManager {
         app.currentTemperatureData = new Float32Array(totalPixels);
         app.currentBiomeOverrides = new Uint8Array(totalPixels);
         app.currentSpringOverrides = new Uint8Array(totalPixels);
+        // How much of the surface texture the working terrain carries (see BrushLayerCache)
+        app.currentRoughness = new Uint8Array(totalPixels);
         app.bufferRiverMap = new Uint8Array(totalPixels);
         app.bufferWaterMask = new Float32Array(totalPixels);
+        // The river image the terrain shader draws rivers from (see RiverNetwork.rasterise)
+        app.bufferRivers = new Uint8Array(totalPixels * 4);
 
-        app.bufferBase = new Uint8Array(totalPixels * 4);
-        app.bufferTopography = new Uint8Array(totalPixels * 4);
-        app.bufferBiomes = new Uint8Array(totalPixels * 4);
+        // The terrain's three images (see TerrainShading): the biomes on land and on the water's
+        // surface, the biomes of the beds under water, and the packed relief, depth and height
+        app.bufferSurfaceBiomes = new Uint8Array(totalPixels * 4);
+        app.bufferUnderwaterBiomes = new Uint8Array(totalPixels * 4);
+        app.bufferTerrainAux = new Uint8Array(totalPixels * 4);
         app.bufferContours = new Uint8Array(totalPixels * 4);
-        // Kept in sync alongside bufferBiomes on every biome repaint (see MapStudioApp's
+        // Kept in sync alongside the biome buffers on every biome repaint (see MapStudioApp's
         // _repaintCanvas/#applyBrushStroke), but its own canvas layer stays hidden until the
         // "Preview Rule Coverage" button is hovered - see ProceduralEngine.createBiomesMap's
         // outFallbackBuffer parameter for what actually gets written into it.
         app.bufferBiomeFallback = new Uint8Array(totalPixels * 4);
 
-        // The rebuild scratch buffer is created on demand at the map's current size (see
-        // ProceduralOrchestrator); drop any left over from a map of a different size.
+        // The rebuild scratch buffer and the surface texture are created on demand at the map's
+        // current size (see ProceduralOrchestrator); drop any left over from a map of a different size.
         app.bufferScratch = null;
+        app.surfaceTexture = null;
+        app.surfaceTextureUnavailable = false;
 
         // Fresh buffers hold nothing from any earlier generation
         app.generationInputs = null;
         app.generationBase = null;
+        app.currentRiverData = null;
     }
 
     /**
@@ -65,6 +76,20 @@ export class MapStateManager {
     }
 
     /**
+     * The River Meander value for a map saved before it existed, from the legacy River Meander
+     * value it saved (random noise on the river trace, 0 to MEANDER_JITTER_MAX). No noise means
+     * the default meander and the most noise twice the default, so a map whose rivers were set to
+     * wander more keeps meandering more.
+     * @param {number} jitter - The saved legacy value.
+     * @returns {number}
+     */
+    static riverMeanderFromJitter(jitter) {
+        const channels = FILRODENSWMB.HYDROLOGY.CHANNELS;
+        const share = Math.min(1, Math.max(0, (jitter ?? 0) / FILRODENSWMB.HYDROLOGY.MEANDER_JITTER_MAX));
+        return channels.MEANDER * (1 + share);
+    }
+
+    /**
      * Builds the baseline state for a new map based on its resolution.
      */
     static buildDefaultUiState(width, height) {
@@ -74,6 +99,14 @@ export class MapStateManager {
 
         return {
             generationEngine: "standard",
+
+            // A new map is always built with the current terrain generation rules, and is never
+            // a regional map until RegionalExtractor makes one (see TerrainVersion).
+            terrainVersion: FILRODENSWMB.TERRAIN_VERSION.CURRENT,
+            world: null,
+            // Set when the owner of a legacy map declined updating it and asked not to be asked
+            // again (see TerrainUpgrade.dismiss); never true for a map built at the current revision.
+            terrainUpgradeDismissed: false,
 
             mapWidth: width,
             mapHeight: height,
@@ -93,6 +126,8 @@ export class MapStateManager {
             nextCustomBiomeId: FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID,
 
             mapSeed: FILRODENSWMB.DEFAULTS.SEED,
+            // Whether a Flat map's ground starts with the surface texture (chosen when it is created)
+            flatTexture: false,
             seaLevel: FILRODENSWMB.DEFAULTS.SEA_LEVEL,
             globalTemp: FILRODENSWMB.DEFAULTS.GLOBAL_TEMP,
             seasonOffset: 0,
@@ -113,24 +148,35 @@ export class MapStateManager {
             coastlineFracture: FILRODENSWMB.GENERATION.COASTLINE_FRACTURE,
             continentalGrouping: FILRODENSWMB.GENERATION.CONTINENTAL_GROUPING,
             shelfRange: FILRODENSWMB.GENERATION.SHELF_RANGE,
+            coastalPlain: FILRODENSWMB.GENERATION.COASTAL_PLAIN,
             continentScale: FILRODENSWMB.GENERATION.CONTINENT_SCALE,
+            oceanScale: FILRODENSWMB.GENERATION.OCEAN_SCALE,
+            oceanRidges: FILRODENSWMB.GENERATION.OCEAN_RIDGES,
 
             activeFeatureMode: "spring",
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
             springsBaked: false,
             faultType: "convergent",
-            faultThickness: FILRODENSWMB.TECTONICS?.DEFAULT_THICKNESS || 40,
-            faultStrength: FILRODENSWMB.TECTONICS?.DEFAULT_STRENGTH || 0.25,
+            faultThickness: FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS,
+            faultStrength: FILRODENSWMB.TECTONICS.DEFAULT_STRENGTH,
+            faultStyle: FILRODENSWMB.TECTONICS.FEATURES.RANGE.DEFAULT_STYLE,
             riverWidth: 4,
             liveFeatureUpdates: true,
 
             contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
+            reliefShading: FILRODENSWMB.DISPLAY.RELIEF_SHADING,
+            seabedRelief: FILRODENSWMB.DISPLAY.WATER.SEABED_RELIEF,
+            waterClarity: FILRODENSWMB.DISPLAY.WATER.CLARITY,
+            waterHue: FILRODENSWMB.DISPLAY.WATER.HUE,
+            waterSaturation: FILRODENSWMB.DISPLAY.WATER.SATURATION,
             biomeAlphaActive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_ACTIVE,
             biomeAlphaInactive: FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE,
             maxLakeSize: FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE,
             springAltOffset: FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET,
             springMoistMin: FILRODENSWMB.HYDROLOGY.SPRING_MOISTURE_MIN,
             meanderJitter: FILRODENSWMB.HYDROLOGY.MEANDER_JITTER,
+            riverMeander: FILRODENSWMB.HYDROLOGY.CHANNELS.MEANDER,
+            riverWidthScale: FILRODENSWMB.HYDROLOGY.CHANNELS.WIDTH,
             altCooling: FILRODENSWMB.CLIMATE.ALTITUDE_COOLING,
             freezingThreshold: FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD,
 
@@ -158,14 +204,14 @@ export class MapStateManager {
             regionLineThickness: 2,
             regionLineStyle: "solid",
             regionSmoothing: true,
-            regionOpacity: 0.5,
+            regionOpacity: FILRODENSWMB.DISPLAY.REGION_OPACITY,
             activeRegionQuickStyle: "custom",
             customRegionStyles: [],
 
             labelFontFamily: FILRODENSWMB.LABELS?.DEFAULT_FONT,
             labelFontSize: FILRODENSWMB.LABELS?.DEFAULT_SIZE,
             labelFillColor: FILRODENSWMB.LABELS?.DEFAULT_COLOR,
-            labelMaxWidth: 0,
+            labelMaxChars: 0,
             labelJustify: "left",
             activeLabelQuickStyle: "custom",
             nextLabelText: game.i18n.localize(FILRODENSWMB.LABELS?.DEFAULT_TEXT) || "New Label",
@@ -263,8 +309,11 @@ export class MapStateManager {
      * Syncs the active UI state from the DOM, then gets derived map parameters.
      */
     static getMapParameters(app) {
-        for (const key of Object.keys(app.uiState)) {
-            const input = app.element.querySelector(`[name="${key}"]`);
+        // After the window has closed (a save still under way, say) there are no inputs to read,
+        // and the state already holds every value they last showed
+        const element = app.element;
+        for (const key of element ? Object.keys(app.uiState) : []) {
+            const input = element.querySelector(`[name="${key}"]`);
             if (!input) continue;
 
             if (key === "mapSeed" || key === "gridType" || key === "generationEngine") {
@@ -281,6 +330,18 @@ export class MapStateManager {
     }
 
     /**
+     * A map's grid size as Foundry will use it: never below the smallest grid Foundry allows
+     * (FILRODENSWMB.LIMITS.MIN_GRID_SIZE). The map's grid, the exported scene and its grid data
+     * all use this, so they always describe the same cells.
+     *
+     * @param {number} size - A stored or entered grid size.
+     * @returns {number} The grid size in pixels.
+     */
+    static gridSizeOf(size) {
+        return Math.max(FILRODENSWMB.LIMITS.MIN_GRID_SIZE, Math.round(Number(size)) || FILRODENSWMB.LIMITS.MIN_GRID_SIZE);
+    }
+
+    /**
      * Converts raw state strings/numbers into the final parameters needed by ProceduralEngine.
      */
     static getDerivedMapParameters(state, customBiomeColors) {
@@ -294,16 +355,10 @@ export class MapStateManager {
             compiledPalette[cb.id] = cb.color;
         }
 
-        // Custom biomes default to rendering transparent below sea level, exactly like the
-        // map's own auto-generated biomes there - but a biome meant to represent something
-        // like pack ice or a floating landmass needs to stay visible over water instead, the
-        // way the built-in PACK_ICE biome always has. This map only lists the biomes that
-        // opted into that (a sparse id -> true lookup), so ProceduralEngine.resolveBiomeLookup
-        // can check it in O(1) per pixel without touching the ones that didn't.
-        const solidOverWater = {};
-        for (const cb of state.customBiomes || []) {
-            if (cb.solidOverWater) solidOverWater[cb.id] = true;
-        }
+        // Where each biome may appear (dry land, under water, on the water's surface), by id, so
+        // ProceduralEngine.resolveBiomeLookup can check a painted override's placement in O(1)
+        // per pixel. See BiomePlacement.
+        const biomeSides = BiomePlacement.buildSidesTable(state.customBiomes || []);
 
         const params = {
             seaLevel: state.generationEngine === "advanced" ? 0.35 : state.seaLevel,
@@ -311,13 +366,20 @@ export class MapStateManager {
             coastlineFracture: state.coastlineFracture,
             continentalGrouping: state.continentalGrouping,
             shelfRange: state.shelfRange,
+            coastalPlain: state.coastalPlain,
+            flatTexture: state.flatTexture === true,
             continentScale: state.continentScale,
+            oceanScale: state.oceanScale,
+            oceanRidges: state.oceanRidges,
             globalTemp: state.globalTemp,
             seasonOffset: state.seasonOffset,
             latTop: state.latTop,
             latBottom: state.latBottom,
             globalMoisture: state.globalMoisture,
             riverDensity: state.riverDensity,
+            // Values that depend on the map's terrain revision, already resolved into plain
+            // numbers so the generation engines never need to know which revision they serve.
+            terrain: TerrainVersion.getTerrainParams(state),
             noise: {
                 offsetX: state["noise.offsetX"],
                 offsetY: state["noise.offsetY"],
@@ -342,6 +404,8 @@ export class MapStateManager {
                 springAltOffset: state.springAltOffset,
                 springMoistMin: state.springMoistMin,
                 meanderJitter: state.meanderJitter,
+                riverMeander: state.riverMeander ?? FILRODENSWMB.HYDROLOGY.CHANNELS.MEANDER,
+                riverWidthScale: state.riverWidthScale ?? FILRODENSWMB.HYDROLOGY.CHANNELS.WIDTH,
             },
             climate: {
                 altCooling: state.altCooling,
@@ -349,7 +413,7 @@ export class MapStateManager {
                 windDistance: state.windDistance ?? FILRODENSWMB.CLIMATE.WIND_DISTANCE,
             },
             biomePalette: compiledPalette,
-            solidOverWater,
+            biomeSides,
             customColors: customBiomeColors,
             // Compiled once per generation, not per pixel - see BiomeRuleEngine's own doc
             // comment for why. Custom biomes with no rules yet (rules: [] or undefined)
@@ -357,8 +421,14 @@ export class MapStateManager {
             customBiomeRules: BiomeRuleEngine.compile(state.customBiomes || []),
             display: {
                 contourInterval: state.contourInterval,
+                reliefShading: state.reliefShading,
+                seabedRelief: state.seabedRelief,
+                waterClarity: state.waterClarity,
+                waterHue: state.waterHue,
+                waterSaturation: state.waterSaturation,
                 biomeAlphaActive: state.biomeAlphaActive,
                 biomeAlphaInactive: state.biomeAlphaInactive,
+                regionOpacity: state.regionOpacity,
             },
             cartography: {
                 scaleEnable: state.cartographyScaleEnable,

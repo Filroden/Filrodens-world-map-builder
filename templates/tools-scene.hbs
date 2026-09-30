@@ -3,13 +3,19 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.CanvasSettings"}}</legend>
 
+        {{#if terrainUpgradeAvailable}}
+            <button type="button" class="fwmb-btn subtle danger" data-action="updateMapTerrain" data-tooltip="{{localize 'FILRODENSWMB.UI.UpdateMapHint'}}">
+                <i class="fwmb-icon sync"></i> {{localize "FILRODENSWMB.UI.UpdateMap"}}
+            </button>
+        {{/if}}
+
         <div class="form-group">
             <label data-tooltip="">{{localize "FILRODENSWMB.UI.GenerationEngine"}}</label>
             <select name="generationEngine">
                 <option value="standard" {{#if (eq uiState.generationEngine "standard")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StandardGeneration"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineStandardHint'}}"></i></option>
                 <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.FlatCanvas"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineFlatHint'}}"></i></option>
-                <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.TectonicGeneration"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}"></i></option>
-                <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GuidedGeneration"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}"></i></option>
+                <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{engineLabels.advanced}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}"></i></option>
+                <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{engineLabels.guided}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}"></i></option>
             </select>
         </div>
 
@@ -41,6 +47,16 @@
                 <input type="number" name="mapHeight" class="fwmb-flex-1" value="{{uiState.mapHeight}}" min="500" max="4000" step="100" />
             </div>
         </div>
+
+        {{#if (eq uiState.generationEngine "flat")}}
+            <!-- Read when the map is created (Create New Map), not when it is ticked -->
+            <div class="form-group">
+                <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.FlatTextureHint'}}">
+                    <input type="checkbox" name="flatTexture" class="fwmb-checkbox" {{#if uiState.flatTexture}}checked{{/if}} />
+                    {{localize "FILRODENSWMB.UI.FlatTexture"}}
+                </label>
+            </div>
+        {{/if}}
 
         <button type="button" class="fwmb-btn" data-action="applyResolution">
             {{localize "FILRODENSWMB.UI.ApplyResolution"}}
@@ -79,18 +95,12 @@
             </select>
         </div>
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.GridSize"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="gridSize" value="{{lookup uiState 'gridSize'}}" min="10" max="300" step="5" oninput="this.nextElementSibling.value = this.value" />
-                <output>{{lookup uiState "gridSize"}}</output>
-            </div>
-        </div>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="gridSize" label="FILRODENSWMB.UI.GridSize" value=(lookup uiState 'gridSize') min=20 max=300 step=5}}
     </fieldset>
 
     {{#if (eq uiState.generationEngine "guided")}}
-        <fieldset class="fwmb-fixed-lists fwmb-fieldset">
-            <legend>{{localize "FILRODENSWMB.UI.LandMasks"}}</legend>
+        <details class="fwmb-fieldset fwmb-list-section" data-section="landMasks" {{#unless collapsedSections.landMasks}}open{{/unless}}>
+            <summary>{{localize "FILRODENSWMB.UI.LandMasks"}}</summary>
 
             <div id="fwmb-scroll-landMasks" class="fwmb-list-container fwmb-scrollable stable">
                 {{#each landMasks}}
@@ -115,7 +125,7 @@
                     <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLandMasks"}}</div>
                 {{/each}}
             </div>
-        </fieldset>
+        </details>
 
         <button type="button" class="fwmb-btn wide subtle danger" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
             <i class="fwmb-icon delete"></i> {{localize "FILRODENSWMB.UI.DeleteAllLandMasksTitle"}}
@@ -124,15 +134,16 @@
 
     <div class="fwmb-flex-1"></div>
 
-    {{#if (eq uiState.generationEngine "advanced")}}
-        <!-- Hidden entirely in advanced mode -->
-    {{else if (eq uiState.generationEngine "guided")}}
+    {{#if (eq uiState.generationEngine "guided")}}
         <!-- Rendered inside the Canvas Settings fieldset above -->
-    {{else}}
+    {{else if canCreateRegionalMap}}
         <div class="fwmb-divider"></div>
         <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditCanvasHint'}}">
             {{localize "FILRODENSWMB.UI.EditCanvas"}}
         </button>
+    {{else}}
+        <!-- Nothing to edit on the canvas of a map still on the original tectonic engine (it
+             cannot make regional maps until it is updated) -->
     {{/if}}
 
 </div>

@@ -103,8 +103,16 @@
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.FontSize"}}</label>
             <div class="fwmb-slider-group">
-                <input type="range" name="labelFontSize" value="{{region.label.fontSize}}" min="0.2" max="5.0" step="0.1" oninput="this.nextElementSibling.value = this.value" />
+                <input type="range" name="labelFontSize" value="{{region.label.fontSize}}" min="0.2" max="5.0" step="0.1" />
                 <output>{{region.label.fontSize}}</output>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>{{localize "FILRODENSWMB.UI.Rotation"}}</label>
+            <div class="fwmb-slider-group">
+                <input type="range" name="labelRotation" value="{{region.label.rotation}}" min="{{rotationRange.MIN}}" max="{{rotationRange.MAX}}" step="{{rotationRange.STEP}}" data-default="0" />
+                <output>{{region.label.rotation}}</output>
             </div>
         </div>
 
@@ -115,7 +123,7 @@
 
         <div class="form-group">
             <label>{{localize "FILRODENSWMB.UI.MaxWidth"}}</label>
-            <input type="number" class="fwmb-wide" name="labelMaxWidth" value="{{region.label.maxWidth}}" min="0" step="10" placeholder="0" />
+            <input type="number" class="fwmb-wide" name="labelMaxChars" value="{{region.label.maxChars}}" min="0" step="1" placeholder="0" />
         </div>
 
         <div class="form-group">

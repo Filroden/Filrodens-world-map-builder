@@ -1,7 +1,12 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { RuleEditorDialog } from "./RuleEditorDialog.js";
+import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
+import { RangeDisplay } from "../tools/RangeDisplay.js";
+import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import {
     getCustomPinIconById,
     getPinIconPickerList,
@@ -31,9 +36,12 @@ export class MapDialogManager {
      * Prompts for a single line of text via a minimal DialogV2 form.
      */
     static async _promptTextValue(title, label, defaultValue) {
+        // The value is escaped because it is often an existing name (a map or layer name) that
+        // may contain quotes, which would otherwise end the attribute early and cut the name short
+        const safeValue = Handlebars.escapeExpression(defaultValue ?? "");
         return foundry.applications.api.DialogV2.prompt({
             window: { title: title },
-            content: `<label>${label}</label><input type="text" id="fwmb-prompt-input" value="${defaultValue}">`,
+            content: `<label>${label}</label><input type="text" id="fwmb-prompt-input" value="${safeValue}">`,
             ok: { callback: (event, button) => button.form.elements["fwmb-prompt-input"].value },
         });
     }
@@ -56,6 +64,88 @@ export class MapDialogManager {
     }
 
     /**
+     * Asks to save the open map before a regional map is cut from it, because it has never been
+     * saved or has unsaved changes. A regional map is listed under the saved map it was cut from,
+     * and is built from the map as it is now, so without a save it would have no parent in the
+     * Map Management list, or would not match the parent saved there. There is no Discard: the
+     * regional map is built from the changes, so they must be kept to make it.
+     *
+     * @param {boolean} neverSaved - Whether the map has never been saved (rather than having
+     *   unsaved changes), which picks the title and message.
+     * @returns {Promise<boolean>} True to save and carry on, false to stop.
+     */
+    static async promptSaveBeforeRegionalMap(neverSaved) {
+        const message = neverSaved ? "FILRODENSWMB.UI.RegionalMapSaveFirstNew" : "FILRODENSWMB.UI.RegionalMapSaveFirstChanged";
+        const title = neverSaved ? "FILRODENSWMB.UI.SaveUnsavedMap" : "FILRODENSWMB.UI.SaveExistingMap";
+        const choice = await foundry.applications.api.DialogV2.wait({
+            window: { title: game.i18n.localize(title) },
+            content: `<p>${game.i18n.localize(message)}</p>`,
+            buttons: [
+                { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
+                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+            ],
+            close: () => "cancel",
+        });
+        return choice === "save";
+    }
+
+    /**
+     * Offers to update a map built with older terrain generation rules (see TerrainUpgrade).
+     *
+     * Lists only the changes this map would actually see, explains that the update is not saved
+     * until the map is, and (when opened automatically on load) lets the user stop being asked
+     * for this map. Closing the dialog counts as keeping the original.
+     *
+     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults?: boolean, removesSlip?: boolean, changesRivers?: boolean, changesChannels?: boolean}} impact - What the
+     *   update changes, and why (see TerrainUpgrade.assess).
+     * @param {boolean} allowDismiss - Whether to show the "don't ask again" option.
+     * @returns {Promise<{apply: boolean, dismiss: boolean}>} The user's choice.
+     */
+    static async promptTerrainUpgrade(impact, allowDismiss) {
+        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/terrain-upgrade.hbs", {
+            isRegional: impact.kind === "regional",
+            isTectonics: impact.kind === "tectonics",
+            isFaults: impact.kind === "faults",
+            isRivers: impact.kind === "rivers",
+            changesRivers: impact.changesRivers === true,
+            changesChannels: impact.changesChannels === true,
+            convertsFaults: impact.convertsFaults === true,
+            removesSlip: impact.removesSlip === true,
+            fracture: impact.fracture,
+            fractureChanges: impact.fracture !== undefined && impact.fracture.before !== impact.fracture.after,
+            resized: impact.resized === true,
+            changesTerrain: impact.changesTerrain,
+            changesBiomes: impact.changesBiomes,
+            changesFaults: impact.changesFaults,
+            allowDismiss,
+        });
+
+        const readDismiss = (button) => button.form?.elements?.dismissUpgrade?.checked === true;
+
+        return foundry.applications.api.DialogV2.wait({
+            classes: ["fwmb"],
+            window: { title: game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateTitle") },
+            content,
+            buttons: [
+                {
+                    action: "apply",
+                    label: game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApply"),
+                    icon: "fwmb-icon sync",
+                    default: true,
+                    callback: () => ({ apply: true, dismiss: false }),
+                },
+                {
+                    action: "keep",
+                    label: game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateKeep"),
+                    icon: "fwmb-icon cancel",
+                    callback: (event, button) => ({ apply: false, dismiss: readDismiss(button) }),
+                },
+            ],
+            close: () => ({ apply: false, dismiss: false }),
+        });
+    }
+
+    /**
      * Builds a safe copy of an entity inheriting the current global label defaults.
      */
     static _withLabelDefaults(app, entity) {
@@ -66,11 +156,14 @@ export class MapDialogManager {
             fontFamily: app.uiState.labelFontFamily || "Signika",
             fontSize: app.uiState.labelFontSize || 1,
             fillColor: app.uiState.labelFillColor || "#ffffff",
-            maxWidth: app.uiState.labelMaxWidth || 0,
+            maxChars: app.uiState.labelMaxChars || 0,
             justify: app.uiState.labelJustify || "left",
+            rotation: 0,
         };
 
         safe.label = { ...defaults, ...(safe.label || {}) };
+        // The copy only feeds the dialogue, so wrapping the angle here changes nothing stored
+        safe.label.rotation = CanvasTransforms.normalizeAngle(safe.label.rotation);
 
         return safe;
     }
@@ -79,14 +172,21 @@ export class MapDialogManager {
      * Extracts shared "label properties" form fields from a submitted dialogue.
      */
     static _extractLabelResultFields(form) {
-        return {
+        const fields = {
             quickStyle: form.elements["labelQuickStyle"].value,
             fontFamily: form.elements["labelFontFamily"].value,
             fontSize: Number(form.elements["labelFontSize"].value) || 1,
             fillColor: form.elements["labelFillColor"].value,
-            maxWidth: Number(form.elements["labelMaxWidth"].value) || 0,
+            maxChars: Number(form.elements["labelMaxChars"].value) || 0,
             justify: form.elements["labelJustify"].value,
         };
+
+        // Only dialogues that edit one placed label have a Rotation slider. Leaving the field out
+        // otherwise keeps the label's current angle when the result is merged into it.
+        const rotationInput = form.elements["labelRotation"];
+        if (rotationInput) fields.rotation = CanvasTransforms.normalizeAngle(rotationInput.value);
+
+        return fields;
     }
 
     /**
@@ -96,9 +196,8 @@ export class MapDialogManager {
         const labelQuickStyleSelect = html.querySelector('select[name="labelQuickStyle"]');
         const labelFontFamilySelect = html.querySelector('select[name="labelFontFamily"]');
         const labelFontSizeInput = html.querySelector('input[name="labelFontSize"]');
-        const labelFontSizeOutput = html.querySelector('input[name="labelFontSize"] + output');
         const labelColorInput = html.querySelector('input[name="labelFillColor"]');
-        const labelMaxWidthInput = html.querySelector('input[name="labelMaxWidth"]');
+        const labelMaxCharsInput = html.querySelector('input[name="labelMaxChars"]');
         const labelJustifySelect = html.querySelector('select[name="labelJustify"]');
 
         labelQuickStyleSelect?.addEventListener("change", (e) => {
@@ -110,12 +209,12 @@ export class MapDialogManager {
 
             if (labelFontFamilySelect) labelFontFamilySelect.value = styleData.fontFamily;
             if (labelColorInput) labelColorInput.value = styleData.fillColor;
-            if (labelMaxWidthInput) labelMaxWidthInput.value = styleData.maxWidth;
+            if (labelMaxCharsInput) labelMaxCharsInput.value = styleData.maxChars;
             if (labelJustifySelect) labelJustifySelect.value = styleData.justify;
 
             if (labelFontSizeInput) {
                 labelFontSizeInput.value = styleData.fontSize;
-                if (labelFontSizeOutput) labelFontSizeOutput.value = styleData.fontSize;
+                RangeDisplay.sync(labelFontSizeInput);
             }
         });
 
@@ -123,14 +222,12 @@ export class MapDialogManager {
             if (labelQuickStyleSelect) labelQuickStyleSelect.value = "custom";
         };
 
-        labelFontSizeInput?.addEventListener("input", (e) => {
-            if (labelFontSizeOutput) labelFontSizeOutput.value = e.target.value;
-            revertLabelToCustom();
-        });
+        // The slider's value display is kept current by the shared range listener (RangeDisplay)
+        labelFontSizeInput?.addEventListener("input", revertLabelToCustom);
 
         labelFontFamilySelect?.addEventListener("change", revertLabelToCustom);
         labelColorInput?.addEventListener("input", revertLabelToCustom);
-        labelMaxWidthInput?.addEventListener("input", revertLabelToCustom);
+        labelMaxCharsInput?.addEventListener("input", revertLabelToCustom);
         labelJustifySelect?.addEventListener("change", revertLabelToCustom);
     }
 
@@ -155,8 +252,9 @@ export class MapDialogManager {
     /**
      * Shared Add/Edit dialogue for a single custom pin icon: name, a native file-picker path,
      * and a live preview of the raw SVG against a black background so the GM can confirm
-     * it's genuinely solid white before accepting (see the "why custom icons must be solid
-     * white" design note - this is a self-check, not an automated one).
+     * it's genuinely solid white before accepting. Pins are coloured by tinting their sprite,
+     * which multiplies every pixel by the pin's colour, so only white areas take the colour
+     * exactly (this is a visual self-check, not an automated one).
      */
     static async _promptPinIconDialog(icon, titleKey) {
         const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pin-icon.hbs", { icon });
@@ -237,7 +335,7 @@ export class MapDialogManager {
                     fontFamily: app.uiState.labelFontFamily || "Signika",
                     fontSize: app.uiState.labelFontSize || 1,
                     fillColor: app.uiState.labelFillColor || "#000000",
-                    maxWidth: app.uiState.labelMaxWidth || 0,
+                    maxChars: app.uiState.labelMaxChars || 0,
                     justify: app.uiState.labelJustify || "left",
                 }),
                 getContext: (app, style) => ({
@@ -245,17 +343,12 @@ export class MapDialogManager {
                     fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 }),
-                onRender: (dialogApp, html) => {
-                    const range = html.querySelector('input[name="styleFontSize"]');
-                    const output = html.querySelector("output");
-                    if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
-                },
                 onExtract: (form, fallbackName) => ({
                     name: form.elements["styleName"].value.trim() || fallbackName,
                     fontFamily: form.elements["styleFontFamily"].value,
                     fontSize: Number(form.elements["styleFontSize"].value) || 1,
                     fillColor: form.elements["styleFillColor"].value,
-                    maxWidth: Number(form.elements["styleMaxWidth"].value) || 0,
+                    maxChars: Number(form.elements["styleMaxChars"].value) || 0,
                     justify: form.elements["styleJustify"].value,
                 }),
                 onCascade: (app, id, result) => {
@@ -263,7 +356,7 @@ export class MapDialogManager {
                         fontFamily: result.fontFamily,
                         fontSize: result.fontSize,
                         fillColor: result.fillColor,
-                        maxWidth: result.maxWidth,
+                        maxChars: result.maxChars,
                         justify: result.justify,
                     };
 
@@ -301,7 +394,7 @@ export class MapDialogManager {
                     app.uiState.labelFontFamily = result.fontFamily;
                     app.uiState.labelFontSize = result.fontSize;
                     app.uiState.labelFillColor = result.fillColor;
-                    app.uiState.labelMaxWidth = result.maxWidth;
+                    app.uiState.labelMaxChars = result.maxChars;
                     app.uiState.labelJustify = result.justify;
                 },
             },
@@ -412,20 +505,35 @@ export class MapDialogManager {
                     name: `Custom Biome ${app.uiState.customBiomes.length + 1}`,
                     code: null,
                     color: [128, 128, 128],
-                    solidOverWater: false,
+                    placement: FILRODENSWMB.BIOME_PLACEMENT.LAND,
                 }),
                 getContext: (app, biome) => ({
                     biome: { ...biome, hex: ColorMath.rgbToHex(biome.color) },
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
+                    placements: this.#biomePlacementChoices(BiomePlacement.placementOfCustom(biome)),
                 }),
                 onExtract: (form, fallbackName) => ({
                     name: form.elements["biomeName"].value.trim() || fallbackName,
                     code: form.elements["biomeCode"].value.trim() || null,
                     color: ColorMath.hexToRgb(form.elements["biomeColor"].value),
-                    solidOverWater: form.elements["biomeSolidOverWater"].checked,
+                    placement: form.elements["biomePlacement"].value,
+                    // Superseded by `placement`, which takes priority over it anyway (see
+                    // BiomePlacement.placementOfCustom); cleared so an older map's flag is not
+                    // carried forward once the biome has been edited
+                    solidOverWater: undefined,
                 }),
             },
         };
+    }
+
+    /**
+     * The choices for a custom biome's Placement select, in the order they are offered, with the
+     * biome's current placement selected.
+     * @param {string} selected - One of FILRODENSWMB.BIOME_PLACEMENT.
+     * @returns {Array<{value: string, label: string, selected: boolean}>}
+     */
+    static #biomePlacementChoices(selected) {
+        return Object.values(FILRODENSWMB.BIOME_PLACEMENT).map((value) => ({ value, label: BiomePlacement.labelOf(value), selected: value === selected }));
     }
 
     /**
@@ -463,7 +571,7 @@ export class MapDialogManager {
                                   fontFamily: style.fontFamily,
                                   fontSize: style.fontSize,
                                   fillColor: style.fillColor,
-                                  maxWidth: style.maxWidth,
+                                  maxChars: style.maxChars,
                                   justify: style.justify,
                               },
                           }
@@ -473,7 +581,7 @@ export class MapDialogManager {
             { checkboxName: "applyLabelFontFamily", extract: (form) => ({ label: { fontFamily: form.elements["labelFontFamily"].value } }) },
             { checkboxName: "applyLabelFontSize", extract: (form) => ({ label: { fontSize: Number(form.elements["labelFontSize"].value) || 1 } }) },
             { checkboxName: "applyLabelFillColor", extract: (form) => ({ label: { fillColor: form.elements["labelFillColor"].value } }) },
-            { checkboxName: "applyLabelMaxWidth", extract: (form) => ({ label: { maxWidth: Number(form.elements["labelMaxWidth"].value) || 0 } }) },
+            { checkboxName: "applyLabelMaxChars", extract: (form) => ({ label: { maxChars: Number(form.elements["labelMaxChars"].value) || 0 } }) },
             { checkboxName: "applyLabelJustify", extract: (form) => ({ label: { justify: form.elements["labelJustify"].value } }) },
         ];
 
@@ -547,7 +655,10 @@ export class MapDialogManager {
                         const style = resolveStyle("customRouteStyles")(app, e.target.value);
                         if (!style) return;
                         if (colorInput) colorInput.value = style.color;
-                        if (thicknessInput) thicknessInput.value = style.thickness;
+                        if (thicknessInput) {
+                            thicknessInput.value = style.thickness;
+                            RangeDisplay.sync(thicknessInput);
+                        }
                         if (styleSelect) styleSelect.value = style.style;
                     });
                     this.bindLabelPropertiesDialog(html, app.uiState);
@@ -646,9 +757,8 @@ export class MapDialogManager {
                     const quickStyleSelect = html.querySelector('select[name="massQuickStyle"]');
                     const fontFamilySelect = html.querySelector('select[name="massFontFamily"]');
                     const fontSizeInput = html.querySelector('input[name="massFontSize"]');
-                    const fontSizeOutput = html.querySelector('input[name="massFontSize"] + output');
                     const colorInput = html.querySelector('input[name="massFillColor"]');
-                    const maxWidthInput = html.querySelector('input[name="massMaxWidth"]');
+                    const maxCharsInput = html.querySelector('input[name="massMaxChars"]');
                     const justifySelect = html.querySelector('select[name="massJustify"]');
 
                     quickStyleSelect?.addEventListener("change", (e) => {
@@ -656,16 +766,12 @@ export class MapDialogManager {
                         if (!style) return;
                         if (fontFamilySelect) fontFamilySelect.value = style.fontFamily;
                         if (colorInput) colorInput.value = style.fillColor;
-                        if (maxWidthInput) maxWidthInput.value = style.maxWidth;
+                        if (maxCharsInput) maxCharsInput.value = style.maxChars;
                         if (justifySelect) justifySelect.value = style.justify;
                         if (fontSizeInput) {
                             fontSizeInput.value = style.fontSize;
-                            if (fontSizeOutput) fontSizeOutput.value = style.fontSize;
+                            RangeDisplay.sync(fontSizeInput);
                         }
-                    });
-
-                    fontSizeInput?.addEventListener("input", (e) => {
-                        if (fontSizeOutput) fontSizeOutput.value = e.target.value;
                     });
                 },
                 fields: [
@@ -675,14 +781,14 @@ export class MapDialogManager {
                             const id = form.elements["massQuickStyle"].value;
                             const style = id !== "custom" ? resolveStyle("customLabelStyles")(app, id) : null;
                             return style
-                                ? { quickStyle: id, fontFamily: style.fontFamily, fontSize: style.fontSize, fillColor: style.fillColor, maxWidth: style.maxWidth, justify: style.justify }
+                                ? { quickStyle: id, fontFamily: style.fontFamily, fontSize: style.fontSize, fillColor: style.fillColor, maxChars: style.maxChars, justify: style.justify }
                                 : { quickStyle: "custom" };
                         },
                     },
                     { checkboxName: "applyFontFamily", extract: (form) => ({ fontFamily: form.elements["massFontFamily"].value }) },
                     { checkboxName: "applyFontSize", extract: (form) => ({ fontSize: Number(form.elements["massFontSize"].value) || 1 }) },
                     { checkboxName: "applyFillColor", extract: (form) => ({ fillColor: form.elements["massFillColor"].value }) },
-                    { checkboxName: "applyMaxWidth", extract: (form) => ({ maxWidth: Number(form.elements["massMaxWidth"].value) || 0 }) },
+                    { checkboxName: "applyMaxChars", extract: (form) => ({ maxChars: Number(form.elements["massMaxChars"].value) || 0 }) },
                     { checkboxName: "applyJustify", extract: (form) => ({ justify: form.elements["massJustify"].value }) },
                 ],
             },
@@ -691,7 +797,7 @@ export class MapDialogManager {
 
     // --- ADD ACTIONS ---
 
-    static async onAddCustomBiome(app, event, target) {
+    static async onAddCustomBiome(app, _event, _target) {
         const config = this.QUICK_STYLE_CONFIG.Biome;
         const newBiome = config.getDefaults(app);
 
@@ -735,11 +841,11 @@ export class MapDialogManager {
      * kept in its own file rather than grown here given how large this feature is expected
      * to become - see that file's own doc comment.
      */
-    static async onOpenBiomeRuleEditor(app, event, target) {
+    static async onOpenBiomeRuleEditor(app, _event, _target) {
         await RuleEditorDialog.open(app);
     }
 
-    static async onAddCustomPinIcon(app, event, target) {
+    static async onAddCustomPinIcon(app, _event, _target) {
         const result = await this._promptPinIconDialog({ name: "", path: "" }, "FILRODENSWMB.UI.AddCustomPinIcon");
         if (!result) return;
 
@@ -755,17 +861,17 @@ export class MapDialogManager {
         app.render({ parts: ["context"] });
     }
 
-    static async onHideAllBuiltinPinIcons(app, event, target) {
+    static async onHideAllBuiltinPinIcons(app, _event, _target) {
         await setAllBuiltinPinIconsDisabled(true);
         app.render({ parts: ["context"] });
     }
 
-    static async onRevealAllBuiltinPinIcons(app, event, target) {
+    static async onRevealAllBuiltinPinIcons(app, _event, _target) {
         await setAllBuiltinPinIconsDisabled(false);
         app.render({ parts: ["context"] });
     }
 
-    static async onAddDecoration(app, event, target) {
+    static async onAddDecoration(app, _event, _target) {
         if (!app.canvasEngine?.isEditMode) return;
 
         const defaultName = `Decoration ${app.mapDecorations.length + 1}`;
@@ -833,7 +939,7 @@ export class MapDialogManager {
         });
     }
 
-    static onAddRegionLayer(app, event, target) {
+    static onAddRegionLayer(app, _event, _target) {
         const id = foundry.utils.randomID();
         app.regionLayers.push({ id: id, name: `Region Layer ${app.regionLayers.length + 1}`, visibility: "all", regions: [] });
         app.activeRegionLayerId = id;
@@ -966,7 +1072,7 @@ export class MapDialogManager {
      * single id. A no-op when there's nothing to delete (the toolbar button is also disabled in
      * that case, but this guards direct calls too).
      */
-    static async onDeleteAllLandMasks(app, event, target) {
+    static async onDeleteAllLandMasks(app, _event, _target) {
         if (app.landMasks.length === 0) return;
 
         const confirmed = await this._confirmDialog(
@@ -1137,31 +1243,26 @@ export class MapDialogManager {
         const dec = app.mapDecorations.find((d) => d.id === id);
         if (!dec) return;
 
-        const content = `
-                <div class="form-group fwmb-dialog-content">
-                    <label>${game.i18n.localize("FILRODENSWMB.UI.Name")}</label>
-                    <input type="text" id="fwmb-dec-name" value="${dec.name}">
-                </div>
-                <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-space-10);">
-                    <label>${game.i18n.localize("FILRODENSWMB.UI.Opacity")}</label>
-                    <div class="fwmb-slider-group">
-                        <input type="range" id="fwmb-dec-alpha" value="${dec.opacity ?? 1}" min="0.1" max="1" step="0.1" />
-                        <output>${dec.opacity ?? 1}</output>
-                    </div>
-                </div>
-            `;
-
         await this._processEditDialog(app, dec, {
             titleKey: "FILRODENSWMB.UI.Edit",
-            htmlContent: content,
-            onRender: (dialogApp, html) => {
-                const range = html.querySelector("#fwmb-dec-alpha");
-                const output = html.querySelector("output");
-                if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
+            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-decoration.hbs",
+            context: {
+                decoration: {
+                    name: dec.name,
+                    opacity: dec.opacity ?? 1,
+                    // Snapped to the slider's grid, so the value shown matches the slider's position
+                    // even for a scale saved before scales were stepped (1.157625 shows as 1.15)
+                    scale: CanvasTransforms.stepValue(dec.scale ?? 1, 0, FILRODENSWMB.UI.WHEEL_RESIZE.DECORATION_SCALE),
+                    rotation: CanvasTransforms.normalizeAngle(dec.rotation),
+                },
+                scaleRange: FILRODENSWMB.UI.WHEEL_RESIZE.DECORATION_SCALE,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
             },
             onExtract: (form) => ({
-                name: form.querySelector("#fwmb-dec-name").value,
-                opacity: Number(form.querySelector("#fwmb-dec-alpha").value),
+                name: form.elements["decorationName"].value,
+                opacity: Number(form.elements["decorationOpacity"].value),
+                scale: Number(form.elements["decorationScale"].value) || 1,
+                rotation: CanvasTransforms.normalizeAngle(form.elements["decorationRotation"].value),
             }),
         });
     }
@@ -1171,33 +1272,119 @@ export class MapDialogManager {
         const fault = app.tectonicFaults.find((f) => f.id === id);
         if (!fault) return;
 
-        const tectonicTypes = Object.entries(FILRODENSWMB.TECTONICS?.LABELS || {}).map(([key, label]) => ({
-            id: key,
-            label: label,
-        }));
+        const currentMap = TerrainVersion.getVersion(app.uiState) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
 
         await this._processEditDialog(app, fault, {
             titleKey: "FILRODENSWMB.UI.EditFault",
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-tectonics.hbs",
-            context: { fault, tectonicTypes },
-            onExtract: (form) => ({
-                name: form.elements["faultName"].value,
-                description: form.elements["faultDesc"].value,
-                type: form.elements["faultType"].value,
-                thickness: Number(form.elements["faultThickness"].value),
-                strength: Number(form.elements["faultStrength"].value),
-            }),
+            context: {
+                fault,
+                tectonicTypes: TectonicFeatureEngine.typeOptions(currentMap, fault.type),
+                rangeStyles: Object.entries(FILRODENSWMB.TECTONICS.FEATURES.RANGE_STYLES).map(([styleId, label]) => ({ id: styleId, label })),
+                settings: this.#featureSettings(fault),
+                isFeature: TectonicFeatureEngine.isFeatureType(fault.type),
+            },
+            onRender: (dialogApp, html) => this.#watchFaultType(html),
+            onExtract: (form) => this.#extractFault(form),
             onSave: (entity, result) => {
-                entity.color = FILRODENSWMB.TECTONICS?.COLORS?.[result.type] || 0xffffff;
+                this.#finishFaultEdit(entity, result);
                 if (app.activeFaultId === id) {
-                    app.uiState.faultType = result.type;
-                    app.uiState.faultThickness = result.thickness;
-                    app.uiState.faultStrength = result.strength;
-                    app.render({ parts: ["toolbar"] });
+                    app.uiState.faultType = entity.type;
+                    app.uiState.faultThickness = entity.thickness;
+                    app.uiState.faultStrength = entity.strength;
+                    if (entity.style) app.uiState.faultStyle = entity.style;
+                    app.render({ parts: ["editToolbar"] });
                 }
             },
             triggersTerrain: true,
         });
+    }
+
+    /**
+     * The settings of every tectonic feature type for the edit dialogue: the fault's own values
+     * where it has them, the defaults otherwise, so switching type in the dialogue shows sensible
+     * starting values.
+     */
+    static #featureSettings(fault) {
+        const features = FILRODENSWMB.TECTONICS.FEATURES;
+        return {
+            style: fault.style ?? features.RANGE.DEFAULT_STYLE,
+            arcDistance: fault.arcDistance ?? features.SUBDUCTION.DEFAULT_ARC_DISTANCE,
+            trenchDepth: fault.trenchDepth ?? features.SUBDUCTION.DEFAULT_TRENCH_DEPTH,
+            floorTexture: fault.floorTexture ?? features.RIFT.DEFAULT_FLOOR_TEXTURE,
+            volcanoes: fault.volcanoes ?? 0,
+            spacing: fault.spacing ?? features.HOTSPOT.DEFAULT_SPACING,
+            spacingTrend: fault.spacingTrend ?? features.HOTSPOT.DEFAULT_SPACING_TREND,
+            scatter: fault.scatter ?? features.HOTSPOT.DEFAULT_SCATTER,
+            variation: fault.variation ?? features.HOTSPOT.DEFAULT_VARIATION,
+            pulses: fault.pulses ?? features.HOTSPOT.DEFAULT_PULSES,
+            vents: fault.vents ?? features.HOTSPOT.DEFAULT_VENTS,
+            drowned: fault.drowned ?? features.HOTSPOT.DEFAULT_DROWNED,
+        };
+    }
+
+    /** The settings each tectonic feature type reads, beyond thickness and strength. */
+    static #FEATURE_FIELDS = {
+        range: ["style"],
+        subduction: ["arcDistance", "trenchDepth"],
+        rift: ["floorTexture", "volcanoes"],
+        hotspot: ["spacing", "spacingTrend", "scatter", "variation", "pulses", "vents", "drowned"],
+    };
+
+    /**
+     * Shows the dialogue's settings for the chosen fault type and hides the rest, now and whenever
+     * the type changes (see edit-tectonics.hbs).
+     */
+    static #watchFaultType(html) {
+        const select = html.querySelector('select[name="faultType"]');
+        if (!select) return;
+        const update = () => {
+            for (const section of html.querySelectorAll("[data-fault-types]")) {
+                section.hidden = !section.dataset.faultTypes.split(" ").includes(select.value);
+            }
+        };
+        select.addEventListener("change", update);
+        update();
+    }
+
+    /**
+     * Reads the edit dialogue: the shared fields, plus the settings of the chosen type only, so
+     * a fault never keeps settings of a type it no longer is.
+     */
+    static #extractFault(form) {
+        const elements = form.elements;
+        const type = elements["faultType"].value;
+        const result = {
+            name: elements["faultName"].value,
+            description: elements["faultDesc"].value,
+            type,
+            thickness: Number(elements["faultThickness"].value),
+            strength: Number(elements["faultStrength"].value),
+            reversed: elements["faultReverse"]?.checked === true,
+        };
+        for (const field of this.#FEATURE_FIELDS[type] ?? []) {
+            const input = field === "style" ? elements["faultStyle"] : elements[field];
+            if (input) result[field] = field === "style" ? input.value : Number(input.value);
+        }
+        return result;
+    }
+
+    /**
+     * Completes an edited fault after the dialogue's values are merged into it: its colour, whether
+     * it is a tectonic feature, and dropping settings of other types. Its direction is a setting
+     * (`reversed`, see TectonicFeatureEngine), kept only while it is on and only for a feature.
+     */
+    static #finishFaultEdit(fault, result) {
+        fault.color = TectonicFeatureEngine.colorOf(fault.type);
+        if (!result.reversed || !TectonicFeatureEngine.isFeatureType(fault.type)) delete fault.reversed;
+
+        const keep = new Set(this.#FEATURE_FIELDS[fault.type] ?? []);
+        for (const fields of Object.values(this.#FEATURE_FIELDS)) {
+            for (const field of fields) if (!keep.has(field)) delete fault[field];
+        }
+
+        if (TectonicFeatureEngine.isFeatureType(fault.type)) fault.revision = FILRODENSWMB.TECTONICS.FEATURES.REVISION;
+        else delete fault.revision;
     }
 
     static async onEditLabel(app, event, target, explicitData = null) {
@@ -1221,6 +1408,7 @@ export class MapDialogManager {
 
         if (type === "custom") {
             foundry.utils.mergeObject(labelData, sourceObj);
+            labelData.rotation = CanvasTransforms.normalizeAngle(labelData.rotation);
         } else {
             const safeObj = this._withLabelDefaults(app, sourceObj);
             foundry.utils.mergeObject(labelData, safeObj.label);
@@ -1231,6 +1419,7 @@ export class MapDialogManager {
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-labels.hbs",
             context: {
                 label: labelData,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
                 fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 customLabelStyles: app.uiState.customLabelStyles || [],
@@ -1279,6 +1468,7 @@ export class MapDialogManager {
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs",
             context: {
                 pin: safePin,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
                 icons,
                 pinIconPath: currentIcon?.path || "",
                 pinIconIsCustom: currentIcon?.isCustom || false,
@@ -1287,10 +1477,6 @@ export class MapDialogManager {
                 customLabelStyles: app.uiState.customLabelStyles || [],
             },
             onRender: (dialogApp, html) => {
-                const range = html.querySelector('input[name="pinScale"]');
-                const output = html.querySelector("output");
-                if (range && output) range.addEventListener("input", (e) => (output.value = e.target.value));
-
                 const trigger = html.querySelector("#fwmb-edit-pin-select .fwmb-select-trigger");
                 const optionsMenu = html.querySelector("#fwmb-edit-pin-select .fwmb-select-options");
                 const hiddenInput = html.querySelector("#fwmb-edit-pin-icon-input");
@@ -1368,6 +1554,7 @@ export class MapDialogManager {
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs",
             context: {
                 region: safeRegion,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
                 fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 customLabelStyles: app.uiState.customLabelStyles || [],
@@ -1510,6 +1697,7 @@ export class MapDialogManager {
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs",
             context: {
                 route: safeRoute,
+                rotationRange: FILRODENSWMB.UI.ROTATION,
                 customRouteStyles: app.uiState.customRouteStyles || [],
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
@@ -1528,6 +1716,7 @@ export class MapDialogManager {
                         if (styleData) {
                             colorInput.value = styleData.color;
                             thicknessInput.value = styleData.thickness;
+                            RangeDisplay.sync(thicknessInput);
                             styleSelect.value = styleData.style;
                         }
                     }

@@ -1,34 +1,51 @@
 {
   "seed": "FILRODEN",
+  "generationEngine": "standard",
+  "terrainVersion": 2,
+  "world": {
+    "zoom": 1.5329249617151608,
+    "originX": 775,
+    "originY": 1664,
+    "rootW": 4000,
+    "rootH": 4000
+  },
   "springsBaked": true,
-  "mapWidth": 4000,
-  "mapHeight": 2370,
+  "mapWidth": 4004,
+  "mapHeight": 1848,
   "gridType": "hexR",
-  "gridSize": 25,
+  "gridSize": 77,
   "params": {
     "seaLevel": 0.55,
+    "tectonicPlates": 10,
+    "coastlineFracture": 0.3,
+    "continentalGrouping": 0.4,
+    "shelfRange": 0.15,
+    "continentScale": 150,
     "globalTemp": 0.5,
     "seasonOffset": 0,
-    "latTop": 16.965000000000003,
-    "latBottom": -39.91499999999999,
+    "latTop": 15.120000000000005,
+    "latBottom": -38.92500000000001,
     "globalMoisture": 0.5,
     "riverDensity": 75,
+    "terrain": {
+      "extraOctaves": 1
+    },
     "noise": {
-      "offsetX": 718.2372245663386,
-      "offsetY": 4168.776371308017,
-      "moistureOffset": 18752.93014533521,
-      "tempOffset": 37505.86029067042,
+      "offsetX": 421.5543644716692,
+      "offsetY": 3470.542113323124,
+      "moistureOffset": 15329.249617151609,
+      "tempOffset": 30658.499234303217,
       "elevation": {
-        "scale": 0.0004266,
+        "scale": 0.0005218781218781219,
         "octaves": 8,
         "stretch": 2.2
       },
       "moisture": {
-        "scale": 0.0010664999999999993,
+        "scale": 0.0013046953046953046,
         "octaves": 3
       },
       "temperature": {
-        "scale": 0.02133,
+        "scale": 0.02609390609390609,
         "octaves": 2
       }
     },
@@ -41,9 +58,14 @@
     "climate": {
       "altCooling": 0.4,
       "freezingThreshold": 0.2,
-      "windDistance": 75.01172058134084
+      "windDistance": 18.392036753445634
     },
     "biomePalette": {
+      "0": [
+        0,
+        0,
+        0
+      ],
       "1": [
         26,
         75,
@@ -108,6 +130,11 @@
         225,
         235,
         240
+      ],
+      "ERASER": [
+        0,
+        0,
+        0
       ],
       "DEEP_OCEAN": [
         26,
@@ -175,7 +202,21 @@
         240
       ]
     },
+    "solidOverWater": {},
     "customColors": {},
+    "customBiomeRules": {
+      "rowCount": 0,
+      "rowBiomeId": {},
+      "rowElevStart": {},
+      "rowElevCount": {},
+      "rowMoistStart": {},
+      "rowMoistCount": {},
+      "rowTempStart": {},
+      "rowTempCount": {},
+      "elevSegments": {},
+      "moistSegments": {},
+      "tempSegments": {}
+    },
     "display": {
       "contourInterval": 0.1,
       "biomeAlphaActive": 0.85,
@@ -184,319 +225,291 @@
     "cartography": {
       "scaleEnable": true,
       "scaleUnits": "Miles",
-      "scaleInterval": 188,
+      "scaleInterval": 153,
       "scaleValue": 50,
       "scaleMajorTicks": 10,
       "scaleMinorTicks": 5,
       "scaleX": 50,
-      "scaleY": 2320,
+      "scaleY": 1798,
       "borderEnable": true,
       "borderStyle": "double",
       "borderColor": "#000000"
     }
   },
   "customBiomes": [],
+  "customRouteStyles": [],
+  "customLabelStyles": [],
   "history": [
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 91.42053445850915,
+      "size": 74.7300918836141,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3325.363338021566,
-          "y": 1028.1293952180029
+          "x": 2883.8150842266464,
+          "y": 777.5761868300153
         },
         {
-          "x": 3496.4838255977506,
-          "y": 849.9765588373184
+          "x": 3023.6944869831555,
+          "y": 631.9483154670751
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 91.42053445850915,
+      "size": 74.7300918836141,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3327.7074542897344,
-          "y": 1086.7323019221753
+          "x": 2885.731240428792,
+          "y": 825.4800918836141
         },
         {
-          "x": 3571.4955461790905,
-          "y": 1171.1204875761846
+          "x": 3085.011485451761,
+          "y": 894.461715160797
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 91.42053445850915,
+      "size": 74.7300918836141,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3808.2512892639475,
-          "y": 983.5911861228326
+          "x": 3278.5432618683003,
+          "y": 741.1692189892809
         },
         {
-          "x": 3709.7984060009376,
-          "y": 1082.0440693858416
+          "x": 3198.064701378254,
+          "y": 821.6477794793262
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 91.42053445850915,
+      "size": 74.7300918836141,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3648.8513830285992,
-          "y": 798.4060009376474
+          "x": 3148.244640122512,
+          "y": 589.7928790199088
         },
         {
-          "x": 3780.121894045945,
-          "y": 1098.4528832630099
+          "x": 3255.549387442573,
+          "y": 835.0608728943339
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 91.42053445850915,
+      "size": 74.7300918836141,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3676.980778246601,
-          "y": 777.3089545241444
+          "x": 3171.238514548239,
+          "y": 572.5474732006126
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 91.42053445850915,
+      "size": 74.7300918836141,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3676.980778246601,
-          "y": 800.7501172058135
+          "x": 3171.238514548239,
+          "y": 591.7090352220521
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 91.42053445850915,
+      "size": 74.7300918836141,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3533.9896858884194,
-          "y": 845.2883263009854
+          "x": 3054.3529862174573,
+          "y": 628.1160030627879
         },
         {
-          "x": 3517.5808720112536,
-          "y": 812.4706985466479
+          "x": 3040.9398928024516,
+          "y": 601.2898162327718
         },
         {
-          "x": 3508.204406938585,
-          "y": 737.458977965308
+          "x": 3033.2752679938753,
+          "y": 539.972817764166
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 91.42053445850915,
+      "size": 74.7300918836141,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3512.8926394749183,
-          "y": 1016.4088138771683
+          "x": 3037.107580398162,
+          "y": 767.9954058192956
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 91.42053445850915,
+      "size": 74.7300918836141,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3512.8926394749183,
-          "y": 1016.4088138771683
+          "x": 3037.107580398162,
+          "y": 767.9954058192956
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 44.53820909517112,
+      "size": 36.40696784073507,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3526.9573370839194,
-          "y": 1000
+          "x": 3048.604517611026,
+          "y": 754.5823124042879
         },
         {
-          "x": 3533.9896858884194,
-          "y": 1023.4411626816691
+          "x": 3054.3529862174573,
+          "y": 773.7438744257274
         },
         {
-          "x": 3531.6455696202543,
-          "y": 1004.6882325363339
+          "x": 3052.4368300153146,
+          "y": 758.4146248085758
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 44.53820909517112,
+      "size": 36.40696784073507,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3545.710267229254,
-          "y": 941.3970932958275
+          "x": 3063.9337672281767,
+          "y": 706.6784073506891
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 44.53820909517112,
+      "size": 36.40696784073507,
       "strength": 0.02,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 3566.8073136427574,
-          "y": 1121.894045944679
+          "x": 3081.179173047474,
+          "y": 854.2224349157733
         },
         {
-          "x": 3573.8396624472575,
-          "y": 1166.43225503985
+          "x": 3086.927641653905,
+          "y": 890.6294027565084
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 234.41162681669013,
+      "size": 191.6156202143951,
       "strength": 0.03,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 1309.423347398031,
-          "y": 2443.975621190811
+          "x": 1235.9207503828484,
+          "y": 1934.9345329249618
         },
         {
-          "x": 1813.4083450539147,
-          "y": 2514.2991092358184
+          "x": 1647.8943338437978,
+          "y": 1992.4192189892804
         },
         {
-          "x": 1379.746835443038,
-          "y": 2451.0079699953126
+          "x": 1293.405436447167,
+          "y": 1940.6830015313942
         },
         {
-          "x": 1264.8851383028607,
-          "y": 2443.975621190811
+          "x": 1199.513782542114,
+          "y": 1934.9345329249618
         }
       ]
     },
     {
       "layer": "terrain",
       "tool": "raise",
-      "size": 234.41162681669013,
+      "size": 191.6156202143951,
       "strength": 0.03,
       "feather": 0.4,
       "paintValue": null,
       "points": [
         {
-          "x": 1452.414439756213,
-          "y": 2469.760900140648
+          "x": 1352.80627871363,
+          "y": 1956.0122511485458
         },
         {
-          "x": 1621.190811064229,
-          "y": 2502.578527894984
+          "x": 1490.769525267994,
+          "y": 1982.8384379785605
         },
         {
-          "x": 2087.6699484294427,
-          "y": 2687.7637130801695
+          "x": 1872.0846094946405,
+          "y": 2134.2147779479333
         },
         {
-          "x": 2188.466947960619,
-          "y": 2669.0107829348344
-        }
-      ]
-    },
-    {
-      "layer": "terrain",
-      "tool": "slopeUp",
-      "size": 7,
-      "strength": 0.02,
-      "feather": 0.4,
-      "paintValue": null,
-      "points": [
-        {
-          "x": 2693,
-          "y": 1091
-        },
-        {
-          "x": 2699,
-          "y": 1085
-        }
-      ]
-    },
-    {
-      "layer": "features",
-      "tool": "raise",
-      "size": 7,
-      "strength": 0.02,
-      "feather": 0.4,
-      "paintValue": null,
-      "points": [
-        {
-          "x": 2702,
-          "y": 1082
+          "x": 1954.4793261868301,
+          "y": 2118.8855283307817
         }
       ]
     }
   ],
+  "tectonicFaults": [],
+  "manualRivers": [],
   "mapPins": [
     {
       "id": "v4Br7tWipwR4hoWa",
       "name": "Elaris",
       "icon": "circle_outline_with_dot",
-      "x": 2929,
-      "y": 843,
+      "x": 2586.810872894334,
+      "y": 630.0321592649311,
       "description": "<em>Eldoria</em> is the central jewel of Aethoria, a region of remarkable diversity both geographically and culturally.<br>\n<img src=\"images/Old Wing of University.webp\"/><br>\nAt its heart lies <em>Elaris</em>, the bustling cosmopolitan city known for its academic institutions and vibrant markets. As the political and economic hub, <em>Elaris</em> is surrounded by various landscapes that contribute to its prosperity and influence.",
       "label": {
-        "x": 2869,
-        "y": 821,
+        "x": 2480.27258805513,
+        "y": 623.9004594180705,
         "rotation": 0,
         "fontFamily": "Signika",
         "fontSize": 0.5,
@@ -504,17 +517,36 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "2OUd86EmKKYfLJnV"
+      "journalPageId": "KnHQ5H2pNreuc7hQ",
+      "color": "#ffffff"
+    },
+    {
+      "id": "4gZEMaxsTcrRrEps",
+      "name": "Valhold",
+      "icon": "circle_outline_with_dot",
+      "x": 3633.032159264931,
+      "y": 137.58001531393637,
+      "label": {
+        "x": 3754.133231240429,
+        "y": 137.96324655436447,
+        "fontFamily": "Signika",
+        "fontSize": 0.5,
+        "fillColor": "#dedcd3"
+      },
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "PxbtmlcEuLrCiv5p",
+      "color": "#ffffff"
     },
     {
       "id": "RpEOceUq5T2aseIL",
       "name": "Forgepeak Keep",
       "icon": "castle_keep",
-      "x": 3752,
-      "y": 978,
+      "x": 3228.7232006125573,
+      "y": 729.6722817764165,
       "label": {
-        "x": 3854,
-        "y": 978,
+        "x": 3393.895865237366,
+        "y": 731.2052067381317,
         "fontFamily": "Signika",
         "fontSize": 0.35,
         "fillColor": "#dedcd3"
@@ -522,18 +554,19 @@
       "description": "",
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "r2bUhqL6bmUWrsJX"
+      "journalPageId": "yxIYdvWPZpyjHDif",
+      "color": "#ffffff"
     },
     {
       "id": "zH1QhctgZjLldL4n",
       "name": "Lighthouse (East)",
       "icon": "column_shrine",
-      "x": 3697,
-      "y": 829,
+      "x": 3188.4839203675347,
+      "y": 593.625191424196,
       "description": "Surely this wouldn't be haunted...right?",
       "label": {
-        "x": 3779,
-        "y": 870,
+        "x": 3347.9081163859114,
+        "y": 593.2419601837672,
         "rotation": 0,
         "fontFamily": "Signika",
         "fontSize": 0.35,
@@ -541,55 +574,54 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "6dTpOltZ9dviqcMH"
+      "journalPageId": "lmMCJxz32Djr6lXZ",
+      "color": "#ffffff"
     },
     {
       "id": "JOffO8KVBmwWuRw8",
       "name": "Lighthouse (West)",
       "icon": "column_shrine",
-      "x": 3535,
-      "y": 819,
+      "x": 3062.0176110260345,
+      "y": 578.2959418070451,
       "description": "",
       "label": {
-        "x": 3618,
-        "y": 779,
-        "rotation": 0,
+        "x": 2898.761102603369,
+        "y": 499.73353751914243,
+        "rotation": 20,
         "fontFamily": "Signika",
         "fontSize": 0.35,
         "fillColor": "#e0f0fa"
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "CyTJR3rHSUs3xfNC"
+      "journalPageId": "l2sa71VHKOK9zIOt",
+      "color": "#ffffff"
     },
     {
       "id": "rhcvenvcwFGbdsv2",
-      "name": "Hidden Lair",
+      "name": "Dotted Pin",
       "icon": "map_pin_outline_with_dot",
-      "x": 2681,
-      "y": 1077,
+      "x": 2356.8721286370596,
+      "y": 804.4023736600307,
       "label": {
-        "x": 2597,
-        "y": 1075,
-        "visibility": "gm",
-        "fontFamily": "Signika",
-        "fontSize": 0.4,
-        "fillColor": "#ffffff"
+        "x": 2491.0030627871365,
+        "y": 871.4678407350689,
+        "visibility": "none"
       },
-      "scale": 0.3,
-      "visibility": "gm",
-      "journalPageId": "dtiHjvtDRybPoKw6",
-      "description": ""
+      "scale": 0.25,
+      "visibility": "all",
+      "journalPageId": "6qM7iAuiLPWszNYm",
+      "color": "#ffffff"
     },
     {
       "id": "dN0rJiaqn1328T5p",
       "name": "Dusthaven",
       "icon": "dot",
-      "x": 3264.416315049226,
-      "y": 948.4294421003291,
+      "x": 2833.995022970903,
+      "y": 712.4268759571216,
       "label": {
-        "x": 3371,
-        "y": 949,
+        "x": 2713.2771822358345,
+        "y": 740.4027565084226,
         "fontFamily": "Signika",
         "fontSize": 0.5,
         "fillColor": "#dedcd3",
@@ -598,17 +630,18 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "HLIRQhLv57TPzAMY"
+      "journalPageId": "4sDT66953ERNYlb1",
+      "color": "#ffffff"
     },
     {
       "id": "bjUrSxYTECc6Y3dc",
       "name": "Sylvanhaven",
       "icon": "dot",
-      "x": 2978.4341303328665,
-      "y": 1396.1556493202072,
+      "x": 2600.223966309343,
+      "y": 1078.4127105666164,
       "label": {
-        "x": 3058,
-        "y": 1434,
+        "x": 2722.4747320061256,
+        "y": 1126.6998468606432,
         "fontFamily": "Signika",
         "fontSize": 0.5,
         "fillColor": "#dedcd3",
@@ -617,253 +650,176 @@
       },
       "scale": 0.25,
       "visibility": "all",
-      "journalPageId": "T8UgrlV1phM16zPK"
+      "journalPageId": "wktc16qJewVrIKmA",
+      "color": "#ffffff"
     },
     {
-      "id": "ifCFOXyiIq7PFEl6",
+      "id": "LlvRt81S6tj4wAsC",
       "name": "River Source",
-      "x": 2758.556024378809,
-      "y": 1237.6933895921238,
+      "x": 311.18376722817766,
+      "y": 1831.8453292496172,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "10Q5dzWEU5yJKVGb"
+      "visibility": "all"
     },
     {
-      "id": "nFoXOBVpcqkuZXsN",
+      "id": "Qp32XlrVvMCAiIJD",
       "name": "River Source",
-      "x": 2102.203469292077,
-      "y": 810.126582278481,
+      "x": 2087.843797856049,
+      "y": 679.0857580398163,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "3Doa3zyuuBAhVJfw"
+      "visibility": "all"
     },
     {
-      "id": "ZLjq4MZsw4MOOsLB",
+      "id": "3mb8MCBmwkYtPJ8d",
       "name": "River Source",
-      "x": 3052.9770276605723,
-      "y": 1005.1570557899672,
+      "x": 2461.877488514548,
+      "y": 953.47932618683,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "bAbqJ9cvkuMkrGEv"
+      "visibility": "all"
     },
     {
-      "id": "iUn4Krv9m41FS1bX",
+      "id": "An7pM9a1I1bOf00F",
       "name": "River Source",
-      "x": 1404.5944678856072,
-      "y": 909.5171120487577,
+      "x": 2582.9785604900458,
+      "y": 824.7136294027565,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "dy2UahzKdWR1pXh1"
+      "visibility": "all"
     },
     {
-      "id": "2qgYU79EBalHrNNI",
+      "id": "Dsm4YhPhtCbrhoMY",
       "name": "River Source",
-      "x": 2612.2831692451946,
-      "y": 1477.7308954524144,
+      "x": 1882.4318529862176,
+      "y": 611.6370597243491,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "H5VCs4Bygbn97pi9"
+      "visibility": "all"
     },
     {
-      "id": "NhSObGS4JIsmNLPS",
+      "id": "jfS3RHISirBORLfz",
       "name": "River Source",
-      "x": 2548.523206751055,
-      "y": 1457.1026722925458,
+      "x": 295.85451761102604,
+      "y": 1790.4563552833079,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "A3QVuhZnylAR4Aod"
+      "visibility": "all"
     },
     {
-      "id": "rdgpCTZEFp43eaR9",
+      "id": "FAg8yEWKPkb9GiRB",
       "name": "River Source",
-      "x": 67.51054852320675,
-      "y": 2394.7491795593064,
+      "x": 416.95558958652373,
+      "y": 1897.761102603369,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "9ifzXQeSJQDoAa2e"
+      "visibility": "all"
     },
     {
-      "id": "8VsX7dCqNVuA6ZcR",
+      "id": "pGPgQMn3jJqIrLy7",
       "name": "River Source",
-      "x": 131.27051101734648,
-      "y": 2201.5939990623538,
+      "x": 320.3813169984686,
+      "y": 1903.8928024502297,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "YkJtKFavLRUgMAcD"
+      "visibility": "all"
     },
     {
-      "id": "gGWPkAZqpVbztgaZ",
+      "id": "ufrgj3hGQrhsxJX8",
       "name": "River Source",
-      "x": 3017.346460384435,
-      "y": 1121.4252226910455,
+      "x": 455.2787136294028,
+      "y": 1845.6416539050535,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "Z3jj7n1zSYF0UDbI"
+      "visibility": "all"
     },
     {
-      "id": "6ZWwuEtodbcOJGlo",
+      "id": "yOLJxUJQpmtH5oLS",
       "name": "River Source",
-      "x": 2668.5419596812003,
-      "y": 1211.4392873886545,
+      "x": 2184.418070444104,
+      "y": 905.95865237366,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "14fITWslLJ51vT6e"
+      "visibility": "all"
     },
     {
-      "id": "rdl1ezi3ONcM71h4",
+      "id": "mXw1IMp9pCGBwytq",
       "name": "River Source",
-      "x": 2692.9207688701363,
-      "y": 1203.9381153305205,
+      "x": 3873.7013782542112,
+      "y": 288.18989280245023,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "hwO4wTVn504B2xIj"
+      "visibility": "all"
     },
     {
-      "id": "0sUSofYc7Grjs2PQ",
+      "id": "iMQ9uRvyUJcs6jFo",
       "name": "River Source",
-      "x": 2490.3891233005156,
-      "y": 862.6347866854196,
+      "x": 2029.592649310873,
+      "y": 605.5053598774886,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "keHsNAvayDhGxeR5"
+      "visibility": "all"
     },
     {
-      "id": "7HhGtE67wBw8jJYn",
+      "id": "ofRezqvBs3h6nmxk",
       "name": "River Source",
-      "x": 2586.0290670417253,
-      "y": 928.2700421940929,
+      "x": 2374.500765696784,
+      "y": 1117.5022970903522,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "CxUNMCWKTm2ZF5sw"
+      "visibility": "all"
     },
     {
-      "id": "y9eETpdl2RZqAfK6",
+      "id": "lA55GBvWgiMsiYcK",
       "name": "River Source",
-      "x": 2606.657290201594,
-      "y": 1565.86966713549,
+      "x": 2173.687595712098,
+      "y": 639.2297090352221,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "o74X06fAM7ONgvre"
+      "visibility": "all"
     },
     {
-      "id": "R8NcFkuHHoKoqOiV",
+      "id": "HoJ7y587O4lvogtJ",
       "name": "River Source",
-      "x": 2120.956399437412,
-      "y": 828.8795124238162,
+      "x": -4.598774885145483,
+      "y": 1865.5696784073507,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "LJyq71k7STHmbBoG"
+      "visibility": "all"
     },
     {
-      "id": "dJ7UNor135RFHVpg",
+      "id": "BDasv3vcrXPk5xP9",
       "name": "River Source",
-      "x": 234.4116268166901,
-      "y": 2314.1115799343647,
+      "x": 2244.2021439509954,
+      "y": 951.9464012251149,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "ZFZ5XDPZCgtg69hA"
+      "visibility": "all"
     },
     {
-      "id": "qM9yU4po2sXGXXL2",
+      "id": "FElmFXrQTXrVRo5S",
       "name": "River Source",
-      "x": 2677.918424753868,
-      "y": 1232.0675105485232,
+      "x": 3996.335375191424,
+      "y": 42.921898928024504,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "fOEmOq27nTgom6oa"
+      "visibility": "all"
     },
     {
-      "id": "HCrI6StyLIaQdPfm",
+      "id": "iK1VjxQ4wc7pvuQ5",
       "name": "River Source",
-      "x": 2496.0150023441165,
-      "y": 1462.7285513361464,
+      "x": 2376.0336906584994,
+      "y": 889.0964777947933,
       "type": "spring",
       "radius": 6,
-      "visibility": "all",
-      "journalPageId": "HB27QxE8bMKFCaFV"
+      "visibility": "all"
     },
     {
-      "id": "6gTs4BUgcMZ6ZPZW",
+      "id": "6q1LJI3BADy71Tak",
       "name": "River Source",
-      "x": 133.14580403187998,
-      "y": 2349.7421472105016,
-      "type": "spring",
-      "radius": 6,
-      "visibility": "all",
-      "journalPageId": "cjWOan9RYpNc0qcQ"
-    },
-    {
-      "id": "6FPu2wH0O8HcSrxh",
-      "name": "River Source",
-      "x": 286.9198312236287,
-      "y": 2353.4927332395687,
-      "type": "spring",
-      "radius": 6,
-      "visibility": "all",
-      "journalPageId": "CoQTTPnb0jFcGFR6"
-    },
-    {
-      "id": "CV9hbZDO5NnMAIM3",
-      "name": "River Source",
-      "x": 2494.1397093295827,
-      "y": 1151.429910923582,
-      "type": "spring",
-      "radius": 6,
-      "visibility": "all",
-      "journalPageId": "Lc1kRPa2L99owkuN"
-    },
-    {
-      "id": "yFAsOZZ8pF2m1Avt",
-      "name": "River Source",
-      "x": 2743.553680262541,
-      "y": 1172.0581340834506,
-      "type": "spring",
-      "radius": 6,
-      "visibility": "all",
-      "journalPageId": "ZbXzZvLKVqwiPWk1"
-    },
-    {
-      "id": "p99FGMZuP6H7zW7C",
-      "name": "River Source",
-      "x": 2295.3586497890296,
-      "y": 1052.0393811533052,
-      "type": "spring",
-      "radius": 6,
-      "visibility": "all",
-      "journalPageId": "IBcpUiInmXpVjzbV"
-    },
-    {
-      "id": "ZIdQbTYlFUAWSoRB",
-      "name": "River Source",
-      "x": 1483.356774496015,
-      "y": 995.7805907172996,
-      "type": "spring",
-      "radius": 6,
-      "visibility": "all",
-      "journalPageId": "l4QlPM6luOfopJ4T"
-    },
-    {
-      "id": "jxH8R75YUn7JmUH5",
-      "name": "River Source",
-      "x": 2799,
-      "y": 1071,
+      "x": 366.3690658499234,
+      "y": 1738.3369065849924,
       "type": "spring",
       "radius": 6,
       "visibility": "all"
@@ -875,44 +831,44 @@
       "name": "Hidden Trail",
       "points": [
         {
-          "x": 2680.731364275668,
-          "y": 1089.076418190343
+          "x": 2356.8721286370596,
+          "y": 827.3962480857588
         },
         {
-          "x": 2774.4960150023444,
-          "y": 1053.9146741678396
+          "x": 2433.5183767228177,
+          "y": 798.6539050535995
         },
         {
-          "x": 2816.6901078293477,
-          "y": 1021.097046413503
+          "x": 2468.009188361408,
+          "y": 771.8277182235842
         },
         {
-          "x": 2882.325363338023,
-          "y": 1039.8499765588374
+          "x": 2521.661562021441,
+          "y": 787.1569678407351
         },
         {
-          "x": 2947.9606188466933,
-          "y": 1023.4411626816691
+          "x": 2575.3139356814686,
+          "y": 773.7438744257274
         },
         {
-          "x": 2983.122362869197,
-          "y": 983.5911861228326
+          "x": 2604.056278713628,
+          "y": 741.1692189892809
         },
         {
-          "x": 2957.3370839193617,
-          "y": 939.0529770276614
+          "x": 2582.9785604900453,
+          "y": 704.7622511485458
         },
         {
-          "x": 2936.2400375058587,
-          "y": 903.8912330051579
+          "x": 2565.733154670749,
+          "y": 676.0199081163867
         },
         {
-          "x": 2926.863572433193,
-          "y": 866.3853727144875
+          "x": 2558.0685298621747,
+          "y": 645.3614088820834
         },
         {
-          "x": 2929,
-          "y": 843
+          "x": 2584.8947166921885,
+          "y": 630.0321592649311
         }
       ],
       "color": "#8d6e63",
@@ -922,31 +878,32 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "gm"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "9uKdSbSCO0WiuZBB",
       "name": "Elaris Road",
       "points": [
         {
-          "x": 2929,
-          "y": 843
+          "x": 2586.810872894334,
+          "y": 630.0321592649311
         },
         {
-          "x": 3022.9723394280372,
-          "y": 857.00890764182
+          "x": 2636.630934150078,
+          "y": 637.6967840735076
         },
         {
-          "x": 3081.57524613221,
-          "y": 875.7618377871543
+          "x": 2684.5348392036767,
+          "y": 653.0260336906586
         },
         {
-          "x": 3133.1458040318794,
-          "y": 903.8912330051579
+          "x": 2726.6902756508416,
+          "y": 676.0199081163867
         },
         {
-          "x": 3264.416315049226,
-          "y": 946.0853258321613
+          "x": 2833.995022970903,
+          "y": 710.510719754977
         }
       ],
       "color": "#ffb300",
@@ -956,39 +913,40 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "1nr4lirwg8osyPs5",
       "name": "Route 3",
       "points": [
         {
-          "x": 3264.416315049226,
-          "y": 948.4294421003291
+          "x": 2833.995022970903,
+          "y": 712.4268759571216
         },
         {
-          "x": 3306.6104078762323,
-          "y": 976.558837318331
+          "x": 2868.485834609496,
+          "y": 735.4207503828484
         },
         {
-          "x": 3398.0309423347417,
-          "y": 950.773558368496
+          "x": 2943.21592649311,
+          "y": 714.3430321592656
         },
         {
-          "x": 3437.880918893577,
-          "y": 903.8912330051579
+          "x": 2975.790581929556,
+          "y": 676.0199081163867
         },
         {
-          "x": 3489.451476793249,
-          "y": 875.7618377871543
+          "x": 3017.946018376723,
+          "y": 653.0260336906586
         },
         {
-          "x": 3517.5808720112536,
-          "y": 849.9765588373184
+          "x": 3040.9398928024516,
+          "y": 631.9483154670751
         },
         {
-          "x": 3543.366150961089,
-          "y": 814.8148148148149
+          "x": 3062.0176110260345,
+          "y": 603.2059724349158
         }
       ],
       "color": "#8d6e63",
@@ -997,71 +955,72 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "oz18HaDioLiH2jqC",
       "name": "Route 4",
       "points": [
         {
-          "x": 2929,
-          "y": 843
+          "x": 2584.8947166921885,
+          "y": 628.1160030627879
         },
         {
-          "x": 2987.810595405534,
-          "y": 786.6854195968128
+          "x": 2607.8885911179186,
+          "y": 580.212098009189
         },
         {
-          "x": 3142.522269104549,
-          "y": 798.4060009376474
+          "x": 2734.3549004594192,
+          "y": 589.7928790199088
         },
         {
-          "x": 3243.3192686357243,
-          "y": 842.9442100328185
+          "x": 2816.749617151608,
+          "y": 626.1998468606439
         },
         {
-          "x": 3414.4397562119084,
-          "y": 798.4060009376474
+          "x": 2956.6290199081163,
+          "y": 589.7928790199088
         },
         {
-          "x": 3503.5161744022503,
-          "y": 732.7707454289733
+          "x": 3029.4429555895867,
+          "y": 536.1405053598775
         },
         {
-          "x": 3566.8073136427574,
-          "y": 709.3295827473042
+          "x": 3081.179173047474,
+          "y": 516.978943338438
         },
         {
-          "x": 3686.357243319269,
-          "y": 706.9854664791374
+          "x": 3178.903139356815,
+          "y": 515.062787136294
         },
         {
-          "x": 3789.4983591186133,
-          "y": 695.2648851383029
+          "x": 3263.214012251149,
+          "y": 505.4820061255743
         },
         {
-          "x": 3925.457102672293,
-          "y": 631.9737458977974
+          "x": 3374.3510719754977,
+          "y": 453.7457886676883
         },
         {
-          "x": 3974.6835443037976,
-          "y": 524.1443975621191
+          "x": 3414.590352220521,
+          "y": 365.60260336906583
         },
         {
-          "x": 4019.2217533989688,
-          "y": 428.03563056727614
+          "x": 3450.997320061256,
+          "y": 287.04019908116385
         },
         {
-          "x": 4033.2864510079703,
-          "y": 334.2709798406001
+          "x": 3462.4942572741193,
+          "y": 210.39395099540582
         },
         {
-          "x": 4108.298171589312,
-          "y": 278.01218940459535
+          "x": 3523.8112557427266,
+          "y": 164.4062021439517
         },
         {
-          "x": 4241.912798874824,
-          "y": 245.19456165025872
+          "x": 3633.032159264931,
+          "y": 137.58001531393637
         }
       ],
       "color": "#4dd0e1",
@@ -1070,19 +1029,20 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "wK8B2Qxj4hTOki5a",
       "name": "Route 5",
       "points": [
         {
-          "x": 3266.7604313173933,
-          "y": 946.0853258321613
+          "x": 2835.9111791730475,
+          "y": 710.510719754977
         },
         {
-          "x": 3353.4927332395705,
-          "y": 826.5353961556493
+          "x": 2906.808958652375,
+          "y": 612.7867534456356
         }
       ],
       "color": "#4dd0e1",
@@ -1091,47 +1051,48 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     },
     {
       "id": "D78oGVZIJ2R2ESiw",
       "name": "Route 6",
       "points": [
         {
-          "x": 2976.0900140646995,
-          "y": 1393.8115330520402
+          "x": 2598.3078101071987,
+          "y": 1076.4965543644723
         },
         {
-          "x": 3093.2958274730445,
-          "y": 1375.0586029067042
+          "x": 2694.1156202143966,
+          "y": 1061.16730474732
         },
         {
-          "x": 3135.489920300046,
-          "y": 1346.9292076887023
+          "x": 2728.6064318529857,
+          "y": 1038.1734303215933
         },
         {
-          "x": 3184.716361931552,
-          "y": 1365.6821378340367
+          "x": 2768.8457120980092,
+          "y": 1053.5026799387442
         },
         {
-          "x": 3222.222222222224,
-          "y": 1321.1439287388655
+          "x": 2799.504211332314,
+          "y": 1017.0957120980091
         },
         {
-          "x": 3264.416315049226,
-          "y": 1267.2292545710277
+          "x": 2833.995022970903,
+          "y": 973.024119448699
         },
         {
-          "x": 3271.448663853729,
-          "y": 1196.9057665260207
+          "x": 2839.743491577337,
+          "y": 915.5394333843805
         },
         {
-          "x": 3285.513361462729,
-          "y": 1067.979371776841
+          "x": 2851.240428790199,
+          "y": 810.1508422664632
         },
         {
-          "x": 3266.7604313173933,
-          "y": 948.4294421003291
+          "x": 2835.9111791730475,
+          "y": 712.4268759571216
         }
       ],
       "color": "#e0e0e0",
@@ -1140,7 +1101,8 @@
       "label": {
         "visibility": "none"
       },
-      "visibility": "all"
+      "visibility": "all",
+      "quickStyle": "custom"
     }
   ],
   "regionLayers": [
@@ -1155,208 +1117,208 @@
           "description": "",
           "points": [
             {
-              "x": 2050.1640881387716,
-              "y": 184.2475386779193
+              "x": 1841.4261102603368,
+              "y": 87.75995405819366
             },
             {
-              "x": 2209.563994374121,
-              "y": 310.8298171589311
+              "x": 1971.7247320061256,
+              "y": 191.23238897396632
             },
             {
-              "x": 2357.243319268636,
-              "y": 360.05625879043686
+              "x": 2092.4425727411945,
+              "y": 231.47166921898997
             },
             {
-              "x": 2432.2550398499766,
-              "y": 470.2297233942812
+              "x": 2153.759571209801,
+              "y": 321.53101071975567
             },
             {
-              "x": 2549.4608532583215,
-              "y": 606.1884669479606
+              "x": 2249.5673813169983,
+              "y": 432.66807044410416
             },
             {
-              "x": 2844.819503047351,
-              "y": 678.8560712611354
+              "x": 2491.0030627871365,
+              "y": 492.0689127105673
             },
             {
-              "x": 3144.866385372714,
-              "y": 751.5236755743093
+              "x": 2736.2710566615615,
+              "y": 551.4697549770298
             },
             {
-              "x": 3280.8251289263967,
-              "y": 772.6207219878115
+              "x": 2847.4081163859128,
+              "y": 568.7151607963253
             },
             {
-              "x": 3376.9338959212396,
-              "y": 735.1148616971402
+              "x": 2925.9705206738145,
+              "y": 538.0566615620214
             },
             {
-              "x": 3559.774964838256,
-              "y": 655.4149085794664
+              "x": 3075.430704441041,
+              "y": 472.9073506891278
             },
             {
-              "x": 3606.657290201594,
-              "y": 735.1148616971402
+              "x": 3113.75382848392,
+              "y": 538.0566615620214
             },
             {
-              "x": 3611.3455227379295,
-              "y": 842.9442100328185
+              "x": 3117.5861408882097,
+              "y": 626.1998468606439
             },
             {
-              "x": 3632.4425691514302,
-              "y": 974.2147210501649
+              "x": 3134.831546707504,
+              "y": 733.5045941807051
             },
             {
-              "x": 3653.5396155649323,
-              "y": 1110.1734646038444
+              "x": 3152.0769525267992,
+              "y": 844.6416539050535
             },
             {
-              "x": 3641.819034224098,
-              "y": 1220.3469292076895
+              "x": 3142.49617151608,
+              "y": 934.70099540582
             },
             {
-              "x": 3473.0426629160816,
-              "y": 1300.0468823253643
+              "x": 3004.5329249617157,
+              "y": 999.8503062787144
             },
             {
-              "x": 3374.5897796530726,
-              "y": 1405.5321143928747
+              "x": 2924.0543644716704,
+              "y": 1086.0773353751922
             },
             {
-              "x": 3273.7927801218934,
-              "y": 1571.9643694327249
+              "x": 2841.6596477794787,
+              "y": 1222.1244257274127
             },
             {
-              "x": 3081.57524613221,
-              "y": 1724.3319268635732
+              "x": 2684.5348392036767,
+              "y": 1346.6745788667695
             },
             {
-              "x": 2891.7018284106894,
-              "y": 1808.720112517581
+              "x": 2529.326186830015,
+              "y": 1415.656202143951
             },
             {
-              "x": 2762.77543366151,
-              "y": 1965.7759024847642
+              "x": 2423.937595712098,
+              "y": 1544.0386676875964
             },
             {
-              "x": 2561.181434599156,
-              "y": 2061.884669479607
+              "x": 2259.148162327718,
+              "y": 1622.6010719754984
             },
             {
-              "x": 2345.5227379278012,
-              "y": 2134.552273792781
+              "x": 2082.8617917304746,
+              "y": 1682.0019142419608
             },
             {
-              "x": 2099.390529770277,
-              "y": 2104.0787623066103
+              "x": 1881.6653905053602,
+              "y": 1657.0918836140888
             },
             {
-              "x": 1827.4730426629162,
-              "y": 2007.9699953117683
+              "x": 1659.3912710566615,
+              "y": 1578.5294793261876
             },
             {
-              "x": 1684.4819503047352,
-              "y": 1893.1082981715895
+              "x": 1542.5057427258805,
+              "y": 1484.6378254211331
             },
             {
-              "x": 1609.4702297233944,
-              "y": 1677.4496015002353
+              "x": 1481.188744257274,
+              "y": 1308.3514548238904
             },
             {
-              "x": 1546.1790904828883,
-              "y": 1583.6849507735592
+              "x": 1429.452526799388,
+              "y": 1231.7052067381323
             },
             {
-              "x": 1335.2086263478677,
-              "y": 1506.3291139240507
+              "x": 1256.9984686064327,
+              "y": 1168.4720520673814
             },
             {
-              "x": 1070.323488045008,
-              "y": 1443.0379746835451
+              "x": 1040.4728177641662,
+              "y": 1116.7358346094954
             },
             {
-              "x": 866.3853727144875,
-              "y": 1445.3820909517112
+              "x": 873.7672281776423,
+              "y": 1118.6519908116386
             },
             {
-              "x": 854.664791373653,
-              "y": 1609.4702297233944
+              "x": 864.1864471669226,
+              "y": 1252.7829249617153
             },
             {
-              "x": 861.6971401781525,
-              "y": 1827.473042662917
+              "x": 869.9349157733534,
+              "y": 1430.9854517611034
             },
             {
-              "x": 739.8030942334732,
-              "y": 1914.2053445850922
+              "x": 770.2947932618677,
+              "y": 1501.8832312404295
             },
             {
-              "x": 559.3061415846227,
-              "y": 1850.914205344586
+              "x": 622.7507656967841,
+              "y": 1450.147013782543
             },
             {
-              "x": 451.4767932489447,
-              "y": 1696.2025316455697
+              "x": 534.607580398162,
+              "y": 1323.6807044410414
             },
             {
-              "x": 399.90623534927335,
-              "y": 1539.1467416783873
+              "x": 492.4521439509954,
+              "y": 1195.2982388973967
             },
             {
-              "x": 289.732770745429,
-              "y": 1417.2526957337093
+              "x": 402.3928024502297,
+              "y": 1095.6581163859119
             },
             {
-              "x": 172.52695733708393,
-              "y": 1300.0468823253643
+              "x": 306.5849923430322,
+              "y": 999.8503062787144
             },
             {
-              "x": 174.8710736052504,
-              "y": 1126.5822784810136
+              "x": 308.50114854517574,
+              "y": 858.054747320062
             },
             {
-              "x": 266.29160806375995,
-              "y": 969.5264885138304
+              "x": 383.2312404287902,
+              "y": 729.6722817764165
             },
             {
-              "x": 451.4767932489447,
-              "y": 953.1176746366621
+              "x": 534.607580398162,
+              "y": 716.2591883614089
             },
             {
-              "x": 653.0707923112986,
-              "y": 939.0529770276614
+              "x": 699.3970137825421,
+              "y": 704.7622511485458
             },
             {
-              "x": 711.6736990154712,
-              "y": 864.0412564463197
+              "x": 747.3009188361409,
+              "y": 643.4452526799388
             },
             {
-              "x": 789.0295358649798,
-              "y": 695.2648851383029
+              "x": 810.534073506892,
+              "y": 505.4820061255743
             },
             {
-              "x": 939.0529770276597,
-              "y": 512.4238162212846
+              "x": 933.1680704441035,
+              "y": 356.02182235834607
             },
             {
-              "x": 1154.7116736990151,
-              "y": 423.3473980309432
+              "x": 1109.4544410413473,
+              "y": 283.2078866768766
             },
             {
-              "x": 1375.0586029067042,
-              "y": 317.8621659634318
+              "x": 1289.573124042879,
+              "y": 196.98085758039815
             },
             {
-              "x": 1618.8466947960624,
-              "y": 275.66807313642755
+              "x": 1488.8533690658503,
+              "y": 162.49004594180704
             },
             {
-              "x": 1811.0642287857484,
-              "y": 261.6033755274262
+              "x": 1645.9781776416542,
+              "y": 150.99310872894333
             },
             {
-              "x": 1942.3347398030944,
-              "y": 198.3122362869207
+              "x": 1753.2829249617153,
+              "y": 99.25689127105736
             }
           ],
           "fillColor": "#a89f91",
@@ -1369,22 +1331,22 @@
             "fontFamily": "Signika",
             "fontSize": 1,
             "fillColor": "#ffffff",
-            "x": 2094.7022972339428,
-            "y": 963.9006094702297
+            "x": 1877.833078101072,
+            "y": 725.0735068912711
           },
-          "visibility": "gm",
-          "journalPageId": "l50xU4WDdLGUawr9"
+          "visibility": "all",
+          "quickStyle": "custom"
         }
       ],
-      "visibility": "gm"
+      "visibility": "all"
     }
   ],
   "mapLabels": [
     {
       "id": "D02uZdlfLyLd0JDL",
       "name": "Valoria Plains",
-      "x": 2436.0056258790437,
-      "y": 1712.1425222691046,
+      "x": 2156.8254211332314,
+      "y": 1336.71056661562,
       "rotation": 0,
       "fontFamily": "Signika",
       "fontSize": 0.55,
@@ -1394,8 +1356,8 @@
     {
       "id": "veSrNAS9jyOmtTqj",
       "name": "Mystwood Forest",
-      "x": 1695.2648851383028,
-      "y": 650.7266760431318,
+      "x": 1551.3200612557428,
+      "y": 469.0750382848392,
       "rotation": 0,
       "fontFamily": "Signika",
       "fontSize": 0.5,
@@ -1405,8 +1367,8 @@
     {
       "id": "NJAPfwR7nbsLJiGb",
       "name": "Sundered Isles",
-      "x": 596.3431786216596,
-      "y": 1419.5968120018754,
+      "x": 653.0260336906586,
+      "y": 1097.5742725880552,
       "rotation": 0,
       "fontFamily": "Signika",
       "fontSize": 0.5,
@@ -1416,8 +1378,8 @@
     {
       "id": "dIf68PDjeE17fOuV",
       "name": "Grimlands",
-      "x": 1620.253164556962,
-      "y": 1308.9545241443975,
+      "x": 1490.0030627871363,
+      "y": 1007.1316998468607,
       "rotation": 0,
       "fontFamily": "Signika",
       "fontSize": 0.5,
@@ -1427,8 +1389,8 @@
     {
       "id": "yRcEPeBGyx7eoy5W",
       "name": "Thundris Peaks",
-      "x": 2687.2948898265354,
-      "y": 1252.695733708392,
+      "x": 2362.2373660030626,
+      "y": 961.1439509954058,
       "rotation": 0,
       "fontFamily": "Signika",
       "fontSize": 0.5,
@@ -1436,18 +1398,6 @@
       "visibility": "all"
     }
   ],
-  "mapDecorations": [
-    {
-      "id": "ba2jJkPKk36FkYQc",
-      "type": "decoration",
-      "name": "Compass",
-      "src": "sharedAssets/images/icons/image-from-rawpixel-id-6704634-png.png",
-      "x": 237,
-      "y": 236,
-      "rotation": 0,
-      "scale": 0.48767497911552943,
-      "visibility": "all"
-    }
-  ],
+  "mapDecorations": [],
   "parentId": "im9ZOyzF5YMfQef4"
 }
