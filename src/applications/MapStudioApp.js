@@ -38,6 +38,13 @@ const PERCENT = 100;
  */
 const OVERLAY_PAINT_WAIT_MAX_MS = 250;
 
+// Brush size assumed when outlining an Undo/Redo preview for a stroke recorded without one
+const DEFAULT_STROKE_PREVIEW_SIZE = 20;
+
+// Margin (in map pixels) around a vector entity's points in an Undo/Redo preview, so a single
+// pin or a thin line still gets a visible outline
+const VECTOR_PREVIEW_PADDING = 50;
+
 /**
  * The kinds of refresh the map runs through its refresh queue (see RefreshQueue):
  *   TERRAIN         - generateTerrain: a full generation, or a refresh of what changed when nothing
@@ -785,7 +792,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * and when the requested width changes, so the outline always shows what will be made.
      */
     #snapCrop(cropBox) {
-        if (!this.canvasEngine || !cropBox || !(cropBox.width > 0) || !(cropBox.height > 0)) return;
+        // Written as !(value > 0) on purpose: a missing or NaN value also fails the check,
+        // whereas the equivalent-looking value <= 0 would let it through
+        if (!this.canvasEngine || !cropBox || !(cropBox.width > 0) || !(cropBox.height > 0)) return; // NOSONAR
         this.canvasEngine.setCropBox(this.#planCrop(cropBox).cropBox);
     }
 
@@ -800,7 +809,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * crop is being dragged these show where it will snap to when released.
      */
     #showCropReadouts(cropBox) {
-        if (!cropBox || !(cropBox.width > 0) || !(cropBox.height > 0)) return;
+        // Written as !(value > 0) on purpose: a missing or NaN value also fails the check,
+        // whereas the equivalent-looking value <= 0 would let it through
+        if (!cropBox || !(cropBox.width > 0) || !(cropBox.height > 0)) return; // NOSONAR
         const plan = this.#planCrop(cropBox);
 
         this.uiState.regionalTargetHeight = plan.targetHeight;
@@ -3410,7 +3421,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Identifies the spatial bounds of the next Undo or Redo action.
+     * Outlines on the canvas the area the next Undo or Redo would change, labelled with what it
+     * would undo or redo.
      */
     #previewActionBounds(direction) {
         if (!this.canvasEngine) return;
@@ -3418,122 +3430,132 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const ledger = direction === "undo" ? this.globalHistoryLedger : this.globalRedoLedger;
         const actionType = ledger.at(-1);
 
-        if (!actionType) return;
+        let preview = null;
+        if (actionType === "raster") preview = this.#rasterActionPreview(direction);
+        else if (actionType === "vector") preview = this.#vectorActionPreview(direction);
+        if (!preview?.bounds) return;
 
-        let targetBounds = null;
-        let actionLabel = "";
+        const prefixKey = direction === "undo" ? "FILRODENSWMB.UI.ActionUndo" : "FILRODENSWMB.UI.ActionRedo";
+        const prefix = game.i18n.localize(prefixKey);
+        this.canvasEngine.showActionPreview(preview.bounds, `${prefix} ${preview.label}`);
+    }
 
-        if (actionType === "raster") {
-            const stack = direction === "undo" ? this.brushEngine.history : this.brushEngine.redoStack;
-            const targetStroke = stack.at(-1);
+    /**
+     * The area and label of the brush stroke the next Undo or Redo would step through.
+     *
+     * @returns {{bounds: object, label: string}|null} Null when there is no stroke to step through.
+     */
+    #rasterActionPreview(direction) {
+        const stack = direction === "undo" ? this.brushEngine.history : this.brushEngine.redoStack;
+        const targetStroke = stack.at(-1);
+        if (!targetStroke?.points?.length) return null;
 
-            if (targetStroke?.points && targetStroke.points.length > 0) {
-                targetBounds = this.#calculatePointBounds(targetStroke.points, targetStroke.size || 20);
+        // Map the raster layer to its localisation key
+        const isBiome = targetStroke.layer === "biome";
+        const locKey = isBiome ? "FILRODENSWMB.UI.ActionBiomeBrush" : "FILRODENSWMB.UI.ActionTerrainBrush";
+        const fallback = isBiome ? "Biome Brush" : "Terrain Brush";
 
-                // Map the raster layer to its localisation key
-                const isBiome = targetStroke.layer === "biome";
-                const locKey = isBiome ? "FILRODENSWMB.UI.ActionBiomeBrush" : "FILRODENSWMB.UI.ActionTerrainBrush";
-                const fallback = isBiome ? "Biome Brush" : "Terrain Brush";
+        return {
+            bounds: this.#calculatePointBounds(targetStroke.points, targetStroke.size || DEFAULT_STROKE_PREVIEW_SIZE),
+            label: game.i18n.localize(locKey) || fallback,
+        };
+    }
 
-                actionLabel = game.i18n.localize(locKey) || fallback;
-            }
-        } else if (actionType === "vector") {
-            const stack = direction === "undo" ? this.pinHistory : this.pinRedoStack;
-            const targetSnapshot = stack.at(-1);
+    /**
+     * The area and label of the vector edit the next Undo or Redo would restore, found by
+     * comparing the map's current vector state with the snapshot it would restore.
+     *
+     * @returns {{bounds: object|null, label: string}|null} Null when there is no snapshot to restore or nothing differs.
+     */
+    #vectorActionPreview(direction) {
+        const stack = direction === "undo" ? this.pinHistory : this.pinRedoStack;
+        const targetSnapshot = stack.at(-1);
+        if (!targetSnapshot) return null;
 
-            if (targetSnapshot) {
-                const currentState = MapStateManager.getVectorStateSnapshot(this);
-                const diffResult = this.#diffVectorSnapshots(currentState, targetSnapshot);
-
-                if (diffResult) {
-                    targetBounds = diffResult.bounds;
-                    actionLabel = diffResult.label;
-                }
-            }
-        }
-
-        if (targetBounds) {
-            const prefixKey = direction === "undo" ? "FILRODENSWMB.UI.ActionUndo" : "FILRODENSWMB.UI.ActionRedo";
-            const prefix = game.i18n.localize(prefixKey);
-
-            this.canvasEngine.showActionPreview(targetBounds, `${prefix} ${actionLabel}`);
-        }
+        return this.#diffVectorSnapshots(MapStateManager.getVectorStateSnapshot(this), targetSnapshot);
     }
 
     /**
      * Compares two global state snapshots to find the specific entity that changed.
+     *
+     * @returns {{bounds: object|null, label: string}|null} The changed entity's padded bounds and its label, or null when nothing differs.
      */
     #diffVectorSnapshots(current, target) {
-        let changedEntity = null;
-        let entityKey = null;
+        const change = MapStudioApp.#firstChangedEntity(current, target);
+        if (!change) return null;
 
+        return {
+            bounds: this.#calculatePointBounds(MapStudioApp.#entityPoints(change.entity), VECTOR_PREVIEW_PADDING),
+            label: this.#getActionLabel(change.key, change.entity),
+        };
+    }
+
+    /**
+     * Finds the first entity that differs between two vector state snapshots. The snapshots'
+     * lists (pins, rivers, region layers and so on) are compared in order, and the first list
+     * holding a difference decides the result.
+     *
+     * @returns {{key: string, entity: object}|null} The list the change is in and the changed entity, or null when nothing differs.
+     */
+    static #firstChangedEntity(current, target) {
         for (const key of Object.keys(current)) {
             if (!Array.isArray(current[key]) || !Array.isArray(target[key])) continue;
 
-            const currentMap = new Map(current[key].map((item, idx) => [item.id || `idx_${idx}`, item]));
-            const targetMap = new Map(target[key].map((item, idx) => [item.id || `idx_${idx}`, item]));
-
-            for (const [id, targetItem] of targetMap.entries()) {
-                const currentItem = currentMap.get(id);
-
-                if (!currentItem || JSON.stringify(currentItem) !== JSON.stringify(targetItem)) {
-                    changedEntity = currentItem || targetItem;
-                    entityKey = key;
-
-                    if (changedEntity.regions && Array.isArray(changedEntity.regions)) {
-                        const cRegs = new Map((currentItem?.regions || []).map((r, i) => [r.id || `idx_${i}`, r]));
-                        const tRegs = new Map((targetItem?.regions || []).map((r, i) => [r.id || `idx_${i}`, r]));
-                        let changedReg = null;
-
-                        for (const [rId, tReg] of tRegs.entries()) {
-                            const cReg = cRegs.get(rId);
-                            if (!cReg || JSON.stringify(cReg) !== JSON.stringify(tReg)) {
-                                changedReg = cReg || tReg;
-                                break;
-                            }
-                        }
-                        if (!changedReg) {
-                            for (const [rId, cReg] of cRegs.entries()) {
-                                if (!tRegs.has(rId)) {
-                                    changedReg = cReg;
-                                    break;
-                                }
-                            }
-                        }
-                        if (changedReg) changedEntity = changedReg;
-                    }
-                    break;
-                }
-            }
-
-            if (!changedEntity) {
-                for (const [id, currentItem] of currentMap.entries()) {
-                    if (!targetMap.has(id)) {
-                        changedEntity = currentItem;
-                        entityKey = key;
-                        break;
-                    }
-                }
-            }
-
-            if (changedEntity) break;
+            const change = MapStudioApp.#firstChangedItem(current[key], target[key]);
+            if (change) return { key, entity: MapStudioApp.#narrowToRegion(change) };
         }
+        return null;
+    }
 
-        if (!changedEntity) return null;
+    /**
+     * Finds the first item that differs between two versions of a list. Items are matched by id
+     * (or, lacking one, by position). An item in `target` that is missing from `current` or
+     * differs from it is found first, and the current version is reported where both exist, since
+     * that is what is on the canvas now. Failing that, an item in `current` that `target` no longer
+     * has is reported.
+     *
+     * @returns {{item: object, currentItem: object|undefined, targetItem: object|undefined}|null}
+     *   The item to report and both versions of it (either may be missing), or null when the lists match.
+     */
+    static #firstChangedItem(currentItems, targetItems) {
+        const currentById = MapStudioApp.#itemsById(currentItems);
+        const targetById = MapStudioApp.#itemsById(targetItems);
 
-        let points = [];
-        if (changedEntity.points) {
-            points = changedEntity.points;
-        } else if (changedEntity.regions) {
-            points = changedEntity.regions.flatMap((r) => r.points || []);
-        } else if (changedEntity.x !== undefined && changedEntity.y !== undefined) {
-            points = [changedEntity];
+        for (const [id, targetItem] of targetById) {
+            const currentItem = currentById.get(id);
+            if (!currentItem || JSON.stringify(currentItem) !== JSON.stringify(targetItem)) {
+                return { item: currentItem || targetItem, currentItem, targetItem };
+            }
         }
+        for (const [id, currentItem] of currentById) {
+            if (!targetById.has(id)) return { item: currentItem, currentItem, targetItem: undefined };
+        }
+        return null;
+    }
 
-        return {
-            bounds: this.#calculatePointBounds(points, 50),
-            label: this.#getActionLabel(entityKey, changedEntity),
-        };
+    /** Keys a list's items by id, or by position for an item without one. */
+    static #itemsById(items) {
+        return new Map(items.map((item, index) => [item.id || `idx_${index}`, item]));
+    }
+
+    /**
+     * When the changed item is a region layer that exists in the target snapshot, narrows the
+     * change to the region inside it that differs, so the preview outlines that region rather than
+     * the whole layer. A layer the target no longer has at all is left whole: every one of its
+     * regions would go, so the whole layer is the area affected.
+     */
+    static #narrowToRegion({ item, currentItem, targetItem }) {
+        if (!targetItem || !Array.isArray(item.regions)) return item;
+
+        return MapStudioApp.#firstChangedItem(currentItem?.regions || [], targetItem.regions || [])?.item ?? item;
+    }
+
+    /** The points that outline a vector entity: its own points, its regions' points, or the entity itself when it is a single point. */
+    static #entityPoints(entity) {
+        if (entity.points) return entity.points;
+        if (entity.regions) return entity.regions.flatMap((region) => region.points || []);
+        if (entity.x !== undefined && entity.y !== undefined) return [entity];
+        return [];
     }
 
     /**
@@ -3610,68 +3632,120 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return JSON.stringify([this.tectonicFaults, this.manualRivers, guidedMasks]);
     }
 
+    /**
+     * Steps one action back (undo) or forward (redo) through the global history. The ledger
+     * records the order of vector and brush (raster) actions, each of which keeps its own stack of
+     * states. An entry whose stack has nothing left to step through is dropped and the next one
+     * tried, so a single Undo or Redo always changes something while anything is left.
+     */
     async #processHistoryStep(isUndo) {
-        // Dynamically assign the source and target stacks based on the direction
+        // Dynamically assign the source and target ledgers based on the direction
         const sourceLedger = isUndo ? this.globalHistoryLedger : this.globalRedoLedger;
         const targetLedger = isUndo ? this.globalRedoLedger : this.globalHistoryLedger;
-        const sourcePinStack = isUndo ? this.pinHistory : this.pinRedoStack;
-        const targetPinStack = isUndo ? this.pinRedoStack : this.pinHistory;
 
         let action = sourceLedger?.pop();
-
         while (action) {
-            if (action === "vector") {
-                if (sourcePinStack.length > 0) {
-                    const previousTerrainInputs = this.#serialiseTerrainInputs();
-                    const previousFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
-                    const previousCustomBiomes = JSON.stringify(this.uiState.customBiomes);
-
-                    targetPinStack.push(MapStateManager.getVectorStateSnapshot(this));
-                    const state = sourcePinStack.pop();
-                    MapStateManager.restoreVectorStateSnapshot(this, state);
-
-                    targetLedger.push("vector");
-
-                    const currentFeaturePins = JSON.stringify(this.mapPins.filter((p) => !p.icon));
-
-                    // Faults, manual rivers and (in guided mode) land masks all change the
-                    // elevation data, so an undo/redo that alters any of them needs a terrain
-                    // regeneration, not just a repaint.
-                    if (previousTerrainInputs !== this.#serialiseTerrainInputs()) {
-                        // The pixel layers only change once the terrain is regenerated, so only
-                        // the vector layers need redrawing now
-                        this._repaintVectors();
-                        this.requestTerrainUpdate(null, this.debouncedGenerateTerrain);
-                    } else if (previousFeaturePins !== currentFeaturePins) {
-                        this._repaintCanvas();
-                        this.debouncedGenerateClimate();
-                    } else if (previousCustomBiomes !== JSON.stringify(this.uiState.customBiomes)) {
-                        // A custom biome's name/colour/rules changing affects only how the biome
-                        // layer paints (ProceduralEngine reads uiState.customBiomes fresh every
-                        // repaint via MapStateManager.getMapParameters) - no elevation/moisture/
-                        // temperature data changed, so a full terrain/climate regenerate would be
-                        // wasted work, unlike the fault/river/pin branches above.
-                        this._repaintCanvas();
-                    } else {
-                        this._repaintVectors();
-                    }
-                    break;
-                }
-            } else if (action === "raster") {
-                // Dynamically trigger the brush engine's internal undo or redo
-                const brushAction = isUndo ? this.brushEngine?.undo() : this.brushEngine?.redo();
-
-                if (this.baseElevationData && brushAction) {
-                    targetLedger.push("raster");
-                    await this.#requestChangedTerrain(isUndo ? "Brush undo" : "Brush redo");
-                    break;
-                }
-            }
+            const stepped = await this.#stepHistoryAction(action, isUndo, targetLedger);
+            if (stepped) break;
             action = sourceLedger?.pop();
         }
 
         this.render({ parts: ["context"] });
         this.markDirty();
+    }
+
+    /**
+     * Steps one ledger entry, recording it on `targetLedger` when it changed something.
+     *
+     * @returns {Promise<boolean>} Whether anything was stepped through.
+     */
+    async #stepHistoryAction(action, isUndo, targetLedger) {
+        if (action === "vector") return this.#stepVectorHistory(isUndo, targetLedger);
+        if (action === "raster") return this.#stepRasterHistory(isUndo, targetLedger);
+        return false;
+    }
+
+    /**
+     * Restores the previous (undo) or next (redo) vector state snapshot, then refreshes whatever
+     * the change affects (see #refreshAfterVectorStep).
+     *
+     * @returns {boolean} Whether there was a snapshot to restore.
+     */
+    #stepVectorHistory(isUndo, targetLedger) {
+        const sourcePinStack = isUndo ? this.pinHistory : this.pinRedoStack;
+        const targetPinStack = isUndo ? this.pinRedoStack : this.pinHistory;
+        if (sourcePinStack.length === 0) return false;
+
+        const before = this.#vectorRefreshInputs();
+        targetPinStack.push(MapStateManager.getVectorStateSnapshot(this));
+        MapStateManager.restoreVectorStateSnapshot(this, sourcePinStack.pop());
+        targetLedger.push("vector");
+
+        this.#refreshAfterVectorStep(before, this.#vectorRefreshInputs());
+        return true;
+    }
+
+    /**
+     * Serialises the parts of the vector state that decide how much must be refreshed after it
+     * changes (see #refreshAfterVectorStep), so a before and after can be compared.
+     */
+    #vectorRefreshInputs() {
+        return {
+            terrain: this.#serialiseTerrainInputs(),
+            featurePins: JSON.stringify(this.mapPins.filter((p) => !p.icon)),
+            customBiomes: JSON.stringify(this.uiState.customBiomes),
+        };
+    }
+
+    /**
+     * Refreshes the map after a vector undo/redo, doing only as much work as the change needs.
+     * The checks run from the most to the least expensive refresh, and the first that applies
+     * covers the ones after it.
+     */
+    #refreshAfterVectorStep(before, after) {
+        // Faults, manual rivers and (in guided mode) land masks all change the elevation data,
+        // so an undo/redo that alters any of them needs a terrain regeneration, not just a repaint.
+        if (before.terrain !== after.terrain) {
+            // The pixel layers only change once the terrain is regenerated, so only the vector
+            // layers need redrawing now
+            this._repaintVectors();
+            this.requestTerrainUpdate(null, this.debouncedGenerateTerrain);
+            return;
+        }
+
+        // Feature pins (those without an icon) shape the climate
+        if (before.featurePins !== after.featurePins) {
+            this._repaintCanvas();
+            this.debouncedGenerateClimate();
+            return;
+        }
+
+        // A custom biome's name, colour or rules changing affects only how the biome layer
+        // paints (ProceduralEngine reads uiState.customBiomes fresh on every repaint through
+        // MapStateManager.getMapParameters). No elevation, moisture or temperature data changed,
+        // so regenerating the terrain or climate would be wasted work.
+        if (before.customBiomes !== after.customBiomes) {
+            this._repaintCanvas();
+            return;
+        }
+
+        this._repaintVectors();
+    }
+
+    /**
+     * Steps the brush engine's own undo or redo, then regenerates the terrain it affects. The
+     * brush engine steps even when no terrain exists yet, so its stacks stay in line with the
+     * ledger, but the entry only counts as stepped through when there is terrain to refresh.
+     *
+     * @returns {Promise<boolean>} Whether a stroke was stepped through onto existing terrain.
+     */
+    async #stepRasterHistory(isUndo, targetLedger) {
+        const brushAction = isUndo ? this.brushEngine?.undo() : this.brushEngine?.redo();
+        if (!this.baseElevationData || !brushAction) return false;
+
+        targetLedger.push("raster");
+        await this.#requestChangedTerrain(isUndo ? "Brush undo" : "Brush redo");
+        return true;
     }
 
     // --- Action Handlers ---
@@ -4658,13 +4732,15 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Generates a random 6-character alphanumeric seed (uppercased) - the one place this logic
-     * lives, so anywhere a blank or randomised map seed is needed (this button, an auto-generated
+     * Generates a random 6-character alphanumeric seed (uppercased). This is the one place this
+     * logic lives, so anywhere a blank or randomised map seed is needed (this button, an auto-generated
      * default map name, a blank seed left on the Create/Convert Map dialogue) goes through the same
      * approach rather than each call site inventing its own.
      */
     #generateRandomSeed() {
-        return Math.random().toString(36).substring(2, 8).toUpperCase();
+        // Math.random() is enough here: a seed only needs to differ from map to map, and nothing
+        // depends on it being unpredictable
+        return Math.random().toString(36).substring(2, 8).toUpperCase(); // NOSONAR
     }
 
     async _onRedoBrush(_event, _target) {

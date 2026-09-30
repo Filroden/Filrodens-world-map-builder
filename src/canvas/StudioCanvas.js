@@ -7,6 +7,35 @@ import { TerrainCompositor } from "./TerrainCompositor.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 
+/** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
+const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br: "nwse-resize", tr: "nesw-resize", bl: "nesw-resize" });
+
+/**
+ * Entities whose nodes may be dragged into the buffer around the map, so lines and outlines can
+ * span well outside the visible map. Single-point markers (pins, labels, decorations) and manual
+ * river nodes stay confined to the map itself, the same rule applied when these nodes are first
+ * created (see MapStudioApp's click handlers).
+ */
+const BUFFERED_NODE_TYPES = Object.freeze(["route", "region", "landMask", "fault"]);
+
+// Shortest time between two brush stamps sent to the app while the pointer moves with the button
+// held, however often the browser reports pointer moves
+const BRUSH_MOVE_INTERVAL_MS = 100;
+
+// Furthest (in screen pixels) the pointer may travel between pressing and releasing the right
+// button for it to count as a right-click rather than the end of a pan
+const RIGHT_CLICK_MAX_TRAVEL_PX = 5;
+
+const POINTER_BUTTON = Object.freeze({ PRIMARY: 0, MIDDLE: 1, SECONDARY: 2 });
+
+// Hex grid geometry: a hexagon's six corners lie 60 degrees apart, and a row grid's hexes are
+// turned a further 30 degrees so they stand pointy-topped. Staggered rows (or columns) of hexes
+// sit one and a half radii apart.
+const HEX_CORNERS = 6;
+const HEX_CORNER_ANGLE_DEG = 60;
+const POINTY_TOP_TURN_DEG = 30;
+const HEX_STAGGERED_SPACING = 1.5;
+
 export class StudioCanvas {
     /** Whether destroy() has run (see destroy). */
     #destroyed = false;
@@ -394,74 +423,99 @@ export class StudioCanvas {
         e.stopPropagation();
     }
 
+    /**
+     * Routes a pointer move to whichever interaction is under way, in priority order: a crop box
+     * being drawn or moved, the crop tool's hover cursor, panning the reference image, panning the
+     * map, dragging a node or shape, painting with the brush, and finally plain hovering.
+     */
     #handlePointerMove(e, canvasElement) {
         const coords = this.#getMapCoordinates(e, canvasElement);
 
-        if (this.activeCropAction) return this.#processCropDrag(coords);
-
-        if (this.isCropMode && !this.activeCropAction) {
-            const zone = this.#getCropHitZone(coords.x, coords.y);
-            if (zone === "center") canvasElement.style.cursor = "move";
-            else if (zone === "tl" || zone === "br") canvasElement.style.cursor = "nwse-resize";
-            else if (zone === "tr" || zone === "bl") canvasElement.style.cursor = "nesw-resize";
-            else canvasElement.style.cursor = "crosshair";
+        if (this.activeCropAction) {
+            this.#processCropDrag(coords);
             return;
         }
-
+        if (this.isCropMode) {
+            this.#showCropCursor(coords, canvasElement);
+            return;
+        }
         if (this.isDraggingReference) {
-            const dx = coords.x - this.dragStart.x;
-            const dy = coords.y - this.dragStart.y;
-            this.dragStart = { x: coords.x, y: coords.y };
-            if (this.onReferencePan) this.onReferencePan(dx, dy);
+            this.#panReference(coords);
             return;
         }
-
-        // --- MAP PANNING ---
         if (this.isDragging) {
-            const dx = e.clientX - this.dragStart.x;
-            const dy = e.clientY - this.dragStart.y;
-            this.stage.position.x = this.stageStart.x + dx;
-            this.stage.position.y = this.stageStart.y + dy;
+            this.#panMap(e);
             return;
         }
-
-        // --- NODE DRAGGING ---
         if (this.activeDrag) {
-            if (!this.activeDrag.started && !this.#hasExceededDragThreshold(e)) return;
-            this.#beginDragOnce();
-
-            if (this.activeDrag.shapeDrag) {
-                this.#moveDraggedShape(coords);
-                return;
-            }
-
-            // Line/polygon nodes (routes, regions, land masks, fault lines) may be dragged into the
-            // buffer so they can span well outside the visible map. Single-point markers (pins,
-            // labels, decorations) and manual river nodes stay confined to the map itself - the same
-            // rule applied when these nodes are first created (see MapStudioApp's click handlers).
-            const bufferedTypes = ["route", "region", "landMask", "fault"];
-            const buffer = bufferedTypes.includes(this.activeDrag.entityType) ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
-            this.activeDrag.target.x = Math.max(-buffer, Math.min(coords.x, this.mapWidth + buffer));
-            this.activeDrag.target.y = Math.max(-buffer, Math.min(coords.y, this.mapHeight + buffer));
-            if (this.onInfraDrag) this.onInfraDrag();
+            this.#dragHeldItem(e, coords);
             return;
         }
-
         if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
-            const now = performance.now();
-            if (now - this.lastBrushTime > 100) {
-                this.onBrushMove(coords.x, coords.y);
-                this.lastBrushTime = now;
-            }
+            this.#paintBrushMove(coords);
             return;
         }
 
-        if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+        this.#hover(e, coords, canvasElement);
+    }
 
-        if (this.isEditMode && !this.isDragging && !this.activeDrag) {
-            const hit = this.#getHitTarget(coords.x, coords.y);
-            canvasElement.style.cursor = StudioCanvas.#hoverCursor(hit, e.shiftKey);
+    /** Shows which part of the crop box (a corner, the middle, or outside) the pointer is over. */
+    #showCropCursor(coords, canvasElement) {
+        const zone = this.#getCropHitZone(coords.x, coords.y);
+        canvasElement.style.cursor = CROP_ZONE_CURSORS[zone] ?? "crosshair";
+    }
+
+    /** Moves the reference image by how far the pointer has moved since the last move. */
+    #panReference(coords) {
+        const dx = coords.x - this.dragStart.x;
+        const dy = coords.y - this.dragStart.y;
+        this.dragStart = { x: coords.x, y: coords.y };
+        if (this.onReferencePan) this.onReferencePan(dx, dy);
+    }
+
+    /** Moves the map with the pointer, measured in screen pixels from where the pan started. */
+    #panMap(e) {
+        const dx = e.clientX - this.dragStart.x;
+        const dy = e.clientY - this.dragStart.y;
+        this.stage.position.x = this.stageStart.x + dx;
+        this.stage.position.y = this.stageStart.y + dy;
+    }
+
+    /**
+     * Moves the node or shape the pointer holds. Nothing moves until the pointer has travelled
+     * past the drag threshold, so a click on an item does not nudge it.
+     */
+    #dragHeldItem(e, coords) {
+        if (!this.activeDrag.started && !this.#hasExceededDragThreshold(e)) return;
+        this.#beginDragOnce();
+
+        if (this.activeDrag.shapeDrag) {
+            this.#moveDraggedShape(coords);
+            return;
         }
+
+        const buffer = BUFFERED_NODE_TYPES.includes(this.activeDrag.entityType) ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
+        this.activeDrag.target.x = Math.max(-buffer, Math.min(coords.x, this.mapWidth + buffer));
+        this.activeDrag.target.y = Math.max(-buffer, Math.min(coords.y, this.mapHeight + buffer));
+        if (this.onInfraDrag) this.onInfraDrag();
+    }
+
+    /** Paints a brush stamp at the pointer, at most once every BRUSH_MOVE_INTERVAL_MS. */
+    #paintBrushMove(coords) {
+        const now = performance.now();
+        if (now - this.lastBrushTime <= BRUSH_MOVE_INTERVAL_MS) return;
+
+        this.onBrushMove(coords.x, coords.y);
+        this.lastBrushTime = now;
+    }
+
+    /** Reports the pointer's position and, while editing, shows whether anything under it can be picked up. */
+    #hover(e, coords, canvasElement) {
+        if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+        if (!this.isEditMode) return;
+
+        const hit = this.#getHitTarget(coords.x, coords.y);
+        canvasElement.style.cursor = StudioCanvas.#hoverCursor(hit, e.shiftKey);
     }
 
     /**
@@ -668,46 +722,61 @@ export class StudioCanvas {
         }
     }
 
+    /**
+     * Ends whatever the released button was doing: the right or middle button ends a pan (a
+     * right-button release that barely moved counts as a right-click), and the primary button ends
+     * a crop, a reference pan, a node or shape drag, or a brush stroke.
+     */
     #handlePointerUp(e, canvasElement) {
         if (canvasElement.hasPointerCapture(e.pointerId)) {
             canvasElement.releasePointerCapture(e.pointerId);
         }
 
-        if (e.button === 2 || e.button === 1) {
-            this.isDragging = false;
-            if (e.button === 2 && this.dragStart) {
-                const dist = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
-                if (dist < 5 && this.onRightClick) this.onRightClick();
-            }
-            canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
+        if (e.button === POINTER_BUTTON.SECONDARY || e.button === POINTER_BUTTON.MIDDLE) {
+            this.#endPan(e, canvasElement);
             return;
         }
+        if (e.button === POINTER_BUTTON.PRIMARY) this.#endPrimaryAction(canvasElement);
+    }
 
-        if (e.button === 0) {
-            if (this.activeCropAction) {
-                this.activeCropAction = null;
-                canvasElement.style.cursor = "crosshair";
-                if (this.cropBox && this.onCropRelease) this.onCropRelease({ ...this.cropBox });
-                return;
-            }
-            if (this.isDraggingReference) {
-                this.isDraggingReference = false;
-                canvasElement.style.cursor = "crosshair";
-                return;
-            }
-            if (this.activeDrag) {
-                const wasDragged = this.activeDrag.started;
-                this.activeDrag = null;
-                this.#releaseShapeDragBox();
-                this.#setHeldItem(null);
-                canvasElement.style.cursor = "crosshair";
-                if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
-                return;
-            }
-            if (this.isEditMode && this.onBrushEnd) {
-                this.onBrushEnd();
-            }
+    /** Ends a map pan, treating a right-button release close to where it was pressed as a right-click. */
+    #endPan(e, canvasElement) {
+        this.isDragging = false;
+        if (e.button === POINTER_BUTTON.SECONDARY && this.dragStart) {
+            const travel = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
+            if (travel < RIGHT_CLICK_MAX_TRAVEL_PX && this.onRightClick) this.onRightClick();
         }
+        canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
+    }
+
+    /** Ends the primary-button interaction under way, the first of those listed on #handlePointerUp that applies. */
+    #endPrimaryAction(canvasElement) {
+        if (this.activeCropAction) {
+            this.activeCropAction = null;
+            canvasElement.style.cursor = "crosshair";
+            if (this.cropBox && this.onCropRelease) this.onCropRelease({ ...this.cropBox });
+            return;
+        }
+        if (this.isDraggingReference) {
+            this.isDraggingReference = false;
+            canvasElement.style.cursor = "crosshair";
+            return;
+        }
+        if (this.activeDrag) {
+            this.#endDrag(canvasElement);
+            return;
+        }
+        if (this.isEditMode && this.onBrushEnd) this.onBrushEnd();
+    }
+
+    /** Lets go of the node or shape being dragged, telling the app only if it actually moved. */
+    #endDrag(canvasElement) {
+        const wasDragged = this.activeDrag.started;
+        this.activeDrag = null;
+        this.#releaseShapeDragBox();
+        this.#setHeldItem(null);
+        canvasElement.style.cursor = "crosshair";
+        if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
     }
 
     #handlePointerLeave(_e, _canvasElement) {
@@ -797,7 +866,7 @@ export class StudioCanvas {
         let sprite = this.layerSprites[layerId];
 
         // Setup the persistent sprite if it does not exist or resolution has changed
-        if (!sprite || sprite.width !== width || sprite.height !== height) {
+        if (sprite?.width !== width || sprite.height !== height) {
             if (sprite) sprite.destroy(true);
 
             // The texture keeps its own copy of the pixels, decoupled from the engine's buffer
@@ -986,67 +1055,89 @@ export class StudioCanvas {
 
         if (!isVisible || type === "none") return;
 
-        // 1. Initialise the masking container if it does not exist
+        this.#maskGridToMap();
+
+        // Configure the drawing line styles
+        this.gridLayer.lineStyle(1, 0xffffff, FILRODENSWMB.DISPLAY.GRID_ALPHA);
+
+        const cellSize = Math.max(FILRODENSWMB.LIMITS.MIN_GRID_SIZE, Number(size));
+        if (type === "square") this.#drawSquareGrid(cellSize);
+        else if (type === "hexR" || type === "hexC") this.#drawHexGrid(cellSize, type === "hexR");
+    }
+
+    /**
+     * Clips the grid layer to the map, so hexes drawn past the edges (see #drawHexGrid) are cut
+     * off cleanly at the map's border. The mask is created the first time and reused after.
+     */
+    #maskGridToMap() {
         if (!this.gridMask) {
             this.gridMask = new PIXI.Graphics();
             this.stage.addChild(this.gridMask);
         }
 
-        // 2. Build the bounding-box clipping mask to capture edge overflows
         this.gridMask.beginFill(0xffffff);
         this.gridMask.drawRect(0, 0, this.mapWidth, this.mapHeight);
         this.gridMask.endFill();
         this.gridLayer.mask = this.gridMask;
+    }
 
-        // 3. Configure the drawing line styles
-        this.gridLayer.lineStyle(1, 0xffffff, FILRODENSWMB.DISPLAY.GRID_ALPHA);
+    /** Draws square grid lines every `cellSize` map pixels, starting at the map's top-left corner. */
+    #drawSquareGrid(cellSize) {
+        for (let x = 0; x <= this.mapWidth; x += cellSize) {
+            this.gridLayer.moveTo(x, 0).lineTo(x, this.mapHeight);
+        }
+        for (let y = 0; y <= this.mapHeight; y += cellSize) {
+            this.gridLayer.moveTo(0, y).lineTo(this.mapWidth, y);
+        }
+    }
 
-        const width = this.mapWidth;
-        const height = this.mapHeight;
-        const s = Math.max(FILRODENSWMB.LIMITS.MIN_GRID_SIZE, Number(size));
+    /**
+     * Draws a hex grid whose hexes are `cellSize` map pixels across their flat sides. Row grids
+     * (`isRow`) have pointy-topped hexes in rows, every other row shifted by half a hex; column
+     * grids have flat-topped hexes in columns, every other column shifted.
+     *
+     * Hexes start one column and one row before the map and run one hex past its far edges, so
+     * the partial hexes along every edge are drawn complete and then clipped by the grid mask
+     * (see #maskGridToMap), rather than left open.
+     */
+    #drawHexGrid(cellSize, isRow) {
+        const radius = cellSize / Math.sqrt(3);
+        const spacing = {
+            x: isRow ? cellSize : radius * HEX_STAGGERED_SPACING,
+            y: isRow ? radius * HEX_STAGGERED_SPACING : cellSize,
+        };
 
-        if (type === "square") {
-            for (let x = 0; x <= width; x += s) {
-                this.gridLayer.moveTo(x, 0).lineTo(x, height);
-            }
-            for (let y = 0; y <= height; y += s) {
-                this.gridLayer.moveTo(0, y).lineTo(width, y);
-            }
-        } else if (type === "hexR" || type === "hexC") {
-            const isRow = type === "hexR";
-            const r = s / Math.sqrt(3);
-            const widthDist = isRow ? s : r * 1.5;
-            const heightDist = isRow ? r * 1.5 : s;
-
-            // Intentionally sampling from column -1 to guarantee edge completion
-            for (let col = -1; col * widthDist < width + s; col++) {
-                for (let row = -1; row * heightDist < height + s; row++) {
-                    let cx, cy;
-
-                    if (isRow) {
-                        const offset = row % 2 === 0 ? 0 : s / 2;
-                        cx = col * widthDist + offset;
-                        cy = row * heightDist;
-                    } else {
-                        const offset = col % 2 === 0 ? 0 : s / 2;
-                        cx = col * widthDist;
-                        cy = row * heightDist + offset;
-                    }
-
-                    // Draw the 6 structural vertices of the Hexagon
-                    for (let i = 0; i < 6; i++) {
-                        const angle_deg = 60 * i - (isRow ? 30 : 0);
-                        const angle_rad = (Math.PI / 180) * angle_deg;
-                        const px = cx + r * Math.cos(angle_rad);
-                        const py = cy + r * Math.sin(angle_rad);
-
-                        if (i === 0) this.gridLayer.moveTo(px, py);
-                        else this.gridLayer.lineTo(px, py);
-                    }
-                    this.gridLayer.closePath();
-                }
+        for (let col = -1; col * spacing.x < this.mapWidth + cellSize; col++) {
+            for (let row = -1; row * spacing.y < this.mapHeight + cellSize; row++) {
+                const centre = StudioCanvas.#hexCentre(col, row, spacing, cellSize, isRow);
+                this.#drawHexagon(centre, radius, isRow);
             }
         }
+    }
+
+    /** The centre of the hex at `col`, `row`: every odd row (row grids) or odd column (column grids) is shifted by half a hex. */
+    static #hexCentre(col, row, spacing, cellSize, isRow) {
+        if (isRow) {
+            const offset = row % 2 === 0 ? 0 : cellSize / 2;
+            return { x: col * spacing.x + offset, y: row * spacing.y };
+        }
+
+        const offset = col % 2 === 0 ? 0 : cellSize / 2;
+        return { x: col * spacing.x, y: row * spacing.y + offset };
+    }
+
+    /** Draws one hexagon's outline through its six corners, turned so row grids' hexes are pointy-topped. */
+    #drawHexagon(centre, radius, isRow) {
+        for (let i = 0; i < HEX_CORNERS; i++) {
+            const angleDeg = HEX_CORNER_ANGLE_DEG * i - (isRow ? POINTY_TOP_TURN_DEG : 0);
+            const angleRad = (Math.PI / 180) * angleDeg;
+            const px = centre.x + radius * Math.cos(angleRad);
+            const py = centre.y + radius * Math.sin(angleRad);
+
+            if (i === 0) this.gridLayer.moveTo(px, py);
+            else this.gridLayer.lineTo(px, py);
+        }
+        this.gridLayer.closePath();
     }
 
     /**

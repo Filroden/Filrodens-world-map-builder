@@ -50,7 +50,9 @@ export class UpwindMargin {
      *   has no elevation to copy.
      */
     static build(parent, cropBox, zoomScale) {
-        if (!parent?.elevation || !(parent.width > 0) || !(parent.height > 0) || !(zoomScale > 0)) return null;
+        // Written as !(value > 0) on purpose: a missing or NaN value also fails the check,
+        // whereas the equivalent-looking value <= 0 would let it through
+        if (!parent?.elevation || !(parent.width > 0) || !(parent.height > 0) || !(zoomScale > 0)) return null; // NOSONAR
 
         const parentMargin = this.decode(parent.margin);
         // A column or two more than the parent's own reach: the regional map's reach is the

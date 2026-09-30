@@ -196,7 +196,14 @@ export class LineField {
         this.#blurPass(scratch, this.along, radius, false);
     }
 
-    #blurPass(source, target, radius, horizontal) {
+    /**
+     * One pass of the box blur along every row (horizontal) or column of the grid, as a running
+     * sum: each step adds the point entering the window and removes the one leaving it, so every
+     * point costs the same whatever the radius. Only points inside the reach are counted (see
+     * #smoothAlong). The window's edge tests are kept inline in the one loop, since they run for
+     * every grid point on both passes.
+     */
+    #blurPass(source, target, radius, horizontal) { // NOSONAR
         const lines = horizontal ? this.rows : this.columns;
         const size = horizontal ? this.columns : this.rows;
         const indexOf = horizontal ? (line, i) => line * this.columns + i : (line, i) => i * this.columns + line;

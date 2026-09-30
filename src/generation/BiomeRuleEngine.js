@@ -74,7 +74,9 @@ export class BiomeRuleEngine {
      */
     static matchBiomeId(compiled, elevation, moisture, temperature, side) {
         for (let row = 0; row < compiled.rowCount; row++) {
-            if ((compiled.rowSides[row] & side) === 0) continue;
+            // A bitwise test on purpose: rowSides holds each row's allowed sides as BIOME_SIDE flags
+            // combined into one number, and & picks out whether `side` is among them
+            if ((compiled.rowSides[row] & side) === 0) continue; // NOSONAR
             if (!BiomeRuleEngine.#axisMatches(compiled.elevSegments, compiled.rowElevStart[row], compiled.rowElevCount[row], elevation)) continue;
             if (!BiomeRuleEngine.#axisMatches(compiled.moistSegments, compiled.rowMoistStart[row], compiled.rowMoistCount[row], moisture)) continue;
             if (!BiomeRuleEngine.#axisMatches(compiled.tempSegments, compiled.rowTempStart[row], compiled.rowTempCount[row], temperature)) continue;

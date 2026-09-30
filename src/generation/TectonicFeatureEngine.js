@@ -155,7 +155,7 @@ export class TectonicFeatureEngine {
         const settingsKey = JSON.stringify(fault, (key, value) => (TectonicFeatureEngine.#DISPLAY_FIELDS.has(key) ? undefined : value)) + frameKey;
         const groundKey = TectonicFeatureEngine.#fingerprint(context.ground, context.width, plan.bounds);
         const cached = cache?.[fault.id];
-        if (cached && cached.settingsKey === settingsKey && cached.groundKey === groundKey) return cached.delta;
+        if (cached?.settingsKey === settingsKey && cached.groundKey === groundKey) return cached.delta;
 
         const delta = kind.render(plan, shaped, context);
         if (cache && fault.id) cache[fault.id] = { settingsKey, groundKey, delta };

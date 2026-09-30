@@ -119,9 +119,11 @@ export class LabelWidth {
      * @returns {number}
      */
     static pixelsToChars(legacyPx, fontFamily, fontSizeRem, rootFontPx) {
-        if (!(legacyPx > 0)) return 0;
+        // Both checks are written as !(value > 0) on purpose: a missing or NaN value also fails
+        // them, whereas the equivalent-looking value <= 0 would let it through
+        if (!(legacyPx > 0)) return 0; // NOSONAR
         const charPx = LabelWidth.charRatio(fontFamily) * (fontSizeRem || 1) * rootFontPx;
-        if (!(charPx > 0)) return 0;
+        if (!(charPx > 0)) return 0; // NOSONAR
         return Math.max(1, Math.ceil(legacyPx / charPx - LabelWidth.#ROUNDING_TOLERANCE));
     }
 

@@ -421,7 +421,9 @@ export class ProceduralEngine {
             const index = at.y * width + at.x;
             const isFrozen = temperatureData[index] < freezeLimit;
             if (!isStartRecorded) this.#recordRiverStep(record, at.x, at.y, isFrozen, width, riverMap);
-            isStartRecorded = false;
+            // Cleared on every pass, though only the first can find it set: stepping on always reaches
+            // a pixel not yet recorded
+            isStartRecorded = false; // NOSONAR
 
             const next = this.#nextRiverStep(record, at, ideal, isFrozen, map);
             if (!next) break;
@@ -1882,8 +1884,12 @@ export class ProceduralEngine {
      * A landmass that runs off a side of the grid which cuts through the world (a regional map's
      * working area, not the top map's own edge) cannot be measured, since part of it is unseen.
      * It is treated as unbounded, as is every cell of a grid with no coastline at all.
+     *
+     * Both steps (tracing each landmass, then giving every cell its landmass's reach) run over
+     * every cell of the grid, so their tests are written inline in the loops rather than moved
+     * into helpers called once per cell.
      */
-    static #measureLandmasses(grid, ownershipGrid, distanceGrid, seedGrid) {
+    static #measureLandmasses(grid, ownershipGrid, distanceGrid, seedGrid) { // NOSONAR
         const { width, height, cutEdges } = grid;
         const total = width * height;
         const landmassOf = new Int32Array(total).fill(-1);
@@ -2186,8 +2192,11 @@ export class ProceduralEngine {
      * fourteen passes over 9.6 million cells), so the eight neighbours are unrolled and the
      * bounds tests are only made for the cells near the grid's edge. The result is exactly that of
      * testing each neighbour in turn with its own bounds test.
+     *
+     * Its length and branching are the price of that speed, so it is deliberately left as one
+     * function: moving the neighbour tests into helpers would add a call per neighbour per cell.
      */
-    static #executeJFAPass(input, output, width, height, step) {
+    static #executeJFAPass(input, output, width, height, step) { // NOSONAR
         for (let y = 0; y < height; y++) {
             const rowInside = y - step >= 0 && y + step < height;
             for (let x = 0; x < width; x++) {
@@ -2202,7 +2211,9 @@ export class ProceduralEngine {
                     const down = current + step * width * 2;
                     const side = step * 2;
                     for (let k = 0; k < 8; k++) {
-                        const neighbour = JFA_ORDER_ROW[k] < 0 ? up : JFA_ORDER_ROW[k] > 0 ? down : current;
+                        // Kept as one nested conditional inside this per-pixel loop rather than a separate
+                        // statement or helper: it picks the row above, below or the pixel's own
+                        const neighbour = JFA_ORDER_ROW[k] < 0 ? up : JFA_ORDER_ROW[k] > 0 ? down : current; // NOSONAR
                         const index = neighbour + JFA_ORDER_COL[k] * side;
                         const seedX = input[index];
                         const seedY = input[index + 1];
@@ -2633,7 +2644,9 @@ export class ProceduralEngine {
      */
     #abyssalHills(pixel, distance, ridges) {
         const hills = ridges.hills;
-        if (!(hills.height > 0) || distance >= hills.reach) return 0;
+        // Written as !(value > 0) on purpose: a missing or NaN value also fails the check,
+        // whereas the equivalent-looking value <= 0 would let it through
+        if (!(hills.height > 0) || distance >= hills.reach) return 0; // NOSONAR
 
         const settings = FILRODENSWMB.GENERATION.COASTAL_PROFILE.OCEAN_RIDGES.ABYSSAL_HILLS;
         const offset = settings.NOISE_OFFSET;

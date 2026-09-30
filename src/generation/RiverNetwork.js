@@ -199,8 +199,11 @@ export class RiverNetwork {
      * @param {number} height
      * @param {Uint8Array} out - Written in full (or only inside bounds).
      * @param {{minX, minY, maxX, maxY}|null} [bounds]
+     *
+     * This runs over every pixel near every river on each repaint, so its per-pixel tests are
+     * deliberately kept inline in one function rather than split into helpers called per pixel.
      */
-    static rasterise({ channels, pools }, width, height, out, bounds = null) {
+    static rasterise({ channels, pools }, width, height, out, bounds = null) { // NOSONAR
         const range = RiverNetwork.FIELD_RANGE;
         const box = bounds ?? { minX: 0, minY: 0, maxX: width - 1, maxY: height - 1 };
         // Empty: every byte 0 but alpha, written as whole pixels
@@ -512,7 +515,9 @@ export class RiverNetwork {
         const lakes = [];
         const stack = [];
         for (let start = 0; start < waterMask.length; start++) {
-            if (!(waterMask[start] > 0) || pools[start]) continue;
+            // Written as !(value > 0) on purpose: a missing or NaN value also fails the check,
+            // whereas the equivalent-looking value <= 0 would let it through
+            if (!(waterMask[start] > 0) || pools[start]) continue; // NOSONAR
             const members = RiverNetwork.#collectLake(start, waterMask, width, height, pools, stack);
             const isPool = members.length < limit || RiverNetwork.#isNarrow(members, waterMask, width, height, narrow);
             if (isPool) for (const i of members) pools[i] = POOL;
@@ -558,7 +563,9 @@ export class RiverNetwork {
                 frontier.push(i);
             }
         }
-        for (let step = 2; frontier.length; step++) {
+        // A breadth-first walk in from the shore that ends when the frontier empties: step is only
+        // the distance from the shore of the pixels being reached, checked against the limit
+        for (let step = 2; frontier.length; step++) { // NOSONAR
             if (step > limit + 1) return false;
             const next = [];
             for (const i of frontier) {

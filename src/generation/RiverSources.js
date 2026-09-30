@@ -60,7 +60,9 @@ export class RiverSources {
             if (x < 0 || y < 0 || x >= width || y >= height) continue;
 
             const index = y * width + x;
-            if (!(elevation[index] > minElevation) || !(moisture[index] > minMoisture)) continue;
+            // Written as !(value > limit) on purpose: a NaN value also fails the check, whereas the
+            // equivalent-looking value <= limit would let it through
+            if (!(elevation[index] > minElevation) || !(moisture[index] > minMoisture)) continue; // NOSONAR
             if (RiverSources.#isBlocked(worldX, worldY, blocks)) continue;
             springs.push({ id: `source-${candidate}`, x, y, homeX: x, homeY: y, candidate });
         }
@@ -83,7 +85,9 @@ export class RiverSources {
      * @returns {object[]} The baked pins (a subset of `pins`).
      */
     static findBakedPins(pins, seedNumber, params, width, height) {
-        const springs = pins.filter((pin) => pin.type === "spring" && !(pin.inflow > 0));
+        // !(inflow > 0) on purpose: springs saved before inflow existed have none, and must count as
+        // having no inflow (undefined <= 0 is false, so the equivalent-looking test would drop them)
+        const springs = pins.filter((pin) => pin.type === "spring" && !(pin.inflow > 0)); // NOSONAR
         if (springs.length === 0) return [];
 
         const world = RiverSources.#world(params, width, height);

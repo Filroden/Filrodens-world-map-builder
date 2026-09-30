@@ -54,7 +54,9 @@ export class Volcanoes {
         const activityAt = (d) => Volcanoes.#activity(d / options.pulseLength + seed, noise);
         const stations = [];
         let distance = 0;
-        for (let n = 0; distance <= length; n++) {
+        // The walk ends by distance along the line, not by a count: n only numbers the steps, so
+        // each step's length varies (see #stepLength)
+        for (let n = 0; distance <= length; n++) { // NOSONAR
             const along = length > 0 ? distance / length : 1;
             const activity = activityAt(distance);
             if (activity >= options.pulses * settings.QUIET_ACTIVITY) stations.push({ ...Volcanoes.pointAt(curve, distance), along, activity });
@@ -174,7 +176,9 @@ export class Volcanoes {
     static #shieldModel(volcano, floor, seaLevel) {
         const bottom = Math.min(floor, seaLevel - MIN_SHIELD_DEPTH);
         const rise = volcano.top - bottom;
-        if (!(rise > 0)) return null;
+        // Written as !(value > 0) on purpose: a missing or NaN value also fails the check,
+        // whereas the equivalent-looking value <= 0 would let it through
+        if (!(rise > 0)) return null; // NOSONAR
         // Size the young volcano so its coast (sea level) lies `radius` from the summit
         const coastShare = volcano.top > seaLevel ? Volcanoes.#shieldInverse((seaLevel - bottom) / rise) : SUBMARINE_COAST_SHARE;
         const footprint = volcano.radius / Math.max(MIN_COAST_SHARE, coastShare);
@@ -336,7 +340,9 @@ export class Volcanoes {
         const textures = Volcanoes.#stratoTextures(delta, context.noise);
         const wobbleAmount = FILRODENSWMB.TECTONICS.FEATURES.VOLCANO.STRATO_WOBBLE;
         for (const volcano of volcanoes) {
-            if (!(volcano.rise > 0)) continue;
+            // Written as !(value > 0) on purpose: a missing or NaN value also fails the check,
+            // whereas the equivalent-looking value <= 0 would let it through
+            if (!(volcano.rise > 0)) continue; // NOSONAR
             const foot = Volcanoes.#averageAround(volcano, ground);
             const top = Math.max(foot + volcano.rise, context.seaLevel + volcano.rise * STRATO.MIN_RISE_ABOVE_SEA);
             Volcanoes.#forEachPixel(delta, volcano, volcano.radius * STRATO.REACH, (x, y, r, angle) => {

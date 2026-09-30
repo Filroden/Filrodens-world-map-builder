@@ -228,7 +228,7 @@ export class HydrologyEngine {
                 continue;
             }
             const last = pixels.at(-1);
-            if (last && last.x === x && last.y === y) continue;
+            if (last?.x === x && last.y === y) continue;
             pixels.push({ x, y });
         }
         return pixels;
