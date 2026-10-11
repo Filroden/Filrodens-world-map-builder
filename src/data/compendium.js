@@ -222,23 +222,23 @@ const MAP_DATA_PATH = `flags.${FILRODENSWMB.ID}.mapData`;
 const OWNERS_PATH = `flags.${FILRODENSWMB.ID}.owners`;
 
 /**
- * The update entries that delete, under `path`, each key of `stored` that `next` no longer has.
+ * `next` with every key of `stored` that `next` no longer has marked for deletion.
  *
  * Foundry merges an object written to a flag into the one already there, so a key left out of a
  * save would otherwise survive it: the region layers of a map migrated to layer sets, or the owner
- * array of a deleted level. A "-=" key removes it.
+ * array of a deleted level. A key whose value is a ForcedDeletion operator is removed instead (the
+ * replacement for the older "-=key" syntax, which Foundry now reports as deprecated).
  *
- * @param {string} path
- * @param {object|undefined} stored
- * @param {object} next
- * @returns {object}
+ * @param {object|undefined} stored - What the flag holds now.
+ * @param {object} next - What it should hold.
+ * @returns {object} A shallow copy of `next` with the deletions added.
  */
-function staleKeyDeletions(path, stored, next) {
-    const deletions = {};
+function withStaleKeysDeleted(stored, next) {
+    const update = { ...next };
     for (const key of Object.keys(stored ?? {})) {
-        if (!(key in next)) deletions[`${path}.-=${key}`] = null;
+        if (!(key in next)) update[key] = new foundry.data.operators.ForcedDeletion();
     }
-    return deletions;
+    return update;
 }
 
 /**
@@ -287,11 +287,10 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null, { 
             const stored = doc.flags?.[FILRODENSWMB.ID] ?? {};
             const update = {
                 name: mapName,
-                [MAP_DATA_PATH]: mapDataPayload,
-                ...staleKeyDeletions(MAP_DATA_PATH, stored.mapData, mapDataPayload),
+                [MAP_DATA_PATH]: withStaleKeysDeleted(stored.mapData, mapDataPayload),
                 pages: pages,
             };
-            if (owners) Object.assign(update, { [OWNERS_PATH]: owners }, staleKeyDeletions(OWNERS_PATH, stored.owners, owners));
+            if (owners) update[OWNERS_PATH] = withStaleKeysDeleted(stored.owners, owners);
             await doc.update(update);
             return doc;
         }
