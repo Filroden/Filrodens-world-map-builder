@@ -7,5 +7,14 @@
   },
   "devDependencies": {
     "@foundryvtt/foundryvtt-cli": "3.0.0"
+  },
+  "dependencies": {
+    "pixi.js": "^7.4.2",
+    "playwright": "^1.64.0"
+  },
+  "allowScripts": {
+    "pixi.js@7.4.2": true,
+    "playwright@1.64.0": true,
+    "classic-level@1.4.1": true
   }
 }
