@@ -316,7 +316,7 @@ export class SceneExporter {
             const iconSize = Math.max(NOTE_ICON_MIN_PX, Math.min(Math.round(app.mapWidth / NOTE_ICON_WIDTH_RATIO), NOTE_ICON_MAX_PX));
 
             const pinNotes = app.mapPins.filter((pin) => pin.icon && pin.journalPageId).map((pin) => this.#pinNote(pin, journalObj, iconSize));
-            const regionNotes = app.regionLayers.flatMap((layer) => layer.regions.filter((region) => region.journalPageId && region.points?.length > 0).map((region) => this.#regionNote(region, journalObj, iconSize)));
+            const regionNotes = this.regionNoteAnchors(app).map(({ region, x, y }) => ({ entryId: journalObj.id, pageId: region.journalPageId, x, y, iconSize }));
             const noteData = [...pinNotes, ...regionNotes];
 
             if (noteData.length > 0) {
@@ -339,26 +339,42 @@ export class SceneExporter {
         };
     }
 
-    /** A map note at the centre of a region's bounding box. */
-    static #regionNote(region, journalObj, iconSize) {
+    /**
+     * Where each region with a journal page gets its map note. On the display mesh that is the
+     * region's label anchor (the deepest point of its largest part; see MeshSession.labelAnchor),
+     * which always lies inside the region, unlike the centre of its bounding box (which can fall
+     * outside a crescent or ring-shaped region, or in the sea); a polygon region keeps the centre
+     * of its bounding box.
+     *
+     * @param {object} app - Reads regionLayers and meshSession.
+     * @returns {Array<{region: object, x: number, y: number}>}
+     */
+    static regionNoteAnchors(app) {
+        const anchors = [];
+        for (const layer of app.regionLayers ?? []) {
+            for (const region of layer.regions) {
+                if (!region.journalPageId) continue;
+                const anchor = app.meshSession ? app.meshSession.labelAnchor(layer.id, region.key) : this.#boundsCentre(region.points);
+                if (anchor) anchors.push({ region, x: anchor.x, y: anchor.y });
+            }
+        }
+        return anchors;
+    }
+
+    /** The centre of a polygon's bounding box, or null for a region without points. */
+    static #boundsCentre(points) {
+        if (!points?.length) return null;
         let minX = Infinity,
             maxX = -Infinity,
             minY = Infinity,
             maxY = -Infinity;
-        for (const p of region.points) {
+        for (const p of points) {
             if (p.x < minX) minX = p.x;
             if (p.x > maxX) maxX = p.x;
             if (p.y < minY) minY = p.y;
             if (p.y > maxY) maxY = p.y;
         }
-
-        return {
-            entryId: journalObj.id,
-            pageId: region.journalPageId,
-            x: minX + (maxX - minX) / 2,
-            y: minY + (maxY - minY) / 2,
-            iconSize,
-        };
+        return { x: minX + (maxX - minX) / 2, y: minY + (maxY - minY) / 2 };
     }
 
     /** Generates the Scene's thumbnail. It is only a convenience, so a failure is skipped quietly. */

@@ -6,6 +6,7 @@ import { getRegionUploadResource } from "./RegionUploadResource.js";
 import { TerrainCompositor } from "./TerrainCompositor.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
+import { RegionLevelLayers } from "./RegionLevelLayers.js";
 
 /** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
 const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br: "nwse-resize", tr: "nesw-resize", bl: "nesw-resize" });
@@ -27,6 +28,8 @@ const BRUSH_MOVE_INTERVAL_MS = 100;
 const RIGHT_CLICK_MAX_TRAVEL_PX = 5;
 
 const POINTER_BUTTON = Object.freeze({ PRIMARY: 0, MIDDLE: 1, SECONDARY: 2 });
+// The texture side every WebGL implementation must support, assumed when the real limit cannot be read
+const MIN_GUARANTEED_TEXTURE_SIZE = 4096;
 
 // Hex grid geometry: a hexagon's six corners lie 60 degrees apart, and a row grid's hexes are
 // turned a further 30 degrees so they stand pointy-topped. Staggered rows (or columns) of hexes
@@ -80,6 +83,19 @@ export class StudioCanvas {
 
         this.terrainCompositor = new TerrainCompositor(PIXI);
         this.layers.biomeFallback.visible = false;
+
+        // Region levels drawn from the display mesh (see renderRegionLevels): fills read their land
+        // mask from the terrain's packed texture
+        this.regionLevels = new RegionLevelLayers(PIXI, this.layers.regions, {
+            auxProvider: () => this.terrainCompositor.auxTexture,
+            maxTextureSize: () => {
+                const gl = this.app.renderer.gl;
+                return gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : MIN_GUARANTEED_TEXTURE_SIZE;
+            },
+        });
+        // Optional (x, y, radius) => hit lookup for things picked without edit nodes (regions and
+        // routes drawn from the mesh), consulted when no node or marker is under the pointer
+        this.meshHitTest = null;
 
         // Vector Graphics Engine for non-pixel entities (custom river and fault guides, spring pins).
         // Rivers themselves are drawn by the terrain shader (see TerrainCompositor).
@@ -231,6 +247,12 @@ export class StudioCanvas {
                 closest = item;
             }
         }
+        // Regions and routes drawn from the mesh have no nodes; they are found by what lies under
+        // the pointer instead (see meshHitTest). Such a hit can be picked (double-clicked) but not
+        // dragged: it carries selectOnly.
+        if (!closest && this.isEditMode && this.meshHitTest) {
+            closest = this.meshHitTest(x, y, FILRODENSWMB.MESH.ROUTE_HIT_PX / (this.stage.scale.x || 1));
+        }
         return closest;
     }
 
@@ -364,7 +386,7 @@ export class StudioCanvas {
         }
 
         const hit = this.#getHitTarget(coords.x, coords.y);
-        const grabbedTarget = hit ? hit.target : null;
+        const grabbedTarget = hit && !hit.selectOnly ? hit.target : null;
 
         // Shift pressed on a node of a region or land mask picks up the whole shape (see
         // #beginShapeDrag); Shift pressed anywhere else inserts a node on the nearest line or
@@ -545,6 +567,7 @@ export class StudioCanvas {
      */
     static #hoverCursor(hit, isShiftHeld) {
         if (!hit) return "crosshair";
+        if (hit.selectOnly) return "pointer";
         return isShiftHeld && hit.shape ? "move" : "grab";
     }
 
@@ -830,9 +853,11 @@ export class StudioCanvas {
         // Destroying a PIXI application twice fails part-way (its resize plugin has already been
         // torn down), so it is only ever destroyed once
         if (this.app && !this.#destroyed) {
-            // The terrain's mesh and textures go first: destroying them again after the stage
-            // has already destroyed its children would fail on the mesh's released geometry
+            // The terrain's and the regions' meshes and textures go first: destroying them again
+            // after the stage has already destroyed its children would fail on the meshes'
+            // released geometry
             this.terrainCompositor.destroy();
+            this.regionLevels.clear();
             this.app.destroy(true, { children: true, texture: true, baseTexture: true });
         }
         this.#destroyed = true;
@@ -1329,7 +1354,7 @@ export class StudioCanvas {
     /**
      * Renders vector routes and POI pins to the infrastructure layer.
      */
-    renderInfrastructure(pins = [], routes = [], isEditMode = false, activeRouteId = null) {
+    renderInfrastructure(pins = [], routes = [], isEditMode = false, activeRouteId = null, meshSession = null) {
         // Clone and sort the routes by thickness so major highways always draw on top
         const sortedRoutes = [...routes].sort((a, b) => a.thickness - b.thickness);
 
@@ -1340,8 +1365,13 @@ export class StudioCanvas {
         this.pinContainer.removeChildren().forEach((c) => c.destroy());
         this.nodeContainer.removeChildren().forEach((c) => c.destroy(true));
 
-        // 1. Render Routes (Bottom Layer)
+        // 1. Render Routes (Bottom Layer). Routes on the display mesh are drawn from their legs and
+        // have no edit nodes (see #drawMeshRoute).
+        if (FILRODENSWMB.MESH_NATIVE) {
+            for (const route of sortedRoutes) this.#drawMeshRoute(route, meshSession);
+        }
         sortedRoutes.forEach((route) => {
+            if (FILRODENSWMB.MESH_NATIVE) return;
             if (!this.#isVisibleInCurrentPass(route.visibility, "all", false) || !route.points || route.points.length === 0) return;
 
             // 1a. Draw Edit Nodes FIRST (Guarantees the initial single click is visible)
@@ -1411,6 +1441,29 @@ export class StudioCanvas {
         });
     }
 
+    /**
+     * Draws a route from its legs on the display mesh: the line through its cells' sites (corner
+     * cut when the route is smoothed; see MeshSession.routeLine), with a black outline one pixel
+     * wider underneath unless the route turns its outline off. Nothing is drawn before the map's
+     * mesh session exists.
+     */
+    #drawMeshRoute(route, meshSession) {
+        if (!meshSession || !this.#isVisibleInCurrentPass(route.visibility, "all", false)) return;
+        const flat = meshSession.routeLine(route);
+        if (flat.length < 4) return;
+
+        const points = [];
+        for (let i = 0; i < flat.length; i += 2) points.push({ x: flat[i], y: flat[i + 1] });
+        const lineStyle = (width, color) => ({ width, color, alpha: 1, cap: PIXI.LINE_CAP.ROUND, join: PIXI.LINE_JOIN.ROUND });
+
+        if (route.outline !== false) {
+            this.routeGraphics.lineStyle(lineStyle(route.thickness + 1, 0x000000));
+            this.#drawVectorPath(this.routeGraphics, points, route.style, route.thickness);
+        }
+        this.routeGraphics.lineStyle(lineStyle(route.thickness, ColorMath.hexToPackedInt(route.color)));
+        this.#drawVectorPath(this.routeGraphics, points, route.style, route.thickness);
+    }
+
     renderLandMasks(masks = [], isEditMode = false, activeMaskId = null, isVisible = true) {
         if (!this.landMaskGraphics) {
             this.landMaskGraphics = new PIXI.Graphics();
@@ -1456,6 +1509,23 @@ export class StudioCanvas {
                 this.#renderEditNodes(mask.points, g, isActive, mask, "landMask");
             }
         }
+    }
+
+    /**
+     * Draws the map's region levels from its mesh session (see RegionLevelLayers), with the
+     * visibility rules of the current render pass. Without a session (while a map is still being
+     * opened) nothing is drawn.
+     *
+     * @param {import("../mesh/MeshSession.js").MeshSession|null} meshSession
+     * @param {number} [globalOpacity] - The map's region opacity, applied over each level's own.
+     */
+    renderRegionLevels(meshSession, globalOpacity = 1) {
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        this.regionLevels.render(meshSession, {
+            isVisible: (visibility, parentVisibility, isContainer) => this.#isVisibleInCurrentPass(visibility, parentVisibility, isContainer),
+            globalOpacity,
+            resScale,
+        });
     }
 
     renderRegions(regionLayers = [], isEditMode = false, activeRegionId = null, globalOpacity = 0.5) {
@@ -1617,7 +1687,7 @@ export class StudioCanvas {
         this.brushCursor.drawCircle(x, y, radius);
     }
 
-    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], regionLayers = [], isEditMode = false) {
+    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], regionLayers = [], isEditMode = false, meshSession = null) {
         this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
 
         // Extract native OS root font size to mimic CSS 'rem' behaviour
@@ -1705,6 +1775,11 @@ export class StudioCanvas {
             drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility, pin.id, "pin");
         });
 
+        if (FILRODENSWMB.MESH_NATIVE) {
+            this.#drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession);
+            return;
+        }
+
         // Auto-Labels: Routes (Spline Midpoint)
         mapRoutes.forEach((route) => {
             if (route.visibility === "none" || !route.points || route.points.length < 2) return;
@@ -1739,6 +1814,44 @@ export class StudioCanvas {
                 drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, regionVis, region.id, "region", layer.id);
             });
         });
+    }
+
+    /**
+     * Route and region labels on the display mesh. A route's label sits above the middle point of
+     * its line; a region's at its label anchor (the deepest point of its largest part; see
+     * MeshSession.labelAnchor). A label the user has moved keeps its own position either way.
+     */
+    #drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession) {
+        if (!meshSession) return;
+        const ROUTE_LABEL_RISE = 15;
+
+        for (const route of mapRoutes) {
+            if (route.visibility === "none" || !this.#isVisibleInCurrentPass(route.visibility, "all", true)) continue;
+            const line = meshSession.routeLine(route);
+            if (line.length < 4) continue;
+            const mid = Math.floor(line.length / 4) * 2;
+            drawLabel(route.name, ensureLabelData(route), line[mid], line[mid + 1] - ROUTE_LABEL_RISE, route.visibility, route.id, "route");
+        }
+
+        for (const set of meshSession.layerSets) {
+            if (!this.#isVisibleInCurrentPass(set.visibility, "all", true)) continue;
+            for (const level of set.levels) this.#drawLevelLabels(drawLabel, ensureLabelData, meshSession, set, level);
+        }
+    }
+
+    #drawLevelLabels(drawLabel, ensureLabelData, meshSession, set, level) {
+        const levelVisibility = level.visibility !== "none" && set.visibility === "gm" ? "gm" : level.visibility || "all";
+        if (!this.#isVisibleInCurrentPass(levelVisibility, "all", true)) return;
+
+        for (const region of level.regions) {
+            let regionVisibility = region.visibility || "all";
+            if (regionVisibility !== "none" && levelVisibility === "gm") regionVisibility = "gm";
+            if (!this.#isVisibleInCurrentPass(regionVisibility, levelVisibility, true)) continue;
+
+            const anchor = meshSession.labelAnchor(level.id, region.key);
+            if (!anchor) continue;
+            drawLabel(region.name, ensureLabelData(region), anchor.x, anchor.y, regionVisibility, region.id, "region", level.id);
+        }
     }
 
     renderCartography(uiState, mapWidth, mapHeight, isEditMode = false, decorations = []) {

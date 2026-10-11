@@ -38,9 +38,9 @@ export class GridDataExporter {
 
         const { params } = MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors);
         const biomeIdToKey = GridDataExporter.#buildBiomeIdToKeyMap();
-        const visibleRegions = GridDataExporter.#collectVisibleRegions(app.regionLayers);
+        const visibleRegions = app.meshSession ? GridDataExporter.#collectMeshRegions(app.meshSession) : GridDataExporter.#collectVisibleRegions(app.regionLayers);
         const visiblePins = (app.mapPins || []).filter((pin) => pin.visibility !== "none" && pin.icon);
-        const visibleRoutes = (app.mapRoutes || []).filter((route) => route.visibility !== "none" && route.points?.length >= 2);
+        const visibleRoutes = GridDataExporter.#collectVisibleRoutes(app);
         const namedRivers = (app.manualRivers || []).filter((river) => river.points?.length >= 2);
 
         const cells = {};
@@ -129,12 +129,67 @@ export class GridDataExporter {
                     // pass), so the exported flag agrees with what a GM actually sees toggled.
                     visibility: layer.visibility === "gm" ? "gm" : regionVisibility,
                     layer: { id: layer.id, name: layer.name },
-                    polygon: region.points,
+                    contains: (px, py) => GridAggregator.pointInPolygon(px, py, region.points),
                     bounds: GridAggregator.getPolygonPixelBounds(region.points),
                 });
             }
         }
         return visible;
+    }
+
+    /**
+     * The same list for regions on the display mesh: a region holds a pixel when the cell under
+     * the pixel is one of its own (read from the cell raster, so membership is exact and costs one
+     * lookup per pixel). Its level stands in for the region layer in the exported `layer` field,
+     * and a GM-only layer set or level makes its regions GM-only, as on the canvas.
+     */
+    static #collectMeshRegions(session) {
+        const visible = [];
+        const { cellRaster, width } = session.mesh;
+        for (const set of session.layerSets) {
+            if (set.visibility === "none") continue;
+            for (const level of set.levels) {
+                if (level.visibility === "none") continue;
+                const gmOnly = set.visibility === "gm" || level.visibility === "gm";
+                const owners = session.layer(level.id).owners;
+                for (const region of level.regions) {
+                    const regionVisibility = region.visibility || "all";
+                    const bounds = session.regionBounds(level.id, region.key);
+                    if (regionVisibility === "none" || !bounds) continue;
+                    visible.push({
+                        id: region.id,
+                        name: region.name,
+                        visibility: gmOnly ? "gm" : regionVisibility,
+                        layer: { id: level.id, name: level.name },
+                        contains: (px, py) => owners[cellRaster[Math.floor(py) * width + Math.floor(px)]] === region.key,
+                        bounds,
+                    });
+                }
+            }
+        }
+        return visible;
+    }
+
+    /**
+     * Routes with a line to test cells against: their own points, or for routes on the display mesh
+     * the line drawn through their cells (see MeshSession.routeLine).
+     */
+    static #collectVisibleRoutes(app) {
+        const routes = [];
+        for (const route of app.mapRoutes || []) {
+            if (route.visibility === "none") continue;
+            const points = route.points ?? GridDataExporter.#meshRoutePoints(app.meshSession, route);
+            if (points.length >= 2) routes.push({ id: route.id, name: route.name, visibility: route.visibility, points });
+        }
+        return routes;
+    }
+
+    static #meshRoutePoints(session, route) {
+        if (!session || !route.legs) return [];
+        const line = session.routeLine(route);
+        const points = [];
+        for (let i = 0; i < line.length; i += 2) points.push({ x: line[i], y: line[i + 1] });
+        return points;
     }
 
     /** Builds every field for a single grid cell, sampling the map's raster buffers across the cell's polygon. */
@@ -249,7 +304,7 @@ export class GridDataExporter {
         tallies.temperature.add(GridDataExporter.#classifyTemperatureBand(temperature));
 
         for (let r = 0; r < candidateRegions.length; r++) {
-            if (GridAggregator.pointInPolygon(px, py, candidateRegions[r].polygon)) regionInsideCounts[r]++;
+            if (candidateRegions[r].contains(px, py)) regionInsideCounts[r]++;
         }
 
         stats.sampleCount++;

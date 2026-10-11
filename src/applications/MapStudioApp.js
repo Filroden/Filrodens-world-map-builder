@@ -6,7 +6,8 @@ import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { RenderTimer } from "../tools/RenderTimer.js";
-import { getSavedMaps, loadMapData, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
+import { getSavedMaps, loadMapData, loadMapOwners, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
+import { MapJson } from "../data/MapJson.js";
 import { Scene3D } from "../canvas/Scene3D.js";
 import { SceneExporter } from "./SceneExporter.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
@@ -24,6 +25,7 @@ import { LandMaskGenerator } from "../generation/LandMaskGenerator.js";
 import { RandomLandMap } from "../generation/RandomLandMap.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { LayerPainting } from "../canvas/LayerPainting.js";
+import { MeshIntegration } from "./MeshIntegration.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -439,12 +441,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     #createRefreshQueue() {
         const latest = (_waiting, next) => next;
+        // Every refresh can change land, water or rivers, which the display mesh summarises per
+        // cell: it is told before the refresh runs, and catches up before the vectors are redrawn
+        const tracked = (run) => (request) => {
+            MeshIntegration.markTerrainChanged(this);
+            return run(request);
+        };
         return new RefreshQueue(
             {
-                [REFRESH.TERRAIN]: { run: () => this.#generateTerrainNow(), merge: latest },
-                [REFRESH.CHANGED_TERRAIN]: { run: ({ title }) => this.#refreshChangedTerrain(title), merge: latest },
-                [REFRESH.CLIMATE]: { run: ({ bounds }) => this.#generateClimateNow(bounds), merge: (waiting, next) => this.#mergeClimateRequests(waiting, next) },
-                [REFRESH.FEATURES]: { run: ({ bounds }) => this.#generateFeaturesNow(bounds), merge: (waiting, next) => ({ bounds: waiting.bounds && next.bounds ? SpatialMath.mergeBounds(waiting.bounds, next.bounds) : null }) },
+                [REFRESH.TERRAIN]: { run: tracked(() => this.#generateTerrainNow()), merge: latest },
+                [REFRESH.CHANGED_TERRAIN]: { run: tracked(({ title }) => this.#refreshChangedTerrain(title)), merge: latest },
+                [REFRESH.CLIMATE]: { run: tracked(({ bounds }) => this.#generateClimateNow(bounds)), merge: (waiting, next) => this.#mergeClimateRequests(waiting, next) },
+                [REFRESH.FEATURES]: { run: tracked(({ bounds }) => this.#generateFeaturesNow(bounds)), merge: (waiting, next) => ({ bounds: waiting.bounds && next.bounds ? SpatialMath.mergeBounds(waiting.bounds, next.bounds) : null }) },
             },
             { isStopped: () => this.#shutDown },
         );
@@ -1259,6 +1267,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     #bindCanvasCallbacks() {
         if (!this.canvasEngine) return;
+        MeshIntegration.bindHitTest(this);
         this.canvasEngine.onCanvasHover = (x, y) => {
             const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
             const showCursor = this.canvasEngine.isEditMode && isBrushActive && !this.canvasEngine.isDragging;
@@ -1358,6 +1367,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         activeWindow.setTimeout(async () => {
             await this.generateTerrain();
             this.isDirty = false;
+            // Unless a map was loaded meanwhile, the new map gets its (empty) display mesh
+            if (!this.currentSaveId) MeshIntegration.startNewMap(this);
         }, 50);
     }
 
@@ -1632,10 +1643,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const infraPins = this.mapPins.filter((p) => !!p.icon);
 
         const isInfraEdit = this.activeTool === "infrastructure" && isEdit;
-        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.activeRouteId);
+        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.activeRouteId, this.meshSession);
 
         const isRegionEdit = this.activeTool === "regions" && isEdit;
-        this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
+        if (MeshIntegration.enabled) MeshIntegration.renderRegions(this);
+        else this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
 
         if (this.activeTool === "features") {
             this.canvasEngine.renderFeaturePins(this.mapPins, isEdit, this.proceduralSprings);
@@ -1650,7 +1662,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         if (this.activeTool === "labels") {
-            this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isEdit);
+            this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isEdit, this.meshSession);
         }
 
         if (this.activeTool === "scene" && this.canvasEngine.renderLandMasks) {
@@ -1743,7 +1755,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const isNear = (pt) => Math.hypot(pt.x - x, pt.y - y) < this.currentSnapThreshold;
 
         // Check Routes
-        if (this.mapRoutes.some((route) => route.points.some(isNear))) return true;
+        if (this.mapRoutes.some((route) => (route.points ?? []).some(isNear))) return true;
 
         // Check Pins
         return this.mapPins.some((pin) => pin.visibility !== "none" && pin.icon && isNear(pin));
@@ -1853,7 +1865,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (config.toolCategory !== this.activeTool) continue;
 
             const vectorArray = this[config.stateKey];
-            const vIndex = vectorArray.findIndex((v) => v.points.includes(target));
+            // Routes on the display mesh have no points (and no nodes to delete)
+            const vIndex = vectorArray.findIndex((v) => v.points?.includes(target));
 
             if (vIndex > -1) {
                 const vector = vectorArray[vIndex];
@@ -1875,7 +1888,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 3. Check Regions
         if (this.activeTool === "regions") {
             for (const layer of this.regionLayers) {
-                const rIndex = layer.regions.findIndex((r) => r.points.includes(target));
+                const rIndex = layer.regions.findIndex((r) => r.points?.includes(target));
 
                 if (rIndex > -1) {
                     const region = layer.regions[rIndex];
@@ -1980,7 +1993,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const region = layer?.regions.find((r) => r.id === activeId);
 
         this.activeRegionId = null;
-        if (region && region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) {
+        if (region?.points && region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) {
             this.#discardIncompletePolygon(layer.regions, region);
         }
     }
@@ -2514,6 +2527,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.canvasEngine.clearInteractiveTargets();
         const isEditModeActive = this.canvasEngine.isEditMode;
+        MeshIntegration.prepareRender(this);
 
         // 1. Render Springs, Faults and custom river guides
         const showPins = this.activeTool === "features" && isEditModeActive;
@@ -2532,15 +2546,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 2. Render Infrastructure
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
         const infraPins = this.mapPins.filter((p) => !!p.icon);
-        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.activeRouteId);
+        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.activeRouteId, this.meshSession);
 
-        // 3. Render Regions
+        // 3. Render Regions (from the display mesh, or as polygons with MESH_NATIVE off)
         const isRegionEdit = this.activeTool === "regions" && isEditModeActive;
-        this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
+        if (MeshIntegration.enabled) MeshIntegration.renderRegions(this);
+        else this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
 
         // 4. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
-        this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isLabelEdit);
+        this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isLabelEdit, this.meshSession);
 
         // 5. Render Land Masks
         if (this.canvasEngine.renderLandMasks) {
@@ -2817,9 +2832,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
-    async #ingestMapPayload(rawPayload) {
+    /**
+     * Loads a saved map into the Studio and generates it.
+     *
+     * @param {object} rawPayload - The map data.
+     * @param {Object<string, string>} [rawOwners] - Its encoded owner arrays (see compendium.loadMapOwners).
+     */
+    async #ingestMapPayload(rawPayload, rawOwners = {}) {
         // Deep clone to sever the connection to Foundry's memory cache
         const payload = foundry.utils.deepClone(rawPayload);
+        // Regions and routes come from the display mesh, whose session opens once the terrain
+        // exists (see the end of this method); with MESH_NATIVE off, a map saved on the mesh is
+        // shown from the polygons it was migrated from
+        if (MeshIntegration.enabled) MeshIntegration.beginLoad(this, payload, rawOwners);
+        else MeshIntegration.legacyView(payload);
 
         this.uiState.mapSeed = payload.seed;
         this.currentParentId = payload.parentId || null;
@@ -3011,7 +3037,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         this.mapRoutes = payload.mapRoutes || [];
-        this.regionLayers = payload.regionLayers || [];
+        this.regionLayers = payload.regionLayers || MeshIntegration.regionLayersView(payload.layerSets);
         this.landMasks = payload.landMasks || [];
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
@@ -3046,8 +3072,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.render({ parts: ["toolbar", "context"] });
         await this.generateTerrain();
+        if (MeshIntegration.enabled) await MeshIntegration.finishLoad(this, this.#processingOverlay());
         this.#updateGrid();
         this.canvasEngine.resetCamera();
+    }
+
+    /** The processing overlay, for work done outside this class (see MeshIntegration.finishLoad). */
+    #processingOverlay() {
+        return {
+            start: (message) => this.#startProcessing(message),
+            end: () => this.#endProcessing(),
+            text: (message) => {
+                const textEl = this.element?.querySelector(".fwmb-processing-text");
+                if (textEl) textEl.textContent = message;
+            },
+        };
     }
 
     #handleInfrastructureClick(x, y) {
@@ -3055,6 +3094,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // pins are single-point markers and stay confined to the map itself
         const buffer = this.uiState.activeInfraMode === "route" ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
         if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
+
+        // Routes on the display mesh are made from waypoints, not drawn node by node
+        if (this.uiState.activeInfraMode === "route" && MeshIntegration.refusesLegacyEdit(this)) return;
 
         MapStateManager.pushVectorState(this);
 
@@ -3135,6 +3177,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     #handleRegionClick(x, y) {
+        // Regions on the display mesh are painted, not drawn node by node
+        if (MeshIntegration.refusesLegacyEdit(this)) return;
+
         // Region nodes may extend into the buffer, matching scene masks and infrastructure routes
         const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
         if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
@@ -3308,7 +3353,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 parentId: this.currentParentId,
             };
 
-            const journal = await saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId);
+            // The display mesh's block, layer sets and owner arrays (see MeshIntegration)
+            const owners = MeshIntegration.preparePayload(this, payload);
+            const journal = await saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId, { owners });
 
             if (journal) {
                 this.currentSaveId = journal.id;
@@ -3484,8 +3531,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const change = MapStudioApp.#firstChangedEntity(current, target);
         if (!change) return null;
 
+        // Regions and routes on the display mesh have no points: their cells' bounds stand in
+        const points = MapStudioApp.#entityPoints(change.entity);
         return {
-            bounds: this.#calculatePointBounds(MapStudioApp.#entityPoints(change.entity), VECTOR_PREVIEW_PADDING),
+            bounds: this.#calculatePointBounds(points.length ? points : MeshIntegration.outlinePoints(this, change.entity), VECTOR_PREVIEW_PADDING),
             label: this.#getActionLabel(change.key, change.entity),
         };
     }
@@ -3940,6 +3989,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#updateCanvasModes(this.activeTool);
 
         await this.generateTerrain();
+        MeshIntegration.startNewMap(this);
         this.#updateGrid();
         this.canvasEngine.resetCamera();
 
@@ -4228,10 +4278,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         try {
             // 4. Delegate heavy mathematical payload extraction
-            const payload = RegionalExtractor.createPayload(this, cropBox);
+            const { payload, owners } = RegionalExtractor.createPayload(this, cropBox);
 
             // 5. Save to database
-            const journal = await saveMapData(mapName, payload, null);
+            const journal = await saveMapData(mapName, payload, null, { owners });
             if (journal) ui.notifications.info(`Regional Map '${journal.name}' created successfully.`);
         } catch (err) {
             console.error("FWMB | Regional Map Generation Failed:", err);
@@ -4266,7 +4316,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 }
 
                 const cleanName = file.name.replace(".json", "").replace("fwmb_", "");
-                await saveMapData(`${cleanName} (Imported)`, parsedData);
+                // A file carries the owner arrays inside it (see MapJson); the compendium keeps them apart
+                const { mapData, owners } = MapJson.fromImport(parsedData);
+                await saveMapData(`${cleanName} (Imported)`, mapData, null, { owners });
 
                 ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ImportSuccess"));
 
@@ -4537,11 +4589,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (payload) {
             this.currentSaveId = mapId;
             this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-            await this.#ingestMapPayload(payload);
+            await this.#ingestMapPayload(payload, await loadMapOwners(mapId));
             ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
 
             this.render({ parts: ["toolbar", "context"] });
-            this.isDirty = false;
+            // A map migrated or given a new mesh as it opened has changes to save
+            this.isDirty = MeshIntegration.changedOnLoad(this);
 
             // Offered only once the map is fully generated and marked clean: the check reads the
             // generated climate, and an update applied here must leave the map marked unsaved.
@@ -4650,7 +4703,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
             const newName = `${originalName} (Standalone)`;
 
-            await saveMapData(newName, exportData, null);
+            await saveMapData(newName, exportData, null, { owners: await loadMapOwners(mapId) });
 
             ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.PromoteSuccess") || "Standalone map created successfully.");
             this.render({ parts: ["context"] });
@@ -4664,7 +4717,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const rawName = card.querySelector(".fwmb-map-card-info").textContent.trim();
         const mapName = rawName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
 
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+        // The owner arrays travel inside the file (see MapJson)
+        const blob = new Blob([JSON.stringify(MapJson.toExport(exportData, await loadMapOwners(mapId)), null, 2)], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = `fwmb_${mapName}.json`;
@@ -5355,7 +5409,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             case "region": {
                 const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);
                 const region = layer?.regions.find((r) => r.id === id);
-                return region?.points || [];
+                // A region on the display mesh has no points: its cells' bounds stand in
+                return region?.points || MeshIntegration.outlinePoints(this, region);
             }
             case "river": {
                 const river = this.manualRivers.find((r) => r.id === id);
@@ -5363,7 +5418,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
             case "route": {
                 const route = this.mapRoutes.find((r) => r.id === id);
-                return route?.points || [];
+                return route?.points || MeshIntegration.outlinePoints(this, route);
             }
 
             default:

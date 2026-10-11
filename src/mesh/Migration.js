@@ -33,9 +33,10 @@ const DEFAULT_SET_NAME = "Regions";
  * @param {object} [options]
  * @param {Function} [options.idFactory]
  * @param {string} [options.setName]
+ * @param {number} [options.levelOpacity] - Opacity of each new level (default: createLevel's).
  * @returns {{layerSet: object, owners: Object<string, Int32Array>}}
  */
-export function regionsToOwners(regionLayers, mesh, { idFactory = randomId, setName = DEFAULT_SET_NAME } = {}) {
+export function regionsToOwners(regionLayers, mesh, { idFactory = randomId, setName = DEFAULT_SET_NAME, levelOpacity = undefined } = {}) {
     const layerSet = createLayerSet({ name: setName, kind: "custom" }, idFactory);
     const owners = {};
     for (const layer of regionLayers ?? []) {
@@ -44,6 +45,7 @@ export function regionsToOwners(regionLayers, mesh, { idFactory = randomId, setN
                 id: layer.id,
                 name: layer.name ?? "",
                 visibility: layer.visibility ?? "all",
+                opacity: levelOpacity,
                 style: levelStyleFrom(layer.regions?.[0]),
             },
             idFactory,
@@ -192,9 +194,10 @@ export function pinsToCells(pins, mesh) {
  * @param {Function} [options.idFactory]
  * @param {string} [options.setName] - Name of the layer set the old region layers go into.
  * @param {object} [options.meshBlock] - Overrides for the new mesh block (seed, spacing).
+ * @param {number} [options.levelOpacity] - Opacity of the levels made from region layers.
  * @returns {{mapData: object, owners: Object<string, Int32Array>, mesh: import("./MeshBuilder.js").Mesh|null}}
  */
-export function migrateMapData(mapData, mesh = null, { idFactory = randomId, setName = DEFAULT_SET_NAME, meshBlock = {} } = {}) {
+export function migrateMapData(mapData, mesh = null, { idFactory = randomId, setName = DEFAULT_SET_NAME, meshBlock = {}, levelOpacity = undefined } = {}) {
     if ((mapData.vectorSchemaVersion ?? 0) >= VECTOR_SCHEMA_VERSION) return { mapData, owners: {}, mesh };
 
     const next = structuredClone(mapData);
@@ -202,7 +205,7 @@ export function migrateMapData(mapData, mesh = null, { idFactory = randomId, set
     const built = mesh ?? MeshBuilder.fromMapData(next);
     next.mesh.cells = built.cellCount;
 
-    const { layerSet, owners } = regionsToOwners(mapData.regionLayers, built, { idFactory, setName });
+    const { layerSet, owners } = regionsToOwners(mapData.regionLayers, built, { idFactory, setName, levelOpacity });
     next.layerSets = layerSet.levels.length ? [layerSet] : [];
     delete next.regionLayers;
     next.mapRoutes = routesToWaypoints(mapData.mapRoutes, built, { idFactory });

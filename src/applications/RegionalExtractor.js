@@ -6,11 +6,17 @@ import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { UpwindMargin } from "../tools/UpwindMargin.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
+import { MeshIntegration } from "./MeshIntegration.js";
+import { extractRegionalVectors } from "../mesh/RegionalMesh.js";
+import { clampAreaFactor } from "../mesh/Schema.js";
 
 export class RegionalExtractor {
     /**
      * Orchestrates the mathematical scaling and data translation for a regional crop.
-     * Returns a perfectly formatted payload ready to be saved to the database.
+     *
+     * @returns {{payload: object, owners: Object<string, string>|null}} The regional map's data, ready
+     *     to save, and the encoded owner arrays to save beside it (null for a map whose regions are
+     *     polygons; see compendium.saveMapData).
      */
     static createPayload(app, drawnCropBox) {
         const state = foundry.utils.deepClone(app.uiState);
@@ -35,7 +41,8 @@ export class RegionalExtractor {
         // Both the world description and the wind distance are worked out from the parent's
         // unscaled state, since #applyScaleToState overwrites the size they are derived from.
         state.terrainVersion = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
-        state.world = world;
+        // The regional map shows the same world, so keeps its parent's area factor
+        state.world = world ? { ...world, areaFactor: clampAreaFactor(app.uiState.world?.areaFactor) } : world;
         state.windDistance = windDistance;
 
         // 3. Derive Map Parameters
@@ -53,7 +60,7 @@ export class RegionalExtractor {
             .filter((layer) => layer.regions.length > 0);
 
         // 5. Pack and Return the Payload
-        return {
+        const payload = {
             seed: currentSeed,
             generationEngine: state.generationEngine,
             terrainVersion: state.terrainVersion,
@@ -67,6 +74,7 @@ export class RegionalExtractor {
             customBiomes: state.customBiomes,
             customRouteStyles: state.customRouteStyles,
             customLabelStyles: state.customLabelStyles,
+            customRegionStyles: state.customRegionStyles,
             history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
             tectonicFaults: this.#translateFaults(app.tectonicFaults ?? [], cropBox, zoomScale, targetWidth, targetHeight),
             manualRivers: this.#scaleRiverWidths(translate(app.manualRivers), zoomScale),
@@ -79,6 +87,33 @@ export class RegionalExtractor {
             upwindMargin: upwindMargin(cropBox, zoomScale),
             parentId: app.currentSaveId,
         };
+        return { payload, owners: this.#meshVectors(app, payload, cropBox, zoomScale) };
+    }
+
+    /**
+     * Replaces the payload's regions and routes with the parent's on the display mesh, carried
+     * onto the regional map's own mesh (see RegionalMesh.extractRegionalVectors). The polygon
+     * translation above is what a map without a mesh session keeps.
+     *
+     * @returns {Object<string, string>|null} The regional map's encoded owner arrays.
+     */
+    static #meshVectors(app, payload, cropBox, zoomScale) {
+        if (!MeshIntegration.enabled || !app.meshSession) return null;
+
+        MeshIntegration.reconcile(app);
+        const { fields, owners } = extractRegionalVectors({
+            session: app.meshSession,
+            layerSets: app.layerSets,
+            routes: app.mapRoutes,
+            pins: payload.mapPins,
+            childMapData: { mapWidth: payload.mapWidth, mapHeight: payload.mapHeight, seed: payload.seed, params: payload.params, world: payload.world },
+            crop: { x: cropBox.x, y: cropBox.y },
+            zoom: zoomScale,
+            idFactory: () => foundry.utils.randomID(),
+        });
+        delete payload.regionLayers;
+        Object.assign(payload, fields);
+        return owners;
     }
 
     /**

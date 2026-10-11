@@ -1,16 +1,21 @@
 /**
  * Background worker for GenerationWorkers: runs one band of rows of a whole-map generation or
- * painting pass and sends the rows back.
+ * painting pass and sends the rows back, or one whole job (such as building a map's mesh) with
+ * progress reports along the way.
  *
- * Each task builds its own ProceduralEngine from the map's seed. The passes run here draw on the
- * engine's noise only, never on its random number streams, so an engine made here gives exactly
- * the values the main thread's engine gives.
+ * Each band task builds its own ProceduralEngine from the map's seed. The passes run here draw on
+ * the engine's noise only, never on its random number streams, so an engine made here gives
+ * exactly the values the main thread's engine gives.
  *
- * A message is `{ id, task, payload }`; the reply is `{ id, result }` (its buffers transferred,
- * not copied) or `{ id, error }`.
+ * A message is `{ id, task, payload }`, or `{ id, cancel: true }` to stop job `id`. The reply is
+ * `{ id, result }` (its buffers transferred, not copied) or `{ id, error, cancelled }`; a job may
+ * send `{ id, progress: { stage, pct, text } }` any number of times before it. A job can only see
+ * a cancel message while it is paused (see pause), since a worker handles one message at a time:
+ * the long jobs pause between steps for exactly that reason.
  */
 import { ProceduralEngine } from "./ProceduralEngine.js";
 import { LayerPainting } from "../canvas/LayerPainting.js";
+import { buildMeshData } from "../mesh/MeshBuilder.js";
 
 /** One band's rows, newly allocated: `width` values per row. */
 const bandBuffer = (width, rowStart, rowEnd) => new Float32Array((rowEnd - rowStart) * width);
@@ -54,17 +59,59 @@ function paintRows(payload) {
     return { value: layers, transfer: Object.values(layers).map((buffer) => buffer.buffer) };
 }
 
-const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows };
+/**
+ * A map's mesh: sites, triangulation and cell raster (see MeshBuilder.buildMeshData), with
+ * progress reports and the chance to cancel between steps.
+ */
+async function buildMesh(params, job) {
+    const data = await buildMeshData(params, { onProgress: job.progress, isCancelled: job.isCancelled, pause });
+    const transfer = [data.sites.buffer, data.triangles.buffer, data.halfedges.buffer, data.hull.buffer, data.cellRaster.buffer];
+    // A typed array can share its buffer with another (Delaunator trims its arrays as views of
+    // larger ones), and a buffer may only be listed once
+    return { value: data, transfer: [...new Set(transfer)] };
+}
 
-self.addEventListener("message", (event) => {
-    const { id, task, payload } = event.data;
+const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh };
+
+/** Ids of jobs asked to stop. */
+const cancelled = new Set();
+
+/**
+ * Lets the worker handle waiting messages (a cancel, above all) before continuing. A message
+ * channel resolves on the next turn without the minimum delay timers have in browsers.
+ */
+const channel = typeof MessageChannel === "undefined" ? null : new MessageChannel();
+/** Jobs waiting to continue, in the order they paused (two jobs may run interleaved). */
+const waiting = [];
+if (channel) channel.port1.onmessage = () => waiting.shift()?.();
+function pause() {
+    if (!channel) return new Promise((resolve) => setTimeout(resolve, 0));
+    return new Promise((resolve) => {
+        waiting.push(resolve);
+        channel.port2.postMessage(0);
+    });
+}
+
+self.addEventListener("message", async (event) => {
+    const { id, task, payload, cancel } = event.data;
+    if (cancel) {
+        cancelled.add(id);
+        return;
+    }
+
+    const job = {
+        progress: (progress) => self.postMessage({ id, progress }),
+        isCancelled: () => cancelled.has(id),
+    };
     try {
         const run = TASKS[task];
         if (!run) throw new Error(`unknown task "${task}"`);
 
-        const { value, transfer } = run(payload);
+        const { value, transfer } = await run(payload, job);
         self.postMessage({ id, result: value }, transfer);
     } catch (error) {
-        self.postMessage({ id, error: error?.message ?? String(error) });
+        self.postMessage({ id, error: error?.message ?? String(error), cancelled: job.isCancelled() });
+    } finally {
+        cancelled.delete(id);
     }
 });

@@ -338,8 +338,13 @@ export class Mesh {
      * @param {number} params.modelSpacing - Model spacing in pixels.
      * @param {number} params.seed
      * @param {number} [params.kmPerPx] - Effective km per pixel (for claims and route costs).
+     * @param {MeshData|null} [prebuilt] - Sites, triangulation and optionally the cell raster of
+     *     exactly these parameters, made elsewhere (a worker, or the raster cache; see
+     *     buildMeshData). The mesh then skips sampling and Delaunay, which are its costliest steps.
+     *     Nothing checks that they match the parameters: pass only what buildMeshData produced
+     *     from the same ones.
      */
-    constructor({ width, height, spacing, modelSpacing, seed, kmPerPx = 1 }) {
+    constructor({ width, height, spacing, modelSpacing, seed, kmPerPx = 1 }, prebuilt = null) {
         this.width = width;
         this.height = height;
         this.spacing = spacing;
@@ -347,12 +352,13 @@ export class Mesh {
         this.seed = seed;
         this.kmPerPx = kmPerPx;
 
-        const { sites, modelCount } = generateSites({ width, height, spacing, modelSpacing, seed });
+        const { sites, modelCount } = prebuilt ?? generateSites({ width, height, spacing, modelSpacing, seed });
         this.sites = sites;
         this.cellCount = sites.length / 2;
         this.modelCount = modelCount;
 
-        this.delaunay = new Delaunay(sites);
+        this.delaunay = prebuilt ? delaunayFromTriangulation(sites, prebuilt) : new Delaunay(sites);
+        if (prebuilt?.cellRaster) this.adoptCellRaster(prebuilt.cellRaster);
         this.triangles = this.delaunay.triangles;
         this.halfedges = this.delaunay.halfedges;
 
@@ -427,18 +433,19 @@ export class Mesh {
         return this.#cellRaster !== null;
     }
 
+    /**
+     * Uses a cell raster made elsewhere (by buildMeshData, in a worker or from the cache) instead
+     * of building one. It must be the raster of this mesh: width x height cell ids.
+     * @param {Int32Array} raster
+     */
+    adoptCellRaster(raster) {
+        if (raster.length !== this.width * this.height) throw new Error(`A cell raster of ${raster.length} pixels does not fit a ${this.width} x ${this.height} map.`);
+        this.#cellRaster = raster;
+    }
+
     #buildCellRaster() {
-        const { width, height } = this;
-        const raster = new Int32Array(width * height);
-        let hint = 0;
-        for (let y = 0; y < height; y++) {
-            const row = y * width;
-            if (y > 0) hint = raster[row - width];
-            for (let x = 0; x < width; x++) {
-                hint = this.delaunay.find(x + PIXEL_CENTRE, y + PIXEL_CENTRE, hint);
-                raster[row + x] = hint;
-            }
-        }
+        const raster = new Int32Array(this.width * this.height);
+        rasteriseRows(this.delaunay, this.width, raster, 0, this.height);
         return raster;
     }
 
@@ -502,7 +509,17 @@ export class Mesh {
  * @property {number} seaLevel
  */
 
-function aggregateCells(mesh, { elevation, seaLevel, waterMask = null, riverMap = null, riverKm = null, riverKmThreshold = FILRODENSWMB.MESH.RELAX.RIVER_KM }) {
+function aggregateCells(mesh, buffers) {
+    const sums = accumulateRows(mesh, buffers, 0, mesh.height);
+    return finishAggregates(mesh, buffers, sums);
+}
+
+/**
+ * Pixel sums per cell over rows rowStart to rowEnd (exclusive): pixel count, land count, river
+ * count and summed elevation. Arrays are full size; cells with no pixel in the rows stay 0.
+ * Shared by the whole-map aggregates and the bounded refresh of a band (see MeshSession).
+ */
+export function accumulateRows(mesh, { elevation, seaLevel, waterMask = null, riverMap = null, riverKm = null, riverKmThreshold = FILRODENSWMB.MESH.RELAX.RIVER_KM }, rowStart, rowEnd) {
     const n = mesh.cellCount;
     const raster = mesh.cellRaster;
     const count = new Int32Array(n);
@@ -511,7 +528,8 @@ function aggregateCells(mesh, { elevation, seaLevel, waterMask = null, riverMap 
     const elevationSum = new Float64Array(n);
     const isRiver = riverPredicate(riverMap, riverKm, riverKmThreshold);
 
-    for (let pixel = 0; pixel < raster.length; pixel++) {
+    const end = rowEnd * mesh.width;
+    for (let pixel = rowStart * mesh.width; pixel < end; pixel++) {
         const cell = raster[pixel];
         const height = elevation[pixel];
         count[cell]++;
@@ -519,18 +537,30 @@ function aggregateCells(mesh, { elevation, seaLevel, waterMask = null, riverMap 
         if (height >= seaLevel && !(waterMask && waterMask[pixel] > 0)) landCount[cell]++;
         if (isRiver(pixel)) riverCount[cell]++;
     }
+    return { count, landCount, riverCount, elevationSum };
+}
 
-    const meanElevation = new Float32Array(n);
-    const landFraction = new Float32Array(n);
-    const land = new Uint8Array(n);
-    for (let cell = 0; cell < n; cell++) {
+/**
+ * Turns pixel sums into the per-cell aggregates. With `cells`, only those cells are finished
+ * (into `into`, the aggregates being updated); otherwise every cell, into new arrays.
+ */
+export function finishAggregates(mesh, { elevation, seaLevel, waterMask = null }, sums, cells = null, into = null) {
+    const n = mesh.cellCount;
+    const out = into ?? { count: sums.count, landCount: sums.landCount, riverCount: sums.riverCount, meanElevation: new Float32Array(n), landFraction: new Float32Array(n), land: new Uint8Array(n), seaLevel };
+    const finish = (cell) => {
         // A cell too thin to hold a pixel centre takes its site's pixel
-        if (count[cell] === 0) fillFromSite(mesh, cell, { elevation, seaLevel, waterMask }, { count, landCount, elevationSum });
-        meanElevation[cell] = elevationSum[cell] / count[cell];
-        landFraction[cell] = landCount[cell] / count[cell];
-        land[cell] = landCount[cell] * 2 > count[cell] ? 1 : 0;
-    }
-    return { count, landCount, riverCount, meanElevation, landFraction, land, seaLevel };
+        if (sums.count[cell] === 0) fillFromSite(mesh, cell, { elevation, seaLevel, waterMask }, sums);
+        out.count[cell] = sums.count[cell];
+        out.landCount[cell] = sums.landCount[cell];
+        out.riverCount[cell] = sums.riverCount[cell];
+        out.meanElevation[cell] = sums.elevationSum[cell] / sums.count[cell];
+        out.landFraction[cell] = sums.landCount[cell] / sums.count[cell];
+        out.land[cell] = sums.landCount[cell] * 2 > sums.count[cell] ? 1 : 0;
+    };
+    if (cells) for (const cell of cells) finish(cell);
+    else for (let cell = 0; cell < n; cell++) finish(cell);
+    out.seaLevel = seaLevel;
+    return out;
 }
 
 function riverPredicate(riverMap, riverKm, threshold) {
@@ -549,7 +579,121 @@ function fillFromSite(mesh, cell, { elevation, seaLevel, waterMask }, sums) {
 }
 
 /**
- * Builds meshes and works out their parameters from a map.
+ * Writes the cell under each pixel centre of rows rowStart to rowEnd (exclusive) into `raster`.
+ * Each lookup starts from the previous pixel's cell, or the cell above at the start of a row, so
+ * the walk is a step or two; a band continues from the row before it, so splitting the raster into
+ * bands gives exactly the raster built in one go.
+ */
+function rasteriseRows(delaunay, width, raster, rowStart, rowEnd) {
+    let hint = rowStart > 0 ? raster[(rowStart - 1) * width] : 0;
+    for (let y = rowStart; y < rowEnd; y++) {
+        const row = y * width;
+        if (y > 0) hint = raster[row - width];
+        for (let x = 0; x < width; x++) {
+            hint = delaunay.find(x + PIXEL_CENTRE, y + PIXEL_CENTRE, hint);
+            raster[row + x] = hint;
+        }
+    }
+}
+
+/**
+ * A Delaunay object for sites whose triangulation was computed elsewhere, so it need not be
+ * computed again. Sets exactly the fields d3-delaunay's own constructor and _init set (points,
+ * triangles, halfedges, hull, inedges and the hull index) by the same rules, which is all that
+ * find, neighbors and voronoi read.
+ *
+ * d3-delaunay replaces a collinear set of sites with jittered ones; a mesh's sites are a
+ * Poisson-disc fill and never collinear, and a triangulation that came from one is refused rather
+ * than reproduced, since its triangles would not match these sites.
+ *
+ * @param {Float64Array} sites
+ * @param {{triangles: Uint32Array|Int32Array, halfedges: Int32Array, hull: Uint32Array|Int32Array}} triangulation
+ * @returns {Delaunay}
+ */
+export function delaunayFromTriangulation(sites, { triangles, halfedges, hull }) {
+    if (hull.length <= 2) throw new Error("A prebuilt triangulation needs at least three hull sites.");
+    const delaunay = Object.create(Delaunay.prototype);
+    const count = sites.length / 2;
+    delaunay.points = sites;
+    delaunay.triangles = triangles;
+    delaunay.halfedges = halfedges;
+    delaunay.hull = hull;
+    delaunay.inedges = new Int32Array(count).fill(-1);
+    delaunay._hullIndex = new Int32Array(count).fill(-1);
+    for (let edge = 0; edge < halfedges.length; edge++) {
+        const site = triangles[nextHalfedge(edge)];
+        if (halfedges[edge] === -1 || delaunay.inedges[site] === -1) delaunay.inedges[site] = edge;
+    }
+    for (let i = 0; i < hull.length; i++) delaunay._hullIndex[hull[i]] = i;
+    return delaunay;
+}
+
+/**
+ * @typedef {object} MeshData
+ * @property {Float64Array} sites
+ * @property {number} modelCount
+ * @property {Uint32Array|Int32Array} triangles
+ * @property {Int32Array} halfedges
+ * @property {Uint32Array|Int32Array} hull
+ * @property {Int32Array} [cellRaster]
+ */
+
+/** Rows of the cell raster built between progress reports (and chances to cancel). */
+const RASTER_ROWS_PER_STEP = 64;
+
+/** Share of a build's progress each stage reaches when it ends. */
+const BUILD_PROGRESS = Object.freeze({ SITES: 30, TRIANGULATION: 40, RASTER: 100 });
+
+/** Raised by buildMeshData when it is cancelled. */
+export class MeshBuildCancelled extends Error {
+    constructor() {
+        super("The mesh build was cancelled.");
+        this.name = "MeshBuildCancelled";
+    }
+}
+
+/**
+ * Builds what a Mesh needs from its parameters: the sites, their triangulation and the cell
+ * raster. This is the slow part of a mesh (about a third of a second on a 2000 x 1600 map, a
+ * second at 4000 x 3200) and touches nothing but its inputs, so it can run in a worker; the main
+ * thread then builds the Mesh from the result (new Mesh(params, data)) without repeating it.
+ *
+ * Between stages, and every RASTER_ROWS_PER_STEP rows of the raster, it reports progress and
+ * awaits `pause`, which is where a worker lets a cancel message in; when `isCancelled` then
+ * answers true it stops with MeshBuildCancelled. The arithmetic is the same however often it
+ * pauses, so the result is the same bit for bit wherever and however it runs.
+ *
+ * @param {object} params - Mesh constructor parameters (see Mesh).
+ * @param {object} [options]
+ * @param {function({stage: string, pct: number}): void} [options.onProgress]
+ * @param {function(): boolean} [options.isCancelled]
+ * @param {function(): Promise<void>} [options.pause] - Default: resolves at once.
+ * @returns {Promise<MeshData>}
+ */
+export async function buildMeshData(params, { onProgress = null, isCancelled = () => false, pause = () => Promise.resolve() } = {}) {
+    const checkpoint = async (stage, pct) => {
+        onProgress?.({ stage, pct });
+        await pause();
+        if (isCancelled()) throw new MeshBuildCancelled();
+    };
+    await checkpoint("sites", 0);
+    const { sites, modelCount } = generateSites(params);
+    await checkpoint("triangulation", BUILD_PROGRESS.SITES);
+    const delaunay = new Delaunay(sites);
+    await checkpoint("raster", BUILD_PROGRESS.TRIANGULATION);
+
+    const { width, height } = params;
+    const cellRaster = new Int32Array(width * height);
+    const rasterShare = BUILD_PROGRESS.RASTER - BUILD_PROGRESS.TRIANGULATION;
+    for (let row = 0; row < height; row += RASTER_ROWS_PER_STEP) {
+        rasteriseRows(delaunay, width, cellRaster, row, Math.min(height, row + RASTER_ROWS_PER_STEP));
+        await checkpoint("raster", BUILD_PROGRESS.TRIANGULATION + Math.round((rasterShare * Math.min(height, row + RASTER_ROWS_PER_STEP)) / height));
+    }
+    return { sites, modelCount, triangles: delaunay.triangles, halfedges: delaunay.halfedges, hull: delaunay.hull, cellRaster };
+}
+
+/**
+ * Builds the meshes and works out their parameters from a map.
  */
 export class MeshBuilder {
     /**
@@ -572,7 +716,9 @@ export class MeshBuilder {
             width: mapData.mapWidth,
             height: mapData.mapHeight,
             spacing: block.spacing,
-            modelSpacing: block.modelSpacingKm / kmPerPx,
+            // A block made before the pixel spacing was stored works it out from km, which is
+            // what it was made with (see Schema.createMeshBlock)
+            modelSpacing: block.modelSpacingPx ?? block.modelSpacingKm / kmPerPx,
             seed: block.seed,
             kmPerPx,
         };

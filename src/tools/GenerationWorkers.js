@@ -125,9 +125,102 @@ class WorkerPool {
     }
 }
 
+/**
+ * One module worker for whole jobs (see GenerationWorkers.runOne), kept apart from the band pool so
+ * a job of a second or more never holds up the bands of a generation running meanwhile. Jobs are
+ * told apart by id; each may report progress before its result, and may be cancelled.
+ */
+class JobWorker {
+    #worker;
+    #pending = new Map();
+    #nextId = 1;
+    #failure = null;
+
+    constructor() {
+        this.#worker = new Worker(WORKER_URL, { type: "module" });
+        this.#worker.addEventListener("message", (event) => this.#onMessage(event.data));
+        this.#worker.addEventListener("error", (event) => this.#fail(new Error(event.message || "The job worker could not start or crashed.")));
+        this.#worker.addEventListener("messageerror", () => this.#fail(new Error("A job worker message could not be read.")));
+    }
+
+    get failed() {
+        return this.#failure !== null;
+    }
+
+    /**
+     * @param {string} task
+     * @param {object} payload
+     * @param {object} options
+     * @param {function(object): void} [options.onProgress]
+     * @param {AbortSignal} [options.signal]
+     * @returns {Promise<*>}
+     */
+    run(task, payload, { onProgress = null, signal = null } = {}) {
+        if (this.#failure) return Promise.reject(this.#failure);
+
+        const id = this.#nextId++;
+        return new Promise((resolve, reject) => {
+            const job = { resolve, reject, onProgress, signal, onAbort: null };
+            if (signal) {
+                job.onAbort = () => this.#cancel(id);
+                signal.addEventListener("abort", job.onAbort, { once: true });
+            }
+            this.#pending.set(id, job);
+            this.#worker.postMessage({ id, task, payload });
+        });
+    }
+
+    terminate() {
+        this.#fail(new Error("The job worker was stopped."));
+    }
+
+    /**
+     * Asks the worker to stop job `id` and rejects it at once: the worker's eventual reply (a
+     * cancelled error, or the result if it was already on its way) is ignored.
+     */
+    #cancel(id) {
+        const job = this.#pending.get(id);
+        if (!job) return;
+        this.#pending.delete(id);
+        this.#worker.postMessage({ id, cancel: true });
+        job.reject(abortError(job.signal));
+    }
+
+    #onMessage({ id, result, error, progress }) {
+        const job = this.#pending.get(id);
+        if (!job) return;
+
+        if (progress) {
+            job.onProgress?.(progress);
+            return;
+        }
+        this.#pending.delete(id);
+        job.signal?.removeEventListener("abort", job.onAbort);
+        if (error) job.reject(new Error(error));
+        else job.resolve(result);
+    }
+
+    #fail(error) {
+        this.#failure = error;
+        for (const job of this.#pending.values()) job.reject(error);
+        this.#pending.clear();
+        this.#worker.terminate();
+    }
+}
+
+/** The error a cancelled job rejects with: the signal's own reason, or a standard AbortError. */
+function abortError(signal) {
+    if (signal?.reason) return signal.reason;
+    const error = new Error("The job was cancelled.");
+    error.name = "AbortError";
+    return error;
+}
+
 export class GenerationWorkers {
     static #pool = null;
     static #disabled = false;
+    static #jobWorker = null;
+    static #jobsDisabled = false;
 
     /**
      * How many workers this machine gets: one per core, less one for the main thread, capped.
@@ -199,6 +292,68 @@ export class GenerationWorkers {
         }
 
         await Promise.all(bands.map(({ rowStart, rowEnd }) => pool.run(task, payloadFor(rowStart, rowEnd)).then((result) => receive(rowStart, rowEnd, result))));
+    }
+
+    /**
+     * Runs one whole job (not divided into bands) in a background worker, reporting its progress
+     * and letting it be cancelled. Where workers cannot be used, or after the job worker has failed
+     * once (workers then stay off for jobs for the rest of the session, with a console warning),
+     * `alone` runs the same job on the main thread instead; both must give the same result.
+     *
+     * A cancelled job rejects at once with the signal's reason (an AbortError by default),
+     * whichever way it runs. An error thrown by the task itself is not a worker failure: it rejects
+     * as it would on the main thread.
+     *
+     * @param {string} task - The task's name (see GenerationWorker.js).
+     * @param {object} payload - The task's inputs (copied to the worker).
+     * @param {object} [options]
+     * @param {function({stage: string, pct: number, text?: string}): void} [options.onProgress]
+     * @param {AbortSignal} [options.signal]
+     * @param {function({onProgress: Function, isCancelled: function(): boolean}): Promise<*>} [options.alone]
+     * @returns {Promise<*>} The task's result.
+     */
+    static async runOne(task, payload, { onProgress = null, signal = null, alone = null } = {}) {
+        if (signal?.aborted) throw abortError(signal);
+        const worker = this.#ensureJobWorker();
+        if (!worker) return this.#runAlone(alone, { onProgress, signal });
+
+        try {
+            return await worker.run(task, payload, { onProgress, signal });
+        } catch (error) {
+            if (signal?.aborted || !worker.failed) throw error;
+            this.#disableJobs(error);
+            return this.#runAlone(alone, { onProgress, signal });
+        }
+    }
+
+    /** Stops the job worker (jobs then start a new one when next asked for). */
+    static terminateJobs() {
+        this.#jobWorker?.terminate();
+        this.#jobWorker = null;
+    }
+
+    static async #runAlone(alone, { onProgress, signal }) {
+        if (!alone) throw new Error("No worker is available and the job has no main-thread fallback.");
+        const result = await alone({ onProgress, isCancelled: () => !!signal?.aborted });
+        if (signal?.aborted) throw abortError(signal);
+        return result;
+    }
+
+    static #ensureJobWorker() {
+        if (this.#jobsDisabled || typeof Worker === "undefined") return null;
+        if (this.#jobWorker?.failed) this.#jobWorker = null;
+        try {
+            this.#jobWorker ??= new JobWorker();
+        } catch (error) {
+            this.#disableJobs(error);
+            return null;
+        }
+        return this.#jobWorker;
+    }
+
+    static #disableJobs(error) {
+        this.#jobsDisabled = true;
+        console.warn(`FWMB | Background jobs are unavailable (${error.message}), so they will run on the main thread, which pauses the window while they do.`);
     }
 
     static #ensurePool() {

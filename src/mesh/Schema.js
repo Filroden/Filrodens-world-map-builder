@@ -75,9 +75,23 @@ export function effectiveKmPerPx(mapData) {
     const config = FILRODENSWMB.MESH;
     const top = mapData?.params?.latTop ?? config.DEFAULT_LAT_TOP;
     const bottom = mapData?.params?.latBottom ?? config.DEFAULT_LAT_BOTTOM;
-    const areaFactor = mapData?.world?.areaFactor ?? config.AREA_FACTOR;
+    const areaFactor = clampAreaFactor(mapData?.world?.areaFactor);
     const span = Math.abs(top - bottom) || config.DEFAULT_LAT_TOP - config.DEFAULT_LAT_BOTTOM;
     return (span * KM_PER_DEGREE) / mapData.mapHeight / Math.sqrt(areaFactor);
+}
+
+/**
+ * A map's area factor made valid: a whole number within MESH.AREA_FACTOR_RANGE, or the default
+ * (MESH.AREA_FACTOR) when there is no usable number.
+ * @param {*} value
+ * @returns {number}
+ */
+export function clampAreaFactor(value) {
+    const config = FILRODENSWMB.MESH;
+    const [min, max] = config.AREA_FACTOR_RANGE;
+    const number = Number(value);
+    if (value === null || value === undefined || value === "" || !Number.isFinite(number)) return config.AREA_FACTOR;
+    return Math.min(max, Math.max(min, Math.round(number)));
 }
 
 /**
@@ -104,18 +118,35 @@ export function resolveSpacing(width, height, spacing = FILRODENSWMB.MESH.SPACIN
 
 /**
  * The mesh parameters stored with a map. Everything else about the mesh is rebuilt from these.
- * @param {object} mapData - Needs mapWidth, mapHeight and seed.
+ *
+ * The model spacing is stored in pixels as well as in effective km. The model sites are sampled
+ * before the display sites and every display site depends on where they fell, so if the pixel
+ * spacing were worked out afresh from the km value on each load, changing the map's area factor
+ * (which changes km per pixel) would move every cell and invalidate every owner array. Fixing the
+ * pixel value when the mesh is created keeps the mesh, and so the regions painted on it, exactly
+ * where they are whatever the area factor later becomes; the generator reads modelSpacingKm for
+ * its own scale.
+ *
+ * The map's width and height are recorded too, so a map whose size no longer matches its mesh can
+ * be told apart from one whose mesh simply has to be rebuilt (see MeshSession).
+ *
+ * @param {object} mapData - Needs mapWidth, mapHeight and seed; params.latTop/latBottom and
+ *     world.areaFactor give the km scale.
  * @param {object} [overrides]
- * @returns {{seed: number, spacing: number, cells: number, modelSpacingKm: number, version: number}}
+ * @returns {{seed: number, spacing: number, cells: number, modelSpacingKm: number, modelSpacingPx: number, width: number, height: number, version: number}}
  */
 export function createMeshBlock(mapData, overrides = {}) {
     const config = FILRODENSWMB.MESH;
     const spacing = resolveSpacing(mapData.mapWidth, mapData.mapHeight, overrides.spacing ?? config.SPACING);
+    const modelSpacingKm = overrides.modelSpacingKm ?? config.MODEL_SPACING_KM;
     return {
         seed: (overrides.seed ?? hashString(`mesh:${mapData.seed ?? ""}`)) % SEED_RANGE,
         spacing,
         cells: overrides.cells ?? 0,
-        modelSpacingKm: overrides.modelSpacingKm ?? config.MODEL_SPACING_KM,
+        modelSpacingKm,
+        modelSpacingPx: overrides.modelSpacingPx ?? modelSpacingKm / effectiveKmPerPx(mapData),
+        width: mapData.mapWidth,
+        height: mapData.mapHeight,
         version: config.ALGORITHM_VERSION,
     };
 }
@@ -134,6 +165,10 @@ export function defaultLevelStyle() {
         lineStyle: "solid",
         seaLineThickness: 0.75,
         seaLineStyle: "dashed",
+        // Off: thicknesses are map pixels, as region borders have always been. On: they are
+        // multiplied by the map's resolution scale, as pins and labels are, so a border keeps its
+        // weight relative to the map on very large or very small maps.
+        scaleWithMap: false,
     };
 }
 
@@ -237,11 +272,18 @@ export function createRoute(fields = {}, idFactory = randomId) {
  * Checks a map's v4 vector data. Owner arrays are checked separately (validateOwners), since they
  * are stored apart from mapData.
  *
- * @param {object} mapData
+ * The one thing it repairs rather than reports is the area factor: a missing, fractional or out of
+ * range world.areaFactor is set to its clamped value (see clampAreaFactor), because a map from an
+ * older build or an edited JSON file can carry any number there, and every km-based figure the
+ * map shows depends on it. A map without a world object is left without one; it reads as the
+ * default.
+ *
+ * @param {object} mapData - Its world.areaFactor may be updated.
  * @returns {string[]} One message per problem; empty when the data is valid.
  */
 export function validateVectorData(mapData) {
     const errors = [];
+    normaliseAreaFactor(mapData);
     if (mapData.vectorSchemaVersion !== VECTOR_SCHEMA_VERSION) errors.push(`vectorSchemaVersion is ${mapData.vectorSchemaVersion}, expected ${VECTOR_SCHEMA_VERSION}`);
     if ("regionLayers" in mapData) errors.push("regionLayers is still present");
     validateMeshBlock(mapData.mesh, errors);
@@ -250,6 +292,18 @@ export function validateVectorData(mapData) {
     for (const set of mapData.layerSets ?? []) validateLayerSet(set, levelIds, errors);
     for (const route of mapData.mapRoutes ?? []) validateRoute(route, mapData.mesh?.cells, errors);
     return errors;
+}
+
+/**
+ * Sets a map's world.areaFactor to its clamped value when the map has a world object (see
+ * clampAreaFactor). Returns the value in force either way.
+ * @param {object} mapData
+ * @returns {number}
+ */
+export function normaliseAreaFactor(mapData) {
+    const value = clampAreaFactor(mapData?.world?.areaFactor);
+    if (mapData?.world && typeof mapData.world === "object") mapData.world.areaFactor = value;
+    return value;
 }
 
 function validateMeshBlock(mesh, errors) {

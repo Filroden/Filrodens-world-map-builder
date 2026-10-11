@@ -155,7 +155,9 @@ function roundTo(value, decimals) {
 function countFeatures(payload) {
     const pins = payload.mapPins || [];
     const countPins = (type) => pins.filter((pin) => pin.type === type).length;
-    const layers = payload.regionLayers || [];
+    // A map at vector schema version 4 keeps its regions in the levels of its layer sets; each
+    // level counts as a region layer, as the region layers it replaces did
+    const layers = payload.regionLayers || (payload.layerSets || []).flatMap((set) => set.levels || []);
     const springs = countPins(SPRING_PIN_TYPES.ADDED);
     const blocked = countPins(SPRING_PIN_TYPES.REMOVED);
 
@@ -215,18 +217,44 @@ function getJournalColors(payload) {
     return [...builtIn, ...custom];
 }
 
+/** The flag path of the map data, and of the owner arrays saved beside it. */
+const MAP_DATA_PATH = `flags.${FILRODENSWMB.ID}.mapData`;
+const OWNERS_PATH = `flags.${FILRODENSWMB.ID}.owners`;
+
 /**
- * Saves the Map Studio's generation parameters and brush history to a new JournalEntry.
- * Generates an embedded human-readable settings page within the text layer.
+ * The update entries that delete, under `path`, each key of `stored` that `next` no longer has.
+ *
+ * Foundry merges an object written to a flag into the one already there, so a key left out of a
+ * save would otherwise survive it: the region layers of a map migrated to layer sets, or the owner
+ * array of a deleted level. A "-=" key removes it.
+ *
+ * @param {string} path
+ * @param {object|undefined} stored
+ * @param {object} next
+ * @returns {object}
  */
+function staleKeyDeletions(path, stored, next) {
+    const deletions = {};
+    for (const key of Object.keys(stored ?? {})) {
+        if (!(key in next)) deletions[`${path}.-=${key}`] = null;
+    }
+    return deletions;
+}
+
 /**
- * Upgraded Save function. If existingId is provided, it overwrites the payload natively.
+ * Saves a map to the compendium: a new JournalEntry, or the one with existingId overwritten. The
+ * journal holds the map data under its flags, a human-readable summary page, and (for a map on the
+ * display mesh) each level's encoded owner array under its own flag key beside the map data, so
+ * the arrays do not have to be read whenever the map data is (see loadMapOwners).
  *
  * @param {string} mapName - The journal's name.
  * @param {object} mapDataPayload - The map data to store.
  * @param {string|null} [existingId] - The journal to overwrite, if any.
+ * @param {object} [options]
+ * @param {Object<string, string>|null} [options.owners] - Encoded owner arrays by level id (see
+ *     OwnerLayer.encodeOwners); null leaves any stored owners as they are.
  */
-export async function saveMapData(mapName, mapDataPayload, existingId = null) {
+export async function saveMapData(mapName, mapDataPayload, existingId = null, { owners = null } = {}) {
     if (!mapDataPayload) return null;
 
     const packName = `world.${FILRODENSWMB.COMPENDIUM.NAME}`;
@@ -255,24 +283,27 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null) {
                 pages[0]._id = existingPage.id;
             }
 
-            // Strictly overwrite the internal flags and the page content
-            await doc.update({
+            // Overwrite the map data and the page content, removing what the map no longer has
+            const stored = doc.flags?.[FILRODENSWMB.ID] ?? {};
+            const update = {
                 name: mapName,
-                "flags.filrodens-world-map-builder.mapData": mapDataPayload,
+                [MAP_DATA_PATH]: mapDataPayload,
+                ...staleKeyDeletions(MAP_DATA_PATH, stored.mapData, mapDataPayload),
                 pages: pages,
-            });
+            };
+            if (owners) Object.assign(update, { [OWNERS_PATH]: owners }, staleKeyDeletions(OWNERS_PATH, stored.owners, owners));
+            await doc.update(update);
             return doc;
         }
     }
 
-    return await JournalEntry.create(
-        {
-            name: mapName,
-            pages: pages,
-            "flags.filrodens-world-map-builder.mapData": mapDataPayload,
-        },
-        { pack: pack.collection },
-    );
+    const data = {
+        name: mapName,
+        pages: pages,
+        [MAP_DATA_PATH]: mapDataPayload,
+    };
+    if (owners) data[OWNERS_PATH] = owners;
+    return await JournalEntry.create(data, { pack: pack.collection });
 }
 
 export async function deleteSavedMap(id) {
@@ -334,6 +365,20 @@ export async function updateMapDataFields(documentId, fields) {
 
     await doc.update(update);
     return true;
+}
+
+/**
+ * The encoded owner arrays saved with a map, by level id (see saveMapData), or an empty object
+ * for a map that has none.
+ * @param {string} documentId
+ * @returns {Promise<Object<string, string>>}
+ */
+export async function loadMapOwners(documentId) {
+    const pack = game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
+    if (!pack) return {};
+
+    const document = await pack.getDocument(documentId);
+    return foundry.utils.deepClone(document?.flags?.[FILRODENSWMB.ID]?.owners ?? {});
 }
 
 /**

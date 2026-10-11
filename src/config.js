@@ -1229,7 +1229,41 @@ export const FILRODENSWMB = {
         // Version of the site sampler and mesh algorithms. A change that moves any cell centre
         // must bump this, since stored owner arrays are only valid for the mesh they were made on.
         ALGORITHM_VERSION: 1,
+        // The range a map's own area factor (world.areaFactor) may take, whole numbers only: 1
+        // shows the world exactly as drawn, 10 to 20 suits most fantasy maps, 40 is a very
+        // compressed sketch. Values outside it are clamped when a map is loaded.
+        AREA_FACTOR_RANGE: [1, 40],
+        // How region levels are drawn (see RegionMeshLayer and RegionLevelLayers)
+        FILL: {
+            // Opacity of a region's colour over water, as a share of its opacity over land, when
+            // its layer set tints claimed water (0 leaves claimed water untinted)
+            WATER_TINT_ALPHA: 0.35,
+            // Period of the diagonal and crosshatch fill patterns, in map pixels, and the width of
+            // each hatch line. These match the 16 px tile with 2 px strokes earlier versions drew
+            // hatched regions with, so a migrated map keeps its look.
+            HATCH_PERIOD: 16,
+            HATCH_LINE_WIDTH: 2,
+            // Cells per row of the owners and palette textures. A paint stroke then uploads only
+            // the rows of 1,024 cells it touched rather than the whole level.
+            TEXTURE_ROW: 1024,
+        },
+        // Border line styles by arc class: land borders take the level's own line style, sea and
+        // shore borders the level's sea style. Dash patterns are multiples of the line width.
+        ARCS: {
+            DASH: { dashed: [4, 3], dotted: [1, 2], dashdot: [4, 2, 1, 2] },
+            // Thickness is rounded to this step, so a slider can offer quarter pixels
+            THICKNESS_STEP: 0.25,
+        },
+        // The cell raster cache in the browser's IndexedDB (see MeshCache): rebuilding the mesh of
+        // a large map takes about a second, reading it back a fraction of that.
+        CACHE: { DATABASE: "fwmb-mesh", STORE: "rasters", MAX_ENTRIES: 8 },
+        // How close (in screen pixels) a click must be to a route's line to pick the route
+        ROUTE_HIT_PX: 8,
     },
+    // Draw regions and routes from the display mesh (src/mesh/). Off, the polygon renderer and
+    // node editing of earlier versions run instead, on the legacy points every migrated region
+    // and route keeps, which allows the two to be compared side by side on the same map.
+    MESH_NATIVE: true,
     ENTITY_CONFIG: {
         decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },
         // `smoothed: true` marks entities StudioCanvas always renders as a Catmull-Rom curve
