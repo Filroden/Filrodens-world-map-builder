@@ -1184,6 +1184,52 @@ export const FILRODENSWMB = {
             },
         },
     },
+    // The version of the map's vector data (regions, routes and pins). Maps saved before it existed
+    // have no `vectorSchemaVersion` and hold regions as polygons and routes as node lists; version 4
+    // holds regions as cell ownership on the display mesh and routes as waypoint cells (see
+    // src/mesh/Migration.js, which converts the older shapes once).
+    VECTOR_SCHEMA_VERSION: 4,
+    // The display mesh: a Poisson-disc Voronoi mesh over the whole map that regions are painted on
+    // and routes are found across (see src/mesh/). Sizes are in map pixels unless they say km.
+    MESH: {
+        // Distance between neighbouring cell centres. Small enough that a border drawn along cell
+        // edges reads as a line, not a staircase, at the zoom levels a map is usually edited at.
+        SPACING: 4,
+        // Above this many cells (roughly 0.6 x width x height / spacing²) the spacing is widened
+        // until the mesh fits, so a very large map keeps a mesh that builds in a few seconds and a
+        // cell-id texture that fits in GPU memory. The widened spacing is stored with the map.
+        MAX_CELLS: 500000,
+        MIN_SPACING: 4,
+        // Spacing of the coarser model mesh the generator works on, in effective km (see
+        // AREA_FACTOR). Its sites are a subset of the display mesh's sites.
+        MODEL_SPACING_KM: 25,
+        // A drawn map shows a world this many times larger in area than its latitudes suggest
+        // would fit, so a continent spanning 120° of latitude has the size of a realistic
+        // medieval landscape. Effective km per pixel = latitude span x 111.2 / height / √AREA_FACTOR.
+        AREA_FACTOR: 15,
+        // Latitudes assumed when a map does not record its own (top, bottom)
+        DEFAULT_LAT_TOP: 60,
+        DEFAULT_LAT_BOTTOM: -60,
+        // How heights in the elevation buffer (0 to 1, with the sea level between) convert to
+        // metres: (elevation - sea level) x METRES_PER_UNIT.
+        METRES_PER_UNIT: 10000,
+        // Realms claim water up to this far from their coast (effective km)
+        CLAIM_KM: 60,
+        // Border relaxation: cells at least RINGS steps from a differently owned cell keep their
+        // owner; the band between is re-flooded with a cost that rises with the height climbed
+        // (doubling per RELIEF_M_PER_STEP metres) and with entering a cell on a river carrying at
+        // least RIVER_KM of upstream length (x RIVER_CROSS), so borders settle on ridges and rivers.
+        RELAX: { RINGS: 3, RELIEF_M_PER_STEP: 120, RIVER_KM: 40, RIVER_CROSS: 6 },
+        // Default route cost before the generator supplies its own: the step length, doubled per
+        // RELIEF_M_PER_STEP metres climbed, x WATER_STEP for a step into or across water.
+        ROUTE_COST: { RELIEF_M_PER_STEP: 120, WATER_STEP: 4 },
+        // Corner-cutting passes applied to borders and smoothed routes. Each pass doubles the
+        // points; one is enough to hide the Voronoi corners at the display spacing.
+        CHAIKIN_PASSES: 1,
+        // Version of the site sampler and mesh algorithms. A change that moves any cell centre
+        // must bump this, since stored owner arrays are only valid for the mesh they were made on.
+        ALGORITHM_VERSION: 1,
+    },
     ENTITY_CONFIG: {
         decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },
         // `smoothed: true` marks entities StudioCanvas always renders as a Catmull-Rom curve
