@@ -6,10 +6,14 @@
     "foundry-id": "node scripts/foundry-id.mjs",
     "fixtures": "node tests/mesh/fixtures/build-p0jbva.mjs",
     "pretest": "node tests/mesh/fixtures/build-p0jbva.mjs --if-missing",
-    "test": "node --test \"tests/**/*.test.mjs\""
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "lint": "eslint main.js src tests scripts"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@foundryvtt/foundryvtt-cli": "3.0.0",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
     "handlebars": "^4.7.8"
   },
   "dependencies": {

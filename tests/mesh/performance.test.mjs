@@ -1,4 +1,3 @@
-/* global process */
 // Timings on P0JBVA (2000 x 1600 at 4 px, about 120k cells) against the phase 1 budgets. Each
 // figure is the best of a few runs, so a busy machine does not fail the test on one slow run.
 // Run with: node --test --test-reporter=spec tests/mesh/performance.test.mjs

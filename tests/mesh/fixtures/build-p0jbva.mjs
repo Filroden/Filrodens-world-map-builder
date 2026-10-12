@@ -1,4 +1,3 @@
-/* global process */
 // Builds the P0JBVA terrain rasters the mesh tests read, by running the module's own generation
 // pipeline on fixtures/p0jbva.json outside Foundry (the same code the Studio runs on load, on the
 // main thread). The rasters are derived data, so they are not kept in the repository: this script

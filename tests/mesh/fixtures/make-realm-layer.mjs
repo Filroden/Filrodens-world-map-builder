@@ -1,4 +1,3 @@
-/* global process */
 // Carries the settlement prototype's final realms (a run of ./run.sh out/p0 out/c0 test-cultures.json)
 // from its 25 km model mesh onto P0JBVA's display mesh, the way the generator will: each land cell
 // takes the realm most of its land pixels belong to, unowned land joins the nearest realm, borders
