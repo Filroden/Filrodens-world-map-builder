@@ -24,7 +24,7 @@
 
     <!-- One scrolling list for every layer, so the header above and the Edit Regions button
          below stay in view however many layers and regions there are. Each layer collapses to
-         its header; MapStudioApp remembers which are collapsed through data-section. -->
+         its header; MapStudio remembers which are collapsed through data-section. -->
     <div id="fwmb-scroll-region-layers" class="fwmb-list-container fwmb-scrollable stable">
     {{#each regionLayers}}
     <details class="fwmb-accordion-group" data-layer-id="{{this.id}}" data-section="regionLayer.{{this.id}}" {{#unless this.collapsed}}open{{/unless}}>

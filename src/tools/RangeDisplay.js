@@ -7,8 +7,8 @@
  * .fwmb-slider-group. Either way the <output> is found through the nearest of those two wrappers,
  * so neither layout depends on the other's element order.
  *
- * main.js calls this for every slider inside an FWMB window or dialogue, so no template needs its
- * own inline handler to keep its value display current.
+ * The studio's view (StudioView) calls this for every slider inside the studio, its dialogues
+ * included, so no template needs its own inline handler to keep its value display current.
  *
  * The filled portion of the track (from the minimum up to the thumb) is drawn in CSS from a
  * custom property, --fwmb-range-fill, holding the thumb's position as a percentage. Only Firefox

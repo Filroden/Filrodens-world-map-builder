@@ -16,7 +16,7 @@ const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br:
  * Entities whose nodes may be dragged into the buffer around the map, so lines and outlines can
  * span well outside the visible map. Single-point markers (pins, labels, decorations) and manual
  * river nodes stay confined to the map itself, the same rule applied when these nodes are first
- * created (see MapStudioApp's click handlers).
+ * created (see MapStudio's click handlers).
  */
 const BUFFERED_NODE_TYPES = Object.freeze(["route", "region", "landMask", "fault"]);
 
@@ -1414,7 +1414,9 @@ export class StudioCanvas {
         pins.forEach((pin) => {
             if (!this.#isVisibleInCurrentPass(pin.visibility, "all", false)) return;
 
-            const texturePath = resolvePinIconPath(pin.icon);
+            // Icon paths are stored as the host names them (a built-in icon by its module path);
+            // the host turns them into a URL the page can load (see platform.assets)
+            const texturePath = platform.assets.url(resolvePinIconPath(pin.icon));
             const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
 
             // Apply multiplicative tinting (defaults to white if missing)
@@ -1641,11 +1643,12 @@ export class StudioCanvas {
         this.#fadeOutHighlight(highlight);
     }
 
-    async updateReferenceImage(url, x, y, scale, alpha) {
-        if (!url) {
+    async updateReferenceImage(path, x, y, scale, alpha) {
+        if (!path) {
             this.referenceSprite.texture = PIXI.Texture.EMPTY;
             return;
         }
+        const url = platform.assets.url(path);
 
         try {
             if (!this.referenceSprite.texture.textureCacheIds.includes(url)) {
@@ -1991,7 +1994,7 @@ export class StudioCanvas {
         decorations.forEach((dec) => {
             if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false) || !dec.src) return;
 
-            const sprite = new PIXI.Sprite(PIXI.Texture.from(dec.src));
+            const sprite = new PIXI.Sprite(PIXI.Texture.from(platform.assets.url(dec.src)));
             sprite.anchor.set(0.5);
             sprite.x = dec.x;
             sprite.y = dec.y;

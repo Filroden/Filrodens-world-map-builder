@@ -247,6 +247,12 @@
     "FILRODENSWMB.UI.Discard": "Discard",
     "FILRODENSWMB.UI.Cancel": "Cancel",
     "FILRODENSWMB.UI.Accept": "Accept",
+    "FILRODENSWMB.UI.Yes": "Yes",
+    "FILRODENSWMB.UI.No": "No",
+    "FILRODENSWMB.UI.Confirm": "Confirm",
+    "FILRODENSWMB.UI.Close": "Close",
+    "FILRODENSWMB.UI.BrowseFiles": "Choose a file",
+    "FILRODENSWMB.Web.StorageUnavailable": "This browser is not letting the map builder store anything, so saved maps will be lost when the page closes. Export maps you want to keep.",
 
     "FILRODENSWMB.UI.SaveMap": "Save Map",
     "FILRODENSWMB.UI.SaveMapAs": "Save Map As...",

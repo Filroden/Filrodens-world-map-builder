@@ -19,7 +19,7 @@ import { platform } from "../platform/index.js";
  * Kept in its own file (rather than folded into MapDialogManager.js, already the module's
  * largest file) because this is the single largest piece of interactive UI in the module,
  * matching how RegionalExtractor.js and SceneExporter.js already carve substantial
- * single-feature logic out of MapStudioApp.js.
+ * single-feature logic out of MapStudio.js.
  */
 export class RuleEditorDialog {
     /** How close a dragged handle has to get to 0 or 1 before it's treated as touching that true edge (see RuleSegment's openMin/openMax). */
@@ -62,8 +62,8 @@ export class RuleEditorDialog {
     }
 
     /**
-     * Opens the Rule Editor for the given MapStudioApp instance.
-     * @param {object} app - The MapStudioApp instance.
+     * Opens the Rule Editor for the given MapStudio instance.
+     * @param {object} app - The MapStudio instance.
      */
     static async open(app) {
         const customBiomes = platform.utils.deepClone(app.uiState.customBiomes || []);
@@ -104,7 +104,7 @@ export class RuleEditorDialog {
         // save is still needed), they just don't occupy an undo slot.
         app.uiState.customBiomes = customBiomes;
         app._repaintCanvas(); // customBiomeRules is recompiled fresh from uiState.customBiomes on every repaint (see MapStateManager.getDerivedMapParameters) - no separate cache to invalidate.
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
         app.markDirty();
     }
 

@@ -126,7 +126,7 @@ export class MeshIntegration {
             overlay.end();
         }
         app._repaintVectors();
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
     }
 
     static async #loadMeshData(params, prefetch, overlay) {

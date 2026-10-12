@@ -11,10 +11,11 @@ Node's built-in test runner, no test framework. From the repository root:
 ## Layout
 
 - `mesh/`: the v4 mesh engine (`src/mesh/`) and its module integration (`MeshSession`, persistence, the mesh cache, the worker protocol, regional extraction and the exporters). The integration tests stub the few Foundry globals they reach in `mesh/foundry-stubs.mjs`; the worker test runs the real worker module in a Node worker thread through `support/web-worker-shim.mjs`.
-- `ui/`: checks on the templates and the studio's action table that need no browser: every template compiles with only the helpers the module provides (so a template cannot quietly rely on a Foundry-only helper the web host would lack), every statically named partial exists, and every `data-action` in the templates has a handler.
+- `ui/`: the studio's interface without a browser: every template compiles with only the helpers both hosts provide (so a template cannot quietly rely on a Foundry-only helper the web version would lack), every statically named partial exists, and every `data-action` in the templates has a handler; the region renderer (`StudioView`), the dialogues (`Overlay` and the dialogue service) and the studio's closing rules, in happy-dom.
+- `platform/`: the host services (`src/platform`). Foundry's pass calls on to Foundry as the module always has; the web version's behave as Foundry's do where the shared code relies on it (saved maps, settings, strings, templates, asset paths, the file picker).
 - `support/`: shared helpers that are not tests. `pipeline-setup.mjs` builds a stand-in for the studio app from a saved map so the generation pipeline can run outside Foundry; `web-worker-shim.mjs` gives Node a browser-style module `Worker`.
 
-The browser render check for the region fill (`design/tests/mesh/browser/render-check.mjs`, headless Chromium through Playwright) stays in `design/` and is run by hand; it reads the fixtures from here.
+Two checks run the studio in headless Chromium (Playwright) and stay in `design/`, run by hand: `design/prototypes/thin-frame/studio-smoke-check.mjs` (the studio in a stand-in Foundry window) and `design/prototypes/web/web-smoke-check.mjs` (the web version, from the working copy or any site address). The browser render check for the region fill (`design/tests/mesh/browser/render-check.mjs`, headless Chromium through Playwright) stays in `design/` and is run by hand; it reads the fixtures from here.
 
 ## Fixtures (`mesh/fixtures/`)
 

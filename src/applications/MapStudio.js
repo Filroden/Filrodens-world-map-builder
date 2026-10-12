@@ -25,11 +25,7 @@ import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { LayerPainting } from "../canvas/LayerPainting.js";
 import { MeshIntegration } from "./MeshIntegration.js";
 import { platform } from "../platform/index.js";
-
-// The studio's window is a Foundry application; everything inside it goes through the platform
-// services (see src/platform/index.js)
-// eslint-disable-next-line no-restricted-globals
-const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+import { StudioView } from "../ui/StudioView.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -49,6 +45,9 @@ const DEFAULT_STROKE_PREVIEW_SIZE = 20;
 // pin or a thin line still gets a visible outline
 const VECTOR_PREVIEW_PADDING = 50;
 
+/** Where the module's templates are served from (they are named by this path). */
+const TEMPLATE_ROOT = "modules/filrodens-world-map-builder/templates/";
+
 /**
  * The kinds of refresh the map runs through its refresh queue (see RefreshQueue):
  *   TERRAIN         - generateTerrain: a full generation, or a refresh of what changed when nothing
@@ -60,159 +59,168 @@ const VECTOR_PREVIEW_PADDING = 50;
  */
 const REFRESH = Object.freeze({ TERRAIN: "terrain", CHANGED_TERRAIN: "changedTerrain", CLIMATE: "climate", FEATURES: "features" });
 
-export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
-    static DEFAULT_OPTIONS = {
-        id: "fwmb-map-studio",
-        classes: ["fwmb", "fwmb-layout"],
-        position: { width: 1300, height: 900 },
-        window: {
-            title: "FILRODENSWMB.UI.ControlTitle",
-            icon: "fwmb-icon map",
-            resizable: true,
-        },
-        // prettier-ignore
-        actions: {
-            // --- DIALOG MANAGER: Quick Styles ---
-            addLabelQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
-            addRouteQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
-            addRegionQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
-            editLabelQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
-            editRouteQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
-            editRegionQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
-            deleteLabelQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
-            deleteRouteQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
-            deleteRegionQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+/**
+ * The map studio: its state, its regions (the toolbar, the context panel, the map and the edit
+ * toolbar), its actions and the map engines behind them. It is independent of what frames it: a
+ * host (a Foundry window, or a web page) gives it an element to draw into with mount(), asks
+ * canClose() before closing (which may ask about unsaved changes), and calls destroy() when it
+ * does close. Everything the studio needs from the host's environment goes through the platform
+ * services (see src/platform/index.js).
+ *
+ * The host's root element should sit inside an element carrying the "fwmb" class (which the
+ * module's styles are scoped to) and be given the studio frame's class, "fwmb-studio".
+ */
+export class MapStudio {
+    /**
+     * The studio's action handlers, by the data-action name its templates use. Each is called with
+     * the click event and the element carrying the data-action, with the studio as `this` (see
+     * StudioView, which dispatches them). They belong to the studio, not to the window around it: a
+     * Foundry window given them as its own actions as well would run every handler twice.
+     */
+    // prettier-ignore
+    static ACTIONS = {
+        // --- DIALOG MANAGER: Quick Styles ---
+        addLabelQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
+        addRouteQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
+        addRegionQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
+        editLabelQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
+        editRouteQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
+        editRegionQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
+        deleteLabelQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+        deleteRouteQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+        deleteRegionQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
 
-            // --- MASS EDIT ---
-            toggleMassEditMode(e, t)   { this._onToggleMassEditMode(e, t); },
-            toggleMassEditItem(e, t)   { this._onToggleMassEditItem(e, t); },
-            massEditSelectAll(e, t)    { this._onMassEditSelectAll(e, t); },
-            massEditSelectNone(e, t)   { this._onMassEditSelectNone(e, t); },
-            openMassEdit(e, t)         { MapDialogManager.onMassEdit(this, e, t); },
+        // --- MASS EDIT ---
+        toggleMassEditMode(e, t)   { this._onToggleMassEditMode(e, t); },
+        toggleMassEditItem(e, t)   { this._onToggleMassEditItem(e, t); },
+        massEditSelectAll(e, t)    { this._onMassEditSelectAll(e, t); },
+        massEditSelectNone(e, t)   { this._onMassEditSelectNone(e, t); },
+        openMassEdit(e, t)         { MapDialogManager.onMassEdit(this, e, t); },
 
-            // --- DIALOG MANAGER: Entity Deletion ---
-            deleteDecoration(e, t)  { MapDialogManager.onDeleteEntity(this, e, t); },
-            deleteFault(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
-            deleteLabel(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
-            deletePin(e, t)         { MapDialogManager.onDeleteEntity(this, e, t); },
-            deleteRegion(e, t)      { MapDialogManager.onDeleteRegion(this, e, t); },
-            deleteRegionLayer(e, t) { MapDialogManager.onDeleteEntity(this, e, t); },
-            deleteRiver(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
-            deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
-            deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
-            deleteAllLandMasks(e, t) { MapDialogManager.onDeleteAllLandMasks(this, e, t); },
-            editLandMask(e, t)      { MapDialogManager.onEditLandMask(this, e, t); },
+        // --- DIALOG MANAGER: Entity Deletion ---
+        deleteDecoration(e, t)  { MapDialogManager.onDeleteEntity(this, e, t); },
+        deleteFault(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+        deleteLabel(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+        deletePin(e, t)         { MapDialogManager.onDeleteEntity(this, e, t); },
+        deleteRegion(e, t)      { MapDialogManager.onDeleteRegion(this, e, t); },
+        deleteRegionLayer(e, t) { MapDialogManager.onDeleteEntity(this, e, t); },
+        deleteRiver(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+        deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
+        deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
+        deleteAllLandMasks(e, t) { MapDialogManager.onDeleteAllLandMasks(this, e, t); },
+        editLandMask(e, t)      { MapDialogManager.onEditLandMask(this, e, t); },
 
-            // --- DIALOG MANAGER: Entity Editing ---
-            editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
-            editFault(e, t)       { MapDialogManager.onEditFault(this, e, t); },
-            editLabel(e, t)       { MapDialogManager.onEditLabel(this, e, t); },
-            editPin(e, t)         { MapDialogManager.onEditPin(this, e, t); },
-            editRegion(e, t)      { MapDialogManager.onEditRegion(this, e, t); },
-            editRegionLayer(e, t) { MapDialogManager.onEditRegionLayer(this, e, t); },
-            editRiver(e, t)       { MapDialogManager.onEditRiver(this, e, t); },
-            editRoute(e, t)       { MapDialogManager.onEditRoute(this, e, t); },
+        // --- DIALOG MANAGER: Entity Editing ---
+        editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
+        editFault(e, t)       { MapDialogManager.onEditFault(this, e, t); },
+        editLabel(e, t)       { MapDialogManager.onEditLabel(this, e, t); },
+        editPin(e, t)         { MapDialogManager.onEditPin(this, e, t); },
+        editRegion(e, t)      { MapDialogManager.onEditRegion(this, e, t); },
+        editRegionLayer(e, t) { MapDialogManager.onEditRegionLayer(this, e, t); },
+        editRiver(e, t)       { MapDialogManager.onEditRiver(this, e, t); },
+        editRoute(e, t)       { MapDialogManager.onEditRoute(this, e, t); },
 
-            // --- DIALOG MANAGER: Custom Biomes & Misc ---
-            addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
-            editCustomBiome(e, t)   { MapDialogManager.onEditCustomBiome(this, e, t); },
-            deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
-            openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
-            addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
-            addRegionLayer(e, t)    { MapDialogManager.onAddRegionLayer(this, e, t); },
+        // --- DIALOG MANAGER: Custom Biomes & Misc ---
+        addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
+        editCustomBiome(e, t)   { MapDialogManager.onEditCustomBiome(this, e, t); },
+        deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
+        openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
+        addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
+        addRegionLayer(e, t)    { MapDialogManager.onAddRegionLayer(this, e, t); },
 
-            // --- DIALOG MANAGER: Pin Icons ---
-            addCustomPinIcon(e, t)     { MapDialogManager.onAddCustomPinIcon(this, e, t); },
-            editCustomPinIcon(e, t)    { MapDialogManager.onEditCustomPinIcon(this, e, t); },
-            removeCustomPinIcon(e, t)  { MapDialogManager.onRemoveCustomPinIcon(this, e, t); },
-            toggleBuiltinPinIcon(e, t) { MapDialogManager.onToggleBuiltinPinIcon(this, e, t); },
-            hideAllBuiltinPinIcons(e, t)   { MapDialogManager.onHideAllBuiltinPinIcons(this, e, t); },
-            revealAllBuiltinPinIcons(e, t) { MapDialogManager.onRevealAllBuiltinPinIcons(this, e, t); },
+        // --- DIALOG MANAGER: Pin Icons ---
+        addCustomPinIcon(e, t)     { MapDialogManager.onAddCustomPinIcon(this, e, t); },
+        editCustomPinIcon(e, t)    { MapDialogManager.onEditCustomPinIcon(this, e, t); },
+        removeCustomPinIcon(e, t)  { MapDialogManager.onRemoveCustomPinIcon(this, e, t); },
+        toggleBuiltinPinIcon(e, t) { MapDialogManager.onToggleBuiltinPinIcon(this, e, t); },
+        hideAllBuiltinPinIcons(e, t)   { MapDialogManager.onHideAllBuiltinPinIcons(this, e, t); },
+        revealAllBuiltinPinIcons(e, t) { MapDialogManager.onRevealAllBuiltinPinIcons(this, e, t); },
 
-            // --- MAP STUDIO APP: Internal Tooling & States ---
-            adjustNoiseScale(e, t)          { this._onAdjustNoiseScale(e, t); },
-            adjustReferenceScale(e, t)      { this._onAdjustReferenceScale(e, t); },
-            applyFeatureMath(e, t)          { this._onApplyFeatureMath(e, t); },
-            applyResolution(e, t)           { this._onApplyResolution(e, t); },
-            changeTool(e, t)                { this._onChangeTool(e, t); },
-            exportPng(e, t)                 { this._onExportPng(e, t); },
-            exportScene(e, t)               { this._onExportScene(e, t); },
-            exportSettings(e, t)            { this._onExportSettings(e, t); },
-            generateRandomLandMap(e, t)     { this._onGenerateRandomLandMap(e, t); },
-            generateRandomLandMask(e, t)    { this._onGenerateRandomLandMask(e, t); },
-            generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
-            importMapJson(e, t)             { this._onImportMapJson(e, t); },
-            importSettings(e, t)            { this._onImportSettings(e, t); },
-            manageMap(e, t)                 { this._onManageMapAction(e, t); },
-            nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
-            nudgeReference(e, t)            { this._onNudgeReference(e, t); },
-            randomizeSeed(e, t)             { this._onRandomizeSeed(e, t); },
-            redoBrush(e, t)                 { this._onRedoBrush(e, t); },
-            removeReferenceImage(e, t)      { this._onRemoveReferenceImage(e, t); },
-            resetNoisePan(e, t)             { this._onResetNoisePan(e, t); },
-            resetNoiseScale(e, t)           { this._onResetNoiseScale(e, t); },
-            resetReferencePan(e, t)         { this._onResetReferencePan(e, t); },
-            resetReferenceScale(e, t)       { this._onResetReferenceScale(e, t); },
-            resetZoom(e, t)                 { this._onResetZoom(e, t); },
-            saveMap(e, t)                   { this._onSaveMap(e, t); },
-            saveMapAs(e, t)                 { this._onSaveMapAs(e, t); },
-            selectRegionLayer(e, t)         { this._onSelectRegionLayer(e, t); },
-            setBrushBiome(e, t)             { this._onSetBrushBiome(e, t); },
-            setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
-            setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
-            setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
-            setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
-            setRegionMode(e, t)             { this._onSetRegionMode(e, t); },
-            setRegionPreset(e, t)           { this._onSetRegionPreset(e, t); },
-            setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
-            threeDView(e, t)                { this._onThreeDView(e, t); },
-            toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
-            toggleGrid(e, t)                { this._onToggleGrid(e, t); },
-            toggleLayer(e, t)               { this._onToggleLayer(e, t); },
-            toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
-            toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
-            togglePinDropdown(e, t)         { this._onTogglePinDropdown(e, t); },
-            toggleRegionSmoothing(e, t)     { this._onToggleRegionSmoothing(e, t); },
-            toggleTerrainLayer(e, t)        { this._onToggleTerrainLayer(e, t); },
-            toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
-            toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
-            undoBrush(e, t)                 { this._onUndoBrush(e, t); },
-            updateMapTerrain(e, t)          { this._onUpdateMapTerrain(e, t); },
-            zoomIn(e, t)                    { this._onZoomIn(e, t); },
-            zoomOut(e, t)                   { this._onZoomOut(e, t); },
-            zoomToFeature(e, t)             { this._onZoomToFeature(e, t); },
-        },
+        // --- MAP STUDIO APP: Internal Tooling & States ---
+        adjustNoiseScale(e, t)          { this._onAdjustNoiseScale(e, t); },
+        adjustReferenceScale(e, t)      { this._onAdjustReferenceScale(e, t); },
+        applyFeatureMath(e, t)          { this._onApplyFeatureMath(e, t); },
+        applyResolution(e, t)           { this._onApplyResolution(e, t); },
+        changeTool(e, t)                { this._onChangeTool(e, t); },
+        exportPng(e, t)                 { this._onExportPng(e, t); },
+        exportScene(e, t)               { this._onExportScene(e, t); },
+        exportSettings(e, t)            { this._onExportSettings(e, t); },
+        generateRandomLandMap(e, t)     { this._onGenerateRandomLandMap(e, t); },
+        generateRandomLandMask(e, t)    { this._onGenerateRandomLandMask(e, t); },
+        generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
+        importMapJson(e, t)             { this._onImportMapJson(e, t); },
+        importSettings(e, t)            { this._onImportSettings(e, t); },
+        manageMap(e, t)                 { this._onManageMapAction(e, t); },
+        nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
+        nudgeReference(e, t)            { this._onNudgeReference(e, t); },
+        randomizeSeed(e, t)             { this._onRandomizeSeed(e, t); },
+        redoBrush(e, t)                 { this._onRedoBrush(e, t); },
+        removeReferenceImage(e, t)      { this._onRemoveReferenceImage(e, t); },
+        resetNoisePan(e, t)             { this._onResetNoisePan(e, t); },
+        resetNoiseScale(e, t)           { this._onResetNoiseScale(e, t); },
+        resetReferencePan(e, t)         { this._onResetReferencePan(e, t); },
+        resetReferenceScale(e, t)       { this._onResetReferenceScale(e, t); },
+        resetZoom(e, t)                 { this._onResetZoom(e, t); },
+        saveMap(e, t)                   { this._onSaveMap(e, t); },
+        saveMapAs(e, t)                 { this._onSaveMapAs(e, t); },
+        selectRegionLayer(e, t)         { this._onSelectRegionLayer(e, t); },
+        setBrushBiome(e, t)             { this._onSetBrushBiome(e, t); },
+        setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
+        setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
+        setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
+        setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
+        setRegionMode(e, t)             { this._onSetRegionMode(e, t); },
+        setRegionPreset(e, t)           { this._onSetRegionPreset(e, t); },
+        setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
+        threeDView(e, t)                { this._onThreeDView(e, t); },
+        toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
+        toggleGrid(e, t)                { this._onToggleGrid(e, t); },
+        toggleLayer(e, t)               { this._onToggleLayer(e, t); },
+        toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
+        toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
+        togglePinDropdown(e, t)         { this._onTogglePinDropdown(e, t); },
+        toggleRegionSmoothing(e, t)     { this._onToggleRegionSmoothing(e, t); },
+        toggleTerrainLayer(e, t)        { this._onToggleTerrainLayer(e, t); },
+        toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
+        toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
+        undoBrush(e, t)                 { this._onUndoBrush(e, t); },
+        updateMapTerrain(e, t)          { this._onUpdateMapTerrain(e, t); },
+        zoomIn(e, t)                    { this._onZoomIn(e, t); },
+        zoomOut(e, t)                   { this._onZoomOut(e, t); },
+        zoomToFeature(e, t)             { this._onZoomToFeature(e, t); },
     };
 
-    static PARTS = {
-        toolbar: {
-            template: "modules/filrodens-world-map-builder/templates/toolbar.hbs",
-            classes: ["fwmb-toolbar"],
-        },
-        context: {
-            template: "modules/filrodens-world-map-builder/templates/context.hbs",
-            classes: ["fwmb-context-panel"],
-            scrollable: [".fwmb-scrollable", "#fwmb-scroll-auto-labels", "#fwmb-scroll-custom-labels", "#fwmb-scroll-rivers", "#fwmb-scroll-faults", "#fwmb-scroll-pins", "#fwmb-scroll-routes", "#fwmb-scroll-region-layers"],
-        },
-        map: {
-            template: "modules/filrodens-world-map-builder/templates/map.hbs",
-            classes: ["fwmb-map"],
-        },
-        editToolbar: {
-            template: "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
-            classes: ["fwmb-edit-toolbar"],
-        },
-    };
+    /**
+     * The studio's regions, in drawing order, for StudioView. Each template draws one root element,
+     * which is given the region's classes. The map is drawn once: the PIXI canvas lives in it, and
+     * drawing it again would rebuild its container and leave the canvas behind. The edit toolbar is
+     * drawn at the top of the map's container, inside the map region.
+     */
+    static #REGIONS = Object.freeze({
+        toolbar: { template: `${TEMPLATE_ROOT}toolbar.hbs`, classes: ["fwmb-toolbar"] },
+        context: { template: `${TEMPLATE_ROOT}context.hbs`, classes: ["fwmb-context-panel"] },
+        map: { template: `${TEMPLATE_ROOT}map.hbs`, classes: ["fwmb-map"], once: true },
+        editToolbar: { template: `${TEMPLATE_ROOT}parts/edit-map-tools.hbs`, classes: ["fwmb-edit-toolbar"], slot: ".fwmb-map-container" },
+    });
 
-    /** Whether close() has started, and may still be asking about unsaved changes (see close). */
+    /** The element the studio is drawn in (see mount); null before it is mounted and once destroyed. */
+    root = null;
+
+    /** Draws and redraws the studio's regions in the root (null until the studio is mounted). */
+    view = null;
+
+    /** Whether closing has started, and may still be asking about unsaved changes (see canClose). */
     #closing = false;
 
     /**
-     * Whether close() has gone past the point of no return and destroyed the canvas. Work that
-     * was already running when the window closed (a refresh part-way through, say) checks this
-     * before it draws, since there is nothing left to draw on.
+     * Whether the studio has been destroyed (see destroy), with its canvas. Work that was already
+     * running when it closed (a refresh part-way through, say) checks this before it draws, since
+     * there is nothing left to draw on.
      */
     #shutDown = false;
+
+    /** Stops dialogues being drawn in the studio (see platform.dialogs.attach); null when closed. */
+    #detachDialogs = null;
 
     /** The save under way, or null (see saveCurrentMap). */
     #activeSave = null;
@@ -249,7 +257,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * of them on, so a layer switched off for an export can never look like lost work the next
      * time the map is opened.
      */
-    #terrainLayers = MapStudioApp.#allTerrainLayers(true);
+    #terrainLayers = MapStudio.#allTerrainLayers(true);
 
     /** The terrain layer list that is open, or null (see _onToggleLayerMenu). */
     #openLayerMenu = null;
@@ -286,14 +294,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         { key: "customLabelStyles", labelKey: "FILRODENSWMB.UI.SettingsLabelQuickStyles" },
     ];
 
-    constructor(options) {
-        options.position = platform.utils.mergeObject(options.position || {}, {
-            width: window.innerWidth * 0.7,
-            height: window.innerHeight * 0.9,
-        });
-
-        super(options);
-
+    constructor() {
         this.canvasEngine = null;
         this.activeTool = "scene";
         this.viewFilters = { all: true, gm: true, none: false };
@@ -414,7 +415,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.#refreshes = this.#createRefreshQueue();
 
-        // Each of these runs a moment after the edit that scheduled it, by which time the window
+        // Each of these runs a moment after the edit that scheduled it, by which time the studio
         // may have been closed; see #whileOpen
         this.debouncedGenerateTerrain = platform.utils.debounce(this.#whileOpen(() => this.generateTerrain()), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
         this.debouncedGenerateClimate = platform.utils.debounce(this.#whileOpen((bounds) => this.generateClimate(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
@@ -486,18 +487,18 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return this.#refreshes.request(REFRESH.CHANGED_TERRAIN, { title });
     }
 
-    /** Whether the window is open and its canvas can still be drawn on. */
+    /** Whether the studio is mounted and its canvas can still be drawn on. */
     get #isOpen() {
-        return this.rendered && !this.#shutDown;
+        return this.root !== null && !this.#shutDown;
     }
 
     /**
-     * Wraps work scheduled for later (a debounced refresh) so that it only runs while the window
-     * is open. Closing the window removes its element and destroys its canvas, so a refresh that
+     * Wraps work scheduled for later (a debounced refresh) so that it only runs while the studio
+     * is open. Closing the studio lets go of its element and destroys its canvas, so a refresh that
      * fires afterwards would fail part-way, and there is nothing left for it to update.
      *
      * @param {Function} work - The work to run, given whatever arguments the wrapper receives.
-     * @returns {Function} A function that runs `work` if the window is still open.
+     * @returns {Function} A function that runs `work` if the studio is still open.
      */
     #whileOpen(work) {
         return (...args) => (this.#isOpen ? work(...args) : undefined);
@@ -518,38 +519,49 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     /**
-     * Applies RTL directionality if the active language requires it.
+     * Marks an element (the host's frame around the studio, which carries the "fwmb" class) as
+     * right-to-left when the active language is written that way. The host calls this on its frame,
+     * so its own controls (a window's header) follow the same direction as the studio.
+     *
+     * @param {HTMLElement} element
      */
-    static #applyRTLSupport(element) {
+    static applyTextDirection(element) {
         const rtlLanguages = FILRODENSWMB.UI.RTL_LANGUAGES || [];
         // Falls back to "en" when the host's localisation is not ready yet (see platform.i18n.lang)
-        const currentLang = platform.i18n.lang;
-
-        if (!rtlLanguages.includes(currentLang)) return;
+        if (!rtlLanguages.includes(platform.i18n.lang)) return;
 
         element.setAttribute("dir", "rtl");
         element.classList.add("rtl");
     }
 
-    async _preparePartContext(partId, context, options) {
-        context = await super._preparePartContext(partId, context, options);
+    /**
+     * The template context for one of the studio's regions (see #REGIONS). Most of it is shared by
+     * every region; the edit toolbar and the context panel each add their own.
+     *
+     * @param {string} regionId
+     * @returns {Promise<object>}
+     */
+    async #buildRegionContext(regionId) {
+        const context = {};
 
         context.hasPendingFeatureMath = this.hasPendingFeatureMath;
         this.uiState.isEditMode = this.canvasEngine?.isEditMode ?? false;
 
         context.config = FILRODENSWMB;
         context.activeTool = this.activeTool;
+        // Whether the host can export to a scene (Foundry can; the web version cannot)
+        context.sceneExport = platform.scene.available;
 
         const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
         context.isLocked = this.uiState.isEditMode && !isVectorTool;
 
-        if (partId === "editToolbar") {
+        if (regionId === "editToolbar") {
             const editableTools = FILRODENSWMB.UI.EDITABLE_TOOLS;
 
             if (editableTools.includes(this.activeTool)) {
-                context.toolbarPartial = `modules/filrodens-world-map-builder/templates/parts/toolbar-${this.activeTool}.hbs`;
+                context.toolbarPartial = `${TEMPLATE_ROOT}parts/toolbar-${this.activeTool}.hbs`;
             } else {
-                context.toolbarPartial = `modules/filrodens-world-map-builder/templates/parts/toolbar-empty.hbs`;
+                context.toolbarPartial = `${TEMPLATE_ROOT}parts/toolbar-empty.hbs`;
             }
         }
 
@@ -581,7 +593,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }));
 
         context.biomeList = [...builtInBiomes, ...customBiomesMapped];
-        context.biomeGroups = MapStudioApp.#groupBiomesByPlacement(context.biomeList);
+        context.biomeGroups = MapStudio.#groupBiomesByPlacement(context.biomeList);
         context.layerGroups = this.#layerGroupsContext();
 
         // The fault types on offer depend on the map's terrain version (see
@@ -648,8 +660,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             .sort(alphaSort)
             .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Region));
 
-        if (partId === "context") {
-            context.toolPartial = `modules/filrodens-world-map-builder/templates/tools-${this.activeTool}.hbs`;
+        if (regionId === "context") {
+            context.toolPartial = `${TEMPLATE_ROOT}tools-${this.activeTool}.hbs`;
 
             context.massEditMode = { ...this.massEditMode };
             context.massEditCount = {
@@ -714,77 +726,162 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         return context;
     }
 
-    _onRender(context, options) {
-        super._onRender(context, options);
-        MapStudioApp.#applyRTLSupport(this.element);
+    /**
+     * Draws the studio into the host's element, once: a StudioView draws its regions there and
+     * redraws them in place from then on (see StudioView and #REGIONS). The first draw also sets up
+     * the canvas and generates the first map.
+     *
+     * @param {HTMLElement} root - The studio's frame (an empty element with the "fwmb-studio" class).
+     */
+    mount(root) {
+        if (this.root) throw new Error("MapStudio: already mounted");
+        this.root = root;
+        this.view = new StudioView({
+            root,
+            regions: MapStudio.#REGIONS,
+            renderTemplate: (path, context) => platform.templates.render(path, context),
+            buildContext: (regionId) => this.#buildRegionContext(regionId),
+            actions: MapStudio.ACTIONS,
+            controller: this,
+            afterRender: (regions) => this.#afterRegionsDrawn(regions),
+        });
+        this.#bindStudioListeners(root);
+        // Dialogues are drawn inside the studio while it is open
+        this.#detachDialogs = platform.dialogs.attach(root);
+        this.view.render();
+    }
 
-        this.#bindGlobalListeners();
-        this.#initCanvasAndEngines();
-        this.#bindToolbarListeners();
-        this.#bindContextPanelListeners();
+    /**
+     * What has to follow a redraw of any of the studio's regions, straight on the page rather than
+     * through the templates (see StudioView's afterRender).
+     *
+     * @param {string[]} regions - The regions just drawn.
+     */
+    #afterRegionsDrawn(regions) {
+        if (this.#shutDown) return;
+        if (regions.includes("map")) this.#onMapDrawn();
         this.#bindCollapsibleFieldsets();
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
         this.#updateHistoryButtons();
         this.#updateCanvasHint();
+    }
 
-        const mapContainer = this.element.querySelector(".fwmb-map-container");
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+    /**
+     * Sets up what lives in the map region, which is drawn once: the canvas and its engines, and the
+     * Undo/Redo buttons' preview of what they would change.
+     */
+    #onMapDrawn() {
+        this.#initCanvasAndEngines();
 
-        if (mapContainer && editToolbar && editToolbar.parentElement !== mapContainer) {
-            mapContainer.prepend(editToolbar);
+        for (const [action, direction] of [["undoBrush", "undo"], ["redoBrush", "redo"]]) {
+            const button = this.view.root.querySelector(`[data-action="${action}"]`);
+            button?.addEventListener("pointerenter", () => this.#previewActionBounds(direction));
+            button?.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
         }
     }
 
-    #bindGlobalListeners() {
-        // Range sliders' value displays and filled tracks are kept up to date module-wide, for
-        // this window and every dialogue alike, by the listeners registered in main.js (see
-        // RangeDisplay).
+    /**
+     * The studio's listeners, all on its root element so they keep working however its regions
+     * are redrawn (an element inside a region can be replaced by a redraw; the root never is).
+     *
+     * @param {HTMLElement} root
+     */
+    #bindStudioListeners(root) {
+        root.addEventListener("dblclick", (event) => this.#resetSliderToMapDefault(event));
+        root.addEventListener("keydown", (event) => this.#handleStudioKeydown(event));
+        root.addEventListener("input", (event) => this.#routeFieldEvent(event));
+        root.addEventListener("change", (event) => this.#routeFieldEvent(event));
+        root.addEventListener("pointerover", (event) => this.#togglePreviewFallback(event, true));
+        root.addEventListener("pointerout", (event) => this.#togglePreviewFallback(event, false));
+    }
 
-        if (!this.element.dataset.hasDblClickListener) {
-            this.element.addEventListener("dblclick", (event) => {
-                const target = event.target;
-                if (target.tagName === "INPUT" && target.type === "range") {
-                    const defaultVal = this.defaultUiState[target.name];
-                    if (defaultVal !== undefined && target.value !== String(defaultVal)) {
-                        target.value = defaultVal;
-                        // The input event refreshes the value display and filled track (see
-                        // RangeDisplay), and triggers regeneration as a drag would.
-                        target.dispatchEvent(new Event("input", { bubbles: true }));
-                    }
-                }
-            });
-            this.element.dataset.hasDblClickListener = "true";
+    /**
+     * A double-clicked slider in the studio's panels or toolbar returns to the map default for its
+     * setting. Range sliders' value displays and filled tracks follow through the input event (see
+     * StudioView and RangeDisplay), which also triggers regeneration as a drag would. Sliders in a
+     * dialogue are not map settings, so they are left alone.
+     */
+    #resetSliderToMapDefault(event) {
+        const target = event.target;
+        if (target.tagName !== "INPUT" || target.type !== "range" || target.closest("dialog")) return;
+
+        const defaultVal = this.defaultUiState[target.name];
+        if (defaultVal === undefined || target.value === String(defaultVal)) return;
+
+        target.value = defaultVal;
+        target.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    /**
+     * The studio's keyboard shortcuts (Ctrl/Cmd+Z undo, Ctrl/Cmd+Shift+Z and Ctrl/Cmd+Y redo),
+     * outside text fields.
+     *
+     * Tab is kept within the page's own handling: Foundry's keybindings listen on the window and
+     * act on Tab whenever focus is not in a text field (cycling through tokens on the canvas behind
+     * the window), cancelling the browser's move to the next control. Stopping the key here leaves
+     * Tab to move focus through the studio's controls as it does anywhere else.
+     */
+    #handleStudioKeydown(event) {
+        if (event.key === "Tab") {
+            event.stopPropagation();
+            return;
         }
 
-        // Universal Keyboard Shortcuts
-        if (!this.element.dataset.hasKeyboardListeners) {
-            this.element.addEventListener("keydown", (event) => {
-                // Ensure shortcuts only fire if the user is focused on this module app (bypassing text inputs)
-                const activeElement = document.activeElement;
-                const isInputFocused = activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA");
-                if (isInputFocused) return;
+        // Shortcuts only fire while the user is not typing into a field
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA");
+        if (isInputFocused) return;
 
-                const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+        const isCtrlOrCmd = event.ctrlKey || event.metaKey;
 
-                if (isCtrlOrCmd && event.key.toLowerCase() === "z") {
-                    event.preventDefault();
-                    if (event.shiftKey) {
-                        this._onRedoBrush();
-                    } else {
-                        this._onUndoBrush();
-                    }
-                } else if (isCtrlOrCmd && event.key.toLowerCase() === "y") {
-                    event.preventDefault();
-                    this._onRedoBrush();
-                }
-            });
-            this.element.dataset.hasKeyboardListeners = "true";
+        if (isCtrlOrCmd && event.key.toLowerCase() === "z") {
+            event.preventDefault();
+            if (event.shiftKey) {
+                this._onRedoBrush();
+            } else {
+                this._onUndoBrush();
+            }
+        } else if (isCtrlOrCmd && event.key.toLowerCase() === "y") {
+            event.preventDefault();
+            this._onRedoBrush();
         }
+    }
+
+    /**
+     * Sends a field's input or change event to the handler for the region it is in: the edit
+     * toolbar's brush settings, or the context panel's map settings. The reference image's file
+     * picker reports its new path with a change event of its own.
+     */
+    #routeFieldEvent(event) {
+        const target = event.target;
+        if (target.closest(".fwmb-edit-toolbar")) {
+            this.#handleToolbarInput(event);
+            return;
+        }
+        if (!target.closest(".fwmb-context-panel")) return;
+
+        if (event.type === "change" && target.matches('file-picker[name="referenceImage"]')) {
+            this.uiState.referenceImage = target.value;
+            this.#updateReferenceLayer();
+            return;
+        }
+        this.#handleContextPanelInput(event);
+    }
+
+    /**
+     * While the pointer is over the Biomes panel's fallback preview button, the canvas shows where
+     * the fallback biome would be used. The pointer moving between the button's own children is not
+     * leaving it.
+     */
+    #togglePreviewFallback(event, isOver) {
+        const button = event.target.closest?.("#fwmb-preview-fallback-btn");
+        if (!button || button.contains(event.relatedTarget)) return;
+        this.canvasEngine?.toggleLayer("biomeFallback", isOver);
     }
 
     #initCanvasAndEngines() {
-        const container = this.element.querySelector(".fwmb-map-preview");
+        const container = this.root.querySelector(".fwmb-map-preview");
         if (!container || this.canvasEngine) return;
 
         this.canvasEngine = new StudioCanvas(container);
@@ -825,69 +922,33 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const plan = this.#planCrop(cropBox);
 
         this.uiState.regionalTargetHeight = plan.targetHeight;
-        const heightInput = this.element.querySelector('input[name="regionalTargetHeight"]');
+        const heightInput = this.root.querySelector('input[name="regionalTargetHeight"]');
         if (heightInput) heightInput.value = plan.targetHeight;
 
         const latRange = Math.abs(this.uiState.latTop - this.uiState.latBottom);
         const newLatTop = this.uiState.latTop - (plan.cropBox.y / this.mapHeight) * latRange;
         const newLatBottom = this.uiState.latTop - ((plan.cropBox.y + plan.cropBox.height) / this.mapHeight) * latRange;
 
-        const latTopEl = this.element.querySelector("#fwmb-readout-lat-top");
-        const latBottomEl = this.element.querySelector("#fwmb-readout-lat-bottom");
+        const latTopEl = this.root.querySelector("#fwmb-readout-lat-top");
+        const latBottomEl = this.root.querySelector("#fwmb-readout-lat-bottom");
         if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;
         if (latBottomEl) latBottomEl.innerHTML = `${newLatBottom.toFixed(2)}&deg;`;
-    }
-
-    #bindToolbarListeners() {
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-        if (editToolbar && !editToolbar.dataset.hasListeners) {
-            editToolbar.dataset.hasListeners = "true";
-            editToolbar.addEventListener("input", (e) => this.#handleToolbarInput(e));
-            editToolbar.addEventListener("change", (e) => this.#handleToolbarInput(e));
-        }
-
-        if (!this.element.dataset.hasUndoListeners) {
-            this.element.dataset.hasUndoListeners = "true";
-
-            const undoBtn = this.element.querySelector('[data-action="undoBrush"]');
-            const redoBtn = this.element.querySelector('[data-action="redoBrush"]');
-
-            if (undoBtn) {
-                undoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("undo"));
-                undoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
-            }
-            if (redoBtn) {
-                redoBtn.addEventListener("pointerenter", () => this.#previewActionBounds("redo"));
-                redoBtn.addEventListener("pointerleave", () => this.canvasEngine?.clearActionPreview());
-            }
-        }
-
-        // Lives in tools-biomes.hbs, a per-tool-tab template part that gets torn down and
-        // rebuilt on context re-renders - unlike the persistent .fwmb-edit-toolbar above, a
-        // root-level "bind once ever" guard would go stale after the first rebuild. Guard on
-        // the button's own dataset instead, so each fresh DOM node gets bound exactly once.
-        const fallbackBtn = this.element.querySelector("#fwmb-preview-fallback-btn");
-        if (fallbackBtn && !fallbackBtn.dataset.hasListeners) {
-            fallbackBtn.dataset.hasListeners = "true";
-            fallbackBtn.addEventListener("pointerenter", () => this.canvasEngine?.toggleLayer("biomeFallback", true));
-            fallbackBtn.addEventListener("pointerleave", () => this.canvasEngine?.toggleLayer("biomeFallback", false));
-        }
     }
 
     /**
      * Keeps the Undo/Redo buttons' disabled state and step-count tooltip in sync with
      * globalHistoryLedger/globalRedoLedger. Deliberately DOM-only rather than routed through
-     * template context and a "map" part re-render: the PIXI canvas is mounted into
-     * .fwmb-map-preview once by #initCanvasAndEngines and never re-attached, so re-rendering
-     * the "map" part would rebuild that container from the template and orphan the canvas.
-     * Called from _onRender, which covers every render() call across the app (tool switches,
-     * vector edits via MapStateManager.pushVectorState, undo/redo itself), plus directly from
+     * template context and a redraw of the map region: the PIXI canvas is mounted into
+     * .fwmb-map-preview once by #initCanvasAndEngines and never re-attached, so the map region is
+     * drawn only once (see #REGIONS). Called after every redraw of the studio's regions (see
+     * #afterRegionsDrawn: tool switches, vector edits via MapStateManager.pushVectorState,
+     * undo/redo itself), plus directly from
      * #handleBrushEnd, since ending a paint/terrain stroke changes the ledger without
      * triggering a render of its own.
      */
     #updateHistoryButtons() {
-        const undoBtn = this.element.querySelector('[data-action="undoBrush"]');
-        const redoBtn = this.element.querySelector('[data-action="redoBrush"]');
+        const undoBtn = this.root.querySelector('[data-action="undoBrush"]');
+        const redoBtn = this.root.querySelector('[data-action="redoBrush"]');
 
         const undoCount = this.globalHistoryLedger?.length ?? 0;
         const redoCount = this.globalRedoLedger?.length ?? 0;
@@ -938,7 +999,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #syncFaultLiveEdits(name) {
         if (!["faultType", "faultThickness", "faultStrength", "faultStyle"].includes(name)) return;
         // The range style only shows while a range is chosen, so switching to or from one redraws the toolbar
-        if (name === "faultType") this.render({ parts: ["editToolbar"] });
+        if (name === "faultType") this.view?.render(["editToolbar"]);
         if (!this.activeFaultId) return;
 
         const fault = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
@@ -947,7 +1008,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         fault.type = this.uiState.faultType;
         fault.thickness = this.uiState.faultThickness;
         fault.strength = this.uiState.faultStrength;
-        MapStudioApp.#applyFeatureFields(fault, this.uiState);
+        MapStudio.#applyFeatureFields(fault, this.uiState);
 
         if (name === "faultType") {
             fault.color = TectonicFeatureEngine.colorOf(this.uiState.faultType);
@@ -991,7 +1052,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Fallback to custom if a manual property is changed
         if (["routeColor", "routeThickness", "routeStyle"].includes(name)) {
             this.uiState.activeRouteQuickStyle = "custom";
-            this.render({ parts: ["toolbar", "editToolbar"] });
+            this.view?.render(["toolbar", "editToolbar"]);
         }
 
         // Apply preset if dropdown is changed
@@ -1003,7 +1064,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.uiState.routeColor = styleData.color;
                     this.uiState.routeThickness = styleData.thickness;
                     this.uiState.routeStyle = styleData.style;
-                    this.render({ parts: ["toolbar", "editToolbar"] });
+                    this.view?.render(["toolbar", "editToolbar"]);
                 }
             }
         }
@@ -1025,7 +1086,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Fallback to custom if a manual property is changed
         if (["regionFillColor", "regionFillStyle", "regionLineColor", "regionLineThickness", "regionLineStyle"].includes(name)) {
             this.uiState.activeRegionQuickStyle = "custom";
-            this.render({ parts: ["toolbar", "editToolbar"] });
+            this.view?.render(["toolbar", "editToolbar"]);
         }
 
         // Apply preset if dropdown is changed
@@ -1040,7 +1101,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.uiState.regionLineThickness = styleData.lineThickness;
                     this.uiState.regionLineStyle = styleData.lineStyle;
                     this.uiState.regionSmoothing = styleData.smoothing;
-                    this.render({ parts: ["toolbar", "editToolbar"] });
+                    this.view?.render(["toolbar", "editToolbar"]);
                 }
             }
         }
@@ -1074,7 +1135,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * only ever reflects whatever the last-rendered context said), which would otherwise slam
      * it shut the moment any action inside it - a checkbox, Hide/Reveal all - triggers a
      * context re-render. Tracking `open` in JS and feeding it back through the render context
-     * (see `builtinPinIconsExpanded` and `collapsedSections` in _preparePartContext) keeps it as
+     * (see `builtinPinIconsExpanded` and `collapsedSections` in #buildRegionContext) keeps it as
      * the GM left it until they toggle it themselves. Assigning `ontoggle` and `onclick`
      * (rather than addEventListener) is deliberate: re-running this after every render always
      * replaces any previous handler, so the same element never ends up with duplicate listeners.
@@ -1083,16 +1144,16 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * data-section. They are open by default, so only the collapsed ones are remembered.
      */
     #bindCollapsibleFieldsets() {
-        const builtinIconsDetails = this.element.querySelector("#fwmb-builtin-pin-icons");
+        const builtinIconsDetails = this.root.querySelector("#fwmb-builtin-pin-icons");
         if (builtinIconsDetails) {
             builtinIconsDetails.ontoggle = () => {
                 this._builtinPinIconsExpanded = builtinIconsDetails.open;
             };
         }
 
-        for (const section of this.element.querySelectorAll("details[data-section]")) {
+        for (const section of this.root.querySelectorAll("details[data-section]")) {
             section.ontoggle = () => this.#rememberSectionState(section);
-            section.querySelector(":scope > summary").onclick = MapStudioApp.#keepSummaryControlsFromToggling;
+            section.querySelector(":scope > summary").onclick = MapStudio.#keepSummaryControlsFromToggling;
         }
     }
 
@@ -1114,25 +1175,6 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (event.target.closest("[data-action], button, a")) event.preventDefault();
     }
 
-    #bindContextPanelListeners() {
-        const contextPanel = this.element.querySelector(".fwmb-context-panel");
-        if (!contextPanel || contextPanel.dataset.hasNoiseListeners) return;
-
-        contextPanel.dataset.hasNoiseListeners = "true";
-
-        contextPanel.addEventListener("change", (event) => {
-            if (event.target.matches('file-picker[name="referenceImage"]')) {
-                this.uiState.referenceImage = event.target.value;
-                this.#updateReferenceLayer();
-                return; // Stop here for the file picker
-            }
-            // Route all other change events (like hitting Enter) to the handler
-            this.#handleContextPanelInput(event);
-        });
-
-        contextPanel.addEventListener("input", (e) => this.#handleContextPanelInput(e));
-    }
-
     #handleContextPanelInput(event) {
         const target = event.target;
 
@@ -1148,7 +1190,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // The resolution fields describe the next map Create New Map will build, not the open
         // map, so changing them neither marks the map unsaved nor regenerates anything
-        if (MapStudioApp.#NEW_MAP_SIZE_INPUTS.has(name)) return this.#recordNewMapSize(target, name);
+        if (MapStudio.#NEW_MAP_SIZE_INPUTS.has(name)) return this.#recordNewMapSize(target, name);
 
         // Skip marking dirty for temporary visual overlays
         if (!name.startsWith("reference")) this.markDirty();
@@ -1169,7 +1211,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (name === "contourInterval") return this.debouncedRepaintCanvas();
         // Relief strength and the water settings are terrain shader settings, so moving them
         // redraws without repainting
-        if (MapStudioApp.#TERRAIN_SHADER_INPUTS.has(name)) return this.#updateTerrainShaderInputs();
+        if (MapStudio.#TERRAIN_SHADER_INPUTS.has(name)) return this.#updateTerrainShaderInputs();
 
         // 2. Custom biome colour handler (uses dataset instead of name)
         if (target.type === "color" && target.dataset.biome) return this.#updateBiomeColor(target);
@@ -1276,7 +1318,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             this.canvasEngine.updateBrushCursor(x, y, this.uiState.brushSize, showCursor);
 
-            const readout = this.element.querySelector(".fwmb-canvas-readout");
+            const readout = this.root.querySelector(".fwmb-canvas-readout");
             if (!readout) return;
 
             if (x === null || y === null || x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight || !this.currentElevationData) {
@@ -1315,10 +1357,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             // make the same stored elevation display as a different percentage purely because the
             // map's extremes changed somewhere else - a point the user never touched could appear to
             // move. Do not add a clamp here.
-            this.element.querySelector("#fwmb-readout-elev").textContent = Math.round(elev * 100) + "%";
-            this.element.querySelector("#fwmb-readout-mois").textContent = Math.round(mois * 100) + "%";
-            this.element.querySelector("#fwmb-readout-temp").textContent = Math.round(temp * 100) + "%";
-            this.element.querySelector("#fwmb-readout-biome").textContent = this.#getBiomeDisplayName(lookupKey);
+            this.root.querySelector("#fwmb-readout-elev").textContent = Math.round(elev * 100) + "%";
+            this.root.querySelector("#fwmb-readout-mois").textContent = Math.round(mois * 100) + "%";
+            this.root.querySelector("#fwmb-readout-temp").textContent = Math.round(temp * 100) + "%";
+            this.root.querySelector("#fwmb-readout-biome").textContent = this.#getBiomeDisplayName(lookupKey);
         };
     }
 
@@ -1362,10 +1404,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.hasBooted) return;
 
         this.hasBooted = true;
-        const layerBtns = this.element.querySelectorAll('[data-action="toggleLayer"]');
+        const layerBtns = this.root.querySelectorAll('[data-action="toggleLayer"]');
         for (const btn of layerBtns) btn.classList.add("active");
 
-        const activeWindow = this.element.ownerDocument.defaultView || window;
+        const activeWindow = this.root.ownerDocument.defaultView || window;
         activeWindow.setTimeout(async () => {
             await this.generateTerrain();
             this.isDirty = false;
@@ -1374,31 +1416,48 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }, 50);
     }
 
-    async close(options) {
-        // A second close while the first is still asking about unsaved changes, or still
-        // closing, must not shut the window down twice
-        if (this.#closing) return;
+    /**
+     * Asks whether the studio may close, which asks about unsaved changes when there are any. The
+     * host calls this before closing, and closes only on true, then calls destroy(). Once it has
+     * answered true, any later call answers false, so a second close request while the first is
+     * still asking, or still closing, never shuts the studio down twice.
+     *
+     * @returns {Promise<boolean>}
+     */
+    async canClose() {
+        if (this.#closing) return false;
         this.#closing = true;
 
-        let canClose = false;
+        let allowed = false;
         try {
             // A save already under way decides whether there are unsaved changes left, so it is
             // allowed to finish before the user is asked about them
             if (this.#activeSave) await this.#activeSave;
-            canClose = await this.#gateUnsavedChanges();
+            allowed = await this.#gateUnsavedChanges();
         } finally {
-            if (!canClose) this.#closing = false;
+            if (!allowed) this.#closing = false;
         }
-        if (!canClose) return; // Abort closure entirely
+        return allowed;
+    }
 
+    /**
+     * Shuts the studio down as its host closes: stops its redraws, its dialogues and its canvas,
+     * and lets go of the root. Called once, after canClose() has answered true.
+     */
+    destroy() {
         this.#shutDown = true;
         this.#closeLayerMenu();
+        // A dialogue still open is dismissed, so whatever opened it carries on as if it were cancelled
+        this.#detachDialogs?.();
+        this.#detachDialogs = null;
+        // A redraw still queued would draw into a window that is going away
+        this.view?.destroy();
         if (this.canvasEngine) this.canvasEngine.destroy();
         if (this.scene3D) this.scene3D.destroy();
 
-        // The scratch buffer is recreated whenever it is needed, so it can go with the window
+        // The scratch buffer is recreated whenever it is needed, so it can go with the studio
         this.bufferScratch = null;
-        return super.close(options);
+        this.root = null;
     }
 
     /**
@@ -1439,7 +1498,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * changes all end in one, and whenever the pointer picks up or lets go of an item.
      */
     #updateCanvasHint() {
-        const element = this.element?.querySelector(".fwmb-map-hint");
+        const element = this.root?.querySelector(".fwmb-map-hint");
         if (!element) return;
 
         const context = CanvasHints.resolveContext({
@@ -1602,8 +1661,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (this.globalHistoryLedger.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
                 this.globalHistoryLedger.shift();
             }
-            // No render() follows a brush stroke ending (painting stays lightweight), so the
-            // Undo/Redo buttons need their own direct refresh here rather than waiting on _onRender.
+            // No redraw follows a brush stroke ending (painting stays lightweight), so the Undo/Redo
+            // buttons need their own direct refresh here rather than waiting for one.
             this.#updateHistoryButtons();
         }
 
@@ -1634,7 +1693,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #handleReferenceScale(factor) {
         this.uiState.referenceScale *= factor;
         this.uiState.referenceScale = Math.max(FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MIN, Math.min(this.uiState.referenceScale, FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_MAX));
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.#updateReferenceLayer();
     }
 
@@ -1691,7 +1750,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.proceduralSprings.splice(index, 1);
         this._repaintVectors();
         this.debouncedCanvasClimate();
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
         return true;
     }
@@ -1718,7 +1777,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // region's centre, so redrawing once on release brings it to the region's new centre.
         if (this.activeTool === "regions") this._repaintVectors();
 
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
 
         if (this.activeTool === "features" || this.activeTool === "scene") {
@@ -1749,7 +1808,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this._repaintVectors();
         if (match.triggersTerrain) this.requestTerrainUpdate();
 
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
     }
 
@@ -1843,7 +1902,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.debouncedCanvasClimate();
         }
 
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
     }
 
@@ -1951,7 +2010,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         polygons.splice(polygons.indexOf(polygon), 1);
 
         this._repaintVectors();
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     /**
@@ -2028,7 +2087,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             mask.points.push({ x, y });
             this.markDirty();
             this._repaintVectors();
-            this.render({ parts: ["context"] });
+            this.view?.render(["context"]);
         }
     }
 
@@ -2122,7 +2181,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.requestTerrainUpdate();
             this.markDirty();
         }
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     #handleFeatureClick(x, y) {
@@ -2172,7 +2231,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     color: TectonicFeatureEngine.colorOf(type),
                     visibility: "all",
                 };
-                MapStudioApp.#applyFeatureFields(fault, this.uiState);
+                MapStudio.#applyFeatureFields(fault, this.uiState);
                 this.tectonicFaults.push(fault);
             }
             activeEntity = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
@@ -2201,14 +2260,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.requestTerrainUpdate(SpatialMath.mergeBounds(oldBounds, newBounds));
         }
 
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
     }
 
     /** Every terrain layer, all on or all off. */
     static #allTerrainLayers(isOn) {
         const layers = {};
-        for (const group of Object.values(MapStudioApp.#TERRAIN_LAYER_GROUPS)) {
+        for (const group of Object.values(MapStudio.#TERRAIN_LAYER_GROUPS)) {
             for (const key of Object.keys(group.layers)) layers[key] = isOn;
         }
         return layers;
@@ -2247,7 +2306,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * @returns {"on"|"partial"|"off"}
      */
     #layerGroupState(groupId) {
-        const keys = Object.keys(MapStudioApp.#TERRAIN_LAYER_GROUPS[groupId].layers);
+        const keys = Object.keys(MapStudio.#TERRAIN_LAYER_GROUPS[groupId].layers);
         const onCount = keys.filter((key) => this.#terrainLayers[key]).length;
         if (onCount === keys.length) return "on";
         return onCount === 0 ? "off" : "partial";
@@ -2256,7 +2315,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /** The map controls' terrain layer groups, for map.hbs. */
     #layerGroupsContext() {
         const ariaChecked = { on: "true", partial: "mixed", off: "false" };
-        return Object.entries(MapStudioApp.#TERRAIN_LAYER_GROUPS).map(([id, group]) => {
+        return Object.entries(MapStudio.#TERRAIN_LAYER_GROUPS).map(([id, group]) => {
             const state = this.#layerGroupState(id);
             return {
                 id,
@@ -2274,9 +2333,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * #terrainLayers, in place, so an open list stays open while it is being ticked.
      */
     #refreshLayerGroupControls() {
-        if (!this.element) return;
+        if (!this.root) return;
         for (const group of this.#layerGroupsContext()) {
-            const container = this.element.querySelector(`.fwmb-layer-group[data-layer-group="${group.id}"]`);
+            const container = this.root.querySelector(`.fwmb-layer-group[data-layer-group="${group.id}"]`);
             if (!container) continue;
 
             const button = container.querySelector('[data-action="toggleLayerMenu"]');
@@ -2314,7 +2373,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         container.closest(".fwmb-map-controls")?.classList.add("fwmb-menu-open");
         this.#openLayerMenu = container;
 
-        const doc = this.element.ownerDocument;
+        const doc = this.root.ownerDocument;
         doc.addEventListener("pointerdown", this.#onPointerDownOutsideMenu, true);
         doc.addEventListener("keydown", this.#onMenuKeyDown, true);
         container.querySelector('[role="menuitemcheckbox"]')?.focus();
@@ -2352,7 +2411,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     /** Ticks or unticks a layer in a terrain layer list, or all of the group's layers ("all"). */
     _onToggleTerrainLayer(_event, target) {
         const layer = target.dataset.terrainLayer;
-        const group = MapStudioApp.#TERRAIN_LAYER_GROUPS[target.dataset.layerGroup];
+        const group = MapStudio.#TERRAIN_LAYER_GROUPS[target.dataset.layerGroup];
         if (!layer || !group) return;
 
         if (layer === "all") {
@@ -2494,7 +2553,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Copies the painted layers to the canvas and uploads them to the GPU (only `uploadBounds`,
      * or everything when it is null). The rule-coverage preview is kept current every repaint,
      * but its layer stays hidden until the "Preview Rule Coverage" button is hovered (see
-     * #bindToolbarListeners), so no visibility changes here.
+     * #togglePreviewFallback), so no visibility changes here.
      */
     #uploadLayers(uploadBounds, target, timer, mark) {
         let since = mark;
@@ -2877,7 +2936,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         MapStateManager.allocateBuffers(this);
         // Every terrain layer is on when a map opens (see #terrainLayers)
-        this.#setTerrainLayers(MapStudioApp.#allTerrainLayers(true));
+        this.#setTerrainLayers(MapStudio.#allTerrainLayers(true));
 
         this.brushEngine = this.#createBrushEngine();
 
@@ -3072,7 +3131,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.defaultUiState = platform.utils.deepClone(this.uiState);
 
-        this.render({ parts: ["toolbar", "context"] });
+        this.view?.render(["toolbar", "context"]);
         await this.generateTerrain();
         if (MeshIntegration.enabled) await MeshIntegration.finishLoad(this, this.#processingOverlay());
         this.#updateGrid();
@@ -3085,7 +3144,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             start: (message) => this.#startProcessing(message),
             end: () => this.#endProcessing(),
             text: (message) => {
-                const textEl = this.element?.querySelector(".fwmb-processing-text");
+                const textEl = this.root?.querySelector(".fwmb-processing-text");
                 if (textEl) textEl.textContent = message;
             },
         };
@@ -3144,7 +3203,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         this._repaintVectors();
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
     }
 
@@ -3168,7 +3227,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
 
         this._repaintVectors();
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
     }
 
@@ -3228,7 +3287,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         this._repaintVectors();
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
     }
 
@@ -3252,7 +3311,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.isDirty = false;
         }
 
-        const activeWindow = this.element.ownerDocument.defaultView || window;
+        const activeWindow = this.root.ownerDocument.defaultView || window;
         await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
 
         return true;
@@ -3267,7 +3326,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * from is left exactly as it was last saved, and later plain saves go to the new copy.
      *
      * Only one save runs at a time; asking again while one is under way does nothing and reports
-     * no save. The save under way is kept so that closing the window can wait for it.
+     * no save. The save under way is kept so that closing the studio can wait for it.
      *
      * @param {object} [options]
      * @param {boolean} [options.asNew=false] - Save as a new saved map ("Save as").
@@ -3364,7 +3423,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 this.isDirty = false; // Successfully saved, map is no longer dirty
                 platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
                 // A new saved map also belongs in the saved maps list, if it is showing
-                this.render({ parts: createsNewMap && this.activeTool === "manage" ? ["toolbar", "context"] : ["toolbar"] });
+                this.view?.render(createsNewMap && this.activeTool === "manage" ? ["toolbar", "context"] : ["toolbar"]);
                 return true;
             } else {
                 platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.SaveError"));
@@ -3382,9 +3441,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async #startProcessing(message) {
         this.processingTasks = (this.processingTasks || 0) + 1;
 
-        // A task already under way (a save, say) can reach here after the window has closed,
+        // A task already under way (a save, say) can reach here after the studio has closed,
         // when there is no overlay left to show
-        const overlay = this.element?.querySelector(".fwmb-processing-overlay");
+        const overlay = this.root?.querySelector(".fwmb-processing-overlay");
         if (overlay) {
             const textEl = overlay.querySelector(".fwmb-processing-text");
             if (textEl) textEl.textContent = message;
@@ -3394,7 +3453,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Give the browser the chance to paint the overlay before the main thread is locked: the
         // frame after next is when it has been painted. The wait is capped (see
         // OVERLAY_PAINT_WAIT_MAX_MS), since without frames it would never end.
-        const activeWindow = this.element?.ownerDocument.defaultView || window;
+        const activeWindow = this.root?.ownerDocument.defaultView || window;
         await new Promise((resolve) => {
             let settled = false;
             const finish = (painted) => {
@@ -3415,7 +3474,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.processingTasks = Math.max(0, (this.processingTasks || 0) - 1);
         if (this.processingTasks > 0) return;
 
-        const overlay = this.element?.querySelector(".fwmb-processing-overlay");
+        const overlay = this.root?.querySelector(".fwmb-processing-overlay");
         if (overlay) overlay.classList.add("fwmb-hidden");
     }
 
@@ -3435,7 +3494,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             generate();
         } else {
             this.hasPendingFeatureMath = true;
-            this.render({ parts: ["editToolbar"] });
+            this.view?.render(["editToolbar"]);
         }
     }
 
@@ -3466,7 +3525,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!this.hasPendingFeatureMath) return;
 
         this.hasPendingFeatureMath = false;
-        this.render({ parts: ["editToolbar"] });
+        this.view?.render(["editToolbar"]);
     }
 
     /**
@@ -3530,11 +3589,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * @returns {{bounds: object|null, label: string}|null} The changed entity's padded bounds and its label, or null when nothing differs.
      */
     #diffVectorSnapshots(current, target) {
-        const change = MapStudioApp.#firstChangedEntity(current, target);
+        const change = MapStudio.#firstChangedEntity(current, target);
         if (!change) return null;
 
         // Regions and routes on the display mesh have no points: their cells' bounds stand in
-        const points = MapStudioApp.#entityPoints(change.entity);
+        const points = MapStudio.#entityPoints(change.entity);
         return {
             bounds: this.#calculatePointBounds(points.length ? points : MeshIntegration.outlinePoints(this, change.entity), VECTOR_PREVIEW_PADDING),
             label: this.#getActionLabel(change.key, change.entity),
@@ -3552,8 +3611,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         for (const key of Object.keys(current)) {
             if (!Array.isArray(current[key]) || !Array.isArray(target[key])) continue;
 
-            const change = MapStudioApp.#firstChangedItem(current[key], target[key]);
-            if (change) return { key, entity: MapStudioApp.#narrowToRegion(change) };
+            const change = MapStudio.#firstChangedItem(current[key], target[key]);
+            if (change) return { key, entity: MapStudio.#narrowToRegion(change) };
         }
         return null;
     }
@@ -3569,8 +3628,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      *   The item to report and both versions of it (either may be missing), or null when the lists match.
      */
     static #firstChangedItem(currentItems, targetItems) {
-        const currentById = MapStudioApp.#itemsById(currentItems);
-        const targetById = MapStudioApp.#itemsById(targetItems);
+        const currentById = MapStudio.#itemsById(currentItems);
+        const targetById = MapStudio.#itemsById(targetItems);
 
         for (const [id, targetItem] of targetById) {
             const currentItem = currentById.get(id);
@@ -3598,7 +3657,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     static #narrowToRegion({ item, currentItem, targetItem }) {
         if (!targetItem || !Array.isArray(item.regions)) return item;
 
-        return MapStudioApp.#firstChangedItem(currentItem?.regions || [], targetItem.regions || [])?.item ?? item;
+        return MapStudio.#firstChangedItem(currentItem?.regions || [], targetItem.regions || [])?.item ?? item;
     }
 
     /** The points that outline a vector entity: its own points, its regions' points, or the entity itself when it is a single point. */
@@ -3701,7 +3760,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             action = sourceLedger?.pop();
         }
 
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
     }
 
@@ -3852,7 +3911,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         this.uiState["noise.elevation.scale"] = targetScale;
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
         this.debouncedGenerateTerrain();
     }
@@ -3899,7 +3958,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (target.name === "generationEngine") {
                 target.value = this.uiState.generationEngine;
             }
-            this.render({ parts: ["context"] });
+            this.view?.render(["context"]);
             return false;
         }
 
@@ -3912,7 +3971,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         MapStateManager.allocateBuffers(this);
         // A new map opens with every terrain layer on (see #terrainLayers)
-        this.#setTerrainLayers(MapStudioApp.#allTerrainLayers(true));
+        this.#setTerrainLayers(MapStudio.#allTerrainLayers(true));
 
         this.defaultUiState = MapStateManager.buildDefaultUiState(newWidth, newHeight);
         this.uiState = platform.utils.deepClone(this.defaultUiState);
@@ -3936,7 +3995,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.customBiomeColors[key] = rgb;
         });
 
-        this.render({ parts: ["toolbar", "context"] });
+        this.view?.render(["toolbar", "context"]);
 
         // 1. Reset all history and spatial arrays except for the land masks, which are preserved if switching to Guided Mode
         this.markDirty();
@@ -3996,7 +4055,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.canvasEngine.resetCamera();
 
         // 5. Force UI to update
-        this.render({ parts: ["toolbar", "context", "editToolbar"] });
+        this.view?.render(["toolbar", "context", "editToolbar"]);
         return true;
     }
 
@@ -4025,7 +4084,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // 4. Paint
         this._repaintVectors();
-        this.render({ parts: ["toolbar", "context", "editToolbar"] });
+        this.view?.render(["toolbar", "context", "editToolbar"]);
     }
 
     /**
@@ -4067,7 +4126,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * constant's comment for why this matters.
      */
     #isMassEditBlocked(type) {
-        const group = MapStudioApp.MASS_EDIT_EXCLUSIVE_GROUPS.find((siblings) => siblings.includes(type));
+        const group = MapStudio.MASS_EDIT_EXCLUSIVE_GROUPS.find((siblings) => siblings.includes(type));
         return !!group && group.some((sibling) => sibling !== type && this.massEditMode[sibling]);
     }
 
@@ -4081,11 +4140,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (this.canvasEngine.setCropMode) this.canvasEngine.setCropMode(false);
         }
 
-        await this.render({ parts: ["toolbar", "editToolbar", "context"] });
+        await this.view?.render(["toolbar", "editToolbar", "context"]);
     }
 
     #ensureToolLayerVisible(newTool) {
-        const terrainLayers = MapStudioApp.#TOOL_TERRAIN_LAYERS[newTool];
+        const terrainLayers = MapStudio.#TOOL_TERRAIN_LAYERS[newTool];
         if (terrainLayers) {
             this.#setTerrainLayers(Object.fromEntries(terrainLayers.map((key) => [key, true])));
             return;
@@ -4100,7 +4159,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const layerId = toolLayerMap[newTool];
         if (!layerId) return; // If the tool doesn't have an auto-layer, do nothing
 
-        const btn = this.element.querySelector(`[data-layer="${layerId}"]`);
+        const btn = this.root.querySelector(`[data-layer="${layerId}"]`);
         if (btn && !btn.classList.contains("active")) {
             btn.classList.add("active");
             this.canvasEngine?.toggleLayer(layerId, true);
@@ -4194,8 +4253,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.canvasEngine.stage.position.set(0, 0);
             this.canvasEngine.stage.scale.set(1, 1);
 
-            const activeWindow = this.element.ownerDocument.defaultView || window;
-            const textEl = this.element.querySelector(".fwmb-processing-text");
+            const activeWindow = this.root.ownerDocument.defaultView || window;
+            const textEl = this.root.querySelector(".fwmb-processing-text");
 
             // --- 1. PLAYER PASS ---
             if (textEl) textEl.textContent = "Extracting Player View...";
@@ -4328,7 +4387,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
                 }
 
-                this.render({ parts: ["toolbar", "context"] });
+                this.view?.render(["toolbar", "context"]);
             } catch (err) {
                 console.error("FWMB | Import Failed:", err);
                 platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ImportError"));
@@ -4346,7 +4405,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * client-side file save, no server round trip.
      */
     async _onExportSettings(_event, _target) {
-        const categories = MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key, labelKey }) => {
+        const categories = MapStudio.STYLE_LIBRARY_CATEGORIES.map(({ key, labelKey }) => {
             const count = (this.uiState[key] || []).length;
 
             return {
@@ -4366,7 +4425,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             classes: ["fwmb"],
             title: platform.i18n.localize("FILRODENSWMB.UI.ExportSettings"),
             content: content,
-            onSubmit: (form) => MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key }) => key).filter((key) => form.elements[key]?.checked),
+            onSubmit: (form) => MapStudio.STYLE_LIBRARY_CATEGORIES.map(({ key }) => key).filter((key) => form.elements[key]?.checked),
         });
 
         if (!selectedKeys) return; // User cancelled
@@ -4442,7 +4501,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 }
 
                 this.markDirty();
-                this.render({ parts: ["context"] });
+                this.view?.render(["context"]);
 
                 // Unlike Route/Region/Label quick styles - which only affect the map once a user
                 // explicitly selects one to paint or create something new with - an imported custom
@@ -4505,7 +4564,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         let duplicateCount = 0;
         let customBiomesImported = false;
 
-        for (const { key } of MapStudioApp.STYLE_LIBRARY_CATEGORIES) {
+        for (const { key } of MapStudio.STYLE_LIBRARY_CATEGORIES) {
             const entries = categories[key];
             if (!Array.isArray(entries) || entries.length === 0) continue;
 
@@ -4588,7 +4647,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId));
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
 
-            this.render({ parts: ["toolbar", "context"] });
+            this.view?.render(["toolbar", "context"]);
             // A map migrated or given a new mesh as it opened has changes to save
             this.isDirty = MeshIntegration.changedOnLoad(this);
 
@@ -4607,7 +4666,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.terrainUpgrade = await this.#assessTerrainUpgrade();
         if (!this.terrainUpgrade) return;
 
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         if (this.uiState.terrainUpgradeDismissed) return;
 
         const choice = await MapDialogManager.promptTerrainUpgrade(this.terrainUpgrade, true);
@@ -4640,7 +4699,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.terrainUpgrade = null;
 
         await TerrainUpgrade.apply(this, plan);
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApplied"));
     }
 
@@ -4660,7 +4719,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         await platform.store.deleteSavedMap(mapId);
         if (this.currentSaveId === mapId) this.currentSaveId = null;
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     async #handleMapRename(mapId, card) {
@@ -4676,13 +4735,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                     this.currentSaveId = updatedDoc.id;
                 }
             }
-            this.render({ parts: ["context"] });
+            this.view?.render(["context"]);
         }
     }
 
     async #handleMapDuplicate(mapId) {
         await platform.store.duplicateSavedMap(mapId);
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     async #handleMapPromote(mapId, card) {
@@ -4702,7 +4761,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             await platform.store.saveMapData(newName, exportData, null, { owners: await platform.store.loadMapOwners(mapId) });
 
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.PromoteSuccess") || "Standalone map created successfully.");
-            this.render({ parts: ["context"] });
+            this.view?.render(["context"]);
         }
     }
 
@@ -4762,7 +4821,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState["noise.offsetX"] += dx;
         this.uiState["noise.offsetY"] += dy;
 
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
         this.debouncedGenerateTerrain();
     }
@@ -4778,7 +4837,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     async _onRandomizeSeed(_event, _target) {
         this.uiState.mapSeed = this.#generateRandomSeed();
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     /**
@@ -4800,20 +4859,20 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     _onRemoveReferenceImage(_event, _target) {
         this.uiState.referenceImage = "";
         this.#updateReferenceLayer();
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     _onResetNoisePan(_event, _target) {
         this.uiState["noise.offsetX"] = this.defaultUiState["noise.offsetX"];
         this.uiState["noise.offsetY"] = this.defaultUiState["noise.offsetY"];
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
         this.debouncedGenerateTerrain();
     }
 
     _onResetNoiseScale(_event, _target) {
         this.uiState["noise.elevation.scale"] = this.defaultUiState["noise.elevation.scale"];
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
         this.markDirty();
         this.debouncedGenerateTerrain();
     }
@@ -4849,7 +4908,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const id = target.closest(".fwmb-accordion-group").dataset.layerId;
         this._finishActiveRegion();
         this.activeRegionLayerId = id;
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     /**
@@ -4868,7 +4927,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this.uiState.brushBiome = this.uiState.lastPaintBiome ?? FILRODENSWMB.BIOME_IDS.GRASSLAND;
         }
 
-        this.render({ parts: ["toolbar", "editToolbar"] });
+        this.view?.render(["toolbar", "editToolbar"]);
     }
 
     /**
@@ -4890,13 +4949,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         this.uiState.brushBiome = biome;
-        this.render({ parts: ["toolbar", "editToolbar"] });
+        this.view?.render(["toolbar", "editToolbar"]);
     }
 
     _onSetFeatureMode(event, target) {
         this.uiState.activeFeatureMode = target.dataset.mode;
         this.activeFaultId = null; // Ends the current fault line natively
-        this.render({ parts: ["toolbar", "editToolbar"] });
+        this.view?.render(["toolbar", "editToolbar"]);
     }
 
     /**
@@ -4905,7 +4964,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     _onSetInfraMode(event, target) {
         this.uiState.activeInfraMode = target.dataset.mode;
         this.activeRouteId = null;
-        this.render({ parts: ["toolbar", "editToolbar"] });
+        this.view?.render(["toolbar", "editToolbar"]);
     }
 
     _onSetInfrastructureIcon(event, target) {
@@ -4915,7 +4974,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.activeInfraMode = "pin";
         this.activeRouteId = null;
 
-        this.render({ parts: ["toolbar", "editToolbar"] });
+        this.view?.render(["toolbar", "editToolbar"]);
     }
 
     _onSetRegionMode(event, target) {
@@ -4950,7 +5009,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
 
         this._repaintVectors();
-        this.render({ parts: ["toolbar", "context", "editToolbar"] });
+        this.view?.render(["toolbar", "context", "editToolbar"]);
     }
 
     _onSetRegionPreset(event, target) {
@@ -4959,7 +5018,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.uiState[targetProperty] = color;
         this.uiState.activeRegionQuickStyle = "custom";
-        this.render({ parts: ["toolbar", "editToolbar"] });
+        this.view?.render(["toolbar", "editToolbar"]);
 
         if (this.activeRegionId && this.activeRegionLayerId) {
             const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
@@ -4995,14 +5054,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // mode, never while land masks are being drawn
         this.canvasEngine?.setCropMode?.(this.uiState.isEditMode && this.activeTool === "scene" && this.#isCropToolSelected());
 
-        this.render({ parts: ["toolbar", "editToolbar"] });
+        this.view?.render(["toolbar", "editToolbar"]);
     }
 
     /**
      * Toggles the interactive 3D topography visualisation.
      */
     async _onThreeDView(_event, _target) {
-        const overlay = this.element.querySelector("#fwmb-3d-overlay");
+        const overlay = this.root.querySelector("#fwmb-3d-overlay");
 
         if (!overlay || !this.currentElevationData) return;
 
@@ -5014,13 +5073,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             overlay.classList.add("fwmb-hidden");
 
             // Query the button safely to remove the active state
-            const btn = this.element.querySelector('[data-action="threeDView"]');
+            const btn = this.root.querySelector('[data-action="threeDView"]');
             if (btn) btn.classList.remove("active");
 
             // Restore the manual layout wrappers
-            const mapControls = this.element.querySelector(".fwmb-map-controls");
-            const contextPanel = this.element.querySelector(".fwmb-context-panel");
-            const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
+            const mapControls = this.root.querySelector(".fwmb-map-controls");
+            const contextPanel = this.root.querySelector(".fwmb-context-panel");
+            const editToolbar = this.root.querySelector(".fwmb-edit-toolbar");
 
             if (mapControls) mapControls.classList.remove("fwmb-hidden");
             if (contextPanel) contextPanel.style.display = "";
@@ -5038,10 +5097,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         await this.#deactivateEditMode();
 
         // 3. Setup 3D overlay UI
-        const mapControls = this.element.querySelector(".fwmb-map-controls");
-        const contextPanel = this.element.querySelector(".fwmb-context-panel");
-        const editToolbar = this.element.querySelector(".fwmb-edit-toolbar");
-        const freshTarget = this.element.querySelector('[data-action="threeDView"]');
+        const mapControls = this.root.querySelector(".fwmb-map-controls");
+        const contextPanel = this.root.querySelector(".fwmb-context-panel");
+        const editToolbar = this.root.querySelector(".fwmb-edit-toolbar");
+        const freshTarget = this.root.querySelector('[data-action="threeDView"]');
 
         overlay.classList.remove("fwmb-hidden");
         if (freshTarget) freshTarget.classList.add("active");
@@ -5070,7 +5129,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     _onToggleEditMode(_event, _target) {
-        const toolbar = this.element.querySelector(".fwmb-edit-toolbar");
+        const toolbar = this.root.querySelector(".fwmb-edit-toolbar");
         if (!toolbar) return;
 
         const isActivating = !this.uiState.isEditMode;
@@ -5109,7 +5168,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this._repaintVectors();
         }
 
-        this.render({ parts: ["context", "toolbar", "editToolbar"] });
+        this.view?.render(["context", "toolbar", "editToolbar"]);
     }
 
     _onToggleGrid(event, target) {
@@ -5159,7 +5218,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.uiState.liveFeatureUpdates && this.hasPendingFeatureMath) {
             this.generateTerrain();
         }
-        this.render({ parts: ["editToolbar"] });
+        this.view?.render(["editToolbar"]);
     }
 
     _onTogglePinDropdown(event, target) {
@@ -5243,7 +5302,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.massEditMode[type] = !this.massEditMode[type];
         if (!this.massEditMode[type]) this.massEditSelection[type].clear();
 
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     /**
@@ -5262,7 +5321,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (target.checked) selection.add(id);
         else selection.delete(id);
 
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     _onMassEditSelectAll(event, target) {
@@ -5271,7 +5330,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!selection) return;
 
         this._getMassEditableIds(type).forEach((id) => selection.add(id));
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     _onMassEditSelectNone(event, target) {
@@ -5280,7 +5339,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!selection) return;
 
         selection.clear();
-        this.render({ parts: ["context"] });
+        this.view?.render(["context"]);
     }
 
     _onToggleVisibility(event, target) {
@@ -5289,7 +5348,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (modified) {
             this._repaintVectors();
-            this.render({ parts: ["context"] });
+            this.view?.render(["context"]);
             this.markDirty();
         }
     }

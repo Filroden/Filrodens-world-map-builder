@@ -1,4 +1,4 @@
-import { MapStudioApp } from "../applications/MapStudioApp.js";
+import { MapStudioWindow } from "../platform/foundry/MapStudioWindow.js";
 
 export function registerSidebarInjection() {
     Hooks.on("renderSceneDirectory", injectSidebarButton);
@@ -45,7 +45,6 @@ function createMapBuilderButton() {
 
 function handleMapBuilderButtonClick(event) {
     event.preventDefault();
-    // Instantiate our new standalone Map Studio Application
-    const app = new MapStudioApp({});
-    app.render({ force: true });
+    // Opens the map studio in a window of its own
+    new MapStudioWindow().render({ force: true });
 }

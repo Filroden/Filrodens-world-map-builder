@@ -2,7 +2,6 @@ import { FILRODENSWMB } from "./src/config.js";
 import { registerSidebarInjection } from "./src/hooks/sidebar-injection.js";
 import { initializeCompendium } from "./src/platform/foundry/store.js";
 import { registerPinIconSettings } from "./src/data/pinIcons.js";
-import { RangeDisplay } from "./src/tools/RangeDisplay.js";
 
 Hooks.once("init", async () => {
     game.filrodenswmb = {
@@ -91,35 +90,6 @@ Hooks.once("init", async () => {
         },
         { capture: true, passive: true },
     );
-
-    // Keep every FWMB range slider's value display and filled track in step with the slider,
-    // in the studio window and in every dialogue, however the slider was drawn (see RangeDisplay).
-    // Moving a slider updates it as it moves; drawing or redrawing a window sets every track's
-    // fill from the values the template wrote.
-    document.addEventListener(
-        "input",
-        (event) => {
-            const target = event.target;
-            if (target instanceof HTMLInputElement && target.type === "range" && target.closest(".fwmb")) RangeDisplay.sync(target);
-        },
-        { passive: true },
-    );
-    // A slider carrying data-default (such as a dialogue's Rotation or Scale) returns to that
-    // value on double-click, in any FWMB window or dialogue. The studio window resets its toolbar
-    // and panel sliders to the map defaults itself; those sliders carry no data-default, so the two
-    // never act on the same slider.
-    document.addEventListener("dblclick", (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLInputElement) || target.type !== "range" || !target.closest(".fwmb")) return;
-        if (target.dataset.default === undefined || target.value === target.dataset.default) return;
-
-        target.value = target.dataset.default;
-        // The input event refreshes the value display and filled track (see RangeDisplay)
-        target.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    Hooks.on("renderApplicationV2", (_application, element) => {
-        if (element?.classList?.contains("fwmb")) RangeDisplay.syncAllFills(element);
-    });
 
     registerSidebarInjection();
 });

@@ -3192,7 +3192,7 @@ export class ProceduralEngine {
      * there is one, otherwise the bed's or the land's), which is what the hover readout and the
      * grid data export report. `isFallback` is true when `visible` came from the built-in
      * default - a hand-painted override or a matching custom rule both count as "covered". This
-     * is what the "Preview Rule Coverage" highlight (MapStudioApp's hover button, see
+     * is what the "Preview Rule Coverage" highlight (MapStudio's hover button, see
      * createBiomesMap's optional `outFallbackBuffer` below) tints: exactly the pixels a GM's
      * custom rule set doesn't reach. The returned object is reused (see #lookup).
      */
@@ -3269,7 +3269,7 @@ export class ProceduralEngine {
      * FILRODENSWMB.DISPLAY.FALLBACK_HIGHLIGHT_COLOR/ALPHA where resolveBiomeLookup's `isFallback`
      * came back true (no override, no custom rule - the built-in default did the work), fully
      * transparent everywhere else. This is a free byproduct of the same per-pixel loop below, not
-     * a second pass - see MapStudioApp's "Preview Rule Coverage" hover button, which just
+     * a second pass - see MapStudio's "Preview Rule Coverage" hover button, which just
      * toggles this buffer's own canvas layer visible/hidden rather than recomputing anything.
      * Left `null` (the default) for callers that don't need the preview - the 3D view
      * generation, for one - and costs nothing extra when omitted beyond the one `if` check.

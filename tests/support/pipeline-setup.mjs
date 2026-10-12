@@ -1,4 +1,4 @@
-// Builds a MapStudioApp stand-in for a saved map, as app-pipeline.mjs does, for investigation scripts.
+// Builds a MapStudio stand-in for a saved map, as app-pipeline.mjs does, for investigation scripts.
 const { FILRODENSWMB } = await import("../../src/config.js");
 const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
 const { ProceduralOrchestrator } = await import("../../src/ProceduralOrchestrator.js");

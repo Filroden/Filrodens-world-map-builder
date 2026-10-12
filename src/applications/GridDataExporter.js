@@ -25,7 +25,7 @@ export class GridDataExporter {
     static #GRIDLESS_TYPE = "none";
 
     /**
-     * @param {MapStudioApp} app - the live Studio application, read for its generated buffers
+     * @param {MapStudio} app - the live Studio application, read for its generated buffers
      * (`currentElevationData` etc.), vector entities (`regionLayers`, `mapPins`, `mapRoutes`,
      * `manualRivers`) and `uiState`.
      * @returns {object|null} The full `gridData` payload, or `null` for a gridless map - there is

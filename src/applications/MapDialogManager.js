@@ -54,9 +54,9 @@ export class MapDialogManager {
             title: platform.i18n.localize("FILRODENSWMB.UI.Warning"),
             content: `<p>${platform.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
             buttons: [
-                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
                 { action: "discard", label: platform.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
                 { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
             ],
             dismissed: "cancel",
         });
@@ -80,8 +80,8 @@ export class MapDialogManager {
             title: platform.i18n.localize(title),
             content: `<p>${platform.i18n.localize(message)}</p>`,
             buttons: [
-                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
                 { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
             ],
             dismissed: "cancel",
         });
@@ -127,17 +127,17 @@ export class MapDialogManager {
             content,
             buttons: [
                 {
+                    action: "keep",
+                    label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateKeep"),
+                    icon: "fwmb-icon cancel",
+                    callback: (form) => ({ apply: false, dismiss: readDismiss(form) }),
+                },
+                {
                     action: "apply",
                     label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApply"),
                     icon: "fwmb-icon sync",
                     default: true,
                     callback: () => ({ apply: true, dismiss: false }),
-                },
-                {
-                    action: "keep",
-                    label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateKeep"),
-                    icon: "fwmb-icon cancel",
-                    callback: (form) => ({ apply: false, dismiss: readDismiss(form) }),
                 },
             ],
             dismissed: { apply: false, dismiss: false },
@@ -310,7 +310,7 @@ export class MapDialogManager {
             if (repaintCanvas) app._repaintCanvas();
             else app._repaintVectors();
             if (triggersTerrain) app.requestTerrainUpdate();
-            app.render({ parts: renderParts });
+            app.view?.render(renderParts);
             app.markDirty();
         }
     }
@@ -844,7 +844,7 @@ export class MapDialogManager {
         if (!result) return;
 
         await addCustomPinIcon(result);
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
     }
 
     static async onToggleBuiltinPinIcon(app, event, target) {
@@ -852,17 +852,17 @@ export class MapDialogManager {
         if (!key) return;
 
         await setBuiltinPinIconDisabled(key, target.checked);
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
     }
 
     static async onHideAllBuiltinPinIcons(app, _event, _target) {
         await setAllBuiltinPinIconsDisabled(true);
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
     }
 
     static async onRevealAllBuiltinPinIcons(app, _event, _target) {
         await setAllBuiltinPinIconsDisabled(false);
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
     }
 
     static async onAddDecoration(app, _event, _target) {
@@ -903,7 +903,7 @@ export class MapDialogManager {
             });
 
             app._repaintVectors();
-            app.render({ parts: ["context"] });
+            app.view?.render(["context"]);
             app.markDirty();
         }
     }
@@ -933,7 +933,7 @@ export class MapDialogManager {
         const id = platform.utils.randomID();
         app.regionLayers.push({ id: id, name: `Region Layer ${app.regionLayers.length + 1}`, visibility: "all", regions: [] });
         app.activeRegionLayerId = id;
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
     }
 
     // --- DELETE ACTIONS ---
@@ -967,11 +967,11 @@ export class MapDialogManager {
 
         if (Number(app.uiState.brushBiome) === id) {
             app.uiState.brushBiome = FILRODENSWMB.BIOME_IDS.GRASSLAND;
-            app.render({ parts: ["toolbar"] });
+            app.view?.render(["toolbar"]);
         }
 
         app._repaintCanvas();
-        app.render({ parts: ["toolbar", "context"] });
+        app.view?.render(["toolbar", "context"]);
         app.markDirty();
     }
 
@@ -1002,7 +1002,7 @@ export class MapDialogManager {
             app.markDirty();
         }
 
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
     }
 
     static async onDeleteEntity(app, event, target) {
@@ -1030,7 +1030,7 @@ export class MapDialogManager {
         app._repaintVectors();
         if (config.triggersTerrain) app.requestTerrainUpdate(null, app.debouncedGenerateTerrain);
 
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
         app.markDirty();
     }
 
@@ -1050,7 +1050,7 @@ export class MapDialogManager {
 
         app._repaintVectors();
         app.requestTerrainUpdate();
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
         app.markDirty();
     }
 
@@ -1078,7 +1078,7 @@ export class MapDialogManager {
 
         app._repaintVectors();
         app.requestTerrainUpdate();
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
         app.markDirty();
     }
 
@@ -1099,11 +1099,11 @@ export class MapDialogManager {
 
         if (app.uiState[config.activeStateKey] === id) {
             app.uiState[config.activeStateKey] = "custom";
-            app.render({ parts: ["toolbar", "context"] });
+            app.view?.render(["toolbar", "context"]);
         }
 
         app.markDirty();
-        app.render({ parts: ["context", "toolbar"] });
+        app.view?.render(["context", "toolbar"]);
     }
 
     static async onDeleteRegion(app, event, target) {
@@ -1122,7 +1122,7 @@ export class MapDialogManager {
         if (app.activeRegionId === regionId) app.activeRegionId = null;
 
         app._repaintVectors();
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
         app.markDirty();
     }
 
@@ -1220,7 +1220,7 @@ export class MapDialogManager {
 
         app.massEditMode[type] = false;
         app.massEditSelection[type].clear();
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
     }
 
     // --- EDIT ACTIONS ---
@@ -1280,7 +1280,7 @@ export class MapDialogManager {
                     app.uiState.faultThickness = entity.thickness;
                     app.uiState.faultStrength = entity.strength;
                     if (entity.style) app.uiState.faultStyle = entity.style;
-                    app.render({ parts: ["editToolbar"] });
+                    app.view?.render(["editToolbar"]);
                 }
             },
             triggersTerrain: true,
@@ -1432,7 +1432,7 @@ export class MapDialogManager {
         if (!result) return;
 
         await updateCustomPinIcon(id, result);
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
     }
 
     static async onEditPin(app, event, target, explicitId = null) {
@@ -1610,7 +1610,7 @@ export class MapDialogManager {
         const newName = await this._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.EditLayer"), "Layer Name", layer.name);
         if (newName) {
             layer.name = newName;
-            app.render({ parts: ["context"] });
+            app.view?.render(["context"]);
             app.markDirty();
         }
     }
@@ -1631,7 +1631,7 @@ export class MapDialogManager {
             onSave: (entity, result) => {
                 if (app.activeRiverId === id) {
                     app.uiState.riverWidth = result.width;
-                    app.render({ parts: ["toolbar"] });
+                    app.view?.render(["toolbar"]);
                 }
             },
             triggersTerrain: true,
@@ -1733,7 +1733,7 @@ export class MapDialogManager {
                     app.uiState.routeColor = result.color;
                     app.uiState.routeThickness = result.thickness;
                     app.uiState.routeStyle = result.style;
-                    app.render({ parts: ["toolbar"] });
+                    app.view?.render(["toolbar"]);
                 }
             },
         });

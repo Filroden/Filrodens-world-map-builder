@@ -22,7 +22,7 @@ export class ProceduralOrchestrator {
      * background workers (see GenerationWorkers); it must be awaited, since the brush history is
      * replayed onto the base terrain only once that is complete.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @returns {Promise<void>}
      */
     static async processTopographyPhase(app) {
@@ -61,7 +61,7 @@ export class ProceduralOrchestrator {
      * entered, and, in guided mode only, the land masks, which are the only vector shapes the base
      * terrain is built from.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @returns {string} A string that differs between two states exactly when their inputs differ.
      */
     static describeGenerationInputs(app) {
@@ -92,7 +92,7 @@ export class ProceduralOrchestrator {
      * Records that a full generation has just finished, so that a later refresh can tell whether
      * the base terrain it produced is still what the current settings would produce.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @param {string} inputs - The description taken when that generation started.
      */
     static rememberGenerationInputs(app, inputs) {
@@ -120,7 +120,7 @@ export class ProceduralOrchestrator {
      * if a generation never finished or the buffers were replaced, so any doubt means a full
      * generation.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @returns {boolean} True if only a refresh of what actually changed is needed.
      */
     static canSkipBaseRegeneration(app) {
@@ -152,7 +152,7 @@ export class ProceduralOrchestrator {
      * (see BrushLayerCache.reset): all of it on a Flat map created with textured ground, none on
      * any other map, whose own detail is its texture.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @returns {number}
      */
     static getBaseRoughness(app) {
@@ -174,7 +174,7 @@ export class ProceduralOrchestrator {
      * The buffer covers the whole map, but only the tiles asked for so far hold the texture;
      * callers must only read pixels inside the bounds they asked for.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @param {object|null} [bounds] - The pixels needed (inclusive), or null for the whole map.
      * @returns {Float32Array|null} The texture, or null if the browser had no memory for it, in
      *   which case the brushes that paint it leave the ground as it is.
@@ -218,7 +218,7 @@ export class ProceduralOrchestrator {
      * replay that reaches the area finds its tiles ready instead of working each out on the main
      * thread as its first stamp arrives. Does nothing when the work would not be shared.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @param {object|null} area - The pixels needed (inclusive), or null for none.
      * @returns {Promise<void>}
      */
@@ -431,7 +431,7 @@ export class ProceduralOrchestrator {
      * replayed from the base terrain, which is the slow part, only when it cannot be trusted: on a
      * full generation (the base terrain may have changed), or after something invalidated it.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @param {ProceduralEngine|null} engine - Engine to take the noise source from; created if omitted.
      * @param {object|null} params - Derived map parameters; derived from the UI state if omitted.
      * @param {object|null} bounds - Restricts the rebuild to a rectangle; null rebuilds the whole map.
@@ -487,7 +487,7 @@ export class ProceduralOrchestrator {
      * it have not been updated yet. If the rebuild leaves such a pixel as it already was, it is
      * not reported as changed, so the caller must add the area painted live to the result.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @param {ProceduralEngine|null} engine - Engine to take the noise source from; created if omitted.
      * @param {object|null} params - Derived map parameters; derived from the UI state if omitted.
      * @returns {{minX: number, maxX: number, minY: number, maxY: number}|null} Box around every
@@ -764,7 +764,7 @@ export class ProceduralOrchestrator {
      * ProceduralEngine.getWindDistance), so an elevation change alters the moisture of pixels up
      * to that distance to its left and right, and those pixels have to be recomputed too.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @param {object|null} bounds - Area whose elevation changed, or null for the whole map.
      * @returns {Promise<object|null>} The area the climate was actually recomputed over, which is where
      *   moisture and temperature may have changed; null when the whole map was recomputed.
@@ -828,7 +828,7 @@ export class ProceduralOrchestrator {
      * area it asks for the water changes to be tracked, and gets back where the water differs from
      * before so the repaint can include it.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @param {boolean} trackWaterChanges - Whether to report where the water changed.
      * @returns {object|null} Box around every pixel whose water depth changed, or null if
      *   none did or tracking was not requested. If tracking was requested but the browser had no
@@ -949,7 +949,7 @@ export class ProceduralOrchestrator {
      * across a pool but not across a lake (see RiverNetwork.rasterise). Anything else repaints
      * the whole image.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @param {object} params - The map's derived parameters.
      * @param {object|null} previousNetwork - The network drawn before this refresh, if any.
      * @param {boolean} isTracked - Whether this refresh is limited to an area (see processFeaturePhase).

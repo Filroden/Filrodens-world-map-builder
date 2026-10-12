@@ -29,7 +29,8 @@
  * - `templates`: `render(path, context)` resolving to an HTML string; templates are named by
  *   their Foundry path ("modules/filrodens-world-map-builder/templates/...").
  * - `fonts`: `list()`, the font family names offered for labels.
- * - `dialogs`: `confirm`, `prompt` and `choose` (see foundry/dialogs.js for the options).
+ * - `dialogs`: `confirm`, `prompt` and `choose`, and `attach(element)` for where they are drawn
+ *   (see src/ui/dialogs.js for the options; every host can use createOverlayDialogs from there).
  * - `settings`: `register(key, config)`, `get(key)`, `set(key, value)` for the module's settings.
  * - `store`: the saved maps (see foundry/store.js for the methods and what they return).
  * - `assets`: `url(path)`, a stored asset path as a URL that resolves the same from any page or

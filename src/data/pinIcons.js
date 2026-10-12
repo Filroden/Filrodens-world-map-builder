@@ -251,8 +251,9 @@ export async function setAllBuiltinPinIconsDisabled(isDisabled) {
 }
 
 /**
- * Scans every saved map in the world compendium, plus the pins of a currently open (and
- * possibly unsaved) Studio session, for pins using the given icon key.
+ * Scans every saved map, plus the pins of a currently open (and possibly unsaved) Studio session,
+ * for pins using the given icon key. Saved maps keep their pins under `mapPins`, the name the
+ * Studio saves them by.
  * @param {string} key - The icon key to search for.
  * @param {Array} livePins - The currently open session's `app.mapPins`, or [] if none.
  * @returns {Promise<{savedMaps: Array<{id: string, name: string, count: number}>, liveCount: number, totalCount: number}>}
@@ -261,7 +262,7 @@ export async function findPinIconUsage(key, livePins = []) {
     const savedMaps = [];
 
     for (const { id, name, mapData } of await platform.store.listMapData()) {
-        const pins = mapData?.pins || [];
+        const pins = mapData?.mapPins || [];
         const count = pins.filter((pin) => pin.icon === key).length;
         if (count > 0) savedMaps.push({ id, name, count });
     }
@@ -283,11 +284,11 @@ export async function revertPinIconUsage(key, livePins = []) {
     const fallback = FILRODENSWMB.PIN_ICONS.DEFAULT;
 
     for (const { id, mapData } of await platform.store.listMapData()) {
-        const pins = mapData?.pins;
+        const pins = mapData?.mapPins;
         if (!pins?.some((pin) => pin.icon === key)) continue;
 
         const revertedPins = pins.map((pin) => (pin.icon === key ? { ...pin, icon: fallback } : pin));
-        await platform.store.updateMapDataFields(id, { pins: revertedPins });
+        await platform.store.updateMapDataFields(id, { mapPins: revertedPins });
     }
 
     for (const pin of livePins) {

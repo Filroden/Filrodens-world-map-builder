@@ -7,7 +7,7 @@ import { platform } from "../platform/index.js";
 export class MapStateManager {
     /**
      * Allocates the memory buffers required for procedural generation.
-     * @param {Object} app - The MapStudioApp instance.
+     * @param {Object} app - The MapStudio instance.
      */
     static allocateBuffers(app) {
         const totalPixels = app.mapWidth * app.mapHeight;
@@ -31,7 +31,7 @@ export class MapStateManager {
         app.bufferUnderwaterBiomes = new Uint8Array(totalPixels * 4);
         app.bufferTerrainAux = new Uint8Array(totalPixels * 4);
         app.bufferContours = new Uint8Array(totalPixels * 4);
-        // Kept in sync alongside the biome buffers on every biome repaint (see MapStudioApp's
+        // Kept in sync alongside the biome buffers on every biome repaint (see MapStudio's
         // _repaintCanvas/#applyBrushStroke), but its own canvas layer stays hidden until the
         // "Preview Rule Coverage" button is hovered - see ProceduralEngine.createBiomesMap's
         // outFallbackBuffer parameter for what actually gets written into it.
@@ -239,7 +239,7 @@ export class MapStateManager {
      * Generates a deep-cloned snapshot of the current vector state.
      *
      * Custom Biomes (`uiState.customBiomes` - name/code/colour/rules) are included here too,
-     * even though they're `uiState` rather than a `MapStudioApp` vector array like the rest of
+     * even though they're `uiState` rather than a `MapStudio` vector array like the rest of
      * this snapshot - every biome-add/edit/delete action calls `pushVectorState` before
      * applying its change (see MapDialogManager), which only works if a biome change is part of
      * what gets undone. Leaving `customBiomes` out would make Ctrl+Z after renaming, recolouring
@@ -310,9 +310,9 @@ export class MapStateManager {
      * Syncs the active UI state from the DOM, then gets derived map parameters.
      */
     static getMapParameters(app) {
-        // After the window has closed (a save still under way, say) there are no inputs to read,
+        // After the studio has closed (a save still under way, say) there are no inputs to read,
         // and the state already holds every value they last showed
-        const element = app.element;
+        const element = app.root;
         for (const key of element ? Object.keys(app.uiState) : []) {
             const input = element.querySelector(`[name="${key}"]`);
             if (!input) continue;

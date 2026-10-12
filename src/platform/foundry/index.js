@@ -5,7 +5,7 @@
  * importing it on another host (or in a Node test that stubs only some globals) is harmless.
  */
 import { FILRODENSWMB } from "../../config.js";
-import * as dialogs from "./dialogs.js";
+import { createOverlayDialogs } from "../../ui/dialogs.js";
 import * as store from "./store.js";
 
 /** Offered when Foundry's font list is not available yet. */
@@ -19,6 +19,9 @@ const i18n = {
         return game?.i18n?.lang || "en";
     },
 };
+
+/** The studio's dialogues are drawn inside the studio, the same in Foundry as on any other host. */
+const dialogs = createOverlayDialogs({ localize: (key) => i18n.localize(key) });
 
 const notify = {
     info: (text, options) => ui.notifications.info(text, options),
@@ -53,9 +56,10 @@ const settings = {
 const assets = {
     /**
      * A stored asset path made root-relative (with any route prefix Foundry is configured with),
-     * so it resolves the same from any page or stylesheet. Absolute URLs are returned unchanged.
+     * so it resolves the same from any page or stylesheet. Complete URLs (http, https, and the data
+     * URLs a map made in the web version holds for its images) are returned unchanged.
      */
-    url: (path) => (!path || /^https?:\/\//i.test(path) ? path : foundry.utils.getRoute(path)),
+    url: (path) => (!path || /^(?:https?|data|blob):/i.test(path) ? path : foundry.utils.getRoute(path)),
 };
 
 const moduleInfo = {

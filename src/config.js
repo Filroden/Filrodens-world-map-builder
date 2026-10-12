@@ -435,7 +435,7 @@ export const FILRODENSWMB = {
         // Every hint names the thing it acts on (a pin, the crop area, the whole region), so each
         // reads on its own. COMMON is shown ahead of every context except a held item, whose own
         // list replaces the whole hint while the pointer holds it. Keep these lists in step with
-        // the pointer and wheel handling in StudioCanvas and the tool click handlers in MapStudioApp.
+        // the pointer and wheel handling in StudioCanvas and the tool click handlers in MapStudio.
         CANVAS_HINTS: {
             COMMON: ["Pan", "Zoom"],
             CONTEXTS: {
@@ -852,7 +852,7 @@ export const FILRODENSWMB = {
         // ProceduralEngine.resolveBiomeLookup already treats any override <= 0 as "no override,
         // compute the biome normally" (its `overrideId > 0` check); this just gives that existing
         // sentinel a name instead of a bare literal 0. Deliberately excluded from
-        // MapStudioApp's context.biomeList, since it's offered as its own toolbar icon rather
+        // MapStudio's context.biomeList, since it's offered as its own toolbar icon rather
         // than a dropdown option.
         ERASER: 0,
         DEEP_OCEAN: 1,

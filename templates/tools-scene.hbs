@@ -1,4 +1,4 @@
-<div class="fwmb-tool-content fwmb-scrollable">
+<div class="fwmb-tool-content fwmb-scrollable fwmb-fixed-lists">
 
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.CanvasSettings"}}</legend>
@@ -131,8 +131,6 @@
             <i class="fwmb-icon delete"></i> {{localize "FILRODENSWMB.UI.DeleteAllLandMasksTitle"}}
         </button>
     {{/if}}
-
-    <div class="fwmb-flex-1"></div>
 
     {{#if (eq uiState.generationEngine "guided")}}
         <!-- Rendered inside the Canvas Settings fieldset above -->

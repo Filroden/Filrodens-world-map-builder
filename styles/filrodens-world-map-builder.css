@@ -1003,11 +1003,24 @@
 }
 
 /* Only the list sections stretch to share the panel's height. Settings fieldsets (Cartography's
-   Scale and Border) keep their natural height, so they are never squashed into each other. */
+   Scale and Border) keep their natural height, so they are never squashed into each other.
+   A list section grows no taller than its own content: a short or empty list stays compact and
+   leaves the space to the others (or empty at the foot of the panel), instead of stretching to
+   an equal share, or to the whole panel when every other list is collapsed. Long lists still
+   share the height and each scrolls within its share. */
 .fwmb .fwmb-fixed-lists details.fwmb-fieldset {
     flex: 1;
     min-height: 5rem;
+    max-height: max-content;
     margin: 0;
+}
+
+/* The divider above a panel's edit button keeps it at the foot of the panel. The auto margin takes
+   only the height the lists leave unused (it never competes with them for it, as a spacer would),
+   and the padding keeps the line clear of the list above when there is none left over. */
+.fwmb .fwmb-fixed-lists > .fwmb-divider {
+    margin-block-start: auto;
+    padding-block-start: var(--fwmb-size-10);
 }
 
 /* --- COLLAPSIBLE LIST SECTIONS ---
@@ -1134,6 +1147,19 @@
     flex-direction: row;
     overflow: hidden;
     height: 100%;
+}
+
+/* The studio's frame, inside the window's content: its regions (toolbar, context panel, map) sit
+   side by side in it. It has to claim the whole window, or it shrinks to the width of its
+   content. It is positioned so that anything placed over the studio is placed against it. */
+.fwmb .fwmb-studio {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    position: relative;
 }
 
 /* 1. The Toolbar Part */
@@ -1834,7 +1860,7 @@ input.fwmb-swatch {
 }
 
 /* Greys out and disables a Mass Edit "Select" toggle when a sibling type sharing the same
-   panel already has Select mode active (see MapStudioApp.MASS_EDIT_EXCLUSIVE_GROUPS) - only
+   panel already has Select mode active (see MapStudio.MASS_EDIT_EXCLUSIVE_GROUPS) - only
    one type in a shared panel can be mass-edited at a time, so it stays unambiguous which list
    an eventual Mass Edit applies to. */
 .fwmb-legend-action.disabled {
@@ -2355,6 +2381,145 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     max-width: 40rem;
 }
 
+/* --- DIALOGUES (OVERLAYS) --- */
+/* Dialogues are <dialog> elements drawn inside the studio's frame (see Overlay), not windows of
+   their own: "modal" ones are centred over a scrim that covers the studio, "docked" ones sit along
+   its end edge with the studio still usable. Both stack above the panels and menus (z-index 100)
+   and below the processing overlay. */
+.fwmb-overlay-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 500;
+}
+
+.fwmb .fwmb-overlay {
+    position: absolute;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-medium);
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-primary);
+    box-shadow: var(--fwmb-shadow-window);
+    z-index: 510;
+    display: flex;
+    flex-direction: column;
+    max-width: calc(100% - 2rem);
+    max-height: calc(100% - 2rem);
+    overflow: hidden;
+}
+
+/* A <dialog> is display:none until it is opened; the rule above must not show a closed one */
+.fwmb .fwmb-overlay:not([open]) {
+    display: none;
+}
+
+/* Modal: centred by auto margins (rather than a transform), so a resized dialogue stays centred
+   and its corner follows the pointer */
+.fwmb .fwmb-overlay-modal {
+    inset: 0;
+    margin: auto;
+    width: 25rem;
+    height: fit-content;
+}
+
+/* Moved or resized: placed by its offset in the studio (left and top, set as it moves) */
+.fwmb .fwmb-overlay-modal.fwmb-overlay-placed {
+    inset: auto;
+    margin: 0;
+}
+
+/* Docked: a panel along the end edge, the full height of the studio less a margin */
+.fwmb .fwmb-overlay-docked {
+    inset-block: 1rem;
+    inset-inline: auto 1rem;
+    width: 22rem;
+    height: auto;
+    max-height: none;
+}
+
+.fwmb .fwmb-overlay-resizable {
+    resize: both;
+    min-width: 20rem;
+    min-height: 12rem;
+}
+
+.fwmb .fwmb-overlay-header {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-size-8);
+    flex: none;
+    padding: var(--fwmb-size-4) var(--fwmb-size-4) var(--fwmb-size-4) var(--fwmb-size-12);
+    background: var(--fwmb-main-900);
+    color: var(--fwmb-main-100);
+}
+
+/* A modal dialogue is moved by dragging its header */
+.fwmb .fwmb-overlay-modal .fwmb-overlay-header {
+    cursor: move;
+    user-select: none;
+    touch-action: none;
+}
+
+.fwmb .fwmb-overlay-header h2 {
+    flex: 1;
+    margin: 0;
+    font-family: inherit;
+    font-size: var(--fwmb-size-14);
+    font-weight: bold;
+    line-height: var(--fwmb-line-height-heading);
+    color: inherit;
+    border: none;
+}
+
+.fwmb button.fwmb-overlay-close {
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.fwmb button.fwmb-overlay-close:hover {
+    background: var(--fwmb-main-700);
+    color: var(--fwmb-main-100);
+}
+
+.fwmb button.fwmb-overlay-close:focus-visible {
+    outline: 2px solid var(--fwmb-main-100);
+    outline-offset: -2px;
+}
+
+.fwmb .fwmb-overlay-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    padding: var(--fwmb-size-12) var(--fwmb-size-16);
+    overflow-x: hidden;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-size-8);
+}
+
+.fwmb .fwmb-overlay-footer {
+    display: flex;
+    flex: none;
+    gap: var(--fwmb-size-8);
+    padding: var(--fwmb-size-8) var(--fwmb-size-16) var(--fwmb-size-12);
+}
+
+.fwmb .fwmb-overlay-footer[hidden] {
+    display: none;
+}
+
+.fwmb .fwmb-overlay-footer .fwmb-btn {
+    flex: 1;
+}
+
 /* --- PROCESSING OVERLAY --- */
 .fwmb-processing-overlay {
     position: absolute;
@@ -2393,13 +2558,11 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
    BIOME RULE EDITOR
 =================================================================== */
 
-.fwmb-rule-editor-dialog {
+.fwmb .fwmb-overlay.fwmb-rule-editor-dialog {
     width: 65rem;
 }
 
-.fwmb-rule-editor-dialog .window-content,
-.fwmb-rule-editor-dialog form.dialog-form,
-.fwmb-rule-editor-dialog .dialog-content.standard-form {
+.fwmb-rule-editor-dialog .fwmb-overlay-body {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
@@ -2412,7 +2575,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     flex-direction: column;
     gap: var(--fwmb-size-10);
     /* min-height:0 is required for a flex child to shrink below its content size and
-       actually scroll instead of overflowing its now-bounded .dialog-content parent above. */
+       actually scroll instead of overflowing its bounded .fwmb-overlay-body parent above. */
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;

@@ -1,6 +1,7 @@
 // The Foundry implementation of the platform services: each one passes calls on to the Foundry API
 // in the shape the module used before the services existed, so moving a call site onto a service
-// changes nothing in Foundry. Foundry's classes are replaced by recorders here.
+// changes nothing in Foundry. Foundry's classes are replaced by recorders here. The dialogues are
+// shared by every host and tested with the studio's UI (tests/ui/dialogs.test.mjs).
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -15,64 +16,12 @@ test("loading the platform touches no Foundry global", () => {
     assert.equal(result.stdout.trim(), "i18n,notify,utils,templates,fonts,dialogs,settings,store,assets,module,grid,scene");
 });
 
-/** Records every DialogV2 call and resolves with whatever `respond(kind, options)` returns. */
-function stubDialogs(respond) {
-    const calls = [];
-    const record = (kind) => async (options) => {
-        calls.push({ kind, options });
-        return respond(kind, options);
-    };
-    globalThis.foundry = { ...globalThis.foundry, applications: { api: { DialogV2: { confirm: record("confirm"), prompt: record("prompt"), wait: record("wait") } } } };
-    return calls;
-}
-
 const { platform } = await import("../../src/platform/index.js");
 
-test("confirm keeps the title, content and the always-resolve behaviour", async () => {
-    const calls = stubDialogs(() => true);
-    assert.equal(await platform.dialogs.confirm({ title: "Delete?", content: "<p>Sure?</p>" }), true);
-    assert.deepEqual(calls[0].options, { window: { title: "Delete?" }, content: "<p>Sure?</p>", rejectClose: false, modal: true });
-});
-
-test("prompt reads its result from the form of the pressed button and runs onRender with the element", async () => {
-    const form = { elements: { name: { value: "Harbour" } } };
-    const element = { id: "dialog-element" };
-    let rendered = null;
-    const calls = stubDialogs((_kind, options) => {
-        options.render({ target: { element } });
-        return options.ok.callback({}, { form });
-    });
-    const result = await platform.dialogs.prompt({
-        title: "Edit",
-        content: "<form></form>",
-        classes: ["fwmb"],
-        onRender: (html) => (rendered = html),
-        onSubmit: (submitted) => submitted.elements.name.value,
-    });
-    assert.equal(result, "Harbour");
-    assert.equal(rendered, element);
-    assert.deepEqual(calls[0].options.classes, ["fwmb"]);
-    assert.deepEqual(calls[0].options.window, { title: "Edit" });
-});
-
-test("choose passes buttons through, hands callbacks the form, and resolves `dismissed` on close", async () => {
-    const form = { elements: { dismissUpgrade: { checked: true } } };
-    const calls = stubDialogs((_kind, options) => options);
-    const options = await platform.dialogs.choose({
-        title: "Update?",
-        content: "",
-        icon: "fwmb-icon tune",
-        resizable: true,
-        buttons: [
-            { action: "apply", label: "Apply", default: true },
-            { action: "keep", label: "Keep", callback: (submitted) => submitted.elements.dismissUpgrade.checked },
-        ],
-        dismissed: "cancel",
-    });
-    assert.deepEqual(calls[0].options.window, { title: "Update?", icon: "fwmb-icon tune", resizable: true });
-    assert.deepEqual(options.buttons[0], { action: "apply", label: "Apply", default: true });
-    assert.equal(options.buttons[1].callback({}, { form }), true);
-    assert.equal(options.close(), "cancel");
+test("dialogues are the shared overlay service and need an element to be drawn in", async () => {
+    assert.equal(typeof platform.dialogs.attach, "function");
+    // With nothing attached there is nowhere to draw: the call fails rather than hanging
+    await assert.rejects(platform.dialogs.confirm({ title: "Delete?", content: "<p>Sure?</p>" }), /none is attached/);
 });
 
 test("settings are namespaced to the module", () => {
@@ -92,6 +41,7 @@ test("asset URLs route relative paths through Foundry and leave absolute ones al
     globalThis.foundry = { ...globalThis.foundry, utils: { getRoute: (path) => `/prefix/${path}` } };
     assert.equal(platform.assets.url("icons/a.svg"), "/prefix/icons/a.svg");
     assert.equal(platform.assets.url("https://cdn.example/a.svg"), "https://cdn.example/a.svg");
+    assert.equal(platform.assets.url("data:image/svg+xml;base64,AAAA"), "data:image/svg+xml;base64,AAAA");
     assert.equal(platform.assets.url(""), "");
 });
 

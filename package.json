@@ -3,18 +3,21 @@
   "type": "module",
   "scripts": {
     "pack": "node scripts/pack.mjs",
+    "pack:web": "node scripts/pack.mjs --web",
+    "serve:web": "node scripts/serve-web.mjs",
     "foundry-id": "node scripts/foundry-id.mjs",
     "fixtures": "node tests/mesh/fixtures/build-p0jbva.mjs",
     "pretest": "node tests/mesh/fixtures/build-p0jbva.mjs --if-missing",
     "test": "node --test \"tests/**/*.test.mjs\"",
-    "lint": "eslint main.js src tests scripts"
+    "lint": "eslint main.js src tests scripts web"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@foundryvtt/foundryvtt-cli": "3.0.0",
     "eslint": "^10.12.0",
     "globals": "^17.13.0",
-    "handlebars": "^4.7.8"
+    "handlebars": "^4.7.8",
+    "happy-dom": "^20.14.6"
   },
   "dependencies": {
     "pixi.js": "^7.4.2",
