@@ -11,7 +11,7 @@ copyFiles(
   './dist',
   ['js', 'json', 'css', 'hbs', 'svg', 'md', 'html'],
   [],
-  ['dist', 'node_modules', '.git', '.github', 'scripts', 'tests'],
+  ['dist', 'node_modules', '.git', '.github', 'scripts', 'tests', 'design', 'wiki'],
   ['package.json', 'package-lock.json', 'GEMINI.md', '.DS_Store', '.gitignore', '.gitattributes']
 )  
 .then(() => {

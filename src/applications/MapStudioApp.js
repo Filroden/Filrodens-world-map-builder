@@ -2135,7 +2135,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         MapStateManager.pushVectorState(this);
         const finalPos = { x, y };
-        let activeEntity = null;
+        let activeEntity;
 
         if (this.uiState.activeFeatureMode === "spring") {
             this.mapPins.push({
@@ -5289,13 +5289,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _onToggleVisibility(event, target) {
         const targetType = target.dataset.target; // "layer", "feature", or "label"
-        let modified = false;
-
-        if (targetType === "layer") {
-            modified = this.#toggleLayerVisibility(target);
-        } else {
-            modified = this.#toggleEntityVisibility(target, targetType);
-        }
+        const modified = targetType === "layer" ? this.#toggleLayerVisibility(target) : this.#toggleEntityVisibility(target, targetType);
 
         if (modified) {
             this._repaintVectors();

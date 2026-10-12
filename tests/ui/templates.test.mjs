@@ -1,8 +1,9 @@
-// Every Handlebars template compiles with only the helpers the module provides or registers, and
-// every partial it names exists. Foundry registers its own helpers (localize among them) in the
-// studio window, but the web host has to register them itself, so a template that quietly relied
-// on a Foundry-only helper would compile in Foundry and fail on the web. Compiling here with
-// knownHelpersOnly turns that into a build-time failure.
+// Every Handlebars template compiles, calls only helpers the module knows about, and names only
+// partials that exist. Foundry registers its own helpers (localize, eq, or, numberFormat among
+// them) in the studio window, but the web host has to register them itself, so a template that
+// quietly relied on another Foundry helper would work in Foundry and fail on the web. Handlebars
+// only reports a missing helper when the template is rendered, so the helper calls are read from
+// the parsed template instead and checked against the list below.
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -16,12 +17,32 @@ const TEMPLATES = join(ROOT, "templates");
 const FOUNDRY_PREFIX = "modules/filrodens-world-map-builder/templates/";
 
 /**
- * Helpers a template may call with arguments. Handlebars' own block helpers are always known;
- * these are the ones the module relies on beyond them (Foundry provides localize in the studio
- * window; the web host registers its own). Add a helper here when the module starts registering
+ * Helpers the templates may call. Handlebars' own (if, unless, each, with, lookup, log) are always
+ * there; the rest are Foundry's, which the studio window gets for free and the web host must
+ * register itself (see the thin-frame plan). Add a helper here when the module starts registering
  * it on both hosts.
  */
-const KNOWN_HELPERS = { localize: true };
+const KNOWN_HELPERS = new Set(["if", "unless", "each", "with", "lookup", "log", "localize", "eq", "or", "numberFormat"]);
+
+/**
+ * The names of every helper a template calls: any mustache, block or subexpression with
+ * parameters or a hash (a bare `{{name}}` is a context lookup and is left alone).
+ *
+ * @param {object} node - A node of the parsed template.
+ * @param {Set<string>} found - Collects the helper names.
+ */
+function collectHelpers(node, found) {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+        for (const child of node) collectHelpers(child, found);
+        return;
+    }
+    const isCall = ["MustacheStatement", "BlockStatement", "SubExpression", "PartialStatement"].includes(node.type);
+    if (isCall && node.type !== "PartialStatement" && (node.params?.length || node.hash?.pairs?.length) && node.path?.type === "PathExpression") {
+        found.add(node.path.original);
+    }
+    for (const [key, value] of Object.entries(node)) if (key !== "loc" && key !== "path") collectHelpers(value, found);
+}
 
 /** Every .hbs file under templates/, as paths relative to the templates folder with / separators. */
 function listTemplates(dir = TEMPLATES) {
@@ -41,9 +62,14 @@ test("there are templates to check", () => {
 });
 
 for (const path of templates) {
-    test(`${path} compiles with the module's helpers only`, () => {
+    test(`${path} compiles and calls only known helpers`, () => {
         const source = readFileSync(join(TEMPLATES, path), "utf8");
-        assert.doesNotThrow(() => Handlebars.compile(source, { knownHelpers: KNOWN_HELPERS, knownHelpersOnly: true, strict: false }));
+        const ast = Handlebars.parse(source);
+        assert.doesNotThrow(() => Handlebars.compile(ast));
+        const helpers = new Set();
+        collectHelpers(ast.body, helpers);
+        const unknown = [...helpers].filter((name) => !KNOWN_HELPERS.has(name));
+        assert.deepEqual(unknown, [], `helpers not registered on both hosts: ${unknown.join(", ")}`);
     });
 }
 

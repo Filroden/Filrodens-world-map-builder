@@ -39,6 +39,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      # Fails on errors only; warnings are reported in the log
+      - name: Lint
+        run: npm run lint
+
       # Builds the P0JBVA terrain rasters (derived data, about 8 s) then runs every test under tests/
       - name: Run tests
         run: npm test
