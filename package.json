@@ -3,10 +3,14 @@
   "type": "module",
   "scripts": {
     "pack": "node scripts/pack.mjs",
-    "foundry-id": "node scripts/foundry-id.mjs"
+    "foundry-id": "node scripts/foundry-id.mjs",
+    "fixtures": "node tests/mesh/fixtures/build-p0jbva.mjs",
+    "pretest": "node tests/mesh/fixtures/build-p0jbva.mjs --if-missing",
+    "test": "node --test \"tests/**/*.test.mjs\""
   },
   "devDependencies": {
-    "@foundryvtt/foundryvtt-cli": "3.0.0"
+    "@foundryvtt/foundryvtt-cli": "3.0.0",
+    "handlebars": "^4.7.8"
   },
   "dependencies": {
     "pixi.js": "^7.4.2",
@@ -16,5 +20,8 @@
     "pixi.js@7.4.2": true,
     "playwright@1.64.0": true,
     "classic-level@1.4.1": true
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

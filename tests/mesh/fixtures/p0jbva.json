@@ -1,0 +1,679 @@
+{
+  "seed": "P0JBVA",
+  "generationEngine": "guided",
+  "springsBaked": true,
+  "mapWidth": 2000,
+  "mapHeight": 1600,
+  "gridType": "square",
+  "gridSize": 50,
+  "gridVisible": true,
+  "params": {
+    "seaLevel": 0.35,
+    "tectonicPlates": 10,
+    "coastlineFracture": 0.1,
+    "continentalGrouping": 0.4,
+    "shelfRange": 0.2,
+    "continentScale": 400,
+    "globalTemp": 0.5,
+    "seasonOffset": 0,
+    "latTop": 60,
+    "latBottom": -60,
+    "globalMoisture": 0.5,
+    "riverDensity": 40,
+    "noise": {
+      "offsetX": 0,
+      "offsetY": 0,
+      "moistureOffset": 10000,
+      "tempOffset": 20000,
+      "elevation": {
+        "scale": 0.002,
+        "octaves": 8,
+        "stretch": 1.75
+      },
+      "moisture": {
+        "scale": 0.001,
+        "octaves": 3
+      },
+      "temperature": {
+        "scale": 0.001,
+        "octaves": 2
+      }
+    },
+    "hydrology": {
+      "maxLakeSize": 8000,
+      "springAltOffset": 0.25,
+      "springMoistMin": 0.45,
+      "meanderJitter": 0,
+      "riverMeander": 1,
+      "riverWidthScale": 1
+    },
+    "climate": {
+      "altCooling": 0.4,
+      "freezingThreshold": 0.2,
+      "windDistance": 40
+    },
+    "biomePalette": {
+      "0": [
+        0,
+        0,
+        0
+      ],
+      "1": [
+        26,
+        75,
+        132
+      ],
+      "2": [
+        46,
+        117,
+        182
+      ],
+      "3": [
+        240,
+        240,
+        240
+      ],
+      "4": [
+        149,
+        163,
+        164
+      ],
+      "5": [
+        77,
+        107,
+        83
+      ],
+      "6": [
+        141,
+        163,
+        104
+      ],
+      "7": [
+        58,
+        122,
+        70
+      ],
+      "8": [
+        41,
+        92,
+        53
+      ],
+      "9": [
+        194,
+        178,
+        128
+      ],
+      "10": [
+        23,
+        66,
+        32
+      ],
+      "11": [
+        196,
+        186,
+        114
+      ],
+      "12": [
+        214,
+        198,
+        137
+      ],
+      "13": [
+        225,
+        235,
+        240
+      ],
+      "DEEP_OCEAN": [
+        26,
+        75,
+        132
+      ],
+      "SHALLOW_OCEAN": [
+        46,
+        117,
+        182
+      ],
+      "SNOW": [
+        240,
+        240,
+        240
+      ],
+      "TUNDRA": [
+        149,
+        163,
+        164
+      ],
+      "TAIGA": [
+        77,
+        107,
+        83
+      ],
+      "GRASSLAND": [
+        141,
+        163,
+        104
+      ],
+      "DECIDUOUS_FOREST": [
+        58,
+        122,
+        70
+      ],
+      "TEMPERATE_RAINFOREST": [
+        41,
+        92,
+        53
+      ],
+      "TEMPERATE_DESERT": [
+        194,
+        178,
+        128
+      ],
+      "TROPICAL_RAINFOREST": [
+        23,
+        66,
+        32
+      ],
+      "SAVANNA": [
+        196,
+        186,
+        114
+      ],
+      "SUBTROPICAL_DESERT": [
+        214,
+        198,
+        137
+      ],
+      "PACK_ICE": [
+        225,
+        235,
+        240
+      ],
+      "ERASER": [
+        0,
+        0,
+        0
+      ]
+    },
+    "customColors": {
+      "DEEP_OCEAN": [
+        26,
+        75,
+        132
+      ],
+      "SHALLOW_OCEAN": [
+        46,
+        117,
+        182
+      ],
+      "PACK_ICE": [
+        225,
+        235,
+        240
+      ],
+      "SNOW": [
+        240,
+        240,
+        240
+      ],
+      "TUNDRA": [
+        149,
+        163,
+        164
+      ],
+      "TAIGA": [
+        77,
+        107,
+        83
+      ],
+      "GRASSLAND": [
+        141,
+        163,
+        104
+      ],
+      "DECIDUOUS_FOREST": [
+        58,
+        122,
+        70
+      ],
+      "TEMPERATE_RAINFOREST": [
+        41,
+        92,
+        53
+      ],
+      "TEMPERATE_DESERT": [
+        194,
+        178,
+        128
+      ],
+      "TROPICAL_RAINFOREST": [
+        23,
+        66,
+        32
+      ],
+      "SAVANNA": [
+        196,
+        186,
+        114
+      ],
+      "SUBTROPICAL_DESERT": [
+        214,
+        198,
+        137
+      ]
+    },
+    "display": {
+      "contourInterval": 0.1,
+      "biomeAlphaActive": 0.85,
+      "biomeAlphaInactive": 0.65,
+      "reliefShading": 0.5,
+      "seabedRelief": 0.75,
+      "waterClarity": 1,
+      "waterHue": 210,
+      "waterSaturation": 1,
+      "regionOpacity": 0.5
+    },
+    "cartography": {
+      "scaleEnable": false,
+      "scaleUnits": "Miles",
+      "scaleInterval": 100,
+      "scaleValue": 1,
+      "scaleMajorTicks": 4,
+      "scaleMinorTicks": 4,
+      "scaleX": 50,
+      "scaleY": 1550,
+      "borderEnable": false,
+      "borderStyle": "solid",
+      "borderColor": "#000000"
+    },
+    "solidOverWater": {},
+    "customBiomeRules": {
+      "rowCount": 0,
+      "rowBiomeId": {},
+      "rowElevStart": {},
+      "rowElevCount": {},
+      "rowMoistStart": {},
+      "rowMoistCount": {},
+      "rowTempStart": {},
+      "rowTempCount": {},
+      "elevSegments": {},
+      "moistSegments": {},
+      "tempSegments": {},
+      "rowSides": {}
+    },
+    "coastalPlain": 0.2,
+    "flatTexture": false,
+    "oceanScale": 200,
+    "oceanRidges": 0.5,
+    "terrain": {
+      "extraOctaves": 0,
+      "detailOctaves": 1,
+      "resolutionScale": 2,
+      "fillEnclosedCoast": true,
+      "coastalBuffers": true,
+      "world": {
+        "zoom": 1,
+        "originX": 0,
+        "originY": 0,
+        "rootW": 2000,
+        "rootH": 1600
+      },
+      "faultFrame": {
+        "zoom": 1,
+        "originX": 0,
+        "originY": 0
+      },
+      "currentRivers": true
+    },
+    "biomeSides": {}
+  },
+  "customBiomes": [],
+  "customRouteStyles": [],
+  "customLabelStyles": [],
+  "customRegionStyles": [],
+  "history": [],
+  "tectonicFaults": [],
+  "manualRivers": [],
+  "mapPins": [],
+  "mapRoutes": [],
+  "regionLayers": [],
+  "landMasks": [
+    {
+      "id": "4bxNRjmRWBJ1NF1y",
+      "name": "Landmass 1",
+      "operation": "add",
+      "points": [
+        {
+          "x": -51,
+          "y": -20
+        },
+        {
+          "x": -55,
+          "y": 471
+        },
+        {
+          "x": 34,
+          "y": 542
+        },
+        {
+          "x": 157,
+          "y": 672
+        },
+        {
+          "x": 222,
+          "y": 757
+        },
+        {
+          "x": 300,
+          "y": 797
+        },
+        {
+          "x": 427,
+          "y": 684
+        },
+        {
+          "x": 518,
+          "y": 693
+        },
+        {
+          "x": 564,
+          "y": 755
+        },
+        {
+          "x": 417,
+          "y": 839
+        },
+        {
+          "x": 426,
+          "y": 914
+        },
+        {
+          "x": 502,
+          "y": 961
+        },
+        {
+          "x": 559,
+          "y": 1087
+        },
+        {
+          "x": 658,
+          "y": 1234
+        },
+        {
+          "x": 719,
+          "y": 1444
+        },
+        {
+          "x": 716,
+          "y": 1626
+        },
+        {
+          "x": 1384,
+          "y": 1627
+        },
+        {
+          "x": 1146,
+          "y": 1507
+        },
+        {
+          "x": 1252,
+          "y": 1439
+        },
+        {
+          "x": 1200,
+          "y": 1330
+        },
+        {
+          "x": 1279,
+          "y": 1341
+        },
+        {
+          "x": 1331,
+          "y": 1106
+        },
+        {
+          "x": 1318,
+          "y": 1048
+        },
+        {
+          "x": 1237,
+          "y": 1028
+        },
+        {
+          "x": 1389,
+          "y": 769
+        },
+        {
+          "x": 1359,
+          "y": 683
+        },
+        {
+          "x": 1437,
+          "y": 529
+        },
+        {
+          "x": 1309,
+          "y": 434
+        },
+        {
+          "x": 1394,
+          "y": 424
+        },
+        {
+          "x": 1465,
+          "y": 364
+        },
+        {
+          "x": 1579,
+          "y": 403
+        },
+        {
+          "x": 1625,
+          "y": 371
+        },
+        {
+          "x": 1617,
+          "y": 269
+        },
+        {
+          "x": 1740,
+          "y": 230
+        },
+        {
+          "x": 1871,
+          "y": 283
+        },
+        {
+          "x": 1897,
+          "y": 337
+        },
+        {
+          "x": 2012,
+          "y": 362
+        },
+        {
+          "x": 2026,
+          "y": -16
+        }
+      ]
+    },
+    {
+      "id": "jewuBl8tTj7FuLmd",
+      "name": "Landmass 2",
+      "operation": "add",
+      "points": [
+        {
+          "x": 1598,
+          "y": 1247
+        },
+        {
+          "x": 1530,
+          "y": 1245
+        },
+        {
+          "x": 1517,
+          "y": 1167
+        },
+        {
+          "x": 1470,
+          "y": 1114
+        },
+        {
+          "x": 1447,
+          "y": 1073
+        },
+        {
+          "x": 1475,
+          "y": 1015
+        },
+        {
+          "x": 1568,
+          "y": 954
+        },
+        {
+          "x": 1660,
+          "y": 997
+        },
+        {
+          "x": 1659,
+          "y": 1065
+        },
+        {
+          "x": 1616,
+          "y": 1094
+        },
+        {
+          "x": 1657,
+          "y": 1129
+        },
+        {
+          "x": 1651,
+          "y": 1169
+        }
+      ]
+    },
+    {
+      "id": "OnBlez9FwNyXFmAt",
+      "name": "Landmass 3",
+      "operation": "add",
+      "points": [
+        {
+          "x": 2022,
+          "y": 489
+        },
+        {
+          "x": 1915,
+          "y": 510
+        },
+        {
+          "x": 1784,
+          "y": 535
+        },
+        {
+          "x": 1690,
+          "y": 646
+        },
+        {
+          "x": 1783,
+          "y": 717
+        },
+        {
+          "x": 1888,
+          "y": 728
+        },
+        {
+          "x": 1957,
+          "y": 755
+        },
+        {
+          "x": 2024,
+          "y": 724
+        }
+      ]
+    },
+    {
+      "id": "S85aNQGAg13RnIEK",
+      "name": "Landmass 4",
+      "operation": "add",
+      "points": [
+        {
+          "x": 2024,
+          "y": 1310
+        },
+        {
+          "x": 1958,
+          "y": 1324
+        },
+        {
+          "x": 1890,
+          "y": 1314
+        },
+        {
+          "x": 1847,
+          "y": 1313
+        },
+        {
+          "x": 1827,
+          "y": 1372
+        },
+        {
+          "x": 1839,
+          "y": 1432
+        },
+        {
+          "x": 1907,
+          "y": 1500
+        },
+        {
+          "x": 1925,
+          "y": 1550
+        },
+        {
+          "x": 2010,
+          "y": 1566
+        }
+      ]
+    },
+    {
+      "id": "AV2MveX58r1rgo6Y",
+      "name": "Ocean Hole 5",
+      "operation": "subtract",
+      "points": [
+        {
+          "x": 1004,
+          "y": 784
+        },
+        {
+          "x": 1066,
+          "y": 804
+        },
+        {
+          "x": 1111,
+          "y": 849
+        },
+        {
+          "x": 1063,
+          "y": 933
+        },
+        {
+          "x": 1013,
+          "y": 950
+        },
+        {
+          "x": 964,
+          "y": 925
+        },
+        {
+          "x": 952,
+          "y": 860
+        }
+      ]
+    }
+  ],
+  "mapLabels": [],
+  "mapDecorations": [],
+  "parentId": null,
+  "terrainVersion": 2,
+  "world": null,
+  "terrainUpgradeDismissed": false,
+  "upwindMargin": null
+}

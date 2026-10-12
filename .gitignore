@@ -6,3 +6,6 @@
 /design
 
 *.iml
+
+# Derived test data, rebuilt by npm test (see tests/README.md)
+/tests/mesh/fixtures/p0jbva/

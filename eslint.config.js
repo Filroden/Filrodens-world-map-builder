@@ -52,9 +52,9 @@ export default [
             "no-console": "off", // Set to "warn" if you want to find left-over logs
         },
     },
-    // --- Override for Node.js build scripts ---
+    // --- Override for Node.js build scripts and tests ---
     {
-        files: ["scripts/**/*.mjs"],
+        files: ["scripts/**/*.mjs", "tests/**/*.mjs"],
         languageOptions: {
             globals: {
                 ...globals.node, // This explicitly allows 'process', '__dirname', etc.

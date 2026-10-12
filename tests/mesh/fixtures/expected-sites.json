@@ -1,0 +1,29 @@
+{
+ "note": "FNV-1a of the sites Float64Array bytes (hashSites). A change means the sampler changed: bump config MESH.ALGORITHM_VERSION and regenerate the owner fixtures.",
+ "cases": [
+  {
+   "params": {
+    "width": 400,
+    "height": 300,
+    "spacing": 4,
+    "modelSpacing": 12,
+    "seed": 42
+   },
+   "cells": 4517,
+   "modelCount": 509,
+   "hash": "286a2eef"
+  },
+  {
+   "params": {
+    "width": 2000,
+    "height": 1600,
+    "spacing": 4,
+    "modelSpacing": 11.60966230877523,
+    "seed": 3957674699
+   },
+   "cells": 119788,
+   "modelCount": 14293,
+   "hash": "ce3e9dfa"
+  }
+ ]
+}

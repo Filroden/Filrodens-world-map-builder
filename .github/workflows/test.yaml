@@ -1,0 +1,44 @@
+name: Tests
+
+# Runs the Node test suite on every push and pull request, so a branch gets a tick or a cross
+# within a couple of minutes without waiting for a release. release-on-tag.yaml runs the same
+# suite again as the gate before a release is drafted.
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'wiki/**'
+      - 'design/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'wiki/**'
+      - 'design/**'
+
+# A newer push to the same branch cancels the run still going for the older one
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # Builds the P0JBVA terrain rasters (derived data, about 8 s) then runs every test under tests/
+      - name: Run tests
+        run: npm test
