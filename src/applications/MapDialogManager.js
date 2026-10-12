@@ -18,31 +18,30 @@ import {
     findPinIconUsage,
     revertPinIconUsage,
 } from "../data/pinIcons.js";
+import { platform } from "../platform/index.js";
 
 export class MapDialogManager {
     /**
      * Shows a standard Yes/No confirmation dialogue.
      */
     static async _confirmDialog(title, content) {
-        return foundry.applications.api.DialogV2.confirm({
-            window: { title: title || game.i18n.localize("FILRODENSWMB.UI.Warning") },
-            content: `<p>${content || game.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
-            rejectClose: false,
-            modal: true,
+        return platform.dialogs.confirm({
+            title: title || platform.i18n.localize("FILRODENSWMB.UI.Warning"),
+            content: `<p>${content || platform.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
         });
     }
 
     /**
-     * Prompts for a single line of text via a minimal DialogV2 form.
+     * Prompts for a single line of text via a minimal form.
      */
     static async _promptTextValue(title, label, defaultValue) {
         // The value is escaped because it is often an existing name (a map or layer name) that
         // may contain quotes, which would otherwise end the attribute early and cut the name short
-        const safeValue = Handlebars.escapeExpression(defaultValue ?? "");
-        return foundry.applications.api.DialogV2.prompt({
-            window: { title: title },
+        const safeValue = platform.utils.escapeHtml(defaultValue ?? "");
+        return platform.dialogs.prompt({
+            title,
             content: `<label>${label}</label><input type="text" id="fwmb-prompt-input" value="${safeValue}">`,
-            ok: { callback: (event, button) => button.form.elements["fwmb-prompt-input"].value },
+            onSubmit: (form) => form.elements["fwmb-prompt-input"].value,
         });
     }
 
@@ -51,15 +50,15 @@ export class MapDialogManager {
      * Returns the chosen action as a string.
      */
     static async promptUnsavedChanges() {
-        return foundry.applications.api.DialogV2.wait({
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.Warning") },
-            content: `<p>${game.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
+        return platform.dialogs.choose({
+            title: platform.i18n.localize("FILRODENSWMB.UI.Warning"),
+            content: `<p>${platform.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
             buttons: [
-                { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
-                { action: "discard", label: game.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
-                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
+                { action: "discard", label: platform.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
             ],
-            close: () => "cancel",
+            dismissed: "cancel",
         });
     }
 
@@ -77,14 +76,14 @@ export class MapDialogManager {
     static async promptSaveBeforeRegionalMap(neverSaved) {
         const message = neverSaved ? "FILRODENSWMB.UI.RegionalMapSaveFirstNew" : "FILRODENSWMB.UI.RegionalMapSaveFirstChanged";
         const title = neverSaved ? "FILRODENSWMB.UI.SaveUnsavedMap" : "FILRODENSWMB.UI.SaveExistingMap";
-        const choice = await foundry.applications.api.DialogV2.wait({
-            window: { title: game.i18n.localize(title) },
-            content: `<p>${game.i18n.localize(message)}</p>`,
+        const choice = await platform.dialogs.choose({
+            title: platform.i18n.localize(title),
+            content: `<p>${platform.i18n.localize(message)}</p>`,
             buttons: [
-                { action: "save", label: game.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
-                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
             ],
-            close: () => "cancel",
+            dismissed: "cancel",
         });
         return choice === "save";
     }
@@ -102,7 +101,7 @@ export class MapDialogManager {
      * @returns {Promise<{apply: boolean, dismiss: boolean}>} The user's choice.
      */
     static async promptTerrainUpgrade(impact, allowDismiss) {
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/terrain-upgrade.hbs", {
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/terrain-upgrade.hbs", {
             isRegional: impact.kind === "regional",
             isTectonics: impact.kind === "tectonics",
             isFaults: impact.kind === "faults",
@@ -120,28 +119,28 @@ export class MapDialogManager {
             allowDismiss,
         });
 
-        const readDismiss = (button) => button.form?.elements?.dismissUpgrade?.checked === true;
+        const readDismiss = (form) => form?.elements?.dismissUpgrade?.checked === true;
 
-        return foundry.applications.api.DialogV2.wait({
+        return platform.dialogs.choose({
             classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateTitle") },
+            title: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateTitle"),
             content,
             buttons: [
                 {
                     action: "apply",
-                    label: game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApply"),
+                    label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApply"),
                     icon: "fwmb-icon sync",
                     default: true,
                     callback: () => ({ apply: true, dismiss: false }),
                 },
                 {
                     action: "keep",
-                    label: game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateKeep"),
+                    label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateKeep"),
                     icon: "fwmb-icon cancel",
-                    callback: (event, button) => ({ apply: false, dismiss: readDismiss(button) }),
+                    callback: (form) => ({ apply: false, dismiss: readDismiss(form) }),
                 },
             ],
-            close: () => ({ apply: false, dismiss: false }),
+            dismissed: { apply: false, dismiss: false },
         });
     }
 
@@ -257,14 +256,13 @@ export class MapDialogManager {
      * exactly (this is a visual self-check, not an automated one).
      */
     static async _promptPinIconDialog(icon, titleKey) {
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/edit-pin-icon.hbs", { icon });
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/edit-pin-icon.hbs", { icon });
 
-        return foundry.applications.api.DialogV2.prompt({
+        return platform.dialogs.prompt({
             classes: ["fwmb"],
-            window: { title: game.i18n.localize(titleKey) },
+            title: platform.i18n.localize(titleKey),
             content,
-            render: (event) => {
-                const html = event.target.element;
+            onRender: (html) => {
                 const pathInput = html.querySelector('[name="iconPath"]');
                 const previewImg = html.querySelector("#fwmb-pin-icon-preview-img");
                 if (!pathInput || !previewImg) return;
@@ -278,40 +276,36 @@ export class MapDialogManager {
                 pathInput.addEventListener("input", updatePreview);
                 pathInput.addEventListener("change", updatePreview);
             },
-            ok: {
-                callback: (evt, button) => {
-                    const name = button.form.elements["iconName"].value.trim();
-                    const path = button.form.elements["iconPath"].value.trim();
-                    return name && path ? { name, path } : null;
-                },
+            onSubmit: (form) => {
+                const name = form.elements["iconName"].value.trim();
+                const path = form.elements["iconPath"].value.trim();
+                return name && path ? { name, path } : null;
             },
         });
     }
 
     /**
-     * Unified pipeline for editing vector entities to remove boilerplate.
+     * Unified pipeline for editing vector entities to remove boilerplate. `onRender(element)`, when
+     * given, runs once the dialogue is in the page; `onExtract(form, fallbackName)` reads the
+     * changes from its form.
      */
     static async _processEditDialog(app, entity, options = {}) {
         const { titleKey, template, htmlContent, context = {}, onRender, onExtract, onSave, triggersTerrain = false, repaintCanvas = false, renderParts = ["context"] } = options;
 
-        const content = template ? await foundry.applications.handlebars.renderTemplate(template, context) : htmlContent;
+        const content = template ? await platform.templates.render(template, context) : htmlContent;
 
-        const result = await foundry.applications.api.DialogV2.prompt({
+        const result = await platform.dialogs.prompt({
             classes: ["fwmb"],
-            window: { title: game.i18n.localize(titleKey) || titleKey },
+            title: platform.i18n.localize(titleKey) || titleKey,
             content: content,
-            render: (event) => {
-                if (onRender) onRender(event.target, event.target.element);
-            },
-            ok: {
-                callback: (event, button) => (onExtract ? onExtract(button.form, entity.name) : null),
-            },
+            onRender,
+            onSubmit: (form) => (onExtract ? onExtract(form, entity.name) : null),
         });
 
         if (result) {
             MapStateManager.pushVectorState(app);
 
-            foundry.utils.mergeObject(entity, result);
+            platform.utils.mergeObject(entity, result);
             if (onSave) onSave(entity, result);
             if (repaintCanvas) app._repaintCanvas();
             else app._repaintVectors();
@@ -340,7 +334,7 @@ export class MapDialogManager {
                 }),
                 getContext: (app, style) => ({
                     style,
-                    fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
+                    fonts: platform.fonts.list(),
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 }),
                 onExtract: (form, fallbackName) => ({
@@ -361,10 +355,10 @@ export class MapDialogManager {
                     };
 
                     for (const lbl of app.mapLabels) {
-                        if (lbl.quickStyle === id) foundry.utils.mergeObject(lbl, aestheticProperties);
+                        if (lbl.quickStyle === id) platform.utils.mergeObject(lbl, aestheticProperties);
                     }
                     const updateAttached = (ent) => {
-                        if (ent.label && ent.label.quickStyle === id) foundry.utils.mergeObject(ent.label, aestheticProperties);
+                        if (ent.label && ent.label.quickStyle === id) platform.utils.mergeObject(ent.label, aestheticProperties);
                     };
                     app.mapPins.forEach(updateAttached);
                     app.mapRoutes.forEach(updateAttached);
@@ -426,7 +420,7 @@ export class MapDialogManager {
                     };
 
                     for (const route of app.mapRoutes) {
-                        if (route.quickStyle === id) foundry.utils.mergeObject(route, aestheticProperties);
+                        if (route.quickStyle === id) platform.utils.mergeObject(route, aestheticProperties);
                     }
                 },
                 onDisconnect: (app, id) => {
@@ -477,7 +471,7 @@ export class MapDialogManager {
 
                     app.regionLayers.forEach((layer) => {
                         layer.regions.forEach((region) => {
-                            if (region.quickStyle === id) foundry.utils.mergeObject(region, aestheticProperties);
+                            if (region.quickStyle === id) platform.utils.mergeObject(region, aestheticProperties);
                         });
                     });
                 },
@@ -589,7 +583,7 @@ export class MapDialogManager {
         // values) needed to render that shared fieldset - merged into each owning type's own
         // getContext() result below.
         const getLabelContext = (app) => ({
-            fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
+            fonts: platform.fonts.list(),
             customLabelStyles: app.uiState.customLabelStyles || [],
             labelDefaults: this.QUICK_STYLE_CONFIG.Label.getDefaults(app),
         });
@@ -749,7 +743,7 @@ export class MapDialogManager {
                 getEntities: (app, ids) => app.mapLabels.filter((l) => ids.has(l.id)),
                 getContext: (app) => ({
                     customLabelStyles: app.uiState.customLabelStyles || [],
-                    fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
+                    fonts: platform.fonts.list(),
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
                     defaults: this.QUICK_STYLE_CONFIG.Label.getDefaults(app),
                 }),
@@ -876,20 +870,16 @@ export class MapDialogManager {
 
         const defaultName = `Decoration ${app.mapDecorations.length + 1}`;
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/add-decoration.hbs", { defaultName });
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/add-decoration.hbs", { defaultName });
 
-        const result = await foundry.applications.api.DialogV2.prompt({
+        const result = await platform.dialogs.prompt({
             classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.AddDecoration") },
+            title: platform.i18n.localize("FILRODENSWMB.UI.AddDecoration"),
             content: content,
-            ok: {
-                callback: (evt, button) => {
-                    return {
-                        name: button.form.elements["fwmb-dec-name"].value.trim() || defaultName,
-                        src: button.form.elements["fwmb-dec-src"].value,
-                    };
-                },
-            },
+            onSubmit: (form) => ({
+                name: form.elements["fwmb-dec-name"].value.trim() || defaultName,
+                src: form.elements["fwmb-dec-src"].value,
+            }),
         });
 
         if (!result) return;
@@ -901,7 +891,7 @@ export class MapDialogManager {
             const spawnY = app.mapHeight / 2;
 
             app.mapDecorations.push({
-                id: foundry.utils.randomID(),
+                id: platform.utils.randomID(),
                 type: "decoration",
                 name: result.name || "Unnamed Decoration",
                 src: result.src,
@@ -933,14 +923,14 @@ export class MapDialogManager {
             onRender: config.onRender,
             onExtract: (form) => config.onExtract(form, newStyle.name),
             onSave: (entity, result) => {
-                const id = foundry.utils.randomID();
+                const id = platform.utils.randomID();
                 app.uiState[config.registryKey].push({ id, ...result });
             },
         });
     }
 
     static onAddRegionLayer(app, _event, _target) {
-        const id = foundry.utils.randomID();
+        const id = platform.utils.randomID();
         app.regionLayers.push({ id: id, name: `Region Layer ${app.regionLayers.length + 1}`, visibility: "all", regions: [] });
         app.activeRegionLayerId = id;
         app.render({ parts: ["context"] });
@@ -969,7 +959,7 @@ export class MapDialogManager {
     static async onDeleteCustomBiome(app, event, target) {
         const id = Number(target.closest(".fwmb-list-item").dataset.id);
 
-        const confirmed = await this._confirmDialog(undefined, game.i18n.localize("FILRODENSWMB.UI.DeleteBiomeConfirm"));
+        const confirmed = await this._confirmDialog(undefined, platform.i18n.localize("FILRODENSWMB.UI.DeleteBiomeConfirm"));
         if (!confirmed) return;
 
         MapStateManager.pushVectorState(app);
@@ -994,10 +984,10 @@ export class MapDialogManager {
 
         const content =
             usage.totalCount > 0
-                ? game.i18n.format("FILRODENSWMB.UI.RemovePinIconInUseWarning", { name: icon.name, count: usage.totalCount })
-                : game.i18n.format("FILRODENSWMB.UI.RemovePinIconConfirm", { name: icon.name });
+                ? platform.i18n.format("FILRODENSWMB.UI.RemovePinIconInUseWarning", { name: icon.name, count: usage.totalCount })
+                : platform.i18n.format("FILRODENSWMB.UI.RemovePinIconConfirm", { name: icon.name });
 
-        const confirmed = await this._confirmDialog(game.i18n.localize("FILRODENSWMB.UI.RemovePinIcon"), content);
+        const confirmed = await this._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.RemovePinIcon"), content);
         if (!confirmed) return;
 
         if (usage.totalCount > 0) {
@@ -1076,8 +1066,8 @@ export class MapDialogManager {
         if (app.landMasks.length === 0) return;
 
         const confirmed = await this._confirmDialog(
-            game.i18n.localize("FILRODENSWMB.UI.DeleteAllLandMasksTitle"),
-            game.i18n.format("FILRODENSWMB.UI.DeleteAllLandMasksConfirm", { count: app.landMasks.length }),
+            platform.i18n.localize("FILRODENSWMB.UI.DeleteAllLandMasksTitle"),
+            platform.i18n.format("FILRODENSWMB.UI.DeleteAllLandMasksConfirm", { count: app.landMasks.length }),
         );
         if (!confirmed) return;
 
@@ -1183,7 +1173,7 @@ export class MapDialogManager {
             // both contribute to the same nested key (e.g. two label fields both writing into
             // `patch.label`), and a shallow assign would let the second one silently wipe out
             // whatever the first had already set there.
-            foundry.utils.mergeObject(patch, field.extract(form, app));
+            platform.utils.mergeObject(patch, field.extract(form, app));
         }
         return patch;
     }
@@ -1206,27 +1196,24 @@ export class MapDialogManager {
         if (entities.length === 0) return;
 
         const context = { count: entities.length, ...config.getContext(app) };
-        const content = await foundry.applications.handlebars.renderTemplate(config.template, context);
+        const content = await platform.templates.render(config.template, context);
 
-        const result = await foundry.applications.api.DialogV2.prompt({
+        const result = await platform.dialogs.prompt({
             classes: ["fwmb"],
-            window: { title: game.i18n.format(config.titleKey, { count: entities.length }) },
+            title: platform.i18n.format(config.titleKey, { count: entities.length }),
             content: content,
-            render: (event) => {
-                const dialogHtml = event.target.element;
+            onRender: (dialogHtml) => {
                 this.bindMassEditToggles(dialogHtml);
                 if (config.onRender) config.onRender(dialogHtml, app);
             },
-            ok: {
-                callback: (evt, button) => this._extractMassEditPatch(button.form, config.fields, app),
-            },
+            onSubmit: (form) => this._extractMassEditPatch(form, config.fields, app),
         });
 
         if (!result) return;
 
         if (Object.keys(result).length > 0) {
             MapStateManager.pushVectorState(app);
-            entities.forEach((entity) => foundry.utils.mergeObject(entity, result));
+            entities.forEach((entity) => platform.utils.mergeObject(entity, result));
             app._repaintVectors();
             app.markDirty();
         }
@@ -1284,7 +1271,7 @@ export class MapDialogManager {
                 settings: this.#featureSettings(fault),
                 isFeature: TectonicFeatureEngine.isFeatureType(fault.type),
             },
-            onRender: (dialogApp, html) => this.#watchFaultType(html),
+            onRender: (html) => this.#watchFaultType(html),
             onExtract: (form) => this.#extractFault(form),
             onSave: (entity, result) => {
                 this.#finishFaultEdit(entity, result);
@@ -1407,11 +1394,11 @@ export class MapDialogManager {
         let labelData = { name: sourceObj.name };
 
         if (type === "custom") {
-            foundry.utils.mergeObject(labelData, sourceObj);
+            platform.utils.mergeObject(labelData, sourceObj);
             labelData.rotation = CanvasTransforms.normalizeAngle(labelData.rotation);
         } else {
             const safeObj = this._withLabelDefaults(app, sourceObj);
-            foundry.utils.mergeObject(labelData, safeObj.label);
+            platform.utils.mergeObject(labelData, safeObj.label);
         }
 
         await this._processEditDialog(app, sourceObj, {
@@ -1420,11 +1407,11 @@ export class MapDialogManager {
             context: {
                 label: labelData,
                 rotationRange: FILRODENSWMB.UI.ROTATION,
-                fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
+                fonts: platform.fonts.list(),
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 customLabelStyles: app.uiState.customLabelStyles || [],
             },
-            onRender: (dialogApp, html) => {
+            onRender: (html) => {
                 this.bindLabelPropertiesDialog(html, app.uiState);
             },
             onExtract: (form, fallbackName) => {
@@ -1473,10 +1460,10 @@ export class MapDialogManager {
                 pinIconPath: currentIcon?.path || "",
                 pinIconIsCustom: currentIcon?.isCustom || false,
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
+                fonts: platform.fonts.list(),
                 customLabelStyles: app.uiState.customLabelStyles || [],
             },
-            onRender: (dialogApp, html) => {
+            onRender: (html) => {
                 const trigger = html.querySelector("#fwmb-edit-pin-select .fwmb-select-trigger");
                 const optionsMenu = html.querySelector("#fwmb-edit-pin-select .fwmb-select-options");
                 const hiddenInput = html.querySelector("#fwmb-edit-pin-icon-input");
@@ -1555,12 +1542,12 @@ export class MapDialogManager {
             context: {
                 region: safeRegion,
                 rotationRange: FILRODENSWMB.UI.ROTATION,
-                fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
+                fonts: platform.fonts.list(),
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 customLabelStyles: app.uiState.customLabelStyles || [],
                 customRegionStyles: app.uiState.customRegionStyles || [],
             },
-            onRender: (dialogApp, html) => {
+            onRender: (html) => {
                 const quickStyleSelect = html.querySelector('select[name="regionQuickStyle"]');
                 const fillTransparentCheckbox = html.querySelector('input[name="regionFillTransparent"]');
                 const fillColorInput = html.querySelector('input[name="regionFillColor"]');
@@ -1620,7 +1607,7 @@ export class MapDialogManager {
         const layer = app.regionLayers.find((l) => l.id === id);
         if (!layer) return;
 
-        const newName = await this._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.EditLayer"), "Layer Name", layer.name);
+        const newName = await this._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.EditLayer"), "Layer Name", layer.name);
         if (newName) {
             layer.name = newName;
             app.render({ parts: ["context"] });
@@ -1700,10 +1687,10 @@ export class MapDialogManager {
                 rotationRange: FILRODENSWMB.UI.ROTATION,
                 customRouteStyles: app.uiState.customRouteStyles || [],
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                fonts: CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"],
+                fonts: platform.fonts.list(),
                 customLabelStyles: app.uiState.customLabelStyles || [],
             },
-            onRender: (dialogApp, html) => {
+            onRender: (html) => {
                 const quickStyleSelect = html.querySelector('select[name="routeQuickStyle"]');
                 const colorInput = html.querySelector('input[name="routeColor"]');
                 const thicknessInput = html.querySelector('input[name="routeThickness"]');

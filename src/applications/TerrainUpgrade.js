@@ -2,8 +2,8 @@ import { FILRODENSWMB } from "../config.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
-import { loadMapData, updateMapDataFields } from "../data/compendium.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
+import { platform } from "../platform/index.js";
 
 /**
  * Offers a map built with an older revision of the terrain generation rules the chance to be
@@ -48,7 +48,7 @@ export class TerrainUpgrade {
             if (known) return known;
             if (!current.parentId) return null;
 
-            current = await loadMapData(current.parentId);
+            current = await platform.store.loadMapData(current.parentId);
             if (!current) return null;
         }
 
@@ -303,6 +303,6 @@ export class TerrainUpgrade {
         app.uiState.terrainUpgradeDismissed = true;
         if (!app.currentSaveId) return;
 
-        await updateMapDataFields(app.currentSaveId, { terrainUpgradeDismissed: true });
+        await platform.store.updateMapDataFields(app.currentSaveId, { terrainUpgradeDismissed: true });
     }
 }

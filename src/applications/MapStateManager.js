@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { platform } from "../platform/index.js";
 
 export class MapStateManager {
     /**
@@ -214,7 +215,7 @@ export class MapStateManager {
             labelMaxChars: 0,
             labelJustify: "left",
             activeLabelQuickStyle: "custom",
-            nextLabelText: game.i18n.localize(FILRODENSWMB.LABELS?.DEFAULT_TEXT) || "New Label",
+            nextLabelText: platform.i18n.localize(FILRODENSWMB.LABELS?.DEFAULT_TEXT) || "New Label",
             customLabelStyles: [],
 
             cartographyScaleEnable: false,
@@ -246,20 +247,20 @@ export class MapStateManager {
      */
     static getVectorStateSnapshot(app) {
         return {
-            tectonicFaults: foundry.utils.deepClone(app.tectonicFaults),
+            tectonicFaults: platform.utils.deepClone(app.tectonicFaults),
             activeFaultId: app.activeFaultId,
-            manualRivers: foundry.utils.deepClone(app.manualRivers),
+            manualRivers: platform.utils.deepClone(app.manualRivers),
             activeRiverId: app.activeRiverId,
-            landMasks: foundry.utils.deepClone(app.landMasks || []),
+            landMasks: platform.utils.deepClone(app.landMasks || []),
             activeLandMaskId: app.activeLandMaskId,
-            pins: foundry.utils.deepClone(app.mapPins),
-            routes: foundry.utils.deepClone(app.mapRoutes),
-            regionLayers: foundry.utils.deepClone(app.regionLayers),
-            mapLabels: foundry.utils.deepClone(app.mapLabels),
-            mapDecorations: foundry.utils.deepClone(app.mapDecorations),
+            pins: platform.utils.deepClone(app.mapPins),
+            routes: platform.utils.deepClone(app.mapRoutes),
+            regionLayers: platform.utils.deepClone(app.regionLayers),
+            mapLabels: platform.utils.deepClone(app.mapLabels),
+            mapDecorations: platform.utils.deepClone(app.mapDecorations),
             activeRouteId: app.activeRouteId,
             activeRegionId: app.activeRegionId,
-            customBiomes: foundry.utils.deepClone(app.uiState?.customBiomes || []),
+            customBiomes: platform.utils.deepClone(app.uiState?.customBiomes || []),
         };
     }
 

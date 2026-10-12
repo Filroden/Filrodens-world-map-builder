@@ -137,7 +137,7 @@ test("grid data: region coverage from the cell raster matches the polygon test w
 });
 
 test("scene notes for regions sit at the label anchor", { skip: P0_SKIP }, async () => {
-    const { SceneExporter } = await import("../../src/applications/SceneExporter.js");
+    const { SceneExporter } = await import("../../src/platform/foundry/SceneExporter.js");
     const { session, mapData } = await openV3();
     const levels = structuredClone(mapData.layerSets.flatMap((set) => set.levels));
     levels[0].regions[0].journalPageId = "page";

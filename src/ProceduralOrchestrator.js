@@ -11,6 +11,7 @@ import { FILRODENSWMB } from "./config.js";
 import { TerrainVersion } from "./tools/TerrainVersion.js";
 import { GenerationWorkers } from "./tools/GenerationWorkers.js";
 import { BrushEngine } from "./tools/BrushEngine.js";
+import { platform } from "./platform/index.js";
 
 export class ProceduralOrchestrator {
     /**
@@ -896,7 +897,7 @@ export class ProceduralOrchestrator {
                 const newSprings = engine.bakeProceduralSprings(app.currentElevationData, app.currentMoistureData, app.mapWidth, app.mapHeight, params);
                 for (const s of newSprings) {
                     app.mapPins.push({
-                        id: foundry.utils.randomID(),
+                        id: platform.utils.randomID(),
                         name: "River Source",
                         x: s.x,
                         y: s.y,

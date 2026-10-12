@@ -1,7 +1,13 @@
-import { FILRODENSWMB } from "../config.js";
-import { ColorMath } from "../tools/ColorMath.js";
-import { TerrainVersion } from "../tools/TerrainVersion.js";
-import { BiomePlacement } from "../generation/BiomePlacement.js";
+/**
+ * Saved maps in Foundry: each map is a JournalEntry in the world compendium, holding the map data
+ * (and each level's encoded owner array) in its flags, plus a readable summary page. This is the
+ * Foundry implementation of the platform's `store` service (see ../index.js); the shared code
+ * reaches it as `platform.store`.
+ */
+import { FILRODENSWMB } from "../../config.js";
+import { ColorMath } from "../../tools/ColorMath.js";
+import { TerrainVersion } from "../../tools/TerrainVersion.js";
+import { BiomePlacement } from "../../generation/BiomePlacement.js";
 
 /** Decimal places kept when showing a regional map's zoom (a crop's zoom need not be a whole number). */
 const ZOOM_DECIMALS = 2;
@@ -378,6 +384,20 @@ export async function loadMapOwners(documentId) {
 
     const document = await pack.getDocument(documentId);
     return foundry.utils.deepClone(document?.flags?.[FILRODENSWMB.ID]?.owners ?? {});
+}
+
+/**
+ * Every saved map's data, for work that has to look across all of them (such as finding which
+ * maps use a pin icon). Each entry's map data is the stored object itself, not a copy.
+ *
+ * @returns {Promise<Array<{id: string, name: string, mapData: object|null}>>}
+ */
+export async function listMapData() {
+    const pack = game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
+    if (!pack) return [];
+
+    const documents = await pack.getDocuments();
+    return documents.map((doc) => ({ id: doc.id, name: doc.name, mapData: doc.flags?.[FILRODENSWMB.ID]?.mapData ?? null }));
 }
 
 /**

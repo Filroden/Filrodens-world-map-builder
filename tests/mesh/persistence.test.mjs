@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { test } from "node:test";
 import { MeshIntegration } from "../../src/applications/MeshIntegration.js";
-import { saveMapData } from "../../src/data/compendium.js";
+import { saveMapData } from "../../src/platform/foundry/store.js";
 import { MapJson } from "../../src/data/MapJson.js";
 import { MeshSession } from "../../src/mesh/MeshSession.js";
 import { decodeOwners } from "../../src/mesh/OwnerLayer.js";

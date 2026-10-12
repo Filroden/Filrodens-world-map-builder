@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { platform } from "../platform/index.js";
 
 /**
  * Where procedural rivers rise (their springs), under the current river rules.
@@ -119,7 +120,7 @@ export class RiverSources {
      * @returns {object} A "block_spring" pin.
      */
     static removalPin(spring) {
-        return { id: foundry.utils.randomID(), name: "Removed River Source", x: spring.x + 0.5, y: spring.y + 0.5, type: "block_spring", radius: 6, visibility: "all" };
+        return { id: platform.utils.randomID(), name: "Removed River Source", x: spring.x + 0.5, y: spring.y + 0.5, type: "block_spring", radius: 6, visibility: "all" };
     }
 
     // ----------------------------------------------------------------- helpers

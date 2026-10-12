@@ -4,6 +4,7 @@ import { MeshBuilder } from "../mesh/MeshBuilder.js";
 import { MeshSession, SESSION_WARNINGS } from "../mesh/MeshSession.js";
 import { distanceToSegment } from "../mesh/RoutePath.js";
 import { VECTOR_SCHEMA_VERSION, createLayerSet, createLevel, createMeshBlock } from "../mesh/Schema.js";
+import { platform } from "../platform/index.js";
 
 /**
  * Connects the Map Studio to the display mesh (src/mesh/): opening a map's mesh session when the
@@ -101,15 +102,15 @@ export class MeshIntegration {
         if (!load || load.token !== state.token) return;
         state.load = null;
 
-        await overlay.start(game.i18n.localize("FILRODENSWMB.UI.PreparingMap"));
+        await overlay.start(platform.i18n.localize("FILRODENSWMB.UI.PreparingMap"));
         try {
             const result = await MeshSession.open(load.payload, {
                 owners: load.owners,
                 buffers: this.terrainBuffers(app),
                 loadMeshData: (params) => this.#loadMeshData(params, load.prefetch, overlay),
                 onProgress: (progress) => overlay.text(this.#progressText(progress)),
-                idFactory: () => foundry.utils.randomID(),
-                setName: game.i18n.localize("FILRODENSWMB.UI.MigratedRegionsSet"),
+                idFactory: () => platform.utils.randomID(),
+                setName: platform.i18n.localize("FILRODENSWMB.UI.MigratedRegionsSet"),
                 // The map's region opacity applies over every level (see renderVectors), as it did
                 // over every region layer, so migrated levels add none of their own
                 levelOpacity: 1,
@@ -120,7 +121,7 @@ export class MeshIntegration {
         } catch (error) {
             console.error("FWMB | The map's mesh could not be prepared:", error);
             state.unavailable = true;
-            ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.MeshLoadFailed"));
+            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.MeshLoadFailed"));
         } finally {
             overlay.end();
         }
@@ -140,7 +141,7 @@ export class MeshIntegration {
 
     static #progressText({ stage, pct }) {
         const keys = { migrate: "FILRODENSWMB.UI.PreparingMapMigrate", rebuild: "FILRODENSWMB.UI.PreparingMapRebuild", aggregates: "FILRODENSWMB.UI.PreparingMap" };
-        const text = game.i18n.localize(keys[stage] ?? "FILRODENSWMB.UI.PreparingMapMesh");
+        const text = platform.i18n.localize(keys[stage] ?? "FILRODENSWMB.UI.PreparingMapMesh");
         return Number.isFinite(pct) && !keys[stage] ? `${text} ${pct}%` : text;
     }
 
@@ -162,10 +163,10 @@ export class MeshIntegration {
     }
 
     static #report({ migrated, warnings }) {
-        if (migrated) ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.MapUpgraded"), { permanent: true });
+        if (migrated) platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.MapUpgraded"), { permanent: true });
         for (const { key, detail } of warnings) {
-            if (key === SESSION_WARNINGS.REBUILT) ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.MeshRebuilt"), { permanent: true });
-            else if (key === SESSION_WARNINGS.OWNERS_LOST || key === SESSION_WARNINGS.OWNERS_MISSING) ui.notifications.warn(game.i18n.format("FILRODENSWMB.UI.MeshOwnersLost", { detail }));
+            if (key === SESSION_WARNINGS.REBUILT) platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.MeshRebuilt"), { permanent: true });
+            else if (key === SESSION_WARNINGS.OWNERS_LOST || key === SESSION_WARNINGS.OWNERS_MISSING) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.MeshOwnersLost", { detail }));
             else console.warn(`FWMB | Map data check: ${detail}`);
         }
     }
@@ -269,12 +270,12 @@ export class MeshIntegration {
         app.layerSets ??= [];
         let set = app.layerSets.find((candidate) => candidate.kind === "custom");
         if (!set) {
-            set = createLayerSet({ name: game.i18n.localize("FILRODENSWMB.UI.MigratedRegionsSet"), kind: "custom" }, () => foundry.utils.randomID());
+            set = createLayerSet({ name: platform.i18n.localize("FILRODENSWMB.UI.MigratedRegionsSet"), kind: "custom" }, () => platform.utils.randomID());
             app.layerSets.push(set);
         }
         for (const layer of layers) {
             // The listed object itself becomes the level, so the panel keeps working on it
-            Object.assign(layer, createLevel({ ...layer, opacity: layer.opacity ?? 1 }, () => foundry.utils.randomID()), { id: layer.id });
+            Object.assign(layer, createLevel({ ...layer, opacity: layer.opacity ?? 1 }, () => platform.utils.randomID()), { id: layer.id });
             set.levels.push(layer);
         }
     }
@@ -330,7 +331,7 @@ export class MeshIntegration {
         const state = this.#state(app);
         if (!state.notified) {
             state.notified = true;
-            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.RegionEditingUnavailable"));
+            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.RegionEditingUnavailable"));
         }
         return true;
     }

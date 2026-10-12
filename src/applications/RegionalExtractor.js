@@ -9,6 +9,7 @@ import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { MeshIntegration } from "./MeshIntegration.js";
 import { extractRegionalVectors } from "../mesh/RegionalMesh.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
+import { platform } from "../platform/index.js";
 
 export class RegionalExtractor {
     /**
@@ -16,10 +17,10 @@ export class RegionalExtractor {
      *
      * @returns {{payload: object, owners: Object<string, string>|null}} The regional map's data, ready
      *     to save, and the encoded owner arrays to save beside it (null for a map whose regions are
-     *     polygons; see compendium.saveMapData).
+     *     polygons; see platform.store.saveMapData).
      */
     static createPayload(app, drawnCropBox) {
-        const state = foundry.utils.deepClone(app.uiState);
+        const state = platform.utils.deepClone(app.uiState);
         // Read before the state is scaled to the crop: the parent's own wind reach decides how
         // much of its ground beyond the crop the regional map's climate needs
         const upwindMargin = this.#buildUpwindMargin(app, state);
@@ -53,7 +54,7 @@ export class RegionalExtractor {
 
         const newRegions = app.regionLayers
             .map((layer) => {
-                const translatedLayer = foundry.utils.deepClone(layer);
+                const translatedLayer = platform.utils.deepClone(layer);
                 translatedLayer.regions = translate(layer.regions);
                 return translatedLayer;
             })
@@ -109,7 +110,7 @@ export class RegionalExtractor {
             childMapData: { mapWidth: payload.mapWidth, mapHeight: payload.mapHeight, seed: payload.seed, params: payload.params, world: payload.world },
             crop: { x: cropBox.x, y: cropBox.y },
             zoom: zoomScale,
-            idFactory: () => foundry.utils.randomID(),
+            idFactory: () => platform.utils.randomID(),
         });
         delete payload.regionLayers;
         Object.assign(payload, fields);
@@ -266,7 +267,7 @@ export class RegionalExtractor {
     static #translateHistory(history, cropBox, zoomScale, targetWidth, targetHeight, anchors = new Map()) {
         const newHistory = [];
         for (const stroke of history) {
-            const translatedStroke = foundry.utils.deepClone(stroke);
+            const translatedStroke = platform.utils.deepClone(stroke);
             if (anchors.has(stroke)) translatedStroke.anchor = anchors.get(stroke);
             if (BrushEngine.isSlope(stroke)) translatedStroke.scale = (stroke.scale ?? 1) * zoomScale;
             translatedStroke.size *= zoomScale;
@@ -299,7 +300,7 @@ export class RegionalExtractor {
         const translated = [];
 
         for (const fault of faults) {
-            const scaled = foundry.utils.deepClone(fault);
+            const scaled = platform.utils.deepClone(fault);
             scaled.thickness = (fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS) * zoomScale;
             scaled.points = (fault.points ?? []).map((point) => ({
                 ...point,
@@ -344,7 +345,7 @@ export class RegionalExtractor {
      */
     static #translateLandMasks(landMasks, cropBox, zoomScale) {
         return landMasks.map((mask) => {
-            const translated = foundry.utils.deepClone(mask);
+            const translated = platform.utils.deepClone(mask);
             translated.points = translated.points.map((point) => ({
                 x: (point.x - cropBox.x) * zoomScale,
                 y: (point.y - cropBox.y) * zoomScale,
@@ -391,8 +392,8 @@ export class RegionalExtractor {
 
             const point = river.path[entry];
             pins.push({
-                id: foundry.utils.randomID(),
-                name: game.i18n.localize("FILRODENSWMB.UI.RiverInflow"),
+                id: platform.utils.randomID(),
+                name: platform.i18n.localize("FILRODENSWMB.UI.RiverInflow"),
                 x: this.#clampInside((point.x - cropBox.x) * zoomScale, targetWidth),
                 y: this.#clampInside((point.y - cropBox.y) * zoomScale, targetHeight),
                 type: "spring",
@@ -414,7 +415,7 @@ export class RegionalExtractor {
         const buffer = FILRODENSWMB.LIMITS.OVERFLOW_BUFFER;
 
         for (const item of list) {
-            const translated = foundry.utils.deepClone(item);
+            const translated = platform.utils.deepClone(item);
             let isVisible = false;
 
             if (translated.label?.x !== undefined) {

@@ -1,7 +1,7 @@
-import { FILRODENSWMB } from "../config.js";
-import { resolvePinIconPath } from "../data/pinIcons.js";
-import { GridDataExporter } from "./GridDataExporter.js";
-import { MapStateManager } from "./MapStateManager.js";
+import { FILRODENSWMB } from "../../config.js";
+import { resolvePinIconPath } from "../../data/pinIcons.js";
+import { GridDataExporter } from "../../applications/GridDataExporter.js";
+import { MapStateManager } from "../../applications/MapStateManager.js";
 
 // Map note icons are one fiftieth of the map's width, kept between 32 and 96 pixels
 const NOTE_ICON_WIDTH_RATIO = 50;

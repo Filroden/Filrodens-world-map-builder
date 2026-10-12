@@ -7,6 +7,7 @@ import { TerrainCompositor } from "./TerrainCompositor.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
+import { platform } from "../platform/index.js";
 
 /** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
 const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br: "nwse-resize", tr: "nesw-resize", bl: "nesw-resize" });
@@ -1226,7 +1227,7 @@ export class StudioCanvas {
             renderTexture.destroy(true);
         } catch (err) {
             console.error("FWMB | Failed to export PNG:", err);
-            ui.notifications.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
+            platform.notify.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
         }
     }
 

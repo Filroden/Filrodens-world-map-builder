@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { platform } from "../platform/index.js";
 
 /**
  * Data layer for the pin icon registry: built-in icons (curated, shipped with the module,
@@ -19,30 +20,21 @@ function builtinIconPath(key) {
 }
 
 /**
- * Resolves the world compendium pack that stores saved maps, or null if it hasn't been
- * initialised yet.
- */
-function getMapCompendiumPack() {
-    return game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`) || null;
-}
-
-/**
  * Converts a stored custom icon path into a URL that's safe to use inside a CSS mask.
  *
- * FilePicker returns paths relative to the Foundry Data directory with no leading slash
+ * The file picker returns paths relative to the host's data directory with no leading slash
  * (e.g. "sharedAssets/images/icons/a.svg"). That's fine for an <img src> or a PIXI texture -
  * both resolve it against the document's base URL. But every pin icon glyph is painted via
  * `mask-image: var(--fwmb-mask)`, and a *relative* url() inside a CSS custom property is
  * resolved against the stylesheet where the `var()` is read (filrodens-world-map-builder.css),
  * not against wherever the property's value was set - so a bare relative path 404s one
- * directory level too deep (under styles/). Routing it through Foundry's own getRoute() makes
- * it root-relative (and prefixes any configured route/proxy path), which resolves identically
- * regardless of which stylesheet reads it. A Forge/remote asset-library URL is already
- * absolute and is returned unchanged.
+ * directory level too deep (under styles/). platform.assets.url makes it root-relative (in
+ * Foundry through its own getRoute(), which also prefixes any configured route/proxy path), so
+ * it resolves identically regardless of which stylesheet reads it. A Forge/remote
+ * asset-library URL is already absolute and is returned unchanged.
  */
 function toIconUrl(path) {
-    if (!path || /^https?:\/\//i.test(path)) return path;
-    return foundry.utils.getRoute(path);
+    return platform.assets.url(path);
 }
 
 /**
@@ -51,14 +43,14 @@ function toIconUrl(path) {
  * tools-settings.hbs, not Foundry's native settings sheet.
  */
 export function registerPinIconSettings() {
-    game.settings.register(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, {
+    platform.settings.register(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, {
         scope: "world",
         config: false,
         type: Array,
         default: [],
     });
 
-    game.settings.register(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, {
+    platform.settings.register(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, {
         scope: "world",
         config: false,
         type: Array,
@@ -70,14 +62,14 @@ export function registerPinIconSettings() {
  * The built-in icon keys a GM has hidden from the pickers.
  */
 function getDisabledPinIcons() {
-    return game.settings.get(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED) || [];
+    return platform.settings.get(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED) || [];
 }
 
 /**
  * The GM's registered custom icons, each `{ id, name, path }`.
  */
 function getCustomPinIcons() {
-    return game.settings.get(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM) || [];
+    return platform.settings.get(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM) || [];
 }
 
 /**
@@ -90,7 +82,7 @@ export function getBuiltinPinIconList() {
     return Object.entries(FILRODENSWMB.INFRASTRUCTURE_ICONS)
         .map(([key, labelKey]) => ({
             key,
-            label: game.i18n.localize(labelKey),
+            label: platform.i18n.localize(labelKey),
             isDisabled: disabled.has(key),
             isProtected: key === FILRODENSWMB.PIN_ICONS.DEFAULT,
         }))
@@ -129,7 +121,7 @@ export function getPinIconPickerList(currentKey = null) {
         .filter(([key]) => !disabled.has(key) || key === currentKey)
         .map(([key, labelKey]) => ({
             key,
-            label: game.i18n.localize(labelKey),
+            label: platform.i18n.localize(labelKey),
             path: builtinIconPath(key),
             isCustom: false,
         }))
@@ -154,7 +146,7 @@ export function getPinIconPickerList(currentKey = null) {
  */
 export function getPinIconLabel(key) {
     const labelKey = FILRODENSWMB.INFRASTRUCTURE_ICONS[key];
-    if (labelKey) return game.i18n.localize(labelKey);
+    if (labelKey) return platform.i18n.localize(labelKey);
 
     const custom = getCustomPinIcons().find((entry) => entry.id === key);
     return custom?.name || "Pin";
@@ -180,8 +172,8 @@ export function resolvePinIconPath(key) {
  * Registers a new custom icon and returns the stored entry (including its generated id).
  */
 export async function addCustomPinIcon({ name, path }) {
-    const entry = { id: foundry.utils.randomID(), name, path };
-    await game.settings.set(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, [...getCustomPinIcons(), entry]);
+    const entry = { id: platform.utils.randomID(), name, path };
+    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, [...getCustomPinIcons(), entry]);
     return entry;
 }
 
@@ -191,7 +183,7 @@ export async function addCustomPinIcon({ name, path }) {
  */
 export async function updateCustomPinIcon(id, { name, path }) {
     const icons = getCustomPinIcons().map((entry) => (entry.id === id ? { ...entry, name, path } : entry));
-    await game.settings.set(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, icons);
+    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, icons);
 }
 
 /**
@@ -202,7 +194,7 @@ export async function updateCustomPinIcon(id, { name, path }) {
  */
 export async function removeCustomPinIconEntry(id) {
     const icons = getCustomPinIcons().filter((entry) => entry.id !== id);
-    await game.settings.set(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, icons);
+    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM, icons);
 }
 
 /**
@@ -216,7 +208,7 @@ export async function setBuiltinPinIconDisabled(key, isDisabled) {
     if (isDisabled) current.add(key);
     else current.delete(key);
 
-    await game.settings.set(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, [...current]);
+    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, [...current]);
 }
 
 /**
@@ -250,12 +242,12 @@ export function findUnresolvedPinIcons(pins = []) {
  */
 export async function setAllBuiltinPinIconsDisabled(isDisabled) {
     if (!isDisabled) {
-        await game.settings.set(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, []);
+        await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, []);
         return;
     }
 
     const keys = Object.keys(FILRODENSWMB.INFRASTRUCTURE_ICONS).filter((key) => key !== FILRODENSWMB.PIN_ICONS.DEFAULT);
-    await game.settings.set(FILRODENSWMB.ID, FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, keys);
+    await platform.settings.set(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, keys);
 }
 
 /**
@@ -267,16 +259,11 @@ export async function setAllBuiltinPinIconsDisabled(isDisabled) {
  */
 export async function findPinIconUsage(key, livePins = []) {
     const savedMaps = [];
-    const pack = getMapCompendiumPack();
 
-    if (pack) {
-        const documents = await pack.getDocuments();
-
-        for (const doc of documents) {
-            const pins = doc.flags?.[FILRODENSWMB.ID]?.mapData?.pins || [];
-            const count = pins.filter((pin) => pin.icon === key).length;
-            if (count > 0) savedMaps.push({ id: doc.id, name: doc.name, count });
-        }
+    for (const { id, name, mapData } of await platform.store.listMapData()) {
+        const pins = mapData?.pins || [];
+        const count = pins.filter((pin) => pin.icon === key).length;
+        if (count > 0) savedMaps.push({ id, name, count });
     }
 
     const liveCount = livePins.filter((pin) => pin.icon === key).length;
@@ -294,18 +281,13 @@ export async function findPinIconUsage(key, livePins = []) {
  */
 export async function revertPinIconUsage(key, livePins = []) {
     const fallback = FILRODENSWMB.PIN_ICONS.DEFAULT;
-    const pack = getMapCompendiumPack();
 
-    if (pack) {
-        const documents = await pack.getDocuments();
+    for (const { id, mapData } of await platform.store.listMapData()) {
+        const pins = mapData?.pins;
+        if (!pins?.some((pin) => pin.icon === key)) continue;
 
-        for (const doc of documents) {
-            const pins = doc.flags?.[FILRODENSWMB.ID]?.mapData?.pins;
-            if (!pins?.some((pin) => pin.icon === key)) continue;
-
-            const revertedPins = pins.map((pin) => (pin.icon === key ? { ...pin, icon: fallback } : pin));
-            await doc.update({ [`flags.${FILRODENSWMB.ID}.mapData.pins`]: revertedPins });
-        }
+        const revertedPins = pins.map((pin) => (pin.icon === key ? { ...pin, icon: fallback } : pin));
+        await platform.store.updateMapDataFields(id, { pins: revertedPins });
     }
 
     for (const pin of livePins) {

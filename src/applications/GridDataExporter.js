@@ -3,6 +3,7 @@ import { GridAggregator, VoteTally } from "../generation/GridAggregator.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { RiverNetwork } from "../generation/RiverNetwork.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { platform } from "../platform/index.js";
 
 /**
  * Builds the per-grid-cell exploration data layer written to
@@ -84,15 +85,9 @@ export class GridDataExporter {
      * live Scene document - the export needs the grid's cell geometry, not a placed canvas.
      */
     static #buildGrid(uiState) {
-        if (uiState.gridType === "square") {
-            return new foundry.grid.SquareGrid({ size: MapStateManager.gridSizeOf(uiState.gridSize) });
-        }
-
-        // FWMB only ever exports the odd-offset hex variants (HEXODDR for hexR, HEXODDQ for hexC -
-        // see FILRODENSWMB.GRID_TYPES), so `even` is always false here. `columns` selects the
-        // orientation: true for flat-top/column-offset hexes (hexC), false for pointy-top/
-        // row-offset hexes (hexR).
-        return new foundry.grid.HexagonalGrid({ size: MapStateManager.gridSizeOf(uiState.gridSize), columns: uiState.gridType === "hexC", even: false });
+        // The host supplies the grid geometry (in Foundry, its own grid classes; FWMB only uses
+        // the odd-offset hex variants, see FILRODENSWMB.GRID_TYPES and platform.grid)
+        return platform.grid.create({ type: uiState.gridType, size: MapStateManager.gridSizeOf(uiState.gridSize) });
     }
 
     /** Reverse lookup from a built-in biome's numeric id (FILRODENSWMB.BIOME_IDS) back to its string key. */
@@ -480,7 +475,7 @@ export class GridDataExporter {
         }
 
         if (typeof lookupKey === "string") {
-            return { id: lookupKey, name: game.i18n.localize(`FILRODENSWMB.BIOMES.${lookupKey}`), code: null };
+            return { id: lookupKey, name: platform.i18n.localize(`FILRODENSWMB.BIOMES.${lookupKey}`), code: null };
         }
 
         // Built-in and custom biome ids never collide: built-in ids run 0-13 (FILRODENSWMB.BIOME_IDS)
@@ -489,7 +484,7 @@ export class GridDataExporter {
             const builtInKey = biomeIdToKey.get(lookupKey) ?? null;
             return {
                 id: builtInKey ?? String(lookupKey),
-                name: builtInKey ? game.i18n.localize(`FILRODENSWMB.BIOMES.${builtInKey}`) : "",
+                name: builtInKey ? platform.i18n.localize(`FILRODENSWMB.BIOMES.${builtInKey}`) : "",
                 code: null,
             };
         }

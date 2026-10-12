@@ -1,6 +1,6 @@
 import { FILRODENSWMB } from "./src/config.js";
 import { registerSidebarInjection } from "./src/hooks/sidebar-injection.js";
-import { initializeCompendium } from "./src/data/compendium.js";
+import { initializeCompendium } from "./src/platform/foundry/store.js";
 import { registerPinIconSettings } from "./src/data/pinIcons.js";
 import { RangeDisplay } from "./src/tools/RangeDisplay.js";
 

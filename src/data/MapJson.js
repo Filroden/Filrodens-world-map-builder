@@ -3,7 +3,7 @@ import { normaliseAreaFactor } from "../mesh/Schema.js";
 /**
  * The JSON file a map is exported to and imported from: the map data as saved, plus (for a map on
  * the display mesh) its encoded owner arrays under a top-level `owners` key, by level id. In the
- * compendium the owners live in their own flag beside the map data (see compendium.saveMapData);
+ * compendium the owners live in their own flag beside the map data (see platform.store.saveMapData);
  * a file has to carry them inside, or a re-imported map would lose its regions.
  *
  * Kept free of Foundry calls so the round trip can be tested on its own.

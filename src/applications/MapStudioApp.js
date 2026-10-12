@@ -6,10 +6,8 @@ import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { RenderTimer } from "../tools/RenderTimer.js";
-import { getSavedMaps, loadMapData, loadMapOwners, saveMapData, deleteSavedMap, renameSavedMap, duplicateSavedMap } from "../data/compendium.js";
 import { MapJson } from "../data/MapJson.js";
 import { Scene3D } from "../canvas/Scene3D.js";
-import { SceneExporter } from "./SceneExporter.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { RefreshQueue } from "../tools/RefreshQueue.js";
 import { ColorMath } from "../tools/ColorMath.js";
@@ -26,7 +24,11 @@ import { RandomLandMap } from "../generation/RandomLandMap.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { LayerPainting } from "../canvas/LayerPainting.js";
 import { MeshIntegration } from "./MeshIntegration.js";
+import { platform } from "../platform/index.js";
 
+// The studio's window is a Foundry application; everything inside it goes through the platform
+// services (see src/platform/index.js)
+// eslint-disable-next-line no-restricted-globals
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 // Turns a fraction into a percentage for the timing summary
@@ -285,7 +287,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     ];
 
     constructor(options) {
-        options.position = foundry.utils.mergeObject(options.position || {}, {
+        options.position = platform.utils.mergeObject(options.position || {}, {
             width: window.innerWidth * 0.7,
             height: window.innerHeight * 0.9,
         });
@@ -404,7 +406,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         this.defaultUiState = MapStateManager.buildDefaultUiState(this.mapWidth, this.mapHeight);
 
-        this.uiState = foundry.utils.deepClone(this.defaultUiState);
+        this.uiState = platform.utils.deepClone(this.defaultUiState);
         this.customBiomeColors = {};
 
         // Collects per-phase timings during a full render for the summary logged when it finishes
@@ -414,21 +416,21 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // Each of these runs a moment after the edit that scheduled it, by which time the window
         // may have been closed; see #whileOpen
-        this.debouncedGenerateTerrain = foundry.utils.debounce(this.#whileOpen(() => this.generateTerrain()), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
-        this.debouncedGenerateClimate = foundry.utils.debounce(this.#whileOpen((bounds) => this.generateClimate(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
-        this.debouncedGenerateFeatures = foundry.utils.debounce(this.#whileOpen((bounds) => this.generateFeatures(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.FEATURES);
+        this.debouncedGenerateTerrain = platform.utils.debounce(this.#whileOpen(() => this.generateTerrain()), FILRODENSWMB.UI.DEBOUNCE_MS.TERRAIN);
+        this.debouncedGenerateClimate = platform.utils.debounce(this.#whileOpen((bounds) => this.generateClimate(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.CLIMATE);
+        this.debouncedGenerateFeatures = platform.utils.debounce(this.#whileOpen((bounds) => this.generateFeatures(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.FEATURES);
 
-        this.debouncedCanvasTerrain = foundry.utils.debounce(this.#whileOpen(() => this.generateTerrain()), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
-        this.debouncedCanvasClimate = foundry.utils.debounce(this.#whileOpen((bounds) => this.generateClimate(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedCanvasTerrain = platform.utils.debounce(this.#whileOpen(() => this.generateTerrain()), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedCanvasClimate = platform.utils.debounce(this.#whileOpen((bounds) => this.generateClimate(bounds)), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
-        this.debouncedRepaintCanvas = foundry.utils.debounce(this.#whileOpen(() => this._repaintCanvas()), FILRODENSWMB.UI.DEBOUNCE_MS.DISPLAY);
+        this.debouncedRepaintCanvas = platform.utils.debounce(this.#whileOpen(() => this._repaintCanvas()), FILRODENSWMB.UI.DEBOUNCE_MS.DISPLAY);
 
-        this.debouncedHistoryRebuild = foundry.utils.debounce(this.#whileOpen(() => this.#requestChangedTerrain("Brush stroke rebuild")), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
+        this.debouncedHistoryRebuild = platform.utils.debounce(this.#whileOpen(() => this.#requestChangedTerrain("Brush stroke rebuild")), FILRODENSWMB.UI.DEBOUNCE_MS.CANVAS);
 
         // Every refresh that uses the scratch buffer restarts this timer. The buffer is only ever
         // used inside single synchronous steps and refilled before each use, so it can be dropped
         // whenever the timer fires, even between the steps of a refresh.
-        this.debouncedReleaseScratch = foundry.utils.debounce(() => {
+        this.debouncedReleaseScratch = platform.utils.debounce(() => {
             this.bufferScratch = null;
         }, FILRODENSWMB.UI.DEBOUNCE_MS.SCRATCH_RELEASE);
     }
@@ -520,8 +522,8 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     static #applyRTLSupport(element) {
         const rtlLanguages = FILRODENSWMB.UI.RTL_LANGUAGES || [];
-        // Fallback to "en" if game.i18n is not fully initialised during early render
-        const currentLang = game?.i18n?.lang || "en";
+        // Falls back to "en" when the host's localisation is not ready yet (see platform.i18n.lang)
+        const currentLang = platform.i18n.lang;
 
         if (!rtlLanguages.includes(currentLang)) return;
 
@@ -688,7 +690,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             // Sort the unified list alphabetically by name
             context.autoLabels = autoLabels.toSorted(alphaSort);
-            context.fontFamilies = CONFIG.fontFamilies || ["Signika", "Modesto Condensed", "Arial"];
+            context.fontFamilies = platform.fonts.list();
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
             if (this.regionLayers.length > 0 && !this.activeRegionLayerId) {
@@ -705,7 +707,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }));
 
             if (this.activeTool === "manage") {
-                context.savedMaps = await getSavedMaps();
+                context.savedMaps = await platform.store.getSavedMaps();
             }
         }
 
@@ -893,13 +895,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (undoBtn) {
             undoBtn.disabled = undoCount === 0;
             undoBtn.dataset.tooltip =
-                undoCount > 0 ? game.i18n.format("FILRODENSWMB.UI.UndoCount", { count: undoCount }) : game.i18n.localize("FILRODENSWMB.UI.Undo");
+                undoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.UndoCount", { count: undoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Undo");
         }
 
         if (redoBtn) {
             redoBtn.disabled = redoCount === 0;
             redoBtn.dataset.tooltip =
-                redoCount > 0 ? game.i18n.format("FILRODENSWMB.UI.RedoCount", { count: redoCount }) : game.i18n.localize("FILRODENSWMB.UI.Redo");
+                redoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.RedoCount", { count: redoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Redo");
         }
     }
 
@@ -1351,9 +1353,9 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             if (custom) return custom.name;
 
             const builtInKey = Object.keys(FILRODENSWMB.BIOME_IDS).find((key) => FILRODENSWMB.BIOME_IDS[key] === lookupKey);
-            return builtInKey ? game.i18n.localize(`FILRODENSWMB.BIOMES.${builtInKey}`) : "";
+            return builtInKey ? platform.i18n.localize(`FILRODENSWMB.BIOMES.${builtInKey}`) : "";
         }
-        return game.i18n.localize(`FILRODENSWMB.BIOMES.${lookupKey}`);
+        return platform.i18n.localize(`FILRODENSWMB.BIOMES.${lookupKey}`);
     }
 
     #applyInitialBootState() {
@@ -1452,7 +1454,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             heldItem: this.canvasEngine?.heldItem ?? null,
         });
 
-        CanvasHints.render(element, CanvasHints.getKeys(context), (key) => game.i18n.localize(key));
+        CanvasHints.render(element, CanvasHints.getKeys(context), (key) => platform.i18n.localize(key));
     }
 
     #handleCanvasDoubleClick(hitData) {
@@ -1702,7 +1704,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         for (const spring of this.proceduralSprings ?? []) {
             if (spring.x === spring.homeX && spring.y === spring.homeY) continue;
             this.mapPins.push(RiverSources.removalPin({ x: spring.homeX, y: spring.homeY }));
-            this.mapPins.push({ id: foundry.utils.randomID(), name: "River Source", x: spring.x, y: spring.y, type: "spring", radius: FILRODENSWMB.DISPLAY.PIN_RADIUS, visibility: "all" });
+            this.mapPins.push({ id: platform.utils.randomID(), name: "River Source", x: spring.x, y: spring.y, type: "spring", radius: FILRODENSWMB.DISPLAY.PIN_RADIUS, visibility: "all" });
             spring.homeX = spring.x;
             spring.homeY = spring.y;
         }
@@ -2045,7 +2047,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     #createLandMask(operation, points) {
         const number = this.landMasks.length + 1;
         return {
-            id: foundry.utils.randomID(),
+            id: platform.utils.randomID(),
             name: operation === "subtract" ? `Ocean Hole ${number}` : `Landmass ${number}`,
             operation,
             points,
@@ -2075,7 +2077,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         });
 
         if (!points) {
-            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.RandomLandMaskNoLand"));
+            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.RandomLandMaskNoLand"));
             this.#refreshAfterLandMaskChange(finishedMaskNeedsTerrain);
             return;
         }
@@ -2139,7 +2141,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (this.uiState.activeFeatureMode === "spring") {
             this.mapPins.push({
-                id: foundry.utils.randomID(),
+                id: platform.utils.randomID(),
                 name: "River Source",
                 x: finalPos.x,
                 y: finalPos.y,
@@ -2157,7 +2159,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const existing = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
                 if (existing) existing.points.push(finalPos);
             } else {
-                this.activeFaultId = foundry.utils.randomID();
+                this.activeFaultId = platform.utils.randomID();
                 const type = this.#resolveFaultType();
                 const fault = {
                     id: this.activeFaultId,
@@ -2184,7 +2186,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const river = this.manualRivers.find((r) => r.id === this.activeRiverId);
                 if (river) river.points.push(finalPos);
             } else {
-                this.activeRiverId = foundry.utils.randomID();
+                this.activeRiverId = platform.utils.randomID();
                 this.manualRivers.push({
                     id: this.activeRiverId,
                     name: `Manual River ${this.manualRivers.length + 1}`,
@@ -2643,7 +2645,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     async #refreshChangedTerrain(title) {
         await this.#runTimed(title, async () => {
-            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.RebuildingHistory"));
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.RebuildingHistory"));
 
             try {
                 const rebuiltArea = ProceduralOrchestrator.rebuildChangedTerrain(this);
@@ -2669,7 +2671,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     async #refreshRivers() {
         await this.#runTimed("Features refresh (rivers only)", async () => {
-            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
 
             try {
                 const waterBounds = ProceduralOrchestrator.processFeaturePhase(this, true);
@@ -2738,7 +2740,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // The run starts before the overlay's paint pause so the summary's total covers everything
         // the user waits for, not just the phases that log their own times
         await this.#runTimed("Full render", async () => {
-            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
 
             try {
                 // Hand off the mathematical heavy lifting to the Orchestrator
@@ -2765,7 +2767,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
 
         await this.#runTimed(`Climate refresh (${activeBounds ? "bounded" : "whole map"})`, async () => {
-            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
 
             try {
                 // The climate is recomputed over a wider area than the one that changed, and the
@@ -2784,7 +2786,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const bounds = this.#resolveRefreshBounds(requestedBounds);
 
         await this.#runTimed(`Features refresh (${bounds ? "bounded" : "whole map"})`, async () => {
-            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
 
             try {
                 // Rivers are traced over the whole map, so the water can change well outside the
@@ -2836,11 +2838,11 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Loads a saved map into the Studio and generates it.
      *
      * @param {object} rawPayload - The map data.
-     * @param {Object<string, string>} [rawOwners] - Its encoded owner arrays (see compendium.loadMapOwners).
+     * @param {Object<string, string>} [rawOwners] - Its encoded owner arrays (see platform.store.loadMapOwners).
      */
     async #ingestMapPayload(rawPayload, rawOwners = {}) {
         // Deep clone to sever the connection to Foundry's memory cache
-        const payload = foundry.utils.deepClone(rawPayload);
+        const payload = platform.utils.deepClone(rawPayload);
         // Regions and routes come from the display mesh, whose session opens once the terrain
         // exists (see the end of this method); with MESH_NATIVE off, a map saved on the mesh is
         // shown from the polygons it was migrated from
@@ -3033,7 +3035,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // default), so this is a heads-up rather than a blocker.
         const { affectedPinCount } = findUnresolvedPinIcons(this.mapPins);
         if (affectedPinCount > 0) {
-            ui.notifications.warn(game.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
+            platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
         }
 
         this.mapRoutes = payload.mapRoutes || [];
@@ -3068,7 +3070,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.globalHistoryLedger = [];
         this.globalRedoLedger = [];
 
-        this.defaultUiState = foundry.utils.deepClone(this.uiState);
+        this.defaultUiState = platform.utils.deepClone(this.uiState);
 
         this.render({ parts: ["toolbar", "context"] });
         await this.generateTerrain();
@@ -3104,7 +3106,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         if (this.uiState.activeInfraMode === "pin") {
             const newPin = {
-                id: foundry.utils.randomID(),
+                id: platform.utils.randomID(),
                 name: getPinIconLabel(this.uiState.activeIcon),
                 icon: this.uiState.activeIcon,
                 x: finalPos.x,
@@ -3122,7 +3124,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
                 if (route) route.points.push(finalPos);
             } else {
-                this.activeRouteId = foundry.utils.randomID();
+                this.activeRouteId = platform.utils.randomID();
                 const newRoute = {
                     id: this.activeRouteId,
                     name: `Route ${this.mapRoutes.length + 1}`,
@@ -3151,7 +3153,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         MapStateManager.pushVectorState(this);
         this.mapLabels.push({
-            id: foundry.utils.randomID(),
+            id: platform.utils.randomID(),
             name: this.uiState.nextLabelText || "New Label",
             x: x,
             y: y,
@@ -3185,7 +3187,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
         if (!this.activeRegionLayerId) {
-            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");
             return;
         }
 
@@ -3208,7 +3210,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 }
             }
         } else {
-            this.activeRegionId = foundry.utils.randomID();
+            this.activeRegionId = platform.utils.randomID();
             layer.regions.push({
                 id: this.activeRegionId,
                 name: `Region ${layer.regions.length + 1}`,
@@ -3290,7 +3292,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * name made from the seed for a map that has never been saved.
      */
     #defaultSaveName() {
-        if (this.currentSaveName) return game.i18n.format("FILRODENSWMB.UI.SaveAsCopyName", { name: this.currentSaveName });
+        if (this.currentSaveName) return platform.i18n.format("FILRODENSWMB.UI.SaveAsCopyName", { name: this.currentSaveName });
 
         const { currentSeed } = MapStateManager.getMapParameters(this);
         const hash = currentSeed || this.#generateRandomSeed();
@@ -3311,14 +3313,14 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // finally releases the processing overlay, and a cancelled prompt has not claimed it, so
         // releasing it here would hide the overlay of a refresh that is still running.
         if (createsNewMap) {
-            mapName = (await MapDialogManager._promptTextValue(promptTitle ?? game.i18n.localize("FILRODENSWMB.UI.SaveAs"), game.i18n.localize("FILRODENSWMB.UI.Name"), this.#defaultSaveName()))?.trim();
+            mapName = (await MapDialogManager._promptTextValue(promptTitle ?? platform.i18n.localize("FILRODENSWMB.UI.SaveAs"), platform.i18n.localize("FILRODENSWMB.UI.Name"), this.#defaultSaveName()))?.trim();
 
             if (!mapName) return false; // User cancelled the save prompt (or left the name blank)
         }
 
         try {
             // 2. Lock the UI and show the spinner
-            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.SavingMap"));
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.SavingMap"));
             this.currentSaveName = mapName;
 
             const { currentSeed, params } = MapStateManager.getMapParameters(this);
@@ -3355,17 +3357,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
             // The display mesh's block, layer sets and owner arrays (see MeshIntegration)
             const owners = MeshIntegration.preparePayload(this, payload);
-            const journal = await saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId, { owners });
+            const journal = await platform.store.saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId, { owners });
 
             if (journal) {
                 this.currentSaveId = journal.id;
                 this.isDirty = false; // Successfully saved, map is no longer dirty
-                ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
+                platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.SaveSuccess", { name: journal.name }));
                 // A new saved map also belongs in the saved maps list, if it is showing
                 this.render({ parts: createsNewMap && this.activeTool === "manage" ? ["toolbar", "context"] : ["toolbar"] });
                 return true;
             } else {
-                ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.SaveError"));
+                platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.SaveError"));
                 return false;
             }
         } finally {
@@ -3483,7 +3485,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!preview?.bounds) return;
 
         const prefixKey = direction === "undo" ? "FILRODENSWMB.UI.ActionUndo" : "FILRODENSWMB.UI.ActionRedo";
-        const prefix = game.i18n.localize(prefixKey);
+        const prefix = platform.i18n.localize(prefixKey);
         this.canvasEngine.showActionPreview(preview.bounds, `${prefix} ${preview.label}`);
     }
 
@@ -3504,7 +3506,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         return {
             bounds: this.#calculatePointBounds(targetStroke.points, targetStroke.size || DEFAULT_STROKE_PREVIEW_SIZE),
-            label: game.i18n.localize(locKey) || fallback,
+            label: platform.i18n.localize(locKey) || fallback,
         };
     }
 
@@ -3611,12 +3613,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Resolves the localised UI label for a modified vector entity.
      */
     #getActionLabel(key, entity) {
-        if (!key) return game.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
+        if (!key) return platform.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
 
         if (key === "pins") {
             const isSpring = entity?.type === "spring" || entity?.type === "block_spring";
             const pinKey = isSpring ? "FILRODENSWMB.UI.ActionRiverSpring" : "FILRODENSWMB.UI.ActionInfrastructurePin";
-            return game.i18n.localize(pinKey) || (isSpring ? "River Spring" : "Infrastructure Pin");
+            return platform.i18n.localize(pinKey) || (isSpring ? "River Spring" : "Infrastructure Pin");
         }
 
         const labelConfig = {
@@ -3631,7 +3633,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const match = labelConfig[key];
 
-        return match ? game.i18n.localize(match[0]) || match[1] : game.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
+        return match ? platform.i18n.localize(match[0]) || match[1] : platform.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
     }
 
     /**
@@ -3806,7 +3808,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const targetScale = Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.min(currentScale + dir * FILRODENSWMB.LIMITS.NOISE_SCALE_STEP, maxScale));
 
         if (currentScale === targetScale) {
-            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnScaleLimit") || "Noise scale limit reached.");
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnScaleLimit") || "Noise scale limit reached.");
             return;
         }
 
@@ -3876,7 +3878,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * Highly destructive action: Rebuilds the underlying webgl canvas and spatial arrays.
      */
     async _onApplyResolution(event, target) {
-        const formData = new foundry.applications.ux.FormDataExtended(target.form).object;
+        const formData = platform.utils.readForm(target.form);
 
         const newWidth = Number.parseInt(formData.mapWidth) || FILRODENSWMB.DEFAULTS.MAP_WIDTH;
         const newHeight = Number.parseInt(formData.mapHeight) || FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
@@ -3913,7 +3915,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.#setTerrainLayers(MapStudioApp.#allTerrainLayers(true));
 
         this.defaultUiState = MapStateManager.buildDefaultUiState(newWidth, newHeight);
-        this.uiState = foundry.utils.deepClone(this.defaultUiState);
+        this.uiState = platform.utils.deepClone(this.defaultUiState);
         this.uiState.mapSeed = newSeed;
 
         // Inject the engine choice into the wiped state
@@ -4133,13 +4135,13 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     async _onExportPng(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
-            ui.notifications.warn("No map is currently generated to export.");
+            platform.notify.warn("No map is currently generated to export.");
             return;
         }
 
         const mapName = this.currentSaveName || "Unsaved Map";
 
-        ui.notifications.info(game.i18n.format("Exporting {name} to PNG...", { name: mapName }));
+        platform.notify.info(platform.i18n.format("Exporting {name} to PNG...", { name: mapName }));
         this.canvasEngine.exportToPNG(mapName);
     }
 
@@ -4148,30 +4150,26 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     async _onExportScene(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
-            ui.notifications.warn("No map is currently generated to export.");
+            platform.notify.warn("No map is currently generated to export.");
             return;
         }
 
         const defaultName = this.currentSaveName || "New Map Scene";
         const defaultFolder = "fwmb-exports";
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder });
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder });
 
-        const config = await foundry.applications.api.DialogV2.prompt({
+        const config = await platform.dialogs.prompt({
             classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.ExportScene") || "Export to Scene" },
+            title: platform.i18n.localize("FILRODENSWMB.UI.ExportScene") || "Export to Scene",
             content: content,
-            ok: {
-                callback: (event, button, _dialog) => {
-                    return {
-                        sceneName: button.form.elements["sceneName"].value.trim() || defaultName,
-                        exportFolder: button.form.elements["exportFolder"].value.trim() || defaultFolder,
-                        generateJournals: button.form.elements["generateJournals"].checked,
-                        overwriteJournals: button.form.elements["overwriteJournals"].checked,
-                        createGmOverlay: button.form.elements["createGmOverlay"].checked,
-                    };
-                },
-            },
+            onSubmit: (form) => ({
+                sceneName: form.elements["sceneName"].value.trim() || defaultName,
+                exportFolder: form.elements["exportFolder"].value.trim() || defaultFolder,
+                generateJournals: form.elements["generateJournals"].checked,
+                overwriteJournals: form.elements["overwriteJournals"].checked,
+                createGmOverlay: form.elements["createGmOverlay"].checked,
+            }),
         });
 
         if (!config) return; // User cancelled
@@ -4184,7 +4182,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
      * The background orchestrator for slicing the canvas and creating the Foundry Documents.
      */
     async #executeSceneExportPipeline(config) {
-        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.ExportingScene") || "Exporting Scene...");
+        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingScene") || "Exporting Scene...");
 
         try {
             // Temporarily strip the camera transform so the PNG exports at a mathematically 1:1 scale with 0 offsets
@@ -4233,10 +4231,10 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             this._repaintVectors();
 
             // Hand off the physical Blobs to the server-side Exporter utility
-            await SceneExporter.run(this, config, playerBlob, gmBlob);
+            await platform.scene.run(this, config, playerBlob, gmBlob);
         } catch (err) {
             console.error("FWMB | Pipeline Error:", err);
-            ui.notifications.error("Export pipeline failed. See console for details.");
+            platform.notify.error("Export pipeline failed. See console for details.");
         } finally {
             this.#endProcessing();
         }
@@ -4257,7 +4255,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // 1. Validate Crop Box
         const cropBox = this.canvasEngine.getCropData();
         if (!cropBox || cropBox.width <= 0 || cropBox.height <= 0) {
-            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnInvalidCrop") || "Please draw a valid crop area first.");
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnInvalidCrop") || "Please draw a valid crop area first.");
             return;
         }
 
@@ -4265,27 +4263,27 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const neverSaved = !this.currentSaveId;
         if (neverSaved || this.isDirty) {
             if (!(await MapDialogManager.promptSaveBeforeRegionalMap(neverSaved))) return;
-            if (!(await this.saveCurrentMap({ promptTitle: game.i18n.localize("FILRODENSWMB.UI.SaveUnsavedMap") }))) return;
+            if (!(await this.saveCurrentMap({ promptTitle: platform.i18n.localize("FILRODENSWMB.UI.SaveUnsavedMap") }))) return;
         }
 
         // 2. Prompt for save name
-        const mapName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.SaveRegionalMap"), game.i18n.localize("FILRODENSWMB.UI.Name"), `${this.currentSaveName || "Map"} (Region)`);
+        const mapName = await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.SaveRegionalMap"), platform.i18n.localize("FILRODENSWMB.UI.Name"), `${this.currentSaveName || "Map"} (Region)`);
 
         if (!mapName) return;
 
         // 3. Lock UI
-        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.GeneratingRegion") || "Extracting Region...");
+        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingRegion") || "Extracting Region...");
 
         try {
             // 4. Delegate heavy mathematical payload extraction
             const { payload, owners } = RegionalExtractor.createPayload(this, cropBox);
 
             // 5. Save to database
-            const journal = await saveMapData(mapName, payload, null, { owners });
-            if (journal) ui.notifications.info(`Regional Map '${journal.name}' created successfully.`);
+            const journal = await platform.store.saveMapData(mapName, payload, null, { owners });
+            if (journal) platform.notify.info(`Regional Map '${journal.name}' created successfully.`);
         } catch (err) {
             console.error("FWMB | Regional Map Generation Failed:", err);
-            ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.RegionalGenerationError") || "Failed to generate regional map.");
+            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.RegionalGenerationError") || "Failed to generate regional map.");
         } finally {
             // 6. Cleanup
             this.#endProcessing();
@@ -4305,7 +4303,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             const file = e.target.files[0];
             if (!file) return;
 
-            await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.ImportingMap") || "Importing Map...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ImportingMap") || "Importing Map...");
 
             try {
                 const text = await file.text();
@@ -4318,22 +4316,22 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 const cleanName = file.name.replace(".json", "").replace("fwmb_", "");
                 // A file carries the owner arrays inside it (see MapJson); the compendium keeps them apart
                 const { mapData, owners } = MapJson.fromImport(parsedData);
-                await saveMapData(`${cleanName} (Imported)`, mapData, null, { owners });
+                await platform.store.saveMapData(`${cleanName} (Imported)`, mapData, null, { owners });
 
-                ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ImportSuccess"));
+                platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.ImportSuccess"));
 
                 // Flag now, at import time, rather than waiting for the GM to load the map -
                 // custom pin icons are world-local (see pinIcons.js), so a JSON export from a
                 // different world commonly won't resolve here.
                 const { affectedPinCount } = findUnresolvedPinIcons(parsedData.mapPins);
                 if (affectedPinCount > 0) {
-                    ui.notifications.warn(game.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
+                    platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
                 }
 
                 this.render({ parts: ["toolbar", "context"] });
             } catch (err) {
                 console.error("FWMB | Import Failed:", err);
-                ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.ImportError"));
+                platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ImportError"));
             } finally {
                 this.#endProcessing();
             }
@@ -4357,26 +4355,24 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
                 count,
                 countLabel:
                     count > 0
-                        ? game.i18n.format("FILRODENSWMB.UI.ExportSettingsCount", { count })
-                        : game.i18n.localize("FILRODENSWMB.UI.ExportSettingsCountEmpty"),
+                        ? platform.i18n.format("FILRODENSWMB.UI.ExportSettingsCount", { count })
+                        : platform.i18n.localize("FILRODENSWMB.UI.ExportSettingsCountEmpty"),
             };
         });
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs", { categories });
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs", { categories });
 
-        const selectedKeys = await foundry.applications.api.DialogV2.prompt({
+        const selectedKeys = await platform.dialogs.prompt({
             classes: ["fwmb"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.ExportSettings") },
+            title: platform.i18n.localize("FILRODENSWMB.UI.ExportSettings"),
             content: content,
-            ok: {
-                callback: (event, button) => MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key }) => key).filter((key) => button.form.elements[key]?.checked),
-            },
+            onSubmit: (form) => MapStudioApp.STYLE_LIBRARY_CATEGORIES.map(({ key }) => key).filter((key) => form.elements[key]?.checked),
         });
 
         if (!selectedKeys) return; // User cancelled
 
         if (selectedKeys.length === 0) {
-            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.ExportSettingsNoneSelected"));
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.ExportSettingsNoneSelected"));
             return;
         }
 
@@ -4398,7 +4394,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const exportData = {
             schemaVersion: 1,
-            fwmbVersion: game.modules.get(FILRODENSWMB.ID)?.version || "unknown",
+            fwmbVersion: platform.module.version,
             categories,
         };
 
@@ -4441,7 +4437,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 if (importedCount === 0) {
                     const emptyKey = duplicateCount > 0 ? "FILRODENSWMB.UI.ImportSettingsAllDuplicates" : "FILRODENSWMB.UI.ImportSettingsEmpty";
-                    ui.notifications.warn(game.i18n.localize(emptyKey));
+                    platform.notify.warn(platform.i18n.localize(emptyKey));
                     return;
                 }
 
@@ -4458,12 +4454,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
                 const successMessage =
                     duplicateCount > 0
-                        ? game.i18n.format("FILRODENSWMB.UI.ImportSettingsSuccessWithDuplicates", { count: importedCount, duplicates: duplicateCount })
-                        : game.i18n.format("FILRODENSWMB.UI.ImportSettingsSuccess", { count: importedCount });
-                ui.notifications.info(successMessage);
+                        ? platform.i18n.format("FILRODENSWMB.UI.ImportSettingsSuccessWithDuplicates", { count: importedCount, duplicates: duplicateCount })
+                        : platform.i18n.format("FILRODENSWMB.UI.ImportSettingsSuccess", { count: importedCount });
+                platform.notify.info(successMessage);
             } catch (err) {
                 console.error("FWMB | Style Library Import Failed:", err);
-                ui.notifications.error(game.i18n.localize("FILRODENSWMB.UI.ImportSettingsError"));
+                platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ImportSettingsError"));
             }
         };
 
@@ -4535,7 +4531,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
             }
             if (newEntries.length === 0) continue;
 
-            const idAssigned = key === "customBiomes" ? this.#assignSequentialBiomeIds(newEntries) : newEntries.map((entry) => ({ ...entry, id: foundry.utils.randomID() }));
+            const idAssigned = key === "customBiomes" ? this.#assignSequentialBiomeIds(newEntries) : newEntries.map((entry) => ({ ...entry, id: platform.utils.randomID() }));
 
             this.uiState[key] = [...existing, ...idAssigned];
             importedCount += idAssigned.length;
@@ -4585,12 +4581,12 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const canLoad = await this.#gateUnsavedChanges();
         if (!canLoad) return;
 
-        const payload = await loadMapData(mapId);
+        const payload = await platform.store.loadMapData(mapId);
         if (payload) {
             this.currentSaveId = mapId;
             this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-            await this.#ingestMapPayload(payload, await loadMapOwners(mapId));
-            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
+            await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId));
+            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
 
             this.render({ parts: ["toolbar", "context"] });
             // A map migrated or given a new mesh as it opened has changes to save
@@ -4627,7 +4623,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     async #assessTerrainUpgrade() {
         if (!TerrainVersion.isUpgradeCandidate(this.uiState, this.tectonicFaults)) return null;
 
-        await this.#startProcessing(game.i18n.localize("FILRODENSWMB.UI.CheckingTerrainUpdate"));
+        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.CheckingTerrainUpdate"));
         try {
             return TerrainUpgrade.assess(this);
         } finally {
@@ -4645,7 +4641,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
         await TerrainUpgrade.apply(this, plan);
         this.render({ parts: ["context"] });
-        ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApplied"));
+        platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApplied"));
     }
 
     /**
@@ -4662,17 +4658,17 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const confirmed = await MapDialogManager._confirmDialog();
         if (!confirmed) return;
 
-        await deleteSavedMap(mapId);
+        await platform.store.deleteSavedMap(mapId);
         if (this.currentSaveId === mapId) this.currentSaveId = null;
         this.render({ parts: ["context"] });
     }
 
     async #handleMapRename(mapId, card) {
         const currentName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-        const newName = await MapDialogManager._promptTextValue(game.i18n.localize("FILRODENSWMB.UI.Rename"), game.i18n.localize("FILRODENSWMB.UI.Name") || "Name", currentName);
+        const newName = await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.Rename"), platform.i18n.localize("FILRODENSWMB.UI.Name") || "Name", currentName);
 
         if (newName && newName !== currentName) {
-            const updatedDoc = await renameSavedMap(mapId, newName);
+            const updatedDoc = await platform.store.renameSavedMap(mapId, newName);
 
             if (this.currentSaveId === mapId) {
                 this.currentSaveName = newName;
@@ -4685,40 +4681,40 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
     }
 
     async #handleMapDuplicate(mapId) {
-        await duplicateSavedMap(mapId);
+        await platform.store.duplicateSavedMap(mapId);
         this.render({ parts: ["context"] });
     }
 
     async #handleMapPromote(mapId, card) {
         const confirmed = await MapDialogManager._confirmDialog(
-            game.i18n.localize("FILRODENSWMB.UI.Promote") || "Promote Map",
-            game.i18n.localize("FILRODENSWMB.UI.PromoteConfirm") || "Create a standalone copy of this regional map?",
+            platform.i18n.localize("FILRODENSWMB.UI.Promote") || "Promote Map",
+            platform.i18n.localize("FILRODENSWMB.UI.PromoteConfirm") || "Create a standalone copy of this regional map?",
         );
         if (!confirmed) return;
 
-        const exportData = await loadMapData(mapId);
+        const exportData = await platform.store.loadMapData(mapId);
         if (exportData) {
             delete exportData.parentId;
 
             const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
             const newName = `${originalName} (Standalone)`;
 
-            await saveMapData(newName, exportData, null, { owners: await loadMapOwners(mapId) });
+            await platform.store.saveMapData(newName, exportData, null, { owners: await platform.store.loadMapOwners(mapId) });
 
-            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.PromoteSuccess") || "Standalone map created successfully.");
+            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.PromoteSuccess") || "Standalone map created successfully.");
             this.render({ parts: ["context"] });
         }
     }
 
     async #handleMapExport(mapId, card) {
-        const exportData = await loadMapData(mapId);
+        const exportData = await platform.store.loadMapData(mapId);
         if (!exportData) return;
 
         const rawName = card.querySelector(".fwmb-map-card-info").textContent.trim();
         const mapName = rawName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
 
         // The owner arrays travel inside the file (see MapJson)
-        const blob = new Blob([JSON.stringify(MapJson.toExport(exportData, await loadMapOwners(mapId)), null, 2)], { type: "application/json" });
+        const blob = new Blob([JSON.stringify(MapJson.toExport(exportData, await platform.store.loadMapOwners(mapId)), null, 2)], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = `fwmb_${mapName}.json`;
@@ -4926,7 +4922,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this.uiState.regionMode = target.dataset.mode;
 
         if (!this.activeRegionLayerId) {
-            ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");
             return;
         }
 
@@ -4937,7 +4933,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         this._finishActiveRegion();
 
         // Explicitly create the new region object so it immediately appears in the sidebar accordion
-        this.activeRegionId = foundry.utils.randomID();
+        this.activeRegionId = platform.utils.randomID();
         layer.regions.push({
             id: this.activeRegionId,
             name: `Region ${layer.regions.length + 1}`,
@@ -5137,7 +5133,7 @@ export class MapStudioApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const current = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
         const labelFor = (engine, nameKey) => {
             const version = this.uiState.generationEngine === engine ? (TerrainVersion.getDisplayVersion(this.uiState) ?? current) : current;
-            return game.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: game.i18n.localize(nameKey), version });
+            return platform.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: platform.i18n.localize(nameKey), version });
         };
 
         return {
