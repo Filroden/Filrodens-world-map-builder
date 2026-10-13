@@ -68,3 +68,25 @@ export function isContiguous(mesh, path) {
     for (let i = 1; i < path.length; i++) if (!areNeighbours(mesh, path[i - 1], path[i])) return false;
     return true;
 }
+
+/**
+ * A mesh session on the small mesh (see smallMesh) with water down its left quarter, holding the
+ * given layer sets (each level starts unclaimed unless `owners` gives its array).
+ */
+export async function smallSession(layerSets = [], owners = {}) {
+    const { MeshSession } = await import("../../src/mesh/MeshSession.js");
+    const mesh = smallMesh();
+    const aggregates = flatAggregates(mesh, { isWater: (x) => x < mesh.width / 4 });
+    const block = { seed: 42, spacing: 4, cells: mesh.cellCount, modelSpacingKm: 25, modelSpacingPx: 12, width: mesh.width, height: mesh.height, version: 1 };
+    return new MeshSession({ mesh, meshBlock: block, layerSets, owners, aggregates });
+}
+
+/** The cells of a mesh whose site lies in the rectangle [x0, x1) x [y0, y1). */
+export function cellsInRect(mesh, x0, y0, x1, y1) {
+    const cells = [];
+    for (let cell = 0; cell < mesh.cellCount; cell++) {
+        const [x, y] = [mesh.siteX(cell), mesh.siteY(cell)];
+        if (x >= x0 && x < x1 && y >= y0 && y < y1) cells.push(cell);
+    }
+    return cells;
+}

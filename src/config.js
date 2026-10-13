@@ -448,7 +448,8 @@ export const FILRODENSWMB = {
                 biomes: ["PaintBiomes"],
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
                 line: ["AddPoint", "FinishLine", "MovePoint", "InsertPoint", "DeletePoint", "EditLine"],
-                region: ["AddPoint", "FinishRegion", "MovePoint", "MoveRegion", "InsertPoint", "DeletePoint", "EditRegion"],
+                region: ["SelectRegion", "EditRegion"],
+                route: [],
                 mask: ["AddPoint", "FinishMask", "MovePoint", "MoveMask", "InsertPoint", "DeletePoint", "EditMask"],
                 pin: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
                 labels: ["PlaceLabel", "MoveLabel", "RotateLabel", "ResizeLabel", "EditLabel"],
@@ -456,7 +457,6 @@ export const FILRODENSWMB = {
                 heldLabel: ["RotateHeldLabel", "ResizeHeldLabel"],
                 heldDecoration: ["RotateHeldDecoration", "ResizeHeldDecoration"],
                 heldPin: ["ResizeHeldPin"],
-                heldRegion: ["DropRegion"],
                 heldMask: ["DropMask"],
             },
         },
@@ -1260,21 +1260,18 @@ export const FILRODENSWMB = {
         // How close (in screen pixels) a click must be to a route's line to pick the route
         ROUTE_HIT_PX: 8,
     },
-    // Draw regions and routes from the display mesh (src/mesh/). Off, the polygon renderer and
-    // node editing of earlier versions run instead, on the legacy points every migrated region
-    // and route keeps, which allows the two to be compared side by side on the same map.
-    MESH_NATIVE: true,
     ENTITY_CONFIG: {
         decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },
         // `smoothed: true` marks entities StudioCanvas always renders as a Catmull-Rom curve
         // (see #getSplinePoints), so node-insertion hit-testing must test against that curve too
         // rather than the straight chords between control points. Manual rivers render as a plain
         // straight polyline despite their name, so they are deliberately left un-smoothed here.
+        // Entities with a `toolCategory` are edited node by node in that tool; routes and regions
+        // live on the display mesh and have no nodes (routes keep an entry for deletion only).
         fault: { stateKey: "tectonicFaults", activeKey: "activeFaultId", triggersTerrain: true, toolCategory: "features", smoothed: true },
         label: { stateKey: "mapLabels", activeKey: null, triggersTerrain: false },
         pin: { stateKey: "mapPins", activeKey: null, triggersTerrain: false },
-        regionLayer: { stateKey: "regionLayers", activeKey: "activeRegionLayerId", triggersTerrain: false, isLayer: true },
         river: { stateKey: "manualRivers", activeKey: "activeRiverId", triggersTerrain: true, toolCategory: "features" },
-        route: { stateKey: "mapRoutes", activeKey: "activeRouteId", triggersTerrain: false, toolCategory: "infrastructure", smoothed: true },
+        route: { stateKey: "mapRoutes", activeKey: "activeRouteId", triggersTerrain: false },
     },
 };

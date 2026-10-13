@@ -1,92 +1,176 @@
-<div class="fwmb-tool-content fwmb-fixed-lists">
-    <div class="fwmb-panel-header-row">
-        <label class="fwmb-title">{{localize "FILRODENSWMB.UI.LayerRegions"}}</label>
-        <div class="fwmb-panel-header-actions">
+<div class="fwmb-tool-content fwmb-fixed-lists fwmb-region-panel">
+    {{!--
+        The Regions tool's panel (see RegionPanel.context): the map's layer sets, the active set's
+        levels as a tree, and the active level's regions. Choosing a row in one list sets what the
+        next list shows. Rows carry the ids the actions read: a set row data-set-id, a level row
+        data-level-id, a region row data-id and data-layer-id (its level).
+    --}}
+    <details class="fwmb-fieldset fwmb-list-section fwmb-set-section" data-section="regionSets" {{#unless collapsedSections.regionSets}}open{{/unless}}>
+        <summary class="fwmb-legend-with-action">
+            <span>{{localize "FILRODENSWMB.UI.LayerSets"}}</span>
+            <i class="fwmb-icon info fwmb-legend-info" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerSetsHint'}}"></i>
+            <span class="fwmb-flex-1"></span>
+            <a class="fwmb-legend-action" data-action="addLayerSet" data-tooltip="{{localize 'FILRODENSWMB.UI.NewLayerSet'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </summary>
+
+        <div id="fwmb-scroll-region-sets" class="fwmb-list-container fwmb-scrollable stable">
+            {{#each regionPanel.sets}}
+            <div class="fwmb-list-item fwmb-set-row {{#if this.isActive}}active{{/if}}" data-set-id="{{this.id}}">
+                <button type="button" class="fwmb-btn small" data-action="toggleSetVisibility" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                    <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
+                </button>
+                <span class="fwmb-name fwmb-flex-1" data-action="selectLayerSet" title="{{this.name}}">{{this.name}}</span>
+                <span class="fwmb-count-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.SetLevelCount'}}">{{this.levelCount}}</span>
+                <button type="button" class="fwmb-btn small" data-action="editLayerSet" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLayerSet'}}">
+                    <i class="fwmb-icon edit"></i>
+                </button>
+                <div class="fwmb-dropdown fwmb-row-menu" tabindex="0">
+                    <button type="button" class="fwmb-btn small" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
+                        <i class="fwmb-icon more-vert"></i>
+                    </button>
+                    <div class="fwmb-dropdown-menu">
+                        <button type="button" data-action="moveLayerSetUp" {{#unless this.canMoveUp}}disabled{{/unless}}>
+                            <i class="fwmb-icon arrow-upward"></i> {{localize "FILRODENSWMB.UI.MoveUp"}}
+                        </button>
+                        <button type="button" data-action="moveLayerSetDown" {{#unless this.canMoveDown}}disabled{{/unless}}>
+                            <i class="fwmb-icon arrow-downward"></i> {{localize "FILRODENSWMB.UI.MoveDown"}}
+                        </button>
+                        <button type="button" data-action="deleteLayerSet" class="fwmb-danger">
+                            <i class="fwmb-icon delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {{else}}
+            <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLayerSets"}}</div>
+            {{/each}}
+        </div>
+    </details>
+
+    <details class="fwmb-fieldset fwmb-list-section fwmb-level-section" data-section="regionLevels" {{#unless collapsedSections.regionLevels}}open{{/unless}}>
+        <summary class="fwmb-legend-with-action">
+            <span class="fwmb-text-truncate">{{#if regionPanel.activeSet}}{{localize "FILRODENSWMB.UI.LevelsOfSet" name=regionPanel.activeSet.name}}{{else}}{{localize "FILRODENSWMB.UI.Levels"}}{{/if}}</span>
+            <i class="fwmb-icon info fwmb-legend-info" data-tooltip="{{localize 'FILRODENSWMB.UI.LevelsHint'}}"></i>
+            <span class="fwmb-flex-1"></span>
+            <a class="fwmb-legend-action" data-action="addLevel" data-tooltip="{{localize 'FILRODENSWMB.UI.NewLevel'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
+        </summary>
+
+        <div id="fwmb-scroll-region-levels" class="fwmb-list-container fwmb-scrollable stable">
+            {{#each regionPanel.levels}}
+            <div class="fwmb-list-item fwmb-level-row {{#if this.isActive}}active{{/if}}" data-level-id="{{this.id}}" style="--fwmb-level-depth: {{this.depth}};">
+                <button type="button" class="fwmb-btn small" data-action="toggleLevelVisibility" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                    <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
+                </button>
+                {{#if this.hasParent}}<i class="fwmb-icon subdirectory fwmb-level-branch"></i>{{/if}}
+                <span class="fwmb-name fwmb-flex-1" data-action="selectLevel" title="{{this.name}}">{{this.name}}</span>
+                <span class="fwmb-count-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.LevelRegionCount'}}">{{this.regionCount}}</span>
+                {{#if this.isFree}}<span class="fwmb-level-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.NestingFreeHint'}}">{{localize "FILRODENSWMB.UI.NestingFreeBadge"}}</span>{{/if}}
+                {{#if this.problems}}
+                <span class="fwmb-level-badge warning" data-tooltip="{{localize 'FILRODENSWMB.UI.NestingProblemsHint' count=this.problems}}">
+                    <i class="fwmb-icon exclamation"></i>{{this.problems}}
+                </span>
+                {{/if}}
+                <button type="button" class="fwmb-btn small" data-action="editLevel" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLevel'}}">
+                    <i class="fwmb-icon edit"></i>
+                </button>
+                <div class="fwmb-dropdown fwmb-row-menu" tabindex="0">
+                    <button type="button" class="fwmb-btn small" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
+                        <i class="fwmb-icon more-vert"></i>
+                    </button>
+                    <div class="fwmb-dropdown-menu">
+                        <button type="button" data-action="addChildLevel">
+                            <i class="fwmb-icon subdirectory"></i> {{localize "FILRODENSWMB.UI.AddChildLevel"}}
+                        </button>
+                        <button type="button" data-action="moveLevelUp" {{#unless this.canMoveUp}}disabled{{/unless}}>
+                            <i class="fwmb-icon arrow-upward"></i> {{localize "FILRODENSWMB.UI.MoveUp"}}
+                        </button>
+                        <button type="button" data-action="moveLevelDown" {{#unless this.canMoveDown}}disabled{{/unless}}>
+                            <i class="fwmb-icon arrow-downward"></i> {{localize "FILRODENSWMB.UI.MoveDown"}}
+                        </button>
+                        {{#if this.hasParent}}
+                        <button type="button" data-action="autoAssignLevel" {{#unless this.unassigned}}disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.AutoAssignHint'}}">
+                            <i class="fwmb-icon format-paint"></i> {{localize "FILRODENSWMB.UI.AutoAssign"}}
+                        </button>
+                        <button type="button" data-action="fixLevelNesting" {{#unless this.problems}}disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.FixNestingHint'}}">
+                            <i class="fwmb-icon layers"></i> {{localize "FILRODENSWMB.UI.FixNesting"}}
+                        </button>
+                        {{/if}}
+                        <button type="button" data-action="deleteLevel" class="fwmb-danger">
+                            <i class="fwmb-icon delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {{else}}
+            <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLevels"}}</div>
+            {{/each}}
+        </div>
+    </details>
+
+    <details class="fwmb-fieldset fwmb-list-section" data-section="regionList" {{#unless collapsedSections.regionList}}open{{/unless}}>
+        <summary class="fwmb-legend-with-action">
+            <span class="fwmb-text-truncate">{{#if regionPanel.activeLevel}}{{localize "FILRODENSWMB.UI.RegionsOfLevel" name=regionPanel.activeLevel.name}}{{else}}{{localize "FILRODENSWMB.UI.ToolRegions"}}{{/if}}</span>
+            <i class="fwmb-icon info fwmb-legend-info" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionsHint'}}"></i>
+            <span class="fwmb-flex-1"></span>
             <a class="fwmb-legend-action {{#if massEditMode.region}}active{{/if}}" data-action="toggleMassEditMode" data-type="region" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip-class="fwmb-tooltip">
                 <i class="fwmb-icon edit-square"></i>
             </a>
-            <button type="button" class="fwmb-btn" data-action="addRegionLayer">
-                <i class="fwmb-icon add"></i> {{localize "FILRODENSWMB.UI.NewLayer"}}
-            </button>
-        </div>
-    </div>
-
-    {{#if massEditMode.region}}
-    <div class="fwmb-mass-edit-bar">
-        <a class="fwmb-bulk-action-button" class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="region">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
-        <a class="fwmb-bulk-action-button" class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="region">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
-        <span class="fwmb-flex-1"></span>
-        <button type="button" class="fwmb-btn primary" data-action="openMassEdit" data-type="region" {{#unless massEditCount.region}}disabled{{/unless}}>
-            {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.region}})
-        </button>
-    </div>
-    {{/if}}
-
-    <!-- One scrolling list for every layer, so the header above and the Edit Regions button
-         below stay in view however many layers and regions there are. Each layer collapses to
-         its header; MapStudio remembers which are collapsed through data-section. -->
-    <div id="fwmb-scroll-region-layers" class="fwmb-list-container fwmb-scrollable stable">
-    {{#each regionLayers}}
-    <details class="fwmb-accordion-group" data-layer-id="{{this.id}}" data-section="regionLayer.{{this.id}}" {{#unless this.collapsed}}open{{/unless}}>
-
-        <summary class="fwmb-list-item fwmb-layer-header" style="{{#if this.isActive}}border-color: var(--fwmb-accent-main); background: var(--fwmb-bg-hover);{{/if}}">
-            <div class="fwmb-list-item-content">
-                <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="layer" title="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                    <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
-                </button>
-                
-                <span class="fwmb-name" data-action="selectRegionLayer" style="cursor: pointer; {{#if this.isActive}}color: var(--fwmb-accent-main); font-weight: bold;{{/if}}">
-                    {{this.name}}
-                </span>
-            </div>
-            <div class="fwmb-list-item-actions">
-                <button type="button" class="fwmb-btn small" data-action="editRegionLayer" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                    <i class="fwmb-icon edit"></i>
-                </button>
-                <button type="button" class="fwmb-btn small muted danger" data-action="deleteRegionLayer" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                    <i class="fwmb-icon delete"></i>
-                </button>
-            </div>
+            <a class="fwmb-legend-action {{#unless regionPanel.activeLevel}}disabled{{/unless}}" data-action="addRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.NewRegion'}}" data-tooltip-class="fwmb-tooltip">
+                <i class="fwmb-icon add"></i>
+            </a>
         </summary>
 
-        <div class="fwmb-accordion-content">
-            {{#if this.regions.length}}
-                {{#each this.regions}}
-                <div class="fwmb-list-item" data-id="{{this.id}}" data-layer-id="{{../id}}" data-type="region">
-                    <div class="fwmb-list-item-content">
-                        {{#if @root.massEditMode.region}}
-                            <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="region" {{#if this.massEditSelected}}checked{{/if}} />
-                        {{/if}}
-                        <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature">
-                            <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
+        {{#if massEditMode.region}}
+        <div class="fwmb-mass-edit-bar">
+            <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="region">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
+            <a class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="region">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
+            <span class="fwmb-flex-1"></span>
+            <button type="button" class="fwmb-btn primary" data-action="openMassEdit" data-type="region" {{#unless massEditCount.region}}disabled{{/unless}}>
+                {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.region}})
+            </button>
+        </div>
+        {{/if}}
+
+        <div id="fwmb-scroll-region-list" class="fwmb-list-container fwmb-scrollable stable">
+            {{#each regionPanel.regions}}
+            <div class="fwmb-list-item fwmb-region-row {{#if this.isActive}}active{{/if}}" data-id="{{this.id}}" data-layer-id="{{@root.regionPanel.activeLevel.id}}" data-type="region">
+                {{#if @root.massEditMode.region}}
+                    <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="region" {{#if this.massEditSelected}}checked{{/if}} />
+                {{/if}}
+                <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature">
+                    <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
+                </button>
+                <div class="fwmb-swatch small" style="background-color: {{this.swatch}};"></div>
+                <span class="fwmb-name fwmb-flex-1" data-action="selectRegion" title="{{this.name}}">{{this.name}}</span>
+                <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                    <i class="fwmb-icon center-focus"></i>
+                </button>
+                <button type="button" class="fwmb-btn small" data-action="editRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                    <i class="fwmb-icon edit"></i>
+                </button>
+                <div class="fwmb-dropdown fwmb-row-menu" tabindex="0">
+                    <button type="button" class="fwmb-btn small" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
+                        <i class="fwmb-icon more-vert"></i>
+                    </button>
+                    <div class="fwmb-dropdown-menu">
+                        <button type="button" data-action="mergeRegion">
+                            <i class="fwmb-icon merge"></i> {{localize "FILRODENSWMB.UI.MergeInto"}}
                         </button>
-                        <div class="fwmb-swatch small" style="background-color: {{this.fillColor}}; border-color: {{this.lineColor}};"></div>
-                        <span class="fwmb-name" title="{{this.name}}">{{this.name}}</span>
-                    </div>
-                    <div class="fwmb-list-item-actions">
-                        <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                            <i class="fwmb-icon center-focus"></i>
-                        </button>
-                        <button type="button" class="fwmb-btn small" data-action="editRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                            <i class="fwmb-icon edit"></i>
-                        </button>
-                        <button type="button" class="fwmb-btn muted small danger" data-action="deleteRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                            <i class="fwmb-icon delete"></i>
+                        <button type="button" data-action="deleteRegion" class="fwmb-danger">
+                            <i class="fwmb-icon delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}
                         </button>
                     </div>
                 </div>
-                {{/each}}
+            </div>
             {{else}}
-                <div class="fwmb-hint small">
-                    {{localize "FILRODENSWMB.UI.NoRegionsInLayer"}}
-                </div>
-            {{/if}}
+            <div class="fwmb-empty-state">{{#if regionPanel.activeLevel}}{{localize "FILRODENSWMB.UI.NoRegionsInLevel"}}{{else}}{{localize "FILRODENSWMB.UI.NoLevels"}}{{/if}}</div>
+            {{/each}}
         </div>
     </details>
-    {{else}}
-        <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.NoRegionLayers"}}</div>
-    {{/each}}
-    </div>
 
     <div class="fwmb-divider"></div>
 

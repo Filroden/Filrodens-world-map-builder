@@ -105,3 +105,73 @@ test("a map whose size changed is rebuilt from its migrated polygons", { skip: P
     }
     assert.equal(mapData.mapRoutes.length, first.mapData.mapRoutes.length);
 });
+
+// ------------------------------------------------------------------ strokes and level arrays
+
+test("a stroke marks cells for the fill as it goes, rebuilds borders once at its end and merges its patches", async () => {
+    const { createLayerSet, createLevel, addRegion } = await import("../../src/mesh/Schema.js");
+    const { smallSession, cellsInRect } = await import("./helpers.mjs");
+    const level = createLevel({ id: "lv" });
+    const region = addRegion(level, { id: "r" });
+    const session = await smallSession([createLayerSet({ levels: [level] })]);
+    session.layer("lv").paint(cellsInRect(session.mesh, 200, 100, 260, 160), region.key);
+    session.ownersChanged("lv");
+    const arcs = session.arcsFor("lv");
+    session.takeOwnerChanges("lv");
+
+    session.beginStroke();
+    const first = session.layer("lv").paint(cellsInRect(session.mesh, 260, 100, 280, 160), region.key);
+    session.strokeEdit("lv", first);
+    const second = session.layer("lv").paint(cellsInRect(session.mesh, 270, 100, 300, 160), region.key);
+    session.strokeEdit("lv", second);
+    const undone = session.layer("lv").erase(cellsInRect(session.mesh, 290, 100, 300, 160));
+    session.strokeEdit("lv", undone);
+    assert.ok(session.isStroking);
+    assert.ok(session.takeOwnerChanges("lv"), "the fill is told which cells changed");
+    assert.equal(session.arcsFor("lv"), arcs, "borders stay as they were during the stroke");
+
+    const merged = session.endStroke().get("lv");
+    assert.notEqual(session.arcsFor("lv"), arcs, "borders are rebuilt once the stroke ends");
+    const expected = cellsInRect(session.mesh, 260, 100, 290, 160);
+    assert.deepEqual([...merged.cells].sort((a, b) => a - b), expected.sort((a, b) => a - b), "cells painted and then erased are not in the merged patch");
+    assert.ok(merged.before.every((owner) => owner === -1));
+});
+
+test("a level's owners can be taken out of the session and put back", async () => {
+    const { createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
+    const { smallSession, cellsInRect } = await import("./helpers.mjs");
+    const level = createLevel({ id: "lv" });
+    const session = await smallSession([createLayerSet({ levels: [level] })]);
+    session.layer("lv").paint(cellsInRect(session.mesh, 0, 0, 50, 50), 3);
+    const array = session.layer("lv").owners.slice();
+    const encoded = session.removeLevelOwners("lv");
+    assert.ok(!session.layers.has("lv"));
+    assert.equal(session.removeLevelOwners("lv"), null);
+    session.restoreLevelOwners("lv", encoded);
+    assert.deepEqual(session.layer("lv").owners, array);
+    assert.throws(() => session.restoreLevelOwners("lv", new Int32Array(3)), /cells/);
+});
+
+test("fields added after version 4 first shipped get their defaults on load", async () => {
+    const { normaliseVectorData, roundRouteThickness } = await import("../../src/mesh/Schema.js");
+    const mapData = {
+        params: { display: { regionOpacity: 0.7 } },
+        layerSets: [{ id: "s", levels: [{ id: "l", opacity: 0.5, style: { lineColor: "#123456" }, regions: [{ id: "r", key: 0 }] }] }, { id: "t", opacity: 0.2, levels: [{ id: "m", opacity: 0.4, regions: [] }] }],
+        mapRoutes: [{ id: "a", thickness: 2.4, transport: "camel" }, { id: "b", outline: false, smoothing: true }],
+        mapPins: [{ id: "p" }],
+    };
+    normaliseVectorData(mapData);
+    assert.equal(mapData.layerSets[0].opacity, 1, "a set saved without an opacity starts at 1");
+    assert.equal(mapData.layerSets[0].levels[0].opacity, 0.35, "its levels take on the map's old region opacity");
+    assert.equal(mapData.layerSets[1].opacity, 0.2, "a set keeps its own");
+    assert.equal(mapData.layerSets[1].levels[0].opacity, 0.4, "and so do its levels");
+    const level = mapData.layerSets[0].levels[0];
+    assert.equal(level.nestingMode, "constrained");
+    assert.equal(level.style.lineColor, "#123456");
+    assert.equal(level.style.seaLineStyle, "dashed");
+    assert.equal(level.regions[0].parentKey, null);
+    assert.deepEqual([mapData.mapRoutes[0].thickness, mapData.mapRoutes[0].transport, mapData.mapRoutes[0].outline], [2.5, "road", true]);
+    assert.deepEqual([mapData.mapRoutes[1].outline, mapData.mapRoutes[1].smoothing, mapData.mapRoutes[1].thickness], [false, true, 2]);
+    assert.equal(mapData.mapPins[0].pinStyle, null);
+    assert.equal(roundRouteThickness(0.05), 0.25, "never below one step");
+});

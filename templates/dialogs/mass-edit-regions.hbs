@@ -48,46 +48,6 @@
         </select>
     </div>
 
-    <div class="form-group" style="margin-top: var(--fwmb-size-10);">
-        <label class="fwmb-mass-edit-label">
-            <input type="checkbox" class="fwmb-checkbox" name="applyLineColor" />
-            {{localize "FILRODENSWMB.UI.LineColor"}}
-        </label>
-        <input type="color" name="massLineColor" value="{{defaults.lineColor}}" list="fwmb-standard-colors" class="fwmb-swatch fwmb-wide" style="height: 24px; padding: 0;">
-    </div>
-
-    <div class="form-group" style="margin-top: var(--fwmb-size-10);">
-        <label class="fwmb-mass-edit-label">
-            <input type="checkbox" class="fwmb-checkbox" name="applyLineThickness" />
-            {{localize "FILRODENSWMB.UI.LineThickness"}}
-        </label>
-        <input type="number" name="massLineThickness" value="{{defaults.lineThickness}}" min="0" max="10">
-    </div>
-
-    <div class="form-group" style="margin-top: var(--fwmb-size-10);">
-        <label class="fwmb-mass-edit-label">
-            <input type="checkbox" class="fwmb-checkbox" name="applyLineStyle" />
-            {{localize "FILRODENSWMB.UI.LineStyle"}}
-        </label>
-        <select name="massLineStyle">
-            <option value="solid" {{#if (eq defaults.lineStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
-            <option value="dashed" {{#if (eq defaults.lineStyle "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
-            <option value="dotted" {{#if (eq defaults.lineStyle "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
-            <option value="dashdot" {{#if (eq defaults.lineStyle "dashdot")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashDot"}}</option>
-        </select>
-    </div>
-
-    <div class="form-group" style="margin-top: var(--fwmb-size-10);">
-        <label class="fwmb-mass-edit-label">
-            <input type="checkbox" class="fwmb-checkbox" name="applySmoothing" />
-            {{localize "FILRODENSWMB.UI.Smoothing"}}
-        </label>
-        <select name="massSmoothing">
-            <option value="false" {{#unless defaults.smoothing}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.StyleStraight"}}</option>
-            <option value="true" {{#if defaults.smoothing}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSmooth"}}</option>
-        </select>
-    </div>
-
     <fieldset class="fwmb-fieldset" style="margin-top: var(--fwmb-size-16);">
         <legend>{{localize "FILRODENSWMB.UI.SettingsLabelQuickStyles"}}</legend>
         <div class="fwmb-hint" style="margin-bottom: var(--fwmb-size-10);">

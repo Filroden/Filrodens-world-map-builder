@@ -149,8 +149,8 @@ export class SceneExporter {
             await syncJournalPage(pin, "Unnamed Location");
         }
 
-        for (const layer of app.regionLayers) {
-            for (const region of layer.regions) {
+        for (const level of app.regionLevels) {
+            for (const region of level.regions) {
                 await syncJournalPage(region, "Unnamed Region");
             }
         }
@@ -343,38 +343,22 @@ export class SceneExporter {
      * Where each region with a journal page gets its map note. On the display mesh that is the
      * region's label anchor (the deepest point of its largest part; see MeshSession.labelAnchor),
      * which always lies inside the region, unlike the centre of its bounding box (which can fall
-     * outside a crescent or ring-shaped region, or in the sea); a polygon region keeps the centre
-     * of its bounding box.
+     * outside a crescent or ring-shaped region, or in the sea). Without a mesh session (the
+     * map's mesh could not be prepared) regions have no cells, and no notes.
      *
-     * @param {object} app - Reads regionLayers and meshSession.
+     * @param {object} app - Reads regionLevels and meshSession.
      * @returns {Array<{region: object, x: number, y: number}>}
      */
     static regionNoteAnchors(app) {
         const anchors = [];
-        for (const layer of app.regionLayers ?? []) {
+        for (const layer of app.regionLevels ?? []) {
             for (const region of layer.regions) {
                 if (!region.journalPageId) continue;
-                const anchor = app.meshSession ? app.meshSession.labelAnchor(layer.id, region.key) : this.#boundsCentre(region.points);
+                const anchor = app.meshSession?.labelAnchor(layer.id, region.key) ?? null;
                 if (anchor) anchors.push({ region, x: anchor.x, y: anchor.y });
             }
         }
         return anchors;
-    }
-
-    /** The centre of a polygon's bounding box, or null for a region without points. */
-    static #boundsCentre(points) {
-        if (!points?.length) return null;
-        let minX = Infinity,
-            maxX = -Infinity,
-            minY = Infinity,
-            maxY = -Infinity;
-        for (const p of points) {
-            if (p.x < minX) minX = p.x;
-            if (p.x > maxX) maxX = p.x;
-            if (p.y < minY) minY = p.y;
-            if (p.y > maxY) maxY = p.y;
-        }
-        return { x: minX + (maxX - minX) / 2, y: minY + (maxY - minY) / 2 };
     }
 
     /** Generates the Scene's thumbnail. It is only a convenience, so a failure is skipped quietly. */

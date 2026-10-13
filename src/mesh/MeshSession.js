@@ -2,10 +2,10 @@ import { FILRODENSWMB } from "../config.js";
 import { arcsForLevel, coincidentEdges, labelAnchor } from "./BorderArcs.js";
 import { Mesh, MeshBuilder, accumulateRows, finishAggregates } from "./MeshBuilder.js";
 import { migrateMapData, pinsToCells, regionsToOwners } from "./Migration.js";
-import { OwnerLayer, decodeOwners, encodeOwners } from "./OwnerLayer.js";
+import { OwnerLayer, decodeOwners, encodeOwners, mergePatchList } from "./OwnerLayer.js";
 import { nodesMarkedLine, resampleOwners, retraceLine, routeMarkedLine } from "./Resample.js";
 import { routePolyline } from "./RoutePath.js";
-import { UNCLAIMED, VECTOR_SCHEMA_VERSION, createMeshBlock, normaliseAreaFactor, randomId, validateOwners, validateVectorData } from "./Schema.js";
+import { UNCLAIMED, VECTOR_SCHEMA_VERSION, createMeshBlock, normaliseAreaFactor, normaliseVectorData, randomId, validateOwners, validateVectorData } from "./Schema.js";
 
 /**
  * The mesh of the map that is open, and everything derived from it that drawing and hit-testing
@@ -20,6 +20,11 @@ import { UNCLAIMED, VECTOR_SCHEMA_VERSION, createMeshBlock, normaliseAreaFactor,
  * when its owners change (see ownersChanged), every level's arcs when cells change between land
  * and water (see refreshAggregates), a route's line when its legs or smoothing change. Nothing
  * here touches PIXI or the DOM, so it runs (and is tested) under Node.
+ *
+ * A brush stroke is the exception to dropping caches at once (see beginStroke): while it lasts,
+ * each pointer move's edit only marks the changed cells for the owners texture, so the fill
+ * follows the brush, and the borders, label anchors and bounds of the levels it touched are
+ * rebuilt once, when it ends.
  */
 
 /** Messages MeshSession.open can return, by key, for the caller to localise. */
@@ -43,6 +48,8 @@ export class MeshSession {
     #routeLines = new Map();
     #ownerChanges = new Map();
     #hint = 0;
+    /** The stroke under way (see beginStroke): its patches by level id, or null. */
+    #stroke = null;
 
     /**
      * @param {object} params
@@ -81,7 +88,7 @@ export class MeshSession {
      * @param {function({stage: string, pct?: number}): void} [options.onProgress]
      * @param {Function} [options.idFactory]
      * @param {string} [options.setName] - Name of the layer set migrated region layers go into.
-     * @param {number} [options.levelOpacity] - Opacity of migrated levels.
+     * @param {number} [options.levelOpacity] - Fill opacity of migrated levels (default: the map's old Region Opacity setting).
      * @returns {Promise<{session: MeshSession, mapData: object, migrated: boolean, rebuilt: boolean, changed: boolean, warnings: Array<{key: string, detail?: string}>}>}
      */
     static async open(mapData, { owners = {}, buffers = null, loadMeshData = null, onProgress = null, idFactory = randomId, setName, levelOpacity } = {}) {
@@ -93,6 +100,7 @@ export class MeshSession {
         normaliseAreaFactor(input);
 
         const result = (input.vectorSchemaVersion ?? 0) < VECTOR_SCHEMA_VERSION ? await openLegacy(input, meshFor, { onProgress, idFactory, setName, levelOpacity }) : await openCurrent(input, owners, meshFor, { onProgress });
+        normaliseVectorData(result.mapData);
 
         onProgress?.({ stage: "aggregates" });
         const aggregates = buffers ? result.mesh.aggregate(buffers) : null;
@@ -301,8 +309,18 @@ export class MeshSession {
      * @param {import("./OwnerLayer.js").OwnerPatch|null} [patch] - null when any cell may have changed.
      */
     ownersChanged(levelId, patch = null) {
+        this.#forgetDerived(levelId);
+        this.#markCells(levelId, patch);
+    }
+
+    /** Drops what was derived from a level's owners: its own geometry, and the arcs of levels that left out its borders. */
+    #forgetDerived(levelId) {
         this.#forgetLevel(levelId);
         for (const variants of this.#arcs.values()) for (const variant of [...variants.keys()]) if (variant.split("|").includes(levelId)) variants.delete(variant);
+    }
+
+    /** Adds a patch's cells (or, with no patch, every cell) to what the owners texture must upload. */
+    #markCells(levelId, patch) {
         const previous = this.#ownerChanges.get(levelId);
         if (previous === "all" || !patch) {
             this.#ownerChanges.set(levelId, "all");
@@ -311,6 +329,90 @@ export class MeshSession {
         if (!patch.cells.length) return;
         const range = { minCell: patch.cells[0], maxCell: patch.cells.at(-1) };
         this.#ownerChanges.set(levelId, previous ? { minCell: Math.min(previous.minCell, range.minCell), maxCell: Math.max(previous.maxCell, range.maxCell) } : range);
+    }
+
+    /**
+     * Starts a stroke: a run of edits (a brush drag) that ends up as one undo step and whose
+     * derived geometry is rebuilt once, at its end. Until endStroke, strokeEdit records each edit.
+     * A stroke already under way is ended first, its patches discarded from the record (they
+     * have been applied; only their grouping is lost), which only happens if a pointer release
+     * never arrived.
+     */
+    beginStroke() {
+        if (this.#stroke) this.endStroke();
+        this.#stroke = new Map();
+    }
+
+    /** Whether a stroke is under way (see beginStroke). */
+    get isStroking() {
+        return this.#stroke !== null;
+    }
+
+    /**
+     * Records one edit of a stroke: the changed cells are marked for the owners texture (so the fill
+     * shows them on the next draw), but the level's borders, anchors and bounds are left as they
+     * were until the stroke ends. Outside a stroke this is the same as ownersChanged.
+     * @param {string} levelId
+     * @param {import("./OwnerLayer.js").OwnerPatch} patch
+     */
+    strokeEdit(levelId, patch) {
+        if (!this.#stroke) {
+            this.ownersChanged(levelId, patch);
+            return;
+        }
+        if (!patch.cells.length) return;
+        if (!this.#stroke.has(levelId)) this.#stroke.set(levelId, []);
+        this.#stroke.get(levelId).push(patch);
+        this.#markCells(levelId, patch);
+    }
+
+    /**
+     * Ends the stroke: each level it changed gets its geometry rebuilt (on the next draw), and its
+     * edits come back merged into one patch per level, for one undo step.
+     * @returns {Map<string, import("./OwnerLayer.js").OwnerPatch>} Only levels whose cells ended up different.
+     */
+    endStroke() {
+        const stroke = this.#stroke ?? new Map();
+        this.#stroke = null;
+        const merged = new Map();
+        for (const [levelId, patches] of stroke) {
+            const patch = mergePatchList(patches);
+            this.#forgetDerived(levelId);
+            if (patch.cells.length) merged.set(levelId, patch);
+        }
+        return merged;
+    }
+
+    /**
+     * Takes a level's owner array out of the session (a level being deleted), returning it encoded
+     * so the deletion can be undone (see restoreLevelOwners). Nothing is returned for a level the
+     * session never held.
+     * @param {string} levelId
+     * @returns {string|null}
+     */
+    removeLevelOwners(levelId) {
+        const layer = this.layers.get(levelId);
+        if (!layer) return null;
+        this.layers.delete(levelId);
+        this.#forgetDerived(levelId);
+        this.#ownerChanges.delete(levelId);
+        return layer.encode();
+    }
+
+    /**
+     * Puts a level's owner array back (an undone deletion), or replaces it (an undone resample).
+     * @param {string} levelId
+     * @param {string|Int32Array|null} owners - Encoded, as an array, or null to remove the level's array.
+     */
+    restoreLevelOwners(levelId, owners) {
+        if (owners === null) {
+            this.removeLevelOwners(levelId);
+            return;
+        }
+        const array = typeof owners === "string" ? decodeOwners(owners) : owners;
+        if (array.length !== this.mesh.cellCount) throw new Error(`Owner array has ${array.length} cells; the mesh has ${this.mesh.cellCount}.`);
+        this.layers.set(levelId, new OwnerLayer(array));
+        this.ownersChanged(levelId, null);
     }
 
     /**

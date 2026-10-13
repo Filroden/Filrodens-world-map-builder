@@ -6,7 +6,6 @@ import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { UpwindMargin } from "../tools/UpwindMargin.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
-import { MeshIntegration } from "./MeshIntegration.js";
 import { extractRegionalVectors } from "../mesh/RegionalMesh.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
@@ -52,14 +51,6 @@ export class RegionalExtractor {
         // 4. Translate Spatial Vector Arrays
         const translate = (list) => this.#translateVectorList(list, cropBox, zoomScale, targetWidth, targetHeight);
 
-        const newRegions = app.regionLayers
-            .map((layer) => {
-                const translatedLayer = platform.utils.deepClone(layer);
-                translatedLayer.regions = translate(layer.regions);
-                return translatedLayer;
-            })
-            .filter((layer) => layer.regions.length > 0);
-
         // 5. Pack and Return the Payload
         const payload = {
             seed: currentSeed,
@@ -81,7 +72,6 @@ export class RegionalExtractor {
             manualRivers: this.#scaleRiverWidths(translate(app.manualRivers), zoomScale),
             mapPins: [...translate(app.mapPins), ...this.#riverInflows(app, cropBox, zoomScale, targetWidth, targetHeight)],
             mapRoutes: translate(app.mapRoutes),
-            regionLayers: newRegions,
             mapLabels: translate(app.mapLabels),
             landMasks: state.generationEngine === "guided" ? this.#translateLandMasks(app.landMasks ?? [], cropBox, zoomScale) : [],
             mapDecorations: translate(app.mapDecorations),
@@ -92,16 +82,19 @@ export class RegionalExtractor {
     }
 
     /**
-     * Replaces the payload's regions and routes with the parent's on the display mesh, carried
-     * onto the regional map's own mesh (see RegionalMesh.extractRegionalVectors). The polygon
-     * translation above is what a map without a mesh session keeps.
+     * Gives the payload the parent's regions and routes on the display mesh, carried onto the
+     * regional map's own mesh (see RegionalMesh.extractRegionalVectors). Without a mesh session
+     * (the parent's mesh could not be prepared) the regional map has no regions or routes.
      *
      * @returns {Object<string, string>|null} The regional map's encoded owner arrays.
      */
     static #meshVectors(app, payload, cropBox, zoomScale) {
-        if (!MeshIntegration.enabled || !app.meshSession) return null;
+        if (!app.meshSession) {
+            payload.mapRoutes = [];
+            return null;
+        }
 
-        MeshIntegration.reconcile(app);
+        app.meshSession.setLayerSets(app.layerSets);
         const { fields, owners } = extractRegionalVectors({
             session: app.meshSession,
             layerSets: app.layerSets,
@@ -112,7 +105,6 @@ export class RegionalExtractor {
             zoom: zoomScale,
             idFactory: () => platform.utils.randomID(),
         });
-        delete payload.regionLayers;
         Object.assign(payload, fields);
         return owners;
     }

@@ -18,7 +18,7 @@ const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br:
  * river nodes stay confined to the map itself, the same rule applied when these nodes are first
  * created (see MapStudio's click handlers).
  */
-const BUFFERED_NODE_TYPES = Object.freeze(["route", "region", "landMask", "fault"]);
+const BUFFERED_NODE_TYPES = Object.freeze(["landMask", "fault"]);
 
 // Shortest time between two brush stamps sent to the app while the pointer moves with the button
 // held, however often the browser reports pointer moves
@@ -132,8 +132,8 @@ export class StudioCanvas {
 
         // --- Global Drag Handling ---
         this.activeDrag = null;
-        // What the pointer holds, for the canvas hint: null, "label", "decoration", "pin",
-        // "region" or "mask" (see #heldItemKind)
+        // What the pointer holds, for the canvas hint: null, "label", "decoration", "pin" or
+        // "mask" (see #heldItemKind)
         this.heldItem = null;
         // The highlight box around a shape being dragged with Shift (see #drawShapeDragBox)
         this.shapeDragBox = null;
@@ -392,7 +392,7 @@ export class StudioCanvas {
         const hit = this.#getHitTarget(coords.x, coords.y);
         const grabbedTarget = hit && !hit.selectOnly ? hit.target : null;
 
-        // Shift pressed on a node of a region or land mask picks up the whole shape (see
+        // Shift pressed on a node of a land mask picks up the whole shape (see
         // #beginShapeDrag); Shift pressed anywhere else inserts a node on the nearest line or
         // outline. Inserting a node on top of an existing node is never useful, so giving that
         // press to the shape drag takes nothing away.
@@ -576,13 +576,13 @@ export class StudioCanvas {
     }
 
     /**
-     * What the pointer is holding, for the canvas hint (see CanvasHints): a region or land mask
+     * What the pointer is holding, for the canvas hint (see CanvasHints): a land mask
      * ("mask") dragged whole with Shift, or a label, decoration or pin, whose wheel gestures
      * differ from the tool's own. Nodes and anything else give null, since the tool's hint
      * already covers them.
      */
     static #heldItemKind(hit, activeDrag) {
-        if (activeDrag?.shapeDrag) return hit.entityType === "landMask" ? "mask" : "region";
+        if (activeDrag?.shapeDrag) return "mask";
         if (hit.isLabel) return "label";
         if (hit.isDecoration) return "decoration";
         if (hit.isIconPin) return "pin";
@@ -597,7 +597,7 @@ export class StudioCanvas {
     }
 
     /**
-     * Starts moving a whole region or land mask: records where its points start (see
+     * Starts moving a whole land mask: records where its points start (see
      * CanvasTransforms.beginShapeDrag) and shows the highlight box around it straight away, so
      * pressing with Shift shows what will move before anything does.
      */
@@ -1274,81 +1274,6 @@ export class StudioCanvas {
     }
 
     /**
-     * Programmatically generates seamless diagonal and crosshatch textures for polygon fills.
-     */
-    #getHatchTexture(colorHex, style) {
-        const key = `${colorHex}_${style}`;
-        if (this.layerSprites[key]) return this.layerSprites[key];
-
-        const canvas = document.createElement("canvas");
-        canvas.width = 16;
-        canvas.height = 16;
-        const ctx = canvas.getContext("2d");
-
-        // Convert strict hex integer back to #RRGGBB string for the canvas context
-        ctx.strokeStyle = ColorMath.packedIntToHex(colorHex);
-        ctx.lineWidth = 2;
-
-        if (style === "diagonal" || style === "crosshatch") {
-            ctx.beginPath();
-            ctx.moveTo(-4, 12);
-            ctx.lineTo(12, -4);
-            ctx.moveTo(4, 20);
-            ctx.lineTo(20, 4);
-            ctx.stroke();
-        }
-        if (style === "crosshatch") {
-            ctx.beginPath();
-            ctx.moveTo(20, 12);
-            ctx.lineTo(4, -4);
-            ctx.moveTo(12, 20);
-            ctx.lineTo(-4, 4);
-            ctx.stroke();
-        }
-
-        const texture = PIXI.Texture.from(canvas);
-        this.layerSprites[key] = texture;
-        return texture;
-    }
-
-    /**
-     * A variation of the spline generator that wraps the array to create a perfectly closed, seamless loop.
-     */
-    #getClosedSplinePoints(points, resolution = 20) {
-        // This 3 is a geometric requirement, not the polygon rule (FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES):
-        // a wrapped Catmull-Rom loop needs at least three control points, because with two the
-        // neighbour points either side of each segment coincide and the "loop" collapses onto a
-        // straight line. It must not follow that constant if the polygon minimum is ever changed.
-        if (!points || points.length < 3) return points;
-        const curve = [];
-
-        // Wrap the array: [Last, First, Second, ..., Last, First, Second]
-        const p = [points[points.length - 1], ...points, points[0], points[1]];
-
-        for (let i = 1; i < p.length - 2; i++) {
-            const p0 = p[i - 1];
-            const p1 = p[i];
-            const p2 = p[i + 1];
-            const p3 = p[i + 2];
-
-            for (let t = 0; t <= 1; t += 1 / resolution) {
-                const t2 = t * t;
-                const t3 = t2 * t;
-
-                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
-                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
-
-                if (curve.length > 0) {
-                    const last = curve.at(-1);
-                    if (Math.abs(last.x - x) < 0.1 && Math.abs(last.y - y) < 0.1) continue;
-                }
-                curve.push({ x, y });
-            }
-        }
-        return curve;
-    }
-
-    /**
      * Safety router to clear the spatial node cache before a render pass.
      */
     clearInteractiveTargets() {
@@ -1358,7 +1283,7 @@ export class StudioCanvas {
     /**
      * Renders vector routes and POI pins to the infrastructure layer.
      */
-    renderInfrastructure(pins = [], routes = [], isEditMode = false, activeRouteId = null, meshSession = null) {
+    renderInfrastructure(pins = [], routes = [], isEditMode = false, meshSession = null) {
         // Clone and sort the routes by thickness so major highways always draw on top
         const sortedRoutes = [...routes].sort((a, b) => a.thickness - b.thickness);
 
@@ -1369,47 +1294,8 @@ export class StudioCanvas {
         this.pinContainer.removeChildren().forEach((c) => c.destroy());
         this.nodeContainer.removeChildren().forEach((c) => c.destroy(true));
 
-        // 1. Render Routes (Bottom Layer). Routes on the display mesh are drawn from their legs and
-        // have no edit nodes (see #drawMeshRoute).
-        if (FILRODENSWMB.MESH_NATIVE) {
-            for (const route of sortedRoutes) this.#drawMeshRoute(route, meshSession);
-        }
-        sortedRoutes.forEach((route) => {
-            if (FILRODENSWMB.MESH_NATIVE) return;
-            if (!this.#isVisibleInCurrentPass(route.visibility, "all", false) || !route.points || route.points.length === 0) return;
-
-            // 1a. Draw Edit Nodes FIRST (Guarantees the initial single click is visible)
-            if (isEditMode) {
-                const isActive = route.id === activeRouteId;
-                this.#renderEditNodes(route.points, this.nodeContainer, isActive, route, "route");
-            }
-
-            // 1b. Abort line geometry if there is no second point to connect to
-            if (route.points.length < 2) return;
-
-            const colorHex = ColorMath.hexToPackedInt(route.color);
-            const splinePoints = this.#getSplinePoints(route.points);
-
-            // Pass 1: Draw the 1px black outline shadow
-            this.routeGraphics.lineStyle({
-                width: route.thickness + 1,
-                color: 0x000000,
-                alpha: 1,
-                cap: PIXI.LINE_CAP.ROUND,
-                join: PIXI.LINE_JOIN.ROUND,
-            });
-            this.#drawVectorPath(this.routeGraphics, splinePoints, route.style, route.thickness);
-
-            // Pass 2: Draw the coloured foreground line
-            this.routeGraphics.lineStyle({
-                width: route.thickness,
-                color: colorHex,
-                alpha: 1,
-                cap: PIXI.LINE_CAP.ROUND,
-                join: PIXI.LINE_JOIN.ROUND,
-            });
-            this.#drawVectorPath(this.routeGraphics, splinePoints, route.style, route.thickness);
-        });
+        // 1. Render Routes (Bottom Layer), from their legs on the display mesh (see #drawMeshRoute)
+        for (const route of sortedRoutes) this.#drawMeshRoute(route, meshSession);
 
         // 2. Render Pins (Top Layer)
         const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
@@ -1523,76 +1409,12 @@ export class StudioCanvas {
      * opened) nothing is drawn.
      *
      * @param {import("../mesh/MeshSession.js").MeshSession|null} meshSession
-     * @param {number} [globalOpacity] - The map's region opacity, applied over each level's own.
      */
-    renderRegionLevels(meshSession, globalOpacity = 1) {
+    renderRegionLevels(meshSession) {
         const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
         this.regionLevels.render(meshSession, {
             isVisible: (visibility, parentVisibility, isContainer) => this.#isVisibleInCurrentPass(visibility, parentVisibility, isContainer),
-            globalOpacity,
             resScale,
-        });
-    }
-
-    renderRegions(regionLayers = [], isEditMode = false, activeRegionId = null, globalOpacity = 0.5) {
-        this.layers.regions.removeChildren().forEach((c) => c.destroy({ children: true }));
-
-        regionLayers.forEach((layer) => {
-            if (!this.#isVisibleInCurrentPass(layer.visibility, "all", true)) return;
-
-            const layerContainer = new PIXI.Container();
-            layerContainer.alpha = globalOpacity;
-            this.layers.regions.addChild(layerContainer);
-
-            layer.regions.forEach((region) => {
-                if (!this.#isVisibleInCurrentPass(region.visibility, layer.visibility, false) || !region.points || region.points.length === 0) return;
-
-                const g = new PIXI.Graphics();
-                layerContainer.addChild(g);
-
-                const fillColorHex = region.fillColor === "transparent" ? null : ColorMath.hexToPackedInt(region.fillColor);
-                const lineColorHex = ColorMath.hexToPackedInt(region.lineColor);
-
-                // A polygon is "closed" if it has 3+ points and the user isn't actively currently drawing it
-                const isClosed = region.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && region.id !== activeRegionId;
-                const pts = region.smoothing && isClosed ? this.#getClosedSplinePoints(region.points) : region.points;
-
-                // 1. Draw Fill
-                if (fillColorHex !== null) {
-                    if (region.fillStyle === "solid") {
-                        g.beginFill(fillColorHex, 1);
-                    } else {
-                        const tex = this.#getHatchTexture(fillColorHex, region.fillStyle);
-
-                        // Shift the texture origin to the region's first node.
-                        // This creates a clean, deterministic phase offset between different regions.
-                        const matrix = new PIXI.Matrix();
-                        matrix.translate(pts[0].x, pts[0].y);
-
-                        g.beginTextureFill({ texture: tex, matrix: matrix });
-                    }
-
-                    g.lineStyle(0); // Fills don't have lines
-                    g.moveTo(pts[0].x, pts[0].y);
-                    for (let i = 1; i < pts.length; i++) {
-                        g.lineTo(pts[i].x, pts[i].y);
-                    }
-                    if (isClosed) g.closePath();
-                    g.endFill();
-                }
-
-                // 2. Draw Border
-                if (region.lineThickness > 0) {
-                    g.lineStyle({ width: region.lineThickness, color: lineColorHex, alpha: 1, cap: PIXI.LINE_CAP.ROUND, join: PIXI.LINE_JOIN.ROUND });
-                    this.#drawVectorPath(g, pts, region.lineStyle, region.lineThickness, isClosed);
-                }
-
-                // 3. Draw Edit Nodes
-                if (isEditMode) {
-                    const isActive = region.id === activeRegionId;
-                    this.#renderEditNodes(region.points, layerContainer, isActive, region, "region", layer.id);
-                }
-            });
         });
     }
 
@@ -1694,7 +1516,7 @@ export class StudioCanvas {
         this.brushCursor.drawCircle(x, y, radius);
     }
 
-    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], regionLayers = [], isEditMode = false, meshSession = null) {
+    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], isEditMode = false, meshSession = null) {
         this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
 
         // Extract native OS root font size to mimic CSS 'rem' behaviour
@@ -1782,45 +1604,7 @@ export class StudioCanvas {
             drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility, pin.id, "pin");
         });
 
-        if (FILRODENSWMB.MESH_NATIVE) {
-            this.#drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession);
-            return;
-        }
-
-        // Auto-Labels: Routes (Spline Midpoint)
-        mapRoutes.forEach((route) => {
-            if (route.visibility === "none" || !route.points || route.points.length < 2) return;
-            if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) return; // Check container rules
-
-            const spline = this.#getSplinePoints(route.points);
-            const mid = spline[Math.floor(spline.length / 2)];
-            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15, route.visibility, route.id, "route");
-        });
-
-        // Auto-Labels: Regions (Polygon Centroid)
-        regionLayers.forEach((layer) => {
-            if (!this.#isVisibleInCurrentPass(layer.visibility, "all", true)) return;
-
-            layer.regions.forEach((region) => {
-                let regionVis = region.visibility || "all";
-                if (regionVis !== "none" && layer.visibility === "gm") regionVis = "gm";
-
-                if (!this.#isVisibleInCurrentPass(regionVis, layer.visibility, true) || !region.points || region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) return;
-
-                let minX = Infinity,
-                    maxX = -Infinity,
-                    minY = Infinity,
-                    maxY = -Infinity;
-                region.points.forEach((p) => {
-                    if (p.x < minX) minX = p.x;
-                    if (p.x > maxX) maxX = p.x;
-                    if (p.y < minY) minY = p.y;
-                    if (p.y > maxY) maxY = p.y;
-                });
-
-                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, regionVis, region.id, "region", layer.id);
-            });
-        });
+        this.#drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession);
     }
 
     /**

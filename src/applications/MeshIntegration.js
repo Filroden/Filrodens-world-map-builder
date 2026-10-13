@@ -3,7 +3,7 @@ import { MeshLoader } from "../mesh/MeshLoader.js";
 import { MeshBuilder } from "../mesh/MeshBuilder.js";
 import { MeshSession, SESSION_WARNINGS } from "../mesh/MeshSession.js";
 import { distanceToSegment } from "../mesh/RoutePath.js";
-import { VECTOR_SCHEMA_VERSION, createLayerSet, createLevel, createMeshBlock } from "../mesh/Schema.js";
+import { VECTOR_SCHEMA_VERSION, createMeshBlock, validateOwners } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
 
 /**
@@ -15,22 +15,14 @@ import { platform } from "../platform/index.js";
  * State it keeps on the app:
  * - meshSession: the open map's MeshSession, or null while a map is opening (or when it could not
  *   be prepared).
- * - layerSets: the map's layer sets. Their levels are also what the region panel lists, as
- *   app.regionLayers (see regionLayersView), so the existing list, visibility and edit dialogues
- *   work on them unchanged; reconcile keeps the two in step.
+ * - layerSets: the map's layer sets, the one list of sets, levels and regions that the region
+ *   panel, the region tools, undo and saving all work on. The session is handed the same objects
+ *   (see prepareRender), so it always draws what the panel shows.
  * - meshState: what the mesh code needs between calls (the load in progress, a pending terrain
  *   refresh, whether the map changed on load).
- *
- * With FILRODENSWMB.MESH_NATIVE off none of this runs and the Studio behaves as before, which is
- * what makes a side-by-side comparison possible (see legacyView).
  */
 export class MeshIntegration {
     static #loader = null;
-
-    /** Whether regions and routes are drawn from the mesh. */
-    static get enabled() {
-        return FILRODENSWMB.MESH_NATIVE === true;
-    }
 
     static #state(app) {
         app.meshState ??= { token: 0, load: null, terrainStale: false, changedOnLoad: false, unavailable: false, notified: false };
@@ -49,9 +41,8 @@ export class MeshIntegration {
      * (or reading from the cache) the mesh the map's stored block describes, while the terrain
      * generates. Called from the Studio's payload ingest, before the terrain is generated.
      *
-     * The map's region layers are listed straight away from what was saved (the old region layers,
-     * or the levels of the layer sets), so label width migration and the panel see them; they are
-     * replaced by the session's levels once it opens.
+     * The map's layer sets are listed straight away from what was saved (none for a map saved
+     * before layer sets existed, whose region layers become a set once the session migrates them).
      *
      * @param {object} app
      * @param {object} payload - The map data being loaded (the Studio's own clone).
@@ -111,9 +102,6 @@ export class MeshIntegration {
                 onProgress: (progress) => overlay.text(this.#progressText(progress)),
                 idFactory: () => platform.utils.randomID(),
                 setName: platform.i18n.localize("FILRODENSWMB.UI.MigratedRegionsSet"),
-                // The map's region opacity applies over every level (see renderVectors), as it did
-                // over every region layer, so migrated levels add none of their own
-                levelOpacity: 1,
             });
             if (state.token !== load.token) return;
             this.#adopt(app, result);
@@ -149,7 +137,6 @@ export class MeshIntegration {
         const state = this.#state(app);
         app.meshSession = session;
         app.layerSets = mapData.layerSets ?? [];
-        app.regionLayers = this.regionLayersView(app.layerSets);
         app.mapRoutes = mapData.mapRoutes ?? [];
         app.mapPins = mapData.mapPins ?? [];
         app.uiState.world = mapData.world ?? app.uiState.world ?? null;
@@ -176,7 +163,7 @@ export class MeshIntegration {
      * marked unsaved.
      */
     static changedOnLoad(app) {
-        return this.enabled && this.#state(app).changedOnLoad === true;
+        return this.#state(app).changedOnLoad === true;
     }
 
     /**
@@ -185,7 +172,6 @@ export class MeshIntegration {
      * its mesh, and a map loaded meanwhile takes precedence (the token check).
      */
     static startNewMap(app) {
-        if (!this.enabled) return;
         const state = this.#state(app);
         state.token += 1;
         state.load = null;
@@ -194,7 +180,6 @@ export class MeshIntegration {
         const token = state.token;
         app.meshSession = null;
         app.layerSets = [];
-        app.regionLayers = [];
 
         const mapData = { mapWidth: app.mapWidth, mapHeight: app.mapHeight, seed: app.uiState.mapSeed, params: { latTop: app.uiState.latTop, latBottom: app.uiState.latBottom }, world: app.uiState.world };
         this.#meshLoader()
@@ -219,18 +204,18 @@ export class MeshIntegration {
      * of the Studio's refresh queue starts.
      */
     static markTerrainChanged(app) {
-        if (this.enabled) this.#state(app).terrainStale = true;
+        this.#state(app).terrainStale = true;
     }
 
     /**
-     * Brings the session in line with the map before a draw: the layer sets with the region
-     * panel's list (see reconcile), and the per-cell summaries with the terrain if it has been
-     * regenerated since the last draw.
+     * Brings the session in line with the map before a draw: the layer sets (which the panel,
+     * the tools and undo may have changed or replaced), and the per-cell summaries with the
+     * terrain if it has been regenerated since the last draw.
      */
     static prepareRender(app) {
         const session = app.meshSession;
         if (!session) return;
-        this.reconcile(app);
+        session.setLayerSets(app.layerSets);
         const state = this.#state(app);
         const buffers = state.terrainStale ? this.terrainBuffers(app) : null;
         if (!buffers) return;
@@ -239,53 +224,11 @@ export class MeshIntegration {
     }
 
     /**
-     * The levels of the layer sets, as the list the region panel and its dialogues work on
-     * (app.regionLayers). A level has the fields an old region layer had (id, name, visibility,
-     * regions), so the panel needs no change to list, rename, hide, edit or delete them.
-     */
-    static regionLayersView(layerSets) {
-        return (layerSets ?? []).flatMap((set) => set.levels);
-    }
-
-    /**
-     * Makes the layer sets match app.regionLayers, which the panel and undo change directly: a
-     * level the panel deleted leaves its set, a level an undo restored (as a copy) replaces its
-     * namesake, and a layer added from the panel becomes a level of the first custom set (made if
-     * there is none). The session then adopts the result.
-     */
-    static reconcile(app) {
-        if (!app.meshSession) return;
-        const listed = new Map((app.regionLayers ?? []).map((layer) => [layer.id, layer]));
-        const placed = new Set();
-        for (const set of app.layerSets ?? []) {
-            set.levels = set.levels.filter((level) => listed.has(level.id)).map((level) => listed.get(level.id));
-            for (const level of set.levels) placed.add(level.id);
-        }
-        const added = [...listed.values()].filter((layer) => !placed.has(layer.id));
-        if (added.length) this.#adoptAddedLayers(app, added);
-        app.meshSession.setLayerSets(app.layerSets);
-    }
-
-    static #adoptAddedLayers(app, layers) {
-        app.layerSets ??= [];
-        let set = app.layerSets.find((candidate) => candidate.kind === "custom");
-        if (!set) {
-            set = createLayerSet({ name: platform.i18n.localize("FILRODENSWMB.UI.MigratedRegionsSet"), kind: "custom" }, () => platform.utils.randomID());
-            app.layerSets.push(set);
-        }
-        for (const layer of layers) {
-            // The listed object itself becomes the level, so the panel keeps working on it
-            Object.assign(layer, createLevel({ ...layer, opacity: layer.opacity ?? 1 }, () => platform.utils.randomID()), { id: layer.id });
-            set.levels.push(layer);
-        }
-    }
-
-    /**
-     * Draws the region levels (see StudioCanvas.renderRegionLevels). The map's region opacity
-     * applies over each level's own, as it applied over each region layer before.
+     * Draws the region levels (see StudioCanvas.renderRegionLevels): each level at its own opacity
+     * multiplied by its layer set's.
      */
     static renderRegions(app) {
-        app.canvasEngine.renderRegionLevels(app.meshSession, app.uiState.regionOpacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY);
+        app.canvasEngine.renderRegionLevels(app.meshSession);
     }
 
     /**
@@ -294,7 +237,7 @@ export class MeshIntegration {
      * line passes within `radius` of it. Either can be double-clicked to edit, not dragged.
      */
     static bindHitTest(app) {
-        if (!this.enabled || !app.canvasEngine) return;
+        if (!app.canvasEngine) return;
         app.canvasEngine.meshHitTest = (x, y, radius) => {
             if (!app.meshSession) return null;
             if (app.activeTool === "regions") return this.#regionHit(app, x, y);
@@ -303,8 +246,15 @@ export class MeshIntegration {
         };
     }
 
+    /**
+     * The region under the pointer: on the level being edited when there is one (so a level
+     * below others can still be picked), otherwise on the topmost visible level that has a
+     * region there.
+     */
     static #regionHit(app, x, y) {
-        const levels = [...app.meshSession.levels()].filter((level) => level.visibility !== "none").reverse();
+        const active = app.activeLevelId ? app.meshSession.level(app.activeLevelId) : null;
+        const visible = [...app.meshSession.levels()].filter((level) => level.visibility !== "none").reverse();
+        const levels = active ? [active] : visible;
         for (const level of levels) {
             const region = app.meshSession.regionAt(level.id, x, y);
             if (region && region.visibility !== "none") return { target: region, x, y, radius: 0, entityType: "region", entityId: region.id, layerId: level.id, selectOnly: true };
@@ -322,33 +272,20 @@ export class MeshIntegration {
         return best ? { target: best.route, x, y, radius: 0, entityType: "route", entityId: best.route.id, selectOnly: true } : null;
     }
 
-    /**
-     * Whether a region or route edit of the polygon kind is refused because regions and routes are
-     * on the mesh (their tools come later). Tells the user once per map.
-     */
-    static refusesLegacyEdit(app) {
-        if (!this.enabled || this.#state(app).unavailable) return false;
-        const state = this.#state(app);
-        if (!state.notified) {
-            state.notified = true;
-            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.RegionEditingUnavailable"));
-        }
-        return true;
-    }
-
     // ------------------------------------------------------------------ geometry for the Studio
 
     /**
      * Points outlining a region or route drawn from the mesh (the corners of its bounds), for
      * zooming to it and outlining it in an undo preview. Empty when it is not on the mesh.
      * @param {object} app
-     * @param {object} entity - A region, a level (its regions together) or a route.
+     * @param {object} entity - A region, a level or layer set (its regions together) or a route.
      * @returns {Array<{x: number, y: number}>}
      */
     static outlinePoints(app, entity) {
         const session = app.meshSession;
-        if (!this.enabled || !session || !entity) return [];
+        if (!session || !entity) return [];
         if (Array.isArray(entity.legs)) return boxCorners(lineBounds(session.routeLine(entity)));
+        if (Array.isArray(entity.levels)) return entity.levels.flatMap((level) => this.outlinePoints(app, level));
         if (Array.isArray(entity.regions)) return entity.regions.flatMap((region) => this.outlinePoints(app, region));
         const found = session.findRegion(entity.id);
         return found ? boxCorners(session.regionBounds(found.level.id, found.region.key)) : [];
@@ -370,11 +307,12 @@ export class MeshIntegration {
      */
     static preparePayload(app, payload) {
         const state = this.#state(app);
-        if (!this.enabled || state.unavailable) return null;
+        if (state.unavailable) return null;
 
         const session = app.meshSession;
         if (session) {
-            this.reconcile(app);
+            session.setLayerSets(app.layerSets);
+            this.#checkOwners(session);
             session.assignPinCells(payload.mapPins);
         }
         delete payload.regionLayers;
@@ -385,21 +323,14 @@ export class MeshIntegration {
     }
 
     /**
-     * A map at vector schema version 4 shown the way earlier versions drew it, for comparison with
-     * MESH_NATIVE off: its levels as region layers whose regions have their migrated polygons
-     * back, and its routes with their old points. Regions and routes made after migration have no
-     * polygon and do not show.
-     * @param {object} payload - Updated in place.
+     * The last check before owners are saved: every level's owner array fits the mesh and names
+     * only the level's own regions. A mismatch means a bug elsewhere; it is logged rather than
+     * refused, since the save then writes unclaimed cells for the keys no region has (see
+     * MeshSession.encodeOwners) and loses nothing a region holds.
      */
-    static legacyView(payload) {
-        if ((payload.vectorSchemaVersion ?? 0) < VECTOR_SCHEMA_VERSION || payload.regionLayers) return;
-        payload.regionLayers = this.regionLayersView(payload.layerSets).map((level) => ({
-            id: level.id,
-            name: level.name,
-            visibility: level.visibility,
-            regions: level.regions.filter((region) => region.legacy?.points).map((region) => ({ ...region.legacy, ...region, points: region.legacy.points, lineColor: region.legacy.lineColor ?? level.style.lineColor, lineThickness: region.legacy.lineThickness ?? level.style.lineThickness, lineStyle: region.legacy.lineStyle ?? level.style.lineStyle })),
-        }));
-        payload.mapRoutes = (payload.mapRoutes ?? []).filter((route) => route.legacy?.points).map((route) => ({ ...route, points: route.legacy.points }));
+    static #checkOwners(session) {
+        const problems = [...session.levels()].flatMap((level) => validateOwners(session.layer(level.id).owners, level, session.mesh.cellCount));
+        if (problems.length) console.warn(`FWMB | Region data check before saving: ${problems.join("; ")}`);
     }
 }
 

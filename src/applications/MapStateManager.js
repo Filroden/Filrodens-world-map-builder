@@ -3,6 +3,7 @@ import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { platform } from "../platform/index.js";
+import { VectorHistory } from "./VectorHistory.js";
 
 export class MapStateManager {
     /**
@@ -197,14 +198,10 @@ export class MapStateManager {
             referenceX: width / 2,
             referenceY: height / 2,
 
-            regionMode: "draw",
             regionPresets: FILRODENSWMB.REGIONS.PRESETS,
+            // The fill a new region starts with (the toolbar's choice; see RegionTool)
             regionFillColor: "#c6af53",
             regionFillStyle: "solid",
-            regionLineColor: "#ffffff",
-            regionLineThickness: 2,
-            regionLineStyle: "solid",
-            regionSmoothing: true,
             regionOpacity: FILRODENSWMB.DISPLAY.REGION_OPACITY,
             activeRegionQuickStyle: "custom",
             customRegionStyles: [],
@@ -244,6 +241,10 @@ export class MapStateManager {
      * applying its change (see MapDialogManager), which only works if a biome change is part of
      * what gets undone. Leaving `customBiomes` out would make Ctrl+Z after renaming, recolouring
      * or editing the auto-generation rules of a custom biome have no effect on it at all.
+     *
+     * The layer sets are included (their levels, regions and styles), but not the owner arrays
+     * of the levels: those are far larger and change by patches, which have history entries of
+     * their own (see VectorHistory).
      */
     static getVectorStateSnapshot(app) {
         return {
@@ -255,7 +256,7 @@ export class MapStateManager {
             activeLandMaskId: app.activeLandMaskId,
             pins: platform.utils.deepClone(app.mapPins),
             routes: platform.utils.deepClone(app.mapRoutes),
-            regionLayers: platform.utils.deepClone(app.regionLayers),
+            layerSets: platform.utils.deepClone(app.layerSets ?? []),
             mapLabels: platform.utils.deepClone(app.mapLabels),
             mapDecorations: platform.utils.deepClone(app.mapDecorations),
             activeRouteId: app.activeRouteId,
@@ -265,25 +266,11 @@ export class MapStateManager {
     }
 
     /**
-     * Captures the current state of all non-destructive vector arrays and pushes them to the history stack.
+     * Records the vector state as it is now as an undo step (see VectorHistory), before an edit
+     * changes it.
      */
     static pushVectorState(app) {
-        app.pinHistory.push(this.getVectorStateSnapshot(app));
-
-        if (app.pinHistory.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
-            app.pinHistory.shift();
-        }
-
-        app.pinRedoStack = [];
-
-        // Push to the Global Ledger and clear forward redos
-        if (!app.globalHistoryLedger) app.globalHistoryLedger = [];
-        app.globalHistoryLedger.push("vector");
-        app.globalRedoLedger = [];
-
-        if (app.globalHistoryLedger.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
-            app.globalHistoryLedger.shift();
-        }
+        VectorHistory.push(app, VectorHistory.snapshot(app));
     }
 
     /**
@@ -298,7 +285,9 @@ export class MapStateManager {
         app.activeLandMaskId = state.activeLandMaskId || null;
         app.mapPins = state.pins || app.mapPins;
         app.mapRoutes = state.routes || app.mapRoutes;
-        app.regionLayers = state.regionLayers || app.regionLayers;
+        app.layerSets = state.layerSets || app.layerSets;
+        // The session draws from the layer sets it was given, so it is given the restored ones
+        app.meshSession?.setLayerSets(app.layerSets);
         app.mapLabels = state.mapLabels || app.mapLabels;
         app.mapDecorations = state.mapDecorations || app.mapDecorations;
         app.activeRouteId = state.activeRouteId || null;

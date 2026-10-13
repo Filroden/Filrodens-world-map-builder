@@ -100,17 +100,35 @@ async function exporterApp() {
     app.uiState.gridType = "square";
     app.uiState.gridSize = 100;
     app.mapRoutes = [];
-    app.regionLayers = v3.regionLayers;
     return { app, v3 };
+}
+
+/**
+ * The v3 fixture's region polygons in the form the grid exporter tests cells against (see
+ * GridDataExporter.build's `regions`): a pixel is in a region when it lies inside the polygon's
+ * raw points, as the exporter tested regions before they moved onto the display mesh.
+ */
+async function polygonRegions(regionLayers) {
+    const { GridAggregator } = await import("../../src/generation/GridAggregator.js");
+    return regionLayers.flatMap((layer) =>
+        layer.regions.map((region) => ({
+            id: region.id,
+            name: region.name,
+            visibility: layer.visibility === "gm" ? "gm" : region.visibility || "all",
+            layer: { id: layer.id, name: layer.name },
+            contains: (px, py) => GridAggregator.pointInPolygon(px, py, region.points),
+            bounds: GridAggregator.getPolygonPixelBounds(region.points),
+        })),
+    );
 }
 
 test("grid data: region coverage from the cell raster matches the polygon test within 2%", { skip: P0_SKIP }, async () => {
     const { GridDataExporter } = await import("../../src/applications/GridDataExporter.js");
-    const { app } = await exporterApp();
-    const polygons = GridDataExporter.build(app);
+    const { app, v3 } = await exporterApp();
+    const polygons = GridDataExporter.build(app, { regions: await polygonRegions(v3.regionLayers) });
 
     const { session, mapData } = await openV3();
-    Object.assign(app, { meshSession: session, regionLayers: mapData.layerSets.flatMap((set) => set.levels), mapRoutes: mapData.mapRoutes });
+    Object.assign(app, { meshSession: session, mapRoutes: mapData.mapRoutes });
     const mesh = GridDataExporter.build(app);
 
     // Where two polygons of a layer overlap, both used to claim the pixels; on the mesh the later
@@ -141,7 +159,7 @@ test("scene notes for regions sit at the label anchor", { skip: P0_SKIP }, async
     const { session, mapData } = await openV3();
     const levels = structuredClone(mapData.layerSets.flatMap((set) => set.levels));
     levels[0].regions[0].journalPageId = "page";
-    const anchors = SceneExporter.regionNoteAnchors({ meshSession: session, regionLayers: levels });
+    const anchors = SceneExporter.regionNoteAnchors({ meshSession: session, regionLevels: levels });
     assert.equal(anchors.length, 1);
     const expected = session.labelAnchor(levels[0].id, levels[0].regions[0].key);
     assert.deepEqual([anchors[0].x, anchors[0].y], [expected.x, expected.y]);

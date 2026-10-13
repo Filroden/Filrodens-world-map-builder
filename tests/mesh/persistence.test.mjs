@@ -8,6 +8,7 @@ import { saveMapData } from "../../src/platform/foundry/store.js";
 import { MapJson } from "../../src/data/MapJson.js";
 import { MeshSession } from "../../src/mesh/MeshSession.js";
 import { decodeOwners } from "../../src/mesh/OwnerLayer.js";
+import { deleteLevel, deleteRegion } from "../../src/mesh/RegionEdits.js";
 import { FIXTURES, P0_SKIP, loadP0, readJson } from "./helpers.mjs";
 import { stubCompendium } from "./foundry-stubs.mjs";
 
@@ -18,14 +19,14 @@ async function openApp(areaFactor = 15) {
     const v3 = readJson(join(FIXTURES, "v3-vectors.json"));
     v3.world = { zoom: 1, originX: 0, originY: 0, rootW: v3.mapWidth, rootH: v3.mapHeight, areaFactor };
     const { session, mapData } = await MeshSession.open(v3, { buffers: loadP0().buffers });
-    const app = { meshSession: session, layerSets: mapData.layerSets, regionLayers: MeshIntegration.regionLayersView(mapData.layerSets), mapRoutes: mapData.mapRoutes, mapPins: mapData.mapPins };
+    const app = { meshSession: session, layerSets: mapData.layerSets, mapRoutes: mapData.mapRoutes, mapPins: mapData.mapPins };
     return { app, v3, mapData };
 }
 
 /** The payload the Studio's save builds, before MeshIntegration adds the mesh fields. */
 function savePayload(app, v3, mapData) {
     const { regionLayers: _unused, ...rest } = v3;
-    return { ...rest, world: mapData.world, mapPins: app.mapPins, mapRoutes: app.mapRoutes, regionLayers: app.regionLayers };
+    return { ...rest, world: mapData.world, mapPins: app.mapPins, mapRoutes: app.mapRoutes };
 }
 
 test("save writes owners beside the map data, removes stale keys, and loads back identically", { skip: P0_SKIP }, async () => {
@@ -56,21 +57,28 @@ test("deleting a level removes its owners at the next save", { skip: P0_SKIP }, 
     const firstOwners = MeshIntegration.preparePayload(app, savePayload(app, v3, mapData));
     const doc = stubCompendium("map1", { [FLAG]: { mapData: v3, owners: firstOwners } });
 
-    const removed = app.regionLayers.pop();
+    const levels = app.layerSets[0].levels;
+    const removed = levels.at(-1);
+    assert.ok(deleteLevel(app.meshSession, app.layerSets, removed.id).owners, "the deleted level's owners come back encoded, for undo");
     const payload = savePayload(app, v3, mapData);
     const owners = MeshIntegration.preparePayload(app, payload);
     await saveMapData("Map", payload, "map1", { owners });
     assert.ok(!(removed.id in doc.flags[FLAG].owners));
-    assert.equal(doc.flags[FLAG].mapData.layerSets[0].levels.length, app.regionLayers.length);
+    assert.equal(doc.flags[FLAG].mapData.layerSets[0].levels.length, levels.length);
 });
 
-test("a deleted region's cells are saved unclaimed but kept live for undo", { skip: P0_SKIP }, async () => {
+test("a deleted region's cells become unclaimed, and a key no region holds is saved unclaimed", { skip: P0_SKIP }, async () => {
     const { app } = await openApp();
-    const level = app.regionLayers[0];
-    const region = level.regions.shift();
+    const level = app.layerSets[0].levels[0];
+    const [first, second] = level.regions;
+    deleteRegion(app.meshSession, level.id, first.id);
+    assert.ok(!app.meshSession.layer(level.id).owners.includes(first.key), "deleting a region releases its cells");
+
+    // A region taken out of the level without its cells (as an inconsistent edit would leave it)
+    level.regions.splice(level.regions.indexOf(second), 1);
     const owners = MeshIntegration.preparePayload(app, {});
-    assert.ok(app.meshSession.layer(level.id).owners.includes(region.key), "the live array keeps the cells");
-    assert.ok(!decodeOwners(owners[level.id]).includes(region.key), "the saved array does not");
+    assert.ok(app.meshSession.layer(level.id).owners.includes(second.key), "the live array is left alone");
+    assert.ok(!decodeOwners(owners[level.id]).includes(second.key), "the saved array holds no key without a region");
 });
 
 for (const [given, expected] of [

@@ -19,6 +19,7 @@ import {
     revertPinIconUsage,
 } from "../data/pinIcons.js";
 import { platform } from "../platform/index.js";
+import { regionFillColor } from "../mesh/Schema.js";
 
 export class MapDialogManager {
     /**
@@ -364,7 +365,7 @@ export class MapDialogManager {
                     };
                     app.mapPins.forEach(updateAttached);
                     app.mapRoutes.forEach(updateAttached);
-                    app.regionLayers.forEach((layer) => layer.regions.forEach(updateAttached));
+                    app.regionLevels.forEach((level) => level.regions.forEach(updateAttached));
                 },
                 onDisconnect: (app, id) => {
                     for (const lbl of app.mapLabels) if (lbl.quickStyle === id) lbl.quickStyle = "custom";
@@ -373,7 +374,7 @@ export class MapDialogManager {
                     };
                     app.mapPins.forEach(disconnectAttached);
                     app.mapRoutes.forEach(disconnectAttached);
-                    app.regionLayers.forEach((layer) => layer.regions.forEach(disconnectAttached));
+                    app.regionLevels.forEach((level) => level.regions.forEach(disconnectAttached));
                 },
                 // Mirrors onDisconnect's traversal (standalone Custom Labels, plus the attached
                 // `.label` sub-object every pin/route/region carries) but tallies matches instead
@@ -383,7 +384,7 @@ export class MapDialogManager {
                     const isAttachedMatch = (ent) => ent.label && ent.label.quickStyle === id;
                     count += app.mapPins.filter(isAttachedMatch).length;
                     count += app.mapRoutes.filter(isAttachedMatch).length;
-                    for (const layer of app.regionLayers) count += layer.regions.filter(isAttachedMatch).length;
+                    for (const level of app.regionLevels) count += level.regions.filter(isAttachedMatch).length;
                     return count;
                 },
                 onUpdateActiveUI: (app, result) => {
@@ -435,6 +436,9 @@ export class MapDialogManager {
                     app.uiState.routeStyle = result.style;
                 },
             },
+            // Region quick styles hold a region's fill only: a region's border belongs to its level
+            // (the level's line style), so the line and smoothing fields older styles carry are
+            // dropped when such a style is next saved (see onSave)
             Region: {
                 registryKey: "customRegionStyles",
                 activeStateKey: "activeRegionQuickStyle",
@@ -443,10 +447,6 @@ export class MapDialogManager {
                     name: "New Region Style",
                     fillColor: "#c6af53",
                     fillStyle: "solid",
-                    lineColor: "#ffffff",
-                    lineThickness: 2,
-                    lineStyle: "solid",
-                    smoothing: true,
                 }),
                 getContext: (app, style) => ({
                     style,
@@ -456,42 +456,25 @@ export class MapDialogManager {
                     name: form.elements["styleName"].value.trim() || fallbackName,
                     fillColor: form.elements["styleFillTransparent"].checked ? "transparent" : form.elements["styleFillColor"].value,
                     fillStyle: form.elements["styleFillStyle"].value,
-                    lineColor: form.elements["styleLineColor"].value,
-                    lineThickness: Number(form.elements["styleLineThickness"].value) || 2,
-                    lineStyle: form.elements["styleLineStyle"].value,
-                    smoothing: form.elements["styleSmoothing"].value === "true",
                 }),
+                onSave: (style) => {
+                    for (const key of MapDialogManager.#LEGACY_REGION_STYLE_FIELDS) delete style[key];
+                },
                 onCascade: (app, id, result) => {
-                    const aestheticProperties = {
-                        fillColor: result.fillColor,
-                        fillStyle: result.fillStyle,
-                        lineColor: result.lineColor,
-                        lineThickness: result.lineThickness,
-                        lineStyle: result.lineStyle,
-                        smoothing: result.smoothing,
-                    };
-
-                    app.regionLayers.forEach((layer) => {
-                        layer.regions.forEach((region) => {
-                            if (region.quickStyle === id) platform.utils.mergeObject(region, aestheticProperties);
-                        });
-                    });
+                    const aestheticProperties = { fillColor: result.fillColor, fillStyle: result.fillStyle };
+                    for (const level of app.regionLevels) {
+                        for (const region of level.regions) if (region.quickStyle === id) platform.utils.mergeObject(region, aestheticProperties);
+                    }
                 },
                 onDisconnect: (app, id) => {
-                    app.regionLayers.forEach((layer) => {
-                        layer.regions.forEach((region) => {
-                            if (region.quickStyle === id) region.quickStyle = "custom";
-                        });
-                    });
+                    for (const level of app.regionLevels) {
+                        for (const region of level.regions) if (region.quickStyle === id) region.quickStyle = "custom";
+                    }
                 },
-                getUsageCount: (app, id) => app.regionLayers.reduce((sum, layer) => sum + layer.regions.filter((region) => region.quickStyle === id).length, 0),
+                getUsageCount: (app, id) => app.regionLevels.reduce((sum, level) => sum + level.regions.filter((region) => region.quickStyle === id).length, 0),
                 onUpdateActiveUI: (app, result) => {
                     app.uiState.regionFillColor = result.fillColor;
                     app.uiState.regionFillStyle = result.fillStyle;
-                    app.uiState.regionLineColor = result.lineColor;
-                    app.uiState.regionLineThickness = result.lineThickness;
-                    app.uiState.regionLineStyle = result.lineStyle;
-                    app.uiState.regionSmoothing = result.smoothing;
                 },
             },
             Biome: {
@@ -521,6 +504,9 @@ export class MapDialogManager {
             },
         };
     }
+
+    /** The border fields region quick styles held before borders belonged to the level. */
+    static #LEGACY_REGION_STYLE_FIELDS = ["lineColor", "lineThickness", "lineStyle", "smoothing"];
 
     /**
      * The choices for a custom biome's Placement select, in the order they are offered, with the
@@ -677,7 +663,7 @@ export class MapDialogManager {
             region: {
                 titleKey: "FILRODENSWMB.UI.MassEditRegionsTitle",
                 template: "modules/filrodens-world-map-builder/templates/dialogs/mass-edit-regions.hbs",
-                getEntities: (app, ids) => app.regionLayers.flatMap((layer) => layer.regions).filter((r) => ids.has(r.id)),
+                getEntities: (app, ids) => app.regionLevels.flatMap((level) => level.regions).filter((r) => ids.has(r.id)),
                 getContext: (app) => ({
                     customRegionStyles: app.uiState.customRegionStyles || [],
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
@@ -689,10 +675,6 @@ export class MapDialogManager {
                     const fillTransparentCheckbox = html.querySelector('input[name="massFillTransparent"]');
                     const fillColorInput = html.querySelector('input[name="massFillColor"]');
                     const fillStyleSelect = html.querySelector('select[name="massFillStyle"]');
-                    const lineColorInput = html.querySelector('input[name="massLineColor"]');
-                    const lineThicknessInput = html.querySelector('input[name="massLineThickness"]');
-                    const lineStyleSelect = html.querySelector('select[name="massLineStyle"]');
-                    const smoothingSelect = html.querySelector('select[name="massSmoothing"]');
 
                     quickStyleSelect?.addEventListener("change", (e) => {
                         const style = resolveStyle("customRegionStyles")(app, e.target.value);
@@ -701,10 +683,6 @@ export class MapDialogManager {
                         if (fillTransparentCheckbox) fillTransparentCheckbox.checked = isTransparent;
                         if (fillColorInput) fillColorInput.value = isTransparent ? "#000000" : style.fillColor;
                         if (fillStyleSelect) fillStyleSelect.value = style.fillStyle;
-                        if (lineColorInput) lineColorInput.value = style.lineColor;
-                        if (lineThicknessInput) lineThicknessInput.value = style.lineThickness;
-                        if (lineStyleSelect) lineStyleSelect.value = style.lineStyle;
-                        if (smoothingSelect) smoothingSelect.value = String(style.smoothing);
                     });
                     this.bindLabelPropertiesDialog(html, app.uiState);
                 },
@@ -714,17 +692,7 @@ export class MapDialogManager {
                         extract: (form, app) => {
                             const id = form.elements["massQuickStyle"].value;
                             const style = id !== "custom" ? resolveStyle("customRegionStyles")(app, id) : null;
-                            return style
-                                ? {
-                                      quickStyle: id,
-                                      fillColor: style.fillColor,
-                                      fillStyle: style.fillStyle,
-                                      lineColor: style.lineColor,
-                                      lineThickness: style.lineThickness,
-                                      lineStyle: style.lineStyle,
-                                      smoothing: style.smoothing,
-                                  }
-                                : { quickStyle: "custom" };
+                            return style ? { quickStyle: id, fillColor: style.fillColor, fillStyle: style.fillStyle } : { quickStyle: "custom" };
                         },
                     },
                     {
@@ -732,10 +700,6 @@ export class MapDialogManager {
                         extract: (form) => ({ fillColor: form.elements["massFillTransparent"].checked ? "transparent" : form.elements["massFillColor"].value }),
                     },
                     { checkboxName: "applyFillStyle", extract: (form) => ({ fillStyle: form.elements["massFillStyle"].value }) },
-                    { checkboxName: "applyLineColor", extract: (form) => ({ lineColor: form.elements["massLineColor"].value }) },
-                    { checkboxName: "applyLineThickness", extract: (form) => ({ lineThickness: Number(form.elements["massLineThickness"].value) || 2 }) },
-                    { checkboxName: "applyLineStyle", extract: (form) => ({ lineStyle: form.elements["massLineStyle"].value }) },
-                    { checkboxName: "applySmoothing", extract: (form) => ({ smoothing: form.elements["massSmoothing"].value === "true" }) },
                     ...labelFields(),
                 ],
             },
@@ -931,13 +895,6 @@ export class MapDialogManager {
         });
     }
 
-    static onAddRegionLayer(app, _event, _target) {
-        const id = platform.utils.randomID();
-        app.regionLayers.push({ id: id, name: `Region Layer ${app.regionLayers.length + 1}`, visibility: "all", regions: [] });
-        app.activeRegionLayerId = id;
-        app.view?.render(["context"]);
-    }
-
     // --- DELETE ACTIONS ---
 
     /**
@@ -1016,7 +973,7 @@ export class MapDialogManager {
         const config = FILRODENSWMB.ENTITY_CONFIG[entityType];
         if (!config) return;
 
-        const id = config.isLayer ? target.closest(".fwmb-accordion-group").dataset.layerId : target.closest(".fwmb-list-item").dataset.id;
+        const id = target.closest(".fwmb-list-item").dataset.id;
 
         const confirmed = await this._confirmDialog();
         if (!confirmed) return;
@@ -1106,26 +1063,6 @@ export class MapDialogManager {
 
         app.markDirty();
         app.view?.render(["context", "toolbar"]);
-    }
-
-    static async onDeleteRegion(app, event, target) {
-        const layerId = target.closest(".fwmb-accordion-group").dataset.layerId;
-        const regionId = target.closest(".fwmb-list-item").dataset.id;
-
-        const layer = app.regionLayers.find((l) => l.id === layerId);
-        if (!layer) return;
-
-        const confirmed = await this._confirmDialog();
-        if (!confirmed) return;
-
-        MapStateManager.pushVectorState(app);
-
-        layer.regions = layer.regions.filter((r) => r.id !== regionId);
-        if (app.activeRegionId === regionId) app.activeRegionId = null;
-
-        app._repaintVectors();
-        app.view?.render(["context"]);
-        app.markDirty();
     }
 
     // --- MASS EDIT ---
@@ -1387,7 +1324,7 @@ export class MapDialogManager {
         else if (type === "pin") sourceObj = app.mapPins.find((p) => p.id === id);
         else if (type === "route") sourceObj = app.mapRoutes.find((r) => r.id === id);
         else if (type === "region") {
-            const layer = app.regionLayers.find((l) => l.id === layerId);
+            const layer = app.regionLevels.find((l) => l.id === layerId);
             sourceObj = layer?.regions.find((r) => r.id === id);
         }
 
@@ -1515,6 +1452,7 @@ export class MapDialogManager {
             onRender: config.onRender,
             onExtract: (form) => config.onExtract(form, style.name),
             onSave: (entity, result) => {
+                config.onSave?.(entity, result);
                 if (config.onCascade) config.onCascade(app, id, result);
 
                 if (app.uiState[config.activeStateKey] === id) {
@@ -1525,12 +1463,10 @@ export class MapDialogManager {
     }
 
     static async onEditRegion(app, event, target, explicitData = null) {
-        app._finishActiveRegion();
-
-        const layerId = explicitData ? explicitData.layerId : target.closest(".fwmb-accordion-group").dataset.layerId;
+        const layerId = explicitData ? explicitData.layerId : target.closest("[data-layer-id]").dataset.layerId;
         const regionId = explicitData ? explicitData.regionId : target.closest(".fwmb-list-item").dataset.id;
 
-        const layer = app.regionLayers.find((l) => l.id === layerId);
+        const layer = app.regionLevels.find((l) => l.id === layerId);
         if (!layer) return;
 
         const region = layer.regions.find((r) => r.id === regionId);
@@ -1542,7 +1478,9 @@ export class MapDialogManager {
             titleKey: "FILRODENSWMB.UI.EditRegion",
             template: "modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs",
             context: {
-                region: safeRegion,
+                // A region without a fill of its own is drawn in its preset colour, which the
+                // dialogue starts from so saving it unchanged keeps the region's look
+                region: { ...safeRegion, fillColor: regionFillColor(region), fillStyle: region.fillStyle ?? "solid" },
                 rotationRange: FILRODENSWMB.UI.ROTATION,
                 fonts: platform.fonts.list(),
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
@@ -1554,10 +1492,6 @@ export class MapDialogManager {
                 const fillTransparentCheckbox = html.querySelector('input[name="regionFillTransparent"]');
                 const fillColorInput = html.querySelector('input[name="regionFillColor"]');
                 const fillStyleSelect = html.querySelector('select[name="regionFillStyle"]');
-                const lineColorInput = html.querySelector('input[name="regionLineColor"]');
-                const lineThicknessInput = html.querySelector('input[name="regionLineThickness"]');
-                const lineStyleSelect = html.querySelector('select[name="regionLineStyle"]');
-                const smoothingSelect = html.querySelector('select[name="regionSmoothing"]');
 
                 quickStyleSelect?.addEventListener("change", (e) => {
                     const styleId = e.target.value;
@@ -1568,10 +1502,6 @@ export class MapDialogManager {
                             if (fillTransparentCheckbox) fillTransparentCheckbox.checked = isTransparent;
                             if (fillColorInput) fillColorInput.value = isTransparent ? "#000000" : styleData.fillColor;
                             if (fillStyleSelect) fillStyleSelect.value = styleData.fillStyle;
-                            if (lineColorInput) lineColorInput.value = styleData.lineColor;
-                            if (lineThicknessInput) lineThicknessInput.value = styleData.lineThickness;
-                            if (lineStyleSelect) lineStyleSelect.value = styleData.lineStyle;
-                            if (smoothingSelect) smoothingSelect.value = String(styleData.smoothing);
                         }
                     }
                 });
@@ -1582,10 +1512,6 @@ export class MapDialogManager {
                 fillTransparentCheckbox?.addEventListener("change", revertToCustom);
                 fillColorInput?.addEventListener("input", revertToCustom);
                 fillStyleSelect?.addEventListener("change", revertToCustom);
-                lineColorInput?.addEventListener("input", revertToCustom);
-                lineThicknessInput?.addEventListener("input", revertToCustom);
-                lineStyleSelect?.addEventListener("change", revertToCustom);
-                smoothingSelect?.addEventListener("change", revertToCustom);
 
                 this.bindLabelPropertiesDialog(html, app.uiState);
             },
@@ -1595,26 +1521,9 @@ export class MapDialogManager {
                 quickStyle: form.elements["regionQuickStyle"].value,
                 fillColor: form.elements["regionFillTransparent"].checked ? "transparent" : form.elements["regionFillColor"].value,
                 fillStyle: form.elements["regionFillStyle"].value,
-                lineColor: form.elements["regionLineColor"].value,
-                lineThickness: Number(form.elements["regionLineThickness"].value),
-                lineStyle: form.elements["regionLineStyle"].value,
-                smoothing: form.elements["regionSmoothing"].value === "true",
                 label: this._extractLabelResultFields(form),
             }),
         });
-    }
-
-    static async onEditRegionLayer(app, event, target) {
-        const id = target.closest(".fwmb-accordion-group").dataset.layerId;
-        const layer = app.regionLayers.find((l) => l.id === id);
-        if (!layer) return;
-
-        const newName = await this._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.EditLayer"), "Layer Name", layer.name);
-        if (newName) {
-            layer.name = newName;
-            app.view?.render(["context"]);
-            app.markDirty();
-        }
     }
 
     static async onEditRiver(app, event, target, explicitId = null) {

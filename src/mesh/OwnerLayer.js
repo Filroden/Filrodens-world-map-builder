@@ -52,6 +52,32 @@ export function mergePatches(first, second) {
     };
 }
 
+/**
+ * Combines any number of consecutive patches of the same layer into one, in a single pass (the
+ * same result as folding them with mergePatches, without rebuilding the combined patch at every
+ * step, which would make a long brush stroke cost the square of its length).
+ * @param {OwnerPatch[]} patches - In the order they were made.
+ * @returns {OwnerPatch}
+ */
+export function mergePatchList(patches) {
+    if (patches.length === 0) return EMPTY_PATCH;
+    if (patches.length === 1) return patches[0];
+    const before = new Map();
+    const after = new Map();
+    for (const patch of patches) {
+        patch.cells.forEach((cell, i) => {
+            if (!before.has(cell)) before.set(cell, patch.before[i]);
+            after.set(cell, patch.after[i]);
+        });
+    }
+    const cells = [...before.keys()].filter((cell) => before.get(cell) !== after.get(cell)).sort((a, b) => a - b);
+    return {
+        cells: Int32Array.from(cells),
+        before: Int32Array.from(cells, (cell) => before.get(cell)),
+        after: Int32Array.from(cells, (cell) => after.get(cell)),
+    };
+}
+
 /** True when a patch changes nothing. */
 export function isEmptyPatch(patch) {
     return patch.cells.length === 0;

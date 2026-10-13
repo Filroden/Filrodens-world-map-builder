@@ -1,3 +1,4 @@
+import { FILRODENSWMB } from "../config.js";
 import { MeshBuilder } from "./MeshBuilder.js";
 import { cellsInPolygon } from "./OwnerLayer.js";
 import { legTrace, toFlatPoints } from "./RoutePath.js";
@@ -34,10 +35,11 @@ const DEFAULT_SET_NAME = "Regions";
  * @param {Function} [options.idFactory]
  * @param {string} [options.setName]
  * @param {number} [options.levelOpacity] - Opacity of each new level (default: createLevel's).
+ * @param {number} [options.setOpacity] - Opacity of the layer set (default: createLayerSet's).
  * @returns {{layerSet: object, owners: Object<string, Int32Array>}}
  */
-export function regionsToOwners(regionLayers, mesh, { idFactory = randomId, setName = DEFAULT_SET_NAME, levelOpacity = undefined } = {}) {
-    const layerSet = createLayerSet({ name: setName, kind: "custom" }, idFactory);
+export function regionsToOwners(regionLayers, mesh, { idFactory = randomId, setName = DEFAULT_SET_NAME, levelOpacity = undefined, setOpacity = undefined } = {}) {
+    const layerSet = createLayerSet({ name: setName, kind: "custom", opacity: setOpacity }, idFactory);
     const owners = {};
     for (const layer of regionLayers ?? []) {
         const level = createLevel(
@@ -76,6 +78,7 @@ function regionFields(old) {
         name: old.name ?? "",
         description: old.description ?? "",
         fillColor: old.fillColor ?? null,
+        fillStyle: old.fillStyle ?? null,
         quickStyle: old.quickStyle ?? null,
         visibility: old.visibility ?? "all",
         label: old.label ?? null,
@@ -194,7 +197,8 @@ export function pinsToCells(pins, mesh) {
  * @param {Function} [options.idFactory]
  * @param {string} [options.setName] - Name of the layer set the old region layers go into.
  * @param {object} [options.meshBlock] - Overrides for the new mesh block (seed, spacing).
- * @param {number} [options.levelOpacity] - Opacity of the levels made from region layers.
+ * @param {number} [options.levelOpacity] - Fill opacity of the levels made from region layers
+ *     (default: the map's old Region Opacity setting, or its default when the map never saved one).
  * @returns {{mapData: object, owners: Object<string, Int32Array>, mesh: import("./MeshBuilder.js").Mesh|null}}
  */
 export function migrateMapData(mapData, mesh = null, { idFactory = randomId, setName = DEFAULT_SET_NAME, meshBlock = {}, levelOpacity = undefined } = {}) {
@@ -205,7 +209,11 @@ export function migrateMapData(mapData, mesh = null, { idFactory = randomId, set
     const built = mesh ?? MeshBuilder.fromMapData(next);
     next.mesh.cells = built.cellCount;
 
-    const { layerSet, owners } = regionsToOwners(mapData.regionLayers, built, { idFactory, setName, levelOpacity });
+    // The map's Region Opacity was the fill opacity of every region layer, so it becomes each
+    // migrated level's fill opacity, where the level editor shows it. The set starts at 1, a
+    // multiplier left for fading the whole set later.
+    const fillOpacity = levelOpacity ?? mapData.params?.display?.regionOpacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY;
+    const { layerSet, owners } = regionsToOwners(mapData.regionLayers, built, { idFactory, setName, levelOpacity: fillOpacity, setOpacity: 1 });
     next.layerSets = layerSet.levels.length ? [layerSet] : [];
     delete next.regionLayers;
     next.mapRoutes = routesToWaypoints(mapData.mapRoutes, built, { idFactory });

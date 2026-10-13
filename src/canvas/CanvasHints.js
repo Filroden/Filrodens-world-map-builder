@@ -25,8 +25,8 @@ export class CanvasHints {
      * @param {string} [state.featureMode]  Terrain Features mode: spring, river or fault.
      * @param {string} [state.infraMode]  Infrastructure mode: pin or route.
      * @param {boolean} [state.isMaskDrawing]  Whether the Scene tool is drawing land masks.
-     * @param {string|null} [state.heldItem]  What the pointer holds: label, decoration, pin,
-     *   region or mask (a land mask).
+     * @param {string|null} [state.heldItem]  What the pointer holds: label, decoration, pin or
+     *   mask (a land mask).
      * @returns {string}  A key of CANVAS_HINTS.CONTEXTS.
      */
     static resolveContext(state) {
@@ -55,7 +55,7 @@ export class CanvasHints {
             case "features":
                 return state.featureMode === "spring" ? "spring" : "line";
             case "infrastructure":
-                return state.infraMode === "route" ? "line" : "pin";
+                return state.infraMode === "route" ? "route" : "pin";
             case "regions":
                 return "region";
             case "labels":

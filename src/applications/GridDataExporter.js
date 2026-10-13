@@ -26,12 +26,17 @@ export class GridDataExporter {
 
     /**
      * @param {MapStudio} app - the live Studio application, read for its generated buffers
-     * (`currentElevationData` etc.), vector entities (`regionLayers`, `mapPins`, `mapRoutes`,
-     * `manualRivers`) and `uiState`.
+     * (`currentElevationData` etc.), its mesh session (the regions), vector entities (`mapPins`,
+     * `mapRoutes`, `manualRivers`) and `uiState`.
+     * @param {object} [options]
+     * @param {Array|null} [options.regions] - The regions to test cells against, each
+     *     `{ id, name, visibility, layer: {id, name}, contains(px, py), bounds }`, in place of the
+     *     mesh session's (for comparing another description of the same regions, such as the
+     *     polygons a map's regions were migrated from).
      * @returns {object|null} The full `gridData` payload, or `null` for a gridless map - there is
      * no cell geometry to aggregate into, so the feature does not run.
      */
-    static build(app) {
+    static build(app, { regions = null } = {}) {
         if (app.uiState.gridType === GridDataExporter.#GRIDLESS_TYPE) return null;
 
         const grid = GridDataExporter.#buildGrid(app.uiState);
@@ -39,7 +44,7 @@ export class GridDataExporter {
 
         const { params } = MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors);
         const biomeIdToKey = GridDataExporter.#buildBiomeIdToKeyMap();
-        const visibleRegions = app.meshSession ? GridDataExporter.#collectMeshRegions(app.meshSession) : GridDataExporter.#collectVisibleRegions(app.regionLayers);
+        const visibleRegions = regions ?? (app.meshSession ? GridDataExporter.#collectMeshRegions(app.meshSession) : []);
         const visiblePins = (app.mapPins || []).filter((pin) => pin.visibility !== "none" && pin.icon);
         const visibleRoutes = GridDataExporter.#collectVisibleRoutes(app);
         const namedRivers = (app.manualRivers || []).filter((river) => river.points?.length >= 2);
@@ -100,40 +105,9 @@ export class GridDataExporter {
     }
 
     /**
-     * Flattens every region across every layer into a single list, pre-computing what stays
-     * constant per region for the rest of the export (its bounding box, and its *effective*
-     * visibility) so the per-cell pass below doesn't repeat that work for every cell.
-     */
-    static #collectVisibleRegions(regionLayers) {
-        const visible = [];
-        for (const layer of regionLayers || []) {
-            if (layer.visibility === "none") continue;
-
-            for (const region of layer.regions || []) {
-                if (!region.points || region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) continue;
-
-                const regionVisibility = region.visibility || "all";
-                if (regionVisibility === "none") continue;
-
-                visible.push({
-                    id: region.id,
-                    name: region.name,
-                    // A region under a GM-only layer is never shown to players even if the region
-                    // itself is marked "all" - matching the same elevation rule StudioCanvas
-                    // already applies when rendering regions on-canvas (see its region visibility
-                    // pass), so the exported flag agrees with what a GM actually sees toggled.
-                    visibility: layer.visibility === "gm" ? "gm" : regionVisibility,
-                    layer: { id: layer.id, name: layer.name },
-                    contains: (px, py) => GridAggregator.pointInPolygon(px, py, region.points),
-                    bounds: GridAggregator.getPolygonPixelBounds(region.points),
-                });
-            }
-        }
-        return visible;
-    }
-
-    /**
-     * The same list for regions on the display mesh: a region holds a pixel when the cell under
+     * Every visible region of every level as one list, with what stays constant per region for the
+     * rest of the export (its bounding box and effective visibility) worked out once: a region
+     * holds a pixel when the cell under
      * the pixel is one of its own (read from the cell raster, so membership is exact and costs one
      * lookup per pixel). Its level stands in for the region layer in the exported `layer` field,
      * and a GM-only layer set or level makes its regions GM-only, as on the canvas.

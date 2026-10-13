@@ -107,6 +107,10 @@
         <div class="fwmb-processing-content">
             <i class="fwmb-icon sync fwmb-spin"></i>
             <span class="fwmb-processing-text"></span>
+            <!-- Shown only while work that can stop part-way is running (see MapStudio.runCancellable) -->
+            <button type="button" class="fwmb-btn fwmb-processing-cancel fwmb-hidden" data-action="cancelProcessing">
+                <i class="fwmb-icon cancel"></i> {{localize "FILRODENSWMB.UI.Cancel"}}
+            </button>
         </div>
     </div>
 </div>

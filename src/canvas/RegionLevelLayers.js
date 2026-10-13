@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { FILL_STYLE, RegionMeshLayer, createCellIdTexture } from "./RegionMeshLayer.js";
+import { regionFillColor } from "../mesh/Schema.js";
 
 /**
  * Draws a map's region levels from its mesh session: for each visible level, its fill (a
@@ -45,10 +46,9 @@ export class RegionLevelLayers {
      * @param {import("../mesh/MeshSession.js").MeshSession|null} session
      * @param {object} options
      * @param {function(string, string, boolean): boolean} options.isVisible - (visibility, parentVisibility, isContainer).
-     * @param {number} [options.globalOpacity] - The map's region opacity, applied over each level's own.
      * @param {number} [options.resScale] - The map's resolution scale (for levels whose borders scale with it).
      */
-    render(session, { isVisible, globalOpacity = 1, resScale = 1 }) {
+    render(session, { isVisible, resScale = 1 }) {
         if (!session) {
             this.clear();
             return;
@@ -61,8 +61,8 @@ export class RegionLevelLayers {
         this.#container.removeChildren();
         for (const entry of drawn) {
             const view = this.#levelView(session, entry.level.id);
-            this.#drawFill(session, view, entry, globalOpacity);
-            this.#drawArcs(session, view, entry, globalOpacity, resScale);
+            this.#drawFill(session, view, entry);
+            this.#drawArcs(session, view, entry, resScale);
             this.#container.addChild(view.container);
         }
     }
@@ -116,20 +116,20 @@ export class RegionLevelLayers {
         this.#levels.delete(id);
     }
 
-    #drawFill(session, view, { level, set, palette }, globalOpacity) {
+    #drawFill(session, view, { level, set, palette }) {
         if (!view.fill) return;
         const changes = session.takeOwnerChanges(level.id);
         if (changes) view.fill.setOwners(session.layer(level.id).owners, changes);
         view.fill.setPalette(palette);
         const tint = set.waterTint === false ? 0 : FILRODENSWMB.MESH.FILL.WATER_TINT_ALPHA;
-        view.fill.setOpacity(levelOpacity(level) * globalOpacity, tint);
+        view.fill.setOpacity(drawnOpacity(level, set), tint);
     }
 
-    #drawArcs(session, view, { level, visibleKeys, exclude }, globalOpacity, resScale) {
+    #drawArcs(session, view, { level, set, visibleKeys, exclude }, resScale) {
         const arcs = session.arcsFor(level.id, exclude);
         const style = arcStyle(level.style, resScale);
         const signature = JSON.stringify([style, [...visibleKeys].sort((a, b) => a - b)]);
-        view.arcs.alpha = levelOpacity(level) * globalOpacity;
+        view.arcs.alpha = drawnOpacity(level, set);
         if (view.arcsSource === arcs && view.arcsSignature === signature) return;
 
         view.arcsSource = arcs;
@@ -199,11 +199,10 @@ function visibleAncestors(session, level, shown) {
 function regionPalette(level, levelVisibility, isVisible) {
     const palette = new Map();
     const visibleKeys = new Set();
-    const presets = FILRODENSWMB.REGIONS.PRESETS;
     for (const region of level.regions) {
         if (!isVisible(region.visibility, levelVisibility, false)) continue;
         visibleKeys.add(region.key);
-        const fill = region.fillColor ?? presets[region.key % presets.length];
+        const fill = regionFillColor(region);
         const transparent = fill === "transparent";
         const style = FILL_STYLE[region.fillStyle ?? region.legacy?.fillStyle] ?? FILL_STYLE.solid;
         palette.set(region.key, { color: transparent ? 0 : ColorMath.hexToPackedInt(fill), alpha: transparent ? 0 : 1, style });
@@ -211,8 +210,14 @@ function regionPalette(level, levelVisibility, isVisible) {
     return { palette, visibleKeys };
 }
 
-function levelOpacity(level) {
-    return Number.isFinite(level.opacity) ? level.opacity : FILRODENSWMB.DISPLAY.REGION_OPACITY;
+/**
+ * The opacity a level is drawn at: its own, multiplied by its layer set's, so a whole set can be
+ * faded without changing the balance between its levels.
+ */
+function drawnOpacity(level, set) {
+    const own = Number.isFinite(level.opacity) ? level.opacity : 1;
+    const ofSet = Number.isFinite(set?.opacity) ? set.opacity : FILRODENSWMB.DISPLAY.REGION_OPACITY;
+    return own * ofSet;
 }
 
 // ------------------------------------------------------------------ borders

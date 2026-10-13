@@ -197,6 +197,18 @@
 .fwmb-icon.add {
     --fwmb-mask: url("../assets/icons/add.svg");
 }
+.fwmb-icon.arrow-upward {
+    --fwmb-mask: url("../assets/icons/arrow_upward.svg");
+}
+.fwmb-icon.arrow-downward {
+    --fwmb-mask: url("../assets/icons/arrow_downward.svg");
+}
+.fwmb-icon.subdirectory {
+    --fwmb-mask: url("../assets/icons/subdirectory_arrow_right.svg");
+}
+.fwmb-icon.merge {
+    --fwmb-mask: url("../assets/icons/call_merge.svg");
+}
 .fwmb-icon.remove {
     --fwmb-mask: url("../assets/icons/remove.svg");
 }
@@ -2141,8 +2153,22 @@ input.fwmb-swatch {
     z-index: 100;
 }
 
-/* Automatically reveals menu when the user clicks the kebab button */
-.fwmb-dropdown:focus-within .fwmb-dropdown-menu {
+/* Without popovers, the menu shows in place while focus is inside its dropdown (see src/ui/dropdowns.js) */
+.fwmb-dropdown:focus-within .fwmb-dropdown-menu:not([popover]) {
+    display: flex;
+}
+
+/* With popovers, an open menu is drawn in the top layer, placed against its button by
+   positionPopoverMenu, so no list or fieldset around it can cut it off */
+.fwmb-dropdown-menu[popover] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+}
+
+.fwmb-dropdown-menu:popover-open {
     display: flex;
 }
 
@@ -3153,4 +3179,117 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
    their own display, which would otherwise override the attribute. */
 .fwmb .fwmb-fault-dialog [data-fault-types][hidden] {
     display: none;
+}
+
+/* --- REGIONS PANEL (templates/tools-regions.hbs) --- */
+
+/* Each list's heading: its name, an info icon explaining the tier, then its actions at the end */
+.fwmb .fwmb-region-panel .fwmb-legend-with-action {
+    gap: var(--fwmb-size-4);
+}
+
+.fwmb .fwmb-legend-info {
+    flex: none;
+    width: var(--fwmb-size-12);
+    height: var(--fwmb-size-12);
+    color: var(--fwmb-text-muted);
+    cursor: help;
+}
+
+/* The level tree: each level is indented by its depth below the top of its set */
+.fwmb .fwmb-level-row {
+    padding-inline-start: calc(var(--fwmb-size-8) + var(--fwmb-level-depth, 0) * var(--fwmb-size-16));
+}
+
+.fwmb .fwmb-set-row,
+.fwmb .fwmb-level-row {
+    gap: var(--fwmb-size-6);
+}
+
+.fwmb .fwmb-set-row .fwmb-name,
+.fwmb .fwmb-level-row .fwmb-name,
+.fwmb .fwmb-region-row .fwmb-name {
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The set, level and region being edited */
+.fwmb .fwmb-set-row.active,
+.fwmb .fwmb-level-row.active,
+.fwmb .fwmb-region-row.active {
+    border-color: var(--fwmb-accent-main);
+    background: var(--fwmb-bg-hover);
+}
+
+.fwmb .fwmb-set-row.active .fwmb-name,
+.fwmb .fwmb-level-row.active .fwmb-name,
+.fwmb .fwmb-region-row.active .fwmb-name {
+    color: var(--fwmb-accent-main);
+    font-weight: bold;
+}
+
+.fwmb .fwmb-level-branch {
+    flex: none;
+    color: var(--fwmb-text-muted);
+}
+
+/* How many regions a level holds, and its markers (free nesting, nesting problems) */
+.fwmb .fwmb-count-badge,
+.fwmb .fwmb-level-badge {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fwmb-size-2);
+    padding: 0 var(--fwmb-size-4);
+    border-radius: 999px;
+    font-size: var(--fwmb-size-10);
+    line-height: 1.4;
+    color: var(--fwmb-text-secondary);
+    background: var(--fwmb-bg-hover);
+    border: 1px solid var(--fwmb-border-subtle);
+}
+
+.fwmb .fwmb-level-badge.warning {
+    color: var(--fwmb-text-inverse);
+    background: var(--fwmb-color-warning);
+    border-color: transparent;
+}
+
+.fwmb .fwmb-level-badge .fwmb-icon {
+    width: var(--fwmb-size-10);
+    height: var(--fwmb-size-10);
+}
+
+/* A row's option menu: its button matches the row's other small buttons */
+.fwmb .fwmb-row-menu > button {
+    width: auto;
+    height: auto;
+    border: none;
+}
+
+.fwmb .fwmb-dropdown-menu button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* A checkbox with its label to the right, and an optional info icon after it */
+.fwmb .fwmb-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--fwmb-size-4);
+    cursor: pointer;
+}
+
+.fwmb .fwmb-text-truncate {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The processing overlay's Cancel button sits beside the message */
+.fwmb .fwmb-processing-cancel {
+    margin-inline-start: var(--fwmb-size-8);
 }

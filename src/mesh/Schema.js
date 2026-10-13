@@ -25,6 +25,16 @@ export const ROUTE_MODES = Object.freeze(["terrain", "direct", "trace"]);
 export const ROUTE_CLASSES = Object.freeze(["trunk", "main", "minor"]);
 export const ROUTE_TRANSPORTS = Object.freeze(["road", "river", "sea"]);
 
+/**
+ * How a level keeps its regions inside their parent level's regions while it is painted:
+ * "constrained" (a region can only be painted inside the parent region it belongs to) or "free"
+ * (anything goes; the cells that break the rule are counted and can be fixed afterwards).
+ */
+export const NESTING_MODES = Object.freeze(["constrained", "free"]);
+
+/** Route thickness steps (map pixels): routes take quarter pixels, never less than one step. */
+export const ROUTE_THICKNESS_STEP = 0.25;
+
 const KM_PER_DEGREE = 111.2;
 const ID_LENGTH = 16;
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -173,7 +183,9 @@ export function defaultLevelStyle() {
 }
 
 /**
- * A layer set (for example "Political"): ordered levels, each a partition of the mesh.
+ * A layer set (for example "Political"): ordered levels, each a partition of the mesh. Its
+ * `opacity` multiplies the opacity of every level in it, so a whole set can be faded without
+ * touching the balance between its levels.
  * @param {object} [fields]
  * @param {Function} [idFactory]
  */
@@ -184,6 +196,7 @@ export function createLayerSet(fields = {}, idFactory = randomId) {
         kind: fields.kind ?? "custom",
         visibility: fields.visibility ?? "all",
         waterTint: fields.waterTint ?? true,
+        opacity: fields.opacity ?? 1,
         levels: fields.levels ?? [],
     };
 }
@@ -202,8 +215,9 @@ export function createLevel(fields = {}, idFactory = randomId) {
         name: fields.name ?? "",
         titleTemplate: fields.titleTemplate ?? "{name}",
         parentLevelId: fields.parentLevelId ?? null,
+        nestingMode: fields.nestingMode ?? "constrained",
         visibility: fields.visibility ?? "all",
-        opacity: fields.opacity ?? 0.35,
+        opacity: fields.opacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY,
         style: { ...defaultLevelStyle(), ...fields.style },
         regions: fields.regions ?? [],
         nextKey: fields.nextKey ?? (fields.regions ?? []).reduce((next, region) => Math.max(next, region.key + 1), 0),
@@ -212,8 +226,24 @@ export function createLevel(fields = {}, idFactory = randomId) {
 }
 
 /**
+ * The colour a region is filled with: its own fill colour, or (when it has none) one of the preset
+ * colours chosen by its key, so neighbouring new regions start with different colours and keep
+ * them however the list is sorted. "transparent" is returned as it is.
+ * @param {{fillColor?: string|null, key: number}} region
+ * @returns {string}
+ */
+export function regionFillColor(region) {
+    const presets = FILRODENSWMB.REGIONS.PRESETS;
+    return region.fillColor ?? presets[region.key % presets.length];
+}
+
+/**
  * A region of a level, taking the level's next key. The region holds no geometry: the cells whose
  * owner equals its key are the region.
+ *
+ * `parentKey` is the key of the region of the parent level this region belongs to, on a level that
+ * has a parent. It is fixed when the region is first painted (see RegionEdits) and is what keeps a
+ * constrained level's painting inside one parent region; null until then, and on a top level.
  * @param {object} level - Updated in place (nextKey advances).
  * @param {object} [fields]
  * @param {Function} [idFactory]
@@ -225,7 +255,9 @@ export function addRegion(level, fields = {}, idFactory = randomId) {
         name: fields.name ?? "",
         description: fields.description ?? "",
         fillColor: fields.fillColor ?? null,
+        fillStyle: fields.fillStyle ?? null,
         quickStyle: fields.quickStyle ?? null,
+        parentKey: fields.parentKey ?? null,
         visibility: fields.visibility ?? "all",
         label: fields.label ?? null,
         journalPageId: fields.journalPageId ?? null,
@@ -239,6 +271,11 @@ export function addRegion(level, fields = {}, idFactory = randomId) {
 
 /**
  * A route in the mesh shape. `legs[k]` runs from waypoints[k] to waypoints[k + 1], both included.
+ * `mode` is how new legs are found (and how "re-path all legs" finds every leg again); a leg
+ * already found keeps its cells whatever the mode later becomes. `transport` picks the cost of
+ * finding a terrain leg (see RouteTool): a road keeps to land, a river follows river cells, a sea
+ * route keeps to water. `outline` draws a dark line one step wider under the route; `smoothing`
+ * cuts its corners.
  * @param {object} [fields]
  * @param {Function} [idFactory]
  */
@@ -250,16 +287,16 @@ export function createRoute(fields = {}, idFactory = randomId) {
         visibility: fields.visibility ?? "all",
         label: fields.label ?? null,
         quickStyle: fields.quickStyle ?? null,
-        color: fields.color ?? "#000000",
+        color: fields.color ?? "#ffffff",
         thickness: fields.thickness ?? 2,
         style: fields.style ?? "solid",
-        outline: fields.outline ?? false,
+        outline: fields.outline ?? true,
         smoothing: fields.smoothing ?? false,
         mode: fields.mode ?? "terrain",
         waypoints: fields.waypoints ?? [],
         legs: fields.legs ?? [],
         class: fields.class ?? null,
-        transport: fields.transport ?? null,
+        transport: fields.transport ?? "road",
         generated: fields.generated ?? null,
     };
     if (fields.legacy) route.legacy = fields.legacy;
@@ -284,6 +321,7 @@ export function createRoute(fields = {}, idFactory = randomId) {
 export function validateVectorData(mapData) {
     const errors = [];
     normaliseAreaFactor(mapData);
+    normaliseVectorData(mapData);
     if (mapData.vectorSchemaVersion !== VECTOR_SCHEMA_VERSION) errors.push(`vectorSchemaVersion is ${mapData.vectorSchemaVersion}, expected ${VECTOR_SCHEMA_VERSION}`);
     if ("regionLayers" in mapData) errors.push("regionLayers is still present");
     validateMeshBlock(mapData.mesh, errors);
@@ -304,6 +342,66 @@ export function normaliseAreaFactor(mapData) {
     const value = clampAreaFactor(mapData?.world?.areaFactor);
     if (mapData?.world && typeof mapData.world === "object") mapData.world.areaFactor = value;
     return value;
+}
+
+/**
+ * Gives the vector data the fields added after version 4's shape was first saved, with their
+ * defaults, so code reading a level, route or pin can rely on them: a layer set's opacity, a
+ * level's nesting mode, a region's parent key, a route's transport, outline, smoothing and
+ * thickness (rounded to the thickness step), and a pin's style. Values already present are kept;
+ * an unknown nesting mode or transport becomes the default.
+ *
+ * A set saved before sets had an opacity was drawn with the map's old Region Opacity setting over
+ * every level, so that setting moves into each of its levels' fill opacity (where the level editor
+ * shows it) and the set itself starts at 1.
+ *
+ * @param {object} mapData - Updated in place.
+ * @returns {object} The same mapData.
+ */
+export function normaliseVectorData(mapData) {
+    const oldOpacity = mapData.params?.display?.regionOpacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY;
+    for (const set of mapData.layerSets ?? []) {
+        if (!Number.isFinite(set.opacity)) adoptOldOpacity(set, oldOpacity);
+        for (const level of set.levels ?? []) normaliseLevel(level);
+    }
+    for (const route of mapData.mapRoutes ?? []) normaliseRoute(route);
+    for (const pin of mapData.mapPins ?? []) pin.pinStyle ??= null;
+    return mapData;
+}
+
+function adoptOldOpacity(set, oldOpacity) {
+    set.opacity = 1;
+    for (const level of set.levels ?? []) {
+        const own = Number.isFinite(level.opacity) ? level.opacity : 1;
+        level.opacity = own * oldOpacity;
+    }
+}
+
+function normaliseLevel(level) {
+    if (!NESTING_MODES.includes(level.nestingMode)) level.nestingMode = "constrained";
+    level.style = { ...defaultLevelStyle(), ...level.style };
+    for (const region of level.regions ?? []) {
+        if (!Number.isInteger(region.parentKey)) region.parentKey = null;
+    }
+}
+
+function normaliseRoute(route) {
+    if (!ROUTE_TRANSPORTS.includes(route.transport)) route.transport = "road";
+    if (typeof route.outline !== "boolean") route.outline = true;
+    if (typeof route.smoothing !== "boolean") route.smoothing = false;
+    route.thickness = roundRouteThickness(route.thickness);
+}
+
+/**
+ * A route thickness made valid: rounded to ROUTE_THICKNESS_STEP and never below one step; a
+ * missing or unreadable value becomes the default of 2.
+ * @param {*} value
+ * @returns {number}
+ */
+export function roundRouteThickness(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return 2;
+    return Math.max(ROUTE_THICKNESS_STEP, Math.round(number / ROUTE_THICKNESS_STEP) * ROUTE_THICKNESS_STEP);
 }
 
 function validateMeshBlock(mesh, errors) {
@@ -327,6 +425,7 @@ function validateLayerSet(set, levelIds, errors) {
         if (level.parentLevelId !== null && (!own.has(level.parentLevelId) || !levelIds.has(level.parentLevelId))) {
             errors.push(`level ${level.id}: parent ${level.parentLevelId} is not an earlier level of the same set`);
         }
+        if (!NESTING_MODES.includes(level.nestingMode)) errors.push(`level ${level.id}: unknown nesting mode ${level.nestingMode}`);
         validateRegionKeys(level, errors);
     }
 }
@@ -343,6 +442,7 @@ function validateRegionKeys(level, errors) {
 
 function validateRoute(route, cellCount, errors) {
     if (!ROUTE_MODES.includes(route.mode)) errors.push(`route ${route.id}: unknown mode ${route.mode}`);
+    if (!ROUTE_TRANSPORTS.includes(route.transport)) errors.push(`route ${route.id}: unknown transport ${route.transport}`);
     const { waypoints, legs } = route;
     if (legs.length !== Math.max(0, waypoints.length - 1)) {
         errors.push(`route ${route.id}: ${waypoints.length} waypoints need ${Math.max(0, waypoints.length - 1)} legs, found ${legs.length}`);

@@ -13,7 +13,7 @@ import { RefreshQueue } from "../tools/RefreshQueue.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
-import { placeDropdownMenu } from "../ui/dropdowns.js";
+import { bindDropdownMenus } from "../ui/dropdowns.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
@@ -25,6 +25,9 @@ import { RandomLandMap } from "../generation/RandomLandMap.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { LayerPainting } from "../canvas/LayerPainting.js";
 import { MeshIntegration } from "./MeshIntegration.js";
+import { VectorHistory } from "./VectorHistory.js";
+import { RegionPanel } from "./RegionPanel.js";
+import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
 import { currentTheme, setTheme, THEME_SETTINGS } from "../ui/Theme.js";
@@ -104,8 +107,7 @@ export class MapStudio {
         deleteFault(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
         deleteLabel(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
         deletePin(e, t)         { MapDialogManager.onDeleteEntity(this, e, t); },
-        deleteRegion(e, t)      { MapDialogManager.onDeleteRegion(this, e, t); },
-        deleteRegionLayer(e, t) { MapDialogManager.onDeleteEntity(this, e, t); },
+        deleteRegion(_e, t)     { RegionPanel.deleteRegion(this, ...RegionPanel.regionIdsOf(t)); },
         deleteRiver(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
         deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
         deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
@@ -118,7 +120,6 @@ export class MapStudio {
         editLabel(e, t)       { MapDialogManager.onEditLabel(this, e, t); },
         editPin(e, t)         { MapDialogManager.onEditPin(this, e, t); },
         editRegion(e, t)      { MapDialogManager.onEditRegion(this, e, t); },
-        editRegionLayer(e, t) { MapDialogManager.onEditRegionLayer(this, e, t); },
         editRiver(e, t)       { MapDialogManager.onEditRiver(this, e, t); },
         editRoute(e, t)       { MapDialogManager.onEditRoute(this, e, t); },
 
@@ -128,7 +129,28 @@ export class MapStudio {
         deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
         openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
         addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
-        addRegionLayer(e, t)    { MapDialogManager.onAddRegionLayer(this, e, t); },
+
+        // --- REGIONS PANEL: layer sets, levels and regions (see RegionPanel) ---
+        addLayerSet()               { RegionPanel.addSet(this); },
+        selectLayerSet(_e, t)       { RegionPanel.selectSet(this, t); },
+        editLayerSet(_e, t)         { RegionPanel.editSet(this, t); },
+        deleteLayerSet(_e, t)       { RegionPanel.deleteSet(this, t); },
+        moveLayerSetUp(_e, t)       { RegionPanel.moveSet(this, t, -1); },
+        moveLayerSetDown(_e, t)     { RegionPanel.moveSet(this, t, 1); },
+        toggleSetVisibility(_e, t)  { RegionPanel.toggleSetVisibility(this, t); },
+        addLevel()                  { RegionPanel.addLevel(this); },
+        addChildLevel(_e, t)        { RegionPanel.addChildLevel(this, t); },
+        editLevel(_e, t)            { RegionPanel.editLevel(this, t); },
+        deleteLevel(_e, t)          { RegionPanel.deleteLevel(this, t); },
+        moveLevelUp(_e, t)          { RegionPanel.moveLevel(this, t, -1); },
+        moveLevelDown(_e, t)        { RegionPanel.moveLevel(this, t, 1); },
+        selectLevel(_e, t)          { RegionPanel.selectLevel(this, t); },
+        toggleLevelVisibility(_e, t) { RegionPanel.toggleLevelVisibility(this, t); },
+        autoAssignLevel(_e, t)      { RegionPanel.autoAssign(this, t); },
+        fixLevelNesting(_e, t)      { RegionPanel.fixNesting(this, t); },
+        addRegion()                 { RegionPanel.addRegion(this); },
+        selectRegion(_e, t)         { RegionPanel.selectRegion(this, t); },
+        mergeRegion(_e, t)          { RegionPanel.mergeRegion(this, ...RegionPanel.regionIdsOf(t)); },
 
         // --- DIALOG MANAGER: Pin Icons ---
         addCustomPinIcon(e, t)     { MapDialogManager.onAddCustomPinIcon(this, e, t); },
@@ -143,6 +165,7 @@ export class MapStudio {
         adjustReferenceScale(e, t)      { this._onAdjustReferenceScale(e, t); },
         applyFeatureMath(e, t)          { this._onApplyFeatureMath(e, t); },
         applyResolution(e, t)           { this._onApplyResolution(e, t); },
+        cancelProcessing()              { this.#cancelRunning?.abort(); },
         changeTool(e, t)                { this._onChangeTool(e, t); },
         exportPng(e, t)                 { this._onExportPng(e, t); },
         exportScene(e, t)               { this._onExportScene(e, t); },
@@ -165,14 +188,11 @@ export class MapStudio {
         resetZoom(e, t)                 { this._onResetZoom(e, t); },
         saveMap(e, t)                   { this._onSaveMap(e, t); },
         saveMapAs(e, t)                 { this._onSaveMapAs(e, t); },
-        selectRegionLayer(e, t)         { this._onSelectRegionLayer(e, t); },
         setBrushBiome(e, t)             { this._onSetBrushBiome(e, t); },
         setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
         setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
         setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
         setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
-        setRegionMode(e, t)             { this._onSetRegionMode(e, t); },
-        setRegionPreset(e, t)           { this._onSetRegionPreset(e, t); },
         setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
         threeDView(e, t)                { this._onThreeDView(e, t); },
         toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
@@ -181,7 +201,6 @@ export class MapStudio {
         toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
         toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
         togglePinDropdown(e, t)         { this._onTogglePinDropdown(e, t); },
-        toggleRegionSmoothing(e, t)     { this._onToggleRegionSmoothing(e, t); },
         toggleTerrainLayer(e, t)        { this._onToggleTerrainLayer(e, t); },
         toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
         toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
@@ -349,8 +368,10 @@ export class MapStudio {
         this.massEditSelection = { pin: new Set(), route: new Set(), region: new Set(), label: new Set() };
         this.mapRoutes = [];
         this.activeRouteId = null;
-        this.regionLayers = [];
-        this.activeRegionLayerId = null;
+        // The map's layer sets (see MeshIntegration), and the set, level and region being edited
+        this.layerSets = [];
+        this.activeLayerSetId = null;
+        this.activeLevelId = null;
         this.activeRegionId = null;
         this.landMasks = [];
         this.activeLandMaskId = null;
@@ -571,6 +592,11 @@ export class MapStudio {
         this.isDirty = true;
     }
 
+    /** Every level of every layer set, in drawing order (the levels the region panel lists). */
+    get regionLevels() {
+        return allLevels(this.layerSets);
+    }
+
     /**
      * Dynamically calculates the click-tolerance threshold in canvas-space pixels.
      * Ensures proximity checks remain exactly 15 screen-pixels wide regardless of zoom.
@@ -759,29 +785,16 @@ export class MapStudio {
                 autoLabels.push({ ...r, dataType: "route", displayVisibility: r.label?.visibility || "all" });
             });
 
-            (this.regionLayers || []).forEach((layer) => {
-                (layer.regions || []).forEach((r) => {
-                    autoLabels.push({ ...r, dataType: "region", layerId: layer.id, displayVisibility: r.label?.visibility || "all" });
-                });
-            });
+            for (const level of this.regionLevels) {
+                for (const r of level.regions) autoLabels.push({ ...r, dataType: "region", layerId: level.id, displayVisibility: r.label?.visibility || "all" });
+            }
 
             // Sort the unified list alphabetically by name
             context.autoLabels = autoLabels.toSorted(alphaSort);
             context.fontFamilies = platform.fonts.list();
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
-            if (this.regionLayers.length > 0 && !this.activeRegionLayerId) {
-                this.activeRegionLayerId = this.regionLayers[0].id;
-            }
-
-            context.regionLayers = [...(this.regionLayers || [])].sort(alphaSort).map((layer) => ({
-                ...layer,
-                isActive: layer.id === this.activeRegionLayerId,
-                // Region layer keys hold a dot, so the template cannot look them up in
-                // collapsedSections by path; the layer carries its own flag instead
-                collapsed: this._collapsedSections.has(`regionLayer.${layer.id}`),
-                regions: [...(layer.regions || [])].sort(alphaSort).map((r) => ({ ...r, massEditSelected: this.massEditSelection.region.has(r.id) })),
-            }));
+            if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this);
 
             if (this.activeTool === "manage") {
                 context.savedMaps = await platform.store.getSavedMaps();
@@ -860,7 +873,7 @@ export class MapStudio {
         root.addEventListener("change", (event) => this.#routeFieldEvent(event));
         root.addEventListener("pointerover", (event) => this.#togglePreviewFallback(event, true));
         root.addEventListener("pointerout", (event) => this.#togglePreviewFallback(event, false));
-        root.addEventListener("focusin", (event) => placeDropdownMenu(event.target));
+        bindDropdownMenus(root);
     }
 
     /**
@@ -1065,7 +1078,6 @@ export class MapStudio {
         // 2. Delegate to Sub-Systems
         this.#syncFaultLiveEdits(name);
         this.#syncRouteLiveEdits(name, target);
-        this.#syncRegionLiveEdits(name);
         this.#syncCropLiveEdits(name);
     }
 
@@ -1155,48 +1167,6 @@ export class MapStudio {
         }
     }
 
-    #syncRegionLiveEdits(name) {
-        // Fallback to custom if a manual property is changed
-        if (["regionFillColor", "regionFillStyle", "regionLineColor", "regionLineThickness", "regionLineStyle"].includes(name)) {
-            this.uiState.activeRegionQuickStyle = "custom";
-            this.view?.render(["toolbar", "editToolbar"]);
-        }
-
-        // Apply preset if dropdown is changed
-        if (name === "activeRegionQuickStyle") {
-            const styleId = this.uiState.activeRegionQuickStyle;
-            if (styleId !== "custom") {
-                const styleData = this.uiState.customRegionStyles.find((s) => s.id === styleId);
-                if (styleData) {
-                    this.uiState.regionFillColor = styleData.fillColor;
-                    this.uiState.regionFillStyle = styleData.fillStyle;
-                    this.uiState.regionLineColor = styleData.lineColor;
-                    this.uiState.regionLineThickness = styleData.lineThickness;
-                    this.uiState.regionLineStyle = styleData.lineStyle;
-                    this.uiState.regionSmoothing = styleData.smoothing;
-                    this.view?.render(["toolbar", "editToolbar"]);
-                }
-            }
-        }
-
-        if (!this.activeRegionId || !this.activeRegionLayerId) return;
-        if (name !== "activeRegionQuickStyle" && !name.startsWith("region")) return;
-
-        const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
-        const region = layer?.regions.find((r) => r.id === this.activeRegionId);
-
-        if (region) {
-            region.quickStyle = this.uiState.activeRegionQuickStyle;
-            region.fillColor = this.uiState.regionFillColor;
-            region.fillStyle = this.uiState.regionFillStyle;
-            region.lineColor = this.uiState.regionLineColor;
-            region.lineThickness = this.uiState.regionLineThickness;
-            region.lineStyle = this.uiState.regionLineStyle;
-            region.smoothing = this.uiState.regionSmoothing;
-            this._repaintVectors();
-        }
-    }
-
     #syncCropLiveEdits(name) {
         if (name !== "regionalTargetWidth" || !this.canvasEngine) return;
 
@@ -1239,13 +1209,13 @@ export class MapStudio {
 
     /**
      * A click anywhere in a <summary> toggles its <details>, including a click on a button or
-     * link inside it (a region layer's Edit and Delete buttons, a list's Mass Edit toggle). Those
+     * link inside it (a list's Add button or its Mass Edit toggle) or on the info icon explaining the list. Those
      * controls should only do their own job, so their clicks have the toggle cancelled. Cancelling
      * the default does not stop the click reaching the application's own data-action handling,
      * which listens further up the page.
      */
     static #keepSummaryControlsFromToggling(event) {
-        if (event.target.closest("[data-action], button, a")) event.preventDefault();
+        if (event.target.closest("[data-action], button, a, .fwmb-legend-info")) event.preventDefault();
     }
 
     #handleContextPanelInput(event) {
@@ -1277,7 +1247,6 @@ export class MapStudio {
 
         // 1. Route specific single-action updates
         if (name.startsWith("cartography")) return this.#updateCartography(target, name);
-        if (name === "regionOpacity") return this.#updateRegionOpacity(target);
         if (name === "referenceAlpha") return this.#updateReferenceAlpha(target);
         if (name === "gridType" || name === "gridSize") return this.#updateGridSettings();
         if (name === "biomeAlphaActive" || name === "biomeAlphaInactive") return this.#updateBiomeAlphas();
@@ -1299,11 +1268,6 @@ export class MapStudio {
         else if (target.type === "number") value = Number(target.value);
 
         this.uiState[name] = value;
-        this._repaintVectors();
-    }
-
-    #updateRegionOpacity(target) {
-        this.uiState.regionOpacity = Number(target.value);
         this._repaintVectors();
     }
 
@@ -1627,17 +1591,11 @@ export class MapStudio {
         let requiresTerrainUpdate = false;
 
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
-            if (config.isLayer) continue;
-            if (this[config.activeKey]) {
+            if (config.activeKey && this[config.activeKey]) {
                 this[config.activeKey] = null;
                 cleared = true;
                 if (config.triggersTerrain) requiresTerrainUpdate = true;
             }
-        }
-
-        if (this.activeRegionId) {
-            this._finishActiveRegion();
-            cleared = true;
         }
 
         if (this.activeLandMaskId) {
@@ -1681,7 +1639,7 @@ export class MapStudio {
         }
 
         if (layer === "regions") {
-            this.#handleRegionClick(x, y);
+            this.#selectRegionAt(x, y);
             return;
         }
 
@@ -1777,11 +1735,8 @@ export class MapStudio {
         const infraPins = this.mapPins.filter((p) => !!p.icon);
 
         const isInfraEdit = this.activeTool === "infrastructure" && isEdit;
-        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.activeRouteId, this.meshSession);
-
-        const isRegionEdit = this.activeTool === "regions" && isEdit;
-        if (MeshIntegration.enabled) MeshIntegration.renderRegions(this);
-        else this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
+        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.meshSession);
+        MeshIntegration.renderRegions(this);
 
         if (this.activeTool === "features") {
             this.canvasEngine.renderFeaturePins(this.mapPins, isEdit, this.proceduralSprings);
@@ -1796,7 +1751,7 @@ export class MapStudio {
         }
 
         if (this.activeTool === "labels") {
-            this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isEdit, this.meshSession);
+            this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, isEdit, this.meshSession);
         }
 
         if (this.activeTool === "scene" && this.canvasEngine.renderLandMasks) {
@@ -1859,11 +1814,11 @@ export class MapStudio {
     }
 
     #handleInfraInsertNode(x, y) {
-        if (!["infrastructure", "regions", "features", "scene"].includes(this.activeTool)) return;
+        if (!["features", "scene"].includes(this.activeTool)) return;
 
-        // This only ever splits an existing line/polygon segment (scene masks, infrastructure routes,
-        // regions, fault lines, manual rivers) - pins have no segments and never reach this path -
-        // so all four tools may extend into the buffer here
+        // This only ever splits an existing line/polygon segment (land masks, fault lines, manual
+        // rivers) - pins have no segments and never reach this path - so both tools may extend
+        // into the buffer here
         const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
         if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
 
@@ -1887,18 +1842,13 @@ export class MapStudio {
 
     #isNearExistingNode(x, y) {
         const isNear = (pt) => Math.hypot(pt.x - x, pt.y - y) < this.currentSnapThreshold;
-
-        // Check Routes
-        if (this.mapRoutes.some((route) => (route.points ?? []).some(isNear))) return true;
-
-        // Check Pins
         return this.mapPins.some((pin) => pin.visibility !== "none" && pin.icon && isNear(pin));
     }
 
     #findClosestSegment(x, y) {
         let bestMatch = null;
 
-        // Check Generic Vectors (Routes, Rivers, Faults)
+        // Check Generic Vectors (Rivers, Faults)
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             if (config.toolCategory !== this.activeTool) continue;
 
@@ -1911,21 +1861,6 @@ export class MapStudio {
                     projY: segment.projY,
                     dist: segment.dist,
                     triggersTerrain: config.triggersTerrain,
-                };
-            }
-        }
-
-        // Check Region Vectors
-        if (this.activeTool === "regions") {
-            const regionSegment = SpatialMath.getClosestRegionSegment(this.regionLayers, this.activeRegionId, x, y, this.currentSnapThreshold);
-            if (regionSegment && (!bestMatch || regionSegment.dist < bestMatch.dist)) {
-                bestMatch = {
-                    vector: regionSegment.region, // Map 'region' to 'vector' for universal handling
-                    insertIndex: regionSegment.insertIndex,
-                    projX: regionSegment.projX,
-                    projY: regionSegment.projY,
-                    dist: regionSegment.dist,
-                    triggersTerrain: false,
                 };
             }
         }
@@ -1951,7 +1886,7 @@ export class MapStudio {
     }
 
     #handleInfraDeleteNode(target) {
-        if (!["infrastructure", "regions", "features", "scene"].includes(this.activeTool)) return;
+        if (!["infrastructure", "features", "scene"].includes(this.activeTool)) return;
         if (target.icon && this.activeTool !== "infrastructure") return;
         if (this.#removeProceduralSpring(target)) return;
 
@@ -1994,12 +1929,11 @@ export class MapStudio {
             }
         }
 
-        // 2. Check Generic Vectors (Routes, Faults, Rivers)
+        // 2. Check Generic Vectors (Faults, Rivers)
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             if (config.toolCategory !== this.activeTool) continue;
 
             const vectorArray = this[config.stateKey];
-            // Routes on the display mesh have no points (and no nodes to delete)
             const vIndex = vectorArray.findIndex((v) => v.points?.includes(target));
 
             if (vIndex > -1) {
@@ -2019,28 +1953,7 @@ export class MapStudio {
             }
         }
 
-        // 3. Check Regions
-        if (this.activeTool === "regions") {
-            for (const layer of this.regionLayers) {
-                const rIndex = layer.regions.findIndex((r) => r.points?.includes(target));
-
-                if (rIndex > -1) {
-                    const region = layer.regions[rIndex];
-                    return {
-                        array: region.points,
-                        index: region.points.indexOf(target),
-                        cleanup: () => {
-                            // Orphan cleanup: destroy region if it can no longer enclose an area (unless actively drawing)
-                            if (region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && this.activeRegionId !== region.id) {
-                                layer.regions.splice(rIndex, 1);
-                            }
-                        },
-                    };
-                }
-            }
-        }
-
-        // 4. Check Land Masks
+        // 3. Check Land Masks
         if (this.activeTool === "scene") {
             const mIndex = this.landMasks.findIndex((m) => m.points.includes(target));
             if (mIndex > -1) {
@@ -2076,7 +1989,7 @@ export class MapStudio {
      * longer be recovered with Redo. The cost of leaving history alone is that Undo can bring back
      * a one- or two-node fragment, which the user can delete node by node or from its list.
      *
-     * @param {Array} polygons - The array the polygon lives in (this.landMasks or a region layer's regions).
+     * @param {Array} polygons - The array the polygon lives in (this.landMasks).
      * @param {object} polygon - The incomplete polygon to remove.
      */
     #discardIncompletePolygon(polygons, polygon) {
@@ -2108,28 +2021,6 @@ export class MapStudio {
         if (mask && !isComplete) this.#discardIncompletePolygon(this.landMasks, mask);
 
         return isComplete;
-    }
-
-    /**
-     * Ends the region currently being drawn (if any), discarding it if it never became a shape.
-     * Every path that stops a region being drawn - right-click, changing tool or region layer,
-     * leaving edit mode, opening an edit dialogue - goes through here so none of them can leave an
-     * unusable one- or two-node region behind.
-     *
-     * Not private because the region edit dialogue (MapDialogManager) also has to finish an
-     * in-progress region before opening.
-     */
-    _finishActiveRegion() {
-        const activeId = this.activeRegionId;
-        if (!activeId) return;
-
-        const layer = this.regionLayers.find((l) => l.regions.some((r) => r.id === activeId));
-        const region = layer?.regions.find((r) => r.id === activeId);
-
-        this.activeRegionId = null;
-        if (region?.points && region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) {
-            this.#discardIncompletePolygon(layer.regions, region);
-        }
     }
 
     #handleSceneClick(x, y) {
@@ -2680,16 +2571,14 @@ export class MapStudio {
         // 2. Render Infrastructure
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
         const infraPins = this.mapPins.filter((p) => !!p.icon);
-        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.activeRouteId, this.meshSession);
+        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.meshSession);
 
-        // 3. Render Regions (from the display mesh, or as polygons with MESH_NATIVE off)
-        const isRegionEdit = this.activeTool === "regions" && isEditModeActive;
-        if (MeshIntegration.enabled) MeshIntegration.renderRegions(this);
-        else this.canvasEngine.renderRegions(this.regionLayers, isRegionEdit, this.activeRegionId, this.uiState.regionOpacity);
+        // 3. Render Regions, from the display mesh
+        MeshIntegration.renderRegions(this);
 
         // 4. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
-        this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, this.regionLayers, isLabelEdit, this.meshSession);
+        this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, isLabelEdit, this.meshSession);
 
         // 5. Render Land Masks
         if (this.canvasEngine.renderLandMasks) {
@@ -2976,10 +2865,11 @@ export class MapStudio {
         // Deep clone to sever the connection to Foundry's memory cache
         const payload = platform.utils.deepClone(rawPayload);
         // Regions and routes come from the display mesh, whose session opens once the terrain
-        // exists (see the end of this method); with MESH_NATIVE off, a map saved on the mesh is
-        // shown from the polygons it was migrated from
-        if (MeshIntegration.enabled) MeshIntegration.beginLoad(this, payload, rawOwners);
-        else MeshIntegration.legacyView(payload);
+        // exists (see the end of this method)
+        MeshIntegration.beginLoad(this, payload, rawOwners);
+        this.activeLayerSetId = null;
+        this.activeLevelId = null;
+        this.activeRegionId = null;
 
         this.uiState.mapSeed = payload.seed;
         this.currentParentId = payload.parentId || null;
@@ -3171,7 +3061,6 @@ export class MapStudio {
         }
 
         this.mapRoutes = payload.mapRoutes || [];
-        this.regionLayers = payload.regionLayers || MeshIntegration.regionLayersView(payload.layerSets);
         this.landMasks = payload.landMasks || [];
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
@@ -3180,7 +3069,9 @@ export class MapStudio {
         // characters, rounded up so no label wraps earlier than before (see LabelWidth). The map
         // is not marked as changed: until it is saved, the same conversion runs on every load.
         LabelWidth.migrateMap(
-            { mapLabels: this.mapLabels, mapPins: this.mapPins, mapRoutes: this.mapRoutes, regionLayers: this.regionLayers, customLabelStyles: this.uiState.customLabelStyles },
+            // A map saved before layer sets existed still has its region layers here; they become
+            // levels when the map's mesh session opens, keeping the labels converted now
+            { mapLabels: this.mapLabels, mapPins: this.mapPins, mapRoutes: this.mapRoutes, regionLayers: payload.regionLayers ?? this.regionLevels, customLabelStyles: this.uiState.customLabelStyles },
             LabelWidth.rootFontSize(),
         );
 
@@ -3206,9 +3097,42 @@ export class MapStudio {
 
         this.view?.render(["toolbar", "context"]);
         await this.generateTerrain();
-        if (MeshIntegration.enabled) await MeshIntegration.finishLoad(this, this.#processingOverlay());
+        await MeshIntegration.finishLoad(this, this.#processingOverlay());
         this.#updateGrid();
         this.canvasEngine.resetCamera();
+    }
+
+    /** Stops the cancellable work under way (see runCancellable); null when there is none. */
+    #cancelRunning = null;
+
+    /**
+     * Runs long work under the processing overlay with a Cancel button. The work is handed an
+     * AbortSignal, which Cancel aborts; work that checks it between chunks can stop part-way and
+     * resolve with whatever it uses to mean "cancelled" (null for RegionEdits.autoAssign). One
+     * cancellable piece of work runs at a time: a second one is refused (resolving null) rather
+     * than sharing a Cancel button that would stop both.
+     *
+     * @param {string} message - The overlay's text, already localised.
+     * @param {(signal: AbortSignal) => Promise<*>} work
+     * @returns {Promise<*>} What the work resolves with, or null when it could not start.
+     */
+    async runCancellable(message, work) {
+        if (this.#cancelRunning) return null;
+        const controller = new AbortController();
+        this.#cancelRunning = controller;
+        this.#showCancelButton(true);
+        await this.#startProcessing(message);
+        try {
+            return await work(controller.signal);
+        } finally {
+            this.#cancelRunning = null;
+            this.#showCancelButton(false);
+            this.#endProcessing();
+        }
+    }
+
+    #showCancelButton(visible) {
+        this.root?.querySelector(".fwmb-processing-cancel")?.classList.toggle("fwmb-hidden", !visible);
     }
 
     /** The processing overlay, for work done outside this class (see MeshIntegration.finishLoad). */
@@ -3223,61 +3147,46 @@ export class MapStudio {
         };
     }
 
+    /**
+     * A click with the Infrastructure tool's Pin mode places a pin. Routes are made by the route
+     * modes, which take their clicks before this is reached.
+     */
     #handleInfrastructureClick(x, y) {
-        // Route nodes may extend into the buffer so lines can run off the visible map;
-        // pins are single-point markers and stay confined to the map itself
-        const buffer = this.uiState.activeInfraMode === "route" ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
-        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
-
-        // Routes on the display mesh are made from waypoints, not drawn node by node
-        if (this.uiState.activeInfraMode === "route" && MeshIntegration.refusesLegacyEdit(this)) return;
+        // Pins are single-point markers and stay confined to the map itself
+        if (this.uiState.activeInfraMode !== "pin" || x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
         MapStateManager.pushVectorState(this);
-
-        const finalPos = { x, y };
-
-        if (this.uiState.activeInfraMode === "pin") {
-            const newPin = {
-                id: platform.utils.randomID(),
-                name: getPinIconLabel(this.uiState.activeIcon),
-                icon: this.uiState.activeIcon,
-                x: finalPos.x,
-                y: finalPos.y,
-                scale: this.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
-                visibility: "all",
-                color: this.uiState.pinColor || "#ffffff",
-                label: {
-                    fontSize: this.uiState.pinScale ?? 1,
-                },
-            };
-            this.mapPins.push(newPin);
-        } else if (this.uiState.activeInfraMode === "route") {
-            if (this.activeRouteId) {
-                const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
-                if (route) route.points.push(finalPos);
-            } else {
-                this.activeRouteId = platform.utils.randomID();
-                const newRoute = {
-                    id: this.activeRouteId,
-                    name: `Route ${this.mapRoutes.length + 1}`,
-                    points: [finalPos],
-                    quickStyle: this.uiState.activeRouteQuickStyle,
-                    color: this.uiState.routeColor,
-                    thickness: this.uiState.routeThickness,
-                    style: this.uiState.routeStyle,
-                    visibility: "all",
-                    label: {
-                        visibility: "none",
-                        fontSize: 0.5,
-                    },
-                };
-                this.mapRoutes.push(newRoute);
-            }
-        }
+        this.mapPins.push({
+            id: platform.utils.randomID(),
+            name: getPinIconLabel(this.uiState.activeIcon),
+            icon: this.uiState.activeIcon,
+            x,
+            y,
+            scale: this.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
+            visibility: "all",
+            color: this.uiState.pinColor || "#ffffff",
+            label: {
+                fontSize: this.uiState.pinScale ?? 1,
+            },
+        });
 
         this._repaintVectors();
         this.view?.render(["context"]);
         this.markDirty();
+    }
+
+    /**
+     * A click with the Regions tool's Select mode: the region of the level being edited under the
+     * pointer becomes the active region (none when the pointer is over unclaimed ground).
+     */
+    #selectRegionAt(x, y) {
+        const level = this.activeLevelId ? this.meshSession?.level(this.activeLevelId) : null;
+        if (!level) return;
+        const region = this.meshSession.regionAt(level.id, x, y);
+        const id = region?.id ?? null;
+        if (id === this.activeRegionId) return;
+        this.activeRegionId = id;
+        this.view?.render(["context"]);
     }
 
     #handleLabelClick(x, y) {
@@ -3308,60 +3217,6 @@ export class MapStudio {
         if (this.canvasEngine) {
             this.canvasEngine.updateReferenceImage(this.uiState.referenceImage, this.uiState.referenceX, this.uiState.referenceY, this.uiState.referenceScale, this.uiState.referenceAlpha);
         }
-    }
-
-    #handleRegionClick(x, y) {
-        // Regions on the display mesh are painted, not drawn node by node
-        if (MeshIntegration.refusesLegacyEdit(this)) return;
-
-        // Region nodes may extend into the buffer, matching scene masks and infrastructure routes
-        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
-        if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
-
-        if (!this.activeRegionLayerId) {
-            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");
-            return;
-        }
-
-        const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
-        if (!layer) return;
-
-        MapStateManager.pushVectorState(this);
-
-        const finalPos = { x, y };
-
-        if (this.activeRegionId) {
-            const region = layer.regions.find((r) => r.id === this.activeRegionId);
-            if (region) {
-                const isNearStart = region.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES &&Math.hypot(region.points[0].x - finalPos.x, region.points[0].y - finalPos.y) < this.currentSnapThreshold;
-
-                if (isNearStart) {
-                    this.activeRegionId = null;
-                } else {
-                    region.points.push(finalPos);
-                }
-            }
-        } else {
-            this.activeRegionId = platform.utils.randomID();
-            layer.regions.push({
-                id: this.activeRegionId,
-                name: `Region ${layer.regions.length + 1}`,
-                description: "",
-                points: [finalPos],
-                quickStyle: this.uiState.activeRegionQuickStyle,
-                fillColor: this.uiState.regionFillColor,
-                fillStyle: this.uiState.regionFillStyle,
-                lineColor: this.uiState.regionLineColor,
-                lineThickness: this.uiState.regionLineThickness,
-                lineStyle: this.uiState.regionLineStyle,
-                smoothing: this.uiState.regionSmoothing,
-                visibility: "all",
-            });
-        }
-
-        this._repaintVectors();
-        this.view?.render(["context"]);
-        this.markDirty();
     }
 
     /**
@@ -3480,7 +3335,6 @@ export class MapStudio {
                 manualRivers: this.manualRivers,
                 mapPins: this.mapPins,
                 mapRoutes: this.mapRoutes,
-                regionLayers: this.regionLayers,
                 landMasks: this.landMasks,
                 mapLabels: this.mapLabels,
                 mapDecorations: this.mapDecorations,
@@ -3650,9 +3504,15 @@ export class MapStudio {
      */
     #vectorActionPreview(direction) {
         const stack = direction === "undo" ? this.pinHistory : this.pinRedoStack;
-        const targetSnapshot = stack.at(-1);
-        if (!targetSnapshot) return null;
+        const entry = stack.at(-1);
+        if (!entry) return null;
 
+        // Painted cells: their bounds, labelled as a region edit
+        const painted = VectorHistory.patchBounds(this, entry);
+        if (painted) return { bounds: this.#calculatePointBounds([{ x: painted.minX, y: painted.minY }, { x: painted.maxX, y: painted.maxY }], VECTOR_PREVIEW_PADDING), label: this.#getActionLabel("layerSets") };
+
+        const targetSnapshot = VectorHistory.snapshotOf(entry);
+        if (!targetSnapshot) return null;
         return this.#diffVectorSnapshots(MapStateManager.getVectorStateSnapshot(this), targetSnapshot);
     }
 
@@ -3722,13 +3582,18 @@ export class MapStudio {
     }
 
     /**
-     * When the changed item is a region layer that exists in the target snapshot, narrows the
-     * change to the region inside it that differs, so the preview outlines that region rather than
-     * the whole layer. A layer the target no longer has at all is left whole: every one of its
-     * regions would go, so the whole layer is the area affected.
+     * When the changed item is a layer set or a level that exists in the target snapshot, narrows
+     * the change to the level and then the region inside it that differs, so the preview outlines
+     * that region rather than the whole set. A set or level the target no longer has at all is left
+     * whole: everything in it would go, so the whole of it is the area affected.
      */
     static #narrowToRegion({ item, currentItem, targetItem }) {
-        if (!targetItem || !Array.isArray(item.regions)) return item;
+        if (!targetItem) return item;
+        if (Array.isArray(item.levels)) {
+            const level = MapStudio.#firstChangedItem(currentItem?.levels || [], targetItem.levels || []);
+            return level ? MapStudio.#narrowToRegion(level) : item;
+        }
+        if (!Array.isArray(item.regions)) return item;
 
         return MapStudio.#firstChangedItem(currentItem?.regions || [], targetItem.regions || [])?.item ?? item;
     }
@@ -3757,7 +3622,7 @@ export class MapStudio {
             tectonicFaults: ["FILRODENSWMB.UI.ActionTectonicFault", "Tectonic Fault"],
             manualRivers: ["FILRODENSWMB.UI.ActionCustomRiver", "Custom River"],
             routes: ["FILRODENSWMB.UI.ActionRoute", "Route"],
-            regionLayers: ["FILRODENSWMB.UI.ActionRegion", "Region"],
+            layerSets: ["FILRODENSWMB.UI.ActionRegion", "Region"],
             landMasks: ["FILRODENSWMB.UI.ActionLandMask", "Land Mask"],
             mapLabels: ["FILRODENSWMB.UI.ActionLabel", "Label"],
             mapDecorations: ["FILRODENSWMB.UI.ActionDecoration", "Decoration"],
@@ -3849,19 +3714,14 @@ export class MapStudio {
     }
 
     /**
-     * Restores the previous (undo) or next (redo) vector state snapshot, then refreshes whatever
-     * the change affects (see #refreshAfterVectorStep).
+     * Steps one vector history entry back (undo) or forward (redo; see VectorHistory), then
+     * refreshes whatever the change affects (see #refreshAfterVectorStep).
      *
-     * @returns {boolean} Whether there was a snapshot to restore.
+     * @returns {boolean} Whether there was an entry to step through.
      */
     #stepVectorHistory(isUndo, targetLedger) {
-        const sourcePinStack = isUndo ? this.pinHistory : this.pinRedoStack;
-        const targetPinStack = isUndo ? this.pinRedoStack : this.pinHistory;
-        if (sourcePinStack.length === 0) return false;
-
         const before = this.#vectorRefreshInputs();
-        targetPinStack.push(MapStateManager.getVectorStateSnapshot(this));
-        MapStateManager.restoreVectorStateSnapshot(this, sourcePinStack.pop());
+        if (!VectorHistory.step(this, isUndo)) return false;
         targetLedger.push("vector");
 
         this.#refreshAfterVectorStep(before, this.#vectorRefreshInputs());
@@ -3963,15 +3823,11 @@ export class MapStudio {
             if (p.label) scalePoint(p.label);
         });
         this.mapRoutes.forEach((r) => {
-            r.points?.forEach(scalePoint);
             if (r.label) scalePoint(r.label);
         });
-        this.regionLayers.forEach((layer) => {
-            layer.regions.forEach((reg) => {
-                reg.points?.forEach(scalePoint);
-                if (reg.label) scalePoint(reg.label);
-            });
-        });
+        for (const level of this.regionLevels) {
+            for (const reg of level.regions) if (reg.label) scalePoint(reg.label);
+        }
         if (this.brushEngine) {
             const scaleStroke = (stroke) => {
                 stroke.points.forEach(scalePoint);
@@ -4078,7 +3934,6 @@ export class MapStudio {
         this.tectonicFeatureCache = {};
         this.mapPins = [];
         this.mapRoutes = [];
-        this.regionLayers = [];
 
         // Apply the centre offset to keep masks perfectly framed
         this.landMasks =
@@ -4098,7 +3953,8 @@ export class MapStudio {
 
         // 2. Drop all active drawing states
         this.activeRouteId = null;
-        this.activeRegionLayerId = null;
+        this.activeLayerSetId = null;
+        this.activeLevelId = null;
         this.activeRegionId = null;
         this.activeFaultId = null;
         this.activeRiverId = null;
@@ -4172,9 +4028,8 @@ export class MapStudio {
      */
     #clearActiveDrawingStates() {
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
-            this[config.activeKey] = null;
+            if (config.activeKey) this[config.activeKey] = null;
         }
-        this._finishActiveRegion();
 
         return this._finishActiveLandMask();
     }
@@ -4874,15 +4729,11 @@ export class MapStudio {
             if (p.label) translatePoint(p.label);
         });
         this.mapRoutes.forEach((r) => {
-            r.points?.forEach(translatePoint);
             if (r.label) translatePoint(r.label);
         });
-        this.regionLayers.forEach((layer) => {
-            layer.regions.forEach((reg) => {
-                reg.points?.forEach(translatePoint);
-                if (reg.label) translatePoint(reg.label);
-            });
-        });
+        for (const level of this.regionLevels) {
+            for (const reg of level.regions) if (reg.label) translatePoint(reg.label);
+        }
         if (this.brushEngine) {
             const translateStroke = (stroke) => stroke.points.forEach(translatePoint);
             this.brushEngine.history.forEach(translateStroke);
@@ -4977,13 +4828,6 @@ export class MapStudio {
         if (target) target.disabled = false;
     }
 
-    _onSelectRegionLayer(event, target) {
-        const id = target.closest(".fwmb-accordion-group").dataset.layerId;
-        this._finishActiveRegion();
-        this.activeRegionLayerId = id;
-        this.view?.render(["context"]);
-    }
-
     /**
      * Handles swapping between the Raise, Lower, and Smooth brush tools - and, for the Biomes
      * tool specifically, doubles as the "stop erasing" side of the Paint/Eraser pair. Biomes
@@ -5048,61 +4892,6 @@ export class MapStudio {
         this.activeRouteId = null;
 
         this.view?.render(["toolbar", "editToolbar"]);
-    }
-
-    _onSetRegionMode(event, target) {
-        this.uiState.regionMode = target.dataset.mode;
-
-        if (!this.activeRegionLayerId) {
-            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnNoRegionLayer") || "Please create or select a Region Layer first.");
-            return;
-        }
-
-        const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
-        if (!layer) return;
-
-        // Finish the previous region first; one left with too few points to be a shape is discarded
-        this._finishActiveRegion();
-
-        // Explicitly create the new region object so it immediately appears in the sidebar accordion
-        this.activeRegionId = platform.utils.randomID();
-        layer.regions.push({
-            id: this.activeRegionId,
-            name: `Region ${layer.regions.length + 1}`,
-            description: "",
-            points: [], // Starts empty until the user clicks the canvas
-            quickStyle: this.uiState.activeRegionQuickStyle,
-            fillColor: this.uiState.regionFillColor,
-            fillStyle: this.uiState.regionFillStyle,
-            lineColor: this.uiState.regionLineColor,
-            lineThickness: this.uiState.regionLineThickness,
-            lineStyle: this.uiState.regionLineStyle,
-            smoothing: this.uiState.regionSmoothing,
-            visibility: "all",
-        });
-
-        this._repaintVectors();
-        this.view?.render(["toolbar", "context", "editToolbar"]);
-    }
-
-    _onSetRegionPreset(event, target) {
-        const color = target.dataset.color;
-        const targetProperty = target.dataset.target === "line" ? "regionLineColor" : "regionFillColor";
-
-        this.uiState[targetProperty] = color;
-        this.uiState.activeRegionQuickStyle = "custom";
-        this.view?.render(["toolbar", "editToolbar"]);
-
-        if (this.activeRegionId && this.activeRegionLayerId) {
-            const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
-            const region = layer?.regions.find((r) => r.id === this.activeRegionId);
-            if (region) {
-                region.quickStyle = "custom";
-                if (targetProperty === "line") region.lineColor = color;
-                else region.fillColor = color;
-                this._repaintVectors();
-            }
-        }
     }
 
     /**
@@ -5214,10 +5003,7 @@ export class MapStudio {
                 this.uiState.sceneMode = "addMask";
             }
 
-            const stillValid = this.regionLayers.some((l) => l.id === this.activeRegionLayerId);
-            if (!stillValid) {
-                this.activeRegionLayerId = this.regionLayers[0]?.id ?? null;
-            }
+            RegionPanel.settleActive(this);
         } else {
             // Leaving edit mode ends the pause: the Apply button is hidden with the toolbar, so
             // deferred changes are generated now (covering a mask completed below) and the next
@@ -5299,29 +5085,6 @@ export class MapStudio {
         if (dropdown) dropdown.classList.toggle("fwmb-hidden");
     }
 
-    _onToggleRegionSmoothing(event, target) {
-        this.uiState.regionSmoothing = !this.uiState.regionSmoothing;
-        this.uiState.activeRegionQuickStyle = "custom";
-        target.classList.toggle("active", this.uiState.regionSmoothing);
-
-        // Manually update the icon DOM for instant visual feedback
-        const icon = target.querySelector("i");
-        if (icon) {
-            icon.classList.remove("gesture", "timeline");
-            icon.classList.add(this.uiState.regionSmoothing ? "gesture" : "timeline");
-        }
-
-        if (this.activeRegionId && this.activeRegionLayerId) {
-            const layer = this.regionLayers.find((l) => l.id === this.activeRegionLayerId);
-            const region = layer?.regions.find((r) => r.id === this.activeRegionId);
-            if (region) {
-                region.quickStyle = "custom";
-                region.smoothing = this.uiState.regionSmoothing;
-                this._repaintVectors();
-            }
-        }
-    }
-
     /**
      * Toggles live canvas filters for Player, GM, and Hidden vectors.
      */
@@ -5342,8 +5105,8 @@ export class MapStudio {
 
     /**
      * Returns the ids of every entity of a given type that Mass Edit can currently offer for
-     * selection. Regions are flattened out of their layers since selection is per-type, not
-     * per-layer - a GM mass-editing "regions" expects to pick from all of them at once.
+     * selection. For regions that is the regions of the level being edited, the only ones the
+     * Regions panel lists.
      */
     _getMassEditableIds(type) {
         switch (type) {
@@ -5354,7 +5117,7 @@ export class MapStudio {
             case "label":
                 return (this.mapLabels || []).map((l) => l.id);
             case "region":
-                return (this.regionLayers || []).flatMap((layer) => (layer.regions || []).map((r) => r.id));
+                return (RegionPanel.activeLevel(this)?.regions ?? []).map((r) => r.id);
             default:
                 return [];
         }
@@ -5416,25 +5179,14 @@ export class MapStudio {
     }
 
     _onToggleVisibility(event, target) {
-        const targetType = target.dataset.target; // "layer", "feature", or "label"
-        const modified = targetType === "layer" ? this.#toggleLayerVisibility(target) : this.#toggleEntityVisibility(target, targetType);
+        const targetType = target.dataset.target; // "feature" or "label"
+        const modified = this.#toggleEntityVisibility(target, targetType);
 
         if (modified) {
             this._repaintVectors();
             this.view?.render(["context"]);
             this.markDirty();
         }
-    }
-
-    #toggleLayerVisibility(target) {
-        const id = target.closest(".fwmb-accordion-group")?.dataset.layerId;
-        const layer = this.regionLayers.find((l) => l.id === id);
-
-        if (!layer) return false;
-
-        MapStateManager.pushVectorState(this);
-        layer.visibility = this.#cycleVisibilityState(layer.visibility);
-        return true;
     }
 
     #toggleEntityVisibility(target, targetType) {
@@ -5478,7 +5230,7 @@ export class MapStudio {
 
         // Special handling for nested regions
         if (type === "region") {
-            const layer = this.regionLayers.find((l) => l.id === layerId);
+            const layer = this.regionLevels.find((l) => l.id === layerId);
             return layer?.regions.find((r) => r.id === id);
         }
 
@@ -5529,10 +5281,10 @@ export class MapStudio {
                 return mask?.points || [];
             }
             case "region": {
-                const layer = this.regionLayers.find((l) => l.id === listItem.dataset.layerId);
+                const layer = this.regionLevels.find((l) => l.id === listItem.dataset.layerId);
                 const region = layer?.regions.find((r) => r.id === id);
                 // A region on the display mesh has no points: its cells' bounds stand in
-                return region?.points || MeshIntegration.outlinePoints(this, region);
+                return MeshIntegration.outlinePoints(this, region);
             }
             case "river": {
                 const river = this.manualRivers.find((r) => r.id === id);
@@ -5540,7 +5292,7 @@ export class MapStudio {
             }
             case "route": {
                 const route = this.mapRoutes.find((r) => r.id === id);
-                return route?.points || MeshIntegration.outlinePoints(this, route);
+                return MeshIntegration.outlinePoints(this, route);
             }
 
             default:
