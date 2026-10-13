@@ -21,6 +21,10 @@
  *   previews and live controls.
  * - `placement`: "modal" (the default) or "docked" (see Overlay).
  *
+ * A slider in a dialogue returns on double-click to the value it had when the dialogue opened,
+ * unless the template gives it a default of its own (`data-default`, for a neutral value such as
+ * no rotation).
+ *
  * Dialogues are drawn in the element most recently attached with `attach(element)` (the studio's
  * root, attached while the studio is open). Detaching an element dismisses the dialogues still
  * open in it.
@@ -30,6 +34,11 @@ import { RangeDisplay } from "../tools/RangeDisplay.js";
 
 /** Where a dialogue is drawn when the caller does not say. */
 const DEFAULT_PLACEMENT = "modal";
+
+/** Gives each slider without a default of its own the value it opens with as its default (see StudioView's double-click reset). */
+function rememberOpeningValues(element) {
+    for (const slider of element.querySelectorAll('input[type="range"]:not([data-default])')) slider.dataset.default = slider.value;
+}
 
 /**
  * Creates the dialogue service.
@@ -73,6 +82,7 @@ export function createOverlayDialogs({ localize }) {
             dismissed,
             closeLabel: localize("FILRODENSWMB.UI.Close"),
             onRender: (element) => {
+                rememberOpeningValues(element);
                 onRender?.(element);
                 // Sliders show their value and filled track from the values the content holds
                 RangeDisplay.syncAllFills(element);

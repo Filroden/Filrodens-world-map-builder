@@ -40,6 +40,9 @@ const HEX_CORNER_ANGLE_DEG = 60;
 const POINTY_TOP_TURN_DEG = 30;
 const HEX_STAGGERED_SPACING = 1.5;
 
+/** The smallest distance (map pixels) from a decoration's centre that still picks it up, however small its image. */
+const DECORATION_MIN_HIT_RADIUS = 16;
+
 export class StudioCanvas {
     /** Whether destroy() has run (see destroy). */
     #destroyed = false;
@@ -2005,16 +2008,22 @@ export class StudioCanvas {
             this.layers.cartography.addChild(sprite);
 
             if (isEditMode) {
-                const hitRadius = Math.max(sprite.width, sprite.height, 32) / 2;
                 this.interactiveTargets.push({
                     target: dec,
                     x: dec.x,
                     y: dec.y,
-                    radius: hitRadius,
+                    // Read when the pointer is tested rather than now: an image still loading has no
+                    // size yet, so the whole decoration only becomes a handle once it has loaded
+                    get radius() {
+                        return sprite.destroyed ? 0 : Math.max(sprite.width / 2, sprite.height / 2, DECORATION_MIN_HIT_RADIUS);
+                    },
                     isDecoration: true,
                     entityType: "decoration",
                     entityId: dec.id,
                 });
+                // A marker on its centre, the point it is held by and turns around; where two
+                // decorations overlap, a press picks the one whose centre is nearer
+                this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
             }
         });
     }

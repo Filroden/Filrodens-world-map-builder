@@ -13,6 +13,7 @@ import { RefreshQueue } from "../tools/RefreshQueue.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
+import { placeDropdownMenu } from "../ui/dropdowns.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
@@ -859,6 +860,7 @@ export class MapStudio {
         root.addEventListener("change", (event) => this.#routeFieldEvent(event));
         root.addEventListener("pointerover", (event) => this.#togglePreviewFallback(event, true));
         root.addEventListener("pointerout", (event) => this.#togglePreviewFallback(event, false));
+        root.addEventListener("focusin", (event) => placeDropdownMenu(event.target));
     }
 
     /**

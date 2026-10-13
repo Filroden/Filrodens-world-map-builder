@@ -188,6 +188,18 @@ test("sliders in the content show their value when the dialogue opens", async ()
     await result;
 });
 
+test("a slider returns to the value it opened with, unless it has a default of its own", async () => {
+    const result = dialogs.prompt({
+        title: "Style",
+        content: '<input type="range" name="size" min="0" max="10" value="7"><input type="range" name="rotation" min="-180" max="180" value="45" data-default="0">',
+    });
+    const [size, rotation] = dialog().querySelectorAll('input[type="range"]');
+    assert.equal(size.dataset.default, "7", "the opening value");
+    assert.equal(rotation.dataset.default, "0", "its own default is kept");
+    key(dialog(), "Escape");
+    await result;
+});
+
 test("detaching the studio dismisses the dialogues still open in it", async () => {
     const first = dialogs.choose({ title: "A", content: "", buttons: [{ action: "x", label: "X" }], dismissed: "gone" });
     const second = dialogs.confirm({ title: "B", content: "" });

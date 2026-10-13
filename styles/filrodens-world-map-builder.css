@@ -1257,6 +1257,11 @@
     inset: 0;
     width: 100%;
     height: 100%;
+    /* Fingers on the map pan, zoom and edit it (see TouchGestures), so the browser neither
+       scrolls nor zooms the page for them, nor offers its long-press menu */
+    touch-action: none;
+    -webkit-touch-callout: none;
+    user-select: none;
 }
 
 /* The boxes drawn over the map (map information, undo/redo, canvas hint and map control groups)
@@ -1349,6 +1354,15 @@
 .fwmb-map:hover .fwmb-map-hint,
 .fwmb-map:hover .fwmb-map-history {
     opacity: 1;
+}
+
+/* A touch screen has no hovering pointer to reveal them, so they always show */
+@media (hover: none) {
+    .fwmb-map .fwmb-map-controls,
+    .fwmb-map .fwmb-map-hint,
+    .fwmb-map .fwmb-map-history {
+        opacity: 1;
+    }
 }
 
 .fwmb-map-controls button,
@@ -1763,6 +1777,23 @@
     display: contents;
 }
 
+/* A narrow studio wraps the edit toolbar onto more rows, and the toolbar grows to hold them (the
+   map below takes what is left). Each group wraps its own controls too, and a divider spans the
+   row it sits in rather than the whole toolbar. */
+.fwmb .fwmb-edit-toolbar {
+    row-gap: var(--fwmb-size-8);
+}
+
+.fwmb .fwmb-edit-toolbar :is(.fwmb-brush-settings, .fwmb-brush-tools, .fwmb-brush-history, .fwmb-mask-settings) {
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.fwmb .fwmb-edit-toolbar .fwmb-divider-vertical {
+    height: auto;
+    align-self: stretch;
+}
+
 .fwmb .fwmb-brush-settings,
 .fwmb .fwmb-brush-setting,
 .fwmb .fwmb-brush-tools,
@@ -2129,8 +2160,17 @@ input.fwmb-swatch {
     display: flex;
 }
 
+/* Opens above the button when the list has more room there than below (see src/ui/dropdowns.js) */
+.fwmb-dropdown.fwmb-dropdown-up .fwmb-dropdown-menu {
+    top: auto;
+    bottom: 100%;
+    margin-block: 0 var(--fwmb-size-8);
+}
+
 .fwmb-dropdown-menu button {
     width: 100%;
+    height: auto;
+    white-space: nowrap;
     display: flex;
     align-items: center;
     justify-content: flex-start;
