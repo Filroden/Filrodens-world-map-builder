@@ -14,10 +14,13 @@ const isWeb = process.argv.includes('--web');
 // though the folder is also gitignored and absent from a CI checkout.
 const isRelease = Boolean(process.env.CI);
 
-// The web page, the web host's services (src/platform/web) and the libraries Foundry already
-// provides (PixiJS and Handlebars) are for the web version only
-const excludedFolders = ['dist', 'dist-web', 'node_modules', '.git', '.github', 'scripts', 'tests', 'wiki', 'web', 'pixi', 'handlebars'];
+const excludedFolders = ['dist', 'dist-web', 'node_modules', '.git', '.github', 'scripts', 'tests', 'wiki'];
 if (isRelease) excludedFolders.push('design');
+
+// The web page, the web host's services and the libraries Foundry already provides (PixiJS and
+// Handlebars) are for the web version only. They are removed by path after the copy: the copy
+// leaves folders out by name wherever they are, which would also drop design/prototypes/web.
+const webOnlyPaths = ['web', 'src/platform/web', 'vendor/pixi', 'vendor/handlebars'];
 
 function resetFolder(folder) {
   if (fs.existsSync(folder)) fs.rmSync(folder, { recursive: true });
@@ -34,6 +37,7 @@ async function packModule() {
     excludedFolders,
     ['package.json', 'package-lock.json', 'GEMINI.md', '.DS_Store', '.gitignore', '.gitattributes']
   );
+  for (const folder of webOnlyPaths) fs.rmSync(path.join('./dist', folder), { recursive: true, force: true });
 }
 
 // The site keeps the repository's layout, so the page and the module code find each other by the
