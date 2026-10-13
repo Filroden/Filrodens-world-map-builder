@@ -9,6 +9,7 @@
  */
 import { FILRODENSWMB } from "../../config.js";
 import { MapStudio } from "../../applications/MapStudio.js";
+import { attachTheme } from "../../ui/Theme.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -34,6 +35,9 @@ export class MapStudioWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     /** The studio in this window (null until the window is first drawn). */
     studio = null;
 
+    /** Stops the colour theme being written on the window (see Theme.attachTheme). */
+    #detachTheme = null;
+
     /** @param {object} [options] - ApplicationV2 options; the size defaults to most of the browser window. */
     constructor(options = {}) {
         options.position = foundry.utils.mergeObject(options.position || {}, {
@@ -49,6 +53,8 @@ export class MapStudioWindow extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.studio) return;
 
         MapStudio.applyTextDirection(this.element);
+        // The window as a whole follows the studio's colour theme, its header included
+        this.#detachTheme = attachTheme(this.element);
         this.studio = new MapStudio();
         this.studio.mount(this.element.querySelector(".fwmb-studio"));
     }
@@ -69,6 +75,8 @@ export class MapStudioWindow extends HandlebarsApplicationMixin(ApplicationV2) {
             if (!(await this.studio.canClose())) return;
             this.studio.destroy();
         }
+        this.#detachTheme?.();
+        this.#detachTheme = null;
         return super.close(options);
     }
 }

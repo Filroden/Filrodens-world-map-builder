@@ -26,6 +26,7 @@ import { LayerPainting } from "../canvas/LayerPainting.js";
 import { MeshIntegration } from "./MeshIntegration.js";
 import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
+import { currentTheme, setTheme, THEME_SETTINGS } from "../ui/Theme.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -551,6 +552,8 @@ export class MapStudio {
         context.activeTool = this.activeTool;
         // Whether the host can export to a scene (Foundry can; the web version cannot)
         context.sceneExport = platform.scene.available;
+        // The colour theme's two settings, for the Settings tool
+        context.theme = currentTheme();
 
         const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
         context.isLocked = this.uiState.isEditMode && !isVectorTool;
@@ -860,6 +863,12 @@ export class MapStudio {
             return;
         }
         if (!target.closest(".fwmb-context-panel")) return;
+
+        // The colour theme is the reader's own setting, not part of the map
+        if (target.name === THEME_SETTINGS.MODE || target.name === THEME_SETTINGS.HUE) {
+            if (event.type === "change") setTheme(target.name, target.value);
+            return;
+        }
 
         if (event.type === "change" && target.matches('file-picker[name="referenceImage"]')) {
             this.uiState.referenceImage = target.value;

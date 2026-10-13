@@ -96,10 +96,13 @@
 
 /* ==========================================
    TIER 2: THE HUE ROUTER
+   The hue the reader chose in the studio is the data-fwmb-hue attribute on the studio's frame
+   and <body> (see src/ui/Theme.js); gold is the default.
    ========================================== */
 
 :root,
-.fwmb-hue-gold {
+.fwmb-hue-gold,
+[data-fwmb-hue="gold"] {
     --fwmb-main-100: var(--fwmb-gold-100);
     --fwmb-main-200: var(--fwmb-gold-200);
     --fwmb-main-300: var(--fwmb-gold-300);
@@ -129,7 +132,8 @@
     --fwmb-alternative-accent-dark: var(--fwmb-teal-accent-dark);
 }
 
-.fwmb-hue-teal {
+.fwmb-hue-teal,
+[data-fwmb-hue="teal"] {
     --fwmb-main-100: var(--fwmb-teal-100);
     --fwmb-main-200: var(--fwmb-teal-200);
     --fwmb-main-300: var(--fwmb-teal-300);
@@ -161,9 +165,14 @@
 
 /* ==========================================
    TIER 3: SEMANTIC TOKENS (DARK THEME)
+   The host's theme class (Foundry's interface theme, or the web page's system preference) sets
+   light or dark unless the reader chose one in the studio: that choice is the data-fwmb-theme
+   attribute on the studio's frame and <body> (see src/ui/Theme.js), and its selector is the more
+   specific, so it wins where both are on the same element.
    ========================================== */
 
-.theme-dark {
+.theme-dark,
+:is(body, .fwmb)[data-fwmb-theme="dark"] {
     /* --- Backgrounds --- */
     --fwmb-bg-base: var(--fwmb-main-900); /* Deepest background (App Window) */
     --fwmb-bg-panel: var(--fwmb-main-800); /* Elevated elements (Cards, Inputs, Sidebars) */
@@ -204,7 +213,8 @@
    TIER 3: SEMANTIC TOKENS (LIGHT THEME)
    ========================================== */
 
-.theme-light {
+.theme-light,
+:is(body, .fwmb)[data-fwmb-theme="light"] {
     /* --- Backgrounds --- */
     --fwmb-bg-base: var(--fwmb-main-100);
     --fwmb-bg-panel: var(--fwmb-neutral-000);

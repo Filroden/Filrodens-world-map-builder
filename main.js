@@ -2,31 +2,19 @@ import { FILRODENSWMB } from "./src/config.js";
 import { registerSidebarInjection } from "./src/hooks/sidebar-injection.js";
 import { initializeCompendium } from "./src/platform/foundry/store.js";
 import { registerPinIconSettings } from "./src/data/pinIcons.js";
+import { attachTheme, registerThemeSettings } from "./src/ui/Theme.js";
 
 Hooks.once("init", async () => {
     game.filrodenswmb = {
         config: FILRODENSWMB,
     };
 
-    game.settings.register("filrodens-world-map-builder", "themeHue", {
-        name: "FILRODENSWMB.Settings.ThemeHue.Name",
-        hint: "FILRODENSWMB.Settings.ThemeHue.Hint",
-        scope: "client",
-        config: true,
-        type: String,
-        choices: {
-            gold: "FILRODENSWMB.Settings.ThemeHue.Gold",
-            teal: "FILRODENSWMB.Settings.ThemeHue.Teal",
-        },
-        default: "gold",
-        onChange: (value) => applyThemeHue(value),
-    });
+    // The colour theme is chosen in the studio's Settings tool; <body> carries it so the tooltip
+    // (which Foundry draws there) follows it too. The studio's window carries it as well.
+    registerThemeSettings();
+    attachTheme(document.body);
 
     registerPinIconSettings();
-
-    // Fetch the saved setting and apply the CSS class on startup
-    const savedHue = game.settings.get("filrodens-world-map-builder", "themeHue");
-    applyThemeHue(savedHue);
 
     // Pre-load Handlebars partials so the UI can construct itself dynamically
     await foundry.applications.handlebars.loadTemplates([
@@ -98,11 +86,3 @@ Hooks.once("ready", async () => {
     await initializeCompendium();
 });
 
-/**
- * Applies the selected hue class to the Foundry document body.
- * @param {string} hue - The hue string ('gold' or 'teal').
- */
-function applyThemeHue(hue) {
-    document.body.classList.remove("fwmb-hue-gold", "fwmb-hue-teal");
-    document.body.classList.add(`fwmb-hue-${hue}`);
-}

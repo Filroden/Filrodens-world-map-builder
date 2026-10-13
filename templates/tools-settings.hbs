@@ -1,5 +1,25 @@
 <div class="fwmb-tool-content fwmb-scrollable">
 
+    <!-- The reader's own colour theme (not part of the map; see src/ui/Theme.js) -->
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize "FILRODENSWMB.UI.SettingsAppearance"}}</legend>
+        <div class="form-group">
+            <label data-tooltip="{{localize 'FILRODENSWMB.UI.ThemeModeHint'}}">{{localize "FILRODENSWMB.UI.ThemeMode"}}</label>
+            <select name="themeMode">
+                <option value="auto" {{#if (eq theme.mode "auto")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ThemeModeAuto"}}</option>
+                <option value="light" {{#if (eq theme.mode "light")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ThemeModeLight"}}</option>
+                <option value="dark" {{#if (eq theme.mode "dark")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ThemeModeDark"}}</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label data-tooltip="{{localize 'FILRODENSWMB.Settings.ThemeHue.Hint'}}">{{localize "FILRODENSWMB.Settings.ThemeHue.Name"}}</label>
+            <select name="themeHue">
+                <option value="gold" {{#if (eq theme.hue "gold")}}selected{{/if}}>{{localize "FILRODENSWMB.Settings.ThemeHue.Gold"}}</option>
+                <option value="teal" {{#if (eq theme.hue "teal")}}selected{{/if}}>{{localize "FILRODENSWMB.Settings.ThemeHue.Teal"}}</option>
+            </select>
+        </div>
+    </fieldset>
+
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.SettingsVisuals"}}</legend>
         {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="contourInterval" label="FILRODENSWMB.UI.ContourInterval" value=(lookup uiState 'contourInterval') min=0.02 max=0.3 step=0.02}}

@@ -30,11 +30,20 @@ const fetchFrom = (path, read) =>
 const fetchJson = (path) => fetchFrom(path, (response) => response.json());
 const fetchText = (path) => fetchFrom(path, (response) => response.text());
 
-/** The light or dark theme, following the reader's system preference (the module styles both). */
-function applySystemTheme() {
-    const light = globalThis.matchMedia?.("(prefers-color-scheme: light)").matches;
-    document.body.classList.toggle("theme-light", Boolean(light));
-    document.body.classList.toggle("theme-dark", !light);
+/**
+ * The page's own light or dark theme, from the reader's system preference, kept up to date when
+ * it changes. It is what the studio's "Automatic" theme follows; a theme chosen in the studio
+ * overrides it (see src/ui/Theme.js).
+ */
+function followSystemTheme() {
+    const query = globalThis.matchMedia?.("(prefers-color-scheme: light)");
+    const apply = () => {
+        const light = Boolean(query?.matches);
+        document.body.classList.toggle("theme-light", light);
+        document.body.classList.toggle("theme-dark", !light);
+    };
+    apply();
+    query?.addEventListener?.("change", apply);
 }
 
 /** The language strings: English, with the chosen language's own strings over it. */
@@ -57,7 +66,7 @@ async function openRecords({ IndexedDbRecords, MemoryRecords }) {
 }
 
 async function start() {
-    applySystemTheme();
+    followSystemTheme();
     const frame = document.getElementById("fwmb-app");
 
     const [i18nModule, storeModule, { createWebPlatform }, { installPlatform, platform }, { FilePickerElement }, { WebTooltips }] = await Promise.all([
@@ -87,8 +96,16 @@ async function start() {
     );
     FilePickerElement.define(customElements, { browseLabel: platform.i18n.localize("FILRODENSWMB.UI.BrowseFiles") });
 
-    const [{ registerPinIconSettings }, { MapStudio }] = await Promise.all([import("../src/data/pinIcons.js"), import("../src/applications/MapStudio.js")]);
+    const [{ registerPinIconSettings }, { MapStudio }, { attachTheme, registerThemeSettings }] = await Promise.all([
+        import("../src/data/pinIcons.js"),
+        import("../src/applications/MapStudio.js"),
+        import("../src/ui/Theme.js"),
+    ]);
     registerPinIconSettings();
+    registerThemeSettings();
+    // The colour theme chosen in the studio, on the frame and on <body> (where the tooltip is)
+    attachTheme(frame);
+    attachTheme(document.body);
 
     await platform.templates.load(await fetchJson(TEMPLATE_LIST));
     frame.innerHTML = await platform.templates.render(`modules/${manifest.id}/templates/studio.hbs`, {});

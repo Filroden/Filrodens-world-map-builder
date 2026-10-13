@@ -519,6 +519,12 @@
     "FILRODENSWMB.UI.OverwriteJournals": "Overwrite Existing Journal Pages",
     "FILRODENSWMB.UI.OverwriteJournalsHint": "If checked, existing map journals will be updated with your current descriptions. Warning: This will destroy any manual lore edits made by the GM.",
 
+    "FILRODENSWMB.UI.SettingsAppearance": "Appearance",
+    "FILRODENSWMB.UI.ThemeMode": "Theme",
+    "FILRODENSWMB.UI.ThemeModeHint": "Light or dark. Automatic follows Foundry's interface theme, or in the web version your system's setting.",
+    "FILRODENSWMB.UI.ThemeModeAuto": "Automatic",
+    "FILRODENSWMB.UI.ThemeModeLight": "Light",
+    "FILRODENSWMB.UI.ThemeModeDark": "Dark",
     "FILRODENSWMB.Settings.ThemeHue.Name": "Color Theme",
     "FILRODENSWMB.Settings.ThemeHue.Hint": "Select the primary hue for the interface.",
     "FILRODENSWMB.Settings.ThemeHue.Gold": "Gold",
