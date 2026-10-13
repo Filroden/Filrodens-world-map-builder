@@ -57,6 +57,8 @@ Link to map JSON file: [<https://github.com/Filroden/Filrodens-world-map-builder
 
 Filroden's World Map Builder can be opened from the *Scenes* sidebar. A new button has been added at the top of the sidebar called *Map Builder*.
 
+The map builder needs a mouse and keyboard. The map is edited with clicks, drags, the scroll wheel and the Shift and Ctrl keys, so touch screens are not supported.
+
 Please see the [Wiki](https://github.com/Filroden/Filrodens-world-map-builder/wiki) for more details on how to use the module.
 
 ## Third-Party Licences

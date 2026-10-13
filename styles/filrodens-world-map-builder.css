@@ -1257,11 +1257,6 @@
     inset: 0;
     width: 100%;
     height: 100%;
-    /* Fingers on the map pan, zoom and edit it (see TouchGestures), so the browser neither
-       scrolls nor zooms the page for them, nor offers its long-press menu */
-    touch-action: none;
-    -webkit-touch-callout: none;
-    user-select: none;
 }
 
 /* The boxes drawn over the map (map information, undo/redo, canvas hint and map control groups)
@@ -1354,15 +1349,6 @@
 .fwmb-map:hover .fwmb-map-hint,
 .fwmb-map:hover .fwmb-map-history {
     opacity: 1;
-}
-
-/* A touch screen has no hovering pointer to reveal them, so they always show */
-@media (hover: none) {
-    .fwmb-map .fwmb-map-controls,
-    .fwmb-map .fwmb-map-hint,
-    .fwmb-map .fwmb-map-history {
-        opacity: 1;
-    }
 }
 
 .fwmb-map-controls button,
