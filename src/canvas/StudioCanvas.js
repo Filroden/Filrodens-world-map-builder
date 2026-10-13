@@ -7,6 +7,7 @@ import { TerrainCompositor } from "./TerrainCompositor.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
+import { RegionOverlays } from "./RegionOverlays.js";
 import { platform } from "../platform/index.js";
 
 /** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
@@ -149,6 +150,14 @@ export class StudioCanvas {
         this.brushCursor = new PIXI.Graphics();
         this.brushCursor.visible = false;
 
+        // The Regions tool's outline of the region being edited, and its Fill preview
+        this.regionOverlays = new RegionOverlays(PIXI);
+
+        // A tool that takes the primary button's presses, moves and releases itself while editing
+        // (see #pointerTool), or null; read on every event, so it follows the tool in use
+        this.pointerToolProvider = null;
+        this.pointerToolPressed = false;
+
         // Setup the Crop Tool overlay
         this.cropGraphics = new PIXI.Graphics();
         this.cropBox = null;
@@ -173,6 +182,7 @@ export class StudioCanvas {
             this.layers.labels,
             this.layers.cartography,
             this.cropGraphics,
+            ...this.regionOverlays.displayObjects,
             this.brushCursor,
         );
 
@@ -261,6 +271,9 @@ export class StudioCanvas {
     }
 
     #setupInteractions(canvasElement) {
+        // Focusable from script only (not by Tab), and focused by a press, so the keys a tool
+        // listens for (Escape, Enter, undo) reach the studio after working on the map
+        canvasElement.tabIndex = -1;
         canvasElement.addEventListener("wheel", (e) => this.#handleWheel(e, canvasElement));
         canvasElement.addEventListener("contextmenu", (e) => e.preventDefault());
         canvasElement.addEventListener("pointerdown", (e) => this.#handlePointerDown(e, canvasElement));
@@ -364,8 +377,17 @@ export class StudioCanvas {
         }
     }
 
+    /**
+     * The tool taking the primary button while editing, or null: an object with down, move, up,
+     * hover, doubleClick and leave, each given the map point and the event (see pointerToolProvider).
+     */
+    #pointerTool() {
+        return this.isEditMode ? (this.pointerToolProvider?.() ?? null) : null;
+    }
+
     #handlePointerDown(e, canvasElement) {
         canvasElement.setPointerCapture(e.pointerId);
+        canvasElement.focus({ preventScroll: true });
 
         // Right/Middle Click Drag Pan
         if (e.button === 2 || e.button === 1) {
@@ -386,6 +408,14 @@ export class StudioCanvas {
             this.isDraggingReference = true;
             this.dragStart = { x: coords.x, y: coords.y };
             canvasElement.style.cursor = "grabbing";
+            return;
+        }
+
+        const tool = this.#pointerTool();
+        if (tool) {
+            e.preventDefault();
+            this.pointerToolPressed = true;
+            tool.down(coords.x, coords.y, e);
             return;
         }
 
@@ -471,6 +501,13 @@ export class StudioCanvas {
         }
         if (this.isDragging) {
             this.#panMap(e);
+            return;
+        }
+        const tool = this.#pointerTool();
+        if (tool) {
+            if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+            if (this.pointerToolPressed) tool.move(coords.x, coords.y, e);
+            else tool.hover(coords.x, coords.y, e);
             return;
         }
         if (this.activeDrag) {
@@ -740,6 +777,13 @@ export class StudioCanvas {
         if (!this.isEditMode) return;
 
         const coords = this.#getMapCoordinates(e, canvasElement);
+        const tool = this.#pointerTool();
+        if (tool) {
+            e.preventDefault();
+            tool.doubleClick(coords.x, coords.y, e);
+            return;
+        }
+
         const hit = this.#getHitTarget(coords.x, coords.y);
 
         if (hit && this.onDoubleClick) {
@@ -763,7 +807,14 @@ export class StudioCanvas {
             this.#endPan(e, canvasElement);
             return;
         }
-        if (e.button === POINTER_BUTTON.PRIMARY) this.#endPrimaryAction(canvasElement);
+        if (e.button !== POINTER_BUTTON.PRIMARY) return;
+        if (this.pointerToolPressed) {
+            this.pointerToolPressed = false;
+            const coords = this.#getMapCoordinates(e, canvasElement);
+            this.#pointerTool()?.up(coords.x, coords.y, e);
+            return;
+        }
+        this.#endPrimaryAction(canvasElement);
     }
 
     /** Ends a map pan, treating a right-button release close to where it was pressed as a right-click. */
@@ -807,6 +858,7 @@ export class StudioCanvas {
     }
 
     #handlePointerLeave(_e, _canvasElement) {
+        if (!this.pointerToolPressed) this.#pointerTool()?.leave();
         if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
             this.onCanvasHover(null, null);
         }
@@ -1410,11 +1462,12 @@ export class StudioCanvas {
      *
      * @param {import("../mesh/MeshSession.js").MeshSession|null} meshSession
      */
-    renderRegionLevels(meshSession) {
+    renderRegionLevels(meshSession, { focusLevelId = null } = {}) {
         const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
         this.regionLevels.render(meshSession, {
             isVisible: (visibility, parentVisibility, isContainer) => this.#isVisibleInCurrentPass(visibility, parentVisibility, isContainer),
             resScale,
+            focusLevelId,
         });
     }
 
@@ -2351,6 +2404,7 @@ export class StudioCanvas {
         };
 
         scaleNodes(this.stage);
+        this.regionOverlays.redraw(this.stage.scale.x);
     }
 
     /**

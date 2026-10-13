@@ -47,14 +47,16 @@ export class RegionLevelLayers {
      * @param {object} options
      * @param {function(string, string, boolean): boolean} options.isVisible - (visibility, parentVisibility, isContainer).
      * @param {number} [options.resScale] - The map's resolution scale (for levels whose borders scale with it).
+     * @param {string|null} [options.focusLevelId] - A level being painted: it and its ancestors are
+     *     drawn for the task, and nothing else (see describeLevels).
      */
-    render(session, { isVisible, resScale = 1 }) {
+    render(session, { isVisible, resScale = 1, focusLevelId = null }) {
         if (!session) {
             this.clear();
             return;
         }
         this.#adoptMesh(session.mesh);
-        const drawn = describeLevels(session, isVisible);
+        const drawn = describeLevels(session, isVisible, focusLevelId);
         const keep = new Set(drawn.map((entry) => entry.level.id));
         for (const id of [...this.#levels.keys()]) if (!keep.has(id)) this.#dropLevel(id);
 
@@ -116,20 +118,20 @@ export class RegionLevelLayers {
         this.#levels.delete(id);
     }
 
-    #drawFill(session, view, { level, set, palette }) {
+    #drawFill(session, view, { level, set, palette, opacity }) {
         if (!view.fill) return;
         const changes = session.takeOwnerChanges(level.id);
         if (changes) view.fill.setOwners(session.layer(level.id).owners, changes);
         view.fill.setPalette(palette);
         const tint = set.waterTint === false ? 0 : FILRODENSWMB.MESH.FILL.WATER_TINT_ALPHA;
-        view.fill.setOpacity(drawnOpacity(level, set), tint);
+        view.fill.setOpacity(opacity.fill, tint);
     }
 
-    #drawArcs(session, view, { level, set, visibleKeys, exclude }, resScale) {
+    #drawArcs(session, view, { level, visibleKeys, exclude, opacity }, resScale) {
         const arcs = session.arcsFor(level.id, exclude);
         const style = arcStyle(level.style, resScale);
         const signature = JSON.stringify([style, [...visibleKeys].sort((a, b) => a - b)]);
-        view.arcs.alpha = drawnOpacity(level, set);
+        view.arcs.alpha = opacity.arcs;
         if (view.arcsSource === arcs && view.arcsSignature === signature) return;
 
         view.arcsSource = arcs;
@@ -150,29 +152,61 @@ export class RegionLevelLayers {
 /**
  * The levels to draw, in order, each with its layer set, its palette (the visible regions'
  * colours and styles by key), the keys of its visible regions (borders of hidden regions are left
- * out) and the levels whose borders it leaves out (its visible ancestors; see MeshSession.arcsFor).
+ * out), the levels whose borders it leaves out (its visible ancestors; see MeshSession.arcsFor)
+ * and the opacity of its fill and borders.
  *
  * A level shows when its layer set and it are visible in the pass; a region when it is, under its
  * level. The visibility rules are the canvas's own (a GM-only container makes everything inside it
  * GM-only).
  *
+ * While a level is being painted (`focusLevelId`), the map is drawn for that task instead: the
+ * painted level at a working fill opacity (its own, or at least EDIT_FILL_OPACITY, so a
+ * borders-only level still shows its regions), its ancestors as borders only (the parent region's
+ * outline is there to paint inside), and nothing else, so what a stroke changes is never hidden
+ * under or blended with another level. Hidden levels stay hidden.
+ *
  * @param {import("../mesh/MeshSession.js").MeshSession} session
  * @param {function(string, string, boolean): boolean} isVisible
+ * @param {string|null} [focusLevelId]
  */
-export function describeLevels(session, isVisible) {
+export function describeLevels(session, isVisible, focusLevelId = null) {
+    // A level the session no longer holds (deleted a moment ago) focuses nothing: the map is drawn as viewed
+    const focus = focusLevelId && session.level(focusLevelId) ? focusLineage(session, focusLevelId) : null;
     const drawn = [];
     const shown = new Set();
     for (const set of session.layerSets) {
         if (!isVisible(set.visibility, "all", true)) continue;
         for (const level of set.levels) {
+            if (focus && !focus.has(level.id)) continue;
             const levelVisibility = combinedVisibility(level.visibility, set.visibility);
             if (!isVisible(levelVisibility, "all", true)) continue;
             shown.add(level.id);
             const { palette, visibleKeys } = regionPalette(level, levelVisibility, isVisible);
-            drawn.push({ level, set, palette, visibleKeys, exclude: visibleAncestors(session, level, shown) });
+            const opacity = focus ? focusOpacity(level, set, level.id === focusLevelId) : viewOpacity(level, set);
+            drawn.push({ level, set, palette, visibleKeys, exclude: visibleAncestors(session, level, shown), opacity });
         }
     }
     return drawn;
+}
+
+/** The level being painted and its ancestors, the only levels drawn while it is painted. */
+function focusLineage(session, levelId) {
+    const lineage = new Set();
+    for (let id = levelId; id && !lineage.has(id); id = session.level(id)?.parentLevelId ?? null) lineage.add(id);
+    return lineage;
+}
+
+/** How a level is drawn when the map is viewed: fill and borders at its own opacity times its set's. */
+function viewOpacity(level, set) {
+    const opacity = drawnOpacity(level, set);
+    return { fill: opacity, arcs: opacity };
+}
+
+/** How a level is drawn while one is painted: the painted level at a working fill, its ancestors as borders only. */
+function focusOpacity(level, set, isPainted) {
+    const opacity = drawnOpacity(level, set);
+    if (!isPainted) return { fill: 0, arcs: Math.max(opacity, FILRODENSWMB.MESH.PAINT.EDIT_FILL_OPACITY) };
+    return { fill: Math.max(opacity, FILRODENSWMB.MESH.PAINT.EDIT_FILL_OPACITY), arcs: Math.max(opacity, FILRODENSWMB.MESH.PAINT.EDIT_FILL_OPACITY) };
 }
 
 /** A GM-only parent makes a child GM-only; hidden stays hidden. */

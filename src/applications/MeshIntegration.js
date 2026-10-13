@@ -170,6 +170,10 @@ export class MeshIntegration {
      * Gives a new map (a fresh canvas, or one created from the resolution dialogue) an empty mesh
      * session once its terrain exists. Runs in the background: an empty map draws nothing from
      * its mesh, and a map loaded meanwhile takes precedence (the token check).
+     *
+     * The map's layer sets are left as they are: the Studio empties them when it starts the new
+     * map, and any level or region added while the terrain was generating (the panel can be used
+     * by then) belongs to this map and is kept for the session.
      */
     static startNewMap(app) {
         const state = this.#state(app);
@@ -179,7 +183,7 @@ export class MeshIntegration {
         state.unavailable = false;
         const token = state.token;
         app.meshSession = null;
-        app.layerSets = [];
+        app.layerSets ??= [];
 
         const mapData = { mapWidth: app.mapWidth, mapHeight: app.mapHeight, seed: app.uiState.mapSeed, params: { latTop: app.uiState.latTop, latBottom: app.uiState.latBottom }, world: app.uiState.world };
         this.#meshLoader()
@@ -225,10 +229,32 @@ export class MeshIntegration {
 
     /**
      * Draws the region levels (see StudioCanvas.renderRegionLevels): each level at its own opacity
-     * multiplied by its layer set's.
+     * multiplied by its layer set's, or, while the Regions tool is painting a level, that level and
+     * its ancestors alone, drawn for painting (see RegionLevelLayers.describeLevels), unless the
+     * toolbar's Show Everything is on. The outline of the region being edited follows (see updateOutline).
      */
     static renderRegions(app) {
-        app.canvasEngine.renderRegionLevels(app.meshSession);
+        const painting = app.activeTool === "regions" && app.uiState.isEditMode && !app.uiState.regionShowAll;
+        app.canvasEngine.renderRegionLevels(app.meshSession, { focusLevelId: painting ? app.activeLevelId : null });
+        this.updateOutline(app);
+    }
+
+    /**
+     * Outlines the region being edited while the Regions tool is in use: the border arcs it shares
+     * with its neighbours, unclaimed ground and the sea. Nothing is outlined in other tools. While
+     * a paint stroke is under way the borders are those from before it (they are rebuilt when it
+     * ends), so the outline catches up on release.
+     */
+    static updateOutline(app) {
+        const overlays = app.canvasEngine?.regionOverlays;
+        if (!overlays) return;
+        const found = app.activeTool === "regions" && app.activeRegionId ? app.meshSession?.findRegion(app.activeRegionId) : null;
+        if (!found) {
+            overlays.setOutline([]);
+            return;
+        }
+        const key = found.region.key;
+        overlays.setOutline(app.meshSession.arcsFor(found.level.id).filter((arc) => arc.a === key || arc.b === key));
     }
 
     /**

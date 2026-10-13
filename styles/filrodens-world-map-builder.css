@@ -2527,9 +2527,39 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb .fwmb-overlay-docked {
     inset-block: 1rem;
     inset-inline: auto 1rem;
-    width: 22rem;
+    width: 25rem;
     height: auto;
     max-height: none;
+}
+
+/* A docked dialogue is as wide as it is and no wider (it cannot be resized, as a modal one can),
+   so nothing inside it may be wider than its body: every box is sized with its padding and border
+   inside, a fieldset gives up its minimum content width (a fieldset's default, which lets it
+   overflow a narrow container), and a textarea resizes only vertically, so it cannot be dragged
+   wider than the dialogue */
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body *,
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body *::before,
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body *::after {
+    box-sizing: border-box;
+}
+
+.fwmb .fwmb-overlay-docked .fwmb-dialog-content,
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body > *,
+.fwmb .fwmb-overlay-docked .fwmb-dialog-content > *,
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body fieldset,
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body input,
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body select,
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body textarea {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body fieldset {
+    min-inline-size: 0;
+}
+
+.fwmb .fwmb-overlay-docked .fwmb-overlay-body textarea {
+    resize: vertical;
 }
 
 .fwmb .fwmb-overlay-resizable {
@@ -2595,6 +2625,24 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     display: flex;
     flex-direction: column;
     gap: var(--fwmb-size-8);
+}
+
+/* A dialogue's form rows are the module's own (see .form-group above), on both hosts: a label is
+   bold and as tall as the field beside it, and a stacked row's field takes the row's width */
+.fwmb .fwmb-overlay-body .form-group > label {
+    font-weight: bold;
+    line-height: var(--fwmb-size-32);
+}
+
+.fwmb .fwmb-overlay-body .form-group.stacked > label {
+    line-height: normal;
+}
+
+.fwmb .fwmb-overlay-body .form-group.stacked > :is(input:not([type="checkbox"]), select, textarea) {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .fwmb .fwmb-overlay-footer {
@@ -3292,4 +3340,30 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 /* The processing overlay's Cancel button sits beside the message */
 .fwmb .fwmb-processing-cancel {
     margin-inline-start: var(--fwmb-size-8);
+}
+
+/* The region the Regions tool paints into, shown in its edit toolbar */
+.fwmb .fwmb-active-region {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-size-6);
+    min-height: var(--fwmb-size-24);
+    max-width: 12rem;
+}
+
+.fwmb .fwmb-active-region-name {
+    color: var(--fwmb-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The map canvas takes focus when pressed (so Enter and Escape reach the tools) without a focus ring */
+.fwmb .fwmb-map-preview canvas:focus {
+    outline: none;
+}
+
+/* The docked region editor's four buttons share the footer, wrapping onto two rows if they must */
+.fwmb .fwmb-region-editor .fwmb-overlay-footer {
+    flex-wrap: wrap;
 }

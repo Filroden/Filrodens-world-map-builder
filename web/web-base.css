@@ -95,21 +95,6 @@ body {
     border-radius: 4px;
 }
 
-/* Dialogue forms (the overlay body carries Foundry's standard-form class): labels are bold and
-   as tall as the fields beside them, and a stacked group puts its label on a line of its own */
-:where(#fwmb-app) .standard-form .form-group {
-    flex-wrap: wrap;
-}
-
-:where(#fwmb-app) .standard-form .form-group > label {
-    font-weight: bold;
-    line-height: 32px;
-}
-
-:where(#fwmb-app) .standard-form .form-group.stacked > :is(label, input) {
-    flex: 0 0 100%;
-}
-
 /* --- Tooltips (see src/platform/web/tooltips.js) ---
    The module's #tooltip.fwmb-tooltip rules give the tooltip its look; Foundry's core gives it
    position and stacking, which the page supplies here. The tooltip script works out the position

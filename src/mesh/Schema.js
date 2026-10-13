@@ -201,10 +201,25 @@ export function createLayerSet(fields = {}, idFactory = randomId) {
     };
 }
 
+/** How far a level's regions claim the sea (in map pixels) when the level says nothing: a top level's default, nothing for a child level. */
+export function defaultWatersPx(parentLevelId) {
+    return parentLevelId ? 0 : FILRODENSWMB.MESH.WATERS.DEFAULT_PX;
+}
+
+/**
+ * The fields a level made below another starts with: no fill of its own and a thinner, dashed
+ * border, so it reads as a subdivision of its parent rather than a second fill over it.
+ */
+export function childLevelFields(parentLevelId) {
+    const { OPACITY, LINE_THICKNESS, LINE_STYLE, SEA_LINE_THICKNESS } = FILRODENSWMB.MESH.CHILD_LEVEL;
+    return { parentLevelId, opacity: OPACITY, style: { lineThickness: LINE_THICKNESS, lineStyle: LINE_STYLE, seaLineThickness: SEA_LINE_THICKNESS } };
+}
+
 /**
  * A level of a layer set. Region keys are small integers unique within the level and never reused
  * (nextKey only grows), so an owner array stays valid when regions are deleted or reordered and
- * undo never has to renumber cells.
+ * undo never has to renumber cells. `watersPx` is how far (in map pixels) its regions claim the
+ * sea from their coasts (see RegionEdits.claimWaters); 0 claims none.
  * @param {object} [fields]
  * @param {Function} [idFactory]
  */
@@ -218,6 +233,7 @@ export function createLevel(fields = {}, idFactory = randomId) {
         nestingMode: fields.nestingMode ?? "constrained",
         visibility: fields.visibility ?? "all",
         opacity: fields.opacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY,
+        watersPx: fields.watersPx ?? defaultWatersPx(fields.parentLevelId ?? null),
         style: { ...defaultLevelStyle(), ...fields.style },
         regions: fields.regions ?? [],
         nextKey: fields.nextKey ?? (fields.regions ?? []).reduce((next, region) => Math.max(next, region.key + 1), 0),
@@ -347,7 +363,7 @@ export function normaliseAreaFactor(mapData) {
 /**
  * Gives the vector data the fields added after version 4's shape was first saved, with their
  * defaults, so code reading a level, route or pin can rely on them: a layer set's opacity, a
- * level's nesting mode, a region's parent key, a route's transport, outline, smoothing and
+ * level's nesting mode and territorial waters, a region's parent key, a route's transport, outline, smoothing and
  * thickness (rounded to the thickness step), and a pin's style. Values already present are kept;
  * an unknown nesting mode or transport becomes the default.
  *
@@ -379,6 +395,7 @@ function adoptOldOpacity(set, oldOpacity) {
 
 function normaliseLevel(level) {
     if (!NESTING_MODES.includes(level.nestingMode)) level.nestingMode = "constrained";
+    if (!Number.isFinite(level.watersPx) || level.watersPx < 0) level.watersPx = defaultWatersPx(level.parentLevelId ?? null);
     level.style = { ...defaultLevelStyle(), ...level.style };
     for (const region of level.regions ?? []) {
         if (!Number.isInteger(region.parentKey)) region.parentKey = null;

@@ -27,6 +27,8 @@ import { LayerPainting } from "../canvas/LayerPainting.js";
 import { MeshIntegration } from "./MeshIntegration.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { RegionPanel } from "./RegionPanel.js";
+import { RegionPainter } from "./RegionPainter.js";
+import { RegionEditor } from "./RegionEditor.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
@@ -119,7 +121,7 @@ export class MapStudio {
         editFault(e, t)       { MapDialogManager.onEditFault(this, e, t); },
         editLabel(e, t)       { MapDialogManager.onEditLabel(this, e, t); },
         editPin(e, t)         { MapDialogManager.onEditPin(this, e, t); },
-        editRegion(e, t)      { MapDialogManager.onEditRegion(this, e, t); },
+        editRegion(_e, t)     { RegionEditor.open(this, ...RegionPanel.regionIdsOf(t)); },
         editRiver(e, t)       { MapDialogManager.onEditRiver(this, e, t); },
         editRoute(e, t)       { MapDialogManager.onEditRoute(this, e, t); },
 
@@ -192,6 +194,8 @@ export class MapStudio {
         setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
         setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
         setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
+        setRegionMode(_e, t)            { RegionPainter.setMode(this, t); },
+        toggleRegionShowAll()           { RegionPainter.toggleShowAll(this); },
         setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
         setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
         threeDView(e, t)                { this._onThreeDView(e, t); },
@@ -725,6 +729,8 @@ export class MapStudio {
             isCustom: true,
         }));
 
+        if (this.activeTool === "regions") context.regionToolbar = RegionPainter.toolbarContext(this);
+
         context.regionStyles = (this.uiState.customRegionStyles || []).map((style) => ({
             id: style.id,
             label: style.name,
@@ -844,6 +850,7 @@ export class MapStudio {
         this.#applyInitialBootState();
         this.#updateHistoryButtons();
         this.#updateCanvasHint();
+        MeshIntegration.updateOutline(this);
     }
 
     /**
@@ -912,6 +919,12 @@ export class MapStudio {
         const activeElement = document.activeElement;
         const isInputFocused = activeElement && (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA");
         if (isInputFocused) return;
+
+        // The Regions tool takes Escape: a stroke left hanging, or the region being edited
+        if (this.activeTool === "regions" && RegionPainter.handleKey(this, event)) {
+            event.preventDefault();
+            return;
+        }
 
         const isCtrlOrCmd = event.ctrlKey || event.metaKey;
 
@@ -1349,6 +1362,8 @@ export class MapStudio {
     #bindCanvasCallbacks() {
         if (!this.canvasEngine) return;
         MeshIntegration.bindHitTest(this);
+        // While the Regions tool is editing, the primary button paints (see RegionPainter)
+        this.canvasEngine.pointerToolProvider = () => (this.activeTool === "regions" ? RegionPainter.tool(this) : null);
         this.canvasEngine.onCanvasHover = (x, y) => {
             const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
             const showCursor = this.canvasEngine.isEditMode && isBrushActive && !this.canvasEngine.isDragging;
@@ -1546,6 +1561,7 @@ export class MapStudio {
             isReferenceMode: !!this.canvasEngine?.isReferenceMode,
             featureMode: this.uiState.activeFeatureMode,
             infraMode: this.uiState.activeInfraMode,
+            regionMode: RegionPainter.mode(this),
             isMaskDrawing: this.#isMaskDrawingMode(),
             heldItem: this.canvasEngine?.heldItem ?? null,
         });
@@ -1566,7 +1582,7 @@ export class MapStudio {
                 MapDialogManager.onEditRoute(this, null, null, entityId);
                 break;
             case "region":
-                MapDialogManager.onEditRegion(this, null, null, { regionId: entityId, layerId });
+                RegionEditor.open(this, layerId, entityId);
                 break;
             case "landMask":
                 MapDialogManager.onEditLandMask(this, null, null, entityId);
@@ -1635,11 +1651,6 @@ export class MapStudio {
 
         if (layer === "infrastructure") {
             this.#handleInfrastructureClick(x, y);
-            return;
-        }
-
-        if (layer === "regions") {
-            this.#selectRegionAt(x, y);
             return;
         }
 
@@ -3175,20 +3186,6 @@ export class MapStudio {
         this.markDirty();
     }
 
-    /**
-     * A click with the Regions tool's Select mode: the region of the level being edited under the
-     * pointer becomes the active region (none when the pointer is over unclaimed ground).
-     */
-    #selectRegionAt(x, y) {
-        const level = this.activeLevelId ? this.meshSession?.level(this.activeLevelId) : null;
-        if (!level) return;
-        const region = this.meshSession.regionAt(level.id, x, y);
-        const id = region?.id ?? null;
-        if (id === this.activeRegionId) return;
-        this.activeRegionId = id;
-        this.view?.render(["context"]);
-    }
-
     #handleLabelClick(x, y) {
         if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
@@ -3934,6 +3931,7 @@ export class MapStudio {
         this.tectonicFeatureCache = {};
         this.mapPins = [];
         this.mapRoutes = [];
+        this.layerSets = [];
 
         // Apply the centre offset to keep masks perfectly framed
         this.landMasks =
@@ -4001,6 +3999,8 @@ export class MapStudio {
         else if (maskCompleted) this.requestTerrainUpdate();
         this.#deactivateEditMode();
         this.#clearMassEditState();
+        // An editor docked beside the map belongs to the tool it was opened from
+        platform.dialogs.dismiss({ placement: "docked" });
 
         // 2. Setup new state
         MapStateManager.getMapParameters(this);
@@ -4030,6 +4030,7 @@ export class MapStudio {
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             if (config.activeKey) this[config.activeKey] = null;
         }
+        RegionPainter.cancel(this);
 
         return this._finishActiveLandMask();
     }

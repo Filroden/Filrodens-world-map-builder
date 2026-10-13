@@ -199,7 +199,11 @@ export class MapStateManager {
             referenceY: height / 2,
 
             regionPresets: FILRODENSWMB.REGIONS.PRESETS,
-            // The fill a new region starts with (the toolbar's choice; see RegionTool)
+            // The Regions tool's edit mode: select, paint, erase, fill, lasso or claim (see RegionPainter)
+            regionPaintMode: "select",
+            // Whether every level is drawn while painting, rather than only the one being painted (see MeshIntegration.renderRegions)
+            regionShowAll: false,
+            // The last fill chosen in a region quick style's editor
             regionFillColor: "#c6af53",
             regionFillStyle: "solid",
             regionOpacity: FILRODENSWMB.DISPLAY.REGION_OPACITY,

@@ -19,7 +19,7 @@ const { StudioView } = await import("../../src/ui/StudioView.js");
 
 /** Templates as plain functions of their context, standing in for Handlebars. */
 const TEMPLATES = {
-    toolbar: (c) => `<div><button type="button" data-action="pick" data-tool="a" class="${c.tool === "a" ? "active" : ""}">A</button><input type="checkbox" data-action="tick"></div>`,
+    toolbar: (c) => `<div><button type="button" data-action="pick" data-tool="a" class="${c.tool === "a" ? "active" : ""}"><i class="icon ${c.tool}"></i></button><input type="checkbox" data-action="tick"></div>`,
     panel: (c) => `<form class="${c.locked ? "locked" : ""}"><input type="text" name="title" value="${c.title}"><input type="range" name="size" min="0" max="10" value="${c.size}"><output></output>${c.extra ?? ""}</form>`,
     map: () => `<div class="container"><div class="preview" data-morph-ignore></div></div>`,
     edit: (c) => `<div class="${c.editing ? "" : "hidden"}">edit</div>`,
@@ -99,6 +99,17 @@ test("the focused field keeps what is being typed into it", async () => {
     state.title = "Harbour";
     await view.render(["panel"]);
     assert.equal(field.value, "Half-typ");
+});
+
+test("a focused button still has its icon redrawn", async () => {
+    const view = makeView();
+    await view.render();
+    const button = root.querySelector('[data-action="pick"]');
+    button.focus();
+    state.tool = "b";
+    await view.render(["toolbar"]);
+    assert.equal(root.querySelector('[data-action="pick"] i').className, "icon b");
+    assert.equal(document.activeElement, button, "focus is kept");
 });
 
 test("calls in one task are merged into one redraw of each region asked for", async () => {

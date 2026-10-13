@@ -24,6 +24,7 @@ export class CanvasHints {
      * @param {boolean} state.isReferenceMode  Whether the reference image is taking pointer input.
      * @param {string} [state.featureMode]  Terrain Features mode: spring, river or fault.
      * @param {string} [state.infraMode]  Infrastructure mode: pin or route.
+     * @param {string} [state.regionMode]  Regions mode: select, paint, erase or fill.
      * @param {boolean} [state.isMaskDrawing]  Whether the Scene tool is drawing land masks.
      * @param {string|null} [state.heldItem]  What the pointer holds: label, decoration, pin or
      *   mask (a land mask).
@@ -57,7 +58,7 @@ export class CanvasHints {
             case "infrastructure":
                 return state.infraMode === "route" ? "route" : "pin";
             case "regions":
-                return "region";
+                return CanvasHints.#regionContext(state.regionMode);
             case "labels":
                 return "labels";
             case "cartography":
@@ -67,6 +68,12 @@ export class CanvasHints {
             default:
                 return "view";
         }
+    }
+
+    /** The Regions tool's list for its mode, Select's when the mode has none. */
+    static #regionContext(mode) {
+        const context = `region${(mode ?? "select").charAt(0).toUpperCase()}${(mode ?? "select").slice(1)}`;
+        return FILRODENSWMB.UI.CANVAS_HINTS.CONTEXTS[context] ? context : "regionSelect";
     }
 
     /**

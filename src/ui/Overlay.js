@@ -83,13 +83,18 @@ export class Overlay {
     }
 
     /**
-     * Closes every dialogue open in `host`, each resolving with its `dismissed` value. For a host
-     * that is about to go away, so no caller is left waiting on a dialogue that has gone with it.
+     * Closes every dialogue open in `host` (or only those in one placement), each resolving with its
+     * `dismissed` value. For a host that is about to go away, so no caller is left waiting on a
+     * dialogue that has gone with it, and for an editor that is only ever open once (a docked
+     * editor replacing the one before).
      *
      * @param {HTMLElement} host
+     * @param {"modal" | "docked" | null} [placement] - Only dialogues in this placement; null for all.
      */
-    static dismissAll(host) {
-        for (const overlay of [...(openByHost.get(host) ?? [])]) overlay.dismiss();
+    static dismissAll(host, placement = null) {
+        for (const overlay of [...(openByHost.get(host) ?? [])]) {
+            if (!placement || overlay.#placement === placement) overlay.dismiss();
+        }
     }
 
     #host;
@@ -158,15 +163,23 @@ export class Overlay {
     }
 
     /**
-     * The content, inside a form. It also carries Foundry's standard-form class, so in Foundry the
-     * fields are laid out by the same core rules as in its own dialogues.
+     * The content, inside a form. The form is laid out by the module's own stylesheet alone (see
+     * .fwmb-overlay-body): it carries none of Foundry's form classes, whose flex rules would size
+     * the fields in ways the module's grid and stacked rows do not expect, so a dialogue looks the
+     * same in Foundry and on the web. The body scrolls with the module's own scrollbar.
      */
     #buildBody(doc, content) {
         const form = doc.createElement("form");
-        form.className = "fwmb-overlay-body standard-form";
+        form.className = "fwmb-overlay-body fwmb-scrollable";
         form.method = "dialog";
         if (typeof content === "string") form.innerHTML = content;
         else if (content) form.append(content);
+        // The body scrolls up and down only. It hides any sideways overflow, but focusing a field
+        // that reaches past its edge still scrolls it sideways (hidden overflow can be scrolled by
+        // script and by focus), which would cut off the start of every row; that scroll is undone.
+        form.addEventListener("scroll", () => {
+            if (form.scrollLeft !== 0) form.scrollLeft = 0;
+        });
         return form;
     }
 

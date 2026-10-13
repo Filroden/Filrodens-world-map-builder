@@ -254,3 +254,15 @@ test("sets move and change visibility from their rows, each one undo step", asyn
     VectorHistory.step(app, true);
     assert.deepEqual(app.layerSets.map((set) => [set.id, set.visibility]), [["political", "all"], ["other", "all"]]);
 });
+
+test("deleting the level being painted leaves the map drawn for the level that takes its place", async () => {
+    const { describeLevels } = await import("../../src/canvas/RegionLevelLayers.js");
+    const { app, session } = await studio();
+    RegionPanel.context(app);
+    RegionPanel.selectLevel(app, levelControl("counties"));
+    const drawnFor = (levelId) => describeLevels(session, () => true, levelId).map((entry) => entry.level.id);
+    assert.deepEqual(drawnFor("counties"), ["realms", "counties"], "the painted level and its parent");
+    await RegionPanel.deleteLevel(app, levelControl("counties"));
+    assert.equal(app.activeLevelId, "realms", "settled before the map was redrawn");
+    assert.deepEqual(drawnFor("counties"), ["realms", "zones"], "a level that has gone focuses nothing");
+});

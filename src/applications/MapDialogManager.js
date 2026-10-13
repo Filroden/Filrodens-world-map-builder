@@ -19,7 +19,6 @@ import {
     revertPinIconUsage,
 } from "../data/pinIcons.js";
 import { platform } from "../platform/index.js";
-import { regionFillColor } from "../mesh/Schema.js";
 
 export class MapDialogManager {
     /**
@@ -1459,70 +1458,6 @@ export class MapDialogManager {
                     if (config.onUpdateActiveUI) config.onUpdateActiveUI(app, result);
                 }
             },
-        });
-    }
-
-    static async onEditRegion(app, event, target, explicitData = null) {
-        const layerId = explicitData ? explicitData.layerId : target.closest("[data-layer-id]").dataset.layerId;
-        const regionId = explicitData ? explicitData.regionId : target.closest(".fwmb-list-item").dataset.id;
-
-        const layer = app.regionLevels.find((l) => l.id === layerId);
-        if (!layer) return;
-
-        const region = layer.regions.find((r) => r.id === regionId);
-        if (!region) return;
-
-        const safeRegion = this._withLabelDefaults(app, region);
-
-        await this._processEditDialog(app, region, {
-            titleKey: "FILRODENSWMB.UI.EditRegion",
-            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs",
-            context: {
-                // A region without a fill of its own is drawn in its preset colour, which the
-                // dialogue starts from so saving it unchanged keeps the region's look
-                region: { ...safeRegion, fillColor: regionFillColor(region), fillStyle: region.fillStyle ?? "solid" },
-                rotationRange: FILRODENSWMB.UI.ROTATION,
-                fonts: platform.fonts.list(),
-                palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                customLabelStyles: app.uiState.customLabelStyles || [],
-                customRegionStyles: app.uiState.customRegionStyles || [],
-            },
-            onRender: (html) => {
-                const quickStyleSelect = html.querySelector('select[name="regionQuickStyle"]');
-                const fillTransparentCheckbox = html.querySelector('input[name="regionFillTransparent"]');
-                const fillColorInput = html.querySelector('input[name="regionFillColor"]');
-                const fillStyleSelect = html.querySelector('select[name="regionFillStyle"]');
-
-                quickStyleSelect?.addEventListener("change", (e) => {
-                    const styleId = e.target.value;
-                    if (styleId !== "custom") {
-                        const styleData = app.uiState.customRegionStyles.find((s) => s.id === styleId);
-                        if (styleData) {
-                            const isTransparent = styleData.fillColor === "transparent";
-                            if (fillTransparentCheckbox) fillTransparentCheckbox.checked = isTransparent;
-                            if (fillColorInput) fillColorInput.value = isTransparent ? "#000000" : styleData.fillColor;
-                            if (fillStyleSelect) fillStyleSelect.value = styleData.fillStyle;
-                        }
-                    }
-                });
-
-                const revertToCustom = () => {
-                    if (quickStyleSelect) quickStyleSelect.value = "custom";
-                };
-                fillTransparentCheckbox?.addEventListener("change", revertToCustom);
-                fillColorInput?.addEventListener("input", revertToCustom);
-                fillStyleSelect?.addEventListener("change", revertToCustom);
-
-                this.bindLabelPropertiesDialog(html, app.uiState);
-            },
-            onExtract: (form, fallbackName) => ({
-                name: form.elements["regionName"]?.value.trim() || fallbackName,
-                description: form.elements["regionDesc"].value,
-                quickStyle: form.elements["regionQuickStyle"].value,
-                fillColor: form.elements["regionFillTransparent"].checked ? "transparent" : form.elements["regionFillColor"].value,
-                fillStyle: form.elements["regionFillStyle"].value,
-                label: this._extractLabelResultFields(form),
-            }),
         });
     }
 

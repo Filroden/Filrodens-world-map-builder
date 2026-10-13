@@ -70,13 +70,14 @@ export function isContiguous(mesh, path) {
 }
 
 /**
- * A mesh session on the small mesh (see smallMesh) with water down its left quarter, holding the
- * given layer sets (each level starts unclaimed unless `owners` gives its array).
+ * A mesh session on the small mesh (see smallMesh) with water down its left quarter (or where
+ * `isWater(x, y)` says), holding the given layer sets (each level starts unclaimed unless `owners`
+ * gives its array).
  */
-export async function smallSession(layerSets = [], owners = {}) {
+export async function smallSession(layerSets = [], owners = {}, { isWater = (x) => x < smallMesh().width / 4 } = {}) {
     const { MeshSession } = await import("../../src/mesh/MeshSession.js");
     const mesh = smallMesh();
-    const aggregates = flatAggregates(mesh, { isWater: (x) => x < mesh.width / 4 });
+    const aggregates = flatAggregates(mesh, { isWater });
     const block = { seed: 42, spacing: 4, cells: mesh.cellCount, modelSpacingKm: 25, modelSpacingPx: 12, width: mesh.width, height: mesh.height, version: 1 };
     return new MeshSession({ mesh, meshBlock: block, layerSets, owners, aggregates });
 }

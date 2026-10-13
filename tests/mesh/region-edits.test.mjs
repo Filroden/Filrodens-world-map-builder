@@ -164,3 +164,38 @@ test("auto-assign fills unclaimed land inside each parent only, and a cancelled 
     }
     assert.equal(unassignedCount(map.session, map.counties), 0);
 });
+
+/** Two realms side by side on a coast (water left of x 100), with an enclosed lake inside West. */
+async function coastalMap(watersPx) {
+    const realms = createLevel({ name: "Realms", watersPx }, nextId);
+    const west = addRegion(realms, { name: "West" }, nextId);
+    const east = addRegion(realms, { name: "East" }, nextId);
+    const layerSets = [createLayerSet({ name: "Political", levels: [realms] }, nextId)];
+    const isLake = (x, y) => x >= 180 && x < 220 && y >= 200 && y < 240;
+    const session = await smallSession(layerSets, {}, { isWater: (x, y) => x < 100 || isLake(x, y) });
+    const mesh = session.mesh;
+    const land = session.aggregates.land;
+    const landOnly = (cells) => cells.filter((cell) => land[cell] === 1);
+    session.layer(realms.id).paint(landOnly(cellsInRect(mesh, 100, 0, 250, 150)), west.key);
+    session.layer(realms.id).paint(landOnly(cellsInRect(mesh, 100, 150, 250, 300)), east.key);
+    return { session, realms, west, east, mesh, land };
+}
+
+test("territorial waters go to the nearest coast up to the limit, split between neighbours, and lakes are claimed whole", async () => {
+    const { claimWaters } = await import("../../src/mesh/RegionEdits.js");
+    const map = await coastalMap(30);
+    const result = claimWaters(map.session, map.realms);
+    const owners = map.session.layer(map.realms.id).owners;
+    assert.ok(result.patch.cells.length > 0);
+    // 30 px out to sea: claimed near the coast, open further out
+    assert.equal(owners[map.mesh.cellAt(90, 75)], map.west.key);
+    assert.equal(owners[map.mesh.cellAt(90, 225)], map.east.key);
+    assert.equal(owners[map.mesh.cellAt(20, 150)], UNCLAIMED, "beyond the limit");
+    assert.equal(owners[map.mesh.cellAt(200, 220)], map.east.key, "the lake inside East is East's");
+    const sea = cellsInRect(map.mesh, 85, 0, 100, 300).filter((cell) => map.land[cell] !== 1 && Math.abs(map.mesh.siteY(cell) - 150) > 10);
+    assert.ok(sea.every((cell) => owners[cell] === (map.mesh.siteY(cell) < 150 ? map.west.key : map.east.key)), "the strip splits along the coast's halfway line");
+
+    map.realms.watersPx = 0;
+    claimWaters(map.session, map.realms);
+    assert.ok(cellsInRect(map.mesh, 0, 0, 400, 300).every((cell) => map.land[cell] === 1 || owners[cell] === UNCLAIMED), "no water at all at 0");
+});

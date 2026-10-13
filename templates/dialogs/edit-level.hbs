@@ -40,6 +40,10 @@
         {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="levelOpacity" label="FILRODENSWMB.UI.LevelOpacity" value=level.opacity min=0 max=1 step=0.05}}
     </div>
 
+    <div class="form-group stacked">
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="levelWatersPx" label="FILRODENSWMB.UI.LevelWaters" hint="FILRODENSWMB.UI.LevelWatersHint" value=level.watersPx min=0 max=waters.MAX_PX step=waters.STEP_PX}}
+    </div>
+
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.LevelBorders"}}</legend>
         {{#if copySources.length}}

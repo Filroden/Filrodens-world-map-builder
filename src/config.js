@@ -448,7 +448,11 @@ export const FILRODENSWMB = {
                 biomes: ["PaintBiomes"],
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
                 line: ["AddPoint", "FinishLine", "MovePoint", "InsertPoint", "DeletePoint", "EditLine"],
-                region: ["SelectRegion", "EditRegion"],
+                // The Regions tool, by edit mode (see RegionPainter)
+                regionSelect: ["SelectRegion", "EditRegion"],
+                regionPaint: ["RegionPaint", "RegionPaintShift"],
+                regionErase: ["RegionErase", "RegionEraseShift"],
+                regionFill: ["RegionFill", "RegionFillShift"],
                 route: [],
                 mask: ["AddPoint", "FinishMask", "MovePoint", "MoveMask", "InsertPoint", "DeletePoint", "EditMask"],
                 pin: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
@@ -1259,6 +1263,30 @@ export const FILRODENSWMB = {
         CACHE: { DATABASE: "fwmb-mesh", STORE: "rasters", MAX_ENTRIES: 8 },
         // How close (in screen pixels) a click must be to a route's line to pick the route
         ROUTE_HIT_PX: 8,
+        // Territorial waters (see RegionEdits.claimWaters): a level's water cells go to the nearest
+        // of its regions by sea distance from that region's coast, up to the level's own limit, in
+        // map pixels (the map's own measure; the scale bar can name it in the map's units). A new
+        // top level starts at DEFAULT_PX; a child level at 0 (its parent's waters cover it), and
+        // the level editor offers up to MAX_PX.
+        WATERS: { DEFAULT_PX: 40, MAX_PX: 400, STEP_PX: 5 },
+        // How a child level is drawn when it is made (the atlas convention: the top level fills,
+        // the levels below it draw thinner, dashed borders inside it and no fill of their own)
+        CHILD_LEVEL: { OPACITY: 0, LINE_THICKNESS: 0.75, LINE_STYLE: "dashed", SEA_LINE_THICKNESS: 0.5 },
+        // The Regions tool's painting overlays (see RegionOverlays), all in screen pixels so they
+        // look the same at any zoom: the outline of the region being edited (a dark halo under
+        // an accent line), and the dashed outline of the area a Fill would take.
+        PAINT: {
+            OUTLINE_WIDTH_PX: 2.5,
+            OUTLINE_HALO_PX: 6,
+            OUTLINE_HALO_ALPHA: 0.45,
+            PREVIEW_WIDTH_PX: 1.5,
+            PREVIEW_DASH_PX: [6, 4],
+            // How long the pointer rests (in ms) before the Fill preview is worked out
+            PREVIEW_DELAY_MS: 60,
+            // While the Regions tool is editing, the level being painted is drawn at least this
+            // opaque, so a borders-only level still shows its regions while they are painted
+            EDIT_FILL_OPACITY: 0.5,
+        },
     },
     ENTITY_CONFIG: {
         decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },

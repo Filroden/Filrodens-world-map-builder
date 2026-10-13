@@ -162,8 +162,11 @@ export class StudioView {
         Idiomorph.morph(current, next, {
             morphStyle: "outerHTML",
             // A value being typed (or a slider being dragged) is the newest value; the one the
-            // template rendered a moment earlier would overwrite it
-            ignoreActiveValue: true,
+            // template rendered a moment earlier would overwrite it. Idiomorph keeps the focused
+            // element's children as well as its value (a textarea's text is a child), so this is
+            // asked for only while a field has focus: a focused button (a toggle just clicked) must
+            // still have its icon redrawn.
+            ignoreActiveValue: StudioView.#isField(current.ownerDocument.activeElement),
             callbacks: {
                 beforeNodeMorphed: (oldNode, newNode) => StudioView.#allowMorph(oldNode, newNode),
                 beforeNodeRemoved: (oldNode) => !StudioView.#isIgnored(oldNode),
@@ -194,6 +197,11 @@ export class StudioView {
         element.setAttribute(REGION_ATTRIBUTE, id);
         element.classList.add(...(this.#regions[id].classes ?? []));
         return element;
+    }
+
+    /** Whether an element holds a value the user may be editing (see #place). */
+    static #isField(element) {
+        return !!element && ["input", "textarea", "select"].includes(element.localName);
     }
 
     static #isIgnored(node) {

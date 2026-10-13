@@ -27,7 +27,8 @@
  *
  * Dialogues are drawn in the element most recently attached with `attach(element)` (the studio's
  * root, attached while the studio is open). Detaching an element dismisses the dialogues still
- * open in it.
+ * open in it. `dismiss({ placement })` closes the dialogues open there (only those in one
+ * placement, when given), as if each had been closed without a button.
  */
 import { Overlay } from "./Overlay.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
@@ -46,7 +47,7 @@ function rememberOpeningValues(element) {
  * @param {object} options
  * @param {(key: string) => string} options.localize - Translates the module's string keys (the
  *     buttons' labels and the close control's name).
- * @returns {{confirm: Function, prompt: Function, choose: Function, attach: (element: HTMLElement) => () => void}}
+ * @returns {{confirm: Function, prompt: Function, choose: Function, dismiss: Function, attach: (element: HTMLElement) => () => void}}
  */
 export function createOverlayDialogs({ localize }) {
     /** Attached elements, most recent last; dialogues open in the last one. */
@@ -109,5 +110,10 @@ export function createOverlayDialogs({ localize }) {
         return open(options, buttons, dismissed);
     }
 
-    return { confirm, prompt, choose, attach };
+    function dismiss({ placement = null } = {}) {
+        const host = hosts.at(-1);
+        if (host) Overlay.dismissAll(host, placement);
+    }
+
+    return { confirm, prompt, choose, dismiss, attach };
 }

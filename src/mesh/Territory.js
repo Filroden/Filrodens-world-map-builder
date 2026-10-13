@@ -23,9 +23,12 @@ import { UNCLAIMED } from "./Schema.js";
  * @param {function(number): boolean} options.passable - Cells the flood may enter.
  * @param {function(number, number): number} options.cost - Cost of the step from one cell to a neighbour.
  * @param {number} [options.limit]
+ * @param {function(number, number): boolean} [options.allow] - Whether an owner may enter a cell
+ *     (cell, owner); a cell one owner may not enter stays open to the others (a child region kept
+ *     inside its parent region).
  * @returns {{owner: Int32Array, cost: Float64Array}} owner is UNCLAIMED where the flood did not reach.
  */
-export function floodOwners(mesh, sourceCells, sourceOwners, { passable, cost, limit = Infinity }) {
+export function floodOwners(mesh, sourceCells, sourceOwners, { passable, cost, limit = Infinity, allow = null }) {
     const owner = new Int32Array(mesh.cellCount).fill(UNCLAIMED);
     const best = new Float64Array(mesh.cellCount).fill(Infinity);
     const heap = new MinHeap(sourceCells.length + 1024);
@@ -39,7 +42,7 @@ export function floodOwners(mesh, sourceCells, sourceOwners, { passable, cost, l
         const reached = heap.lastPriority;
         if (reached > best[cell]) continue;
         for (const next of mesh.neighbours(cell)) {
-            if (!passable(next)) continue;
+            if (!passable(next) || (allow && !allow(next, owner[cell]))) continue;
             const total = reached + cost(cell, next);
             if (total >= best[next] || total > limit) continue;
             best[next] = total;
@@ -51,7 +54,7 @@ export function floodOwners(mesh, sourceCells, sourceOwners, { passable, cost, l
 }
 
 /** The owned cells (and their owners) matching a predicate, as parallel arrays. */
-function ownedCells(owners, predicate) {
+export function ownedCells(owners, predicate) {
     const cells = [];
     const values = [];
     owners.forEach((owner, cell) => {

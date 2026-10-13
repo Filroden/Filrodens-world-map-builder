@@ -1,5 +1,6 @@
 import { MinHeap } from "./MinHeap.js";
 import { nestingViolations, parentAssignments } from "./OwnerLayer.js";
+import { floodOwners, ownedCells } from "./Territory.js";
 import { UNCLAIMED } from "./Schema.js";
 import { allLevels, descendantLevels, removeLevel, setOfLevel } from "./LayerTree.js";
 
@@ -13,6 +14,9 @@ import { allLevels, descendantLevels, removeLevel, setOfLevel } from "./LayerTre
  * layer sets are changed in place, and the caller snapshots them before calling when the change
  * must be undoable. The session is told about every owner change, so derived geometry is rebuilt.
  */
+
+/** A cell whose site lies within this many spacings of the map's edge counts as touching it (see claimWaters). */
+const EDGE_MARGIN_SPACINGS = 2;
 
 /** Unclaimed cells handed out between two checks for cancellation (see autoAssign). */
 const AUTO_ASSIGN_CHUNK = 8192;
@@ -144,13 +148,16 @@ export function settleParentKey(session, level, region, cell) {
 /**
  * The cells a paint of `region` may change, as a predicate (null when anything goes): on a
  * constrained child level, only cells of the region's parent region; on a top or free level,
- * every cell.
+ * every cell. A region not yet given a parent region takes the one under `startCell` for the
+ * purpose, as settleParentKey will when it is first painted there, so a preview of a paint
+ * matches the paint; without a start cell such a region may change nothing.
  */
-export function paintAllow(session, level, region) {
+export function paintAllow(session, level, region, startCell = -1) {
     const parent = parentLevelOf(session, level);
     if (!parent || level.nestingMode === "free" || !region) return null;
     const parentOwners = session.layer(parent.id).owners;
-    const key = region.parentKey;
+    const key = hasKey(parent, region.parentKey) ? region.parentKey : startCell >= 0 ? parentOwners[startCell] : UNCLAIMED;
+    if (key === UNCLAIMED) return () => false;
     return (cell) => parentOwners[cell] === key;
 }
 
@@ -307,6 +314,102 @@ export async function autoAssign(session, level, { signal = null, pause = defaul
 }
 
 const defaultPause = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+// ------------------------------------------------------------------ territorial waters
+
+/**
+ * Gives a level's water cells to its regions by the level's territorial waters rule, and takes
+ * back any it no longer claims: every water cell goes to the nearest region by sea distance (a
+ * least-cost flood over water from each region's coastal land cells, in map pixels between
+ * sites), up to the level's `watersPx`; water beyond the limit, and all water when the limit is
+ * 0, is unclaimed. An enclosed water body (one that does not reach the map's edge) whose every shore
+ * cell belongs to one region is that region's whole, however large: a lake inside a realm is the
+ * realm's.
+ *
+ * On a constrained child level a region claims only water inside its parent region, as it is
+ * painted (see paintAllow). Run after any change to a level's land (a stroke, a fill, a region
+ * deleted or merged) and when the limit changes, so the waters always follow the coasts.
+ *
+ * @param {import("./MeshSession.js").MeshSession} session
+ * @param {object} level
+ * @returns {{levelId: string, patch: import("./OwnerLayer.js").OwnerPatch}|null} null without terrain.
+ */
+export function claimWaters(session, level) {
+    if (!session.aggregates) return null;
+    const { mesh } = session;
+    const land = session.aggregates.land;
+    const owners = session.layer(level.id).owners;
+    const limitPx = Math.max(0, Number(level.watersPx) || 0);
+    const parent = parentLevelOf(session, level);
+    const nested = parent && level.nestingMode !== "free" ? { owners: session.layer(parent.id).owners, parents: regionParents(session, level) } : null;
+
+    const wanted = limitPx > 0 ? waterClaims(mesh, land, owners, limitPx, nested) : new Int32Array(mesh.cellCount).fill(UNCLAIMED);
+    const cells = [];
+    const values = [];
+    for (let cell = 0; cell < mesh.cellCount; cell++) {
+        if (land[cell] === 1 || owners[cell] === wanted[cell]) continue;
+        cells.push(cell);
+        values.push(wanted[cell]);
+    }
+    const patch = session.layer(level.id).assign(cells, values);
+    session.ownersChanged(level.id, patch);
+    return { levelId: level.id, patch };
+}
+
+/**
+ * The owner each water cell should have (see claimWaters): the generator's flood from the coasts
+ * (Territory.floodOwners, kept inside parent regions on a nested level), then whole enclosed bodies.
+ */
+function waterClaims(mesh, land, owners, limitPx, nested) {
+    const isWater = (cell) => land[cell] !== 1;
+    const mayClaim = (cell, owner) => !nested || nested.owners[cell] === (nested.parents.get(owner) ?? UNCLAIMED);
+    const sources = ownedCells(owners, (cell) => land[cell] === 1 && mesh.neighbours(cell).some(isWater));
+    const result = floodOwners(mesh, sources.cells, sources.values, { passable: isWater, cost: (a, b) => mesh.distance(a, b), limit: limitPx, allow: mayClaim }).owner;
+    claimEnclosedBodies(mesh, land, owners, result, mayClaim);
+    for (let cell = 0; cell < mesh.cellCount; cell++) if (land[cell] === 1) result[cell] = UNCLAIMED;
+    return result;
+}
+
+/**
+ * Gives each enclosed water body with a single shore owner to that owner (see claimWaters). A body
+ * is a connected set of water cells; it is open sea when any of its cells touches the map's edge.
+ */
+function claimEnclosedBodies(mesh, land, owners, result, mayClaim) {
+    const seen = new Uint8Array(mesh.cellCount);
+    for (let start = 0; start < mesh.cellCount; start++) {
+        if (seen[start] || land[start] === 1) continue;
+        const body = [];
+        const queue = [start];
+        seen[start] = 1;
+        let open = false;
+        let shoreOwner = null;
+        for (let head = 0; head < queue.length; head++) {
+            const cell = queue[head];
+            body.push(cell);
+            if (touchesEdge(mesh, cell)) open = true;
+            for (const next of mesh.neighbours(cell)) {
+                if (land[next] === 1) {
+                    if (shoreOwner === null) shoreOwner = owners[next];
+                    else if (shoreOwner !== owners[next]) shoreOwner = UNCLAIMED;
+                    continue;
+                }
+                if (seen[next]) continue;
+                seen[next] = 1;
+                queue.push(next);
+            }
+        }
+        if (open || shoreOwner === null || shoreOwner === UNCLAIMED) continue;
+        for (const cell of body) if (mayClaim(cell, shoreOwner)) result[cell] = shoreOwner;
+    }
+}
+
+/** Whether a cell lies against the map's edge (a cell whose site is within a spacing of it). */
+function touchesEdge(mesh, cell) {
+    const x = mesh.siteX(cell);
+    const y = mesh.siteY(cell);
+    const margin = mesh.spacing * EDGE_MARGIN_SPACINGS;
+    return x < margin || y < margin || x >= mesh.width - margin || y >= mesh.height - margin;
+}
 
 /** How many cells of a child level are unclaimed land inside a claimed parent region (what autoAssign could fill). */
 export function unassignedCount(session, level) {

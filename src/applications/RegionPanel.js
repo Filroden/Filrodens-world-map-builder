@@ -2,9 +2,9 @@ import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { VectorHistory } from "./VectorHistory.js";
-import { addRegion, createLayerSet, createLevel, defaultLevelStyle, NESTING_MODES, regionFillColor, UNCLAIMED, VISIBILITIES } from "../mesh/Schema.js";
-import { childLevels, insertLevel, levelDepth, moveLevel, parentCandidates, setParent, uniqueName } from "../mesh/LayerTree.js";
-import { assignToParents, autoAssign, deleteLevel, deleteRegion, deleteSet, levelCounts, mergeRegion, nestingProblems, regionParents, unassignedCount } from "../mesh/RegionEdits.js";
+import { addRegion, childLevelFields, createLayerSet, createLevel, defaultLevelStyle, NESTING_MODES, regionFillColor, UNCLAIMED, VISIBILITIES } from "../mesh/Schema.js";
+import { childLevels, insertLevel, levelDepth, moveLevel, parentCandidates, setOfLevel, setParent, uniqueName } from "../mesh/LayerTree.js";
+import { assignToParents, autoAssign, claimWaters, deleteLevel, deleteRegion, deleteSet, levelCounts, mergeRegion, nestingProblems, regionParents, unassignedCount } from "../mesh/RegionEdits.js";
 import { platform } from "../platform/index.js";
 
 /** The level editor's names for the nesting modes (see Schema.NESTING_MODES). */
@@ -27,7 +27,7 @@ const DIALOG_ROOT = "modules/filrodens-world-map-builder/templates/dialogs/";
  * changed too (see VectorHistory).
  *
  * The level and set editors are modal dialogues; the region editor is docked beside the map (see
- * RegionPainter), so the map can be painted and looked at while it is open.
+ * RegionEditor), so the map can be painted and looked at while it is open.
  */
 export class RegionPanel {
     // ------------------------------------------------------------------ the panel's context
@@ -160,6 +160,25 @@ export class RegionPanel {
         this.#refresh(app, { vectors: false, toolbar: true });
     }
 
+    /**
+     * Makes a region the region being edited, with its level and set (a pick on the map, or the
+     * region editor opening); null ids let go of the region.
+     */
+    static selectRegionById(app, levelId, regionId) {
+        if (!regionId) {
+            if (app.activeRegionId === null) return;
+            app.activeRegionId = null;
+            this.#refresh(app, { vectors: false, toolbar: true });
+            return;
+        }
+        const set = setOfLevel(app.layerSets ?? [], levelId);
+        if (!set || regionId === app.activeRegionId) return;
+        app.activeLayerSetId = set.id;
+        app.activeLevelId = levelId;
+        app.activeRegionId = regionId;
+        this.#refresh(app, { vectors: false, toolbar: true });
+    }
+
     // ------------------------------------------------------------------ layer sets
 
     /** New Set: a set with one level, which become the active set and level. */
@@ -189,7 +208,7 @@ export class RegionPanel {
     }
 
     static async #editSetDialog(app, set, titleKey) {
-        const content = await platform.templates.render(`${DIALOG_ROOT}edit-layer-set.hbs`, { set, visibilities: this.#visibilityChoices(set.visibility) });
+        const content = await platform.templates.render(`${DIALOG_ROOT}edit-layer-set.hbs`, { set, visibilities: this.visibilityChoices(set.visibility) });
         return platform.dialogs.prompt({
             classes: ["fwmb"],
             title: platform.i18n.localize(titleKey),
@@ -265,7 +284,7 @@ export class RegionPanel {
 
     static #insertNewLevel(app, set, parentLevelId) {
         const name = uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewLevelName"), set.levels);
-        const level = createLevel({ name, parentLevelId }, this.#idFactory);
+        const level = createLevel({ name, ...(parentLevelId ? childLevelFields(parentLevelId) : {}) }, this.#idFactory);
         insertLevel(set, level);
         app.activeLevelId = level.id;
         app.activeRegionId = null;
@@ -301,12 +320,13 @@ export class RegionPanel {
         const content = await platform.templates.render(`${DIALOG_ROOT}edit-level.hbs`, {
             level: { ...level, style: { ...defaultLevelStyle(), ...level.style } },
             parents: parentCandidates(set, level.id).map((candidate) => ({ id: candidate.id, name: candidate.name, selected: candidate.id === level.parentLevelId })),
-            visibilities: this.#visibilityChoices(level.visibility),
+            visibilities: this.visibilityChoices(level.visibility),
             nestingModes: NESTING_MODES.map((mode) => ({ value: mode, label: NESTING_LABELS[mode], selected: mode === level.nestingMode })),
             lineStyles: this.#lineStyleChoices(level.style?.lineStyle),
             seaLineStyles: this.#lineStyleChoices(level.style?.seaLineStyle ?? "dashed"),
             copySources,
             thicknessStep: FILRODENSWMB.MESH.ARCS.THICKNESS_STEP,
+            waters: FILRODENSWMB.MESH.WATERS,
         });
         const values = await platform.dialogs.prompt({
             classes: ["fwmb", "fwmb-level-editor"],
@@ -328,6 +348,7 @@ export class RegionPanel {
             nestingMode: elements.levelNesting.value,
             visibility: elements.levelVisibility.value,
             opacity: Number(elements.levelOpacity.value),
+            watersPx: Math.max(0, Number(elements.levelWatersPx.value) || 0),
             style: {
                 ...level.style,
                 lineColor: elements.levelLineColor.value,
@@ -343,13 +364,16 @@ export class RegionPanel {
     /**
      * Applies the level editor's values as one undo step. A new parent moves the level (and the
      * levels below it) after that parent where needed, and each region of the level is given the
-     * region of its new parent level holding most of its cells.
+     * region of its new parent level holding most of its cells. A new territorial waters distance
+     * (or a new parent, which changes where waters may lie) claims the waters again.
      */
     static #applyLevelEdit(app, set, level, values) {
-        MapStateManager.pushVectorState(app);
+        const before = VectorHistory.snapshot(app);
         const { parentLevelId, ...fields } = values;
+        const watersChanged = fields.watersPx !== level.watersPx;
         Object.assign(level, fields);
-        if (setParent(set, level.id, parentLevelId) && app.meshSession) {
+        const parentChanged = setParent(set, level.id, parentLevelId);
+        if (parentChanged && app.meshSession) {
             app.meshSession.setLayerSets(app.layerSets);
             const parents = regionParents(app.meshSession, level);
             for (const region of level.regions) {
@@ -357,7 +381,20 @@ export class RegionPanel {
                 region.parentKey = key === UNCLAIMED ? null : key;
             }
         }
+        const waters = watersChanged || parentChanged ? this.watersEntry(app, level.id) : null;
+        VectorHistory.push(app, VectorHistory.composite([before, waters]));
         this.#refresh(app);
+    }
+
+    /**
+     * Gives a level its territorial waters after its land changed (see RegionEdits.claimWaters),
+     * as an undo entry to add to the change's own, or null when nothing changed.
+     */
+    static watersEntry(app, levelId) {
+        const level = app.meshSession?.level(levelId);
+        if (!level) return null;
+        const result = claimWaters(app.meshSession, level);
+        return result ? VectorHistory.owners(levelId, result.patch) : null;
     }
 
     /** The level editor's "Copy style from level" list fills the border fields from the chosen level. */
@@ -414,7 +451,7 @@ export class RegionPanel {
         if (!level?.parentLevelId || !app.meshSession) return;
         const result = await app.runCancellable(platform.i18n.localize("FILRODENSWMB.UI.AutoAssigning"), (signal) => autoAssign(app.meshSession, level, { signal }));
         if (!result) return;
-        VectorHistory.push(app, VectorHistory.owners(level.id, result.patch));
+        VectorHistory.push(app, VectorHistory.composite([VectorHistory.owners(level.id, result.patch), this.watersEntry(app, level.id)]));
         platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.AutoAssigned", { count: result.patch.cells.length, name: level.name }));
         this.#refresh(app);
     }
@@ -428,7 +465,7 @@ export class RegionPanel {
         if (!level?.parentLevelId || !app.meshSession) return;
         const before = VectorHistory.snapshot(app);
         const result = assignToParents(app.meshSession, level);
-        VectorHistory.push(app, VectorHistory.composite([before, VectorHistory.owners(level.id, result?.patch)]));
+        VectorHistory.push(app, VectorHistory.composite([before, VectorHistory.owners(level.id, result?.patch), this.watersEntry(app, level.id)]));
         this.#refresh(app);
     }
 
@@ -465,7 +502,7 @@ export class RegionPanel {
         const before = VectorHistory.snapshot(app);
         const removed = deleteRegion(app.meshSession, levelId, regionId);
         if (!removed) return false;
-        VectorHistory.push(app, VectorHistory.composite([before, VectorHistory.owners(levelId, removed.patch)]));
+        VectorHistory.push(app, VectorHistory.composite([before, VectorHistory.owners(levelId, removed.patch), this.watersEntry(app, levelId)]));
         this.#refresh(app);
         return true;
     }
@@ -494,7 +531,7 @@ export class RegionPanel {
         const before = VectorHistory.snapshot(app);
         const merged = mergeRegion(app.meshSession, levelId, regionId, intoId);
         if (!merged) return false;
-        VectorHistory.push(app, VectorHistory.composite([before, VectorHistory.owners(levelId, merged.patch)]));
+        VectorHistory.push(app, VectorHistory.composite([before, VectorHistory.owners(levelId, merged.patch), this.watersEntry(app, levelId)]));
         app.activeRegionId = intoId;
         this.#refresh(app);
         return true;
@@ -533,7 +570,8 @@ export class RegionPanel {
         return states[(states.indexOf(current || "all") + 1) % states.length];
     }
 
-    static #visibilityChoices(selected) {
+    /** The visibility choices for a select, with `selected` chosen. */
+    static visibilityChoices(selected) {
         const labels = { all: "FILRODENSWMB.UI.VisibleToAll", gm: "FILRODENSWMB.UI.VisibleToGM", none: "FILRODENSWMB.UI.VisibleToNone" };
         return VISIBILITIES.map((value) => ({ value, label: labels[value], selected: value === (selected ?? "all") }));
     }
@@ -543,8 +581,13 @@ export class RegionPanel {
         return Object.entries(styles).map(([value, label]) => ({ value, label, selected: value === (selected ?? "solid") }));
     }
 
-    /** Redraws after a change: the regions (unless only the selection changed), the panel and the dirty flag. */
+    /**
+     * Redraws after a change: the regions (unless only the selection changed), the panel and the
+     * dirty flag. The active ids are settled first, since the regions are drawn for the level being
+     * painted and a level just deleted must not be it.
+     */
     static #refresh(app, { vectors = true, toolbar = false } = {}) {
+        this.settleActive(app);
         if (vectors) {
             app._repaintVectors();
             app.markDirty();
