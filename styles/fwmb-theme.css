@@ -184,7 +184,7 @@
     --fwmb-text-primary: var(--fwmb-main-100); /* Main readable text */
     --fwmb-text-secondary: var(--fwmb-main-200); /* Slightly dimmed text */
     --fwmb-text-muted: var(--fwmb-main-400); /* Placeholders, hints, disabled text */
-    --fwmb-text-inverse: var(--fwmb-main-900); /* Text placed on top of the accent colour */
+    --fwmb-text-inverse: var(--fwmb-neutral-000); /* Text placed on top of the accent colour (light in both themes) */
 
     /* --- Borders & Outlines --- */
     --fwmb-border-main: var(--fwmb-main-700); /* Standard structural borders */
@@ -201,6 +201,13 @@
     --fwmb-color-success: var(--fwmb-success);
     --fwmb-color-warning: var(--fwmb-warning);
     --fwmb-color-danger: var(--fwmb-danger);
+
+    /* --- Filled controls (light text on every fill, in both themes) --- */
+    --fwmb-fill-accent: var(--fwmb-main-accent-dark);
+    --fwmb-fill-accent-hover: color-mix(in srgb, var(--fwmb-main-accent-dark) 85%, black);
+    --fwmb-fill-positive: hsl(130, 60%, 30%);
+    --fwmb-fill-caution: hsl(33, 100%, 35%);
+    --fwmb-fill-negative: hsl(4, 75%, 45%);
 
     /* --- Shadows --- */
     --fwmb-shadow-window: 0 0 10px rgba(0, 0, 0, 0.85);
@@ -243,6 +250,13 @@
     --fwmb-color-success: hsl(130, 60%, 35%);
     --fwmb-color-warning: hsl(33, 100%, 35%);
     --fwmb-color-danger: hsl(4, 90%, 45%);
+
+    /* --- Filled controls (light text on every fill, in both themes) --- */
+    --fwmb-fill-accent: var(--fwmb-main-accent-dark);
+    --fwmb-fill-accent-hover: color-mix(in srgb, var(--fwmb-main-accent-dark) 85%, black);
+    --fwmb-fill-positive: hsl(130, 60%, 30%);
+    --fwmb-fill-caution: hsl(33, 100%, 35%);
+    --fwmb-fill-negative: hsl(4, 75%, 45%);
 
     /* --- Shadows --- */
     --fwmb-shadow-window: 0 8px 24px rgba(0, 0, 0, 0.15);

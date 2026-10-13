@@ -18,6 +18,12 @@ import { createWebStore } from "./store.js";
 import { createWebTemplates, registerHelpers } from "./templates.js";
 import * as utils from "./utils.js";
 
+/**
+ * How many characters of a saved map's id the page title shows: enough to tell maps of the same
+ * name apart, short enough to leave the name readable on a browser tab.
+ */
+const TITLE_ID_LENGTH = 6;
+
 /** Font families offered for labels: ones every desktop browser has. */
 const WEB_FONTS = Object.freeze(["Arial", "Georgia", "Times New Roman", "Trebuchet MS", "Verdana", "Courier New"]);
 
@@ -28,7 +34,8 @@ const WEB_FONTS = Object.freeze(["Arial", "Georgia", "Times New Roman", "Trebuch
  * @param {object} options.handlebars - The Handlebars instance.
  * @param {(path: string) => Promise<string>} options.fetchTemplate - Reads a template by its path in templates/.
  * @param {object} options.records - Where saved maps are kept (see store.js).
- * @param {HTMLElement} options.frame - The page's .fwmb frame (notifications are drawn in it).
+ * @param {HTMLElement} options.frame - The page's .fwmb frame (notifications are drawn in it; the
+ *     studio's title becomes its page's title).
  * @param {{id: string, version: string}} options.manifest - From module.json.
  * @param {string} options.baseUrl - The page's base URL.
  * @param {Storage} [options.storage] - Where settings are kept (local storage by default).
@@ -58,6 +65,12 @@ export function createWebPlatform({ strings, lang, handlebars, fetchTemplate, re
             available: false,
             async run() {
                 throw new Error("The web version cannot export to a scene");
+            },
+        },
+        frame: {
+            idLength: TITLE_ID_LENGTH,
+            setTitle: (text) => {
+                frame.ownerDocument.title = text;
             },
         },
     };

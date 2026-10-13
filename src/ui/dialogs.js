@@ -7,8 +7,9 @@
  *   button's action, "ok", when there is no onSubmit), or null for Cancel or when the dialogue is
  *   dismissed.
  * - `choose`: a row of buttons, drawn in the order given (negative choices first, the positive
- *   one last; see Overlay). Resolves with the pressed button's `callback(form)` result (its
- *   `action` when it has no callback), or `dismissed` when the dialogue is dismissed.
+ *   one last; see Overlay), each with a `tone` for its colour. Resolves with the pressed button's
+ *   `callback(form)` result (its `action` when it has no callback), or `dismissed` when the
+ *   dialogue is dismissed.
  *
  * Every kind takes `title` (already localised) and `content` (an HTML string, usually a rendered
  * template), and optionally:
@@ -82,15 +83,15 @@ export function createOverlayDialogs({ localize }) {
     async function confirm(options) {
         return open(options, () => [
             // No is the default, so Enter (or a stray key press) never confirms a deletion
-            { action: "no", label: localize("FILRODENSWMB.UI.No"), icon: "fwmb-icon cancel", default: true, callback: () => false },
-            { action: "yes", label: localize("FILRODENSWMB.UI.Yes"), icon: "fwmb-icon accept", callback: () => true },
+            { action: "no", label: localize("FILRODENSWMB.UI.No"), icon: "fwmb-icon cancel", tone: "negative", default: true, callback: () => false },
+            { action: "yes", label: localize("FILRODENSWMB.UI.Yes"), icon: "fwmb-icon accept", tone: "positive", callback: () => true },
         ], false);
     }
 
     async function prompt({ onSubmit, ...options }) {
         return open(options, () => [
-            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", callback: () => null },
-            { action: "ok", label: localize("FILRODENSWMB.UI.Confirm"), icon: "fwmb-icon accept", default: true, callback: onSubmit },
+            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", tone: "negative", callback: () => null },
+            { action: "ok", label: localize("FILRODENSWMB.UI.Confirm"), icon: "fwmb-icon accept", tone: "positive", default: true, callback: onSubmit },
         ], null);
     }
 

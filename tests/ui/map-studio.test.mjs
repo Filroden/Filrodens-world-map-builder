@@ -49,6 +49,31 @@ test("unsaved changes are asked about; Cancel keeps the studio open and asks aga
     assert.equal(asked.count, 2);
 });
 
+test("the host's title shows the saved map and its id, and (unsaved) while there are unsaved changes", () => {
+    const strings = { "FILRODENSWMB.UI.ControlTitle": "FWMB", "FILRODENSWMB.UI.WindowTitleMap": "{title}: {name} ({id})", "FILRODENSWMB.UI.WindowTitleUnsaved": "{title} (unsaved)" };
+    const titles = [];
+    installPlatform({
+        i18n: { localize: (key) => strings[key], format: (key, data) => strings[key].replace(/\{(\w+)\}/g, (_, name) => data[name]), lang: "en" },
+        frame: { idLength: 4, setTitle: (text) => titles.push(text) },
+    });
+    const studio = new MapStudio();
+    assert.deepEqual(titles, [], "nothing is shown before the studio is mounted");
+    studio.root = { querySelector: () => null };
+
+    studio.markDirty();
+    studio.markDirty();
+    studio.currentSaveName = "Harbour";
+    studio.currentSaveId = "abcdefgh";
+    studio.isDirty = false;
+    studio.currentSaveName = "Old Harbour";
+    studio.currentSaveId = null;
+    assert.deepEqual(
+        titles,
+        ["FWMB (unsaved)", "FWMB (unsaved)", "FWMB: Harbour (abcd) (unsaved)", "FWMB: Harbour (abcd)", "FWMB: Old Harbour (abcd)", "FWMB"],
+        "shown again on each change (marking an unsaved map again is not one), with the id cut to the host's length",
+    );
+});
+
 test("destroy lets go of the root", () => {
     const studio = new MapStudio();
     studio.root = { querySelector: () => null };

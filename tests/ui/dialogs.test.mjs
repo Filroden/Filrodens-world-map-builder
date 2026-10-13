@@ -52,6 +52,32 @@ test("confirm resolves true for Yes and false for No, with No first and the defa
     assert.equal(await no, false);
 });
 
+test("buttons carry their tone: confirm and prompt's are negative then positive, choose's as given", async () => {
+    const tones = () => [...dialog().querySelectorAll(".fwmb-overlay-footer button")].map((b) => b.dataset.tone ?? null);
+    const confirmed = dialogs.confirm({ title: "A", content: "" });
+    assert.deepEqual(tones(), ["negative", "positive"]);
+    key(dialog(), "Escape");
+    await confirmed;
+
+    const prompted = dialogs.prompt({ title: "B", content: "" });
+    assert.deepEqual(tones(), ["negative", "positive"]);
+    key(dialog(), "Escape");
+    await prompted;
+
+    const chosen = dialogs.choose({
+        title: "C",
+        content: "",
+        buttons: [
+            { action: "discard", label: "Discard", tone: "negative" },
+            { action: "cancel", label: "Cancel", tone: "caution" },
+            { action: "plain", label: "Plain" },
+        ],
+    });
+    assert.deepEqual(tones(), ["negative", "caution", null], "a button without a tone keeps the accent colour");
+    key(dialog(), "Escape");
+    await chosen;
+});
+
 test("a modal dialogue has a scrim, removed with it; a docked one has none", async () => {
     const modal = dialogs.confirm({ title: "A", content: "" });
     assert.ok(dialog().classList.contains("fwmb-overlay-modal"));

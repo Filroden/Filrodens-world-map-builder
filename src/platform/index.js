@@ -40,6 +40,9 @@
  *   `getVertices({ i, j })` for "square", "hexR" and "hexC".
  * - `scene`: `available` (whether maps can be exported to a scene) and
  *   `run(app, config, playerBlob, gmBlob)`.
+ * - `frame`: `setTitle(text)`, the title of what holds the studio (Foundry's window, or the web
+ *   page), and `idLength`, how many characters of a saved map's id the title shows (undefined
+ *   for all of them).
  */
 import { foundryPlatform } from "./foundry/index.js";
 

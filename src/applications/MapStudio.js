@@ -226,6 +226,11 @@ export class MapStudio {
     /** The save under way, or null (see saveCurrentMap). */
     #activeSave = null;
 
+    /** The open map's saved id and name (null for a map never saved), and whether it has unsaved changes (see the accessors below). */
+    #saveId = null;
+    #saveName = null;
+    #dirty = false;
+
     /**
      * The terrain's layers and the two map-control buttons that group them. Each group button
      * opens a list of its layers. The layers are terrain shader settings (see TerrainShading),
@@ -493,6 +498,62 @@ export class MapStudio {
         return this.root !== null && !this.#shutDown;
     }
 
+    /*
+     * The open map's saved id and name and its unsaved state are shown in the host's title (see
+     * #showTitle), so each is an accessor that updates the title when it changes. Every place that
+     * loads, saves, renames, starts a new map or marks a change goes through them.
+     */
+
+    /** The saved map's id, or null for a map that has never been saved. */
+    get currentSaveId() {
+        return this.#saveId;
+    }
+
+    set currentSaveId(id) {
+        if (id === this.#saveId) return;
+        this.#saveId = id;
+        this.#showTitle();
+    }
+
+    /** The saved map's name, or null for a map that has never been saved. */
+    get currentSaveName() {
+        return this.#saveName;
+    }
+
+    set currentSaveName(name) {
+        if (name === this.#saveName) return;
+        this.#saveName = name;
+        this.#showTitle();
+    }
+
+    /** Whether the open map has changes that are not saved. */
+    get isDirty() {
+        return this.#dirty;
+    }
+
+    set isDirty(dirty) {
+        if (dirty === this.#dirty) return;
+        this.#dirty = dirty;
+        this.#showTitle();
+    }
+
+    /**
+     * Shows the module's name in the host's title (the window's title in Foundry, the page's on
+     * the web), followed by the saved map's name and id when one is open, and marked unsaved
+     * while it has unsaved changes.
+     */
+    #showTitle() {
+        if (!this.#isOpen) return;
+        const { i18n, frame } = platform;
+        let title = i18n.localize("FILRODENSWMB.UI.ControlTitle");
+        if (this.#saveId) {
+            const id = this.#saveId.slice(0, frame.idLength);
+            title = i18n.format("FILRODENSWMB.UI.WindowTitleMap", { title, name: this.#saveName ?? "", id });
+        }
+        if (this.#dirty) title = i18n.format("FILRODENSWMB.UI.WindowTitleUnsaved", { title });
+        frame.setTitle(title);
+    }
+
     /**
      * Wraps work scheduled for later (a debounced refresh) so that it only runs while the studio
      * is open. Closing the studio lets go of its element and destroys its canvas, so a refresh that
@@ -752,6 +813,7 @@ export class MapStudio {
         // Dialogues are drawn inside the studio while it is open
         this.#detachDialogs = platform.dialogs.attach(root);
         this.view.render();
+        this.#showTitle();
     }
 
     /**

@@ -1,8 +1,8 @@
 /*
  * The web version's page: what Foundry's core stylesheet and window supply around the studio in
  * Foundry, written for a plain page. Loaded by the web page only, never in Foundry, where these
- * rules would fight core's own. The studio's own look comes from the module's stylesheets, as in
- * Foundry.
+ * rules would fight core's own, and loaded before the module's stylesheets, as Foundry's core is.
+ * The studio's own look comes from the module's stylesheets, as in Foundry.
  */
 
 *,
@@ -40,20 +40,81 @@ body {
     color: var(--fwmb-text-muted, #aaa);
 }
 
-/* Form controls take the page's font, as Foundry's core rules make them do */
-.fwmb input,
-.fwmb select,
-.fwmb textarea,
-.fwmb button {
+/* --- What Foundry's core stylesheet gives the module's controls ---
+   The values come from comparing the computed styles of the studio in Foundry and on the web
+   (dark theme). The selectors are kept as unspecific as Foundry's own (the page's frame inside
+   :where() adds nothing), and this sheet is loaded before the module's, so wherever the module
+   styles a control itself it wins, as it does over Foundry's core rules. */
+
+body {
+    line-height: 1.25;
+    cursor: default;
+}
+
+:where(#fwmb-app) :is(input, select, textarea, button) {
     font: inherit;
+}
+
+:where(#fwmb-app) :is(input, select, textarea) {
     color: inherit;
+}
+
+:where(#fwmb-app) :is(h1, h2, h3, h4) {
+    line-height: 1;
+}
+
+/* Buttons centre their content in a row and are 2em tall unless the module sizes them */
+:where(#fwmb-app) button {
+    font-size: 14px;
+    line-height: normal;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 2em;
+    min-height: 2em;
+}
+
+/* Text fields and selects are 32px tall, their text centred in that height */
+:where(#fwmb-app) :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="hidden"]), select) {
+    height: 32px;
+    line-height: 32px;
+    padding-block: 0;
+    outline: 1px solid transparent;
+}
+
+:where(#fwmb-app) select {
+    cursor: pointer;
+}
+
+:where(#fwmb-app) option {
+    min-height: 32px;
+}
+
+:where(#fwmb-app) input[type="range"] {
+    border-radius: 4px;
+}
+
+/* Dialogue forms (the overlay body carries Foundry's standard-form class): labels are bold and
+   as tall as the fields beside them, and a stacked group puts its label on a line of its own */
+:where(#fwmb-app) .standard-form .form-group {
+    flex-wrap: wrap;
+}
+
+:where(#fwmb-app) .standard-form .form-group > label {
+    font-weight: bold;
+    line-height: 32px;
+}
+
+:where(#fwmb-app) .standard-form .form-group.stacked > :is(label, input) {
+    flex: 0 0 100%;
 }
 
 /* --- Tooltips (see src/platform/web/tooltips.js) ---
    The module's #tooltip.fwmb-tooltip rules give the tooltip its look; Foundry's core gives it
    position and stacking, which the page supplies here. The tooltip script works out the position
    itself, so the module's top margin (an offset for Foundry's placement) is cancelled. */
-#tooltip.fwmb-tooltip {
+body > #tooltip.fwmb-tooltip {
     position: fixed;
     margin: 0;
     pointer-events: none;
@@ -62,7 +123,7 @@ body {
     z-index: 2000;
 }
 
-#tooltip.fwmb-tooltip[hidden] {
+body > #tooltip.fwmb-tooltip[hidden] {
     display: none;
 }
 
@@ -133,5 +194,6 @@ body {
 
 .fwmb file-picker > button.fwmb-btn {
     flex: none;
-    padding-inline: var(--fwmb-size-8, 0.5rem);
+    width: var(--fwmb-size-32, 2rem);
+    padding: 0;
 }

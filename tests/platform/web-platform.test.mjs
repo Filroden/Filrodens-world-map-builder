@@ -262,9 +262,12 @@ test("the web platform has every service, without the scene export", () => {
         baseUrl: "http://localhost/",
         storage: fakeStorage(),
     });
-    assert.deepEqual(Object.keys(services), ["i18n", "notify", "utils", "templates", "fonts", "dialogs", "settings", "store", "assets", "module", "grid", "scene"]);
+    assert.deepEqual(Object.keys(services), ["i18n", "notify", "utils", "templates", "fonts", "dialogs", "settings", "store", "assets", "module", "grid", "scene", "frame"]);
     assert.equal(services.scene.available, false);
     assert.equal(services.module.version, "4.0.0");
     services.notify.warn("Careful", { permanent: true });
     assert.equal(frame.querySelector(".fwmb-notification.warning span").textContent, "Careful");
+    services.frame.setTitle("Map: Harbour");
+    assert.equal(document.title, "Map: Harbour", "the studio's title is the page's");
+    assert.equal(services.frame.idLength, 6, "a short id, to leave the name readable on a tab");
 });

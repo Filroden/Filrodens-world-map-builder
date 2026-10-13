@@ -64,7 +64,7 @@
     <details class="fwmb-fieldset fwmb-list-section" data-section="decorations" {{#unless collapsedSections.decorations}}open{{/unless}}>
         <summary>{{localize "FILRODENSWMB.UI.CartographyDecorations"}}</summary>
 
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
+        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-size-10);">
             {{#each mapDecorations}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="decoration">
                 <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">

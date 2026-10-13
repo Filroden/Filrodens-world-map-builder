@@ -53,6 +53,10 @@ let titleCount = 0;
  * @property {string} label - The button's text (already localised).
  * @property {string} [icon] - An icon class shown before the label.
  * @property {boolean} [default] - The button Enter presses; also styled as the primary button.
+ * @property {"positive"|"caution"|"negative"} [tone] - What the button does, which picks its colour:
+ *     positive goes ahead, negative gives something up (No, Cancel, Discard), and caution steps
+ *     back without losing anything when a negative choice sits beside it. Without one, the button
+ *     takes the accent colour.
  * @property {(form: HTMLFormElement) => unknown} [callback] - Reads the result from the dialogue's form.
  */
 
@@ -175,6 +179,7 @@ export class Overlay {
             element.className = "fwmb-btn";
             element.dataset.overlayAction = button.action;
             if (button.default) element.classList.add("primary");
+            if (button.tone) element.dataset.tone = button.tone;
             if (button.icon) {
                 const glyph = doc.createElement("i");
                 glyph.className = button.icon;

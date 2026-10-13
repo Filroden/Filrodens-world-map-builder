@@ -6,10 +6,14 @@
  *
  * Closing goes through the studio first: it may ask about unsaved changes, and the window only
  * closes once the studio agrees.
+ *
+ * The studio sets the window's title (the open map and whether it has unsaved changes) through
+ * the platform's frame service, which passes it to the window attached to it (see setTitle).
  */
 import { FILRODENSWMB } from "../../config.js";
 import { MapStudio } from "../../applications/MapStudio.js";
 import { attachTheme } from "../../ui/Theme.js";
+import { foundryFrame } from "./index.js";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -38,6 +42,9 @@ export class MapStudioWindow extends HandlebarsApplicationMixin(ApplicationV2) {
     /** Stops the colour theme being written on the window (see Theme.attachTheme). */
     #detachTheme = null;
 
+    /** Stops the studio's title reaching this window (see foundryFrame.attach). */
+    #detachFrame = null;
+
     /** @param {object} [options] - ApplicationV2 options; the size defaults to most of the browser window. */
     constructor(options = {}) {
         options.position = foundry.utils.mergeObject(options.position || {}, {
@@ -55,6 +62,7 @@ export class MapStudioWindow extends HandlebarsApplicationMixin(ApplicationV2) {
         MapStudio.applyTextDirection(this.element);
         // The window as a whole follows the studio's colour theme, its header included
         this.#detachTheme = attachTheme(this.element);
+        this.#detachFrame = foundryFrame.attach(this);
         this.studio = new MapStudio();
         this.studio.mount(this.element.querySelector(".fwmb-studio"));
     }
@@ -69,6 +77,17 @@ export class MapStudioWindow extends HandlebarsApplicationMixin(ApplicationV2) {
         super._replaceHTML(result, content, options);
     }
 
+    /**
+     * Shows `text` as the window's title. It is kept in the window's options too, so the title
+     * stays when Foundry draws the window's frame again (minimising and restoring it, say).
+     *
+     * @param {string} text - The title, already localised.
+     */
+    setTitle(text) {
+        this.options.window.title = text;
+        if (this.window?.title) this.window.title.textContent = text;
+    }
+
     /** Closes the window once the studio agrees (it may ask about unsaved changes first). */
     async close(options) {
         if (this.studio) {
@@ -77,6 +96,8 @@ export class MapStudioWindow extends HandlebarsApplicationMixin(ApplicationV2) {
         }
         this.#detachTheme?.();
         this.#detachTheme = null;
+        this.#detachFrame?.();
+        this.#detachFrame = null;
         return super.close(options);
     }
 }

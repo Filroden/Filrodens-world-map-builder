@@ -81,6 +81,25 @@ const grid = {
 };
 
 /**
+ * The studio's window. The window attaches itself when it mounts the studio (and detaches when it
+ * closes), and the studio's title goes to whichever window is attached; saved map ids are shown
+ * whole, since Foundry's are short.
+ */
+export const foundryFrame = {
+    idLength: undefined,
+    window: null,
+    attach(application) {
+        this.window = application;
+        return () => {
+            if (this.window === application) this.window = null;
+        };
+    },
+    setTitle(text) {
+        this.window?.setTitle(text);
+    },
+};
+
+/**
  * Exporting a map to a Foundry scene. The exporter is loaded when it is first used, which keeps
  * it (and the grid data export it builds on) out of the start-up path.
  */
@@ -92,4 +111,4 @@ const scene = {
     },
 };
 
-export const foundryPlatform = Object.freeze({ i18n, notify, utils, templates, fonts, dialogs, settings, store, assets, module: moduleInfo, grid, scene });
+export const foundryPlatform = Object.freeze({ i18n, notify, utils, templates, fonts, dialogs, settings, store, assets, module: moduleInfo, grid, scene, frame: foundryFrame });

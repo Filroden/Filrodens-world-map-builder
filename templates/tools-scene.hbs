@@ -23,7 +23,7 @@
             <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLandMaskHint'}}">
                 {{localize "FILRODENSWMB.UI.EditLandMask"}}
             </button>
-            <div class="fwmb-divider" style="margin: var(--fwmb-space-10) 0;"></div>
+            <div class="fwmb-divider" style="margin: var(--fwmb-size-10) 0;"></div>
         {{/if}}
 
         {{#unless (eq uiState.generationEngine "flat")}}
@@ -31,7 +31,7 @@
                 <label>{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
                 <div class="fwmb-flex-row">
                     <input type="text" name="mapSeed" class="fwmb-flex-1" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" />
-                    <button type="button" class="fwmb-btn" data-action="randomizeSeed" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
+                    <button type="button" class="fwmb-btn square" data-action="randomizeSeed" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
                         <i class="fwmb-icon shuffle"></i>
                     </button>
                 </div>
@@ -127,7 +127,7 @@
             </div>
         </details>
 
-        <button type="button" class="fwmb-btn wide subtle danger" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
+        <button type="button" class="fwmb-btn subtle danger" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
             <i class="fwmb-icon delete"></i> {{localize "FILRODENSWMB.UI.DeleteAllLandMasksTitle"}}
         </button>
     {{/if}}

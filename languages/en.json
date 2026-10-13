@@ -1,5 +1,7 @@
 {
     "FILRODENSWMB.UI.ControlTitle": "Filroden's World Map Builder",
+    "FILRODENSWMB.UI.WindowTitleMap": "{title}: {name} ({id})",
+    "FILRODENSWMB.UI.WindowTitleUnsaved": "{title} (unsaved)",
     "FILRODENSWMB.UI.SidebarButton": "Map Builder",
 
     "FILRODENSWMB.Notifications.LoadFailed": "Failed to load map data from compendium.",

@@ -405,7 +405,7 @@
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-track {
-    background: var(--fwmb-color-bg-hover) !important;
+    background: var(--fwmb-bg-hover) !important;
     border-radius: var(--fwmb-radius-large) !important;
 }
 
@@ -443,7 +443,7 @@
 /* --- BUTTONS --- */
 /* Standard button styles for all buttons */
 .fwmb button {
-    background: var(--fwmb-accent-main);
+    background: var(--fwmb-fill-accent);
     border: none;
     color: var(--fwmb-text-inverse);
     border-radius: var(--fwmb-radius-small);
@@ -453,7 +453,7 @@
 }
 
 .fwmb button:hover {
-    background: var(--fwmb-accent-hover);
+    background: var(--fwmb-fill-accent-hover);
     border-color: var(--fwmb-border-focus);
     color: var(--fwmb-text-inverse);
     box-shadow: none;
@@ -475,6 +475,7 @@
     font-weight: bold;
     gap: var(--fwmb-size-8);
     padding: var(--fwmb-size-8) var(--fwmb-size-10);
+    min-height: var(--fwmb-size-32);
 }
 
 .fwmb .fwmb-btn.wide {
@@ -486,6 +487,14 @@
     padding: 0.75rem;
     height: var(--fwmb-size-8);
     width: var(--fwmb-size-8);
+    min-height: 0;
+}
+
+/* An icon-only button beside a field or a full-width button: square, as tall as both */
+.fwmb .fwmb-btn.square {
+    flex: none;
+    width: var(--fwmb-size-32);
+    padding: 0;
 }
 
 .fwmb .fwmb-btn.subtle {
@@ -521,7 +530,7 @@
 }
 
 .fwmb .fwmb-btn.active {
-    background: var(--fwmb-accent-main);
+    background: var(--fwmb-fill-accent);
     color: var(--fwmb-text-inverse);
 }
 
@@ -532,9 +541,32 @@
     color: var(--fwmb-color-danger);
 }
 
-/* A full-width button paired with a small icon-only companion action (e.g. the Biome Rule
-   Editor button plus the "Preview Rule Coverage" hover-trigger beside it) - the first child
-   grows to fill the row, later children keep their own natural (usually .small) size. */
+/* A button's tone, from what it does (see Overlay's buttons): green to go ahead, amber to step back
+   without losing anything when there is also a negative choice, red to give something up */
+.fwmb .fwmb-btn[data-tone="positive"] {
+    background: var(--fwmb-fill-positive);
+}
+.fwmb .fwmb-btn[data-tone="positive"]:hover {
+    background: color-mix(in srgb, var(--fwmb-fill-positive) 85%, black);
+}
+
+.fwmb .fwmb-btn[data-tone="caution"] {
+    background: var(--fwmb-fill-caution);
+}
+.fwmb .fwmb-btn[data-tone="caution"]:hover {
+    background: color-mix(in srgb, var(--fwmb-fill-caution) 85%, black);
+}
+
+.fwmb .fwmb-btn[data-tone="negative"] {
+    background: var(--fwmb-fill-negative);
+}
+.fwmb .fwmb-btn[data-tone="negative"]:hover {
+    background: color-mix(in srgb, var(--fwmb-fill-negative) 85%, black);
+}
+
+/* A full-width button paired with an icon-only companion action (for example the Biome Rule
+   Editor button and the rule coverage preview beside it): the first child grows to fill the
+   row, later children keep their own size (usually .square). */
 .fwmb .fwmb-btn-row {
     display: flex;
     flex-direction: row;
@@ -546,7 +578,7 @@
     min-width: 0;
 }
 
-.fwmb .fwmb-btn-row > .fwmb-btn.small {
+.fwmb .fwmb-btn-row > .fwmb-btn.square {
     flex: 0 0 auto;
 }
 
@@ -587,7 +619,7 @@
 
 .fwmb input::placeholder,
 .fwmb textarea::placeholder {
-    color: var(--fwmb-name-text-muted);
+    color: var(--fwmb-text-muted);
     opacity: 1;
     font-style: italic;
 }
@@ -636,7 +668,7 @@
 
 .fwmb option:hover,
 .fwmb option:focus {
-    background: var(--fwmb-accent-hover);
+    background: var(--fwmb-fill-accent-hover);
     color: var(--fwmb-text-inverse);
     outline: none;
 }
@@ -708,8 +740,8 @@
     flex-direction: column;
     padding: var(--fwmb-size-10);
     gap: var(--fwmb-size-10);
-    background-color: var(--fwmb-name-bg-panel);
-    border-inline-end: 1px solid var(--fwmb-name-border-main);
+    background-color: var(--fwmb-bg-panel);
+    border-inline-end: 1px solid var(--fwmb-border-main);
     overflow-y: hidden;
 }
 
@@ -851,7 +883,7 @@
 }
 
 .fwmb-bulk-action-button:hover {
-    background: var(--fwmb-accent-hover);
+    background: var(--fwmb-fill-accent-hover);
 }
 
 /* The checkbox + field-name label pairing used for every opt-in row in a Mass Edit dialogue. */
@@ -872,7 +904,7 @@
 
 .fwmb label {
     margin: 0;
-    color: var(--fwmb-name-text-primary);
+    color: var(--fwmb-text-primary);
     white-space: nowrap;
 }
 
@@ -963,9 +995,9 @@
 }
 
 .fwmb .fwmb-badge.primary {
-    background-color: var(--fwmb-accent-main);
+    background-color: var(--fwmb-fill-accent);
     color: var(--fwmb-text-inverse);
-    border-color: var(--fwmb-accent-main);
+    border-color: var(--fwmb-fill-accent);
 }
 
 /* ===================================================================
@@ -1192,7 +1224,7 @@
 
 .fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button.active {
     color: var(--fwmb-text-inverse);
-    background: var(--fwmb-accent-main);
+    background: var(--fwmb-fill-accent);
     border-color: var(--fwmb-border-main);
 }
 
@@ -1415,8 +1447,8 @@
 }
 
 .fwmb-layer-menu [aria-checked="true"] .fwmb-layer-check {
-    background: var(--fwmb-accent-main);
-    border-color: var(--fwmb-accent-main);
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent);
 }
 
 .fwmb-layer-menu [aria-checked="true"] .fwmb-layer-check::after {
@@ -1478,12 +1510,12 @@
     width: var(--fwmb-size-16);
     height: var(--fwmb-size-16);
     min-width: var(--fwmb-size-16);
-    color: var(--fwmb-color-text-muted-solid);
+    color: var(--fwmb-text-muted);
 }
 
 .fwmb-readout-biome {
     font-weight: bold;
-    color: var(--fwmb-color-text-accent);
+    color: var(--fwmb-accent-main);
 }
 
 /* --- RANGE SLIDERS ---
@@ -1605,7 +1637,8 @@
     min-width: 0;
 }
 
-.fwmb .fwmb-range-label {
+.fwmb .fwmb-range-label,
+.fwmb .fwmb-info-label {
     display: flex;
     align-items: center;
     gap: var(--fwmb-size-4);
@@ -1855,7 +1888,7 @@ input.fwmb-swatch {
 /* Marks the Mass Edit "Select" toggle as currently active, so a GM mid-selection can tell
    at a glance which item type's checkboxes are showing. */
 .fwmb-legend-action.active {
-    background-color: var(--fwmb-accent-main);
+    background-color: var(--fwmb-fill-accent);
     color: var(--fwmb-text-inverse);
 }
 
@@ -1883,6 +1916,13 @@ input.fwmb-swatch {
     display: flex;
     flex-direction: column;
     gap: var(--fwmb-size-4);
+}
+
+/* The zoom buttons match the direction pad's buttons beside them */
+.fwmb .fwmb-transform-zoom .fwmb-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
 }
 
 .fwmb-transform-dpad {
@@ -1984,7 +2024,7 @@ input.fwmb-swatch {
     display: inline-block;
     inline-size: 1rem;
     block-size: 1rem;
-    border: 1px solid var(--color-border-dark);
+    border: 1px solid var(--fwmb-border-main);
 }
 
 .fwmb-summary-empty {
@@ -2047,7 +2087,7 @@ input.fwmb-swatch {
     height: var(--fwmb-size-32);
     padding: 0;
     display: flex;
-    justify-content: inline-start;
+    justify-content: center;
     align-items: center;
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-medium);
@@ -2057,7 +2097,7 @@ input.fwmb-swatch {
 
 .fwmb-map-card-actions > button:hover,
 .fwmb-dropdown > button:hover {
-    background: var(--fwmb-accent-hover);
+    background: var(--fwmb-fill-accent-hover);
 }
 
 /* ==========================================
@@ -2956,8 +2996,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     cursor: pointer;
 }
 .fwmb button.fwmb-rule-step-btn:hover:not(:disabled) {
-    background: var(--fwmb-accent-main);
-    color: var(--fwmb-bg-base);
+    background: var(--fwmb-fill-accent);
+    color: var(--fwmb-text-inverse);
 }
 .fwmb button.fwmb-rule-step-btn:disabled {
     opacity: 0.35;

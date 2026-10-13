@@ -54,9 +54,9 @@ export class MapDialogManager {
             title: platform.i18n.localize("FILRODENSWMB.UI.Warning"),
             content: `<p>${platform.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
             buttons: [
-                { action: "discard", label: platform.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete" },
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
-                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
+                { action: "discard", label: platform.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete", tone: "negative" },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", tone: "caution" },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", tone: "positive", default: true },
             ],
             dismissed: "cancel",
         });
@@ -80,8 +80,8 @@ export class MapDialogManager {
             title: platform.i18n.localize(title),
             content: `<p>${platform.i18n.localize(message)}</p>`,
             buttons: [
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
-                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", default: true },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", tone: "negative" },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", tone: "positive", default: true },
             ],
             dismissed: "cancel",
         });
@@ -130,12 +130,14 @@ export class MapDialogManager {
                     action: "keep",
                     label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateKeep"),
                     icon: "fwmb-icon cancel",
+                    tone: "negative",
                     callback: (form) => ({ apply: false, dismiss: readDismiss(form) }),
                 },
                 {
                     action: "apply",
                     label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApply"),
                     icon: "fwmb-icon sync",
+                    tone: "positive",
                     default: true,
                     callback: () => ({ apply: true, dismiss: false }),
                 },

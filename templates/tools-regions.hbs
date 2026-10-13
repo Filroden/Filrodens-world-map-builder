@@ -29,13 +29,13 @@
     {{#each regionLayers}}
     <details class="fwmb-accordion-group" data-layer-id="{{this.id}}" data-section="regionLayer.{{this.id}}" {{#unless this.collapsed}}open{{/unless}}>
 
-        <summary class="fwmb-list-item fwmb-layer-header" style="{{#if this.isActive}}border-color: var(--fwmb-color-text-accent); background: var(--fwmb-bg-hover);{{/if}}">
+        <summary class="fwmb-list-item fwmb-layer-header" style="{{#if this.isActive}}border-color: var(--fwmb-accent-main); background: var(--fwmb-bg-hover);{{/if}}">
             <div class="fwmb-list-item-content">
                 <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="layer" title="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
                 </button>
                 
-                <span class="fwmb-name" data-action="selectRegionLayer" style="cursor: pointer; {{#if this.isActive}}color: var(--fwmb-color-text-accent); font-weight: bold;{{/if}}">
+                <span class="fwmb-name" data-action="selectRegionLayer" style="cursor: pointer; {{#if this.isActive}}color: var(--fwmb-accent-main); font-weight: bold;{{/if}}">
                     {{this.name}}
                 </span>
             </div>

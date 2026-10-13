@@ -2,7 +2,7 @@
 
     <details class="fwmb-fieldset fwmb-list-section" data-section="autoLabels" {{#unless collapsedSections.autoLabels}}open{{/unless}}>
         <summary>{{localize "FILRODENSWMB.UI.AutoLabels"}}</summary>
-        <div id="fwmb-scroll-auto-labels" class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
+        <div id="fwmb-scroll-auto-labels" class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-size-10);">
             
             {{#each autoLabels}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="{{this.dataType}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}}>
@@ -43,7 +43,7 @@
         </div>
         {{/if}}
 
-        <div id="fwmb-scroll-custom-labels" class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
+        <div id="fwmb-scroll-custom-labels" class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-size-10);">
             {{#each mapLabels}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="custom">
                 {{#if ../massEditMode.label}}
