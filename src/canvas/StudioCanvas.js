@@ -8,6 +8,7 @@ import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
 import { RegionOverlays } from "./RegionOverlays.js";
+import { RouteOverlays } from "./RouteOverlays.js";
 import { platform } from "../platform/index.js";
 
 /** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
@@ -152,6 +153,8 @@ export class StudioCanvas {
 
         // The Regions tool's outline of the region being edited, and its Fill preview
         this.regionOverlays = new RegionOverlays(PIXI);
+        // The Routes tool's route being placed, trace stroke and waypoint handles
+        this.routeOverlays = new RouteOverlays(PIXI);
 
         // A tool that takes the primary button's presses, moves and releases itself while editing
         // (see #pointerTool), or null; read on every event, so it follows the tool in use
@@ -183,6 +186,7 @@ export class StudioCanvas {
             this.layers.cartography,
             this.cropGraphics,
             ...this.regionOverlays.displayObjects,
+            ...this.routeOverlays.displayObjects,
             this.brushCursor,
         );
 
@@ -2405,6 +2409,7 @@ export class StudioCanvas {
 
         scaleNodes(this.stage);
         this.regionOverlays.redraw(this.stage.scale.x);
+        this.routeOverlays.redraw(this.stage.scale.x);
     }
 
     /**

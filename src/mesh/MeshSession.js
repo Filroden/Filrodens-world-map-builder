@@ -47,6 +47,8 @@ export class MeshSession {
     #bounds = new Map();
     #routeLines = new Map();
     #ownerChanges = new Map();
+    /** Each water cell's distance from land in cells (see shoreDistance), or null until asked for. */
+    #shoreDistance = null;
     #hint = 0;
     /** The stroke under way (see beginStroke): its patches by level id, or null. */
     #stroke = null;
@@ -468,15 +470,55 @@ export class MeshSession {
         const previous = this.aggregates;
         this.aggregates = next;
         if (!previous) {
-            this.#arcs.clear();
+            this.#landChanged();
             return new Int32Array(0);
         }
         const changed = [];
         for (let cell = 0; cell < next.land.length; cell++) {
             if (previous.land[cell] !== next.land[cell] || (previous.riverCount[cell] > 0) !== (next.riverCount[cell] > 0)) changed.push(cell);
         }
-        if (changed.some((cell) => previous.land[cell] !== next.land[cell])) this.#arcs.clear();
+        if (changed.some((cell) => previous.land[cell] !== next.land[cell])) this.#landChanged();
         return Int32Array.from(changed);
+    }
+
+    /** Clears what is derived from which cells are land: every level's arcs, and the shore distances. */
+    #landChanged() {
+        this.#arcs.clear();
+        this.#shoreDistance = null;
+    }
+
+    /**
+     * How far each water cell lies from land, in cells (steps between neighbouring cells): 0 for
+     * land, 1 for water beside it, and so on. Worked out once from the aggregates' land and kept
+     * until a cell turns from land to water or back. Routes use it to keep a road's bridge within
+     * reach of a shore (see RouteEdits.transportCost).
+     * @returns {Int32Array|null} null without aggregates.
+     */
+    shoreDistance() {
+        if (!this.aggregates) return null;
+        if (this.#shoreDistance) return this.#shoreDistance;
+        const { mesh } = this;
+        const land = this.aggregates.land;
+        const distance = new Int32Array(mesh.cellCount).fill(-1);
+        const queue = new Int32Array(mesh.cellCount);
+        let tail = 0;
+        for (let cell = 0; cell < mesh.cellCount; cell++) {
+            if (land[cell] !== 1) continue;
+            distance[cell] = 0;
+            queue[tail++] = cell;
+        }
+        // A breadth-first flood outwards from every land cell at once, so each water cell takes the
+        // step count of the nearest shore
+        for (let head = 0; head < tail; head++) {
+            const cell = queue[head];
+            for (const next of mesh.neighbours(cell)) {
+                if (distance[next] >= 0) continue;
+                distance[next] = distance[cell] + 1;
+                queue[tail++] = next;
+            }
+        }
+        this.#shoreDistance = distance;
+        return distance;
     }
 
     #afterRefresh(cells, before) {
@@ -488,7 +530,7 @@ export class MeshSession {
             if (land !== landNow) landChanged = true;
             if (land !== landNow || river !== this.aggregates.riverCount[cell] > 0) changed.push(cell);
         }
-        if (landChanged) this.#arcs.clear();
+        if (landChanged) this.#landChanged();
         return Int32Array.from(changed).sort();
     }
 

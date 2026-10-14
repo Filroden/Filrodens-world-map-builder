@@ -25,6 +25,7 @@ export class CanvasHints {
      * @param {string} [state.featureMode]  Terrain Features mode: spring, river or fault.
      * @param {string} [state.infraMode]  Infrastructure mode: pin or route.
      * @param {string} [state.regionMode]  Regions mode: select, paint, erase or fill.
+     * @param {string} [state.routeMode]  Routes mode (Infrastructure in Route mode): select, draw or edit.
      * @param {boolean} [state.isMaskDrawing]  Whether the Scene tool is drawing land masks.
      * @param {string|null} [state.heldItem]  What the pointer holds: label, decoration, pin or
      *   mask (a land mask).
@@ -56,9 +57,9 @@ export class CanvasHints {
             case "features":
                 return state.featureMode === "spring" ? "spring" : "line";
             case "infrastructure":
-                return state.infraMode === "route" ? "route" : "pin";
+                return state.infraMode === "route" ? CanvasHints.#modeContext("route", state.routeMode, "draw") : "pin";
             case "regions":
-                return CanvasHints.#regionContext(state.regionMode);
+                return CanvasHints.#modeContext("region", state.regionMode, "select");
             case "labels":
                 return "labels";
             case "cartography":
@@ -70,10 +71,14 @@ export class CanvasHints {
         }
     }
 
-    /** The Regions tool's list for its mode, Select's when the mode has none. */
-    static #regionContext(mode) {
-        const context = `region${(mode ?? "select").charAt(0).toUpperCase()}${(mode ?? "select").slice(1)}`;
-        return FILRODENSWMB.UI.CANVAS_HINTS.CONTEXTS[context] ? context : "regionSelect";
+    /**
+     * A tool's list for its mode (the tool's prefix and the capitalised mode, such as regionPaint
+     * or routeDraw), or the list of its fallback mode when the mode has none.
+     */
+    static #modeContext(prefix, mode, fallback) {
+        const name = (candidate) => `${prefix}${candidate.charAt(0).toUpperCase()}${candidate.slice(1)}`;
+        const context = name(mode ?? fallback);
+        return FILRODENSWMB.UI.CANVAS_HINTS.CONTEXTS[context] ? context : name(fallback);
     }
 
     /**

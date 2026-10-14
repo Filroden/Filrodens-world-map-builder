@@ -116,13 +116,13 @@ test("the v3 fixture migrates: version, legacy data, counts, valid shapes and ma
     }
 });
 
-test("migrated routes trace the old lines and keep their look", () => {
+test("migrated routes follow the old lines as straight legs and keep their look", () => {
     const v3 = readJson(join(FIXTURES, "v3-vectors.json"));
     const { mapData, mesh } = migrateMapData(v3, null, { idFactory: ids });
     mapData.mapRoutes.forEach((route, i) => {
         const old = v3.mapRoutes[i];
         assert.equal(route.id, old.id);
-        assert.equal(route.mode, "trace");
+        assert.equal(route.mode, "direct");
         assert.equal(route.smoothing, true);
         assert.equal(route.outline, true);
         assert.deepEqual(route.legacy.points, old.points);

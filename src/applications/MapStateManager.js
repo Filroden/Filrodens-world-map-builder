@@ -186,9 +186,19 @@ export class MapStateManager {
             activeInfraMode: "pin",
             pinColor: "#ffffff",
             pinScale: 1,
+            // The Routes tool's edit mode: select, draw or edit (see RouteTool)
+            routeToolMode: "draw",
+            // How closely a traced stroke is kept, in mesh cells (see RouteTool)
+            routeDetail: FILRODENSWMB.MESH.ROUTE_DRAW.DETAIL.DEFAULT,
+            // The line and leg mode a new route starts with, which also show and edit the picked route, and the transport it is made for
             routeColor: "#ffffff",
-            routeThickness: 3,
+            routeThickness: 2,
             routeStyle: "solid",
+            routeOutline: true,
+            routeSmoothing: false,
+            routeMode: "terrain",
+            routeSpanWater: false,
+            routeTransport: "road",
             activeRouteQuickStyle: "custom",
             customRouteStyles: [],
 

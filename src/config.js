@@ -453,7 +453,10 @@ export const FILRODENSWMB = {
                 regionPaint: ["RegionPaint", "RegionPaintShift"],
                 regionErase: ["RegionErase", "RegionEraseShift"],
                 regionFill: ["RegionFill", "RegionFillShift"],
-                route: [],
+                // The Routes tool (Infrastructure in Route mode), by edit mode (see RouteTool)
+                routeSelect: ["SelectRoute", "EditRoute"],
+                routeDraw: ["RouteAddWaypoint", "RouteTrace", "RouteFinish", "RouteUndoWaypoint", "RouteCancel"],
+                routeEdit: ["RouteMoveWaypoint", "RouteInsertWaypoint", "RouteRemoveWaypoint", "RouteSplit", "RouteJoin", "EditRoute"],
                 mask: ["AddPoint", "FinishMask", "MovePoint", "MoveMask", "InsertPoint", "DeletePoint", "EditMask"],
                 pin: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
                 labels: ["PlaceLabel", "MoveLabel", "RotateLabel", "ResizeLabel", "EditLabel"],
@@ -1227,6 +1230,18 @@ export const FILRODENSWMB = {
         // Default route cost before the generator supplies its own: the step length, doubled per
         // RELIEF_M_PER_STEP metres climbed, x WATER_STEP for a step into or across water.
         ROUTE_COST: { RELIEF_M_PER_STEP: 120, WATER_STEP: 4 },
+        // Finding a route's legs by hand (see RouteEdits.transportCost): a step along an existing
+        // route of the same transport costs SHARED_STEP of its usual cost, so a new road joins the
+        // network rather than running beside it; a river route pays RIVER_LAND_STEP for a step over
+        // land without a river, so it keeps to rivers and water and crosses land only to reach them.
+        // A road never enters water and a sea route never enters land, except that a road allowed
+        // to span water (route.spanWater) pays SPAN_WATER_STEP for each step over water, on top of
+        // ROUTE_COST.WATER_STEP, so it bridges a strait when the way round is longer than that and
+        // keeps to land otherwise. Such a road only enters water within SPAN_WATER_MAX_CELLS / 2
+        // cells of a shore (see MeshSession.shoreDistance), so the widest water it can bridge is
+        // about SPAN_WATER_MAX_CELLS cells across; wider water needs a sea route. Simple factors
+        // until the generator's cost model replaces them.
+        ROUTE: { SHARED_STEP: 0.5, RIVER_LAND_STEP: 6, SPAN_WATER_STEP: 6, SPAN_WATER_MAX_CELLS: 12 },
         // Corner-cutting passes applied to borders and smoothed routes. Each pass doubles the
         // points; one is enough to hide the Voronoi corners at the display spacing.
         CHAIKIN_PASSES: 1,
@@ -1263,6 +1278,19 @@ export const FILRODENSWMB = {
         CACHE: { DATABASE: "fwmb-mesh", STORE: "rasters", MAX_ENTRIES: 8 },
         // How close (in screen pixels) a click must be to a route's line to pick the route
         ROUTE_HIT_PX: 8,
+        // The waypoint handles of the route being edited (see RouteOverlays), in screen pixels:
+        // a handle's radius, the held one's, their outline, and how near a press must be to take
+        // hold of one
+        ROUTE_HANDLES: { HANDLE_PX: 5, HANDLE_HELD_PX: 7, HANDLE_LINE_PX: 1.5, REACH_PX: 10 },
+        // Drawing routes (see RouteTool): a press that moves further than DRAG_PX screen pixels is a
+        // traced stroke rather than a click; the stroke is thinned to its bends with a tolerance of
+        // the toolbar's Detail setting in mesh cell spacings, offered from DETAIL.MIN to DETAIL.MAX
+        // cells (1 keeps every bend the mesh can hold; at the usual 4 px spacing the top of the
+        // range is a tolerance of a few hundred map pixels, which keeps little more than a sweeping
+        // stroke's ends) and starting at DETAIL.DEFAULT. A run of stroke longer than GAP_FACTOR
+        // times the tolerance gains waypoints along it (see RouteEdits.fillGaps), so a long straight
+        // stroke still holds a terrain-found route near itself.
+        ROUTE_DRAW: { DRAG_PX: 4, DETAIL: { MIN: 1, MAX: 60, DEFAULT: 6, GAP_FACTOR: 10 } },
         // Territorial waters (see RegionEdits.claimWaters): a level's water cells go to the nearest
         // of its regions by sea distance from that region's coast, up to the level's own limit, in
         // map pixels (the map's own measure; the scale bar can name it in the map's units). A new

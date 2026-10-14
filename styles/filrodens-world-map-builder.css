@@ -3363,7 +3363,19 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     outline: none;
 }
 
-/* The docked region editor's four buttons share the footer, wrapping onto two rows if they must */
-.fwmb .fwmb-region-editor .fwmb-overlay-footer {
+/* The docked region and route editors' four buttons share the footer, wrapping onto two rows if they must */
+.fwmb .fwmb-region-editor .fwmb-overlay-footer,
+.fwmb .fwmb-route-editor .fwmb-overlay-footer {
     flex-wrap: wrap;
+}
+
+/* The Routes toolbar's outline and smoothing toggles: a checkbox and its name kept on one line */
+.fwmb .fwmb-brush-setting > .fwmb-checkbox-label {
+    white-space: nowrap;
+}
+
+/* The route editor's transport, shown but not editable, sits where its control would */
+.fwmb .fwmb-route-transport {
+    color: var(--fwmb-text-secondary);
+    text-align: end;
 }

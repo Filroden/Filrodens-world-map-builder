@@ -18,7 +18,7 @@
     <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-size-10);">
         <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
         <div class="fwmb-slider-group">
-            <input type="range" name="styleThickness" value="{{style.thickness}}" min="1" max="10" step="1" />
+            <input type="range" name="styleThickness" value="{{style.thickness}}" min="{{thicknessStep}}" max="10" step="{{thicknessStep}}" />
             <output>{{style.thickness}}</output>
         </div>
     </div>
@@ -30,5 +30,20 @@
             <option value="dashed" {{#if (eq style.style "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
             <option value="dotted" {{#if (eq style.style "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
         </select>
+    </div>
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-size-10);">
+        <label class="fwmb-checkbox-label">
+            <input type="checkbox" class="fwmb-checkbox" name="styleOutline" {{#if style.outline}}checked{{/if}} />
+            {{localize "FILRODENSWMB.UI.RouteOutline"}}
+        </label>
+        <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteOutlineHint'}}"></i>
+    </div>
+
+    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-size-10);">
+        <label class="fwmb-checkbox-label">
+            <input type="checkbox" class="fwmb-checkbox" name="styleSmoothing" {{#if style.smoothing}}checked{{/if}} />
+            {{localize "FILRODENSWMB.UI.RouteSmoothing"}}
+        </label>
+        <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteSmoothingHint'}}"></i>
     </div>
 </div>

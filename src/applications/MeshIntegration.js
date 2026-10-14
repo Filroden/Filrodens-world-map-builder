@@ -289,13 +289,27 @@ export class MeshIntegration {
     }
 
     static #routeHit(app, x, y, radius) {
+        const route = this.routeAt(app, x, y, radius);
+        return route ? { target: route, x, y, radius: 0, entityType: "route", entityId: route.id, selectOnly: true } : null;
+    }
+
+    /**
+     * The visible route whose line passes nearest a map point, within `radius` map pixels, or null.
+     * @param {object} app
+     * @param {number} x
+     * @param {number} y
+     * @param {number} radius
+     * @returns {object|null}
+     */
+    static routeAt(app, x, y, radius) {
+        if (!app.meshSession) return null;
         let best = null;
         for (const route of app.mapRoutes ?? []) {
             if (route.visibility === "none") continue;
             const distance = distanceToLine(app.meshSession.routeLine(route), x, y, radius);
             if (distance <= radius && (!best || distance < best.distance)) best = { route, distance };
         }
-        return best ? { target: best.route, x, y, radius: 0, entityType: "route", entityId: best.route.id, selectOnly: true } : null;
+        return best?.route ?? null;
     }
 
     // ------------------------------------------------------------------ geometry for the Studio

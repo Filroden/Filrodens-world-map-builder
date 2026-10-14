@@ -1,4 +1,5 @@
 <div class="fwmb-dialog-content">
+    {{!-- The route editor (see RouteEditor): the route's details, its path (how its legs are found; the transport it was drawn for is fixed), its line and its label. --}}
     <datalist id="fwmb-standard-colors">
         {{#each palette}}
             <option value="{{this}}"></option>
@@ -13,7 +14,55 @@
         <label>{{localize "FILRODENSWMB.UI.Description"}}</label>
         <textarea class="fwmb-scrollable stable" name="routeDesc" rows="4">{{route.description}}</textarea>
     </div>
-    
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.Visibility"}}</label>
+        <select name="routeVisibility">
+            {{#each visibilities}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+    </div>
+
+    <div class="fwmb-divider"></div>
+
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.RouteLegMode"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteLegModeHint'}}"></i></label>
+        <select name="routeMode">
+            {{#each legModes}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.RouteTransport"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteTransportFixedHint'}}"></i></label>
+        <span class="fwmb-route-transport">{{localize transportLabel}}</span>
+    </div>
+    <div class="form-group">
+        <label class="fwmb-checkbox-label">
+            <input type="checkbox" class="fwmb-checkbox" name="routeSpanWater" {{#if route.spanWater}}checked{{/if}} />
+            {{localize "FILRODENSWMB.UI.RouteSpanWater"}}
+        </label>
+        <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteSpanWaterHint'}}"></i>
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.RouteDetail"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteDetailEditorHint'}}"></i></label>
+        <div class="fwmb-slider-group">
+            <input type="range" name="routeDetail" value="{{detail.value}}" min="{{detail.MIN}}" max="{{detail.MAX}}" step="1" />
+            <output>{{detail.value}}</output>
+        </div>
+    </div>
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.RouteClass"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteClassHint'}}"></i></label>
+        <select name="routeClass">
+            <option value="" {{#unless route.class}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.RouteClassNone"}}</option>
+            {{#each classes}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+    </div>
+
+    <div class="fwmb-divider"></div>
+
     <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
         <select name="routeQuickStyle">
@@ -35,7 +84,7 @@
     <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
         <div class="fwmb-slider-group">
-            <input type="range" name="routeThickness" value="{{route.thickness}}" min="1" max="10" step="1" />
+            <input type="range" name="routeThickness" value="{{route.thickness}}" min="{{thicknessStep}}" max="10" step="{{thicknessStep}}" />
             <output>{{route.thickness}}</output>
         </div>
     </div>
@@ -46,6 +95,20 @@
             <option value="dashed" {{#if (eq route.style "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
             <option value="dotted" {{#if (eq route.style "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
         </select>
+    </div>
+    <div class="form-group">
+        <label class="fwmb-checkbox-label">
+            <input type="checkbox" class="fwmb-checkbox" name="routeOutline" {{#if route.outline}}checked{{/if}} />
+            {{localize "FILRODENSWMB.UI.RouteOutline"}}
+        </label>
+        <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteOutlineHint'}}"></i>
+    </div>
+    <div class="form-group">
+        <label class="fwmb-checkbox-label">
+            <input type="checkbox" class="fwmb-checkbox" name="routeSmoothing" {{#if route.smoothing}}checked{{/if}} />
+            {{localize "FILRODENSWMB.UI.RouteSmoothing"}}
+        </label>
+        <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteSmoothingHint'}}"></i>
     </div>
 
     <fieldset class="fwmb-fieldset" style="margin-top: var(--fwmb-size-16);">

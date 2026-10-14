@@ -21,7 +21,7 @@ export const UNCLAIMED = -1;
 
 export const LAYER_SET_KINDS = Object.freeze(["political", "custom"]);
 export const VISIBILITIES = Object.freeze(["all", "gm", "none"]);
-export const ROUTE_MODES = Object.freeze(["terrain", "direct", "trace"]);
+export const ROUTE_MODES = Object.freeze(["terrain", "direct"]);
 export const ROUTE_CLASSES = Object.freeze(["trunk", "main", "minor"]);
 export const ROUTE_TRANSPORTS = Object.freeze(["road", "river", "sea"]);
 
@@ -313,6 +313,7 @@ export function createRoute(fields = {}, idFactory = randomId) {
         legs: fields.legs ?? [],
         class: fields.class ?? null,
         transport: fields.transport ?? "road",
+        spanWater: fields.spanWater ?? false,
         generated: fields.generated ?? null,
     };
     if (fields.legacy) route.legacy = fields.legacy;
@@ -403,9 +404,13 @@ function normaliseLevel(level) {
 }
 
 function normaliseRoute(route) {
+    // Routes once kept a "trace" mode for a freehand stroke stored as one long leg; a traced
+    // stroke is now thinned to waypoints with straight legs, and such a route edits as a straight one
+    if (route.mode === "trace") route.mode = "direct";
     if (!ROUTE_TRANSPORTS.includes(route.transport)) route.transport = "road";
     if (typeof route.outline !== "boolean") route.outline = true;
     if (typeof route.smoothing !== "boolean") route.smoothing = false;
+    if (typeof route.spanWater !== "boolean") route.spanWater = false;
     route.thickness = roundRouteThickness(route.thickness);
 }
 

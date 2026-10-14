@@ -29,6 +29,8 @@ import { VectorHistory } from "./VectorHistory.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { RegionPainter } from "./RegionPainter.js";
 import { RegionEditor } from "./RegionEditor.js";
+import { RouteTool } from "./RouteTool.js";
+import { RouteEditor } from "./RouteEditor.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
@@ -123,7 +125,7 @@ export class MapStudio {
         editPin(e, t)         { MapDialogManager.onEditPin(this, e, t); },
         editRegion(_e, t)     { RegionEditor.open(this, ...RegionPanel.regionIdsOf(t)); },
         editRiver(e, t)       { MapDialogManager.onEditRiver(this, e, t); },
-        editRoute(e, t)       { MapDialogManager.onEditRoute(this, e, t); },
+        editRoute(_e, t)      { RouteEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
 
         // --- DIALOG MANAGER: Custom Biomes & Misc ---
         addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
@@ -196,6 +198,7 @@ export class MapStudio {
         setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
         setRegionMode(_e, t)            { RegionPainter.setMode(this, t); },
         toggleRegionShowAll()           { RegionPainter.toggleShowAll(this); },
+        setRouteMode(_e, t)             { RouteTool.setMode(this, t); },
         setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
         setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
         threeDView(e, t)                { this._onThreeDView(e, t); },
@@ -730,6 +733,7 @@ export class MapStudio {
         }));
 
         if (this.activeTool === "regions") context.regionToolbar = RegionPainter.toolbarContext(this);
+        if (this.activeTool === "infrastructure") context.routeToolbar = RouteTool.toolbarContext(this);
 
         context.regionStyles = (this.uiState.customRegionStyles || []).map((style) => ({
             id: style.id,
@@ -851,6 +855,7 @@ export class MapStudio {
         this.#updateHistoryButtons();
         this.#updateCanvasHint();
         MeshIntegration.updateOutline(this);
+        RouteTool.updateOverlays(this);
     }
 
     /**
@@ -922,6 +927,11 @@ export class MapStudio {
 
         // The Regions tool takes Escape: a stroke left hanging, or the region being edited
         if (this.activeTool === "regions" && RegionPainter.handleKey(this, event)) {
+            event.preventDefault();
+            return;
+        }
+        // The Routes tool takes Enter, Backspace and Escape while a route is placed or picked
+        if (this.#isRouteMode() && RouteTool.handleKey(this, event)) {
             event.preventDefault();
             return;
         }
@@ -1090,7 +1100,7 @@ export class MapStudio {
 
         // 2. Delegate to Sub-Systems
         this.#syncFaultLiveEdits(name);
-        this.#syncRouteLiveEdits(name, target);
+        this.#syncRouteLiveEdits(name, event.type === "change");
         this.#syncCropLiveEdits(name);
     }
 
@@ -1146,38 +1156,25 @@ export class MapStudio {
         return current ? FILRODENSWMB.TECTONICS.FEATURES.DEFAULT_TYPE : FILRODENSWMB.TECTONICS.TYPES.CONVERGENT;
     }
 
-    #syncRouteLiveEdits(name, target) {
-        // Fallback to custom if a manual property is changed
-        if (["routeColor", "routeThickness", "routeStyle"].includes(name)) {
+    /**
+     * The toolbar's route fields. Changing a line field by hand leaves the quick style for Custom;
+     * choosing a quick style fills the line fields from it. Either way the picked route follows
+     * the toolbar live (see RouteTool.applyToolbarField), recorded as one undo step when the
+     * field's change event arrives, so a slider drag is a single step.
+     */
+    #syncRouteLiveEdits(name, commit) {
+        if (RouteTool.STYLE_FIELD_NAMES.includes(name)) {
             this.uiState.activeRouteQuickStyle = "custom";
             this.view?.render(["toolbar", "editToolbar"]);
         }
-
-        // Apply preset if dropdown is changed
         if (name === "activeRouteQuickStyle") {
-            const styleId = target.value;
-            if (styleId !== "custom") {
-                const styleData = this.uiState.customRouteStyles.find((s) => s.id === styleId);
-                if (styleData) {
-                    this.uiState.routeColor = styleData.color;
-                    this.uiState.routeThickness = styleData.thickness;
-                    this.uiState.routeStyle = styleData.style;
-                    this.view?.render(["toolbar", "editToolbar"]);
-                }
+            const style = (this.uiState.customRouteStyles ?? []).find((candidate) => candidate.id === this.uiState.activeRouteQuickStyle);
+            if (style) {
+                MapDialogManager.QUICK_STYLE_CONFIG.Route.onUpdateActiveUI(this, style);
+                this.view?.render(["toolbar", "editToolbar"]);
             }
         }
-
-        // Apply changes to the active route currently being drawn
-        if (["activeRouteQuickStyle", "routeColor", "routeThickness", "routeStyle"].includes(name) && this.activeRouteId) {
-            const route = this.mapRoutes.find((r) => r.id === this.activeRouteId);
-            if (route) {
-                route.quickStyle = this.uiState.activeRouteQuickStyle;
-                route.color = this.uiState.routeColor;
-                route.thickness = this.uiState.routeThickness;
-                route.style = this.uiState.routeStyle;
-                this._repaintVectors();
-            }
-        }
+        RouteTool.applyToolbarField(this, name, commit);
     }
 
     #syncCropLiveEdits(name) {
@@ -1362,8 +1359,12 @@ export class MapStudio {
     #bindCanvasCallbacks() {
         if (!this.canvasEngine) return;
         MeshIntegration.bindHitTest(this);
-        // While the Regions tool is editing, the primary button paints (see RegionPainter)
-        this.canvasEngine.pointerToolProvider = () => (this.activeTool === "regions" ? RegionPainter.tool(this) : null);
+        // While the Regions tool is editing, the primary button paints (see RegionPainter); while
+        // the Infrastructure tool is in Route mode, it places and edits routes (see RouteTool)
+        this.canvasEngine.pointerToolProvider = () => {
+            if (this.activeTool === "regions") return RegionPainter.tool(this);
+            return this.#isRouteMode() ? RouteTool.tool(this) : null;
+        };
         this.canvasEngine.onCanvasHover = (x, y) => {
             const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
             const showCursor = this.canvasEngine.isEditMode && isBrushActive && !this.canvasEngine.isDragging;
@@ -1562,6 +1563,7 @@ export class MapStudio {
             featureMode: this.uiState.activeFeatureMode,
             infraMode: this.uiState.activeInfraMode,
             regionMode: RegionPainter.mode(this),
+            routeMode: RouteTool.mode(this),
             isMaskDrawing: this.#isMaskDrawingMode(),
             heldItem: this.canvasEngine?.heldItem ?? null,
         });
@@ -1579,7 +1581,7 @@ export class MapStudio {
                 MapDialogManager.onEditPin(this, null, null, entityId);
                 break;
             case "route":
-                MapDialogManager.onEditRoute(this, null, null, entityId);
+                RouteEditor.open(this, entityId);
                 break;
             case "region":
                 RegionEditor.open(this, layerId, entityId);
@@ -1602,7 +1604,15 @@ export class MapStudio {
         }
     }
 
+    /** Whether the Infrastructure tool is in Route mode, so the Routes tool has the map. */
+    #isRouteMode() {
+        return this.activeTool === "infrastructure" && this.uiState.activeInfraMode === "route";
+    }
+
     #handleRightClick() {
+        // A route being placed is finished by a right-click, as a line is
+        if (RouteTool.finishDraft(this)) return true;
+
         let cleared = false;
         let requiresTerrainUpdate = false;
 
@@ -1621,6 +1631,8 @@ export class MapStudio {
 
         if (cleared) {
             this._repaintVectors();
+            RouteTool.updateOverlays(this);
+            this.view?.render(["editToolbar"]);
             if (requiresTerrainUpdate) this.requestTerrainUpdate();
             return true;
         }
@@ -4031,6 +4043,8 @@ export class MapStudio {
             if (config.activeKey) this[config.activeKey] = null;
         }
         RegionPainter.cancel(this);
+        RouteTool.cancel(this);
+        RouteTool.updateOverlays(this);
 
         return this._finishActiveLandMask();
     }
@@ -4881,7 +4895,7 @@ export class MapStudio {
      */
     _onSetInfraMode(event, target) {
         this.uiState.activeInfraMode = target.dataset.mode;
-        this.activeRouteId = null;
+        this.#leaveRouteMode();
         this.view?.render(["toolbar", "editToolbar"]);
     }
 
@@ -4890,9 +4904,21 @@ export class MapStudio {
 
         this.uiState.activeIcon = newIcon;
         this.uiState.activeInfraMode = "pin";
-        this.activeRouteId = null;
+        this.#leaveRouteMode();
 
         this.view?.render(["toolbar", "editToolbar"]);
+    }
+
+    /**
+     * Leaving Route mode (for Pin mode, or another tool) abandons the route being placed, lets go
+     * of the picked route and closes its docked editor, so nothing of the Routes tool stays on the
+     * map or in the toolbar.
+     */
+    #leaveRouteMode() {
+        RouteTool.cancel(this);
+        this.activeRouteId = null;
+        RouteTool.updateOverlays(this);
+        platform.dialogs.dismiss({ placement: "docked" });
     }
 
     /**

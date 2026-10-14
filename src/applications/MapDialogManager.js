@@ -18,6 +18,7 @@ import {
     findPinIconUsage,
     revertPinIconUsage,
 } from "../data/pinIcons.js";
+import { ROUTE_THICKNESS_STEP, roundRouteThickness } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
 
 export class MapDialogManager {
@@ -144,6 +145,29 @@ export class MapDialogManager {
             ],
             dismissed: { apply: false, dismiss: false },
         });
+    }
+
+    /**
+     * Fills a dialogue's line fields from a route quick style: colour, thickness, style, outline and
+     * smoothing. Each field is optional, since the mass-edit dialogue and the route editor offer
+     * different sets of them. The thickness slider's value display follows the slider.
+     * @param {object} style - A route quick style.
+     * @param {{color?: HTMLInputElement, thickness?: HTMLInputElement, style?: HTMLSelectElement, outline?: HTMLInputElement, smoothing?: HTMLInputElement}} fields
+     */
+    static applyRouteStyleToFields(style, fields) {
+        if (fields.color) fields.color.value = style.color;
+        if (fields.thickness) {
+            fields.thickness.value = style.thickness;
+            RangeDisplay.sync(fields.thickness);
+        }
+        if (fields.style) fields.style.value = style.style;
+        if (fields.outline) fields.outline.checked = style.outline !== false;
+        if (fields.smoothing) fields.smoothing.checked = style.smoothing === true;
+    }
+
+    /** The line fields a route quick style carries, as they are copied onto each route that uses it. */
+    static routeStyleFields(style) {
+        return { color: style.color, thickness: style.thickness, style: style.style, outline: style.outline !== false, smoothing: style.smoothing === true };
     }
 
     /**
@@ -401,26 +425,26 @@ export class MapDialogManager {
                 getDefaults: () => ({
                     name: "New Quick Style",
                     color: "#ffffff",
-                    thickness: 3,
+                    thickness: 2,
                     style: "solid",
+                    outline: true,
+                    smoothing: false,
                 }),
                 getContext: (app, style) => ({
-                    style,
+                    style: { ...style, outline: style.outline !== false, smoothing: style.smoothing === true },
+                    thicknessStep: ROUTE_THICKNESS_STEP,
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 }),
                 onExtract: (form, fallbackName) => ({
                     name: form.elements["styleName"].value.trim() || fallbackName,
                     color: form.elements["styleColor"].value,
-                    thickness: Number(form.elements["styleThickness"].value) || 3,
+                    thickness: roundRouteThickness(form.elements["styleThickness"].value),
                     style: form.elements["styleStyle"].value,
+                    outline: form.elements["styleOutline"].checked,
+                    smoothing: form.elements["styleSmoothing"].checked,
                 }),
                 onCascade: (app, id, result) => {
-                    const aestheticProperties = {
-                        color: result.color,
-                        thickness: result.thickness,
-                        style: result.style,
-                    };
-
+                    const aestheticProperties = this.routeStyleFields(result);
                     for (const route of app.mapRoutes) {
                         if (route.quickStyle === id) platform.utils.mergeObject(route, aestheticProperties);
                     }
@@ -433,6 +457,8 @@ export class MapDialogManager {
                     app.uiState.routeColor = result.color;
                     app.uiState.routeThickness = result.thickness;
                     app.uiState.routeStyle = result.style;
+                    app.uiState.routeOutline = result.outline !== false;
+                    app.uiState.routeSmoothing = result.smoothing === true;
                 },
             },
             // Region quick styles hold a region's fill only: a region's border belongs to its level
@@ -624,23 +650,22 @@ export class MapDialogManager {
                     customRouteStyles: app.uiState.customRouteStyles || [],
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
                     defaults: this.QUICK_STYLE_CONFIG.Route.getDefaults(),
+                    thicknessStep: ROUTE_THICKNESS_STEP,
                     ...getLabelContext(app),
                 }),
                 onRender: (html, app) => {
                     const quickStyleSelect = html.querySelector('select[name="massQuickStyle"]');
-                    const colorInput = html.querySelector('input[name="massColor"]');
-                    const thicknessInput = html.querySelector('input[name="massThickness"]');
-                    const styleSelect = html.querySelector('select[name="massStyle"]');
+                    const fields = {
+                        color: html.querySelector('input[name="massColor"]'),
+                        thickness: html.querySelector('input[name="massThickness"]'),
+                        style: html.querySelector('select[name="massStyle"]'),
+                        outline: html.querySelector('input[name="massOutline"]'),
+                        smoothing: html.querySelector('input[name="massSmoothing"]'),
+                    };
 
                     quickStyleSelect?.addEventListener("change", (e) => {
                         const style = resolveStyle("customRouteStyles")(app, e.target.value);
-                        if (!style) return;
-                        if (colorInput) colorInput.value = style.color;
-                        if (thicknessInput) {
-                            thicknessInput.value = style.thickness;
-                            RangeDisplay.sync(thicknessInput);
-                        }
-                        if (styleSelect) styleSelect.value = style.style;
+                        if (style) this.applyRouteStyleToFields(style, fields);
                     });
                     this.bindLabelPropertiesDialog(html, app.uiState);
                 },
@@ -650,12 +675,14 @@ export class MapDialogManager {
                         extract: (form, app) => {
                             const id = form.elements["massQuickStyle"].value;
                             const style = id !== "custom" ? resolveStyle("customRouteStyles")(app, id) : null;
-                            return style ? { quickStyle: id, color: style.color, thickness: style.thickness, style: style.style } : { quickStyle: "custom" };
+                            return style ? { quickStyle: id, ...this.routeStyleFields(style) } : { quickStyle: "custom" };
                         },
                     },
                     { checkboxName: "applyColor", extract: (form) => ({ color: form.elements["massColor"].value }) },
-                    { checkboxName: "applyThickness", extract: (form) => ({ thickness: Number(form.elements["massThickness"].value) || 3 }) },
+                    { checkboxName: "applyThickness", extract: (form) => ({ thickness: roundRouteThickness(form.elements["massThickness"].value) }) },
                     { checkboxName: "applyStyle", extract: (form) => ({ style: form.elements["massStyle"].value }) },
+                    { checkboxName: "applyOutline", extract: (form) => ({ outline: form.elements["massOutline"].checked }) },
+                    { checkboxName: "applySmoothing", extract: (form) => ({ smoothing: form.elements["massSmoothing"].checked }) },
                     ...labelFields(),
                 ],
             },
@@ -1514,73 +1541,6 @@ export class MapDialogManager {
             }),
             onSave: (entity, result) => {
                 if (result.operation !== previousOperation) app.requestTerrainUpdate();
-            },
-        });
-    }
-
-    static async onEditRoute(app, event, target, explicitId = null) {
-        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
-        const route = app.mapRoutes.find((r) => r.id === id);
-        if (!route) return;
-
-        const safeRoute = this._withLabelDefaults(app, route);
-
-        await this._processEditDialog(app, route, {
-            titleKey: "FILRODENSWMB.UI.EditRoute",
-            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-routes.hbs",
-            context: {
-                route: safeRoute,
-                rotationRange: FILRODENSWMB.UI.ROTATION,
-                customRouteStyles: app.uiState.customRouteStyles || [],
-                palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                fonts: platform.fonts.list(),
-                customLabelStyles: app.uiState.customLabelStyles || [],
-            },
-            onRender: (html) => {
-                const quickStyleSelect = html.querySelector('select[name="routeQuickStyle"]');
-                const colorInput = html.querySelector('input[name="routeColor"]');
-                const thicknessInput = html.querySelector('input[name="routeThickness"]');
-                const styleSelect = html.querySelector('select[name="routeStyle"]');
-
-                quickStyleSelect?.addEventListener("change", (e) => {
-                    const styleId = e.target.value;
-                    if (styleId !== "custom") {
-                        const styleData = app.uiState.customRouteStyles.find((s) => s.id === styleId);
-                        if (styleData) {
-                            colorInput.value = styleData.color;
-                            thicknessInput.value = styleData.thickness;
-                            RangeDisplay.sync(thicknessInput);
-                            styleSelect.value = styleData.style;
-                        }
-                    }
-                });
-
-                const revertToCustom = () => {
-                    if (quickStyleSelect) quickStyleSelect.value = "custom";
-                };
-                colorInput?.addEventListener("input", revertToCustom);
-                thicknessInput?.addEventListener("input", revertToCustom);
-                styleSelect?.addEventListener("change", revertToCustom);
-
-                this.bindLabelPropertiesDialog(html, app.uiState);
-            },
-            onExtract: (form, fallbackName) => ({
-                name: form.elements["routeName"]?.value.trim() || fallbackName,
-                description: form.elements["routeDesc"].value,
-                quickStyle: form.elements["routeQuickStyle"].value,
-                color: form.elements["routeColor"].value,
-                thickness: Number(form.elements["routeThickness"].value),
-                style: form.elements["routeStyle"].value,
-                label: this._extractLabelResultFields(form),
-            }),
-            onSave: (entity, result) => {
-                if (app.activeRouteId === id) {
-                    app.uiState.activeRouteQuickStyle = result.quickStyle;
-                    app.uiState.routeColor = result.color;
-                    app.uiState.routeThickness = result.thickness;
-                    app.uiState.routeStyle = result.style;
-                    app.view?.render(["toolbar"]);
-                }
             },
         });
     }

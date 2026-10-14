@@ -16,8 +16,8 @@ import { UNCLAIMED, VECTOR_SCHEMA_VERSION, addRegion, createLayerSet, createLeve
  *   so no region disappears. The per-region border style (colour, width, dash, smoothing) has no
  *   equivalent now that borders belong to the level, so the level takes its first region's style
  *   and every region keeps its old fields under `legacy`.
- * - Routes become "trace" routes: a waypoint at each old node's cell, each leg following the old
- *   straight segment between two nodes. `smoothing` and `outline` are switched on because the old
+ * - Routes become "direct" (straight-legged) routes: a waypoint at each old node's cell, each leg
+ *   following the old straight segment between two nodes. `smoothing` and `outline` are switched on because the old
  *   renderer always drew routes as an outlined spline. The old nodes stay under `legacy.points`.
  * - Pins gain the cell they stand in, and empty `pinStyle` and `generated` fields.
  *
@@ -133,7 +133,7 @@ export function routesToWaypoints(routes, mesh, { idFactory = randomId } = {}) {
                 style: old.style,
                 outline: true,
                 smoothing: true,
-                mode: "trace",
+                mode: "direct",
                 waypoints,
                 legs,
                 legacy: { points: old.points ?? [] },
