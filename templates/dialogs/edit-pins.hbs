@@ -15,17 +15,25 @@
         <textarea class="fwmb-scrollable stable" name="pinDesc" rows="4">{{pin.description}}</textarea>
     </div>
 
-    <div class="form-group" style="display: flex; gap: var(--fwmb-size-4);">
+    <div class="form-group">
+        <label>{{localize "FILRODENSWMB.UI.PinStyle"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.PinStyleHint'}}"></i></label>
+        <select name="pinStyle">
+            <option value="custom" {{#unless pin.pinStyle}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.PinStyleNone"}}</option>
+            {{#each pinStyles}}
+                <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
+            {{/each}}
+        </select>
+    </div>
+
+    <div class="form-group">
         <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
-        <input type="hidden" name="pinIcon" value="{{pin.icon}}" id="fwmb-edit-pin-icon-input" />
-        
         <div class="fwmb-custom-select" id="fwmb-edit-pin-select">
+            <input type="hidden" name="pinIcon" value="{{pin.icon}}" id="fwmb-edit-pin-icon-input" />
             <div class="fwmb-select-trigger" style="cursor: pointer;">
                 <i class="fwmb-icon {{#unless pinIconIsCustom}}{{pin.icon}}{{/unless}}" {{#if pinIconIsCustom}}style="--fwmb-mask: url('{{pinIconPath}}');"{{/if}} id="fwmb-edit-pin-trigger-icon"></i>
                 <i class="fwmb-icon arrow-drop-down"></i>
             </div>
-            <!-- Override absolute positioning to create an inline accordion expansion -->
-            <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden" style="position: relative; top: 0; left: 0; width: 100%; margin-block-start: var(--fwmb-size-8); box-shadow: none;">
+            <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
                 {{#each icons}}
                 <button type="button" class="fwmb-btn {{#if this.selected}}active{{/if}}" data-icon="{{this.key}}" data-path="{{this.path}}" data-custom="{{this.isCustom}}" data-tooltip="{{this.localized}}">
                     <i class="fwmb-icon {{#unless this.isCustom}}{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} alt="{{this.localized}}"></i>

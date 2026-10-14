@@ -331,6 +331,21 @@
 .fwmb-icon.skull {
     --fwmb-mask: url("../assets/pinhead-icons/skull.svg");
 }
+.fwmb-icon.star {
+    --fwmb-mask: url("../assets/pinhead-icons/star.svg");
+}
+.fwmb-icon.circle_outline_with_dot_outline {
+    --fwmb-mask: url("../assets/pinhead-icons/circle_outline_with_dot_outline.svg");
+}
+.fwmb-icon.circle_outline_with_star {
+    --fwmb-mask: url("../assets/pinhead-icons/circle_outline_with_star.svg");
+}
+.fwmb-icon.circle_with_dot {
+    --fwmb-mask: url("../assets/pinhead-icons/circle_with_dot.svg");
+}
+.fwmb-icon.circle_with_dot_outline {
+    --fwmb-mask: url("../assets/pinhead-icons/circle_with_dot_outline.svg");
+}
 .fwmb-icon.broadleaved_tree {
     --fwmb-mask: url("../assets/pinhead-icons/broadleaved_tree.svg");
 }
@@ -2266,9 +2281,37 @@ input.fwmb-swatch {
     box-shadow: var(--fwmb-shadow-popout);
 }
 
+/* A pin's icon on its card and in a picker's trigger takes the module's own text colour: the
+   icons are drawn in currentColor, and the colour a host window gives its text (light on a dark
+   Foundry window) need not suit the module's light theme */
 .fwmb-list-item .fwmb-list-icon {
     width: var(--fwmb-size-16);
     height: var(--fwmb-size-16);
+    color: var(--fwmb-text-primary);
+}
+
+.fwmb .fwmb-select-trigger > .fwmb-icon,
+.fwmb .fwmb-list-item > .fwmb-pin-style-glyph {
+    color: var(--fwmb-text-primary);
+}
+
+/* A dialogue's icon picker opens as a popover placed against its trigger (see
+   MapDialogManager._bindIconPicker), drawn in the top layer so the dialogue's own layout stays
+   put; a popover's default centred placement is undone so the script can place it */
+.fwmb .fwmb-select-options[popover] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    width: 16rem;
+}
+
+/* The grid's own display rule would otherwise beat the browser's hidden state for a closed popover */
+.fwmb .fwmb-select-options[popover]:not(:popover-open) {
+    display: none;
+}
+
+.fwmb .fwmb-select-options:popover-open {
+    display: grid;
 }
 
 .fwmb-list-item .fwmb-rule-indicator {
@@ -3372,6 +3415,13 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 /* The Routes toolbar's outline and smoothing toggles: a checkbox and its name kept on one line */
 .fwmb .fwmb-brush-setting > .fwmb-checkbox-label {
     white-space: nowrap;
+}
+
+/* A pin style's icon on its Style Library card, at the size of the card's buttons */
+.fwmb .fwmb-list-item > .fwmb-pin-style-glyph {
+    flex: 0 0 auto;
+    width: 1.25rem;
+    height: 1.25rem;
 }
 
 /* The route editor's transport, shown but not editable, sits where its control would */

@@ -11,6 +11,15 @@
     {{#if (eq uiState.activeInfraMode 'pin')}}
         <div class="fwmb-brush-settings">
             <div class="fwmb-brush-setting">
+                <label>{{localize "FILRODENSWMB.UI.PinStyle"}}</label>
+                <select name="activePinStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.PinStyleHint'}}">
+                    <option value="custom" {{#if (eq uiState.activePinStyle "custom")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.PinStyleNone"}}</option>
+                    {{#each pinStyles}}
+                        <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
+                    {{/each}}
+                </select>
+            </div>
+            <div class="fwmb-brush-setting">
                 <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
                 <div class="fwmb-custom-select" id="fwmb-pin-select">
                     <div class="fwmb-select-trigger" data-action="togglePinDropdown">

@@ -19,6 +19,8 @@ import {
     revertPinIconUsage,
 } from "../data/pinIcons.js";
 import { ROUTE_THICKNESS_STEP, roundRouteThickness } from "../mesh/Schema.js";
+import { PinStyles } from "./PinStyles.js";
+import { positionPopoverMenu } from "../ui/dropdowns.js";
 import { platform } from "../platform/index.js";
 
 export class MapDialogManager {
@@ -275,6 +277,93 @@ export class MapDialogManager {
     }
 
     /**
+     * Wires a dialogue's icon picker (the custom select of pin icons): its trigger opens the grid,
+     * and choosing an icon writes its key to the hidden input, shows it on the trigger and closes
+     * the grid. The picker's parts are found by id prefix: `${prefix}-select`, `${prefix}-icon-input`
+     * and `${prefix}-trigger-icon`.
+     *
+     * Where the browser supports popovers the grid opens as one, drawn in the top layer against
+     * the trigger (see positionPopoverMenu), so the dialogue's layout does not move while it is
+     * open; it closes on a choice, on Escape, or on a press anywhere else. Without popovers the
+     * grid opens in place below the trigger.
+     * @param {HTMLElement} html
+     * @param {string} prefix
+     * @param {function(string): void} [onChoose] - Called with the chosen icon's key.
+     * @returns {{choose: function(string): void}|null} A way to pick an icon from script (a style
+     *     choosing it, say), or null without a picker.
+     */
+    static _bindIconPicker(html, prefix, onChoose = null) {
+        const trigger = html.querySelector(`#${prefix}-select .fwmb-select-trigger`);
+        const optionsMenu = html.querySelector(`#${prefix}-select .fwmb-select-options`);
+        const hiddenInput = html.querySelector(`#${prefix}-icon-input`);
+        const triggerIcon = html.querySelector(`#${prefix}-trigger-icon`);
+        if (!trigger || !optionsMenu || !hiddenInput) return null;
+
+        const buttons = [...optionsMenu.querySelectorAll("button")];
+        const show = (button) => {
+            hiddenInput.value = button.dataset.icon;
+            this._applyIconGlyph(triggerIcon, button.dataset.icon, button.dataset.path, button.dataset.custom === "true");
+            buttons.forEach((other) => other.classList.toggle("active", other === button));
+        };
+        const { toggle, close } = this.#pickerMenu(trigger, optionsMenu);
+        trigger.addEventListener("click", toggle);
+        for (const button of buttons) {
+            button.addEventListener("click", () => {
+                show(button);
+                close();
+                onChoose?.(button.dataset.icon);
+            });
+        }
+        return {
+            choose: (key) => {
+                const button = buttons.find((candidate) => candidate.dataset.icon === key);
+                if (button) show(button);
+            },
+        };
+    }
+
+    /**
+     * How a picker's grid opens and closes: as a popover placed against its trigger where the
+     * browser has them, otherwise in place by its hidden class.
+     * @returns {{toggle: function(): void, close: function(): void}}
+     */
+    static #pickerMenu(trigger, menu) {
+        if (typeof menu.showPopover !== "function") {
+            return {
+                toggle: () => menu.classList.toggle("fwmb-hidden"),
+                close: () => menu.classList.add("fwmb-hidden"),
+            };
+        }
+        menu.popover = "manual";
+        menu.classList.remove("fwmb-hidden");
+        const isOpen = () => menu.matches(":popover-open");
+        const close = () => {
+            if (isOpen()) menu.hidePopover();
+        };
+        const open = () => {
+            menu.showPopover();
+            positionPopoverMenu(trigger, menu);
+        };
+        const document = menu.ownerDocument;
+        // A press outside the picker, or Escape, closes it; the listeners live only while it is open
+        const onPointerDown = (event) => {
+            if (!trigger.contains(event.target) && !menu.contains(event.target)) close();
+        };
+        const onKeyDown = (event) => {
+            if (event.key === "Escape") {
+                close();
+                event.stopPropagation();
+            }
+        };
+        menu.addEventListener("toggle", (event) => {
+            const listen = event.newState === "open" ? "addEventListener" : "removeEventListener";
+            document[listen]("pointerdown", onPointerDown, true);
+            document[listen]("keydown", onKeyDown, true);
+        });
+        return { toggle: () => (isOpen() ? close() : open()), close };
+    }
+
+    /**
      * Shared Add/Edit dialogue for a single custom pin icon: name, a native file-picker path,
      * and a live preview of the raw SVG against a black background so the GM can confirm
      * it's genuinely solid white before accepting. Pins are coloured by tinting their sprite,
@@ -464,6 +553,50 @@ export class MapDialogManager {
             // Region quick styles hold a region's fill only: a region's border belongs to its level
             // (the level's line style), so the line and smoothing fields older styles carry are
             // dropped when such a style is next saved (see onSave)
+            Pin: {
+                registryKey: "customPinStyles",
+                activeStateKey: "activePinStyle",
+                template: "modules/filrodens-world-map-builder/templates/dialogs/edit-pin-quick-style.hbs",
+                getDefaults: (app) => ({
+                    name: "New Pin Style",
+                    icon: app.uiState.activeIcon || FILRODENSWMB.PIN_ICONS.DEFAULT,
+                    scale: app.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
+                    color: app.uiState.pinColor || FILRODENSWMB.PINS.DEFAULT_STYLE_COLOR,
+                    label: { fontSize: app.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE, visibility: "all", quickStyle: PinStyles.NONE },
+                    detailLevel: FILRODENSWMB.PINS.DETAIL_LEVELS.at(-1),
+                }),
+                getContext: (app, style) => {
+                    const icons = getPinIconPickerList(style.icon).map((entry) => ({ key: entry.key, localized: entry.label, path: entry.path, isCustom: entry.isCustom, selected: entry.key === style.icon }));
+                    const current = icons.find((entry) => entry.selected);
+                    return {
+                        style,
+                        icons,
+                        pinIconPath: current?.path || "",
+                        pinIconIsCustom: current?.isCustom || false,
+                        palette: FILRODENSWMB.LABELS?.PRESETS || [],
+                        customLabelStyles: app.uiState.customLabelStyles || [],
+                        detailLevels: PinStyles.detailLevelChoices(style.detailLevel),
+                        visibilities: PinStyles.visibilityChoices(style.label?.visibility),
+                    };
+                },
+                onRender: (html) => this._bindIconPicker(html, "fwmb-pin-style"),
+                onExtract: (form, fallbackName) => ({
+                    name: form.elements["styleName"].value.trim() || fallbackName,
+                    icon: form.elements["styleIcon"].value,
+                    scale: Number(form.elements["styleScale"].value) || FILRODENSWMB.PINS.DEFAULT_SCALE,
+                    color: form.elements["styleColor"].value,
+                    label: {
+                        fontSize: Number(form.elements["styleLabelSize"].value) || FILRODENSWMB.PINS.DEFAULT_SCALE,
+                        visibility: form.elements["styleLabelVisibility"].value,
+                        quickStyle: form.elements["styleLabelQuickStyle"].value,
+                    },
+                    detailLevel: Number(form.elements["styleDetailLevel"].value) || 0,
+                }),
+                onCascade: (app, id, result) => PinStyles.cascade(app, { id, ...result }),
+                onDisconnect: (app, id) => PinStyles.disconnect(app, id),
+                getUsageCount: (app, id) => PinStyles.usageCount(app, id),
+                onUpdateActiveUI: (app, result) => PinStyles.readIntoToolbar(app, result),
+            },
             Region: {
                 registryKey: "customRegionStyles",
                 activeStateKey: "activeRegionQuickStyle",
@@ -611,31 +744,24 @@ export class MapDialogManager {
                     return {
                         icons,
                         defaultIcon: icons[0] || null,
+                        pinStyles: PinStyles.choices(app, null),
                         palette: FILRODENSWMB.LABELS?.PRESETS || [],
                         ...getLabelContext(app),
                     };
                 },
                 onRender: (html, app) => {
-                    const trigger = html.querySelector("#fwmb-mass-edit-pin-select .fwmb-select-trigger");
-                    const optionsMenu = html.querySelector("#fwmb-mass-edit-pin-select .fwmb-select-options");
-                    const hiddenInput = html.querySelector("#fwmb-mass-edit-pin-icon-input");
-                    const triggerIcon = html.querySelector("#fwmb-mass-edit-pin-trigger-icon");
-
-                    if (trigger && optionsMenu) {
-                        trigger.addEventListener("click", () => optionsMenu.classList.toggle("fwmb-hidden"));
-                        optionsMenu.querySelectorAll("button").forEach((btn) => {
-                            btn.addEventListener("click", () => {
-                                hiddenInput.value = btn.dataset.icon;
-                                this._applyIconGlyph(triggerIcon, btn.dataset.icon, btn.dataset.path, btn.dataset.custom === "true");
-                                optionsMenu.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
-                                btn.classList.add("active");
-                                optionsMenu.classList.add("fwmb-hidden");
-                            });
-                        });
-                    }
+                    this._bindIconPicker(html, "fwmb-mass-edit-pin");
                     this.bindLabelPropertiesDialog(html, app.uiState);
                 },
                 fields: [
+                    {
+                        // A style brings its icon, colour, scale and label fields with it; "no style" only lets the pins go
+                        checkboxName: "applyPinStyle",
+                        extract: (form, app) => {
+                            const style = PinStyles.find(app, form.elements["massPinStyle"].value);
+                            return style ? { pinStyle: style.id, ...PinStyles.fields(app, style) } : { pinStyle: null };
+                        },
+                    },
                     { checkboxName: "applyIcon", extract: (form) => ({ icon: form.elements["massIcon"].value }) },
                     { checkboxName: "applyColor", extract: (form) => ({ color: form.elements["massColor"].value }) },
                     { checkboxName: "applyScale", extract: (form) => ({ scale: Number(form.elements["massScale"].value) || 1 }) },
@@ -1424,41 +1550,63 @@ export class MapDialogManager {
                 icons,
                 pinIconPath: currentIcon?.path || "",
                 pinIconIsCustom: currentIcon?.isCustom || false,
+                pinStyles: PinStyles.choices(app, pin.pinStyle),
                 palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 fonts: platform.fonts.list(),
                 customLabelStyles: app.uiState.customLabelStyles || [],
             },
-            onRender: (html) => {
-                const trigger = html.querySelector("#fwmb-edit-pin-select .fwmb-select-trigger");
-                const optionsMenu = html.querySelector("#fwmb-edit-pin-select .fwmb-select-options");
-                const hiddenInput = html.querySelector("#fwmb-edit-pin-icon-input");
-                const triggerIcon = html.querySelector("#fwmb-edit-pin-trigger-icon");
-
-                if (trigger && optionsMenu) {
-                    trigger.addEventListener("click", () => optionsMenu.classList.toggle("fwmb-hidden"));
-                    const optionBtns = optionsMenu.querySelectorAll("button");
-                    optionBtns.forEach((btn) => {
-                        btn.addEventListener("click", () => {
-                            const newIcon = btn.dataset.icon;
-                            hiddenInput.value = newIcon;
-                            this._applyIconGlyph(triggerIcon, newIcon, btn.dataset.path, btn.dataset.custom === "true");
-                            optionBtns.forEach((b) => b.classList.remove("active"));
-                            btn.classList.add("active");
-                            optionsMenu.classList.add("fwmb-hidden");
-                        });
-                    });
-                }
-                this.bindLabelPropertiesDialog(html, app.uiState);
-            },
+            onRender: (html) => this.#bindPinStyleFields(html, app),
             onExtract: (form, fallbackName) => ({
                 name: form.elements["pinName"]?.value.trim() || fallbackName,
                 description: form.elements["pinDesc"].value,
+                pinStyle: PinStyles.find(app, form.elements["pinStyle"].value)?.id ?? null,
                 icon: form.elements["pinIcon"].value,
                 scale: Number(form.elements["pinScale"].value),
                 color: form.elements["pinColor"].value,
                 label: this._extractLabelResultFields(form),
             }),
         });
+    }
+
+    /**
+     * The pin editor's fields: choosing a pin style fills the icon, colour, scale and label size
+     * from it (and the label quick style, which fills the rest of the label fields as it does in
+     * every editor); changing the icon, colour or scale by hand leaves the style for "no style".
+     * The label fields work as in every other editor.
+     */
+    static #bindPinStyleFields(html, app) {
+        const styleSelect = html.querySelector('select[name="pinStyle"]');
+        const color = html.querySelector('input[name="pinColor"]');
+        const scale = html.querySelector('input[name="pinScale"]');
+        const labelSize = html.querySelector('input[name="labelFontSize"]');
+        const labelQuickStyle = html.querySelector('select[name="labelQuickStyle"]');
+        const toNone = () => {
+            if (styleSelect) styleSelect.value = PinStyles.NONE;
+        };
+        const picker = this._bindIconPicker(html, "fwmb-edit-pin", toNone);
+        this.bindLabelPropertiesDialog(html, app.uiState);
+
+        styleSelect?.addEventListener("change", () => {
+            const style = PinStyles.find(app, styleSelect.value);
+            if (!style) return;
+            const fields = PinStyles.fields(app, style);
+            picker?.choose(fields.icon);
+            if (color) color.value = fields.color;
+            if (scale) {
+                scale.value = fields.scale;
+                RangeDisplay.sync(scale);
+            }
+            if (labelQuickStyle) {
+                labelQuickStyle.value = fields.label.quickStyle;
+                labelQuickStyle.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            if (labelSize) {
+                labelSize.value = fields.label.fontSize;
+                RangeDisplay.sync(labelSize);
+            }
+        });
+        color?.addEventListener("input", toNone);
+        scale?.addEventListener("input", toNone);
     }
 
     static async onEditQuickStyle(app, event, target) {

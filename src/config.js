@@ -912,6 +912,10 @@ export const FILRODENSWMB = {
         circle: "FILRODENSWMB.ICONS.Circle",
         circle_outline: "FILRODENSWMB.ICONS.CircleOutline",
         circle_outline_with_dot: "FILRODENSWMB.ICONS.CircleDotOutline",
+        circle_outline_with_dot_outline: "FILRODENSWMB.ICONS.CircleOutlineDotOutline",
+        circle_outline_with_star: "FILRODENSWMB.ICONS.CircleOutlineStar",
+        circle_with_dot: "FILRODENSWMB.ICONS.CircleDot",
+        circle_with_dot_outline: "FILRODENSWMB.ICONS.CircleDotOutlineHollow",
         city_gate: "FILRODENSWMB.ICONS.CityGate",
         classical_building: "FILRODENSWMB.ICONS.ClassicalBuilding",
         column_shrine: "FILRODENSWMB.ICONS.Shrine",
@@ -949,6 +953,7 @@ export const FILRODENSWMB = {
         question_mark: "FILRODENSWMB.ICONS.QuestionMark",
         shipwreck_in_water: "FILRODENSWMB.ICONS.Shipwreck",
         skull: "FILRODENSWMB.ICONS.Skull",
+        star: "FILRODENSWMB.ICONS.Star",
         wall_tent: "FILRODENSWMB.ICONS.WallTent",
     },
     PIN_ICONS: {
@@ -972,7 +977,28 @@ export const FILRODENSWMB = {
         PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
     },
     PINS: {
-        DEFAULT_SCALE: 1,
+        // The size new pins (and their labels) start with: small, so a map of many places stays readable
+        DEFAULT_SCALE: 0.6,
+        // The pin styles every map starts with (see PinStyles): one per settlement or site tier,
+        // each a built-in icon, a scale, the label's size, and a detail level (0 is always shown;
+        // higher levels are the first hidden when a map is viewed at world scale, which the
+        // generator's tier filter reads). Their names come from the NAME localisation keys, so
+        // a map made in one language keeps the names it was made with.
+        DEFAULT_STYLES: [
+            { icon: "circle_outline_with_star", scale: 1, labelSize: 1, detailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCapital" },
+            { icon: "star", scale: 0.85, labelSize: 0.85, detailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCity" },
+            { icon: "circle_outline_with_dot", scale: 0.7, labelSize: 0.7, detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleLargeTown" },
+            { icon: "dot", scale: 0.6, labelSize: 0.6, detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleTown" },
+            { icon: "dot_outline", scale: 0.5, labelSize: 0.5, detailLevel: 3, name: "FILRODENSWMB.UI.PinStyleVillage" },
+            { icon: "castle", scale: 0.7, labelSize: 0.6, detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleCastle" },
+            { icon: "fortress", scale: 0.7, labelSize: 0.65, detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleFortifiedTown" },
+            { icon: "anchor", scale: 0.6, labelSize: 0.6, detailLevel: 1, name: "FILRODENSWMB.UI.PinStylePort" },
+            { icon: "classical_building", scale: 0.55, labelSize: 0.55, detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleRuin" },
+            { icon: "jp_landmark", scale: 0.6, labelSize: 0.6, detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLandmark" },
+        ],
+        // The colour the default styles use, and the detail levels a style may have
+        DEFAULT_STYLE_COLOR: "#ffffff",
+        DETAIL_LEVELS: [0, 1, 2, 3],
     },
     TECTONICS: {
         DEFAULT_THICKNESS: 40,

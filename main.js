@@ -49,6 +49,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/dialogs/edit-tectonics.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-labels.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/edit-pin-quick-style.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-label-quick-style.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs",

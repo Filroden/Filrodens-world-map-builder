@@ -31,6 +31,7 @@ import { RegionPainter } from "./RegionPainter.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RouteTool } from "./RouteTool.js";
 import { RouteEditor } from "./RouteEditor.js";
+import { PinStyles } from "./PinStyles.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
@@ -91,12 +92,15 @@ export class MapStudio {
         // --- DIALOG MANAGER: Quick Styles ---
         addLabelQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
         addRouteQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
+        addPinQuickStyle(e, t)       { MapDialogManager.onAddQuickStyle(this, e, t); },
         addRegionQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
         editLabelQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
         editRouteQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
+        editPinQuickStyle(e, t)      { MapDialogManager.onEditQuickStyle(this, e, t); },
         editRegionQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
         deleteLabelQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
         deleteRouteQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+        deletePinQuickStyle(e, t)    { MapDialogManager.onDeleteQuickStyle(this, e, t); },
         deleteRegionQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
 
         // --- MASS EDIT ---
@@ -322,6 +326,7 @@ export class MapStudio {
      */
     static STYLE_LIBRARY_CATEGORIES = [
         { key: "customBiomes", labelKey: "FILRODENSWMB.UI.SettingsBiomeColors" },
+        { key: "customPinStyles", labelKey: "FILRODENSWMB.UI.SettingsPinQuickStyles" },
         { key: "customRouteStyles", labelKey: "FILRODENSWMB.UI.SettingsRouteQuickStyles" },
         { key: "customRegionStyles", labelKey: "FILRODENSWMB.UI.SettingsRegionQuickStyles" },
         { key: "customLabelStyles", labelKey: "FILRODENSWMB.UI.SettingsLabelQuickStyles" },
@@ -443,6 +448,7 @@ export class MapStudio {
         this.defaultUiState = MapStateManager.buildDefaultUiState(this.mapWidth, this.mapHeight);
 
         this.uiState = platform.utils.deepClone(this.defaultUiState);
+        PinStyles.ensure(this);
         this.customBiomeColors = {};
 
         // Collects per-phase timings during a full render for the summary logged when it finishes
@@ -731,6 +737,7 @@ export class MapStudio {
             label: style.name,
             isCustom: true,
         }));
+        context.pinStyles = PinStyles.choices(this, this.uiState.activePinStyle);
 
         if (this.activeTool === "regions") context.regionToolbar = RegionPainter.toolbarContext(this);
         if (this.activeTool === "infrastructure") context.routeToolbar = RouteTool.toolbarContext(this);
@@ -760,6 +767,15 @@ export class MapStudio {
         context.customRegionStyles = [...(this.uiState.customRegionStyles || [])]
             .sort(alphaSort)
             .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Region));
+        // Each pin style's row shows its icon, which may be a custom icon drawn from its own image
+        const iconList = getPinIconPickerList();
+        context.customPinStyles = [...PinStyles.list(this)]
+            .sort(alphaSort)
+            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Pin))
+            .map((style) => {
+                const entry = iconList.find((icon) => icon.key === style.icon);
+                return { ...style, iconIsCustom: entry?.isCustom || false, iconPath: entry?.path || "" };
+            });
 
         if (regionId === "context") {
             context.toolPartial = `${TEMPLATE_ROOT}tools-${this.activeTool}.hbs`;
@@ -1101,7 +1117,25 @@ export class MapStudio {
         // 2. Delegate to Sub-Systems
         this.#syncFaultLiveEdits(name);
         this.#syncRouteLiveEdits(name, event.type === "change");
+        this.#syncPinLiveEdits(name);
         this.#syncCropLiveEdits(name);
+    }
+
+    /**
+     * The toolbar's pin style: choosing one fills the icon, colour and scale new pins get from it;
+     * changing the colour or scale by hand (or the icon, see _onSetInfrastructureIcon) leaves the
+     * choice for "no style".
+     */
+    #syncPinLiveEdits(name) {
+        if (name === "activePinStyle") {
+            PinStyles.readIntoToolbar(this, PinStyles.active(this));
+            this.view?.render(["editToolbar"]);
+            return;
+        }
+        if ((name === "pinColor" || name === "pinScale") && this.uiState.activePinStyle !== PinStyles.NONE) {
+            this.uiState.activePinStyle = PinStyles.NONE;
+            this.view?.render(["editToolbar"]);
+        }
     }
 
     #syncFaultLiveEdits(name) {
@@ -2976,6 +3010,9 @@ export class MapStudio {
         this.uiState.customRouteStyles = payload.customRouteStyles || [];
         this.uiState.customLabelStyles = payload.customLabelStyles || [];
         this.uiState.customRegionStyles = payload.customRegionStyles || [];
+        // A map saved before pin styles existed gets the default set; a map that has the key keeps its own, even emptied
+        this.uiState.customPinStyles = Array.isArray(payload.customPinStyles) ? payload.customPinStyles : null;
+        PinStyles.ensure(this);
 
         this.uiState.maxLakeSize = p.hydrology?.maxLakeSize ?? FILRODENSWMB.HYDROLOGY.MAX_LAKE_SIZE;
         this.uiState.springAltOffset = p.hydrology?.springAltOffset ?? FILRODENSWMB.HYDROLOGY.SPRING_ALTITUDE_OFFSET;
@@ -3179,19 +3216,24 @@ export class MapStudio {
         if (this.uiState.activeInfraMode !== "pin" || x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
         MapStateManager.pushVectorState(this);
-        this.mapPins.push({
+        // A pin made with a style is named after the style (a "Town", say) and takes its look from it
+        const style = PinStyles.active(this);
+        const pin = {
             id: platform.utils.randomID(),
-            name: getPinIconLabel(this.uiState.activeIcon),
+            name: style?.name ?? getPinIconLabel(this.uiState.activeIcon),
             icon: this.uiState.activeIcon,
             x,
             y,
             scale: this.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
             visibility: "all",
             color: this.uiState.pinColor || "#ffffff",
+            pinStyle: null,
             label: {
-                fontSize: this.uiState.pinScale ?? 1,
+                fontSize: this.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
             },
-        });
+        };
+        if (style) PinStyles.apply(this, pin, style);
+        this.mapPins.push(pin);
 
         this._repaintVectors();
         this.view?.render(["context"]);
@@ -3339,6 +3381,7 @@ export class MapStudio {
                 customRouteStyles: this.uiState.customRouteStyles,
                 customLabelStyles: this.uiState.customLabelStyles,
                 customRegionStyles: this.uiState.customRegionStyles,
+                customPinStyles: this.uiState.customPinStyles,
                 history: this.brushEngine?.history || [],
                 tectonicFaults: this.tectonicFaults,
                 manualRivers: this.manualRivers,
@@ -3913,6 +3956,7 @@ export class MapStudio {
 
         this.defaultUiState = MapStateManager.buildDefaultUiState(newWidth, newHeight);
         this.uiState = platform.utils.deepClone(this.defaultUiState);
+        PinStyles.ensure(this);
         this.uiState.mapSeed = newSeed;
 
         // Inject the engine choice into the wiped state
@@ -4904,6 +4948,7 @@ export class MapStudio {
 
         this.uiState.activeIcon = newIcon;
         this.uiState.activeInfraMode = "pin";
+        this.uiState.activePinStyle = PinStyles.NONE;
         this.#leaveRouteMode();
 
         this.view?.render(["toolbar", "editToolbar"]);

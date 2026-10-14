@@ -184,8 +184,12 @@ export class MapStateManager {
 
             activeIcon: "map_pin",
             activeInfraMode: "pin",
+            // The pin style new pins take (see PinStyles), or "custom" for the icon, colour and scale below
+            activePinStyle: "custom",
+            // The map's pin styles: null until PinStyles.ensure gives a map its default set
+            customPinStyles: null,
             pinColor: "#ffffff",
-            pinScale: 1,
+            pinScale: FILRODENSWMB.PINS.DEFAULT_SCALE,
             // The Routes tool's edit mode: select, draw or edit (see RouteTool)
             routeToolMode: "draw",
             // How closely a traced stroke is kept, in mesh cells (see RouteTool)

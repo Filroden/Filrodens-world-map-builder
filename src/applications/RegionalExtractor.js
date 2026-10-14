@@ -65,6 +65,7 @@ export class RegionalExtractor {
             params: newParams,
             customBiomes: state.customBiomes,
             customRouteStyles: state.customRouteStyles,
+            customPinStyles: state.customPinStyles,
             customLabelStyles: state.customLabelStyles,
             customRegionStyles: state.customRegionStyles,
             history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
