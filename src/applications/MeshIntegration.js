@@ -3,7 +3,10 @@ import { MeshLoader } from "../mesh/MeshLoader.js";
 import { MeshBuilder } from "../mesh/MeshBuilder.js";
 import { MeshSession, SESSION_WARNINGS } from "../mesh/MeshSession.js";
 import { distanceToSegment } from "../mesh/RoutePath.js";
-import { VECTOR_SCHEMA_VERSION, createMeshBlock, validateOwners } from "../mesh/Schema.js";
+import { resampleOwners, retraceLine, routeMarkedLine } from "../mesh/Resample.js";
+import { VECTOR_SCHEMA_VERSION, createMeshBlock, createRoute, validateOwners } from "../mesh/Schema.js";
+import { allLevels } from "../mesh/LayerTree.js";
+import { VectorHistory } from "./VectorHistory.js";
 import { platform } from "../platform/index.js";
 
 /**
@@ -195,6 +198,61 @@ export class MeshIntegration {
     }
 
     // ------------------------------------------------------------------ while the map is open
+
+    /**
+     * Moves everything on the mesh with the terrain when the map's noise is panned or rescaled:
+     * every level's regions are resampled (each cell takes the owner of the cell that was where
+     * it now is), and every route's line is moved and traced again, so regions and routes stay
+     * over the same ground. A route moved partly off the map comes back as the pieces still on it
+     * (the first keeps the route's identity, the others are new routes); one moved wholly off is
+     * gone. Pins and labels are plain points the caller moves itself.
+     *
+     * A cell whose source point lies just beyond the map's edge (within one cell spacing) takes
+     * the owner of the nearest cell on the edge; further out it is unclaimed, as the map never
+     * showed that ground. The one-cell allowance is for the cells' jitter: a region painted up to
+     * the edge and moved inwards would otherwise lose its border cells (those whose source points
+     * fall a fraction of a cell outside the map), and have a ragged, part-unclaimed border when
+     * moved back. With it, the region keeps a fringe one cell wide over the revealed strip and is
+     * whole again on the way back, without spreading over the strip.
+     *
+     * @param {object} app
+     * @param {function(number, number): [number, number]} toTarget - Where a map point goes.
+     * @param {function(number, number): [number, number]} toSource - Where a map point came from (the inverse).
+     * @returns {Array} History entries restoring each level's owners (the routes are covered by a vector snapshot).
+     */
+    static transformContent(app, toTarget, toSource) {
+        const session = app.meshSession;
+        if (!session) return [];
+        const mesh = session.mesh;
+        const reach = mesh.spacing;
+        const within = (value, size) => Math.min(Math.max(value, 0), size - 1);
+        const fromEdge = (x, y) => {
+            const [sourceX, sourceY] = toSource(x, y);
+            const near = sourceX >= -reach && sourceY >= -reach && sourceX <= mesh.width - 1 + reach && sourceY <= mesh.height - 1 + reach;
+            return near ? [within(sourceX, mesh.width), within(sourceY, mesh.height)] : [sourceX, sourceY];
+        };
+        const entries = [];
+        for (const level of allLevels(app.layerSets ?? [])) {
+            const layer = session.layer(level.id);
+            if (!layer) continue;
+            const before = layer.encode();
+            session.restoreLevelOwners(level.id, resampleOwners(mesh, layer.owners, mesh, fromEdge));
+            entries.push(VectorHistory.levelOwners(level.id, before, session.layer(level.id).encode()));
+        }
+        app.mapRoutes = (app.mapRoutes ?? []).flatMap((route) => this.#movedRoute(session, route, toTarget));
+        return entries;
+    }
+
+    /** A route traced again along its moved line: itself for the first piece on the map, a new route for each other piece. */
+    static #movedRoute(session, route, toTarget) {
+        const pieces = retraceLine(routeMarkedLine(route, session.mesh), session.mesh, toTarget);
+        session.forgetRoute(route.id);
+        return pieces.map((piece, index) => {
+            if (index === 0) return Object.assign(route, piece);
+            const label = route.label ? structuredClone(route.label) : null;
+            return createRoute({ ...route, id: undefined, label, waypoints: piece.waypoints, legs: piece.legs, generated: null });
+        });
+    }
 
     /** The terrain buffers the per-cell summaries read (see Mesh.aggregate), or null before the terrain exists. */
     static terrainBuffers(app) {

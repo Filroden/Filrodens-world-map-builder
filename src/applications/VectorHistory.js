@@ -1,9 +1,10 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { NoiseTransform } from "./NoiseTransform.js";
 
 /**
  * The vector side of the studio's undo and redo: everything except brush strokes on the terrain
- * and biomes (which the brush engine keeps itself). Each step is an entry of one of four kinds:
+ * and biomes (which the brush engine keeps itself). Each step is an entry of one of five kinds:
  *
  * - `{ kind: "vector", snapshot }`: the vector state as it was (see
  *   MapStateManager.getVectorStateSnapshot). Stepping through it restores the snapshot and keeps
@@ -16,6 +17,12 @@ import { MapStateManager } from "./MapStateManager.js";
  * - `{ kind: "levelOwners", levelId, before, after }`: a level's whole owner array, encoded (or
  *   null where the level has none), before and after a change too wide for a patch to be small
  *   (a level deleted, or every cell resampled). Undo puts `before` back, redo `after`.
+ * - `{ kind: "noise", before, after }`: the noise frame (pan offsets and elevation scale; see
+ *   NoiseTransform) before and after the noise was panned or rescaled. Undo puts the map back
+ *   into `before`, redo into `after`, moving the brush strokes with it; the terrain is regenerated
+ *   by the studio once the step is applied, since the frame is one of its inputs. Panning or
+ *   rescaling records this beside a vector snapshot and the levels' owner arrays, so one Undo
+ *   steps the terrain and everything on it back together.
  * - `{ kind: "composite", entries }`: several of the above made by one action (deleting a region
  *   changes the layer sets and its cells). Undo steps its entries backwards, redo forwards.
  *
@@ -24,7 +31,7 @@ import { MapStateManager } from "./MapStateManager.js";
  * many entries it holds. HISTORY_MAX counts entries, as it always has.
  */
 export class VectorHistory {
-    static KIND = Object.freeze({ VECTOR: "vector", OWNERS: "owners", LEVEL_OWNERS: "levelOwners", COMPOSITE: "composite" });
+    static KIND = Object.freeze({ VECTOR: "vector", OWNERS: "owners", LEVEL_OWNERS: "levelOwners", NOISE: "noise", COMPOSITE: "composite" });
 
     /** An entry restoring the vector state as it is now. Take it before changing anything. */
     static snapshot(app) {
@@ -39,6 +46,11 @@ export class VectorHistory {
     /** An entry replacing a level's whole owner array (encoded, or null for none). */
     static levelOwners(levelId, before, after) {
         return { kind: this.KIND.LEVEL_OWNERS, levelId, before, after };
+    }
+
+    /** An entry moving the map between two noise frames (see NoiseTransform.current). */
+    static noise(before, after) {
+        return { kind: this.KIND.NOISE, before, after };
     }
 
     /** One entry for several, leaving out empty ones; a single entry stands on its own. */
@@ -90,6 +102,9 @@ export class VectorHistory {
                 return this.#applyOwners(app, entry, isUndo);
             case this.KIND.LEVEL_OWNERS:
                 app.meshSession?.restoreLevelOwners(entry.levelId, isUndo ? entry.before : entry.after);
+                return entry;
+            case this.KIND.NOISE:
+                NoiseTransform.apply(app, isUndo ? entry.before : entry.after);
                 return entry;
             case this.KIND.COMPOSITE: {
                 const order = isUndo ? [...entry.entries].reverse() : entry.entries;

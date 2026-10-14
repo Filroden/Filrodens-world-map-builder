@@ -106,6 +106,8 @@ export class MapStateManager {
             // a regional map until RegionalExtractor makes one (see TerrainVersion).
             terrainVersion: FILRODENSWMB.TERRAIN_VERSION.CURRENT,
             world: null,
+            // Whether the generator's outputs were made with a different km scale than the map has now (see MapStudio's area factor setting)
+            generatorStale: false,
             // Set when the owner of a legacy map declined updating it and asked not to be asked
             // again (see TerrainUpgrade.dismiss); never true for a map built at the current revision.
             terrainUpgradeDismissed: false,
@@ -217,9 +219,6 @@ export class MapStateManager {
             regionPaintMode: "select",
             // Whether every level is drawn while painting, rather than only the one being painted (see MeshIntegration.renderRegions)
             regionShowAll: false,
-            // The last fill chosen in a region quick style's editor
-            regionFillColor: "#c6af53",
-            regionFillStyle: "solid",
             regionOpacity: FILRODENSWMB.DISPLAY.REGION_OPACITY,
             activeRegionQuickStyle: "custom",
             customRegionStyles: [],

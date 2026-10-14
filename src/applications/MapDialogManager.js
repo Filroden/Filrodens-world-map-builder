@@ -630,10 +630,6 @@ export class MapDialogManager {
                     }
                 },
                 getUsageCount: (app, id) => app.regionLevels.reduce((sum, level) => sum + level.regions.filter((region) => region.quickStyle === id).length, 0),
-                onUpdateActiveUI: (app, result) => {
-                    app.uiState.regionFillColor = result.fillColor;
-                    app.uiState.regionFillStyle = result.fillStyle;
-                },
             },
             Biome: {
                 registryKey: "customBiomes",

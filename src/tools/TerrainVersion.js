@@ -481,7 +481,9 @@ export class TerrainVersion {
      * @returns {{zoom: number, originX: number|null, originY: number|null, rootW: number|null, rootH: number|null}}
      */
     static resolveWorld(state) {
-        if (state.world) return { ...state.world };
+        // A top map's world may hold only its area factor (see Schema.effectiveKmPerPx); the
+        // rest of a top map's description is implied by the map itself
+        if (state.world) return { zoom: 1, originX: 0, originY: 0, rootW: state.mapWidth, rootH: state.mapHeight, ...state.world };
 
         // Only a revision 1 map encodes its zoom in the wind distance; from revision 2 on the
         // wind distance also depends on the crop's shape, so it must not be read as a zoom.

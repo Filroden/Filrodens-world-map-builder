@@ -17,6 +17,7 @@ import { bindDropdownMenus } from "../ui/dropdowns.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { clampAreaFactor, effectiveKmPerPx } from "../mesh/Schema.js";
 import { TerrainUpgrade } from "./TerrainUpgrade.js";
 import { RiverSources } from "../generation/RiverSources.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
@@ -25,6 +26,7 @@ import { RandomLandMap } from "../generation/RandomLandMap.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { LayerPainting } from "../canvas/LayerPainting.js";
 import { MeshIntegration } from "./MeshIntegration.js";
+import { NoiseTransform } from "./NoiseTransform.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { RegionPainter } from "./RegionPainter.js";
@@ -714,6 +716,8 @@ export class MapStudio {
         context.manualRivers = [...(this.manualRivers || [])].sort(alphaSort);
 
         context.uiState = this.uiState;
+        context.worldAreaFactor = clampAreaFactor(this.uiState.world?.areaFactor);
+        context.areaFactorRange = { min: FILRODENSWMB.MESH.AREA_FACTOR_RANGE[0], max: FILRODENSWMB.MESH.AREA_FACTOR_RANGE[1] };
         context.currentSaveName = this.currentSaveName;
         context.terrainUpgradeAvailable = this.terrainUpgrade !== null;
         context.canCreateRegionalMap = TerrainVersion.canCreateRegionalMap(this.uiState);
@@ -1293,6 +1297,7 @@ export class MapStudio {
         if (name.startsWith("cartography")) return this.#updateCartography(target, name);
         if (name === "referenceAlpha") return this.#updateReferenceAlpha(target);
         if (name === "gridType" || name === "gridSize") return this.#updateGridSettings();
+        if (name === "worldAreaFactor") return this.#updateAreaFactor(target);
         if (name === "biomeAlphaActive" || name === "biomeAlphaInactive") return this.#updateBiomeAlphas();
         if (name === "contourInterval") return this.debouncedRepaintCanvas();
         // Relief strength and the water settings are terrain shader settings, so moving them
@@ -1323,6 +1328,22 @@ export class MapStudio {
     #updateGridSettings() {
         MapStateManager.getMapParameters(this);
         this.#updateGrid();
+    }
+
+    /**
+     * The map's area factor (see Schema.effectiveKmPerPx): it changes what a pixel measures in km
+     * and nothing that is drawn, so no repaint follows. It is written into a full description of
+     * the map's world (a top map's own, or the regional one it already has), the open mesh takes
+     * the new km scale at once (it was built with the old one, and keeps it otherwise until the
+     * map is next loaded), and the generator's outputs are marked stale, since every km-based
+     * figure they were made with has changed.
+     */
+    #updateAreaFactor(target) {
+        const areaFactor = clampAreaFactor(target.value);
+        target.value = areaFactor;
+        this.uiState.world = { ...TerrainVersion.resolveWorld(this.uiState), areaFactor };
+        this.uiState.generatorStale = true;
+        if (this.meshSession) this.meshSession.mesh.kmPerPx = effectiveKmPerPx({ mapHeight: this.mapHeight, params: { latTop: this.uiState.latTop, latBottom: this.uiState.latBottom }, world: this.uiState.world });
     }
 
     #updateBiomeAlphas() {
@@ -1874,7 +1895,7 @@ export class MapStudio {
         if (!["features", "scene"].includes(this.activeTool)) return;
 
         // This only ever splits an existing line/polygon segment (land masks, fault lines, manual
-        // rivers) - pins have no segments and never reach this path - so both tools may extend
+        // rivers), since pins have no segments and never reach this path, so both tools may extend
         // into the buffer here
         const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
         if (x < -buffer || x > this.mapWidth + buffer || y < -buffer || y > this.mapHeight + buffer) return;
@@ -2938,6 +2959,7 @@ export class MapStudio {
         // revision (see TerrainVersion). Only regional maps carry a world description.
         this.uiState.terrainVersion = TerrainVersion.getVersion(payload);
         this.uiState.world = payload.world ?? null;
+        this.uiState.generatorStale = payload.generatorStale === true;
         this.upwindMargin = payload.upwindMargin ?? null;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
@@ -3367,6 +3389,7 @@ export class MapStudio {
                 generationEngine: this.uiState.generationEngine,
                 terrainVersion: this.uiState.terrainVersion,
                 world: this.uiState.world,
+                generatorStale: this.uiState.generatorStale === true,
                 upwindMargin: this.upwindMargin ?? null,
                 terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
                 springsBaked: this.uiState.springsBaked,
@@ -3786,7 +3809,7 @@ export class MapStudio {
      */
     #vectorRefreshInputs() {
         return {
-            terrain: this.#serialiseTerrainInputs(),
+            terrain: this.#serialiseTerrainInputs() + JSON.stringify(NoiseTransform.current(this)),
             featurePins: JSON.stringify(this.mapPins.filter((p) => !p.icon)),
             customBiomes: JSON.stringify(this.uiState.customBiomes),
         };
@@ -3798,8 +3821,9 @@ export class MapStudio {
      * covers the ones after it.
      */
     #refreshAfterVectorStep(before, after) {
-        // Faults, manual rivers and (in guided mode) land masks all change the elevation data,
-        // so an undo/redo that alters any of them needs a terrain regeneration, not just a repaint.
+        // Faults, manual rivers, (in guided mode) land masks and the noise frame all change the
+        // elevation data, so an undo/redo that alters any of them needs a terrain regeneration, not
+        // just a repaint.
         if (before.terrain !== after.terrain) {
             // The pixel layers only change once the terrain is regenerated, so only the vector
             // layers need redrawing now
@@ -3847,51 +3871,51 @@ export class MapStudio {
 
     _onAdjustNoiseScale(event, target) {
         const dir = Number(target.dataset.dir);
-        const currentScale = this.uiState["noise.elevation.scale"];
+        const frame = NoiseTransform.current(this);
         const maxScale = Math.max(this.mapWidth, this.mapHeight);
-        const targetScale = Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.min(currentScale + dir * FILRODENSWMB.LIMITS.NOISE_SCALE_STEP, maxScale));
+        const targetScale = Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.min(frame.scale + dir * FILRODENSWMB.LIMITS.NOISE_SCALE_STEP, maxScale));
 
-        if (currentScale === targetScale) {
+        if (frame.scale === targetScale) {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnScaleLimit") || "Noise scale limit reached.");
             return;
         }
+        this.#moveNoiseFrame({ ...frame, scale: targetScale });
+    }
 
-        MapStateManager.pushVectorState(this);
-        const scaleRatio = targetScale / currentScale;
-        const offsetX = this.uiState["noise.offsetX"] || 0;
-        const offsetY = this.uiState["noise.offsetY"] || 0;
-
-        const scalePoint = (pt) => {
-            if (pt?.x !== undefined) {
-                pt.x = (pt.x + offsetX) * scaleRatio - offsetX;
-                pt.y = (pt.y + offsetY) * scaleRatio - offsetY;
-            }
+    /**
+     * Pans or rescales the Standard engine's noise: the terrain moves under the map, and
+     * everything placed on it is carried along so it stays over the same ground. Pins, labels and
+     * decorations are moved here; the brush strokes by NoiseTransform.apply (they belong to the
+     * terrain); the regions and routes by MeshIntegration.transformContent. All of it, the noise
+     * frame included, is one undo step, so Undo brings the terrain back along with everything on
+     * it rather than leaving the content over terrain that has not moved (see VectorHistory).
+     * @param {{offsetX: number, offsetY: number, scale: number}} frame - The noise frame to move to.
+     */
+    #moveNoiseFrame(frame) {
+        const before = NoiseTransform.current(this);
+        if (before.offsetX === frame.offsetX && before.offsetY === frame.offsetY && before.scale === frame.scale) return;
+        const snapshot = VectorHistory.snapshot(this);
+        const { toTarget, toSource } = NoiseTransform.between(before, frame);
+        const movePoint = (pt) => {
+            if (pt?.x !== undefined) [pt.x, pt.y] = toTarget(pt.x, pt.y);
         };
 
-        this.mapLabels.forEach(scalePoint);
-        this.mapDecorations.forEach(scalePoint);
+        this.mapLabels.forEach(movePoint);
+        this.mapDecorations.forEach(movePoint);
         this.mapPins.forEach((p) => {
-            scalePoint(p);
-            if (p.label) scalePoint(p.label);
+            movePoint(p);
+            if (p.label) movePoint(p.label);
         });
         this.mapRoutes.forEach((r) => {
-            if (r.label) scalePoint(r.label);
+            if (r.label) movePoint(r.label);
         });
         for (const level of this.regionLevels) {
-            for (const reg of level.regions) if (reg.label) scalePoint(reg.label);
+            for (const reg of level.regions) if (reg.label) movePoint(reg.label);
         }
-        if (this.brushEngine) {
-            const scaleStroke = (stroke) => {
-                stroke.points.forEach(scalePoint);
-                stroke.size = stroke.size * scaleRatio;
-            };
-            this.brushEngine.history.forEach(scaleStroke);
-            this.brushEngine.redoStack.forEach(scaleStroke);
-            // The brushed layer was built from the strokes as they were before this change.
-            this.brushEngine.invalidateLayerCache();
-        }
+        const levelEntries = MeshIntegration.transformContent(this, toTarget, toSource);
+        NoiseTransform.apply(this, frame);
+        VectorHistory.push(this, VectorHistory.composite([snapshot, VectorHistory.noise(before, frame), ...levelEntries]));
 
-        this.uiState["noise.elevation.scale"] = targetScale;
         this.view?.render(["context"]);
         this.markDirty();
         this.debouncedGenerateTerrain();
@@ -4769,44 +4793,8 @@ export class MapStudio {
     }
 
     _onNudgeNoise(event, target) {
-        const dx = Number(target.dataset.dx);
-        const dy = Number(target.dataset.dy);
-
-        MapStateManager.pushVectorState(this);
-
-        const translatePoint = (pt) => {
-            if (pt?.x !== undefined) {
-                pt.x -= dx;
-                pt.y -= dy;
-            }
-        };
-
-        this.mapLabels.forEach(translatePoint);
-        this.mapDecorations.forEach(translatePoint);
-        this.mapPins.forEach((p) => {
-            translatePoint(p);
-            if (p.label) translatePoint(p.label);
-        });
-        this.mapRoutes.forEach((r) => {
-            if (r.label) translatePoint(r.label);
-        });
-        for (const level of this.regionLevels) {
-            for (const reg of level.regions) if (reg.label) translatePoint(reg.label);
-        }
-        if (this.brushEngine) {
-            const translateStroke = (stroke) => stroke.points.forEach(translatePoint);
-            this.brushEngine.history.forEach(translateStroke);
-            this.brushEngine.redoStack.forEach(translateStroke);
-            // The brushed layer was built from the strokes as they were before this change.
-            this.brushEngine.invalidateLayerCache();
-        }
-
-        this.uiState["noise.offsetX"] += dx;
-        this.uiState["noise.offsetY"] += dy;
-
-        this.view?.render(["context"]);
-        this.markDirty();
-        this.debouncedGenerateTerrain();
+        const frame = NoiseTransform.current(this);
+        this.#moveNoiseFrame({ ...frame, offsetX: frame.offsetX + Number(target.dataset.dx), offsetY: frame.offsetY + Number(target.dataset.dy) });
     }
 
     _onNudgeReference(event, target) {
@@ -4845,19 +4833,14 @@ export class MapStudio {
         this.view?.render(["context"]);
     }
 
+    /** Resetting the pan is a move back to the original offsets, so the content and the undo step follow (see #moveNoiseFrame). */
     _onResetNoisePan(_event, _target) {
-        this.uiState["noise.offsetX"] = this.defaultUiState["noise.offsetX"];
-        this.uiState["noise.offsetY"] = this.defaultUiState["noise.offsetY"];
-        this.view?.render(["context"]);
-        this.markDirty();
-        this.debouncedGenerateTerrain();
+        this.#moveNoiseFrame({ ...NoiseTransform.current(this), offsetX: this.defaultUiState["noise.offsetX"], offsetY: this.defaultUiState["noise.offsetY"] });
     }
 
+    /** Resetting the scale is a rescale back to the original, so the content and the undo step follow (see #moveNoiseFrame). */
     _onResetNoiseScale(_event, _target) {
-        this.uiState["noise.elevation.scale"] = this.defaultUiState["noise.elevation.scale"];
-        this.view?.render(["context"]);
-        this.markDirty();
-        this.debouncedGenerateTerrain();
+        this.#moveNoiseFrame({ ...NoiseTransform.current(this), scale: this.defaultUiState["noise.elevation.scale"] });
     }
 
     _onResetReferencePan(_event, _target) {
