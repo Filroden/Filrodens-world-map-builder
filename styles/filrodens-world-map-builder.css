@@ -41,6 +41,9 @@
 .fwmb-icon--layers {
     --fwmb-mask: url("../assets/icons/layers.svg");
 }
+.fwmb-icon--pentagon {
+    --fwmb-mask: url("../assets/icons/pentagon.svg");
+}
 .fwmb-icon--elevation {
     --fwmb-mask: url("../assets/icons/elevation.svg");
 }
@@ -1118,7 +1121,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.fwmb-rail-stage:first-child {
+.fwmb-rail-group:first-child .fwmb-rail-stage {
     margin-top: 0.25rem;
 }
 .fwmb-rail-btn {
@@ -1136,7 +1139,7 @@
     background: var(--fwmb-bg-hover);
     color: var(--fwmb-text-primary);
 }
-.fwmb-rail-btn[aria-pressed="true"] {
+.fwmb-rail-btn:is([aria-pressed="true"], [aria-current="page"]) {
     background: var(--fwmb-fill-accent);
     color: var(--fwmb-text-inverse);
 }
@@ -2087,19 +2090,104 @@
     position: relative;
 }
 
-/* 1. The Toolbar Part */
+/* The side surfaces' widths follow the room the studio has (data-fwmb-width, written by
+   StudioLayout from the studio's own width, since a Foundry window can be far narrower than the
+   screen): below 1,400px the rail, panel and inspector take their compact widths. */
+.fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) {
+    --fwmb-rail-width: var(--fwmb-rail-width-compact);
+    --fwmb-panel-width: var(--fwmb-panel-width-compact);
+    --fwmb-inspector-width: var(--fwmb-inspector-width-compact);
+}
+
+/* 1. The rail: the tools by stage, the occasional tools, then the file actions at its foot */
 .fwmb .fwmb-toolbar {
-    flex: 0 0 3rem;
+    flex: 0 0 var(--fwmb-rail-width);
+    width: var(--fwmb-rail-width);
+    min-height: 0;
     background: var(--fwmb-bg-base);
     border-inline-end: 1px solid var(--fwmb-border-main);
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-block: var(--fwmb-size-8);
-    gap: var(--fwmb-size-8);
+    gap: 0.25rem;
+    padding: 0.5rem 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button {
+.fwmb-rail-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    width: 100%;
+}
+
+.fwmb-rail-spacer {
+    flex: 1;
+}
+
+.fwmb-rail-btn .fwmb-icon {
+    width: var(--fwmb-size-20);
+    height: var(--fwmb-size-20);
+    min-width: var(--fwmb-size-20);
+}
+
+/* The occasional tools fold into More while the studio is short; More shows only then */
+.fwmb-rail-more {
+    display: none;
+}
+.fwmb-studio[data-fwmb-short] .fwmb-rail-occasional {
+    display: none;
+}
+.fwmb-studio[data-fwmb-short] .fwmb-rail-more {
+    display: flex;
+}
+
+/* More is a rail button like the others (the dropdown's own button look does not apply), and its
+   menu marks the tool in use and whether the 3D view is on */
+.fwmb .fwmb-rail-more > .fwmb-rail-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb .fwmb-rail-more > .fwmb-rail-btn:hover {
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
+}
+.fwmb .fwmb-rail-more > .fwmb-rail-btn[aria-current="page"] {
+    background: var(--fwmb-fill-accent);
+    color: var(--fwmb-text-inverse);
+}
+.fwmb .fwmb-rail-more .fwmb-dropdown-menu button:is([aria-current="page"], [aria-checked="true"]) {
+    background: var(--fwmb-bg-highlight);
+    font-weight: 700;
+}
+
+/* The compact rail: icons only. The stage names are hidden from sight but stay the groups' names
+   for assistive technology, and the gap above each group still keeps them apart. */
+.fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-rail-stage {
+    position: relative;
+    width: 1px;
+    height: 1px;
+    max-width: none;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    margin: 0.75rem 0 0;
+}
+.fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-rail-group:first-child .fwmb-rail-stage {
+    margin-top: 0;
+}
+
+/* The edit toolbar's icon buttons (mask modes, brush tools, brush history): square, transparent
+   until hovered or on */
+.fwmb :is(.fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button {
     width: 2.25rem;
     height: 2.25rem;
     display: flex;
@@ -2111,31 +2199,33 @@
     color: var(--fwmb-text-secondary);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button:hover {
+.fwmb :is(.fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button:hover {
     color: var(--fwmb-text-primary);
     background: var(--fwmb-bg-hover);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button:is([aria-pressed="true"], [aria-current="page"]) {
+.fwmb :is(.fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button:is([aria-pressed="true"], [aria-current="page"]) {
     color: var(--fwmb-text-inverse);
     background: var(--fwmb-fill-accent);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button .fwmb-icon {
+.fwmb :is(.fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button .fwmb-icon {
     width: var(--fwmb-size-20);
     height: var(--fwmb-size-20);
 }
 
-/* 2. The Context Panel Part */
+/* 2. The context panel */
 .fwmb .fwmb-context-panel {
     flex: 0 0 var(--fwmb-panel-width);
+    width: var(--fwmb-panel-width);
+    min-width: 0;
     background: var(--fwmb-bg-panel);
     border-inline-end: 1px solid var(--fwmb-border-main);
     display: flex;
     flex-direction: column;
 }
 
-/* 3. The Map Part */
+/* 3. The map: the canvas, with its four overlays in its corners */
 .fwmb-map-preview {
     flex: 1;
     position: relative;
@@ -2153,153 +2243,139 @@
     height: 100%;
 }
 
-/* The boxes drawn over the map (map information, undo/redo, canvas hint and map control groups)
-   share the overlay ink: one dark background in every theme, so they read over any part of the
-   map, with a faint light edge. */
-.fwmb-map-container {
-    --fwmb-map-overlay-border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-/* The row along the map's bottom edge holding the canvas actions hint (start corner) and the map
-   controls (end corner). The row itself lets pointer events through to the canvas; only the
-   controls take them. The gap is the least space kept between the hint and the controls. */
-.fwmb-map-footer {
-    position: absolute;
-    inset-block-end: var(--fwmb-size-10);
-    inset-inline: var(--fwmb-size-10);
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--fwmb-size-32);
-    pointer-events: none;
+/* The overlays sit above the canvas and take pointer events only where they have controls, so the
+   map can be worked right up to their edges */
+.fwmb-map-preview .fwmb-map-overlay {
     z-index: 20;
 }
 
-/* The map controls: a row of separate groups (view filters, layers, overlays, zoom), each in its
-   own box (see .fwmb-map-control-group). The row itself draws nothing. */
-.fwmb-map-controls {
-    position: relative;
-    flex: none;
-    margin-inline-start: auto;
-    pointer-events: auto;
-    display: flex;
-    gap: var(--fwmb-size-8);
-    z-index: 20;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.fwmb-map-control-group {
-    display: flex;
-    gap: var(--fwmb-size-4);
-    background: var(--fwmb-overlay-bg);
-    padding: var(--fwmb-size-4);
-    border-radius: var(--fwmb-radius-medium);
-    border: var(--fwmb-map-overlay-border);
-}
-
-/* The canvas actions hint: one action per row (see CanvasHints). It is as wide as its longest
-   action and grows upwards, since the footer keeps it on the bottom edge. If the map is too
-   narrow for that width, it stops at the gap before the map controls and its rows wrap. */
-.fwmb-map-hint {
-    flex: 0 1 auto;
-    min-inline-size: 0;
+/* Top start: the information bar, growing downward and stopping 4rem short of the canvas foot
+   (clear of the map controls), then scrolling. Its width is fixed, wide enough for the values and
+   most biome names on one line, so it does not change height (or move the hint beside it) as the
+   pointer passes over biomes with longer and shorter names. */
+.fwmb-canvas-readout {
+    top: 0.5rem;
+    inset-inline-start: 0.5rem;
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-size-4);
-    color: var(--fwmb-overlay-text);
-    font-size: var(--fwmb-size-12);
-    line-height: 1rem;
-    background: var(--fwmb-overlay-bg);
-    padding: var(--fwmb-size-4) var(--fwmb-size-8);
-    border-radius: var(--fwmb-radius-medium);
-    border: var(--fwmb-map-overlay-border);
+    width: 25rem;
+    max-width: calc(100% - 1rem);
+    box-sizing: border-box;
+    max-height: calc(100% - 4rem);
+    overflow-y: auto;
     pointer-events: none;
-    z-index: 10;
-    opacity: 0;
-    transition: opacity 0.2s ease;
 }
-
-/* An empty hint (before the first render fills it) would otherwise show as a small dark box */
-.fwmb-map-hint:empty {
+.fwmb-canvas-readout .fwmb-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    padding: 0.375rem 0.625rem;
+    font: 500 0.8125rem/1rem var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb-canvas-readout .fwmb-values .fwmb-k {
+    color: var(--fwmb-overlay-muted);
+    font: 400 0.6875rem/1rem var(--fwmb-font-ui);
+    margin-inline-end: 0.25rem;
+}
+.fwmb-canvas-readout .fwmb-values .fwmb-thematic {
+    color: var(--fwmb-overlay-accent);
+}
+.fwmb-canvas-readout .fwmb-legends:empty {
     display: none;
 }
 
-.fwmb-map-history {
-    position: absolute;
-    inset-block-start: var(--fwmb-size-10);
-    inset-inline-end: var(--fwmb-size-10);
+/* Top end: the hint, one item per action. Items share a row while there is room; the hint is as
+   wide as the room the information bar leaves beside it (at most 26rem, at least 10rem), so it
+   drops to one item per row as the canvas narrows rather than moving. The mode's own actions are
+   in the normal ink, movement muted. */
+.fwmb-map-hint {
+    top: 0.5rem;
+    inset-inline-end: var(--fwmb-end-inset, 0.5rem);
+    padding: 0.375rem 0.625rem;
+    max-width: clamp(10rem, 100% - var(--fwmb-readout-w, 20rem) - var(--fwmb-end-inset, 0.5rem) - 1rem, 26rem);
     display: flex;
-    gap: var(--fwmb-size-4);
-    background: var(--fwmb-overlay-bg);
-    padding: var(--fwmb-size-4);
-    border-radius: var(--fwmb-radius-medium);
-    border: var(--fwmb-map-overlay-border);
-    z-index: 20;
-    opacity: 0;
-    transition: opacity 0.2s ease;
+    flex-wrap: wrap;
+    gap: 0.125rem 0.75rem;
+    pointer-events: none;
+}
+.fwmb-map-hint:empty {
+    display: none;
+}
+.fwmb-map-hint > * {
+    flex: none;
+    max-width: 100%;
+}
+.fwmb-map-hint .fwmb-more {
+    color: var(--fwmb-overlay-muted);
+}
+/* Bottom end: undo and redo */
+.fwmb-map-history {
+    bottom: 0.5rem;
+    inset-inline-end: var(--fwmb-end-inset, 0.5rem);
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
 }
 
-.fwmb-map:hover .fwmb-map-controls,
-.fwmb-map:hover .fwmb-map-hint,
-.fwmb-map:hover .fwmb-map-history {
-    opacity: 1;
-}
-
-.fwmb-map-controls button,
-.fwmb-map-history button {
-    width: var(--fwmb-control-height);
-    height: var(--fwmb-control-height);
-    background: var(--fwmb-overlay-control);
-    border: 1px solid var(--fwmb-overlay-border);
-    border-radius: 0.25rem;
-    color: var(--fwmb-overlay-text);
-    padding: 0;
+/* Bottom start: the map controls, in groups (view filters | layers | contours, grid and
+   reference | zoom), a hairline between groups. When the full row does not fit beside undo/redo
+   (data-fold, see StudioLayout) the layer groups give way to the one Layers menu. */
+.fwmb-map-controls {
+    bottom: 0.5rem;
+    inset-inline-start: 0.5rem;
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.25rem;
+}
+.fwmb-map-control-group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+.fwmb-map-control-group + .fwmb-map-control-group::before {
+    content: "";
+    width: 1px;
+    height: 1.25rem;
+    background: rgba(255, 255, 255, 0.18);
+    margin: 0 0.125rem;
+}
+.fwmb-map-controls-folded,
+.fwmb-map-controls[data-fold] .fwmb-map-controls-wide {
+    display: none;
+}
+.fwmb-map-controls[data-fold] .fwmb-map-controls-folded {
+    display: flex;
 }
 
-.fwmb-map-controls button:hover,
-.fwmb-map-history button:hover {
-    color: var(--fwmb-overlay-text);
-    background: var(--fwmb-overlay-control-hover);
+.fwmb .fwmb-map-btn .fwmb-icon {
+    width: var(--fwmb-size-16);
+    height: var(--fwmb-size-16);
+    min-width: var(--fwmb-size-16);
 }
-
-/* On: the theme's fill, so a layer that is showing stands out from one that is not */
-.fwmb-map-controls button[aria-pressed="true"],
-.fwmb-map-history button[aria-pressed="true"] {
+.fwmb .fwmb-map-btn[aria-pressed="true"] {
     color: var(--fwmb-text-inverse);
-    background: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-fill-accent);
+}
+.fwmb .fwmb-map-btn[aria-pressed="true"]:hover {
+    background: var(--fwmb-fill-accent-hover);
 }
 
 /* Some of a group's layers on: the button reads as on, with a dot in its corner */
-.fwmb-map-controls button.fwmb-is-partial::after {
-    content: "";
-    position: absolute;
-    inset-inline-end: 0.1875rem;
-    inset-block-end: 0.1875rem;
-    width: 0.375rem;
-    height: 0.375rem;
-    border-radius: 50%;
+.fwmb .fwmb-map-btn.fwmb-is-partial::after {
     background: var(--fwmb-overlay-accent);
     border: 1px solid var(--fwmb-overlay-bg);
 }
 
-.fwmb-map-controls button.fwmb-is-partial {
-    position: relative;
-    color: var(--fwmb-text-inverse);
-    background: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-fill-accent);
+.fwmb-map-history .fwmb-map-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
 }
 
-/* Keep the controls showing while one of their lists is open, even if the pointer leaves the map */
-.fwmb-map-controls.fwmb-menu-open {
-    opacity: 1;
-}
-
-/* A terrain layer group: its button, and the list of its layers that opens above it */
+/* A layer group (Terrain, Biomes, or the folded Layers menu): its button, and the list of its
+   layers that opens above it. The list stays open while it is ticked, and scrolls when it is
+   taller than the canvas. */
 .fwmb-layer-group {
     position: relative;
     display: flex;
@@ -2307,13 +2383,15 @@
 
 .fwmb-layer-menu {
     position: absolute;
-    inset-block-end: calc(100% + var(--fwmb-size-8));
-    inset-inline-end: 0;
+    inset-block-end: calc(100% + 0.5rem);
+    inset-inline-start: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-size-2);
-    min-inline-size: 10rem;
-    padding: var(--fwmb-size-4);
+    gap: 0.125rem;
+    min-inline-size: 11rem;
+    max-block-size: var(--fwmb-layer-menu-max, 20rem);
+    overflow-y: auto;
+    padding: 0.25rem;
     background: var(--fwmb-overlay-bg);
     border: 1px solid var(--fwmb-overlay-border);
     border-radius: var(--fwmb-radius-large);
@@ -2325,23 +2403,47 @@
     display: none;
 }
 
-.fwmb-map-controls .fwmb-layer-menu button {
+.fwmb .fwmb-layer-menu button {
     inline-size: 100%;
     block-size: auto;
+    display: flex;
+    align-items: center;
     justify-content: flex-start;
-    gap: var(--fwmb-size-8);
-    padding: var(--fwmb-size-4) var(--fwmb-size-8);
-    font-size: var(--fwmb-size-13);
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
     white-space: nowrap;
     color: var(--fwmb-overlay-text);
     background: transparent;
     border: none;
+    border-radius: var(--fwmb-radius-small);
 }
 
-.fwmb-map-controls .fwmb-layer-menu button.fwmb-layer-menu-all {
+.fwmb .fwmb-layer-menu button:hover {
+    color: var(--fwmb-overlay-text);
+    background: var(--fwmb-overlay-control-hover);
+}
+
+.fwmb .fwmb-layer-menu button.fwmb-layer-menu-all {
     border-block-end: 1px solid var(--fwmb-overlay-border);
     border-radius: 0;
-    margin-block-end: var(--fwmb-size-2);
+    margin-block-end: 0.125rem;
+}
+
+/* In the folded Layers menu a group row (Terrain, Biomes) ticks its whole group, and its layers
+   sit indented beneath it */
+.fwmb .fwmb-layer-menu button.fwmb-layer-menu-group {
+    font-weight: 700;
+}
+.fwmb .fwmb-layer-menu button.fwmb-layer-menu-sub {
+    padding-inline-start: 1.75rem;
+}
+.fwmb-layer-menu-sep {
+    flex: none;
+    height: 1px;
+    margin: 0.25rem 0;
+    background: var(--fwmb-overlay-border);
 }
 
 /* The tick box drawn in each list row, from the row's aria-checked */
@@ -2379,57 +2481,6 @@
     inline-size: 0.5rem;
     block-size: 0.125rem;
     background: var(--fwmb-overlay-accent);
-}
-
-.fwmb-map-history button:disabled {
-    opacity: 0.45;
-    cursor: default;
-    pointer-events: none;
-}
-
-.fwmb-canvas-readout {
-    position: absolute;
-    inset-block-start: var(--fwmb-size-10);
-    inset-inline-start: var(--fwmb-size-10);
-    background: var(--fwmb-overlay-bg);
-    padding: var(--fwmb-size-6) var(--fwmb-size-10);
-    border-radius: var(--fwmb-radius-medium);
-    border: var(--fwmb-map-overlay-border);
-    color: var(--fwmb-overlay-text);
-    font-family: var(--fwmb-font-readout);
-    font-weight: 500;
-    font-size: var(--fwmb-size-13);
-    line-height: 1rem;
-    font-variant-numeric: tabular-nums;
-    display: flex;
-    align-items: center;
-    gap: var(--fwmb-size-10);
-    z-index: 20;
-    pointer-events: none; /* Crucial: Prevents the readout from blocking brush clicks! */
-}
-
-.fwmb-canvas-readout .fwmb-divider-vertical {
-    height: var(--fwmb-size-16);
-    margin: 0;
-}
-
-.fwmb-readout-item {
-    display: flex;
-    align-items: center;
-    gap: var(--fwmb-size-2);
-}
-
-.fwmb-readout-item i {
-    width: var(--fwmb-size-16);
-    height: var(--fwmb-size-16);
-    min-width: var(--fwmb-size-16);
-    color: var(--fwmb-overlay-muted);
-}
-
-.fwmb-readout-biome {
-    font-family: var(--fwmb-font-ui);
-    font-weight: bold;
-    color: var(--fwmb-overlay-accent);
 }
 
 /* --- RANGE SLIDERS ---
@@ -2668,6 +2719,37 @@
     flex-direction: column;
     align-items: stretch;
     gap: var(--fwmb-size-4);
+}
+
+/* A compact side surface (the panel or inspector at 17.5rem or less: their compact widths, below
+   1,400px of studio width) stacks each row's label above its fields, which then take the whole
+   width; long labels and button texts wrap rather than being cut */
+/* A fieldset is never wider than the side surface it is in (a fieldset's default minimum is its
+   content's width, which would push it past a compact panel's edge) */
+.fwmb :is(.fwmb-panel, .fwmb-overlay-docked) fieldset {
+    min-inline-size: 0;
+}
+
+@container fwmb-side (max-width: 17.5rem) {
+    .fwmb .fwmb-form-group {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--fwmb-size-4);
+    }
+    .fwmb .fwmb-form-group > label,
+    .fwmb .fwmb-form-group > .fwmb-label {
+        white-space: normal;
+    }
+    .fwmb .fwmb-form-fields > :is(input, select):not([type="checkbox"], [type="radio"]) {
+        flex: 1;
+        min-width: 0;
+    }
+    .fwmb .fwmb-btn {
+        white-space: normal;
+        height: auto;
+        min-height: var(--fwmb-control-height);
+    }
 }
 
 /* --- MAP LAYOUT & EDIT TOOLBAR --- */
@@ -3614,16 +3696,15 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     justify-content: center;
 }
 
-.fwmb-processing-content {
-    background: var(--fwmb-overlay-bg);
-    padding: var(--fwmb-space-3) var(--fwmb-space-4);
-    border-radius: var(--fwmb-radius-large);
+.fwmb-processing-title {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-size-10);
-    color: var(--fwmb-overlay-text);
-    font-size: var(--fwmb-size-14);
-    box-shadow: var(--fwmb-shadow-window);
+    gap: 0.5rem;
+}
+
+.fwmb-processing-actions {
+    display: flex;
+    justify-content: flex-end;
 }
 
 .fwmb-spin {
@@ -4280,11 +4361,6 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     white-space: nowrap;
 }
 
-/* The processing overlay's Cancel button sits beside the message */
-.fwmb .fwmb-processing-cancel {
-    margin-inline-start: var(--fwmb-size-8);
-}
-
 /* The region the Regions tool paints into, shown in its edit toolbar */
 .fwmb .fwmb-active-region {
     display: flex;
@@ -4424,4 +4500,51 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     margin-inline-start: 0.75rem;
     padding-inline-start: var(--fwmb-size-8);
     border-inline-start: 1px solid var(--fwmb-border-subtle);
+}
+
+/* The keyboard shortcuts sheet: a table per tool, a caption per mode */
+.fwmb .fwmb-shortcuts-dialog {
+    width: 34rem;
+    max-height: calc(100% - 4rem);
+}
+.fwmb-shortcuts {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+}
+.fwmb-shortcuts-tool {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.fwmb .fwmb-shortcuts-title {
+    margin: 0;
+    font: 600 0.9375rem/1.25rem var(--fwmb-font-display);
+    color: var(--fwmb-text-primary);
+    border: 0;
+}
+.fwmb-shortcuts-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: none;
+    border: 0;
+}
+.fwmb-shortcuts-table caption {
+    text-align: start;
+    font: 700 0.6875rem/1rem var(--fwmb-font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fwmb-accent-main);
+    padding-block: 0.25rem;
+}
+.fwmb-shortcuts-table td {
+    padding: 0.25rem 0;
+    border-block-end: 1px solid var(--fwmb-border-subtle);
+    color: var(--fwmb-text-secondary);
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+}
+.fwmb .fwmb-shortcuts-table tr:nth-child(even) {
+    background: none;
 }

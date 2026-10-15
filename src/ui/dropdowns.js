@@ -16,6 +16,9 @@
 /** Marks a dropdown whose menu opens above its button (the layout without popovers). */
 const OPENS_UP = "fwmb-dropdown-up";
 
+/** Marks a dropdown whose menu opens beside its button rather than below or above it (the rail's More). */
+const BESIDE = "fwmb-dropdown--beside";
+
 /** The space between a menu and its button, in rem. */
 const MENU_GAP_REM = 0.25;
 
@@ -63,8 +66,10 @@ function roomFor(dropdown) {
 
 /**
  * Places an open popover menu against its dropdown's button: below it, or above it when there is
- * more room above than below and it does not fit below; aligned with the button's end edge (its
- * right in a left-to-right page); and moved back inside the room where it would overflow.
+ * more room above than below and it does not fit below, aligned with the button's end edge (its
+ * right in a left-to-right page); or, for a dropdown marked to open beside its button, at the
+ * button's end side with their bottoms aligned. Then moved back inside the room where it would
+ * overflow.
  */
 export function positionPopoverMenu(dropdown, menu) {
     const view = dropdown.ownerDocument.defaultView;
@@ -73,13 +78,20 @@ export function positionPopoverMenu(dropdown, menu) {
     const button = dropdown.getBoundingClientRect();
     const { width, height } = menu.getBoundingClientRect();
 
-    const below = room.bottom - button.bottom;
-    const above = button.top - room.top;
-    const opensUp = below < height + gap && above > below;
-    const top = opensUp ? button.top - gap - height : button.bottom + gap;
-
     const rtl = view.getComputedStyle(dropdown).direction === "rtl";
-    const left = rtl ? button.left : button.right - width;
+    let top;
+    let left;
+    if (dropdown.classList.contains(BESIDE)) {
+        // Beside its button (the rail's More): at its end side, bottoms aligned, so it grows upward
+        top = button.bottom - height;
+        left = rtl ? button.left - gap - width : button.right + gap;
+    } else {
+        const below = room.bottom - button.bottom;
+        const above = button.top - room.top;
+        const opensUp = below < height + gap && above > below;
+        top = opensUp ? button.top - gap - height : button.bottom + gap;
+        left = rtl ? button.left : button.right - width;
+    }
 
     menu.style.top = `${clamp(top, room.top, room.bottom - height)}px`;
     menu.style.left = `${clamp(left, room.left, room.right - width)}px`;

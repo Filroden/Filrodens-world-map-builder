@@ -1,77 +1,72 @@
-<div>
+{{!--
+    The rail: the tools grouped by the stage of making a map they belong to (Shape, Populate,
+    Finish), then the occasional tools, then the file actions at its foot. Every button is
+    icon-only, named by its aria-label and tooltip, and the arrow keys move along the rail (see
+    MapStudio's rail keys).
 
-    <button type="button" data-action="changeTool" data-tool="scene" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolCreateMap'}}" aria-current="{{#if (eq activeTool 'scene')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--grid-on"></i>
-    </button>
+    When the studio is short (data-fwmb-short, see StudioLayout) the occasional tools fold into
+    the More menu, which holds the same four; the file actions never fold. When it is narrow the
+    rail goes compact and the stage names are hidden visually, but stay as the groups' names.
+--}}
+<nav aria-label="{{localize 'FILRODENSWMB.UI.RailLabel'}}">
+    {{#each railStages}}
+    <div class="fwmb-rail-group" role="group" aria-labelledby="fwmb-rail-stage-{{this.id}}">
+        <span class="fwmb-rail-stage" id="fwmb-rail-stage-{{this.id}}" data-tooltip="{{localize this.label}}">{{localize this.label}}</span>
+        {{#each this.tools}}
+        <button type="button" class="fwmb-rail-btn" data-action="changeTool" data-tool="{{this.id}}" aria-label="{{localize this.label}}" data-tooltip="{{localize this.label}}" aria-current="{{#if (eq ../../activeTool this.id)}}page{{else}}false{{/if}}">
+            <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+        </button>
+        {{/each}}
+    </div>
+    {{/each}}
 
-    <button type="button" data-action="changeTool" data-tool="terrain" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolTerrain'}}" aria-current="{{#if (eq activeTool 'terrain')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--landscape"></i>
-    </button>
+    <span class="fwmb-rail-spacer"></span>
 
-    <button type="button" data-action="changeTool" data-tool="biomes" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolBiomes'}}" aria-current="{{#if (eq activeTool 'biomes')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--forest"></i>
-    </button>
+    <div class="fwmb-rail-group fwmb-rail-occasional" role="group" aria-label="{{localize 'FILRODENSWMB.UI.RailOccasional'}}">
+        {{#each railOccasional}}
+        {{#if this.tool}}
+        <button type="button" class="fwmb-rail-btn" data-action="changeTool" data-tool="{{this.tool}}" aria-label="{{localize this.label}}" data-tooltip="{{localize this.label}}" aria-current="{{#if (eq ../activeTool this.tool)}}page{{else}}false{{/if}}">
+            <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+        </button>
+        {{else}}
+        <button type="button" class="fwmb-rail-btn" data-action="{{this.action}}" aria-label="{{localize this.label}}" data-tooltip="{{localize this.label}}" aria-pressed="{{#if this.pressed}}true{{else}}false{{/if}}">
+            <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+        </button>
+        {{/if}}
+        {{/each}}
+    </div>
 
-    <button type="button" data-action="changeTool" data-tool="features" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolFeatures'}}" aria-current="{{#if (eq activeTool 'features')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--water-drop"></i>
-    </button>
+    {{!-- The occasional tools again, in one menu, for a short studio --}}
+    <div class="fwmb-dropdown fwmb-dropdown--beside fwmb-rail-more" tabindex="-1">
+        <button type="button" class="fwmb-rail-btn" aria-haspopup="menu" aria-label="{{localize 'FILRODENSWMB.UI.RailMore'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.RailMore'}}" aria-current="{{#if railOccasionalActive}}page{{else}}false{{/if}}">
+            <span class="fwmb-icon fwmb-icon--more-vert" aria-hidden="true"></span>
+        </button>
+        <div class="fwmb-dropdown-menu" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.RailOccasional'}}">
+            {{#each railOccasional}}
+            {{#if this.tool}}
+            <button type="button" role="menuitem" data-action="changeTool" data-tool="{{this.tool}}" aria-current="{{#if (eq ../activeTool this.tool)}}page{{else}}false{{/if}}">
+                <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span> {{localize this.label}}
+            </button>
+            {{else}}
+            <button type="button" role="menuitemcheckbox" data-action="{{this.action}}" aria-checked="{{#if this.pressed}}true{{else}}false{{/if}}">
+                <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span> {{localize this.label}}
+            </button>
+            {{/if}}
+            {{/each}}
+        </div>
+    </div>
 
-    <button type="button" data-action="changeTool" data-tool="infrastructure" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolInfrastructure'}}" aria-current="{{#if (eq activeTool 'infrastructure')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--location-city"></i>
-    </button>
+    <span class="fwmb-rail-sep"></span>
 
-    <button type="button" data-action="changeTool" data-tool="regions" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegions'}}" aria-current="{{#if (eq activeTool 'regions')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--layers"></i>
-    </button>
-
-    <button type="button" data-action="changeTool" data-tool="labels" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolLabels'}}" aria-current="{{#if (eq activeTool 'labels')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--insert-text"></i>
-    </button>
-
-    <button type="button" data-action="changeTool" data-tool="cartography" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolCartography'}}" aria-current="{{#if (eq activeTool 'cartography')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--explore"></i>
-    </button>
-
-    <div class="fwmb-flex-1"></div>
-    <div class="fwmb-divider"></div>
-
-    <button type="button" data-action="threeDView" data-tooltip="{{localize 'FILRODENSWMB.UI.ThreeDView'}}">
-        <i class="fwmb-icon fwmb-icon--three-d"></i>
-    </button>
-
-    <button type="button" data-action="changeTool" data-tool="reference" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolReference'}}" aria-current="{{#if (eq activeTool 'reference')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--image"></i>
-    </button>
-
-    <button type="button" data-action="changeTool" data-tool="settings" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSettings'}}" aria-current="{{#if (eq activeTool 'settings')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--tune"></i>
-    </button>
-
-    <button type="button" data-action="changeTool" data-tool="library" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolLibrary'}}" aria-current="{{#if (eq activeTool 'library')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--palette"></i>
-    </button>
-
-    <div class="fwmb-divider"></div>
-
-    <button type="button" data-action="exportPng" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportPNG'}}">
-        <i class="fwmb-icon fwmb-icon--png"></i>
-    </button>
-
-    {{#if sceneExport}}
-    <button type="button" data-action="exportScene" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportScene'}}">
-        <i class="fwmb-icon fwmb-icon--map"></i>
-    </button>
-    {{/if}}
-
-    <button type="button" data-action="saveMap" data-tooltip="{{localize 'FILRODENSWMB.UI.SaveMap'}}{{#if currentSaveName}} ({{currentSaveName}}){{/if}}">
-        <i class="fwmb-icon fwmb-icon--save"></i>
-    </button>
-
-    <button type="button" data-action="saveMapAs" data-tooltip="{{localize 'FILRODENSWMB.UI.SaveMapAs'}}">
-        <i class="fwmb-icon fwmb-icon--save-as"></i>
-    </button>
-
-    <button type="button" data-action="changeTool" data-tool="manage" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolManage'}}" aria-current="{{#if (eq activeTool 'manage')}}page{{else}}false{{/if}}">
-        <i class="fwmb-icon fwmb-icon--folder-open"></i>
-    </button>
-</div>
+    <div class="fwmb-rail-group fwmb-rail-files" role="group" aria-label="{{localize 'FILRODENSWMB.UI.RailFiles'}}">
+        <button type="button" class="fwmb-rail-btn{{#if isDirty}} fwmb-is-dirty{{/if}}" data-action="saveMap" aria-label="{{saveLabel}}" data-tooltip="{{saveLabel}}">
+            <span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="fwmb-rail-btn" data-action="saveMapAs" aria-label="{{localize 'FILRODENSWMB.UI.SaveMapAs'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.SaveMapAs'}}">
+            <span class="fwmb-icon fwmb-icon--save-as" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="fwmb-rail-btn" data-action="changeTool" data-tool="manage" aria-label="{{localize 'FILRODENSWMB.UI.ToolManage'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolManage'}}" aria-current="{{#if (eq activeTool 'manage')}}page{{else}}false{{/if}}">
+            <span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span>
+        </button>
+    </div>
+</nav>

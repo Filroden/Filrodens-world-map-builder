@@ -1233,6 +1233,8 @@ export class StudioCanvas {
      * Triggers a detached link click to bypass Electron's DOM navigation interceptors.
      */
     exportToPNG(filename = "world-map") {
+        // The reference image is never exported; it is shown again afterwards only if it was showing
+        const referenceVisible = this.layers.reference.visible;
         try {
             this.layers.reference.visible = false;
 
@@ -1262,7 +1264,7 @@ export class StudioCanvas {
             this.stage.position.set(origX, origY);
             this.stage.scale.set(origScaleX, origScaleY);
 
-            this.layers.reference.visible = true;
+            this.layers.reference.visible = referenceVisible;
 
             const dataUrl = canvas.toDataURL("image/png");
             const byteString = atob(dataUrl.split(",")[1]);
@@ -1288,6 +1290,7 @@ export class StudioCanvas {
             // Clean up the temporary texture from VRAM
             renderTexture.destroy(true);
         } catch (err) {
+            this.layers.reference.visible = referenceVisible;
             console.error("FWMB | Failed to export PNG:", err);
             platform.notify.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
         }

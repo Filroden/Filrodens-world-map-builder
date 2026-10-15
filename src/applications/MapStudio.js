@@ -37,7 +37,8 @@ import { PinStyles } from "./PinStyles.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
-import { isPressed, setPressed, togglePressed } from "../ui/aria.js";
+import { syncMapControls, VIEW_LAYERS } from "../ui/MapControls.js";
+import { StudioLayout } from "../ui/StudioLayout.js";
 import { currentTheme, setTheme, THEME_SETTINGS } from "../ui/Theme.js";
 
 // Turns a fraction into a percentage for the timing summary
@@ -180,6 +181,8 @@ export class MapStudio {
         changeTool(e, t)                { this._onChangeTool(e, t); },
         exportPng(e, t)                 { this._onExportPng(e, t); },
         exportScene(e, t)               { this._onExportScene(e, t); },
+        // The keyboard shortcuts sheet; also opened with "?" (the About tool will offer it too)
+        openShortcuts()                 { this.#openShortcuts(); },
         exportSettings(e, t)            { this._onExportSettings(e, t); },
         generateRandomLandMap(e, t)     { this._onGenerateRandomLandMap(e, t); },
         generateRandomLandMask(e, t)    { this._onGenerateRandomLandMask(e, t); },
@@ -233,7 +236,7 @@ export class MapStudio {
      */
     static #REGIONS = Object.freeze({
         toolbar: { template: `${TEMPLATE_ROOT}toolbar.hbs`, classes: ["fwmb-toolbar"] },
-        context: { template: `${TEMPLATE_ROOT}context.hbs`, classes: ["fwmb-context-panel"] },
+        context: { template: `${TEMPLATE_ROOT}context.hbs`, classes: ["fwmb-panel", "fwmb-context-panel"] },
         map: { template: `${TEMPLATE_ROOT}map.hbs`, classes: ["fwmb-map"], once: true },
         editToolbar: { template: `${TEMPLATE_ROOT}parts/edit-map-tools.hbs`, classes: ["fwmb-edit-toolbar"], slot: ".fwmb-map-container" },
     });
@@ -299,8 +302,18 @@ export class MapStudio {
      */
     #terrainLayers = MapStudio.#allTerrainLayers(true);
 
+    /**
+     * Which of the map controls' single layers are shown (see MapControls.VIEW_LAYERS). Like the
+     * terrain layers they are not saved with the map; the canvas keeps its layers between maps, so
+     * these do too.
+     */
+    #layerVisibility = Object.fromEntries(VIEW_LAYERS.map((id) => [id, true]));
+
     /** The terrain layer list that is open, or null (see _onToggleLayerMenu). */
     #openLayerMenu = null;
+
+    /** Measures the studio for its room-dependent layout rules (see StudioLayout); null until mounted. */
+    #layout = null;
 
     /** Runs the refreshes one at a time (see RefreshQueue and #createRefreshQueue). */
     #refreshes;
@@ -573,6 +586,90 @@ export class MapStudio {
         if (dirty === this.#dirty) return;
         this.#dirty = dirty;
         this.#showTitle();
+        this.#showDirty();
+    }
+
+    /**
+     * The Save button's name for the open map: the map's name when it has one, and that it has
+     * unsaved changes when it does.
+     */
+    #saveLabel() {
+        const { i18n } = platform;
+        let label = i18n.localize("FILRODENSWMB.UI.SaveMap");
+        if (this.#saveName) label = `${label} (${this.#saveName})`;
+        return this.#dirty ? i18n.format("FILRODENSWMB.UI.SaveMapUnsaved", { label }) : label;
+    }
+
+    /**
+     * Marks the rail's Save button with the unsaved-changes dot, in place: the dot comes and goes
+     * with every edit, which is no reason to redraw the rail.
+     */
+    #showDirty() {
+        const button = this.root?.querySelector('.fwmb-toolbar [data-action="saveMap"]');
+        if (!button) return;
+        button.classList.toggle("fwmb-is-dirty", this.#dirty);
+        const label = this.#saveLabel();
+        button.setAttribute("aria-label", label);
+        button.dataset.tooltip = label;
+    }
+
+    /** The rail's groups and buttons, for toolbar.hbs (see FILRODENSWMB.STUDIO). */
+    #railContext() {
+        const { TOOLS, STAGES, OCCASIONAL } = FILRODENSWMB.STUDIO;
+        const occasional = OCCASIONAL.map((entry) => {
+            if (entry.tool) return { tool: entry.tool, ...TOOLS[entry.tool] };
+            return { ...entry, pressed: entry.action === "threeDView" && !!this.scene3D };
+        });
+        return {
+            railStages: STAGES.map((stage) => ({ ...stage, tools: stage.tools.map((id) => ({ id, ...TOOLS[id] })) })),
+            railOccasional: occasional,
+            railOccasionalActive: occasional.some((entry) => entry.tool === this.activeTool),
+            isDirty: this.#dirty,
+            saveLabel: this.#saveLabel(),
+        };
+    }
+
+    /** The map controls' single toggles, for map.hbs (the terrain groups come from #layerGroupsContext). */
+    static #mapControlsContext() {
+        return { viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS };
+    }
+
+    /**
+     * The arrow keys move focus along the rail: down and up (and, as in any toolbar, the inline
+     * arrows) to the next and previous button, Home and End to the first and last. Buttons the
+     * studio's height has hidden (the folded occasional tools, or More while they show) are skipped.
+     *
+     * @param {KeyboardEvent} event
+     * @returns {boolean} Whether the key was used.
+     */
+    #moveAlongRail(event) {
+        const rail = event.target.closest?.(".fwmb-toolbar");
+        if (!rail || event.target.closest(".fwmb-dropdown-menu")) return false;
+        const rtl = rail.ownerDocument.defaultView.getComputedStyle(rail).direction === "rtl";
+        const steps = { ArrowDown: 1, ArrowUp: -1, ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 };
+        if (!(event.key in steps) && event.key !== "Home" && event.key !== "End") return false;
+
+        const buttons = [...rail.querySelectorAll(".fwmb-rail-btn")].filter((button) => button.offsetParent !== null);
+        const index = buttons.indexOf(event.target.closest(".fwmb-rail-btn"));
+        let next;
+        if (event.key === "Home") next = 0;
+        else if (event.key === "End") next = buttons.length - 1;
+        else next = (index + steps[event.key] + buttons.length) % buttons.length;
+        buttons[next]?.focus();
+        return true;
+    }
+
+    /** Opens the keyboard shortcuts sheet (see CanvasHints.sheet). */
+    async #openShortcuts() {
+        const { i18n } = platform;
+        const content = await platform.templates.render(`${TEMPLATE_ROOT}dialogs/shortcuts.hbs`, { tools: CanvasHints.sheet((key) => i18n.localize(key)) });
+        await platform.dialogs.choose({
+            title: i18n.localize("FILRODENSWMB.UI.ShortcutsTitle"),
+            content,
+            classes: ["fwmb-shortcuts-dialog"],
+            resizable: true,
+            buttons: [{ action: "close", label: i18n.localize("FILRODENSWMB.UI.Close"), default: true }],
+        });
     }
 
     /**
@@ -658,6 +755,9 @@ export class MapStudio {
         context.sceneExport = platform.scene.available;
         // The colour theme's two settings, for the Settings tool
         context.theme = currentTheme();
+
+        if (regionId === "toolbar") Object.assign(context, this.#railContext());
+        if (regionId === "map") Object.assign(context, MapStudio.#mapControlsContext());
 
         const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
         context.isLocked = this.uiState.isEditMode && !isVectorTool;
@@ -870,6 +970,8 @@ export class MapStudio {
     #afterRegionsDrawn(regions) {
         if (this.#shutDown) return;
         if (regions.includes("map")) this.#onMapDrawn();
+        // The rail is redrawn with the tool, so it is laid out again (the More menu's place)
+        if (regions.includes("toolbar")) this.#layout?.update();
         this.#bindCollapsibleFieldsets();
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
@@ -885,6 +987,9 @@ export class MapStudio {
      */
     #onMapDrawn() {
         this.#initCanvasAndEngines();
+        this.#syncMapControls();
+        this.#layout = new StudioLayout(this.root);
+        this.#layout.start();
 
         for (const [action, direction] of [["undoBrush", "undo"], ["redoBrush", "redo"]]) {
             const button = this.view.root.querySelector(`[data-action="${action}"]`);
@@ -958,6 +1063,18 @@ export class MapStudio {
         }
 
         const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+
+        // Arrow keys move along the rail, as along any toolbar
+        if (this.#moveAlongRail(event)) {
+            event.preventDefault();
+            return;
+        }
+        // "?" opens the keyboard shortcuts sheet
+        if (event.key === "?" && !isCtrlOrCmd && !event.altKey) {
+            event.preventDefault();
+            this.#openShortcuts();
+            return;
+        }
 
         if (isCtrlOrCmd && event.key.toLowerCase() === "z") {
             event.preventDefault();
@@ -1326,9 +1443,15 @@ export class MapStudio {
         this.#updateReferenceLayer();
     }
 
+    /**
+     * The grid's type or size changed: the grid is turned on to show it (a changed grid that stays
+     * hidden would look like nothing happened), unless the type is now no grid at all.
+     */
     #updateGridSettings() {
         MapStateManager.getMapParameters(this);
+        if (this.uiState.gridType !== "none") this.uiState.gridVisible = true;
         this.#updateGrid();
+        this.#syncMapControls();
     }
 
     /**
@@ -1430,12 +1553,11 @@ export class MapStudio {
             const readout = this.root.querySelector(".fwmb-canvas-readout");
             if (!readout) return;
 
+            // The information bar stays on the canvas; off the map it shows a dash for every value
             if (x === null || y === null || x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight || !this.currentElevationData) {
-                readout.classList.add("fwmb-hidden");
+                for (const value of readout.querySelectorAll('[id^="fwmb-readout-"]')) value.textContent = "–";
                 return;
             }
-
-            readout.classList.remove("fwmb-hidden");
 
             const index = y * this.mapWidth + x;
             const elev = this.currentElevationData[index];
@@ -1513,8 +1635,7 @@ export class MapStudio {
         if (this.hasBooted) return;
 
         this.hasBooted = true;
-        const layerBtns = this.root.querySelectorAll('[data-action="toggleLayer"]');
-        for (const btn of layerBtns) setPressed(btn, true);
+        this.#syncMapControls();
 
         const activeWindow = this.root.ownerDocument.defaultView || window;
         activeWindow.setTimeout(async () => {
@@ -1556,6 +1677,8 @@ export class MapStudio {
     destroy() {
         this.#shutDown = true;
         this.#closeLayerMenu();
+        this.#layout?.stop();
+        this.#layout = null;
         // A dialogue still open is dismissed, so whatever opened it carries on as if it were cancelled
         this.#detachDialogs?.();
         this.#detachDialogs = null;
@@ -1624,7 +1747,7 @@ export class MapStudio {
             heldItem: this.canvasEngine?.heldItem ?? null,
         });
 
-        CanvasHints.render(element, CanvasHints.getKeys(context), (key) => platform.i18n.localize(key));
+        CanvasHints.render(element, CanvasHints.getItems(context), (key) => platform.i18n.localize(key));
     }
 
     #handleCanvasDoubleClick(hitData) {
@@ -2372,23 +2495,27 @@ export class MapStudio {
     }
 
     /**
-     * Brings the terrain layer buttons and lists in the map controls in line with
-     * #terrainLayers, in place, so an open list stays open while it is being ticked.
+     * Writes every view's state onto the map controls, in place, so an open list stays open while
+     * it is being ticked (see MapControls). The map region is drawn once, so this is the only way
+     * its controls change: every action that changes a view calls it (a test checks this), which
+     * is what keeps a toggle from disagreeing with what the map shows.
      */
-    #refreshLayerGroupControls() {
+    #syncMapControls() {
         if (!this.root) return;
-        for (const group of this.#layerGroupsContext()) {
-            const container = this.root.querySelector(`.fwmb-layer-group[data-layer-group="${group.id}"]`);
-            if (!container) continue;
-
-            const button = container.querySelector('[data-action="toggleLayerMenu"]');
-            setPressed(button, group.state === "on");
-            button?.classList.toggle("fwmb-is-partial", group.state === "partial");
-            container.querySelector('[data-terrain-layer="all"]')?.setAttribute("aria-checked", group.allChecked);
-            for (const item of group.items) {
-                container.querySelector(`[data-terrain-layer="${item.key}"]`)?.setAttribute("aria-checked", item.checked);
-            }
-        }
+        const terrainGroups = Object.entries(MapStudio.#TERRAIN_LAYER_GROUPS).map(([id, group]) => ({
+            id,
+            items: Object.keys(group.layers).map((key) => ({ key, on: !!this.#terrainLayers[key] })),
+        }));
+        const state = {
+            viewFilters: this.viewFilters,
+            layers: this.#layerVisibility,
+            grid: !!this.uiState.gridVisible,
+            terrainGroups,
+            threeD: !!this.scene3D,
+        };
+        syncMapControls(this.root, state, (shown, total) => platform.i18n.format("FILRODENSWMB.UI.LayersMenuCount", { shown, total }));
+        // The Layers button's name grows and shrinks with the count; the controls may fold differently
+        this.#layout?.update();
     }
 
     /**
@@ -2398,7 +2525,7 @@ export class MapStudio {
     #setTerrainLayers(changes) {
         this.#terrainLayers = { ...this.#terrainLayers, ...changes };
         this.#syncTerrainSettings();
-        this.#refreshLayerGroupControls();
+        this.#syncMapControls();
     }
 
     /** Opens or closes a terrain layer group's list (a click on the group's button). */
@@ -2413,7 +2540,6 @@ export class MapStudio {
         this.#closeLayerMenu();
         container.querySelector(".fwmb-layer-menu")?.classList.remove("fwmb-hidden");
         target.setAttribute("aria-expanded", "true");
-        container.closest(".fwmb-map-controls")?.classList.add("fwmb-menu-open");
         this.#openLayerMenu = container;
 
         const doc = this.root.ownerDocument;
@@ -2429,7 +2555,6 @@ export class MapStudio {
 
         container.querySelector(".fwmb-layer-menu")?.classList.add("fwmb-hidden");
         container.querySelector('[data-action="toggleLayerMenu"]')?.setAttribute("aria-expanded", "false");
-        container.closest(".fwmb-map-controls")?.classList.remove("fwmb-menu-open");
         this.#openLayerMenu = null;
 
         const doc = container.ownerDocument;
@@ -2442,9 +2567,20 @@ export class MapStudio {
         if (this.#openLayerMenu && !this.#openLayerMenu.contains(event.target)) this.#closeLayerMenu();
     };
 
-    /** Escape closes the open list and returns focus to its button. */
+    /** Escape closes the open list and returns focus to its button; the arrow keys move along it. */
     #onMenuKeyDown = (event) => {
-        if (event.key !== "Escape" || !this.#openLayerMenu) return;
+        if (!this.#openLayerMenu) return;
+        // The arrow keys move between the list's rows, wrapping round at either end
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            const rows = [...this.#openLayerMenu.querySelectorAll('[role="menuitemcheckbox"]')];
+            const index = rows.indexOf(event.target);
+            if (index === -1) return;
+            event.preventDefault();
+            event.stopPropagation();
+            rows[(index + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length].focus();
+            return;
+        }
+        if (event.key !== "Escape") return;
         event.stopPropagation();
         const button = this.#openLayerMenu.querySelector('[data-action="toggleLayerMenu"]');
         this.#closeLayerMenu();
@@ -3982,6 +4118,8 @@ export class MapStudio {
         this.defaultUiState = MapStateManager.buildDefaultUiState(newWidth, newHeight);
         this.uiState = platform.utils.deepClone(this.defaultUiState);
         PinStyles.ensure(this);
+        // The new map's grid starts hidden
+        this.#syncMapControls();
         this.uiState.mapSeed = newSeed;
 
         // Inject the engine choice into the wiped state
@@ -4169,13 +4307,11 @@ export class MapStudio {
         };
 
         const layerId = toolLayerMap[newTool];
-        if (!layerId) return; // If the tool doesn't have an auto-layer, do nothing
+        if (!layerId || this.#layerVisibility[layerId]) return;
 
-        const btn = this.root.querySelector(`[data-layer="${layerId}"]`);
-        if (btn && !isPressed(btn)) {
-            setPressed(btn, true);
-            this.canvasEngine?.toggleLayer(layerId, true);
-        }
+        this.#layerVisibility[layerId] = true;
+        this.canvasEngine?.toggleLayer(layerId, true);
+        this.#syncMapControls();
     }
 
     #updateCanvasModes(newTool) {
@@ -4989,10 +5125,7 @@ export class MapStudio {
             this.scene3D = null;
 
             overlay.classList.add("fwmb-hidden");
-
-            // Query the button safely to remove the active state
-            const btn = this.root.querySelector('[data-action="threeDView"]');
-            setPressed(btn, false);
+            this.#syncMapControls();
 
             // Restore the manual layout wrappers
             const mapControls = this.root.querySelector(".fwmb-map-controls");
@@ -5018,10 +5151,7 @@ export class MapStudio {
         const mapControls = this.root.querySelector(".fwmb-map-controls");
         const contextPanel = this.root.querySelector(".fwmb-context-panel");
         const editToolbar = this.root.querySelector(".fwmb-edit-toolbar");
-        const freshTarget = this.root.querySelector('[data-action="threeDView"]');
-
         overlay.classList.remove("fwmb-hidden");
-        setPressed(freshTarget, true);
 
         // Manually hide layout wrappers so the 3D canvas fills the entire screen
         if (mapControls) mapControls.classList.add("fwmb-hidden");
@@ -5041,6 +5171,7 @@ export class MapStudio {
             terrain: this.#terrainBuffers(),
             settings: this.#terrainSettings(),
         });
+        this.#syncMapControls();
 
         // The 3D view has its own camera gestures; no render follows this, so refresh directly
         this.#updateCanvasHint();
@@ -5086,10 +5217,10 @@ export class MapStudio {
         this.view?.render(["context", "toolbar", "editToolbar"]);
     }
 
-    _onToggleGrid(event, target) {
+    _onToggleGrid(_event, _target) {
         this.uiState.gridVisible = !this.uiState.gridVisible;
-        setPressed(target, this.uiState.gridVisible);
         this.#updateGrid();
+        this.#syncMapControls();
 
         this.markDirty();
     }
@@ -5116,13 +5247,13 @@ export class MapStudio {
         };
     }
 
-    _onToggleLayer(event, target) {
+    _onToggleLayer(_event, target) {
         const layerId = target.dataset.layer;
-        if (!layerId || !this.canvasEngine) return;
+        if (!(layerId in this.#layerVisibility) || !this.canvasEngine) return;
 
-        const isVisible = togglePressed(target);
-
-        this.canvasEngine.toggleLayer(layerId, isVisible);
+        this.#layerVisibility[layerId] = !this.#layerVisibility[layerId];
+        this.canvasEngine.toggleLayer(layerId, this.#layerVisibility[layerId]);
+        this.#syncMapControls();
     }
 
     _onToggleLiveFeatureUpdates(_event, _target) {
@@ -5150,9 +5281,8 @@ export class MapStudio {
         const filter = target.dataset.filter; // "all", "gm", or "none"
         if (!filter) return;
 
-        // Invert the state and visually toggle the button
         this.viewFilters[filter] = !this.viewFilters[filter];
-        setPressed(target, this.viewFilters[filter]);
+        this.#syncMapControls();
 
         // Push to canvas and redraw
         this.canvasEngine.setViewFilters(this.viewFilters);

@@ -1,14 +1,15 @@
 import { FILRODENSWMB } from "../config.js";
 
 /**
- * The list of mouse and keyboard actions shown in the map's bottom corner while the pointer is
- * over the canvas. What is listed depends on what the canvas is doing: the tool in use and its
- * mode while editing, the regional map crop, the reference image, or an item held by the pointer.
+ * The list of mouse and keyboard actions shown in the canvas's top end corner. What is listed
+ * depends on what the canvas is doing: the tool in use and its mode while editing, the regional
+ * map crop, the reference image, or an item held by the pointer.
  *
  * The lists themselves live in FILRODENSWMB.UI.CANVAS_HINTS. Working out the context and the
  * list are pure functions, so they can be checked outside Foundry; only render touches the page.
- * The actions are shown one per row (see .fwmb-map-hint), and each names the thing it acts on,
- * so every row reads on its own.
+ * Each action is one item (see .fwmb-map-hint): items share a row while there is room, and each
+ * names the thing it acts on, so every item reads on its own. The full list of shortcuts is the
+ * keyboard shortcuts sheet (see sheet), opened with "?".
  */
 export class CanvasHints {
     static #KEY_PREFIX = "FILRODENSWMB.UI.Hint";
@@ -82,37 +83,73 @@ export class CanvasHints {
     }
 
     /**
-     * The localisation keys to show for a context, in reading order. The common actions (pan
-     * and zoom) lead every list except a held item's, which describes only what can be done to
-     * that item while it is held.
+     * The localisation keys to show for a context, in reading order, each marked with whether it
+     * is a "more" item (shown in the muted ink): the context's own actions come first in the normal
+     * ink, then the common movement (pan and zoom), muted. A held item's list describes only what
+     * can be done to that item while it is held, so it has no movement.
+     *
+     * @param {string} context  From resolveContext.
+     * @returns {{key: string, more: boolean}[]}
+     */
+    static getItems(context) {
+        const { COMMON, CONTEXTS } = FILRODENSWMB.UI.CANVAS_HINTS;
+        const own = (CONTEXTS[context] ?? []).map((suffix) => ({ key: `${CanvasHints.#KEY_PREFIX}${suffix}`, more: false }));
+        if (context.startsWith("held")) return own;
+        return [...own, ...COMMON.map((suffix) => ({ key: `${CanvasHints.#KEY_PREFIX}${suffix}`, more: true }))];
+    }
+
+    /**
+     * The localisation keys of a context's actions, in reading order (see getItems).
      *
      * @param {string} context  From resolveContext.
      * @returns {string[]}
      */
     static getKeys(context) {
-        const { COMMON, CONTEXTS } = FILRODENSWMB.UI.CANVAS_HINTS;
-        const own = CONTEXTS[context] ?? [];
-        const suffixes = context.startsWith("held") ? own : [...COMMON, ...own];
-        return suffixes.map((suffix) => `${CanvasHints.#KEY_PREFIX}${suffix}`);
+        return CanvasHints.getItems(context).map((item) => item.key);
     }
-
 
     /**
-     * Fills the hint element with one element per action, in order. Text is set with
-     * textContent, never as HTML, so a translation containing markup characters is shown as
-     * written.
+     * The keyboard shortcuts sheet: one table per tool, with a caption per mode, each listing the
+     * mode's own canvas actions (the hint's items) followed by its keyboard shortcuts. Movement and
+     * the shortcuts that work everywhere head the sheet in a table of their own, so no table
+     * repeats them. Built from the same lists as the hint (CANVAS_HINTS) plus SHORTCUTS.
      *
-     * @param {HTMLElement} element  The `.fwmb-map-hint` element.
-     * @param {string[]} keys  From getKeys.
      * @param {(key: string) => string} localize
+     * @returns {{title: string, tables: {caption: string|null, rows: string[]}[]}[]}
      */
-    static render(element, keys, localize) {
-        element.replaceChildren(...keys.map((key) => CanvasHints.#createItem(localize(key))));
+    static sheet(localize) {
+        const { COMMON, CONTEXTS } = FILRODENSWMB.UI.CANVAS_HINTS;
+        const { KEYS, SHEET } = FILRODENSWMB.UI.SHORTCUTS;
+        const hint = (suffix) => localize(`${CanvasHints.#KEY_PREFIX}${suffix}`);
+        const key = (suffix) => localize(`FILRODENSWMB.UI.Shortcut${suffix}`);
+        return SHEET.map((tool) => ({
+            title: localize(tool.title),
+            tables: tool.tables.map((table) => {
+                const actions = table.context === "everywhere" ? COMMON : (CONTEXTS[table.context] ?? []);
+                return {
+                    caption: table.caption ? localize(table.caption) : null,
+                    rows: [...actions.map(hint), ...(KEYS[table.context] ?? []).map(key)],
+                };
+            }),
+        }));
     }
 
-    static #createItem(text) {
-        const item = document.createElement("span");
-        item.className = "fwmb-map-hint-item";
+    /**
+     * Fills the hint element with one element per action, in order. Text is set with textContent,
+     * never as HTML, so a translation containing markup characters is shown as written.
+     *
+     * @param {HTMLElement} element  The `.fwmb-map-hint` element.
+     * @param {{key: string, more: boolean}[]} items  From getItems.
+     * @param {(key: string) => string} localize
+     */
+    static render(element, items, localize) {
+        const doc = element.ownerDocument;
+        element.replaceChildren(...items.map((item) => CanvasHints.#createItem(doc, localize(item.key), item.more)));
+    }
+
+    static #createItem(doc, text, more) {
+        const item = doc.createElement("span");
+        item.className = more ? "fwmb-map-hint-item fwmb-more" : "fwmb-map-hint-item";
         item.textContent = text;
         return item;
     }

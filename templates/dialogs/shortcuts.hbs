@@ -1,0 +1,21 @@
+{{!--
+    The keyboard shortcuts sheet, opened from the hint's last item or with "?": one table per tool,
+    a caption per mode, built by CanvasHints.sheet from the hint lists and SHORTCUTS.
+--}}
+<div class="fwmb-dialog-content fwmb-shortcuts">
+    {{#each tools}}
+    <section class="fwmb-shortcuts-tool">
+        <h3 class="fwmb-shortcuts-title">{{this.title}}</h3>
+        {{#each this.tables}}
+        <table class="fwmb-shortcuts-table">
+            {{#if this.caption}}<caption>{{this.caption}}</caption>{{/if}}
+            <tbody>
+                {{#each this.rows}}
+                <tr><td>{{this}}</td></tr>
+                {{/each}}
+            </tbody>
+        </table>
+        {{/each}}
+    </section>
+    {{/each}}
+</div>

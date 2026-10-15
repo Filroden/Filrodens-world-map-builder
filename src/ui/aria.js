@@ -33,3 +33,16 @@ export function togglePressed(element) {
     setPressed(element, pressed);
     return pressed;
 }
+
+/**
+ * Marks a control as on or off in the way its role reads it: a menu row that can be ticked
+ * (role menuitemcheckbox) with aria-checked, any other toggle with aria-pressed. The same state
+ * can then be shown both by a button and by its row in a menu.
+ * @param {Element|null|undefined} element
+ * @param {boolean} on
+ */
+export function setOn(element, on) {
+    if (!element) return;
+    const attribute = element.getAttribute("role") === "menuitemcheckbox" ? "aria-checked" : "aria-pressed";
+    element.setAttribute(attribute, String(Boolean(on)));
+}

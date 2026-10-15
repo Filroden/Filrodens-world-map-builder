@@ -430,12 +430,13 @@ export const FILRODENSWMB = {
             FADE_FRAMES: 90,
             FADE_GROWTH: 0.15,
         },
-        // The list of canvas actions in the map's bottom corner (see CanvasHints). Each context
+        // The list of canvas actions in the canvas's top end corner (see CanvasHints). Each context
         // lists the suffixes of its `FILRODENSWMB.UI.Hint…` localisation keys, in display order.
         // Every hint names the thing it acts on (a pin, the crop area, the whole region), so each
-        // reads on its own. COMMON is shown ahead of every context except a held item, whose own
-        // list replaces the whole hint while the pointer holds it. Keep these lists in step with
-        // the pointer and wheel handling in StudioCanvas and the tool click handlers in MapStudio.
+        // reads on its own. A context's own actions are shown first, in the normal ink; COMMON
+        // follows them, muted, for every context except a held item, whose own list replaces the
+        // whole hint while the pointer holds it. Keep these lists in step with the pointer and
+        // wheel handling in StudioCanvas and the tool click handlers in MapStudio.
         CANVAS_HINTS: {
             COMMON: ["Pan", "Zoom"],
             CONTEXTS: {
@@ -466,6 +467,71 @@ export const FILRODENSWMB = {
                 heldPin: ["ResizeHeldPin"],
                 heldMask: ["DropMask"],
             },
+        },
+        // The keyboard shortcuts sheet (see CanvasHints.sheet and dialogs/shortcuts.hbs). KEYS lists,
+        // per hint context, the keyboard shortcuts that are not among its hints, as suffixes of
+        // `FILRODENSWMB.UI.Shortcut…` keys; "everywhere" holds those that work in every tool. SHEET
+        // is the sheet's order: one table per tool, a caption per mode, each naming the hint
+        // context whose actions it lists. Keep KEYS in step with the key handling in MapStudio
+        // (#handleStudioKeydown), RegionPainter.handleKey and RouteTool.handleKey.
+        SHORTCUTS: {
+            KEYS: {
+                everywhere: ["Undo", "Redo", "Sheet", "Escape"],
+                regionSelect: ["RegionLetGo"],
+                regionPaint: ["RegionStopStroke"],
+                regionErase: ["RegionStopStroke"],
+                routeSelect: ["RouteLetGo"],
+            },
+            SHEET: [
+                { title: "FILRODENSWMB.UI.ShortcutsEverywhere", tables: [{ caption: null, context: "everywhere" }] },
+                {
+                    title: "FILRODENSWMB.UI.ToolCreateMap",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsLandMasks", context: "mask" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsRegionalCrop", context: "crop" },
+                    ],
+                },
+                { title: "FILRODENSWMB.UI.ToolTerrain", tables: [{ caption: null, context: "terrain" }] },
+                { title: "FILRODENSWMB.UI.ToolBiomes", tables: [{ caption: null, context: "biomes" }] },
+                {
+                    title: "FILRODENSWMB.UI.ToolFeatures",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsRiverSources", context: "spring" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsLines", context: "line" },
+                    ],
+                },
+                {
+                    title: "FILRODENSWMB.UI.ToolRegions",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsSelect", context: "regionSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsPaint", context: "regionPaint" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsErase", context: "regionErase" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsFill", context: "regionFill" },
+                    ],
+                },
+                {
+                    title: "FILRODENSWMB.UI.ToolInfrastructure",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsPins", context: "pin" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsRouteSelect", context: "routeSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsRouteDraw", context: "routeDraw" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsRouteEdit", context: "routeEdit" },
+                    ],
+                },
+                { title: "FILRODENSWMB.UI.ToolLabels", tables: [{ caption: null, context: "labels" }] },
+                { title: "FILRODENSWMB.UI.ToolCartography", tables: [{ caption: null, context: "cartography" }] },
+                {
+                    title: "FILRODENSWMB.UI.ShortcutsHolding",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsHeldLabel", context: "heldLabel" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsHeldDecoration", context: "heldDecoration" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsHeldPin", context: "heldPin" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsHeldMask", context: "heldMask" },
+                    ],
+                },
+                { title: "FILRODENSWMB.UI.ToolReference", tables: [{ caption: null, context: "reference" }] },
+                { title: "FILRODENSWMB.UI.ThreeDView", tables: [{ caption: null, context: "view3d" }] },
+            ],
         },
         ZOOM: {
             FACTOR: 1.25,
@@ -500,6 +566,52 @@ export const FILRODENSWMB = {
             // for not holding the memory while the map sits idle.
             SCRATCH_RELEASE: 30000,
         },
+    },
+    // The studio's frame (see toolbar.hbs). The rail groups the tools by the stage of making a map
+    // they belong to; each tool has its rail icon and name. The occasional tools sit below the
+    // stages (folding into More when the studio is short): a tool, or an action of its own (the 3D
+    // view). Tool ids are the ones uiState.activeTool and the changeTool action use.
+    STUDIO: {
+        TOOLS: {
+            scene: { icon: "grid-on", label: "FILRODENSWMB.UI.ToolCreateMap" },
+            terrain: { icon: "landscape", label: "FILRODENSWMB.UI.ToolTerrain" },
+            biomes: { icon: "forest", label: "FILRODENSWMB.UI.ToolBiomes" },
+            features: { icon: "water-drop", label: "FILRODENSWMB.UI.ToolFeatures" },
+            regions: { icon: "pentagon", label: "FILRODENSWMB.UI.ToolRegions" },
+            infrastructure: { icon: "location-city", label: "FILRODENSWMB.UI.ToolInfrastructure" },
+            labels: { icon: "insert-text", label: "FILRODENSWMB.UI.ToolLabels" },
+            cartography: { icon: "explore", label: "FILRODENSWMB.UI.ToolCartography" },
+            export: { icon: "png", label: "FILRODENSWMB.UI.ToolExport" },
+            reference: { icon: "image", label: "FILRODENSWMB.UI.ToolReference" },
+            library: { icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary" },
+            settings: { icon: "tune", label: "FILRODENSWMB.UI.ToolSettings" },
+            manage: { icon: "folder-open", label: "FILRODENSWMB.UI.ToolManage" },
+        },
+        STAGES: [
+            { id: "shape", label: "FILRODENSWMB.UI.StageShape", tools: ["scene", "terrain", "biomes", "features"] },
+            { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["regions", "infrastructure", "labels"] },
+            { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
+        ],
+        OCCASIONAL: [
+            { tool: "reference" },
+            { tool: "library" },
+            { tool: "settings" },
+            { action: "threeDView", icon: "three-d", label: "FILRODENSWMB.UI.ThreeDView" },
+        ],
+        // The map controls' layer toggles after the Terrain and Biomes groups, in their order: the
+        // layers drawn on the map, then those drawn over it (the grid is a setting of the map, so it
+        // has its own action)
+        VIEW_LAYERS: [
+            { id: "infrastructure", icon: "location-city", label: "FILRODENSWMB.UI.LayerInfrastructure" },
+            { id: "regions", icon: "pentagon", label: "FILRODENSWMB.UI.LayerRegions" },
+            { id: "labels", icon: "insert-text", label: "FILRODENSWMB.UI.LayerLabels" },
+            { id: "cartography", icon: "explore", label: "FILRODENSWMB.UI.LayerCartography" },
+        ],
+        OVERLAY_LAYERS: [
+            { id: "contours", action: "toggleLayer", icon: "scatter-plot", label: "FILRODENSWMB.UI.LayerContours" },
+            { id: null, action: "toggleGrid", icon: "grid-on", label: "FILRODENSWMB.UI.ToggleGrid" },
+            { id: "reference", action: "toggleLayer", icon: "image", label: "FILRODENSWMB.UI.LayerReference" },
+        ],
     },
     DISPLAY: {
         ALPHA: 0.8,
