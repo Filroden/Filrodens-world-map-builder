@@ -11,7 +11,7 @@
  * included, so no template needs its own inline handler to keep its value display current.
  *
  * The filled portion of the track (from the minimum up to the thumb) is drawn in CSS from a
- * custom property, --fwmb-range-fill, holding the thumb's position as a percentage. Only Firefox
+ * custom property, --fwmb-range-percent, holding the thumb's position as a percentage. Only Firefox
  * can colour that portion of a native range input by itself (::-moz-range-progress); Chromium,
  * which Foundry's desktop app runs on, cannot, so the percentage has to be supplied from here
  * and refreshed whenever the value changes.
@@ -20,7 +20,7 @@
  */
 export class RangeDisplay {
     static #WRAPPER_SELECTOR = ".fwmb-range, .fwmb-slider-group";
-    static #FILL_PROPERTY = "--fwmb-range-fill";
+    static #FILL_PROPERTY = "--fwmb-range-percent";
     static #FULL_PERCENT = 100;
     // What a range input uses as its maximum when none is set (the HTML default)
     static #DEFAULT_MAX = 100;

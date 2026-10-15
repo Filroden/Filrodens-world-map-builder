@@ -21,6 +21,8 @@ const TYPES = {
     ".md": "text/markdown; charset=utf-8",
     ".svg": "image/svg+xml",
     ".png": "image/png",
+    ".woff2": "font/woff2",
+    ".txt": "text/plain; charset=utf-8",
 };
 
 /** What a request is answered with, from the working copy or (dist) from the packed site. */

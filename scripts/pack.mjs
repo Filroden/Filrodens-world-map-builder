@@ -32,7 +32,7 @@ async function packModule() {
   await copyFiles(
     '.',
     './dist',
-    ['js', 'mjs', 'json', 'css', 'hbs', 'svg', 'md', 'html'],
+    ['js', 'mjs', 'json', 'css', 'hbs', 'svg', 'md', 'html', 'woff2', 'txt'],
     [],
     excludedFolders,
     ['package.json', 'package-lock.json', 'GEMINI.md', '.DS_Store', '.gitignore', '.gitattributes']

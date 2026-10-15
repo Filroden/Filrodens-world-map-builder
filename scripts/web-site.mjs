@@ -13,7 +13,7 @@ export const SITE_FILES = ["module.json", "LICENSE.md"];
 export const SITE_EXCLUDED_FOLDERS = ["screenshots"];
 
 /** The file types the site carries. */
-export const SITE_EXTENSIONS = ["js", "mjs", "json", "css", "hbs", "svg", "md", "html"];
+export const SITE_EXTENSIONS = ["js", "mjs", "json", "css", "hbs", "svg", "md", "html", "woff2", "txt"];
 
 /** The page itself is web/index.html, served at the site's root. */
 export const PAGE = "web/index.html";

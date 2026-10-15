@@ -6,14 +6,14 @@
             
             {{#each autoLabels}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="{{this.dataType}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}}>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                     <i class="fwmb-icon {{#if (eq this.displayVisibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.displayVisibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
                 </button>
                 <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon fwmb-icon--center-focus"></i>
                 </button>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="editLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                     <i class="fwmb-icon fwmb-icon--edit"></i>
                 </button>
             </div>
@@ -49,17 +49,17 @@
                 {{#if ../massEditMode.label}}
                     <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="label" {{#if this.massEditSelected}}checked{{/if}} />
                 {{/if}}
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
                 </button>
                 <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon fwmb-icon--center-focus"></i>
                 </button>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="editLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                     <i class="fwmb-icon fwmb-icon--edit"></i>
                 </button>
-                <button type="button" class="fwmb-btn fwmb-btn--small fwmb-btn--muted fwmb-btn--danger" data-action="deleteLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                     <i class="fwmb-icon fwmb-icon--delete"></i>
                 </button>
             </div>

@@ -183,7 +183,7 @@ test("focus returns to where it was when the dialogue closes", async () => {
 test("sliders in the content show their value when the dialogue opens", async () => {
     const result = dialogs.prompt({ title: "T", content: '<input type="range" name="s" min="0" max="10" value="5"><output></output>' });
     const slider = dialog().querySelector("input");
-    assert.equal(slider.style.getPropertyValue("--fwmb-range-fill"), "50%");
+    assert.equal(slider.style.getPropertyValue("--fwmb-range-percent"), "50%");
     key(slider, "Escape");
     await result;
 });

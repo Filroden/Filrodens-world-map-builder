@@ -73,18 +73,21 @@ test("every class the scripts set is the module's own", () => {
     assert.deepEqual(foreign, [], `Classes that are not the module's own:\n${foreign.join("\n")}`);
 });
 
-/** Every px length in a stylesheet's declarations (comments dropped), with its line. */
+/** Every px length in a stylesheet's declarations (comments dropped), with its line. A 2px length
+ * is allowed in an outline or outline-offset declaration only. */
 function pxLengths(text) {
     const found = [];
     const code = text.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
-    code.split("\n").forEach((line, index) => {
-        const isOutline = /^\s*outline(-offset)?\s*:/.test(line);
-        for (const [, number] of line.matchAll(/(-?\d*\.?\d+)px\b/g)) {
+    const lines = code.split("\n");
+    for (const declaration of code.matchAll(/([\w-]+)\s*:\s*([^;{}]+)/g)) {
+        const isOutline = /^outline(-offset)?$/.test(declaration[1]);
+        for (const [, number] of declaration[2].matchAll(/(-?\d*\.?\d+)px\b/g)) {
             const size = Math.abs(Number(number));
             if (size === 1 || (isOutline && size === 2)) continue;
-            found.push(`${index + 1}: ${line.trim()}`);
+            const line = code.slice(0, declaration.index).split("\n").length;
+            found.push(`${line}: ${lines[line - 1].trim()}`);
         }
-    });
+    }
     return found;
 }
 

@@ -63,7 +63,7 @@ Please see the [Wiki](https://github.com/Filroden/Filrodens-world-map-builder/wi
 
 ## Third-Party Licences
 
-Filroden's World Map Builder is released under the [MIT Licence](LICENSE.md). It also includes the following third-party code and icons. Each is kept in its own folder together with its licence, and that licence covers every file in the folder.
+Filroden's World Map Builder is released under the [MIT Licence](LICENSE.md). It also includes the following third-party code, icons and fonts. Each is kept in its own folder together with its licence, and that licence covers every file in the folder.
 
 | Dependency | Folder | Licence file | Licence |
 | :--- | :--- | :--- | :--- |
@@ -77,3 +77,6 @@ Filroden's World Map Builder is released under the [MIT Licence](LICENSE.md). It
 | [three.js](https://threejs.org/) r185 (development build) and its OrbitControls add-on, used by the 3D view | [`vendor/three/`](vendor/three/) | [`licence-three.md`](vendor/three/licence-three.md) | MIT |
 | [Google Material Design icons](https://fonts.google.com/icons) (the interface icons) | [`assets/icons/`](assets/icons/) | [`icons-licence.md`](assets/icons/icons-licence.md) | Apache 2.0 |
 | [Pinhead icons](https://pinhead.ink/) (the point of interest icons) | [`assets/pinhead-icons/`](assets/pinhead-icons/) | [`licence-pinhead-icons.md`](assets/pinhead-icons/licence-pinhead-icons.md) | CC0 1.0 (public domain dedication) |
+| [Atkinson Hyperlegible](https://github.com/googlefonts/atkinson-hyperlegible) (the interface font; Latin and Latin Extended, weights 400 and 700) | [`assets/fonts/atkinson-hyperlegible/`](assets/fonts/atkinson-hyperlegible/) | [`OFL.txt`](assets/fonts/atkinson-hyperlegible/OFL.txt) | SIL Open Font License 1.1 |
+| [Sora](https://github.com/sora-xor/sora-font) (titles; Latin and Latin Extended, weights 600 and 700) | [`assets/fonts/sora/`](assets/fonts/sora/) | [`OFL.txt`](assets/fonts/sora/OFL.txt) | SIL Open Font License 1.1 |
+| [Barlow Semi Condensed](https://github.com/jpt/barlow) (values and readouts; Latin and Latin Extended, weights 500 and 600) | [`assets/fonts/barlow-semi-condensed/`](assets/fonts/barlow-semi-condensed/) | [`OFL.txt`](assets/fonts/barlow-semi-condensed/OFL.txt) | SIL Open Font License 1.1 |

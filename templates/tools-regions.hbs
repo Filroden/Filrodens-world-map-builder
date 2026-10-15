@@ -18,16 +18,16 @@
         <div id="fwmb-scroll-region-sets" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
             {{#each regionPanel.sets}}
             <div class="fwmb-list-item fwmb-set-row" aria-selected="{{#if this.isActive}}true{{else}}false{{/if}}" data-set-id="{{this.id}}">
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="toggleSetVisibility" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleSetVisibility" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
                 </button>
                 <span class="fwmb-name fwmb-flex-1" data-action="selectLayerSet" title="{{this.name}}">{{this.name}}</span>
                 <span class="fwmb-count-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.SetLevelCount'}}">{{this.levelCount}}</span>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="editLayerSet" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLayerSet'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLayerSet" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLayerSet'}}">
                     <i class="fwmb-icon fwmb-icon--edit"></i>
                 </button>
                 <div class="fwmb-dropdown fwmb-row-menu" tabindex="0">
-                    <button type="button" class="fwmb-btn fwmb-btn--small" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
+                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
                         <i class="fwmb-icon fwmb-icon--more-vert"></i>
                     </button>
                     <div class="fwmb-dropdown-menu">
@@ -62,7 +62,7 @@
         <div id="fwmb-scroll-region-levels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
             {{#each regionPanel.levels}}
             <div class="fwmb-list-item fwmb-level-row" aria-selected="{{#if this.isActive}}true{{else}}false{{/if}}" data-level-id="{{this.id}}" style="--fwmb-level-depth: {{this.depth}};">
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="toggleLevelVisibility" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleLevelVisibility" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
                 </button>
                 {{#if this.hasParent}}<i class="fwmb-icon fwmb-icon--subdirectory fwmb-level-branch"></i>{{/if}}
@@ -74,11 +74,11 @@
                     <i class="fwmb-icon fwmb-icon--exclamation"></i>{{this.problems}}
                 </span>
                 {{/if}}
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="editLevel" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLevel'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLevel" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLevel'}}">
                     <i class="fwmb-icon fwmb-icon--edit"></i>
                 </button>
                 <div class="fwmb-dropdown fwmb-row-menu" tabindex="0">
-                    <button type="button" class="fwmb-btn fwmb-btn--small" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
+                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
                         <i class="fwmb-icon fwmb-icon--more-vert"></i>
                     </button>
                     <div class="fwmb-dropdown-menu">
@@ -141,19 +141,19 @@
                 {{#if @root.massEditMode.region}}
                     <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="region" {{#if this.massEditSelected}}checked{{/if}} />
                 {{/if}}
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="toggleVisibility" data-target="feature">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
                 </button>
                 <div class="fwmb-swatch fwmb-swatch--small" style="background-color: {{this.swatch}};"></div>
                 <span class="fwmb-name fwmb-flex-1" data-action="selectRegion" title="{{this.name}}">{{this.name}}</span>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon fwmb-icon--center-focus"></i>
                 </button>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="editRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editRegion" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                     <i class="fwmb-icon fwmb-icon--edit"></i>
                 </button>
                 <div class="fwmb-dropdown fwmb-row-menu" tabindex="0">
-                    <button type="button" class="fwmb-btn fwmb-btn--small" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
+                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
                         <i class="fwmb-icon fwmb-icon--more-vert"></i>
                     </button>
                     <div class="fwmb-dropdown-menu">

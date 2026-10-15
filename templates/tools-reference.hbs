@@ -7,7 +7,7 @@
             <div class="fwmb-form-fields">
                 <div class="fwmb-flex-row fwmb-flex-row--centred">
                     <file-picker class="fwmb-flex-1" name="referenceImage" type="image" value="{{uiState.referenceImage}}"></file-picker>
-                    <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--muted fwmb-btn--danger" data-action="removeReferenceImage" data-tooltip="{{localize 'FILRODENSWMB.UI.RemoveImage'}}">
+                    <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeReferenceImage" data-tooltip="{{localize 'FILRODENSWMB.UI.RemoveImage'}}">
                         <i class="fwmb-icon fwmb-icon--delete"></i>
                     </button>
                 </div>
@@ -34,17 +34,17 @@
                     </div>
 
                     <div class="fwmb-transform-dpad">
-                        <button type="button" class="fwmb-dpad-up" data-action="nudgeReference" data-dx="0" data-dy="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-up" data-action="nudgeReference" data-dx="0" data-dy="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
                                 class="fwmb-icon fwmb-icon--edit-arrow-up"
                             ></i></button>
-                        <button type="button" class="fwmb-dpad-left" data-action="nudgeReference" data-dx="-1" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-left" data-action="nudgeReference" data-dx="-1" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
                                 class="fwmb-icon fwmb-icon--edit-arrow-up fwmb-rotate-270"
                             ></i></button>
-                        <button type="button" class="fwmb-dpad-center" data-action="resetReferencePan" data-tooltip="{{localize 'FILRODENSWMB.UI.CenterImage'}}"><i class="fwmb-icon fwmb-icon--center-focus"></i></button>
-                        <button type="button" class="fwmb-dpad-right" data-action="nudgeReference" data-dx="1" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-center" data-action="resetReferencePan" data-tooltip="{{localize 'FILRODENSWMB.UI.CenterImage'}}"><i class="fwmb-icon fwmb-icon--center-focus"></i></button>
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-right" data-action="nudgeReference" data-dx="1" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
                                 class="fwmb-icon fwmb-icon--edit-arrow-up fwmb-rotate-90"
                             ></i></button>
-                        <button type="button" class="fwmb-dpad-down" data-action="nudgeReference" data-dx="0" data-dy="1" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-down" data-action="nudgeReference" data-dx="0" data-dy="1" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
                                 class="fwmb-icon fwmb-icon--edit-arrow-down"
                             ></i></button>
                     </div>

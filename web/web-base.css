@@ -21,8 +21,8 @@ body {
 body {
     background: var(--fwmb-bg-base, #1b1b1b);
     color: var(--fwmb-text-primary, #e6e6e6);
-    font-family: var(--fwmb-font-family);
-    font-size: var(--fwmb-size-14, 0.875rem);
+    font-family: var(--fwmb-font-ui);
+    font-size: var(--fwmb-size-13, 0.8125rem);
 }
 
 /* The studio fills the page (in Foundry, the window's content area holds it) */

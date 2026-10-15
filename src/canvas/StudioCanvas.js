@@ -54,7 +54,10 @@ export class StudioCanvas {
 
         this.app = new PIXI.Application({
             autoDensity: true,
-            backgroundColor: 0x1a4b84,
+            // Transparent, so the space around the map is the studio's own canvas surround colour
+            // (the map preview's background in the stylesheet), which follows the colour theme.
+            // Exports render into their own textures, which start transparent either way.
+            backgroundAlpha: 0,
             antialias: true,
             resolution: window.devicePixelRatio || 1,
             sharedTicker: false,

@@ -4,7 +4,7 @@
         <legend>{{localize "FILRODENSWMB.UI.CanvasSettings"}}</legend>
 
         {{#if terrainUpgradeAvailable}}
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--danger" data-action="updateMapTerrain" data-tooltip="{{localize 'FILRODENSWMB.UI.UpdateMapHint'}}">
+            <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-action="updateMapTerrain" data-tooltip="{{localize 'FILRODENSWMB.UI.UpdateMapHint'}}">
                 <i class="fwmb-icon fwmb-icon--sync"></i> {{localize "FILRODENSWMB.UI.UpdateMap"}}
             </button>
         {{/if}}
@@ -117,15 +117,15 @@
 
                         <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
 
-                        <button type="button" class="fwmb-btn fwmb-btn--small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                             <i class="fwmb-icon fwmb-icon--center-focus"></i>
                         </button>
 
-                        <button type="button" class="fwmb-btn fwmb-btn--small" data-action="editLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                             <i class="fwmb-icon fwmb-icon--edit"></i>
                         </button>
 
-                        <button type="button" class="fwmb-btn fwmb-btn--small fwmb-btn--muted fwmb-btn--danger" data-action="deleteLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                             <i class="fwmb-icon fwmb-icon--delete"></i>
                         </button>
                     </div>
@@ -135,7 +135,7 @@
             </div>
         </details>
 
-        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--danger" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
+        <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
             <i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.DeleteAllLandMasksTitle"}}
         </button>
     {{/if}}

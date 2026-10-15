@@ -416,6 +416,971 @@
     --fwmb-mask: url("../assets/pinhead-icons/wall_tent.svg");
 }
 
+/* ===================================================================
+   --- DESIGN SYSTEM COMPONENTS ---
+   The design system's component styles: buttons, modes, fields, badges, panels and sections,
+   list and tree rows, menus, tooltips, dialogues and the inspector, the rail, the context bar's
+   parts, the canvas overlays' parts and the processing card. Every length is rem and every colour
+   a theme token. They are written as single classes, so the module's layout rules further down
+   (which are scoped under .fwmb) settle the layout wherever both apply.
+=================================================================== */
+
+.fwmb {
+    font: 400 0.8125rem/1.125rem var(--fwmb-font-ui);
+    color: var(--fwmb-text-primary);
+}
+.fwmb *,
+.fwmb *::before,
+.fwmb *::after {
+    box-sizing: border-box;
+}
+
+/* ---------- Icons: a small size beside the default ---------- */
+.fwmb-icon--small {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ---------- Section titles and labels ---------- */
+.fwmb-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.5rem;
+    color: var(--fwmb-accent-main);
+    font: 700 0.75rem/1rem var(--fwmb-font-ui);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.fwmb-panel-title {
+    font: 600 0.875rem/1.25rem var(--fwmb-font-display);
+    color: var(--fwmb-text-primary);
+}
+.fwmb-label {
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-hint {
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    margin: 0.25rem 0 0;
+}
+.fwmb-readout {
+    font: 500 0.8125rem/1rem var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb-info {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    border: 0.09375rem solid currentColor;
+    color: var(--fwmb-text-muted);
+    display: inline-grid;
+    place-items: center;
+    font: 700 0.625rem/1 var(--fwmb-font-ui);
+    flex: none;
+}
+.fwmb-info::before {
+    content: "i";
+}
+
+/* ---------- Buttons ---------- */
+.fwmb-btn {
+    height: 1.75rem;
+    min-width: 1.75rem;
+    padding: 0 0.625rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--fwmb-border-strong);
+    background: var(--fwmb-bg-raised);
+    color: var(--fwmb-text-primary);
+    font: 700 0.8125rem/1rem var(--fwmb-font-ui);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.fwmb-btn:hover {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb-btn:active {
+    background: var(--fwmb-bg-highlight);
+}
+.fwmb-btn:focus-visible,
+.fwmb-mode:focus-visible,
+.fwmb-input:focus-visible,
+.fwmb-select:focus-visible,
+.fwmb-check:focus-visible .fwmb-box,
+.fwmb-swatch:focus-visible,
+.fwmb-list-item:focus-visible,
+.fwmb-rail-btn:focus-visible,
+.fwmb-map-btn:focus-visible {
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: 2px;
+}
+.fwmb-btn:disabled,
+.fwmb-mode:disabled,
+.fwmb-input:disabled,
+.fwmb-select:disabled {
+    opacity: 0.45;
+    cursor: default;
+    pointer-events: none;
+}
+.fwmb-btn--primary {
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent);
+    color: var(--fwmb-text-inverse);
+}
+.fwmb-btn--primary:hover {
+    background: var(--fwmb-fill-accent-hover);
+    border-color: var(--fwmb-fill-accent-hover);
+}
+.fwmb-btn--secondary {
+    background: var(--fwmb-fill-secondary);
+    border-color: var(--fwmb-fill-secondary);
+    color: var(--fwmb-text-inverse);
+}
+.fwmb-btn--subtle {
+    background: transparent;
+    border-color: transparent;
+    color: var(--fwmb-accent-main);
+}
+.fwmb-btn--subtle:hover {
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-accent-hover);
+}
+.fwmb-btn--square {
+    padding: 0;
+    width: 1.75rem;
+}
+.fwmb-btn[data-tone="positive"] {
+    background: var(--fwmb-fill-positive);
+    border-color: var(--fwmb-fill-positive);
+    color: var(--fwmb-text-inverse);
+}
+.fwmb-btn[data-tone="caution"] {
+    background: var(--fwmb-fill-caution);
+    border-color: var(--fwmb-fill-caution);
+    color: var(--fwmb-text-inverse);
+}
+.fwmb-btn[data-tone="negative"] {
+    background: var(--fwmb-fill-negative);
+    border-color: var(--fwmb-fill-negative);
+    color: var(--fwmb-text-inverse);
+}
+.fwmb-btn[data-tone]:hover {
+    filter: brightness(0.9);
+}
+.fwmb-btn--danger-quiet {
+    background: transparent;
+    border-color: var(--fwmb-border-main);
+    color: var(--fwmb-color-danger);
+}
+
+/* ---------- Mode buttons (the context bar's pointer modes; a radio group) ---------- */
+.fwmb-modes {
+    display: inline-flex;
+    gap: 0.25rem;
+}
+.fwmb-mode {
+    height: 1.75rem;
+    padding: 0 0.625rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-panel);
+    color: var(--fwmb-text-primary);
+    font: 700 0.8125rem/1rem var(--fwmb-font-ui);
+    cursor: pointer;
+}
+.fwmb-mode:hover {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb-mode[aria-checked="true"] {
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent);
+    color: var(--fwmb-text-inverse);
+}
+
+/* ---------- Fields ---------- */
+.fwmb-input,
+.fwmb-select {
+    height: 1.75rem;
+    min-width: 7.5rem;
+    padding: 0 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--fwmb-border-strong);
+    background: var(--fwmb-bg-base);
+    color: var(--fwmb-text-primary);
+    font: inherit;
+}
+.fwmb-input--number {
+    min-width: 4.5rem;
+    justify-content: flex-end;
+    font: 500 0.8125rem/1rem var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb-input:hover,
+.fwmb-select:hover {
+    border-color: var(--fwmb-accent-main);
+}
+.fwmb-input--placeholder {
+    color: var(--fwmb-text-muted);
+}
+.fwmb-input[aria-invalid="true"] {
+    border-color: var(--fwmb-color-danger);
+    box-shadow: inset 0 0 0 1px var(--fwmb-color-danger);
+}
+.fwmb-field-error {
+    color: var(--fwmb-color-danger);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-select {
+    justify-content: space-between;
+    cursor: pointer;
+}
+.fwmb-select::after {
+    content: "";
+    width: 0;
+    height: 0;
+    border-left: 0.3125rem solid transparent;
+    border-right: 0.3125rem solid transparent;
+    border-top: 0.375rem solid var(--fwmb-text-secondary);
+}
+
+/* ---------- Slider: label row (name, info, value) above a full-width track ---------- */
+.fwmb-slider-group {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    row-gap: 0.25rem;
+    align-items: center;
+}
+.fwmb-slider-group .fwmb-label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.fwmb-slider-group .fwmb-readout {
+    text-align: end;
+    min-width: 2.5rem;
+}
+.fwmb-slider-group.fwmb-is-changed .fwmb-readout {
+    color: var(--fwmb-accent-main);
+}
+
+/* ---------- Checkbox and switch ---------- */
+.fwmb-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+.fwmb-check .fwmb-box {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.1875rem;
+    border: 0.09375rem solid var(--fwmb-border-strong);
+    background: var(--fwmb-bg-base);
+    display: grid;
+    place-items: center;
+}
+.fwmb-check:hover .fwmb-box {
+    border-color: var(--fwmb-accent-main);
+}
+.fwmb-check[aria-checked="true"] .fwmb-box {
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent);
+}
+.fwmb-check[aria-checked="true"] .fwmb-box::after {
+    content: "";
+    width: 0.5rem;
+    height: 0.25rem;
+    border: 0.125rem solid var(--fwmb-text-inverse);
+    border-top: 0;
+    border-right: 0;
+    transform: rotate(-45deg) translate(1px, -1px);
+}
+.fwmb-check[aria-checked="mixed"] .fwmb-box::after {
+    content: "";
+    width: 0.5rem;
+    height: 0.125rem;
+    background: var(--fwmb-accent-main);
+}
+
+/* ---------- Colour swatch ---------- */
+.fwmb-swatch {
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--fwmb-border-strong);
+    background: var(--swatch, transparent);
+    cursor: pointer;
+    flex: none;
+}
+.fwmb-swatch--wide {
+    width: 4rem;
+}
+.fwmb-swatch:hover {
+    border-color: var(--fwmb-accent-main);
+}
+
+/* ---------- Badges ---------- */
+.fwmb-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 0.1875rem;
+    background: var(--fwmb-badge-bg);
+    color: var(--fwmb-badge-text);
+    font: 400 0.6875rem/0.875rem var(--fwmb-font-ui);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+}
+.fwmb-badge--instant {
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-muted);
+}
+.fwmb-badge--style {
+    background: var(--fwmb-fill-secondary);
+    color: var(--fwmb-text-inverse);
+}
+.fwmb-badge--count {
+    font-family: var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+}
+.fwmb-badge--problem {
+    background: var(--fwmb-fill-negative);
+    color: var(--fwmb-text-inverse);
+}
+
+/* ---------- Panel, section (collapsible) and Next footer ---------- */
+.fwmb-panel {
+    background: var(--fwmb-bg-panel);
+    border-inline-end: 1px solid var(--fwmb-border-main);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.fwmb-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--fwmb-border-main);
+}
+.fwmb-panel-header .fwmb-meta {
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+}
+.fwmb-section {
+    margin: 0.5rem;
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: 0.625rem;
+    background: var(--fwmb-bg-raised);
+}
+.fwmb-section > summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    cursor: pointer;
+}
+.fwmb-section > summary::-webkit-details-marker {
+    display: none;
+}
+.fwmb-section > summary .fwmb-chev {
+    width: 0;
+    height: 0;
+    border-top: 0.3125rem solid transparent;
+    border-bottom: 0.3125rem solid transparent;
+    border-inline-start: 0.375rem solid var(--fwmb-accent-main);
+    transition: transform 0.12s;
+}
+.fwmb-section[open] > summary .fwmb-chev {
+    transform: rotate(90deg);
+}
+.fwmb-section > summary .fwmb-section-title {
+    margin: 0;
+    min-width: 0;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb-section > summary .fwmb-badge {
+    flex: none;
+    white-space: nowrap;
+}
+.fwmb-section .fwmb-body {
+    padding: 0 0.75rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+.fwmb-section--state {
+    background: var(--fwmb-bg-base);
+    border-style: dashed;
+}
+.fwmb-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-row > .fwmb-label {
+    width: 6.5rem;
+    flex: none;
+}
+.fwmb-next {
+    margin-top: auto;
+    padding: 0.625rem 0.75rem;
+    border-top: 1px solid var(--fwmb-border-main);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+/* ---------- List and tree rows ---------- */
+.fwmb-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+.fwmb-list-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.875rem;
+    padding: 0 0.5rem;
+    padding-inline-start: calc(0.5rem + var(--depth, 0) * 1.25rem);
+    border-radius: 0.375rem;
+    color: var(--fwmb-text-primary);
+    cursor: pointer;
+}
+.fwmb-list-item .fwmb-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb-list-item .fwmb-meta {
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+}
+.fwmb-list-item .fwmb-actions {
+    display: none;
+    gap: 0.125rem;
+}
+.fwmb-list-item:is(:hover, :focus-within, [aria-selected="true"]) .fwmb-actions {
+    display: inline-flex;
+}
+.fwmb-list-item:is(:hover, :focus-within) > :is(.fwmb-meta, .fwmb-state) {
+    display: none;
+}
+.fwmb-list-item:hover {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb-list-item[aria-selected="true"] {
+    background: var(--fwmb-bg-highlight);
+}
+.fwmb-list-item.fwmb-is-working {
+    background: var(--fwmb-bg-highlight);
+    box-shadow: inset 0.1875rem 0 0 var(--fwmb-accent-secondary);
+}
+.fwmb-list-item.fwmb-is-working .fwmb-state {
+    color: var(--fwmb-accent-secondary);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.fwmb-list-item.fwmb-is-hidden .fwmb-name {
+    color: var(--fwmb-text-muted);
+}
+.fwmb-list-item .fwmb-tw {
+    width: 1rem;
+    height: 1rem;
+    display: grid;
+    place-items: center;
+    flex: none;
+}
+.fwmb-list-item .fwmb-tw::before {
+    content: "";
+    border-top: 0.3125rem solid transparent;
+    border-bottom: 0.3125rem solid transparent;
+    border-inline-start: 0.375rem solid var(--fwmb-text-secondary);
+}
+.fwmb-list-item[aria-expanded="true"] .fwmb-tw::before {
+    transform: rotate(90deg);
+}
+.fwmb-list-item--add {
+    color: var(--fwmb-text-muted);
+}
+.fwmb-eye {
+    width: 1.5rem;
+    height: 1.5rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.375rem;
+    flex: none;
+    color: var(--fwmb-accent-main);
+}
+.fwmb-eye::before {
+    content: "";
+    width: 0.875rem;
+    height: 0.5625rem;
+    border: 0.09375rem solid currentColor;
+    border-radius: 50% / 60%;
+    background: radial-gradient(circle, currentColor 0 32%, transparent 36%);
+}
+.fwmb-eye--gm {
+    color: var(--fwmb-color-warning);
+}
+.fwmb-eye--off {
+    color: var(--fwmb-text-muted);
+}
+.fwmb-eye--off::before {
+    background: linear-gradient(135deg, transparent 45%, currentColor 45% 55%, transparent 55%);
+}
+.fwmb-chip-swatch {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 0.1875rem;
+    background: var(--swatch);
+    flex: none;
+}
+
+/* ---------- Menus (popover) ---------- */
+.fwmb-dropdown-menu {
+    min-width: 11rem;
+    padding: 0.25rem;
+    border-radius: 0.625rem;
+    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-panel);
+    box-shadow: var(--fwmb-shadow-popout);
+    display: flex;
+    flex-direction: column;
+}
+.fwmb-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 1.875rem;
+    padding: 0 0.5rem;
+    border-radius: 0.375rem;
+    color: var(--fwmb-text-primary);
+    cursor: pointer;
+}
+.fwmb-menu-item:is(:hover, :focus-visible) {
+    background: var(--fwmb-bg-hover);
+    outline: none;
+}
+.fwmb-menu-item--danger {
+    color: var(--fwmb-color-danger);
+}
+.fwmb-menu-item .fwmb-kbd {
+    margin-inline-start: auto;
+    color: var(--fwmb-text-muted);
+    font: 500 0.75rem/1 var(--fwmb-font-readout);
+}
+.fwmb-menu-sep {
+    height: 1px;
+    background: var(--fwmb-border-subtle);
+    margin: 0.25rem 0;
+}
+
+/* ---------- Tooltip and toast ---------- */
+.fwmb-tooltip {
+    max-width: 16rem;
+    padding: 0.375rem 0.625rem;
+    border-radius: 0.375rem;
+    background: var(--fwmb-overlay-bg);
+    color: var(--fwmb-overlay-text);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    box-shadow: var(--fwmb-shadow-popout);
+}
+.fwmb-tooltip .fwmb-key {
+    font-weight: 700;
+    display: block;
+}
+.fwmb-toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    max-width: 22rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-panel);
+    box-shadow: var(--fwmb-shadow-popout);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-toast .fwmb-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    margin-top: 0.25rem;
+    flex: none;
+    background: var(--fwmb-color-success);
+}
+.fwmb-toast--warn .fwmb-dot {
+    background: var(--fwmb-color-warning);
+}
+.fwmb-toast--error .fwmb-dot {
+    background: var(--fwmb-color-danger);
+}
+
+/* ---------- Dialogue (modal) and inspector (docked): the same Overlay, two placements ---------- */
+.fwmb-overlay {
+    display: flex;
+    flex-direction: column;
+    background: var(--fwmb-bg-panel);
+    border: 1px solid var(--fwmb-border-main);
+    color: var(--fwmb-text-primary);
+}
+.fwmb-overlay-modal {
+    width: 25rem;
+    border-radius: 0.625rem;
+    box-shadow: var(--fwmb-shadow-window);
+}
+.fwmb-overlay-docked {
+    width: 22.5rem;
+    border-width: 0 0 0 1px;
+    border-inline-start: 1px solid var(--fwmb-border-main);
+    box-shadow: var(--fwmb-shadow-popout);
+}
+.fwmb-overlay-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--fwmb-border-main);
+}
+.fwmb-overlay-header .fwmb-kind {
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+}
+.fwmb-overlay-header .fwmb-close {
+    margin-inline-start: auto;
+}
+.fwmb-overlay-body {
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.fwmb-overlay-body .fwmb-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--fwmb-border-subtle);
+}
+.fwmb-overlay-body .fwmb-group:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+.fwmb-overlay-footer {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    padding: 0.625rem 0.75rem;
+    border-top: 1px solid var(--fwmb-border-main);
+}
+.fwmb-overlay-footer .fwmb-start {
+    margin-inline-end: auto;
+}
+.fwmb-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+/* ---------- Rail (left tool strip) ---------- */
+.fwmb-rail-stage {
+    font: 700 0.625rem/1 var(--fwmb-font-ui);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fwmb-text-muted);
+    margin: 1rem 0 0.25rem;
+    max-width: calc(100% - 0.5rem);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb-rail-stage:first-child {
+    margin-top: 0.25rem;
+}
+.fwmb-rail-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.375rem;
+    color: var(--fwmb-text-secondary);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+.fwmb-rail-btn:hover {
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
+}
+.fwmb-rail-btn[aria-pressed="true"] {
+    background: var(--fwmb-fill-accent);
+    color: var(--fwmb-text-inverse);
+}
+.fwmb-rail-btn.fwmb-is-dirty {
+    position: relative;
+}
+.fwmb-rail-btn.fwmb-is-dirty::after {
+    content: "";
+    position: absolute;
+    top: 0.3125rem;
+    inset-inline-end: 0.3125rem;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    border-radius: 50%;
+    background: var(--fwmb-accent-secondary);
+}
+.fwmb-rail-sep {
+    width: 1.5rem;
+    height: 1px;
+    background: var(--fwmb-border-main);
+    margin: 0.25rem 0;
+}
+
+/* ---------- Context bar (above the canvas, never over it; one row) ---------- */
+.fwmb-edit-toolbar .fwmb-sep {
+    width: 1px;
+    height: 1.5rem;
+    background: var(--fwmb-border-main);
+    flex: none;
+}
+.fwmb-edit-toolbar .fwmb-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-edit-toolbar .fwmb-state b {
+    color: var(--fwmb-accent-secondary);
+}
+.fwmb-edit-toolbar .fwmb-grow {
+    flex: 1;
+}
+.fwmb-edit-toolbar .fwmb-slider-group {
+    grid-template-columns: auto 6rem auto;
+    column-gap: 0.5rem;
+}
+
+/* ---------- Canvas and its four overlays (always visible while the canvas is) ---------- */
+.fwmb-map-overlay {
+    position: absolute;
+    background: var(--fwmb-overlay-bg);
+    color: var(--fwmb-overlay-text);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-canvas-readout .fwmb-legend {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 0.375rem 0.625rem 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.fwmb-canvas-readout .fwmb-legend .fwmb-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+}
+.fwmb-canvas-readout .fwmb-legend .fwmb-title .fwmb-toggle {
+    margin-inline-start: auto;
+    color: var(--fwmb-overlay-muted);
+    font-weight: 400;
+}
+.fwmb-canvas-readout .fwmb-classes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.125rem 0.5rem;
+}
+.fwmb-canvas-readout .fwmb-classes span {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+.fwmb-canvas-readout .fwmb-classes i {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 0.125rem;
+    background: var(--swatch);
+    flex: none;
+}
+.fwmb-map-btn {
+    width: 1.75rem;
+    height: 1.75rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.25rem;
+    border: 1px solid var(--fwmb-overlay-border);
+    background: var(--fwmb-overlay-control);
+    color: var(--fwmb-overlay-text);
+    cursor: pointer;
+    position: relative;
+}
+.fwmb-map-btn:hover {
+    background: var(--fwmb-overlay-control-hover);
+}
+.fwmb-map-btn[aria-pressed="true"] {
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent);
+}
+.fwmb-map-btn.fwmb-is-partial::after {
+    content: "";
+    position: absolute;
+    inset-inline-end: 0.1875rem;
+    bottom: 0.1875rem;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--fwmb-fill-accent);
+    border: 1px solid #fff;
+}
+
+/* ---------- Processing overlay ---------- */
+.fwmb-processing {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 18rem;
+    padding: 0.75rem;
+    border-radius: 0.625rem;
+    background: var(--fwmb-overlay-bg);
+    color: var(--fwmb-overlay-text);
+    box-shadow: var(--fwmb-shadow-window);
+}
+.fwmb-progress {
+    height: 0.375rem;
+    border-radius: 0.1875rem;
+    background: var(--fwmb-overlay-control);
+    overflow: hidden;
+}
+.fwmb-progress::before {
+    content: "";
+    display: block;
+    height: 100%;
+    width: var(--done, 40%);
+    background: var(--fwmb-range-fill);
+}
+
+/* Legend forms (phase 5 thematic layers): a graded scale (.fwmb-ramp), a key + label list whose key is
+   a colour swatch or a symbol (.fwmb-classes), or a plain text list (.fwmb-terms). */
+.fwmb-canvas-readout .fwmb-classes .fwmb-sym {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex: none;
+    display: grid;
+    place-items: center;
+    color: var(--fwmb-overlay-text);
+    font: 700 0.75rem/1 var(--fwmb-font-ui);
+}
+.fwmb-canvas-readout .fwmb-terms {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+.fwmb-canvas-readout .fwmb-terms li {
+    display: flex;
+    gap: 0.5rem;
+}
+.fwmb-canvas-readout .fwmb-terms .fwmb-k {
+    min-width: 4.5rem;
+}
+.fwmb-canvas-readout .fwmb-legend.fwmb-is-folded > :not(.fwmb-title) {
+    display: none;
+}
+
+/* Inspector lying over the canvas end edge (below 1,200px): end-edge overlays move clear */
+.fwmb-map-preview--covered-end {
+    --fwmb-end-inset: calc(var(--fwmb-inspector-width, 16rem) + 0.5rem);
+}
+.fwmb-map-preview--covered-end :is(.fwmb-map-hint, .fwmb-map-history) {
+    inset-inline-end: var(--fwmb-end-inset);
+}
+
+/* Label and field (migrates Foundry's form-group / form-fields / stacked) */
+.fwmb-form-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-form-group > .fwmb-label {
+    flex: none;
+    width: 6.5rem;
+}
+.fwmb-form-fields {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-form-group--stacked {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+}
+.fwmb-form-group--stacked > .fwmb-label {
+    width: auto;
+}
+/* Side surfaces stack their fields when they are narrow (compact panel 14rem, compact inspector 16rem) */
+.fwmb-panel,
+.fwmb-overlay-docked {
+    container: fwmb-side / inline-size;
+}
+@container fwmb-side (max-width: 17.5rem) {
+    .fwmb-form-group {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.25rem;
+    }
+    .fwmb-form-group > .fwmb-label {
+        width: auto;
+    }
+    .fwmb-section > summary {
+        flex-wrap: wrap;
+        row-gap: 0.25rem;
+    }
+    .fwmb-section > summary .fwmb-section-title {
+        flex: 1;
+    }
+    .fwmb-section > summary .fwmb-badge {
+        order: 2;
+        margin-inline-start: 1.5rem;
+    }
+    .fwmb-section > summary::after {
+        content: "";
+        order: 1;
+        flex-basis: 100%;
+    }
+}
+
 /* --- APPLICATION SCROLLBARS --- */
 .fwmb * {
     scrollbar-width: auto !important;
@@ -432,18 +1397,18 @@
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-track {
-    background: var(--fwmb-bg-hover) !important;
+    background: var(--fwmb-range-track) !important;
     border-radius: var(--fwmb-radius-large) !important;
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-thumb {
-    background-color: var(--fwmb-accent-main) !important;
+    background-color: var(--fwmb-border-strong) !important;
     border-radius: var(--fwmb-radius-large) !important;
-    border: 1px solid rgba(0, 0, 0, 0.6) !important;
+    border: none !important;
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-thumb:hover {
-    background-color: var(--fwmb-accent-hover) !important;
+    background-color: var(--fwmb-accent-main) !important;
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-button {
@@ -452,148 +1417,89 @@
 
 /* --- TOOLTIPS --- */
 #tooltip.fwmb-tooltip {
-    max-width: 18.75rem !important;
-    border: 1px solid var(--fwmb-accent-main);
-    border-radius: var(--fwmb-radius-small);
-    padding: var(--fwmb-size-8);
-    background: var(--fwmb-bg-base);
-    color: var(--fwmb-text-primary);
+    max-width: 16rem !important;
+    border: 1px solid var(--fwmb-overlay-border);
+    border-radius: var(--fwmb-radius-medium);
+    padding: var(--fwmb-space-1) var(--fwmb-size-10);
+    background: var(--fwmb-overlay-bg);
+    color: var(--fwmb-overlay-text);
     box-shadow: var(--fwmb-shadow-popout);
-    font-family: var(--fwmb-font-family);
-    font-size: var(--fwmb-size-14);
-    line-height: var(--fwmb-line-height-body);
+    font-family: var(--fwmb-font-ui);
+    font-size: var(--fwmb-size-12);
+    line-height: 1rem;
     text-align: start;
     z-index: var(--z-index-tooltip, 9999);
     margin-block-start: var(--fwmb-size-10);
 }
 
-/* --- BUTTONS --- */
-/* Standard button styles for all buttons */
-.fwmb button {
+/* --- BUTTONS ---
+   A plain <button> without a class of its own (the rail, the map controls, menu items) is a filled
+   control in the theme's hue. These rules, their hover state and the font included, are written
+   with :where() so that they have no specificity beyond the element: any class the module gives a
+   button (.fwmb-btn and its modifiers, .fwmb-rail-btn, .fwmb-map-btn) decides its look, its hover
+   colours included, instead. Foundry's own window header buttons (.header-control) keep Foundry's
+   font, which draws their Font Awesome icons. */
+:where(.fwmb) button {
     background: var(--fwmb-fill-accent);
     border: none;
     color: var(--fwmb-text-inverse);
-    border-radius: var(--fwmb-radius-small);
+    border-radius: var(--fwmb-radius-medium);
     cursor: pointer;
     padding: 0;
-    transition: all 0.1s ease;
+    transition:
+        background-color 0.1s ease,
+        color 0.1s ease;
 }
 
-.fwmb button:hover {
+:where(.fwmb) button:where(:not(.header-control)) {
+    font-family: var(--fwmb-font-ui);
+}
+
+:where(.fwmb) button:where(:hover) {
     background: var(--fwmb-fill-accent-hover);
-    border-color: var(--fwmb-border-focus);
     color: var(--fwmb-text-inverse);
     box-shadow: none;
 }
 
-.fwmb *:focus-visible,
-.fwmb button:focus {
+/* Focus is the 2px ring 2px outside every control, and never removed */
+.fwmb :focus-visible {
     outline: 2px solid var(--fwmb-border-focus);
-    border-radius: var(--fwmb-radius-small);
+    outline-offset: 2px;
 }
 
-/* Variant styles for primary and danger buttons */
-.fwmb .fwmb-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: inherit;
-    font-size: var(--fwmb-size-14);
-    font-weight: bold;
-    gap: var(--fwmb-size-8);
-    padding: var(--fwmb-size-8) var(--fwmb-size-10);
-    min-height: var(--fwmb-size-32);
-}
-
+/* A button wide enough for its label, which may wrap (the regional map and Apply buttons in the
+   edit toolbar) */
 .fwmb .fwmb-btn.fwmb-btn--wide {
     width: auto;
     height: auto;
+    min-height: var(--fwmb-control-height);
+    padding-block: var(--fwmb-space-1);
+    white-space: normal;
 }
 
-.fwmb .fwmb-btn.fwmb-btn--small {
-    padding: 0.75rem;
-    height: var(--fwmb-size-8);
-    width: var(--fwmb-size-8);
-    min-height: 0;
-}
-
-/* An icon-only button beside a field or a full-width button: square, as tall as both */
-.fwmb .fwmb-btn.fwmb-btn--square {
-    flex: none;
-    width: var(--fwmb-size-32);
-    padding: 0;
-}
-
-.fwmb .fwmb-btn.fwmb-btn--subtle {
-    background: transparent;
-    border: 1px solid var(--fwmb-accent-main);
-    color: var(--fwmb-text-secondary);
-}
-.fwmb .fwmb-btn.fwmb-btn--subtle:hover {
-    background: var(--fwmb-bg-hover);
-}
-
-.fwmb .fwmb-btn.fwmb-btn--muted {
-    background: inherit;
-    border-color: transparent;
-}
-.fwmb .fwmb-btn.fwmb-btn--muted:hover {
-    background: var(--fwmb-bg-hover);
-    border-color: var(--fwmb-border-subtle);
-}
-
-.fwmb .fwmb-btn.fwmb-btn--primary {
-    color: var(--fwmb-text-inverse);
-}
-.fwmb .fwmb-btn.fwmb-btn--primary:hover {
-    color: var(--fwmb-text-inverse);
-}
-
-.fwmb .fwmb-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: var(--fwmb-bg-muted);
-    color: var(--fwmb-text-muted);
-}
-
+/* A toggle or mode button that is on: the theme's fill, as a mode in the context bar */
 .fwmb .fwmb-btn[aria-pressed="true"] {
     background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent);
     color: var(--fwmb-text-inverse);
 }
 
-.fwmb .fwmb-btn.fwmb-btn--danger {
-    color: var(--fwmb-color-danger);
-}
-.fwmb .fwmb-btn.fwmb-btn--danger:hover {
-    color: var(--fwmb-color-danger);
-}
-
-/* A button's tone, from what it does (see Overlay's buttons): green to go ahead, amber to step back
-   without losing anything when there is also a negative choice, red to give something up */
-.fwmb .fwmb-btn[data-tone="positive"] {
-    background: var(--fwmb-fill-positive);
-}
-.fwmb .fwmb-btn[data-tone="positive"]:hover {
-    background: color-mix(in srgb, var(--fwmb-fill-positive) 85%, black);
+/* An icon inside a button follows the button's text colour at the bars' icon size */
+.fwmb .fwmb-btn > .fwmb-icon {
+    width: var(--fwmb-size-20);
+    height: var(--fwmb-size-20);
+    min-width: var(--fwmb-size-20);
 }
 
-.fwmb .fwmb-btn[data-tone="caution"] {
-    background: var(--fwmb-fill-caution);
-}
-.fwmb .fwmb-btn[data-tone="caution"]:hover {
-    background: color-mix(in srgb, var(--fwmb-fill-caution) 85%, black);
-}
-
-.fwmb .fwmb-btn[data-tone="negative"] {
-    background: var(--fwmb-fill-negative);
-}
-.fwmb .fwmb-btn[data-tone="negative"]:hover {
-    background: color-mix(in srgb, var(--fwmb-fill-negative) 85%, black);
+.fwmb .fwmb-btn.fwmb-btn--square > .fwmb-icon {
+    width: var(--fwmb-size-16);
+    height: var(--fwmb-size-16);
+    min-width: var(--fwmb-size-16);
 }
 
 /* A full-width button paired with an icon-only companion action (for example the Biome Rule
    Editor button and the rule coverage preview beside it): the first child grows to fill the
-   row, later children keep their own size (usually .square). */
+   row, later children keep their own size (usually a square button). */
 .fwmb .fwmb-btn-row {
     display: flex;
     flex-direction: row;
@@ -615,24 +1521,31 @@
 .fwmb input[type="time"],
 .fwmb select,
 .fwmb textarea {
-    background: var(--fwmb-bg-panel);
-    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-base);
+    border: 1px solid var(--fwmb-border-strong);
     color: var(--fwmb-text-primary);
-    border-radius: var(--fwmb-radius-small);
-    min-height: var(--fwmb-size-24);
+    border-radius: var(--fwmb-radius-medium);
+    min-height: var(--fwmb-control-height);
     padding-inline: var(--fwmb-size-8);
-    transition:
-        border-color 0.2s,
-        box-shadow 0.2s;
+    font-family: var(--fwmb-font-ui);
+    font-size: var(--fwmb-size-13);
+    transition: border-color 0.2s;
 }
 
 .fwmb input[type="number"],
 .fwmb input[type="time"] {
     text-align: center;
+    font-family: var(--fwmb-font-readout);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
 }
 
 .fwmb input[type="number"] {
     width: 8ch;
+}
+
+.fwmb :is(input[type="text"], input[type="number"], input[type="time"], select, textarea):hover {
+    border-color: var(--fwmb-accent-main);
 }
 
 .fwmb input[type="text"]:focus,
@@ -641,7 +1554,6 @@
 .fwmb select:focus,
 .fwmb textarea:focus {
     border-color: var(--fwmb-border-focus);
-    box-shadow: var(--fwmb-shadow-focus);
 }
 
 .fwmb input::placeholder,
@@ -657,8 +1569,9 @@
 
 .fwmb textarea {
     resize: vertical;
-    font-family: monospace;
+    font-family: var(--fwmb-font-ui);
     line-height: var(--fwmb-line-height-body);
+    padding-block: var(--fwmb-space-1);
 }
 
 /* --- SELECT AND OPTIONS --- */
@@ -678,10 +1591,14 @@
 .fwmb select::picker(select) {
     position-area: top;
     margin-block-end: var(--fwmb-size-4);
-    border: 1px solid var(--fwmb-border-focus);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-large);
+    background: var(--fwmb-bg-panel);
+    box-shadow: var(--fwmb-shadow-popout);
+    padding: var(--fwmb-space-1);
 
     scrollbar-width: thin;
-    scrollbar-color: var(--fwmb-accent-main) var(--fwmb-bg-base);
+    scrollbar-color: var(--fwmb-border-strong) var(--fwmb-bg-panel);
 }
 
 .fwmb option {
@@ -691,38 +1608,39 @@
     background: var(--fwmb-bg-panel);
     color: var(--fwmb-text-primary);
     padding: var(--fwmb-size-4) var(--fwmb-size-8);
+    border-radius: var(--fwmb-radius-medium);
 }
 
 .fwmb option:hover,
 .fwmb option:focus {
-    background: var(--fwmb-fill-accent-hover);
-    color: var(--fwmb-text-inverse);
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
     outline: none;
 }
 
 .fwmb optgroup {
-    background-color: var(--fwmb-bg-base);
-    color: var(--fwmb-text-primary);
+    background-color: var(--fwmb-bg-panel);
+    color: var(--fwmb-accent-main);
     font-weight: bold;
-    font-style: italic;
+    font-style: normal;
+    font-size: var(--fwmb-size-12);
+    text-transform: uppercase;
+    letter-spacing: var(--fwmb-letter-spacing-wide);
     padding-block: 0.1875rem 0.0625rem;
 }
 
 .fwmb input:disabled,
 .fwmb select:disabled,
 .fwmb textarea:disabled {
-    background: var(--fwmb-bg-panel);
-    border-color: var(--fwmb-border-main);
-    color: var(--fwmb-text-muted);
-    opacity: 0.5;
-    cursor: not-allowed;
+    opacity: 0.45;
+    cursor: default;
 }
 
 /* --- CHECKBOXES AND RADIO BUTTONS --- */
 .fwmb-checkbox,
 .fwmb-radio {
     appearance: auto;
-    accent-color: var(--fwmb-accent-main);
+    accent-color: var(--fwmb-fill-accent);
     width: var(--fwmb-size-16) !important;
     height: var(--fwmb-size-16);
     margin: var(--fwmb-size-4);
@@ -785,57 +1703,68 @@
 .fwmb fieldset.fwmb-fieldset,
 .fwmb details.fwmb-fieldset {
     border: 1px solid var(--fwmb-border-main);
-    border-radius: var(--fwmb-radius-medium);
-    padding: var(--fwmb-size-10);
-    margin: var(--fwmb-size-10) 0;
-    gap: var(--fwmb-size-16);
+    border-radius: var(--fwmb-radius-large);
+    background: var(--fwmb-bg-raised);
+    padding: var(--fwmb-space-3);
+    margin: var(--fwmb-space-2) 0;
+    gap: var(--fwmb-space-3);
     display: flex;
     flex-direction: column;
 }
 
 .fwmb fieldset.fwmb-fieldset legend,
 .fwmb details.fwmb-fieldset > summary {
-    font-weight: bold;
+    font-family: var(--fwmb-font-ui);
+    font-weight: 700;
+    font-size: var(--fwmb-size-12);
+    line-height: 1rem;
+    letter-spacing: var(--fwmb-letter-spacing-wide);
+    text-transform: uppercase;
     color: var(--fwmb-accent-main);
     padding-inline: var(--fwmb-size-4);
-    font-size: var(--fwmb-size-14);
 }
 
 /* A <details>-based fieldset (collapsible - used where a list is reviewed only occasionally,
    e.g. the built-in pin icon list) swaps <legend> for a clickable <summary> instead. */
 .fwmb details.fwmb-fieldset {
     border: 1px solid var(--fwmb-border-main);
-    border-radius: var(--fwmb-radius-small);
+    border-radius: var(--fwmb-radius-large);
     margin-block-end: var(--fwmb-size-8);
-    background: var(--fwmb-bg-base);
+    background: var(--fwmb-bg-raised);
+    padding-block-start: 0;
     transition: background-color 0.2s;
 }
 
 .fwmb details.fwmb-fieldset > summary {
-    padding: var(--fwmb-size-8) var(--fwmb-size-10);
-    font-weight: bold;
-    background: var(--fwmb-bg-base);
-    color: var(--fwmb-accent-main);
+    padding: var(--fwmb-size-10) 0;
+    background: transparent;
     cursor: pointer;
     list-style: none;
     display: flex;
     align-items: center;
+    gap: var(--fwmb-space-2);
     user-select: none;
 }
 
 /* Custom Chevron for the Summary */
 .fwmb details.fwmb-fieldset > summary::before {
-    content: "▶";
+    content: "";
     display: inline-block;
-    margin-inline-end: var(--fwmb-size-8);
-    font-size: var(--fwmb-size-12);
-    transition: transform 0.2s ease;
-    color: var(--fwmb-text-primary);
+    flex: none;
+    width: 0;
+    height: 0;
+    border-block: 0.3125rem solid transparent;
+    border-inline-start: 0.375rem solid var(--fwmb-accent-main);
+    transition: transform 0.12s ease;
+}
+
+/* A closed collapsible section is only as tall as its title */
+.fwmb details.fwmb-fieldset:not([open]) {
+    padding-block-end: 0;
 }
 
 .fwmb details.fwmb-fieldset[open] > summary::before {
     transform: rotate(90deg);
-    color: var(--fwmb-accent-main);
 }
 
 /* Hide the default webkit arrow */
@@ -858,15 +1787,15 @@
 
 .fwmb-bulk-action-button {
     font-size: var(--fwmb-size-12);
-    background: var(--fwmb-bg-muted);
-    color: var(--fwmb-text-inverse);
-    border-radius: var(--fwmb-radius-small);
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
+    border-radius: var(--fwmb-radius-medium);
     padding: var(--fwmb-size-4) var(--fwmb-size-10);
     cursor: pointer;
 }
 
 .fwmb-bulk-action-button:hover {
-    background: var(--fwmb-fill-accent-hover);
+    background: var(--fwmb-bg-highlight);
 }
 
 /* The checkbox + field-name label pairing used for every opt-in row in a Mass Edit dialogue. */
@@ -881,13 +1810,13 @@
     display: grid;
     grid-template-columns: auto minmax(0, max-content);
     align-items: center;
-    gap: var(--fwmb-size-16);
+    gap: var(--fwmb-space-2) var(--fwmb-space-4);
     margin-block-end: var(--fwmb-size-8);
 }
 
 .fwmb label {
     margin: 0;
-    color: var(--fwmb-text-primary);
+    color: var(--fwmb-text-secondary);
     white-space: nowrap;
 }
 
@@ -901,8 +1830,7 @@
     border: 1px solid var(--fwmb-border-main);
     padding: var(--fwmb-size-10);
     margin-block-start: var(--fwmb-size-10);
-    border-radius: var(--fwmb-radius-small);
-
+    border-radius: var(--fwmb-radius-large);
     display: flex;
     flex-direction: column;
     gap: var(--fwmb-size-8);
@@ -913,9 +1841,9 @@
 .fwmb .fwmb-hint,
 .fwmb .fwmb-notes {
     font-size: var(--fwmb-size-12);
-    color: var(--fwmb-text-secondary);
+    color: var(--fwmb-text-muted);
     margin-block-start: var(--fwmb-size-2);
-    line-height: var(--fwmb-line-height-body);
+    line-height: 1rem;
 }
 
 .fwmb .fwmb-hint.fwmb-long,
@@ -936,11 +1864,10 @@
     justify-content: center;
     text-align: center;
     color: var(--fwmb-text-muted);
-    font-style: italic;
     padding: var(--fwmb-size-24);
-    background-color: var(--fwmb-bg-panel);
-    border-radius: var(--fwmb-radius-medium);
-    border: 1px solid var(--fwmb-border-main);
+    background-color: var(--fwmb-bg-raised);
+    border-radius: var(--fwmb-radius-large);
+    border: 1px dashed var(--fwmb-border-main);
 }
 
 .fwmb-danger {
@@ -949,32 +1876,15 @@
 
 /* Thematic Dividers */
 .fwmb .fwmb-divider {
-    border-block-end: 0.125rem solid var(--fwmb-border-main);
+    border-block-end: 1px solid var(--fwmb-border-main);
     width: 100%;
     margin-block: var(--fwmb-size-10);
 }
 
 .fwmb .fwmb-divider-vertical {
-    border-inline-end: 0.125rem solid var(--fwmb-border-main);
+    border-inline-end: 1px solid var(--fwmb-border-main);
     height: 100%;
     margin-inline: var(--fwmb-size-4);
-}
-
-/* --- BADGES & PILLS --- */
-.fwmb .fwmb-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fwmb-size-4);
-    background-color: var(--fwmb-bg-base);
-    color: var(--fwmb-text-secondary);
-    border: 1px solid var(--fwmb-border-focus);
-    border-radius: var(--fwmb-radius-large);
-    font-size: var(--fwmb-size-12);
-    font-weight: bold;
-    padding: var(--fwmb-size-2) var(--fwmb-size-8);
-    line-height: var(--fwmb-line-height-heading);
-    white-space: nowrap;
 }
 
 /* ===================================================================
@@ -1098,6 +2008,7 @@
     align-items: center;
     padding: 0;
     margin: 0;
+    min-width: unset;
 }
 
 /* ===================================================================
@@ -1106,8 +2017,10 @@
 
 .fwmb,
 .fwmb .window-content {
-    font-family: var(--fwmb-font-family) !important;
-    font-size: var(--fwmb-size-14);
+    font-family: var(--fwmb-font-ui) !important;
+    font-size: var(--fwmb-size-13);
+    line-height: 1.125rem;
+    color: var(--fwmb-text-primary);
     background: var(--fwmb-bg-base) !important;
     --fwmb-dir-flip: 1;
 }
@@ -1129,15 +2042,18 @@
 /* Main window header styles */
 .fwmb .window-header {
     background-image: unset;
-    background-color: var(--fwmb-main-900);
+    background-color: var(--fwmb-bg-base);
     border: none;
-    color: var(--fwmb-main-100);
+    border-block-end: 1px solid var(--fwmb-border-main);
+    color: var(--fwmb-text-primary);
 }
 
 .fwmb .window-header .window-title {
-    color: var(--fwmb-main-100);
+    color: var(--fwmb-text-primary);
+    font-family: var(--fwmb-font-display);
+    font-weight: 600;
     font-size: var(--fwmb-size-14);
-    line-height: var(--fwmb-line-height-heading);
+    line-height: 1.25rem;
     text-align: start;
     padding-inline-start: var(--fwmb-size-8);
     padding-inline-end: 0;
@@ -1190,30 +2106,30 @@
     align-items: center;
     justify-content: center;
     background: transparent;
+    border: none;
+    border-radius: var(--fwmb-radius-medium);
     color: var(--fwmb-text-secondary);
 }
 
 .fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button:hover {
     color: var(--fwmb-text-primary);
     background: var(--fwmb-bg-hover);
-    border-color: var(--fwmb-border-focus);
 }
 
 .fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button:is([aria-pressed="true"], [aria-current="page"]) {
     color: var(--fwmb-text-inverse);
     background: var(--fwmb-fill-accent);
-    border-color: var(--fwmb-border-main);
 }
 
 .fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button .fwmb-icon {
-    width: var(--fwmb-size-24);
-    height: var(--fwmb-size-24);
+    width: var(--fwmb-size-20);
+    height: var(--fwmb-size-20);
 }
 
 /* 2. The Context Panel Part */
 .fwmb .fwmb-context-panel {
-    flex: 0 0 22rem;
-    background: var(--fwmb-bg-base);
+    flex: 0 0 var(--fwmb-panel-width);
+    background: var(--fwmb-bg-panel);
     border-inline-end: 1px solid var(--fwmb-border-main);
     display: flex;
     flex-direction: column;
@@ -1226,6 +2142,7 @@
     overflow: hidden;
     min-width: 0;
     min-height: 0;
+    background: var(--fwmb-canvas-surround);
 }
 
 .fwmb-map-preview canvas {
@@ -1237,10 +2154,10 @@
 }
 
 /* The boxes drawn over the map (map information, undo/redo, canvas hint and map control groups)
-   share one background and border, dark enough to stay readable over any part of the map. */
+   share the overlay ink: one dark background in every theme, so they read over any part of the
+   map, with a faint light edge. */
 .fwmb-map-container {
-    --fwmb-map-overlay-background: rgba(0, 0, 0, 0.7);
-    --fwmb-map-overlay-border: 1px solid rgba(255, 255, 255, 0.1);
+    --fwmb-map-overlay-border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* The row along the map's bottom edge holding the canvas actions hint (start corner) and the map
@@ -1275,9 +2192,9 @@
 .fwmb-map-control-group {
     display: flex;
     gap: var(--fwmb-size-4);
-    background: var(--fwmb-map-overlay-background);
+    background: var(--fwmb-overlay-bg);
     padding: var(--fwmb-size-4);
-    border-radius: var(--fwmb-radius-small);
+    border-radius: var(--fwmb-radius-medium);
     border: var(--fwmb-map-overlay-border);
 }
 
@@ -1290,11 +2207,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--fwmb-size-4);
-    color: var(--fwmb-main-200);
+    color: var(--fwmb-overlay-text);
     font-size: var(--fwmb-size-12);
-    background: var(--fwmb-map-overlay-background);
+    line-height: 1rem;
+    background: var(--fwmb-overlay-bg);
     padding: var(--fwmb-size-4) var(--fwmb-size-8);
-    border-radius: var(--fwmb-radius-small);
+    border-radius: var(--fwmb-radius-medium);
     border: var(--fwmb-map-overlay-border);
     pointer-events: none;
     z-index: 10;
@@ -1313,9 +2231,9 @@
     inset-inline-end: var(--fwmb-size-10);
     display: flex;
     gap: var(--fwmb-size-4);
-    background: var(--fwmb-map-overlay-background);
+    background: var(--fwmb-overlay-bg);
     padding: var(--fwmb-size-4);
-    border-radius: var(--fwmb-radius-small);
+    border-radius: var(--fwmb-radius-medium);
     border: var(--fwmb-map-overlay-border);
     z-index: 20;
     opacity: 0;
@@ -1330,11 +2248,12 @@
 
 .fwmb-map-controls button,
 .fwmb-map-history button {
-    width: var(--fwmb-size-32);
-    height: var(--fwmb-size-32);
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--fwmb-main-300);
+    width: var(--fwmb-control-height);
+    height: var(--fwmb-control-height);
+    background: var(--fwmb-overlay-control);
+    border: 1px solid var(--fwmb-overlay-border);
+    border-radius: 0.25rem;
+    color: var(--fwmb-overlay-text);
     padding: 0;
     display: flex;
     align-items: center;
@@ -1343,25 +2262,36 @@
 
 .fwmb-map-controls button:hover,
 .fwmb-map-history button:hover {
-    color: var(--fwmb-main-200);
-    background: rgba(0, 0, 0, 0.2);
-    border-color: var(--fwmb-accent-main);
+    color: var(--fwmb-overlay-text);
+    background: var(--fwmb-overlay-control-hover);
 }
 
-/* On: a clear accent fill, so a layer that is showing stands out from one that is not */
+/* On: the theme's fill, so a layer that is showing stands out from one that is not */
 .fwmb-map-controls button[aria-pressed="true"],
 .fwmb-map-history button[aria-pressed="true"] {
-    color: var(--fwmb-main-100);
-    background: color-mix(in srgb, var(--fwmb-accent-main) 45%, rgba(0, 0, 0, 0.4));
-    border-color: var(--fwmb-accent-main);
+    color: var(--fwmb-text-inverse);
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent);
 }
 
-/* Some of a group's layers on: a fainter fill and a dashed edge */
+/* Some of a group's layers on: the button reads as on, with a dot in its corner */
+.fwmb-map-controls button.fwmb-is-partial::after {
+    content: "";
+    position: absolute;
+    inset-inline-end: 0.1875rem;
+    inset-block-end: 0.1875rem;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--fwmb-overlay-accent);
+    border: 1px solid var(--fwmb-overlay-bg);
+}
+
 .fwmb-map-controls button.fwmb-is-partial {
-    color: var(--fwmb-main-200);
-    background: color-mix(in srgb, var(--fwmb-accent-main) 18%, rgba(0, 0, 0, 0.4));
-    border-color: var(--fwmb-accent-main);
-    border-style: dashed;
+    position: relative;
+    color: var(--fwmb-text-inverse);
+    background: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent);
 }
 
 /* Keep the controls showing while one of their lists is open, even if the pointer leaves the map */
@@ -1384,9 +2314,10 @@
     gap: var(--fwmb-size-2);
     min-inline-size: 10rem;
     padding: var(--fwmb-size-4);
-    background: rgba(0, 0, 0, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--fwmb-radius-small);
+    background: var(--fwmb-overlay-bg);
+    border: 1px solid var(--fwmb-overlay-border);
+    border-radius: var(--fwmb-radius-large);
+    box-shadow: var(--fwmb-shadow-popout);
     z-index: 30;
 }
 
@@ -1400,13 +2331,15 @@
     justify-content: flex-start;
     gap: var(--fwmb-size-8);
     padding: var(--fwmb-size-4) var(--fwmb-size-8);
-    font-size: var(--fwmb-size-14);
+    font-size: var(--fwmb-size-13);
     white-space: nowrap;
-    color: var(--fwmb-main-200);
+    color: var(--fwmb-overlay-text);
+    background: transparent;
+    border: none;
 }
 
 .fwmb-map-controls .fwmb-layer-menu button.fwmb-layer-menu-all {
-    border-block-end: 1px solid rgba(255, 255, 255, 0.1);
+    border-block-end: 1px solid var(--fwmb-overlay-border);
     border-radius: 0;
     margin-block-end: var(--fwmb-size-2);
 }
@@ -1414,9 +2347,9 @@
 /* The tick box drawn in each list row, from the row's aria-checked */
 .fwmb-layer-check {
     flex: none;
-    inline-size: 0.9rem;
-    block-size: 0.9rem;
-    border: 1px solid var(--fwmb-main-400);
+    inline-size: 0.875rem;
+    block-size: 0.875rem;
+    border: 1px solid var(--fwmb-overlay-muted);
     border-radius: var(--fwmb-radius-small);
     display: flex;
     align-items: center;
@@ -1438,19 +2371,19 @@
 }
 
 .fwmb-layer-menu [aria-checked="mixed"] .fwmb-layer-check {
-    border-color: var(--fwmb-accent-main);
+    border-color: var(--fwmb-overlay-accent);
 }
 
 .fwmb-layer-menu [aria-checked="mixed"] .fwmb-layer-check::after {
     content: "";
     inline-size: 0.5rem;
     block-size: 0.125rem;
-    background: var(--fwmb-accent-main);
+    background: var(--fwmb-overlay-accent);
 }
 
 .fwmb-map-history button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    opacity: 0.45;
+    cursor: default;
     pointer-events: none;
 }
 
@@ -1458,12 +2391,16 @@
     position: absolute;
     inset-block-start: var(--fwmb-size-10);
     inset-inline-start: var(--fwmb-size-10);
-    background: var(--fwmb-map-overlay-background);
-    padding: var(--fwmb-size-4) var(--fwmb-size-8);
-    border-radius: var(--fwmb-radius-small);
+    background: var(--fwmb-overlay-bg);
+    padding: var(--fwmb-size-6) var(--fwmb-size-10);
+    border-radius: var(--fwmb-radius-medium);
     border: var(--fwmb-map-overlay-border);
-    color: var(--fwmb-main-200);
-    font-size: var(--fwmb-size-12);
+    color: var(--fwmb-overlay-text);
+    font-family: var(--fwmb-font-readout);
+    font-weight: 500;
+    font-size: var(--fwmb-size-13);
+    line-height: 1rem;
+    font-variant-numeric: tabular-nums;
     display: flex;
     align-items: center;
     gap: var(--fwmb-size-10);
@@ -1480,46 +2417,43 @@
     display: flex;
     align-items: center;
     gap: var(--fwmb-size-2);
-    font-family: monospace;
 }
 
 .fwmb-readout-item i {
     width: var(--fwmb-size-16);
     height: var(--fwmb-size-16);
     min-width: var(--fwmb-size-16);
-    color: var(--fwmb-text-muted);
+    color: var(--fwmb-overlay-muted);
 }
 
 .fwmb-readout-biome {
+    font-family: var(--fwmb-font-ui);
     font-weight: bold;
-    color: var(--fwmb-accent-main);
+    color: var(--fwmb-overlay-accent);
 }
 
 /* --- RANGE SLIDERS ---
-   One look for every range slider in the tool panels and the edit toolbar, matching the tracks
-   in the biome rule editor: a rounded track, a tinted fill from the minimum up to the thumb, and
-   a round thumb with a soft glow.
+   One look for every range slider in the tool panels, the edit toolbar and the dialogues: a thin
+   track in the theme's slider colours, filled from the minimum up to the thumb, and a round thumb
+   ringed in the fill colour (filled while the pointer is over it).
 
    The browser's own slider parts are replaced (appearance: none), so the track and thumb are
    drawn separately for Chromium (::-webkit-*) and Firefox (::-moz-*); the two sets of rules must
    be kept apart, because a browser drops a whole rule if it contains a selector it does not
-   recognise. The fill is a gradient on the track whose stop comes from --fwmb-range-fill, a
+   recognise. The fill is a gradient on the track whose stop comes from --fwmb-range-percent, a
    percentage kept up to date by RangeDisplay (src/tools/RangeDisplay.js), since Chromium has no
-   way to colour the filled portion of a native slider by itself. */
+   way to colour the filled portion of a native slider by itself. The input is as tall as the
+   thumb, so the whole thumb can be grabbed, and the track is centred in it. */
 .fwmb {
-    --fwmb-range-accent: var(--fwmb-accent-alternative-main);
-    --fwmb-range-accent-bright: var(--fwmb-accent-alternative-hover);
-    --fwmb-range-glow: var(--fwmb-shadow-alternative-focus);
-    --fwmb-range-track-height: 1.125rem;
+    --fwmb-range-track-height: 0.375rem;
     --fwmb-range-thumb-size: 1rem;
-    --fwmb-range-border: 1px;
 }
 
 .fwmb input[type="range"].fwmb-range-input,
 .fwmb .fwmb-slider-group input[type="range"] {
     appearance: none;
     background: transparent;
-    height: var(--fwmb-range-track-height);
+    height: var(--fwmb-range-thumb-size);
     margin: 0;
     padding: 0;
     border: none;
@@ -1531,13 +2465,13 @@
 .fwmb .fwmb-slider-group input[type="range"]::-webkit-slider-runnable-track {
     box-sizing: border-box;
     height: var(--fwmb-range-track-height);
-    border: var(--fwmb-range-border) solid var(--fwmb-border-subtle);
-    border-radius: 62.5rem;
-    background: linear-gradient(to right, color-mix(in srgb, var(--fwmb-range-accent) 30%, transparent) 0 var(--fwmb-range-fill, 0%), var(--fwmb-bg-hover) var(--fwmb-range-fill, 0%));
+    border: none;
+    border-radius: var(--fwmb-radius-small);
+    background: linear-gradient(to right, var(--fwmb-range-fill) 0 var(--fwmb-range-percent, 0%), var(--fwmb-range-track) var(--fwmb-range-percent, 0%));
 }
 .fwmb input[type="range"].fwmb-range-input:dir(rtl)::-webkit-slider-runnable-track,
 .fwmb .fwmb-slider-group input[type="range"]:dir(rtl)::-webkit-slider-runnable-track {
-    background: linear-gradient(to left, color-mix(in srgb, var(--fwmb-range-accent) 30%, transparent) 0 var(--fwmb-range-fill, 0%), var(--fwmb-bg-hover) var(--fwmb-range-fill, 0%));
+    background: linear-gradient(to left, var(--fwmb-range-fill) 0 var(--fwmb-range-percent, 0%), var(--fwmb-range-track) var(--fwmb-range-percent, 0%));
 }
 .fwmb input[type="range"].fwmb-range-input::-webkit-slider-thumb,
 .fwmb .fwmb-slider-group input[type="range"]::-webkit-slider-thumb {
@@ -1545,12 +2479,15 @@
     box-sizing: border-box;
     width: var(--fwmb-range-thumb-size);
     height: var(--fwmb-range-thumb-size);
-    /* The thumb is placed inside the track's border, so centre it within what is left */
-    margin-block-start: calc((var(--fwmb-range-track-height) - 2 * var(--fwmb-range-border) - var(--fwmb-range-thumb-size)) / 2);
-    border: 0.125rem solid var(--fwmb-bg-base);
+    /* The thumb is placed against the track's top edge, so centre it on the track */
+    margin-block-start: calc((var(--fwmb-range-track-height) - var(--fwmb-range-thumb-size)) / 2);
+    border: 0.125rem solid var(--fwmb-range-fill);
     border-radius: 50%;
-    background: var(--fwmb-range-accent-bright);
-    box-shadow: var(--fwmb-range-glow);
+    background: var(--fwmb-bg-panel);
+}
+.fwmb input[type="range"].fwmb-range-input:hover::-webkit-slider-thumb,
+.fwmb .fwmb-slider-group input[type="range"]:hover::-webkit-slider-thumb {
+    background: var(--fwmb-range-fill);
 }
 
 /* Firefox */
@@ -1558,38 +2495,41 @@
 .fwmb .fwmb-slider-group input[type="range"]::-moz-range-track {
     box-sizing: border-box;
     height: var(--fwmb-range-track-height);
-    border: var(--fwmb-range-border) solid var(--fwmb-border-subtle);
-    border-radius: 62.5rem;
-    background: var(--fwmb-bg-hover);
+    border: none;
+    border-radius: var(--fwmb-radius-small);
+    background: var(--fwmb-range-track);
 }
 .fwmb input[type="range"].fwmb-range-input::-moz-range-progress,
 .fwmb .fwmb-slider-group input[type="range"]::-moz-range-progress {
     box-sizing: border-box;
     height: var(--fwmb-range-track-height);
-    border-radius: 62.5rem;
-    background: color-mix(in srgb, var(--fwmb-range-accent) 30%, transparent);
+    border-radius: var(--fwmb-radius-small);
+    background: var(--fwmb-range-fill);
 }
 .fwmb input[type="range"].fwmb-range-input::-moz-range-thumb,
 .fwmb .fwmb-slider-group input[type="range"]::-moz-range-thumb {
     box-sizing: border-box;
     width: var(--fwmb-range-thumb-size);
     height: var(--fwmb-range-thumb-size);
-    border: 0.125rem solid var(--fwmb-bg-base);
+    border: 0.125rem solid var(--fwmb-range-fill);
     border-radius: 50%;
-    background: var(--fwmb-range-accent-bright);
-    box-shadow: var(--fwmb-range-glow);
+    background: var(--fwmb-bg-panel);
+}
+.fwmb input[type="range"].fwmb-range-input:hover::-moz-range-thumb,
+.fwmb .fwmb-slider-group input[type="range"]:hover::-moz-range-thumb {
+    background: var(--fwmb-range-fill);
 }
 
 .fwmb input[type="range"].fwmb-range-input:focus-visible,
 .fwmb .fwmb-slider-group input[type="range"]:focus-visible {
-    outline: 2px solid var(--fwmb-range-accent);
+    outline: 2px solid var(--fwmb-border-focus);
     outline-offset: 2px;
-    border-radius: 62.5rem;
+    border-radius: var(--fwmb-radius-small);
 }
 
 .fwmb input[type="range"].fwmb-range-input:disabled,
 .fwmb .fwmb-slider-group input[type="range"]:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
     cursor: default;
 }
 
@@ -1598,7 +2538,7 @@
 .fwmb .fwmb-range {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-size-8);
+    gap: var(--fwmb-space-1);
     margin-block-end: var(--fwmb-size-4);
     min-width: 0;
 }
@@ -1618,9 +2558,10 @@
 .fwmb .fwmb-info-label {
     display: flex;
     align-items: center;
-    gap: var(--fwmb-size-4);
+    gap: var(--fwmb-size-6);
     min-width: 0;
     margin: 0;
+    color: var(--fwmb-text-secondary);
 }
 
 .fwmb .fwmb-range-name {
@@ -1631,14 +2572,15 @@
 
 .fwmb .fwmb-range-value {
     flex-shrink: 0;
-    font-family: "Consolas", "Courier New", monospace;
-    font-size: var(--fwmb-size-12);
-    color: var(--fwmb-text-secondary);
+    font-family: var(--fwmb-font-readout);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--fwmb-size-13);
+    line-height: 1rem;
+    color: var(--fwmb-text-primary);
     white-space: nowrap;
-    background: var(--fwmb-bg-hover);
-    border: 1px solid var(--fwmb-border-subtle);
-    border-radius: 62.5rem;
-    padding: var(--fwmb-size-1) var(--fwmb-size-6);
+    min-width: 2.5rem;
+    text-align: end;
 }
 
 .fwmb .fwmb-range-input {
@@ -1655,7 +2597,8 @@
 }
 
 .fwmb .fwmb-range-group-heading {
-    font-size: var(--fwmb-size-8);
+    font-size: var(--fwmb-size-11);
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: var(--fwmb-letter-spacing-wide);
     color: var(--fwmb-text-muted);
@@ -1679,14 +2622,16 @@
 .fwmb .fwmb-slider-group output {
     width: 5ch;
     text-align: end;
-    font-family: "Consolas", "Courier New", monospace;
-    font-size: var(--fwmb-size-12);
-    color: var(--fwmb-text-secondary);
+    font-family: var(--fwmb-font-readout);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    font-size: var(--fwmb-size-13);
+    color: var(--fwmb-text-primary);
 }
 
 .fwmb .fwmb-brush-setting {
-    --fwmb-range-track-height: 0.875rem;
-    --fwmb-range-thumb-size: 0.75rem;
+    --fwmb-range-track-height: 0.3125rem;
+    --fwmb-range-thumb-size: 0.875rem;
 }
 
 /* --- STACKED FORM GROUPS --- */
@@ -1727,7 +2672,7 @@
 
 /* --- MAP LAYOUT & EDIT TOOLBAR --- */
 .fwmb .fwmb-map-container {
-    background-color: #1a4b84;
+    background-color: var(--fwmb-canvas-surround);
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -1753,10 +2698,13 @@
     flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
-    padding: var(--fwmb-size-8) var(--fwmb-size-10);
-    background: var(--fwmb-bg-base);
+    min-height: 2.75rem;
+    padding: var(--fwmb-size-8) var(--fwmb-space-3);
+    background: var(--fwmb-bg-panel);
     border-block-end: 1px solid var(--fwmb-border-main);
-    gap: var(--fwmb-size-10);
+    gap: var(--fwmb-size-8) var(--fwmb-size-10);
+    white-space: normal;
+    overflow: visible;
 }
 
 .fwmb .fwmb-toolbar-content {
@@ -1766,9 +2714,6 @@
 /* A narrow studio wraps the edit toolbar onto more rows, and the toolbar grows to hold them (the
    map below takes what is left). Each group wraps its own controls too, and a divider spans the
    row it sits in rather than the whole toolbar. */
-.fwmb .fwmb-edit-toolbar {
-    row-gap: var(--fwmb-size-8);
-}
 
 .fwmb .fwmb-edit-toolbar :is(.fwmb-brush-settings, .fwmb-brush-tools, .fwmb-brush-history, .fwmb-mask-settings) {
     flex-wrap: wrap;
@@ -1792,7 +2737,7 @@
 }
 
 .fwmb .fwmb-brush-settings label {
-    font-size: var(--fwmb-size-12);
+    font-size: var(--fwmb-size-13);
     color: var(--fwmb-text-secondary);
     margin-inline-end: var(--fwmb-size-4);
     white-space: nowrap;
@@ -1823,7 +2768,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: var(--fwmb-size-8);
-    font-size: var(--fwmb-size-12);
+    font-size: var(--fwmb-size-13);
 }
 
 .fwmb-biome-item {
@@ -1834,7 +2779,7 @@
 }
 
 .fwmb-biome-label {
-    font-size: var(--fwmb-size-12);
+    font-size: var(--fwmb-size-13);
     flex: 1;
 }
 
@@ -1846,8 +2791,7 @@
     padding: 0;
     flex-shrink: 0;
     border-radius: var(--fwmb-radius-small);
-    border: 1px solid var(--fwmb-border-main);
-    box-shadow: var(--fwmb-shadow-popout);
+    border: 1px solid var(--fwmb-border-strong);
     cursor: default;
 }
 
@@ -1888,24 +2832,25 @@ input.fwmb-swatch {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--fwmb-text-secondary);
+    color: var(--fwmb-accent-main);
     transition:
-        color 0.1s,
-        text-shadow 0.1s;
+        background-color 0.1s,
+        color 0.1s;
     margin-inline: var(--fwmb-size-8);
-    border: 1px solid var(--fwmb-border-main);
+    border: 1px solid var(--fwmb-border-strong);
+    border-radius: var(--fwmb-radius-small);
 }
 
 .fwmb-legend-action:hover {
     background-color: var(--fwmb-bg-hover);
-    color: var(--fwmb-accent-main);
-    text-shadow: var(--fwmb-shadow-focus);
+    color: var(--fwmb-accent-hover);
 }
 
 /* Marks the Mass Edit "Select" toggle as currently active, so a GM mid-selection can tell
    at a glance which item type's checkboxes are showing. */
 .fwmb-legend-action[aria-pressed="true"] {
     background-color: var(--fwmb-fill-accent);
+    border-color: var(--fwmb-fill-accent);
     color: var(--fwmb-text-inverse);
 }
 
@@ -1914,8 +2859,8 @@ input.fwmb-swatch {
    one type in a shared panel can be mass-edited at a time, so it stays unambiguous which list
    an eventual Mass Edit applies to. */
 .fwmb-legend-action[aria-disabled="true"] {
-    opacity: 0.5;
-    cursor: not-allowed;
+    opacity: 0.45;
+    cursor: default;
     pointer-events: none;
 }
 
@@ -1925,8 +2870,9 @@ input.fwmb-swatch {
     justify-content: space-evenly;
     align-items: center;
     padding: var(--fwmb-size-10);
-    border-radius: var(--fwmb-radius-medium);
+    border-radius: var(--fwmb-radius-large);
     border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-panel);
 }
 
 .fwmb-transform-zoom {
@@ -1953,6 +2899,7 @@ input.fwmb-swatch {
     width: 100%;
     height: 100%;
     margin: 0;
+    padding: 0;
 }
 
 .fwmb-transform-dpad .fwmb-dpad-up {
@@ -2004,10 +2951,10 @@ input.fwmb-swatch {
 
 .fwmb-summary-table th {
     color: var(--fwmb-text-primary);
-    background-color: var(--fwmb-bg-panel);
-    border-block-end: 0.125rem solid var(--fwmb-border-main);
+    background-color: var(--fwmb-bg-raised);
+    border-block-end: 1px solid var(--fwmb-border-strong);
     padding: var(--fwmb-size-8);
-    text-align: left;
+    text-align: start;
 }
 
 .fwmb-summary-table td {
@@ -2020,7 +2967,8 @@ input.fwmb-swatch {
 }
 
 .fwmb-mono {
-    font-family: var(--font-mono, monospace);
+    font-family: var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
     color: var(--fwmb-accent-main);
 }
 
@@ -2061,10 +3009,11 @@ input.fwmb-swatch {
 
 /* Manage Maps Card UI */
 .fwmb-panel-header h3 {
-    font-weight: bold;
-    color: var(--fwmb-accent-main);
+    font-family: var(--fwmb-font-display);
+    font-weight: 600;
+    color: var(--fwmb-text-primary);
     font-size: var(--fwmb-size-14);
-    margin: var(--fwmb-size-16) var(--fwmb-size-10);
+    margin: 0;
 }
 
 .fwmb-map-list {
@@ -2076,18 +3025,17 @@ input.fwmb-swatch {
 }
 
 .fwmb-map-card {
-    background: var(--fwmb-bg-panel);
+    background: var(--fwmb-bg-raised);
     border: 1px solid var(--fwmb-border-main);
-    border-radius: var(--fwmb-radius-medium);
+    border-radius: var(--fwmb-radius-large);
     padding: var(--fwmb-size-10);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: var(--fwmb-shadow-popout);
 }
 
 .fwmb-map-card-info {
-    font-size: var(--fwmb-size-12);
+    font-size: var(--fwmb-size-13);
     color: var(--fwmb-text-primary);
     font-weight: bold;
 }
@@ -2100,21 +3048,24 @@ input.fwmb-swatch {
 /* Base button styling for Load and Kebab */
 .fwmb-map-card-actions > button,
 .fwmb-dropdown > button {
-    width: var(--fwmb-size-32);
-    height: var(--fwmb-size-32);
+    width: var(--fwmb-control-height);
+    height: var(--fwmb-control-height);
     padding: 0;
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 1px solid var(--fwmb-border-main);
+    border: 1px solid var(--fwmb-border-strong);
     border-radius: var(--fwmb-radius-medium);
+    background: var(--fwmb-bg-raised);
+    color: var(--fwmb-text-primary);
     cursor: pointer;
     transition: background 0.2s ease;
 }
 
 .fwmb-map-card-actions > button:hover,
 .fwmb-dropdown > button:hover {
-    background: var(--fwmb-fill-accent-hover);
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
 }
 
 /* ==========================================
@@ -2128,16 +3079,17 @@ input.fwmb-swatch {
 .fwmb-dropdown-menu {
     display: none;
     position: absolute;
-    right: 0;
+    inset-inline-end: 0;
     top: 100%;
-    margin-block-start: var(--fwmb-size-8);
-    background: var(--fwmb-bg-base);
+    margin-block-start: var(--fwmb-size-4);
+    padding: var(--fwmb-space-1);
+    background: var(--fwmb-bg-panel);
     color: var(--fwmb-text-primary);
     border: 1px solid var(--fwmb-border-main);
-    border-radius: var(--fwmb-radius-small);
-    box-shadow: var(--fwmb-shadow-window);
+    border-radius: var(--fwmb-radius-large);
+    box-shadow: var(--fwmb-shadow-popout);
     flex-direction: column;
-    min-width: 10rem;
+    min-width: 11rem;
     z-index: 100;
 }
 
@@ -2169,19 +3121,20 @@ input.fwmb-swatch {
 
 .fwmb-dropdown-menu button {
     width: 100%;
-    height: auto;
+    height: 1.875rem;
     white-space: nowrap;
     display: flex;
     align-items: center;
     justify-content: flex-start;
     gap: var(--fwmb-size-8);
-    padding: var(--fwmb-size-10) var(--fwmb-size-16);
+    padding: 0 var(--fwmb-size-8);
     background: transparent;
     border: none;
     color: var(--fwmb-text-primary);
-    border-radius: 0;
+    border-radius: var(--fwmb-radius-medium);
     cursor: pointer;
-    font-size: var(--fwmb-size-16);
+    font-size: var(--fwmb-size-13);
+    font-weight: 400;
 }
 
 .fwmb-dropdown-menu button:hover {
@@ -2194,7 +3147,7 @@ input.fwmb-swatch {
 }
 
 .fwmb-dropdown-menu button.fwmb-danger:hover {
-    background: rgba(255, 0, 0, 0.15);
+    background: var(--fwmb-bg-hover);
 }
 
 /* ==========================================
@@ -2203,20 +3156,20 @@ input.fwmb-swatch {
 
 .fwmb-icon-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(var(--fwmb-size-32), 1fr));
-    gap: var(--fwmb-size-8);
+    grid-template-columns: repeat(auto-fill, minmax(var(--fwmb-control-height), 1fr));
+    gap: var(--fwmb-size-4);
     max-height: 12.5rem;
     overflow-y: auto;
     padding: var(--fwmb-size-8);
-    background: var(--fwmb-bg-muted);
+    background: var(--fwmb-bg-panel);
     border: 1px solid var(--fwmb-border-main);
-    border-radius: var(--fwmb-radius-medium);
+    border-radius: var(--fwmb-radius-large);
 }
 
 .fwmb-list-container {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-size-8);
+    gap: var(--fwmb-size-2);
     padding-inline-end: var(--fwmb-size-4);
     flex: 1;
     min-height: 0;
@@ -2224,14 +3177,7 @@ input.fwmb-swatch {
 }
 
 .fwmb-list-item {
-    display: flex;
-    align-items: center;
-    gap: var(--fwmb-size-10);
-    padding: var(--fwmb-size-8);
-    background: var(--fwmb-bg-panel);
-    border: 1px solid var(--fwmb-border-focus);
-    border-radius: var(--fwmb-radius-medium);
-    box-shadow: var(--fwmb-shadow-popout);
+    gap: var(--fwmb-size-4);
 }
 
 /* A pin's icon on its card and in a picker's trigger takes the module's own text colour: the
@@ -2279,9 +3225,9 @@ input.fwmb-swatch {
     justify-content: center;
     width: 6rem;
     height: 6rem;
-    background-color: #000;
+    background-color: var(--fwmb-canvas-surround);
     border: 1px solid var(--fwmb-border-main);
-    border-radius: var(--fwmb-radius-medium);
+    border-radius: var(--fwmb-radius-large);
 }
 
 .fwmb-pin-icon-preview img {
@@ -2296,7 +3242,7 @@ input.fwmb-swatch {
 }
 
 .fwmb .fwmb-name {
-    font-size: var(--fwmb-size-12);
+    font-size: var(--fwmb-size-13);
     color: var(--fwmb-text-primary);
     min-width: 0;
     white-space: nowrap;
@@ -2329,15 +3275,15 @@ input.fwmb-swatch {
     justify-content: space-between;
     padding: var(--fwmb-size-4) var(--fwmb-size-8);
     background: var(--fwmb-bg-base);
-    border: 1px solid var(--fwmb-border-main);
-    border-radius: var(--fwmb-radius-small);
+    border: 1px solid var(--fwmb-border-strong);
+    border-radius: var(--fwmb-radius-medium);
     cursor: pointer;
     min-width: 3.75rem;
-    height: 2rem;
+    height: var(--fwmb-control-height);
 }
 
 .fwmb-select-trigger:hover {
-    background: var(--fwmb-bg-hover);
+    border-color: var(--fwmb-accent-main);
 }
 
 .fwmb-select-trigger img {
@@ -2352,12 +3298,12 @@ input.fwmb-swatch {
 .fwmb-custom-select .fwmb-select-options {
     position: absolute;
     top: 100%;
-    left: 0;
+    inset-inline-start: 0;
     z-index: 100;
     margin-block-start: var(--fwmb-size-4);
-    background: var(--fwmb-bg-base);
-    border: 1px solid var(--fwmb-border-focus);
-    border-radius: var(--fwmb-radius-small);
+    background: var(--fwmb-bg-panel);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-large);
     box-shadow: var(--fwmb-shadow-popout);
     width: 16.25rem; /* Expands to hold the grid */
     padding: var(--fwmb-size-8);
@@ -2405,7 +3351,7 @@ input.fwmb-swatch {
 .fwmb-accordion-content {
     margin-block-start: var(--fwmb-size-8);
     padding-inline-start: var(--fwmb-size-16);
-    border-inline-start: 0.125rem solid var(--fwmb-border-main);
+    border-inline-start: 1px solid var(--fwmb-border-main);
     display: flex;
     flex-direction: column;
     gap: var(--fwmb-size-4);
@@ -2413,8 +3359,7 @@ input.fwmb-swatch {
 
 .fwmb-hint.fwmb-hint--small {
     padding: var(--fwmb-size-4);
-    opacity: 0.7;
-    font-size: 0.9em;
+    font-size: var(--fwmb-size-12);
 }
 
 .fwmb-swatch.fwmb-swatch--small {
@@ -2487,8 +3432,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     margin: 0;
     padding: 0;
     border: 1px solid var(--fwmb-border-main);
-    border-radius: var(--fwmb-radius-medium);
-    background: var(--fwmb-bg-base);
+    border-radius: var(--fwmb-radius-large);
+    background: var(--fwmb-bg-panel);
     color: var(--fwmb-text-primary);
     box-shadow: var(--fwmb-shadow-window);
     z-index: 510;
@@ -2569,9 +3514,10 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     align-items: center;
     gap: var(--fwmb-size-8);
     flex: none;
-    padding: var(--fwmb-size-4) var(--fwmb-size-4) var(--fwmb-size-4) var(--fwmb-size-12);
-    background: var(--fwmb-main-900);
-    color: var(--fwmb-main-100);
+    padding: var(--fwmb-size-6) var(--fwmb-size-6) var(--fwmb-size-6) var(--fwmb-space-3);
+    background: var(--fwmb-bg-panel);
+    color: var(--fwmb-text-primary);
+    border-block-end: 1px solid var(--fwmb-border-main);
 }
 
 /* A modal dialogue is moved by dragging its header */
@@ -2584,38 +3530,38 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb .fwmb-overlay-header h2 {
     flex: 1;
     margin: 0;
-    font-family: inherit;
+    font-family: var(--fwmb-font-display);
     font-size: var(--fwmb-size-14);
-    font-weight: bold;
-    line-height: var(--fwmb-line-height-heading);
+    font-weight: 600;
+    line-height: 1.25rem;
     color: inherit;
     border: none;
 }
 
 .fwmb button.fwmb-overlay-close {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: var(--fwmb-control-height);
+    height: var(--fwmb-control-height);
     flex: none;
     background: transparent;
-    color: inherit;
+    color: var(--fwmb-text-secondary);
     cursor: pointer;
 }
 
 .fwmb button.fwmb-overlay-close:hover {
-    background: var(--fwmb-main-700);
-    color: var(--fwmb-main-100);
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-text-primary);
 }
 
 .fwmb button.fwmb-overlay-close:focus-visible {
-    outline: 2px solid var(--fwmb-main-100);
-    outline-offset: -2px;
+    outline: 2px solid var(--fwmb-border-focus);
+    outline-offset: 2px;
 }
 
 .fwmb .fwmb-overlay-body {
     flex: 1 1 auto;
     min-height: 0;
     margin: 0;
-    padding: var(--fwmb-size-12) var(--fwmb-size-16);
+    padding: var(--fwmb-space-3);
     overflow-x: hidden;
     overflow-y: auto;
     display: flex;
@@ -2627,7 +3573,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
    bold and as tall as the field beside it, and a stacked row's field takes the row's width */
 .fwmb .fwmb-overlay-body .fwmb-form-group > label {
     font-weight: bold;
-    line-height: var(--fwmb-size-32);
+    line-height: var(--fwmb-control-height);
 }
 
 .fwmb .fwmb-overlay-body .fwmb-form-group--stacked > label {
@@ -2645,7 +3591,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     display: flex;
     flex: none;
     gap: var(--fwmb-size-8);
-    padding: var(--fwmb-size-8) var(--fwmb-size-16) var(--fwmb-size-12);
+    padding: var(--fwmb-size-10) var(--fwmb-space-3);
+    border-block-start: 1px solid var(--fwmb-border-main);
 }
 
 .fwmb .fwmb-overlay-footer[hidden] {
@@ -2665,19 +3612,18 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(0.125rem);
 }
 
 .fwmb-processing-content {
-    background: var(--fwmb-bg-panel);
-    padding: var(--fwmb-size-16) var(--fwmb-size-24);
-    border-radius: var(--fwmb-radius-medium);
+    background: var(--fwmb-overlay-bg);
+    padding: var(--fwmb-space-3) var(--fwmb-space-4);
+    border-radius: var(--fwmb-radius-large);
     display: flex;
     align-items: center;
     gap: var(--fwmb-size-10);
-    color: var(--fwmb-text-primary);
-    font-size: var(--fwmb-size-20);
-    box-shadow: var(--fwmb-shadow-popout);
+    color: var(--fwmb-overlay-text);
+    font-size: var(--fwmb-size-14);
+    box-shadow: var(--fwmb-shadow-window);
 }
 
 .fwmb-spin {
@@ -2730,9 +3676,9 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     font-size: var(--fwmb-size-12);
     color: var(--fwmb-text-muted);
     padding: var(--fwmb-size-8) var(--fwmb-size-10);
-    background: var(--fwmb-bg-base);
-    border: 0.125rem solid var(--fwmb-border-subtle);
-    border-radius: var(--fwmb-radius-medium);
+    background: var(--fwmb-bg-raised);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-large);
 }
 
 .fwmb-rule-editor-legend-item {
@@ -2748,10 +3694,10 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     flex-shrink: 0;
 }
 .fwmb-rule-editor-swatch.fwmb-rule-editor-swatch--active {
-    background: var(--fwmb-accent-alternative-main);
+    background: var(--fwmb-range-fill);
 }
 .fwmb-rule-editor-swatch.fwmb-is-locked {
-    background: var(--fwmb-bg-muted);
+    background: var(--fwmb-range-track);
     border: 1px solid var(--fwmb-text-muted);
 }
 
@@ -2763,7 +3709,9 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 .fwmb-rule-editor-section-heading h3 {
     margin: 0;
-    font-size: var(--fwmb-size-16);
+    font-family: var(--fwmb-font-display);
+    font-weight: 600;
+    font-size: var(--fwmb-size-14);
 }
 .fwmb-rule-editor-section-heading h3.fwmb-heading--muted {
     color: var(--fwmb-text-muted);
@@ -2797,14 +3745,12 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 /* --- Biome group card --- */
 
 .fwmb-rule-group {
-    background: var(--fwmb-bg-panel);
+    background: var(--fwmb-bg-raised);
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-large);
-    box-shadow: var(--fwmb-shadow-popout);
     overflow: hidden;
 }
 .fwmb-rule-group.fwmb-is-locked {
-    box-shadow: none;
     background: var(--fwmb-bg-base);
     border-color: var(--fwmb-border-subtle);
 }
@@ -2904,10 +3850,10 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 .fwmb-rule-code {
-    font-family: "Consolas", "Courier New", monospace;
+    font-family: var(--fwmb-font-readout);
     font-size: var(--fwmb-size-12);
-    color: var(--fwmb-accent-alternative-hover);
-    background: color-mix(in srgb, var(--fwmb-accent-alternative-main) 16%, transparent);
+    color: var(--fwmb-badge-text);
+    background: var(--fwmb-badge-bg);
     border-radius: var(--fwmb-radius-small);
     padding: 1px 0.3125rem;
     flex-shrink: 0;
@@ -2941,7 +3887,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 .fwmb-rule-axis-label {
-    font-size: var(--fwmb-size-8);
+    font-size: var(--fwmb-size-11);
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: var(--fwmb-letter-spacing-wide);
     color: var(--fwmb-text-muted);
@@ -2956,8 +3903,9 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 .fwmb-rule-chip {
-    font-family: "Consolas", "Courier New", monospace;
-    font-size: var(--fwmb-size-8);
+    font-family: var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--fwmb-size-11);
     color: var(--fwmb-text-secondary);
     white-space: nowrap;
     background: var(--fwmb-bg-hover);
@@ -2971,11 +3919,11 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     color: var(--fwmb-text-muted);
 }
 .fwmb-rule-chip-edge {
-    color: var(--fwmb-accent-alternative-hover);
+    color: var(--fwmb-accent-main);
     font-weight: 600;
 }
 .fwmb-is-locked .fwmb-rule-chip-edge {
-    color: var(--fwmb-bg-muted);
+    color: var(--fwmb-text-muted);
     font-weight: 500;
 }
 
@@ -2983,7 +3931,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     grid-row: 2;
     position: relative;
     height: 1.125rem;
-    background: var(--fwmb-bg-hover);
+    background: var(--fwmb-range-track);
     border-radius: 62.5rem;
     border: 1px solid var(--fwmb-border-subtle);
 }
@@ -2995,14 +3943,14 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     position: absolute;
     top: 0.1875rem;
     bottom: 0.1875rem;
-    background: color-mix(in srgb, var(--fwmb-accent-alternative-main) 20%, transparent);
-    border-block-start: 1px solid var(--fwmb-accent-alternative-main);
-    border-block-end: 1px solid var(--fwmb-accent-alternative-main);
+    background: color-mix(in srgb, var(--fwmb-range-fill) 35%, transparent);
+    border-block-start: 1px solid var(--fwmb-range-fill);
+    border-block-end: 1px solid var(--fwmb-range-fill);
     border-radius: 62.5rem;
 }
 .fwmb-is-locked .fwmb-rule-fill {
-    background: color-mix(in srgb, var(--fwmb-bg-muted) 30%, transparent);
-    border-color: var(--fwmb-bg-muted);
+    background: color-mix(in srgb, var(--fwmb-text-muted) 20%, transparent);
+    border-color: var(--fwmb-text-muted);
 }
 
 .fwmb-rule-handle {
@@ -3010,19 +3958,18 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     top: 50%;
     width: 0.75rem;
     height: 0.75rem;
-    background: var(--fwmb-accent-alternative-hover);
-    border: 0.125rem solid var(--fwmb-bg-base);
+    background: var(--fwmb-bg-panel);
+    border: 0.125rem solid var(--fwmb-range-fill);
     border-radius: 50%;
     transform: translate(-50%, -50%);
-    box-shadow: var(--fwmb-shadow-alternative-focus);
     cursor: grab;
     touch-action: none;
 }
 .fwmb-is-locked .fwmb-rule-handle {
-    background: var(--fwmb-bg-muted);
+    background: var(--fwmb-text-muted);
+    border-color: var(--fwmb-text-muted);
     width: 0.5rem;
     height: 0.5rem;
-    box-shadow: none;
     cursor: default;
     touch-action: auto;
 }
@@ -3101,8 +4048,9 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 .fwmb-rule-rank {
-    font-family: "Consolas", "Courier New", monospace;
-    font-size: var(--fwmb-size-8);
+    font-family: var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--fwmb-size-11);
     color: var(--fwmb-text-muted);
     flex-shrink: 0;
 }
@@ -3173,9 +4121,9 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     height: var(--fwmb-size-14);
     min-height: 0;
     line-height: 1;
-    font-size: var(--fwmb-size-8);
+    font-size: var(--fwmb-size-10);
     padding: 0;
-    border: 1px dashed var(--fwmb-border-main);
+    border: 1px dashed var(--fwmb-border-strong);
     border-radius: 50%;
     background: transparent;
     color: var(--fwmb-text-secondary);
@@ -3199,7 +4147,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb button.fwmb-rule-zone-chip {
     height: auto;
     min-height: 0;
-    font-size: var(--fwmb-size-8);
+    font-size: var(--fwmb-size-11);
     color: var(--fwmb-text-secondary);
     background: var(--fwmb-bg-hover);
     border: 1px solid var(--fwmb-border-subtle);
@@ -3234,8 +4182,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 .fwmb .fwmb-legend-info {
     flex: none;
-    width: var(--fwmb-size-12);
-    height: var(--fwmb-size-12);
+    width: var(--fwmb-size-16);
+    height: var(--fwmb-size-16);
     color: var(--fwmb-text-muted);
     cursor: help;
 }
@@ -3263,8 +4211,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb .fwmb-set-row[aria-selected="true"],
 .fwmb .fwmb-level-row[aria-selected="true"],
 .fwmb .fwmb-region-row[aria-selected="true"] {
-    border-color: var(--fwmb-accent-main);
-    background: var(--fwmb-bg-hover);
+    background: var(--fwmb-bg-highlight);
 }
 
 .fwmb .fwmb-set-row[aria-selected="true"] .fwmb-name,
@@ -3286,19 +4233,19 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     display: inline-flex;
     align-items: center;
     gap: var(--fwmb-size-2);
-    padding: 0 var(--fwmb-size-4);
-    border-radius: 62.5rem;
-    font-size: var(--fwmb-size-10);
-    line-height: 1.4;
-    color: var(--fwmb-text-secondary);
-    background: var(--fwmb-bg-hover);
-    border: 1px solid var(--fwmb-border-subtle);
+    padding: 0.0625rem var(--fwmb-size-6);
+    border-radius: var(--fwmb-radius-small);
+    font-family: var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--fwmb-size-11);
+    line-height: 0.875rem;
+    color: var(--fwmb-badge-text);
+    background: var(--fwmb-badge-bg);
 }
 
 .fwmb .fwmb-level-badge.fwmb-level-badge--warning {
     color: var(--fwmb-text-inverse);
-    background: var(--fwmb-color-warning);
-    border-color: transparent;
+    background: var(--fwmb-fill-negative);
 }
 
 .fwmb .fwmb-level-badge .fwmb-icon {
@@ -3476,5 +4423,5 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb .fwmb-accordion-content.fwmb-accordion-content--nested {
     margin-inline-start: 0.75rem;
     padding-inline-start: var(--fwmb-size-8);
-    border-inline-start: 0.125rem solid var(--fwmb-border-subtle);
+    border-inline-start: 1px solid var(--fwmb-border-subtle);
 }

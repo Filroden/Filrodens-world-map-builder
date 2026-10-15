@@ -79,17 +79,17 @@
         <div class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
             {{#each mapDecorations}}
             <div class="fwmb-list-item" data-id="{{this.id}}" data-type="decoration">
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="toggleVisibility" data-target="feature" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                     <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
                 </button>
                 <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon fwmb-icon--center-focus"></i>
                 </button>
-                <button type="button" class="fwmb-btn fwmb-btn--small" data-action="editDecoration" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editDecoration" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
                     <i class="fwmb-icon fwmb-icon--edit"></i>
                 </button>
-                <button type="button" class="fwmb-btn fwmb-btn--small fwmb-btn--muted fwmb-btn--danger" data-action="deleteDecoration" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteDecoration" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                     <i class="fwmb-icon fwmb-icon--delete"></i>
                 </button>
             </div>

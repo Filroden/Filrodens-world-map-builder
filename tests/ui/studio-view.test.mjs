@@ -184,11 +184,11 @@ test("sliders get their value display and fill after a redraw and as they move",
     const view = makeView();
     await view.render();
     const slider = root.querySelector('input[type="range"]');
-    assert.equal(slider.style.getPropertyValue("--fwmb-range-fill"), "30%");
+    assert.equal(slider.style.getPropertyValue("--fwmb-range-percent"), "30%");
 
     slider.value = "7";
     slider.dispatchEvent(new window.Event("input", { bubbles: true }));
-    assert.equal(slider.style.getPropertyValue("--fwmb-range-fill"), "70%");
+    assert.equal(slider.style.getPropertyValue("--fwmb-range-percent"), "70%");
 });
 
 test("after destroy, clicks are ignored and render does nothing", async () => {
