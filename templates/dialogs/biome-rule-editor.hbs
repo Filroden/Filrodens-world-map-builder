@@ -6,10 +6,10 @@
 
     <div class="fwmb-rule-editor-legend">
         <div class="fwmb-rule-editor-legend-item">
-            <span class="fwmb-rule-editor-swatch active"></span> {{localize "FILRODENSWMB.UI.RuleEditorLegendActive"}}
+            <span class="fwmb-rule-editor-swatch fwmb-rule-editor-swatch--active"></span> {{localize "FILRODENSWMB.UI.RuleEditorLegendActive"}}
         </div>
         <div class="fwmb-rule-editor-legend-item">
-            <span class="fwmb-rule-editor-swatch locked"></span> {{localize "FILRODENSWMB.UI.RuleEditorLegendLocked"}}
+            <span class="fwmb-rule-editor-swatch fwmb-is-locked"></span> {{localize "FILRODENSWMB.UI.RuleEditorLegendLocked"}}
         </div>
         <div class="fwmb-rule-editor-legend-item">{{localize "FILRODENSWMB.UI.RuleEditorLegendOverlap"}}</div>
         <div class="fwmb-rule-editor-legend-item">{{localize "FILRODENSWMB.UI.RuleEditorLegendSeaLevel"}}</div>
@@ -22,14 +22,14 @@
     <div class="fwmb-rule-editor-flow" id="fwmb-rule-custom-rows"></div>
 
     <div class="fwmb-rule-editor-divider">
-        <i class="fwmb-icon arrow-drop-down"></i>
+        <i class="fwmb-icon fwmb-icon--arrow-drop-down"></i>
         {{localize "FILRODENSWMB.UI.RuleEditorFallthrough"}}
     </div>
 
     <div class="fwmb-rule-editor-section-heading">
-        <h3 class="muted">{{localize "FILRODENSWMB.UI.RuleEditorDefaultsHeading"}}</h3>
+        <h3 class="fwmb-heading--muted">{{localize "FILRODENSWMB.UI.RuleEditorDefaultsHeading"}}</h3>
         <span class="fwmb-rule-editor-count">{{localize "FILRODENSWMB.UI.RuleEditorDefaultsHint"}}</span>
     </div>
-    <div class="fwmb-rule-editor-flow locked" id="fwmb-rule-default-rows"></div>
+    <div class="fwmb-rule-editor-flow fwmb-is-locked" id="fwmb-rule-default-rows"></div>
 
 </div>

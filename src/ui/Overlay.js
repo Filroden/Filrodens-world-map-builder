@@ -156,7 +156,7 @@ export class Overlay {
         close.className = "fwmb-overlay-close";
         close.dataset.overlayAction = "close";
         close.setAttribute("aria-label", closeLabel);
-        close.innerHTML = '<i class="fwmb-icon cancel"></i>';
+        close.innerHTML = '<i class="fwmb-icon fwmb-icon--cancel"></i>';
 
         header.append(heading, close);
         return header;
@@ -191,7 +191,7 @@ export class Overlay {
             element.type = "button";
             element.className = "fwmb-btn";
             element.dataset.overlayAction = button.action;
-            if (button.default) element.classList.add("primary");
+            if (button.default) element.classList.add("fwmb-btn--primary");
             if (button.tone) element.dataset.tone = button.tone;
             if (button.icon) {
                 const glyph = doc.createElement("i");
@@ -229,7 +229,7 @@ export class Overlay {
     /** Focus goes to the first field, or failing that the default button, then any control. */
     #focusFirst() {
         const field = this.#dialog.querySelector(".fwmb-overlay-body :is(input, select, textarea):not([disabled], [type='hidden'])");
-        const target = field ?? this.#dialog.querySelector(".fwmb-overlay-footer .primary") ?? this.#dialog.querySelector(FOCUSABLE);
+        const target = field ?? this.#dialog.querySelector(".fwmb-overlay-footer .fwmb-btn--primary") ?? this.#dialog.querySelector(FOCUSABLE);
         target?.focus();
     }
 

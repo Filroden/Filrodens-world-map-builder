@@ -94,15 +94,15 @@ export function createOverlayDialogs({ localize }) {
     async function confirm(options) {
         return open(options, () => [
             // No is the default, so Enter (or a stray key press) never confirms a deletion
-            { action: "no", label: localize("FILRODENSWMB.UI.No"), icon: "fwmb-icon cancel", tone: "negative", default: true, callback: () => false },
-            { action: "yes", label: localize("FILRODENSWMB.UI.Yes"), icon: "fwmb-icon accept", tone: "positive", callback: () => true },
+            { action: "no", label: localize("FILRODENSWMB.UI.No"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", default: true, callback: () => false },
+            { action: "yes", label: localize("FILRODENSWMB.UI.Yes"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", callback: () => true },
         ], false);
     }
 
     async function prompt({ onSubmit, ...options }) {
         return open(options, () => [
-            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", tone: "negative", callback: () => null },
-            { action: "ok", label: localize("FILRODENSWMB.UI.Confirm"), icon: "fwmb-icon accept", tone: "positive", default: true, callback: onSubmit },
+            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", callback: () => null },
+            { action: "ok", label: localize("FILRODENSWMB.UI.Confirm"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true, callback: onSubmit },
         ], null);
     }
 

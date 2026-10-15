@@ -5,30 +5,38 @@
         {{/each}}
     </datalist>
 
-    <div class="form-group fwmb-dialog-content">
+    <div class="fwmb-form-group fwmb-dialog-content">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
-        <input type="text" name="biomeName" value="{{biome.name}}" autofocus />
+        <div class="fwmb-form-fields">
+            <input type="text" name="biomeName" value="{{biome.name}}" autofocus />
+        </div>
     </div>
 
-    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-size-10);">
+    <div class="fwmb-form-group fwmb-dialog-content fwmb-space-before">
         <label>{{localize "FILRODENSWMB.UI.BiomeCode"}}</label>
-        <input type="text" name="biomeCode" value="{{biome.code}}" placeholder="{{localize 'FILRODENSWMB.UI.BiomeCodeHint'}}" />
+        <div class="fwmb-form-fields">
+            <input type="text" name="biomeCode" value="{{biome.code}}" placeholder="{{localize 'FILRODENSWMB.UI.BiomeCodeHint'}}" />
+        </div>
     </div>
 
-    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-size-10);">
+    <div class="fwmb-form-group fwmb-dialog-content fwmb-space-before">
         <label>{{localize "FILRODENSWMB.UI.BiomeColor"}}</label>
-        <input type="color" name="biomeColor" value="{{biome.hex}}" list="fwmb-standard-colors" class="fwmb-swatch fwmb-wide" style="height: 24px; padding: 0;" />
+        <div class="fwmb-form-fields">
+            <input type="color" name="biomeColor" value="{{biome.hex}}" list="fwmb-standard-colors" class="fwmb-swatch fwmb-wide fwmb-swatch--slim" />
+        </div>
     </div>
 
-    <div class="form-group fwmb-dialog-content" style="margin-top: var(--fwmb-size-10);">
+    <div class="fwmb-form-group fwmb-dialog-content fwmb-space-before">
         <label class="fwmb-info-label">
             {{localize "FILRODENSWMB.UI.BiomePlacement"}}
-            <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomePlacementHint'}}"></i>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomePlacementHint'}}"></i>
         </label>
-        <select name="biomePlacement">
-            {{#each placements}}
-                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
-            {{/each}}
-        </select>
+        <div class="fwmb-form-fields">
+            <select name="biomePlacement">
+                {{#each placements}}
+                    <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
     </div>
 </div>

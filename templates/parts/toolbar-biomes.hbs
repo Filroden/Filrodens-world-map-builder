@@ -1,11 +1,11 @@
 <div class="fwmb-toolbar-content">
     <div class="fwmb-brush-tools">
-        <button type="button" data-action="setBrushTool" data-tool="paint" class="fwmb-btn {{#unless (eq uiState.brushBiome 0)}}active{{/unless}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolPaint'}}">
-            <i class="fwmb-icon format-paint"></i>
+        <button type="button" data-action="setBrushTool" data-tool="paint" class="fwmb-btn" aria-pressed="{{#unless (eq uiState.brushBiome 0)}}true{{else}}false{{/unless}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolPaint'}}">
+            <i class="fwmb-icon fwmb-icon--format-paint"></i>
         </button>
 
-        <button type="button" data-action="setBrushBiome" data-biome="0" class="fwmb-btn {{#if (eq uiState.brushBiome 0)}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolEraseBiome'}}">
-            <i class="fwmb-icon ink-eraser"></i>
+        <button type="button" data-action="setBrushBiome" data-biome="0" class="fwmb-btn" aria-pressed="{{#if (eq uiState.brushBiome 0)}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolEraseBiome'}}">
+            <i class="fwmb-icon fwmb-icon--ink-eraser"></i>
         </button>
     </div>
 
@@ -26,7 +26,7 @@
                     <optgroup label="{{localize this.label}}">
                         {{#each this.biomes}}
                             <option value="{{this.id}}" {{#if (eq @root.uiState.brushBiome this.id)}}selected{{/if}}>
-                                <div class="fwmb-swatch small" style="background-color: {{this.hex}};"></div>
+                                <div class="fwmb-swatch fwmb-swatch--small" style="background-color: {{this.hex}};"></div>
                                 {{#if this.isCustom}}{{this.label}}{{else}}{{localize this.label}}{{/if}}
                             </option>
                         {{/each}}

@@ -5,44 +5,56 @@
         {{/each}}
     </datalist>
 
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
-        <input type="text" name="styleName" style="width: max-content; max-width: 60ch;" value="{{style.name}}" required />
-    </div>
-
-    <div class="form-group">
-        <label>{{localize "FILRODENSWMB.UI.FontFamily"}}</label>
-        <select name="styleFontFamily">
-            {{#each fonts}}
-                <option value="{{this}}" {{#if (eq ../style.fontFamily this)}}selected{{/if}}>{{this}}</option>
-            {{/each}}
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label>{{localize "FILRODENSWMB.UI.FontSize"}}</label>
-        <div class="fwmb-slider-group">
-            <input type="range" name="styleFontSize" value="{{style.fontSize}}" min="0.2" max="5.0" step="0.1" />
-            <output>{{style.fontSize}}</output>
+        <div class="fwmb-form-fields">
+            <input class="fwmb-input--fit" type="text" name="styleName" value="{{style.name}}" required />
         </div>
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.FontFamily"}}</label>
+        <div class="fwmb-form-fields">
+            <select name="styleFontFamily">
+                {{#each fonts}}
+                    <option value="{{this}}" {{#if (eq ../style.fontFamily this)}}selected{{/if}}>{{this}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.FontSize"}}</label>
+        <div class="fwmb-form-fields">
+            <div class="fwmb-slider-group">
+                <input type="range" name="styleFontSize" value="{{style.fontSize}}" min="0.2" max="5.0" step="0.1" />
+                <output>{{style.fontSize}}</output>
+            </div>
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.FontColor"}}</label>
-        <input type="color" class="fwmb-swatch fwmb-wide" name="styleFillColor" value="{{style.fillColor}}" list="fwmb-standard-colors" />
+        <div class="fwmb-form-fields">
+            <input type="color" class="fwmb-swatch fwmb-wide" name="styleFillColor" value="{{style.fillColor}}" list="fwmb-standard-colors" />
+        </div>
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.MaxWidth"}}</label>
-        <input type="number" name="styleMaxChars" value="{{style.maxChars}}" min="0" step="1" />
+        <div class="fwmb-form-fields">
+            <input type="number" name="styleMaxChars" value="{{style.maxChars}}" min="0" step="1" />
+        </div>
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.Justify"}}</label>
-        <select name="styleJustify">
-            <option value="left" {{#if (eq style.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
-            <option value="center" {{#if (eq style.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
-            <option value="right" {{#if (eq style.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
-        </select>
+        <div class="fwmb-form-fields">
+            <select name="styleJustify">
+                <option value="left" {{#if (eq style.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
+                <option value="center" {{#if (eq style.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
+                <option value="right" {{#if (eq style.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
+            </select>
+        </div>
     </div>
 </div>

@@ -5,119 +5,145 @@
         {{/each}}
     </datalist>
 
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
-        <input type="text" name="pinName" value="{{pin.name}}" />
+        <div class="fwmb-form-fields">
+            <input type="text" name="pinName" value="{{pin.name}}" />
+        </div>
     </div>
 
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         <label>{{localize "FILRODENSWMB.UI.Description"}}</label>
-        <textarea class="fwmb-scrollable stable" name="pinDesc" rows="4">{{pin.description}}</textarea>
+        <div class="fwmb-form-fields">
+            <textarea class="fwmb-scrollable fwmb-scrollable--stable" name="pinDesc" rows="4">{{pin.description}}</textarea>
+        </div>
     </div>
 
-    <div class="form-group">
-        <label>{{localize "FILRODENSWMB.UI.PinStyle"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.PinStyleHint'}}"></i></label>
-        <select name="pinStyle">
-            <option value="custom" {{#unless pin.pinStyle}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.PinStyleNone"}}</option>
-            {{#each pinStyles}}
-                <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
-            {{/each}}
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
-        <div class="fwmb-custom-select" id="fwmb-edit-pin-select">
-            <input type="hidden" name="pinIcon" value="{{pin.icon}}" id="fwmb-edit-pin-icon-input" />
-            <div class="fwmb-select-trigger" style="cursor: pointer;">
-                <i class="fwmb-icon {{#unless pinIconIsCustom}}{{pin.icon}}{{/unless}}" {{#if pinIconIsCustom}}style="--fwmb-mask: url('{{pinIconPath}}');"{{/if}} id="fwmb-edit-pin-trigger-icon"></i>
-                <i class="fwmb-icon arrow-drop-down"></i>
-            </div>
-            <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
-                {{#each icons}}
-                <button type="button" class="fwmb-btn {{#if this.selected}}active{{/if}}" data-icon="{{this.key}}" data-path="{{this.path}}" data-custom="{{this.isCustom}}" data-tooltip="{{this.localized}}">
-                    <i class="fwmb-icon {{#unless this.isCustom}}{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} alt="{{this.localized}}"></i>
-                </button>
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.PinStyle"}} <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.PinStyleHint'}}"></i></label>
+        <div class="fwmb-form-fields">
+            <select name="pinStyle">
+                <option value="custom" {{#unless pin.pinStyle}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.PinStyleNone"}}</option>
+                {{#each pinStyles}}
+                    <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
                 {{/each}}
+            </select>
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
+        <div class="fwmb-form-fields">
+            <div class="fwmb-custom-select" id="fwmb-edit-pin-select">
+                <input type="hidden" name="pinIcon" value="{{pin.icon}}" id="fwmb-edit-pin-icon-input" />
+                <div class="fwmb-select-trigger fwmb-clickable">
+                    <i class="fwmb-icon {{#unless pinIconIsCustom}}fwmb-icon--{{pin.icon}}{{/unless}}" {{#if pinIconIsCustom}}style="--fwmb-mask: url('{{pinIconPath}}');"{{/if}} id="fwmb-edit-pin-trigger-icon"></i>
+                    <i class="fwmb-icon fwmb-icon--arrow-drop-down"></i>
+                </div>
+                <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
+                    {{#each icons}}
+                    <button type="button" class="fwmb-btn" aria-pressed="{{#if this.selected}}true{{else}}false{{/if}}" data-icon="{{this.key}}" data-path="{{this.path}}" data-custom="{{this.isCustom}}" data-tooltip="{{this.localized}}">
+                        <i class="fwmb-icon {{#unless this.isCustom}}fwmb-icon--{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} alt="{{this.localized}}"></i>
+                    </button>
+                    {{/each}}
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.PinColor"}}</label>
-        <input type="color" class="fwmb-swatch fwmb-wide" name="pinColor" value="{{pin.color}}" list="fwmb-standard-colors" />
-    </div>
-
-    <div class="form-group">
-        <label>{{localize "FILRODENSWMB.UI.IconScale"}}</label>
-        <div class="fwmb-slider-group">
-            <input type="range" name="pinScale" value="{{pin.scale}}" min="0.2" max="4" step="0.1" />
-            <output>{{pin.scale}}</output>
+        <div class="fwmb-form-fields">
+            <input type="color" class="fwmb-swatch fwmb-wide" name="pinColor" value="{{pin.color}}" list="fwmb-standard-colors" />
         </div>
     </div>
 
-    <fieldset class="fwmb-fieldset" style="margin-top: var(--fwmb-size-16);">
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.IconScale"}}</label>
+        <div class="fwmb-form-fields">
+            <div class="fwmb-slider-group">
+                <input type="range" name="pinScale" value="{{pin.scale}}" min="0.2" max="4" step="0.1" />
+                <output>{{pin.scale}}</output>
+            </div>
+        </div>
+    </div>
+
+    <fieldset class="fwmb-fieldset fwmb-space-before-large">
         <legend>{{localize "FILRODENSWMB.UI.SettingsLabelQuickStyles"}}</legend>
-        <div class="fwmb-hint" style="margin-bottom: var(--fwmb-size-10);">
+        <div class="fwmb-hint fwmb-space-after">
             {{localize "FILRODENSWMB.UI.LabelEditHint"}}
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
-            <select name="labelQuickStyle">
-                <option value="custom" {{#if (eq pin.label.quickStyle "custom")}}selected{{/if}}>
-                    {{localize "FILRODENSWMB.UI.Custom"}}
-                </option>
-                {{#each customLabelStyles}}
-                    <option value="{{this.id}}" {{#if (eq ../pin.label.quickStyle this.id)}}selected{{/if}}>
-                        {{this.name}}
+            <div class="fwmb-form-fields">
+                <select name="labelQuickStyle">
+                    <option value="custom" {{#if (eq pin.label.quickStyle "custom")}}selected{{/if}}>
+                        {{localize "FILRODENSWMB.UI.Custom"}}
                     </option>
-                {{/each}}
-            </select>
+                    {{#each customLabelStyles}}
+                        <option value="{{this.id}}" {{#if (eq ../pin.label.quickStyle this.id)}}selected{{/if}}>
+                            {{this.name}}
+                        </option>
+                    {{/each}}
+                </select>
+            </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.FontFamily"}}</label>
-            <select name="labelFontFamily">
-                {{#each fonts}}
-                    <option value="{{this}}" {{#if (eq ../pin.label.fontFamily this)}}selected{{/if}}>{{this}}</option>
-                {{/each}}
-            </select>
+            <div class="fwmb-form-fields">
+                <select name="labelFontFamily">
+                    {{#each fonts}}
+                        <option value="{{this}}" {{#if (eq ../pin.label.fontFamily this)}}selected{{/if}}>{{this}}</option>
+                    {{/each}}
+                </select>
+            </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.FontSize"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="labelFontSize" value="{{pin.label.fontSize}}" min="0.2" max="5.0" step="0.1" />
-                <output>{{pin.label.fontSize}}</output>
+            <div class="fwmb-form-fields">
+                <div class="fwmb-slider-group">
+                    <input type="range" name="labelFontSize" value="{{pin.label.fontSize}}" min="0.2" max="5.0" step="0.1" />
+                    <output>{{pin.label.fontSize}}</output>
+                </div>
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.Rotation"}}</label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="labelRotation" value="{{pin.label.rotation}}" min="{{rotationRange.MIN}}" max="{{rotationRange.MAX}}" step="{{rotationRange.STEP}}" data-default="0" />
-                <output>{{pin.label.rotation}}</output>
+            <div class="fwmb-form-fields">
+                <div class="fwmb-slider-group">
+                    <input type="range" name="labelRotation" value="{{pin.label.rotation}}" min="{{rotationRange.MIN}}" max="{{rotationRange.MAX}}" step="{{rotationRange.STEP}}" data-default="0" />
+                    <output>{{pin.label.rotation}}</output>
+                </div>
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.FontColor"}}</label>
-            <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{pin.label.fillColor}}" list="fwmb-standard-colors" />
+            <div class="fwmb-form-fields">
+                <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{pin.label.fillColor}}" list="fwmb-standard-colors" />
+            </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.MaxWidth"}}</label>
-            <input type="number" class="fwmb-wide" name="labelMaxChars" value="{{pin.label.maxChars}}" min="0" step="1" placeholder="0" />
+            <div class="fwmb-form-fields">
+                <input type="number" class="fwmb-wide" name="labelMaxChars" value="{{pin.label.maxChars}}" min="0" step="1" placeholder="0" />
+            </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.Justify"}}</label>
-            <select name="labelJustify">
-                <option value="left" {{#if (eq pin.label.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
-                <option value="center" {{#if (eq pin.label.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
-                <option value="right" {{#if (eq pin.label.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
-            </select>
+            <div class="fwmb-form-fields">
+                <select name="labelJustify">
+                    <option value="left" {{#if (eq pin.label.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
+                    <option value="center" {{#if (eq pin.label.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
+                    <option value="right" {{#if (eq pin.label.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
+                </select>
+            </div>
         </div>
     </fieldset>
 

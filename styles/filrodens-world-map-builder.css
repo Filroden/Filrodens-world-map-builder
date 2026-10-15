@@ -23,396 +23,396 @@
     margin: 0;
 }
 
-.fwmb-icon.invert {
+.fwmb-icon--invert {
     filter: invert(1);
 }
 
-.fwmb-icon.reverse {
+.fwmb-icon--reverse {
     transform: scaleX(calc(-1 * var(--fwmb-dir-flip)));
 }
 
 /* --- MATERIAL DESIGN ICONS --- */
-.fwmb-icon.map {
+.fwmb-icon--map {
     --fwmb-mask: url("../assets/icons/map.svg");
 }
-.fwmb-icon.hex {
+.fwmb-icon--hex {
     --fwmb-mask: url("../assets/icons/hive.svg");
 }
-.fwmb-icon.layers {
+.fwmb-icon--layers {
     --fwmb-mask: url("../assets/icons/layers.svg");
 }
-.fwmb-icon.elevation {
+.fwmb-icon--elevation {
     --fwmb-mask: url("../assets/icons/elevation.svg");
 }
-.fwmb-icon.shuffle {
+.fwmb-icon--shuffle {
     --fwmb-mask: url("../assets/icons/shuffle.svg");
 }
-.fwmb-icon.travel-explore {
+.fwmb-icon--travel-explore {
     --fwmb-mask: url("../assets/icons/travel_explore.svg");
 }
-.fwmb-icon.file-open {
+.fwmb-icon--file-open {
     --fwmb-mask: url("../assets/icons/file_open.svg");
 }
-.fwmb-icon.save {
+.fwmb-icon--save {
     --fwmb-mask: url("../assets/icons/save.svg");
 }
-.fwmb-icon.save-as {
+.fwmb-icon--save-as {
     --fwmb-mask: url("../assets/icons/save_as.svg");
 }
-.fwmb-icon.accept {
+.fwmb-icon--accept {
     --fwmb-mask: url("../assets/icons/check.svg");
 }
-.fwmb-icon.delete {
+.fwmb-icon--delete {
     --fwmb-mask: url("../assets/icons/delete.svg");
 }
-.fwmb-icon.cancel {
+.fwmb-icon--cancel {
     --fwmb-mask: url("../assets/icons/cancel.svg");
 }
-.fwmb-icon.brush {
+.fwmb-icon--brush {
     --fwmb-mask: url("../assets/icons/brush.svg");
 }
-.fwmb-icon.select {
+.fwmb-icon--select {
     --fwmb-mask: url("../assets/icons/select.svg");
 }
-.fwmb-icon.grid-on {
+.fwmb-icon--grid-on {
     --fwmb-mask: url("../assets/icons/grid_3x3.svg");
 }
-.fwmb-icon.grid-off {
+.fwmb-icon--grid-off {
     --fwmb-mask: url("../assets/icons/grid_3x3_off.svg");
 }
-.fwmb-icon.zoom-in {
+.fwmb-icon--zoom-in {
     --fwmb-mask: url("../assets/icons/zoom_in.svg");
 }
-.fwmb-icon.zoom-out {
+.fwmb-icon--zoom-out {
     --fwmb-mask: url("../assets/icons/zoom_out.svg");
 }
-.fwmb-icon.zoom-in-map {
+.fwmb-icon--zoom-in-map {
     --fwmb-mask: url("../assets/icons/zoom_in_map.svg");
 }
-.fwmb-icon.zoom-out-map {
+.fwmb-icon--zoom-out-map {
     --fwmb-mask: url("../assets/icons/zoom_out_map.svg");
 }
-.fwmb-icon.center-focus {
+.fwmb-icon--center-focus {
     --fwmb-mask: url("../assets/icons/center_focus_strong.svg");
 }
-.fwmb-icon.tune {
+.fwmb-icon--tune {
     --fwmb-mask: url("../assets/icons/tune.svg");
 }
-.fwmb-icon.landscape {
+.fwmb-icon--landscape {
     --fwmb-mask: url("../assets/icons/landscape.svg");
 }
-.fwmb-icon.water-drop {
+.fwmb-icon--water-drop {
     --fwmb-mask: url("../assets/icons/water_drop.svg");
 }
-.fwmb-icon.format-color-reset {
+.fwmb-icon--format-color-reset {
     --fwmb-mask: url("../assets/icons/format_color_reset.svg");
 }
-.fwmb-icon.temperature {
+.fwmb-icon--temperature {
     --fwmb-mask: url("../assets/icons/device_thermostat.svg");
 }
-.fwmb-icon.forest {
+.fwmb-icon--forest {
     --fwmb-mask: url("../assets/icons/forest.svg");
 }
-.fwmb-icon.location-city {
+.fwmb-icon--location-city {
     --fwmb-mask: url("../assets/icons/location_city.svg");
 }
-.fwmb-icon.folder-open {
+.fwmb-icon--folder-open {
     --fwmb-mask: url("../assets/icons/folder_open.svg");
 }
-.fwmb-icon.edit-arrow-down {
+.fwmb-icon--edit-arrow-down {
     --fwmb-mask: url("../assets/icons/edit_arrow_down.svg");
 }
-.fwmb-icon.edit-arrow-up {
+.fwmb-icon--edit-arrow-up {
     --fwmb-mask: url("../assets/icons/edit_arrow_up.svg");
 }
-.fwmb-icon.undo {
+.fwmb-icon--undo {
     --fwmb-mask: url("../assets/icons/undo.svg");
 }
-.fwmb-icon.redo {
+.fwmb-icon--redo {
     --fwmb-mask: url("../assets/icons/redo.svg");
 }
-.fwmb-icon.format-paint {
+.fwmb-icon--format-paint {
     --fwmb-mask: url("../assets/icons/format_paint.svg");
 }
-.fwmb-icon.ink-eraser {
+.fwmb-icon--ink-eraser {
     --fwmb-mask: url("../assets/icons/ink_eraser.svg");
 }
-.fwmb-icon.three-d {
+.fwmb-icon--three-d {
     --fwmb-mask: url("../assets/icons/3d.svg");
 }
-.fwmb-icon.scatter-plot {
+.fwmb-icon--scatter-plot {
     --fwmb-mask: url("../assets/icons/scatter_plot.svg");
 }
-.fwmb-icon.content-copy {
+.fwmb-icon--content-copy {
     --fwmb-mask: url("../assets/icons/content_copy.svg");
 }
-.fwmb-icon.edit {
+.fwmb-icon--edit {
     --fwmb-mask: url("../assets/icons/edit.svg");
 }
-.fwmb-icon.edit-off {
+.fwmb-icon--edit-off {
     --fwmb-mask: url("../assets/icons/edit_off.svg");
 }
-.fwmb-icon.edit-square {
+.fwmb-icon--edit-square {
     --fwmb-mask: url("../assets/icons/edit_square.svg");
 }
-.fwmb-icon.file-export {
+.fwmb-icon--file-export {
     --fwmb-mask: url("../assets/icons/file_export.svg");
 }
-.fwmb-icon.upload-file {
+.fwmb-icon--upload-file {
     --fwmb-mask: url("../assets/icons/upload_file.svg");
 }
-.fwmb-icon.more-vert {
+.fwmb-icon--more-vert {
     --fwmb-mask: url("../assets/icons/more_vert.svg");
 }
-.fwmb-icon.image {
+.fwmb-icon--image {
     --fwmb-mask: url("../assets/icons/image.svg");
 }
-.fwmb-icon.insert-text {
+.fwmb-icon--insert-text {
     --fwmb-mask: url("../assets/icons/insert_text.svg");
 }
-.fwmb-icon.filter-center-focus {
+.fwmb-icon--filter-center-focus {
     --fwmb-mask: url("../assets/icons/filter_center_focus.svg");
 }
-.fwmb-icon.visibility {
+.fwmb-icon--visibility {
     --fwmb-mask: url("../assets/icons/visibility.svg");
 }
-.fwmb-icon.visibility-off {
+.fwmb-icon--visibility-off {
     --fwmb-mask: url("../assets/icons/visibility_off.svg");
 }
-.fwmb-icon.place {
+.fwmb-icon--place {
     --fwmb-mask: url("../assets/icons/add_location.svg");
 }
-.fwmb-icon.timeline {
+.fwmb-icon--timeline {
     --fwmb-mask: url("../assets/icons/timeline.svg");
 }
-.fwmb-icon.arrow-drop-down {
+.fwmb-icon--arrow-drop-down {
     --fwmb-mask: url("../assets/icons/arrow_drop_down.svg");
 }
-.fwmb-icon.explore {
+.fwmb-icon--explore {
     --fwmb-mask: url("../assets/icons/explore.svg");
 }
-.fwmb-icon.png {
+.fwmb-icon--png {
     --fwmb-mask: url("../assets/icons/file_png.svg");
 }
-.fwmb-icon.add {
+.fwmb-icon--add {
     --fwmb-mask: url("../assets/icons/add.svg");
 }
-.fwmb-icon.arrow-upward {
+.fwmb-icon--arrow-upward {
     --fwmb-mask: url("../assets/icons/arrow_upward.svg");
 }
-.fwmb-icon.arrow-downward {
+.fwmb-icon--arrow-downward {
     --fwmb-mask: url("../assets/icons/arrow_downward.svg");
 }
-.fwmb-icon.subdirectory {
+.fwmb-icon--subdirectory {
     --fwmb-mask: url("../assets/icons/subdirectory_arrow_right.svg");
 }
-.fwmb-icon.merge {
+.fwmb-icon--merge {
     --fwmb-mask: url("../assets/icons/call_merge.svg");
 }
-.fwmb-icon.remove {
+.fwmb-icon--remove {
     --fwmb-mask: url("../assets/icons/remove.svg");
 }
-.fwmb-icon.variable-remove {
+.fwmb-icon--variable-remove {
     --fwmb-mask: url("../assets/icons/variable_remove.svg");
 }
-.fwmb-icon.gesture {
+.fwmb-icon--gesture {
     --fwmb-mask: url("../assets/icons/gesture.svg");
 }
-.fwmb-icon.slope {
+.fwmb-icon--slope {
     --fwmb-mask: url("../assets/icons/signal_cellular_null.svg");
 }
-.fwmb-icon.plateau {
+.fwmb-icon--plateau {
     --fwmb-mask: url("../assets/icons/rectangle.svg");
 }
-.fwmb-icon.security {
+.fwmb-icon--security {
     --fwmb-mask: url("../assets/icons/security.svg");
 }
-.fwmb-icon.crop {
+.fwmb-icon--crop {
     --fwmb-mask: url("../assets/icons/crop.svg");
 }
-.fwmb-icon.water {
+.fwmb-icon--water {
     --fwmb-mask: url("../assets/icons/water.svg");
 }
-.fwmb-icon.upgrade {
+.fwmb-icon--upgrade {
     --fwmb-mask: url("../assets/icons/upgrade.svg");
 }
-.fwmb-icon.sync {
+.fwmb-icon--sync {
     --fwmb-mask: url("../assets/icons/sync.svg");
 }
-.fwmb-icon.sync_disabled {
+.fwmb-icon--sync_disabled {
     --fwmb-mask: url("../assets/icons/sync_disabled.svg");
 }
-.fwmb-icon.info {
+.fwmb-icon--info {
     --fwmb-mask: url("../assets/icons/info.svg");
 }
-.fwmb-icon.palette {
+.fwmb-icon--palette {
     --fwmb-mask: url("../assets/icons/palette.svg");
 }
 
 /* --- PINHEAD ICONS --- */
-.fwmb-icon.anchor {
+.fwmb-icon--anchor {
     --fwmb-mask: url("../assets/pinhead-icons/anchor.svg");
 }
-.fwmb-icon.bridge {
+.fwmb-icon--bridge {
     --fwmb-mask: url("../assets/pinhead-icons/bridge.svg");
 }
-.fwmb-icon.castle_keep {
+.fwmb-icon--castle_keep {
     --fwmb-mask: url("../assets/pinhead-icons/castle_keep.svg");
 }
-.fwmb-icon.castle {
+.fwmb-icon--castle {
     --fwmb-mask: url("../assets/pinhead-icons/castle.svg");
 }
-.fwmb-icon.cave {
+.fwmb-icon--cave {
     --fwmb-mask: url("../assets/pinhead-icons/cave.svg");
 }
-.fwmb-icon.cindercone_volcano_erupting {
+.fwmb-icon--cindercone_volcano_erupting {
     --fwmb-mask: url("../assets/pinhead-icons/cindercone_volcano_erupting.svg");
 }
-.fwmb-icon.circle {
+.fwmb-icon--circle {
     --fwmb-mask: url("../assets/pinhead-icons/circle.svg");
 }
-.fwmb-icon.circle_outline {
+.fwmb-icon--circle_outline {
     --fwmb-mask: url("../assets/pinhead-icons/circle_outline.svg");
 }
-.fwmb-icon.circle_outline_with_dot {
+.fwmb-icon--circle_outline_with_dot {
     --fwmb-mask: url("../assets/pinhead-icons/circle_outline_with_dot.svg");
 }
-.fwmb-icon.city_gate {
+.fwmb-icon--city_gate {
     --fwmb-mask: url("../assets/pinhead-icons/city_gate.svg");
 }
-.fwmb-icon.column_shrine {
+.fwmb-icon--column_shrine {
     --fwmb-mask: url("../assets/pinhead-icons/column_shrine.svg");
 }
-.fwmb-icon.domed_tower {
+.fwmb-icon--domed_tower {
     --fwmb-mask: url("../assets/pinhead-icons/domed_tower.svg");
 }
-.fwmb-icon.dot {
+.fwmb-icon--dot {
     --fwmb-mask: url("../assets/pinhead-icons/dot.svg");
 }
-.fwmb-icon.dot_outline {
+.fwmb-icon--dot_outline {
     --fwmb-mask: url("../assets/pinhead-icons/dot_outline.svg");
 }
-.fwmb-icon.fortress {
+.fwmb-icon--fortress {
     --fwmb-mask: url("../assets/pinhead-icons/fortress.svg");
 }
-.fwmb-icon.geyser_from_ground {
+.fwmb-icon--geyser_from_ground {
     --fwmb-mask: url("../assets/pinhead-icons/geyser_from_ground.svg");
 }
-.fwmb-icon.map_pin {
+.fwmb-icon--map_pin {
     --fwmb-mask: url("../assets/pinhead-icons/map_pin.svg");
 }
-.fwmb-icon.map_pin_outline {
+.fwmb-icon--map_pin_outline {
     --fwmb-mask: url("../assets/pinhead-icons/map_pin_outline.svg");
 }
-.fwmb-icon.map_pin_outline_with_dot {
+.fwmb-icon--map_pin_outline_with_dot {
     --fwmb-mask: url("../assets/pinhead-icons/map_pin_outline_with_dot.svg");
 }
-.fwmb-icon.map_pin_with_dot {
+.fwmb-icon--map_pin_with_dot {
     --fwmb-mask: url("../assets/pinhead-icons/map_pin_with_dot.svg");
 }
-.fwmb-icon.megalith {
+.fwmb-icon--megalith {
     --fwmb-mask: url("../assets/pinhead-icons/megalith.svg");
 }
-.fwmb-icon.mineshaft_profile {
+.fwmb-icon--mineshaft_profile {
     --fwmb-mask: url("../assets/pinhead-icons/mineshaft_profile.svg");
 }
-.fwmb-icon.obelisk {
+.fwmb-icon--obelisk {
     --fwmb-mask: url("../assets/pinhead-icons/obelisk.svg");
 }
-.fwmb-icon.obelisk_on_plinth {
+.fwmb-icon--obelisk_on_plinth {
     --fwmb-mask: url("../assets/pinhead-icons/obelisk_on_plinth.svg");
 }
-.fwmb-icon.place_of_worship_building {
+.fwmb-icon--place_of_worship_building {
     --fwmb-mask: url("../assets/pinhead-icons/place_of_worship_building.svg");
 }
-.fwmb-icon.shipwreck_in_water {
+.fwmb-icon--shipwreck_in_water {
     --fwmb-mask: url("../assets/pinhead-icons/shipwreck_in_water.svg");
 }
-.fwmb-icon.skull {
+.fwmb-icon--skull {
     --fwmb-mask: url("../assets/pinhead-icons/skull.svg");
 }
-.fwmb-icon.star {
+.fwmb-icon--star {
     --fwmb-mask: url("../assets/pinhead-icons/star.svg");
 }
-.fwmb-icon.circle_outline_with_dot_outline {
+.fwmb-icon--circle_outline_with_dot_outline {
     --fwmb-mask: url("../assets/pinhead-icons/circle_outline_with_dot_outline.svg");
 }
-.fwmb-icon.circle_outline_with_star {
+.fwmb-icon--circle_outline_with_star {
     --fwmb-mask: url("../assets/pinhead-icons/circle_outline_with_star.svg");
 }
-.fwmb-icon.circle_with_dot {
+.fwmb-icon--circle_with_dot {
     --fwmb-mask: url("../assets/pinhead-icons/circle_with_dot.svg");
 }
-.fwmb-icon.circle_with_dot_outline {
+.fwmb-icon--circle_with_dot_outline {
     --fwmb-mask: url("../assets/pinhead-icons/circle_with_dot_outline.svg");
 }
-.fwmb-icon.broadleaved_tree {
+.fwmb-icon--broadleaved_tree {
     --fwmb-mask: url("../assets/pinhead-icons/broadleaved_tree.svg");
 }
-.fwmb-icon.campsite {
+.fwmb-icon--campsite {
     --fwmb-mask: url("../assets/pinhead-icons/campsite.svg");
 }
-.fwmb-icon.cannon {
+.fwmb-icon--cannon {
     --fwmb-mask: url("../assets/pinhead-icons/cannon.svg");
 }
-.fwmb-icon.classical_building {
+.fwmb-icon--classical_building {
     --fwmb-mask: url("../assets/pinhead-icons/classical_building.svg");
 }
-.fwmb-icon.conifer_tree {
+.fwmb-icon--conifer_tree {
     --fwmb-mask: url("../assets/pinhead-icons/conifer_tree.svg");
 }
-.fwmb-icon.dagger {
+.fwmb-icon--dagger {
     --fwmb-mask: url("../assets/pinhead-icons/dagger.svg");
 }
-.fwmb-icon.dot_with_rays_down {
+.fwmb-icon--dot_with_rays_down {
     --fwmb-mask: url("../assets/pinhead-icons/dot_with_rays_down.svg");
 }
-.fwmb-icon.dot_with_rays_left {
+.fwmb-icon--dot_with_rays_left {
     --fwmb-mask: url("../assets/pinhead-icons/dot_with_rays_left.svg");
 }
-.fwmb-icon.dot_with_rays_right {
+.fwmb-icon--dot_with_rays_right {
     --fwmb-mask: url("../assets/pinhead-icons/dot_with_rays_right.svg");
 }
-.fwmb-icon.dot_with_rays_up {
+.fwmb-icon--dot_with_rays_up {
     --fwmb-mask: url("../assets/pinhead-icons/dot_with_rays_up.svg");
 }
-.fwmb-icon.exclamation_point {
+.fwmb-icon--exclamation_point {
     --fwmb-mask: url("../assets/pinhead-icons/exclamation_point.svg");
 }
-.fwmb-icon.fence {
+.fwmb-icon--fence {
     --fwmb-mask: url("../assets/pinhead-icons/fence.svg");
 }
-.fwmb-icon.flagstick_with_pennant {
+.fwmb-icon--flagstick_with_pennant {
     --fwmb-mask: url("../assets/pinhead-icons/flagstick_with_pennant.svg");
 }
-.fwmb-icon.gable_roofed_shelter {
+.fwmb-icon--gable_roofed_shelter {
     --fwmb-mask: url("../assets/pinhead-icons/gable_roofed_shelter.svg");
 }
-.fwmb-icon.gravestone {
+.fwmb-icon--gravestone {
     --fwmb-mask: url("../assets/pinhead-icons/gravestone.svg");
 }
-.fwmb-icon.jp_landmark {
+.fwmb-icon--jp_landmark {
     --fwmb-mask: url("../assets/pinhead-icons/jp_landmark.svg");
 }
-.fwmb-icon.lighthouse {
+.fwmb-icon--lighthouse {
     --fwmb-mask: url("../assets/pinhead-icons/lighthouse.svg");
 }
-.fwmb-icon.memorial_stone {
+.fwmb-icon--memorial_stone {
     --fwmb-mask: url("../assets/pinhead-icons/memorial_stone.svg");
 }
-.fwmb-icon.mesoamerican_pyramid {
+.fwmb-icon--mesoamerican_pyramid {
     --fwmb-mask: url("../assets/pinhead-icons/mesoamerican_pyramid.svg");
 }
-.fwmb-icon.observatory_dome {
+.fwmb-icon--observatory_dome {
     --fwmb-mask: url("../assets/pinhead-icons/observatory_dome.svg");
 }
-.fwmb-icon.palace {
+.fwmb-icon--palace {
     --fwmb-mask: url("../assets/pinhead-icons/palace.svg");
 }
-.fwmb-icon.question_mark {
+.fwmb-icon--question_mark {
     --fwmb-mask: url("../assets/pinhead-icons/question_mark.svg");
 }
-.fwmb-icon.wall_tent {
+.fwmb-icon--wall_tent {
     --fwmb-mask: url("../assets/pinhead-icons/wall_tent.svg");
 }
 
@@ -422,13 +422,13 @@
     scrollbar-color: auto !important;
 }
 
-.fwmb .fwmb-scrollable.stable {
+.fwmb .fwmb-scrollable.fwmb-scrollable--stable {
     scrollbar-gutter: stable;
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar {
-    width: 8px !important;
-    height: 8px !important;
+    width: 0.5rem !important;
+    height: 0.5rem !important;
 }
 
 .fwmb .fwmb-scrollable::-webkit-scrollbar-track {
@@ -452,7 +452,7 @@
 
 /* --- TOOLTIPS --- */
 #tooltip.fwmb-tooltip {
-    max-width: 300px !important;
+    max-width: 18.75rem !important;
     border: 1px solid var(--fwmb-accent-main);
     border-radius: var(--fwmb-radius-small);
     padding: var(--fwmb-size-8);
@@ -505,12 +505,12 @@
     min-height: var(--fwmb-size-32);
 }
 
-.fwmb .fwmb-btn.wide {
+.fwmb .fwmb-btn.fwmb-btn--wide {
     width: auto;
     height: auto;
 }
 
-.fwmb .fwmb-btn.small {
+.fwmb .fwmb-btn.fwmb-btn--small {
     padding: 0.75rem;
     height: var(--fwmb-size-8);
     width: var(--fwmb-size-8);
@@ -518,53 +518,53 @@
 }
 
 /* An icon-only button beside a field or a full-width button: square, as tall as both */
-.fwmb .fwmb-btn.square {
+.fwmb .fwmb-btn.fwmb-btn--square {
     flex: none;
     width: var(--fwmb-size-32);
     padding: 0;
 }
 
-.fwmb .fwmb-btn.subtle {
+.fwmb .fwmb-btn.fwmb-btn--subtle {
     background: transparent;
     border: 1px solid var(--fwmb-accent-main);
     color: var(--fwmb-text-secondary);
 }
-.fwmb .fwmb-btn.subtle:hover {
+.fwmb .fwmb-btn.fwmb-btn--subtle:hover {
     background: var(--fwmb-bg-hover);
 }
 
-.fwmb .fwmb-btn.muted {
+.fwmb .fwmb-btn.fwmb-btn--muted {
     background: inherit;
     border-color: transparent;
 }
-.fwmb .fwmb-btn.muted:hover {
+.fwmb .fwmb-btn.fwmb-btn--muted:hover {
     background: var(--fwmb-bg-hover);
     border-color: var(--fwmb-border-subtle);
 }
 
-.fwmb .fwmb-btn.primary {
+.fwmb .fwmb-btn.fwmb-btn--primary {
     color: var(--fwmb-text-inverse);
 }
-.fwmb .fwmb-btn.primary:hover {
+.fwmb .fwmb-btn.fwmb-btn--primary:hover {
     color: var(--fwmb-text-inverse);
 }
 
-.fwmb .fwmb-btn.disabled {
+.fwmb .fwmb-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     background: var(--fwmb-bg-muted);
     color: var(--fwmb-text-muted);
 }
 
-.fwmb .fwmb-btn.active {
+.fwmb .fwmb-btn[aria-pressed="true"] {
     background: var(--fwmb-fill-accent);
     color: var(--fwmb-text-inverse);
 }
 
-.fwmb .fwmb-btn.danger {
+.fwmb .fwmb-btn.fwmb-btn--danger {
     color: var(--fwmb-color-danger);
 }
-.fwmb .fwmb-btn.danger:hover {
+.fwmb .fwmb-btn.fwmb-btn--danger:hover {
     color: var(--fwmb-color-danger);
 }
 
@@ -605,7 +605,7 @@
     min-width: 0;
 }
 
-.fwmb .fwmb-btn-row > .fwmb-btn.square {
+.fwmb .fwmb-btn-row > .fwmb-btn.fwmb-btn--square {
     flex: 0 0 auto;
 }
 
@@ -705,7 +705,7 @@
     color: var(--fwmb-text-primary);
     font-weight: bold;
     font-style: italic;
-    padding-block: 3px 1px;
+    padding-block: 0.1875rem 0.0625rem;
 }
 
 .fwmb input:disabled,
@@ -744,9 +744,8 @@
     text-shadow: none;
 }
 
-.fwmb button.active,
-.fwmb [class*="fwmb-"][class*="-btn"].active,
-.fwmb .fwmb-pill.active {
+.fwmb button:is([aria-pressed="true"], [aria-current="page"]),
+.fwmb [class*="fwmb-"][class*="-btn"][aria-pressed="true"] {
     outline: none;
     box-shadow: none;
 }
@@ -780,49 +779,6 @@
     padding: var(--fwmb-size-16);
     overflow-y: auto;
     min-width: 0; /* Prevents flexbox text overflow issues */
-}
-
-/* --- TABBED NAVIGATION --- */
-.fwmb nav.tabs,
-.fwmb .fwmb-tabs {
-    display: flex;
-    flex: 0 0 auto;
-    gap: 0;
-    padding-inline-start: var(--fwmb-size-4);
-    border-block-end: 1px solid var(--fwmb-border-main);
-    background: var(--fwmb-bg-panel);
-}
-
-.fwmb nav.tabs .item,
-.fwmb .fwmb-tabs .item {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    gap: var(--fwmb-size-10);
-    text-align: center;
-    padding: var(--fwmb-size-8);
-    color: var(--fwmb-text-secondary);
-    font-weight: bold;
-    cursor: pointer;
-    border-block-end: 4px solid transparent;
-    transition:
-        background-color 0.2s,
-        color 0.2s;
-}
-
-.fwmb nav.tabs .item:hover,
-.fwmb .fwmb-tabs .item:hover {
-    color: var(--fwmb-text-primary);
-    background: var(--fwmb-bg-hover);
-}
-
-.fwmb nav.tabs .item.active,
-.fwmb .fwmb-tabs .item.active {
-    color: var(--fwmb-accent-main);
-    border-block-end-color: var(--fwmb-border-focus);
-    background: var(--fwmb-bg-base);
-    text-shadow: none;
 }
 
 /* --- STRUCTURED FORMS --- */
@@ -921,7 +877,7 @@
     cursor: pointer;
 }
 
-.fwmb .form-group {
+.fwmb .fwmb-form-group {
     display: grid;
     grid-template-columns: auto minmax(0, max-content);
     align-items: center;
@@ -968,7 +924,7 @@
     margin-block-end: var(--fwmb-size-10);
 }
 
-.fwmb .fwmb-hint.indent {
+.fwmb .fwmb-hint.fwmb-hint--indent {
     margin-inline-start: var(--fwmb-size-32);
 }
 
@@ -993,13 +949,13 @@
 
 /* Thematic Dividers */
 .fwmb .fwmb-divider {
-    border-block-end: 2px solid var(--fwmb-border-main);
+    border-block-end: 0.125rem solid var(--fwmb-border-main);
     width: 100%;
     margin-block: var(--fwmb-size-10);
 }
 
 .fwmb .fwmb-divider-vertical {
-    border-inline-end: 2px solid var(--fwmb-border-main);
+    border-inline-end: 0.125rem solid var(--fwmb-border-main);
     height: 100%;
     margin-inline: var(--fwmb-size-4);
 }
@@ -1019,12 +975,6 @@
     padding: var(--fwmb-size-2) var(--fwmb-size-8);
     line-height: var(--fwmb-line-height-heading);
     white-space: nowrap;
-}
-
-.fwmb .fwmb-badge.primary {
-    background-color: var(--fwmb-fill-accent);
-    color: var(--fwmb-text-inverse);
-    border-color: var(--fwmb-fill-accent);
 }
 
 /* ===================================================================
@@ -1163,7 +1113,7 @@
 }
 
 /* UI direction handling for RTL languages */
-.fwmb.rtl,
+.fwmb.fwmb-rtl,
 .fwmb[dir="rtl"] {
     --fwmb-dir-flip: -1;
 }
@@ -1234,8 +1184,8 @@
 }
 
 .fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button {
-    width: 36px;
-    height: 36px;
+    width: 2.25rem;
+    height: 2.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1249,7 +1199,7 @@
     border-color: var(--fwmb-border-focus);
 }
 
-.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button.active {
+.fwmb :is(.fwmb-toolbar, .fwmb-mask-settings, .fwmb-brush-tools, .fwmb-brush-history) button:is([aria-pressed="true"], [aria-current="page"]) {
     color: var(--fwmb-text-inverse);
     background: var(--fwmb-fill-accent);
     border-color: var(--fwmb-border-main);
@@ -1399,15 +1349,15 @@
 }
 
 /* On: a clear accent fill, so a layer that is showing stands out from one that is not */
-.fwmb-map-controls button.active,
-.fwmb-map-history button.active {
+.fwmb-map-controls button[aria-pressed="true"],
+.fwmb-map-history button[aria-pressed="true"] {
     color: var(--fwmb-main-100);
     background: color-mix(in srgb, var(--fwmb-accent-main) 45%, rgba(0, 0, 0, 0.4));
     border-color: var(--fwmb-accent-main);
 }
 
 /* Some of a group's layers on: a fainter fill and a dashed edge */
-.fwmb-map-controls button.partial {
+.fwmb-map-controls button.fwmb-is-partial {
     color: var(--fwmb-main-200);
     background: color-mix(in srgb, var(--fwmb-accent-main) 18%, rgba(0, 0, 0, 0.4));
     border-color: var(--fwmb-accent-main);
@@ -1582,7 +1532,7 @@
     box-sizing: border-box;
     height: var(--fwmb-range-track-height);
     border: var(--fwmb-range-border) solid var(--fwmb-border-subtle);
-    border-radius: 999px;
+    border-radius: 62.5rem;
     background: linear-gradient(to right, color-mix(in srgb, var(--fwmb-range-accent) 30%, transparent) 0 var(--fwmb-range-fill, 0%), var(--fwmb-bg-hover) var(--fwmb-range-fill, 0%));
 }
 .fwmb input[type="range"].fwmb-range-input:dir(rtl)::-webkit-slider-runnable-track,
@@ -1597,7 +1547,7 @@
     height: var(--fwmb-range-thumb-size);
     /* The thumb is placed inside the track's border, so centre it within what is left */
     margin-block-start: calc((var(--fwmb-range-track-height) - 2 * var(--fwmb-range-border) - var(--fwmb-range-thumb-size)) / 2);
-    border: 2px solid var(--fwmb-bg-base);
+    border: 0.125rem solid var(--fwmb-bg-base);
     border-radius: 50%;
     background: var(--fwmb-range-accent-bright);
     box-shadow: var(--fwmb-range-glow);
@@ -1609,14 +1559,14 @@
     box-sizing: border-box;
     height: var(--fwmb-range-track-height);
     border: var(--fwmb-range-border) solid var(--fwmb-border-subtle);
-    border-radius: 999px;
+    border-radius: 62.5rem;
     background: var(--fwmb-bg-hover);
 }
 .fwmb input[type="range"].fwmb-range-input::-moz-range-progress,
 .fwmb .fwmb-slider-group input[type="range"]::-moz-range-progress {
     box-sizing: border-box;
     height: var(--fwmb-range-track-height);
-    border-radius: 999px;
+    border-radius: 62.5rem;
     background: color-mix(in srgb, var(--fwmb-range-accent) 30%, transparent);
 }
 .fwmb input[type="range"].fwmb-range-input::-moz-range-thumb,
@@ -1624,7 +1574,7 @@
     box-sizing: border-box;
     width: var(--fwmb-range-thumb-size);
     height: var(--fwmb-range-thumb-size);
-    border: 2px solid var(--fwmb-bg-base);
+    border: 0.125rem solid var(--fwmb-bg-base);
     border-radius: 50%;
     background: var(--fwmb-range-accent-bright);
     box-shadow: var(--fwmb-range-glow);
@@ -1634,7 +1584,7 @@
 .fwmb .fwmb-slider-group input[type="range"]:focus-visible {
     outline: 2px solid var(--fwmb-range-accent);
     outline-offset: 2px;
-    border-radius: 999px;
+    border-radius: 62.5rem;
 }
 
 .fwmb input[type="range"].fwmb-range-input:disabled,
@@ -1652,7 +1602,7 @@
     margin-block-end: var(--fwmb-size-4);
     min-width: 0;
 }
-.fwmb .fwmb-range.spaced {
+.fwmb .fwmb-range.fwmb-range--spaced {
     margin-block-start: var(--fwmb-size-10);
 }
 
@@ -1687,7 +1637,7 @@
     white-space: nowrap;
     background: var(--fwmb-bg-hover);
     border: 1px solid var(--fwmb-border-subtle);
-    border-radius: 999px;
+    border-radius: 62.5rem;
     padding: var(--fwmb-size-1) var(--fwmb-size-6);
 }
 
@@ -1740,16 +1690,39 @@
 }
 
 /* --- STACKED FORM GROUPS --- */
-.fwmb .form-group.stacked {
+.fwmb .fwmb-form-group--stacked {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: var(--fwmb-size-4);
 }
 
-.fwmb .form-group.stacked input[type="range"] {
+.fwmb .fwmb-form-group--stacked input[type="range"] {
     width: 100%;
     margin: 0;
+}
+
+/* The field or fields of a labelled row, after its label: one flex row, so a field and the controls
+   that go with it (an info icon, a companion button) stay together in the row's field column. In a
+   stacked row the wrapper lays its fields out as the stacked row itself does (one under another,
+   each the row's full width), since they were the stacked row's own children before it existed. */
+.fwmb .fwmb-form-fields {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-size-8);
+    min-width: 0;
+}
+
+/* A field gives up its intrinsic width when the row's field column is narrower, as it did as the
+   row's own grid item */
+.fwmb .fwmb-form-fields > :is(input, select, textarea) {
+    min-width: 0;
+}
+
+.fwmb .fwmb-form-group--stacked > .fwmb-form-fields {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--fwmb-size-4);
 }
 
 /* --- MAP LAYOUT & EDIT TOOLBAR --- */
@@ -1826,7 +1799,7 @@
 }
 
 .fwmb .fwmb-brush-setting .fwmb-slider-group input[type="range"] {
-    width: 80px;
+    width: 5rem;
 }
 
 .fwmb .fwmb-brush-setting .fwmb-slider-group output {
@@ -1931,7 +1904,7 @@ input.fwmb-swatch {
 
 /* Marks the Mass Edit "Select" toggle as currently active, so a GM mid-selection can tell
    at a glance which item type's checkboxes are showing. */
-.fwmb-legend-action.active {
+.fwmb-legend-action[aria-pressed="true"] {
     background-color: var(--fwmb-fill-accent);
     color: var(--fwmb-text-inverse);
 }
@@ -1940,7 +1913,7 @@ input.fwmb-swatch {
    panel already has Select mode active (see MapStudio.MASS_EDIT_EXCLUSIVE_GROUPS) - only
    one type in a shared panel can be mass-edited at a time, so it stays unambiguous which list
    an eventual Mass Edit applies to. */
-.fwmb-legend-action.disabled {
+.fwmb-legend-action[aria-disabled="true"] {
     opacity: 0.5;
     cursor: not-allowed;
     pointer-events: none;
@@ -1964,15 +1937,15 @@ input.fwmb-swatch {
 
 /* The zoom buttons match the direction pad's buttons beside them */
 .fwmb .fwmb-transform-zoom .fwmb-btn {
-    width: 36px;
-    height: 36px;
+    width: 2.25rem;
+    height: 2.25rem;
     padding: 0;
 }
 
 .fwmb-transform-dpad {
     display: grid;
-    grid-template-columns: repeat(3, 36px);
-    grid-template-rows: repeat(3, 36px);
+    grid-template-columns: repeat(3, 2.25rem);
+    grid-template-rows: repeat(3, 2.25rem);
     gap: var(--fwmb-size-4);
 }
 
@@ -1982,23 +1955,23 @@ input.fwmb-swatch {
     margin: 0;
 }
 
-.fwmb-transform-dpad .dpad-up {
+.fwmb-transform-dpad .fwmb-dpad-up {
     grid-column: 2;
     grid-row: 1;
 }
-.fwmb-transform-dpad .dpad-left {
+.fwmb-transform-dpad .fwmb-dpad-left {
     grid-column: 1;
     grid-row: 2;
 }
-.fwmb-transform-dpad .dpad-center {
+.fwmb-transform-dpad .fwmb-dpad-center {
     grid-column: 2;
     grid-row: 2;
 }
-.fwmb-transform-dpad .dpad-right {
+.fwmb-transform-dpad .fwmb-dpad-right {
     grid-column: 3;
     grid-row: 2;
 }
-.fwmb-transform-dpad .dpad-down {
+.fwmb-transform-dpad .fwmb-dpad-down {
     grid-column: 2;
     grid-row: 3;
 }
@@ -2032,7 +2005,7 @@ input.fwmb-swatch {
 .fwmb-summary-table th {
     color: var(--fwmb-text-primary);
     background-color: var(--fwmb-bg-panel);
-    border-block-end: 2px solid var(--fwmb-border-main);
+    border-block-end: 0.125rem solid var(--fwmb-border-main);
     padding: var(--fwmb-size-8);
     text-align: left;
 }
@@ -2164,7 +2137,7 @@ input.fwmb-swatch {
     border-radius: var(--fwmb-radius-small);
     box-shadow: var(--fwmb-shadow-window);
     flex-direction: column;
-    min-width: 160px;
+    min-width: 10rem;
     z-index: 100;
 }
 
@@ -2232,32 +2205,12 @@ input.fwmb-swatch {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(var(--fwmb-size-32), 1fr));
     gap: var(--fwmb-size-8);
-    max-height: 200px;
+    max-height: 12.5rem;
     overflow-y: auto;
     padding: var(--fwmb-size-8);
     background: var(--fwmb-bg-muted);
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-medium);
-}
-
-.fwmb-icon-grid .fwmb-icon-btn {
-    width: var(--fwmb-size-32);
-    height: var(--fwmb-size-32);
-    padding: var(--fwmb-size-4);
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: var(--fwmb-radius-medium);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.fwmb-icon-grid .fwmb-icon-btn:hover {
-    background: var(--fwmb-bg-highlight);
-}
-
-.fwmb-icon-grid .fwmb-icon-btn.active {
-    background: var(--fwmb-bg-hover);
-    border-color: var(--fwmb-border-focus);
 }
 
 .fwmb-list-container {
@@ -2324,8 +2277,8 @@ input.fwmb-swatch {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 96px;
-    height: 96px;
+    width: 6rem;
+    height: 6rem;
     background-color: #000;
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-medium);
@@ -2339,7 +2292,7 @@ input.fwmb-swatch {
 .fwmb-route-swatch {
     width: var(--fwmb-size-32);
     border-inline-width: 0;
-    border-block-width: 0.5px;
+    border-block-width: 0.03125rem;
 }
 
 .fwmb .fwmb-name {
@@ -2379,8 +2332,8 @@ input.fwmb-swatch {
     border: 1px solid var(--fwmb-border-main);
     border-radius: var(--fwmb-radius-small);
     cursor: pointer;
-    min-width: 60px;
-    height: 32px;
+    min-width: 3.75rem;
+    height: 2rem;
 }
 
 .fwmb-select-trigger:hover {
@@ -2388,8 +2341,8 @@ input.fwmb-swatch {
 }
 
 .fwmb-select-trigger img {
-    width: 24px;
-    height: 24px;
+    width: 1.5rem;
+    height: 1.5rem;
 }
 
 .theme-dark .fwmb-select-trigger img {
@@ -2406,7 +2359,7 @@ input.fwmb-swatch {
     border: 1px solid var(--fwmb-border-focus);
     border-radius: var(--fwmb-radius-small);
     box-shadow: var(--fwmb-shadow-popout);
-    width: 260px; /* Expands to hold the grid */
+    width: 16.25rem; /* Expands to hold the grid */
     padding: var(--fwmb-size-8);
 }
 
@@ -2452,21 +2405,21 @@ input.fwmb-swatch {
 .fwmb-accordion-content {
     margin-block-start: var(--fwmb-size-8);
     padding-inline-start: var(--fwmb-size-16);
-    border-inline-start: 2px solid var(--fwmb-border-main);
+    border-inline-start: 0.125rem solid var(--fwmb-border-main);
     display: flex;
     flex-direction: column;
     gap: var(--fwmb-size-4);
 }
 
-.fwmb-hint.small {
+.fwmb-hint.fwmb-hint--small {
     padding: var(--fwmb-size-4);
     opacity: 0.7;
     font-size: 0.9em;
 }
 
-.fwmb-swatch.small {
-    width: 16px;
-    height: 16px;
+.fwmb-swatch.fwmb-swatch--small {
+    width: 1rem;
+    height: 1rem;
 }
 
 /* --- REGION & TOOLBAR UTILITIES --- */
@@ -2483,13 +2436,13 @@ input.fwmb-swatch {
 }
 
 input[type="color"].fwmb-swatch.fwmb-swatch-lg {
-    width: 24px;
-    height: 24px;
+    width: 1.5rem;
+    height: 1.5rem;
     padding: 0;
 }
 
 .fwmb-input-short {
-    width: 40px;
+    width: 2.5rem;
 }
 
 .fwmb-centered {
@@ -2501,12 +2454,12 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     background-image:
         linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%),
         linear-gradient(-45deg, transparent 75%, #ccc 75%) !important;
-    background-size: 8px 8px !important;
+    background-size: 0.5rem 0.5rem !important;
     background-position:
         0 0,
-        0 4px,
-        4px -4px,
-        -4px 0px !important;
+        0 0.25rem,
+        0.25rem -0.25rem,
+        -0.25rem 0 !important;
     background-color: #fff !important;
 }
 
@@ -2670,18 +2623,18 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     gap: var(--fwmb-size-8);
 }
 
-/* A dialogue's form rows are the module's own (see .form-group above), on both hosts: a label is
+/* A dialogue's form rows are the module's own (see .fwmb-form-group above), on both hosts: a label is
    bold and as tall as the field beside it, and a stacked row's field takes the row's width */
-.fwmb .fwmb-overlay-body .form-group > label {
+.fwmb .fwmb-overlay-body .fwmb-form-group > label {
     font-weight: bold;
     line-height: var(--fwmb-size-32);
 }
 
-.fwmb .fwmb-overlay-body .form-group.stacked > label {
+.fwmb .fwmb-overlay-body .fwmb-form-group--stacked > label {
     line-height: normal;
 }
 
-.fwmb .fwmb-overlay-body .form-group.stacked > :is(input:not([type="checkbox"]), select, textarea) {
+.fwmb .fwmb-overlay-body .fwmb-form-group--stacked > .fwmb-form-fields > :is(input:not([type="checkbox"]), select, textarea) {
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -2712,7 +2665,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(0.125rem);
 }
 
 .fwmb-processing-content {
@@ -2778,7 +2731,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     color: var(--fwmb-text-muted);
     padding: var(--fwmb-size-8) var(--fwmb-size-10);
     background: var(--fwmb-bg-base);
-    border: 2px solid var(--fwmb-border-subtle);
+    border: 0.125rem solid var(--fwmb-border-subtle);
     border-radius: var(--fwmb-radius-medium);
 }
 
@@ -2794,10 +2747,10 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     border-radius: var(--fwmb-radius-small);
     flex-shrink: 0;
 }
-.fwmb-rule-editor-swatch.active {
+.fwmb-rule-editor-swatch.fwmb-rule-editor-swatch--active {
     background: var(--fwmb-accent-alternative-main);
 }
-.fwmb-rule-editor-swatch.locked {
+.fwmb-rule-editor-swatch.fwmb-is-locked {
     background: var(--fwmb-bg-muted);
     border: 1px solid var(--fwmb-text-muted);
 }
@@ -2812,7 +2765,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     margin: 0;
     font-size: var(--fwmb-size-16);
 }
-.fwmb-rule-editor-section-heading h3.muted {
+.fwmb-rule-editor-section-heading h3.fwmb-heading--muted {
     color: var(--fwmb-text-muted);
 }
 .fwmb-rule-editor-count {
@@ -2850,7 +2803,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     box-shadow: var(--fwmb-shadow-popout);
     overflow: hidden;
 }
-.fwmb-rule-group.locked {
+.fwmb-rule-group.fwmb-is-locked {
     box-shadow: none;
     background: var(--fwmb-bg-base);
     border-color: var(--fwmb-border-subtle);
@@ -2867,13 +2820,13 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
    happen to wrap - the surrounding space grows up or down instead of pushing the track. */
 .fwmb-rule-row {
     display: grid;
-    grid-template-columns: 200px repeat(3, minmax(0, 1fr));
+    grid-template-columns: 12.5rem repeat(3, minmax(0, 1fr));
     grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
     column-gap: var(--fwmb-size-24);
     align-items: center;
     padding: var(--fwmb-size-4) var(--fwmb-size-10);
     border-bottom: 1px solid var(--fwmb-border-subtle);
-    min-height: 52px;
+    min-height: 3.25rem;
 }
 .fwmb-rule-group > .fwmb-rule-row:last-child {
     border-bottom: none;
@@ -2896,7 +2849,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 .fwmb-rule-row-empty {
-    grid-template-columns: 200px 1fr;
+    grid-template-columns: 12.5rem 1fr;
     grid-template-rows: auto;
 }
 .fwmb-rule-row-empty .fwmb-rule-row-label {
@@ -2946,7 +2899,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     text-overflow: ellipsis;
     color: var(--fwmb-text-primary);
 }
-.locked .fwmb-rule-name {
+.fwmb-is-locked .fwmb-rule-name {
     color: var(--fwmb-text-muted);
 }
 
@@ -2956,7 +2909,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     color: var(--fwmb-accent-alternative-hover);
     background: color-mix(in srgb, var(--fwmb-accent-alternative-main) 16%, transparent);
     border-radius: var(--fwmb-radius-small);
-    padding: 1px 5px;
+    padding: 1px 0.3125rem;
     flex-shrink: 0;
 }
 
@@ -3009,10 +2962,10 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     white-space: nowrap;
     background: var(--fwmb-bg-hover);
     border: 1px solid var(--fwmb-border-subtle);
-    border-radius: 999px;
+    border-radius: 62.5rem;
     padding: var(--fwmb-size-1) var(--fwmb-size-6);
 }
-.locked .fwmb-rule-chip {
+.fwmb-is-locked .fwmb-rule-chip {
     background: transparent;
     border-color: transparent;
     color: var(--fwmb-text-muted);
@@ -3021,7 +2974,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     color: var(--fwmb-accent-alternative-hover);
     font-weight: 600;
 }
-.locked .fwmb-rule-chip-edge {
+.fwmb-is-locked .fwmb-rule-chip-edge {
     color: var(--fwmb-bg-muted);
     font-weight: 500;
 }
@@ -3029,25 +2982,25 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-rule-track {
     grid-row: 2;
     position: relative;
-    height: 18px;
+    height: 1.125rem;
     background: var(--fwmb-bg-hover);
-    border-radius: 999px;
+    border-radius: 62.5rem;
     border: 1px solid var(--fwmb-border-subtle);
 }
-.locked .fwmb-rule-track {
+.fwmb-is-locked .fwmb-rule-track {
     background: var(--fwmb-bg-base);
 }
 
 .fwmb-rule-fill {
     position: absolute;
-    top: 3px;
-    bottom: 3px;
+    top: 0.1875rem;
+    bottom: 0.1875rem;
     background: color-mix(in srgb, var(--fwmb-accent-alternative-main) 20%, transparent);
     border-block-start: 1px solid var(--fwmb-accent-alternative-main);
     border-block-end: 1px solid var(--fwmb-accent-alternative-main);
-    border-radius: 999px;
+    border-radius: 62.5rem;
 }
-.locked .fwmb-rule-fill {
+.fwmb-is-locked .fwmb-rule-fill {
     background: color-mix(in srgb, var(--fwmb-bg-muted) 30%, transparent);
     border-color: var(--fwmb-bg-muted);
 }
@@ -3055,20 +3008,20 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb-rule-handle {
     position: absolute;
     top: 50%;
-    width: 12px;
-    height: 12px;
+    width: 0.75rem;
+    height: 0.75rem;
     background: var(--fwmb-accent-alternative-hover);
-    border: 2px solid var(--fwmb-bg-base);
+    border: 0.125rem solid var(--fwmb-bg-base);
     border-radius: 50%;
     transform: translate(-50%, -50%);
     box-shadow: var(--fwmb-shadow-alternative-focus);
     cursor: grab;
     touch-action: none;
 }
-.locked .fwmb-rule-handle {
+.fwmb-is-locked .fwmb-rule-handle {
     background: var(--fwmb-bg-muted);
-    width: 8px;
-    height: 8px;
+    width: 0.5rem;
+    height: 0.5rem;
     box-shadow: none;
     cursor: default;
     touch-action: auto;
@@ -3076,16 +3029,16 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 .fwmb-rule-sea-level-line {
     position: absolute;
-    top: -3px;
-    bottom: -3px;
-    width: 2px;
-    background: repeating-linear-gradient(var(--fwmb-accent-hover) 0 3px, transparent 3px 6px);
+    top: -0.1875rem;
+    bottom: -0.1875rem;
+    width: 0.125rem;
+    background: repeating-linear-gradient(var(--fwmb-accent-hover) 0 0.1875rem, transparent 0.1875rem 0.375rem);
 }
-.locked .fwmb-rule-sea-level-line {
-    background: repeating-linear-gradient(var(--fwmb-text-muted) 0 3px, transparent 3px 6px);
+.fwmb-is-locked .fwmb-rule-sea-level-line {
+    background: repeating-linear-gradient(var(--fwmb-text-muted) 0 0.1875rem, transparent 0.1875rem 0.375rem);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 40rem) {
     /* Below this width everything stacks into one column, so the shared-row-track alignment
        trick above no longer applies (there's nothing left to line up across) - revert the
        label/remove-row/axis grid-row pins and let every child fall into its own row via
@@ -3156,7 +3109,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 /* Custom rows get a trailing column for the remove-row button the defaults rows don't have. */
 .fwmb-rule-row-custom {
-    grid-template-columns: 200px repeat(3, minmax(0, 1fr)) 28px;
+    grid-template-columns: 12.5rem repeat(3, minmax(0, 1fr)) 1.75rem;
 }
 
 .fwmb button.fwmb-rule-remove-row {
@@ -3250,7 +3203,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     color: var(--fwmb-text-secondary);
     background: var(--fwmb-bg-hover);
     border: 1px solid var(--fwmb-border-subtle);
-    border-radius: 999px;
+    border-radius: 62.5rem;
     padding: var(--fwmb-size-1) var(--fwmb-size-4);
     cursor: pointer;
 }
@@ -3259,7 +3212,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     color: var(--fwmb-accent-hover);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 40rem) {
     .fwmb-rule-row-custom {
         grid-template-columns: 1fr;
     }
@@ -3307,16 +3260,16 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 }
 
 /* The set, level and region being edited */
-.fwmb .fwmb-set-row.active,
-.fwmb .fwmb-level-row.active,
-.fwmb .fwmb-region-row.active {
+.fwmb .fwmb-set-row[aria-selected="true"],
+.fwmb .fwmb-level-row[aria-selected="true"],
+.fwmb .fwmb-region-row[aria-selected="true"] {
     border-color: var(--fwmb-accent-main);
     background: var(--fwmb-bg-hover);
 }
 
-.fwmb .fwmb-set-row.active .fwmb-name,
-.fwmb .fwmb-level-row.active .fwmb-name,
-.fwmb .fwmb-region-row.active .fwmb-name {
+.fwmb .fwmb-set-row[aria-selected="true"] .fwmb-name,
+.fwmb .fwmb-level-row[aria-selected="true"] .fwmb-name,
+.fwmb .fwmb-region-row[aria-selected="true"] .fwmb-name {
     color: var(--fwmb-accent-main);
     font-weight: bold;
 }
@@ -3334,7 +3287,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     align-items: center;
     gap: var(--fwmb-size-2);
     padding: 0 var(--fwmb-size-4);
-    border-radius: 999px;
+    border-radius: 62.5rem;
     font-size: var(--fwmb-size-10);
     line-height: 1.4;
     color: var(--fwmb-text-secondary);
@@ -3342,7 +3295,7 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     border: 1px solid var(--fwmb-border-subtle);
 }
 
-.fwmb .fwmb-level-badge.warning {
+.fwmb .fwmb-level-badge.fwmb-level-badge--warning {
     color: var(--fwmb-text-inverse);
     background: var(--fwmb-color-warning);
     border-color: transparent;
@@ -3428,4 +3381,100 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb .fwmb-route-transport {
     color: var(--fwmb-text-secondary);
     text-align: end;
+}
+
+/* --- SPACING AND SMALL LAYOUT HELPERS ---
+   Fixed spacing and alignment for single elements. The spacing helpers win over the element's own
+   margin rules (a fieldset's or a form row's), which is what they are for. */
+.fwmb .fwmb-space-before {
+    margin-block-start: var(--fwmb-size-10) !important;
+}
+
+.fwmb .fwmb-space-before-large {
+    margin-block-start: var(--fwmb-size-16) !important;
+}
+
+.fwmb .fwmb-space-after {
+    margin-block-end: var(--fwmb-size-10) !important;
+}
+
+.fwmb .fwmb-divider.fwmb-divider--spaced {
+    margin: var(--fwmb-size-10) 0;
+}
+
+.fwmb .fwmb-flex-row.fwmb-flex-row--centred {
+    gap: var(--fwmb-size-8);
+    align-items: center;
+}
+
+.fwmb .fwmb-clickable {
+    cursor: pointer;
+}
+
+.fwmb .fwmb-contents {
+    display: contents;
+}
+
+/* The "x" between the width and height of a canvas size or a regional crop */
+.fwmb .fwmb-times {
+    align-self: center;
+}
+
+.fwmb .fwmb-times.fwmb-times--spaced {
+    margin: 0 var(--fwmb-size-4);
+}
+
+.fwmb .fwmb-setting-row.fwmb-setting-row--readout {
+    justify-content: space-between;
+    font-size: 0.9em;
+}
+
+/* A text field sized to its content rather than the row (a style's name). It overrides the stacked
+   dialogue row's rule that stretches every field to the row's width. */
+.fwmb input.fwmb-input--fit {
+    width: max-content !important;
+    max-width: 60ch;
+}
+
+/* A colour field in a row of text fields, as low as the fields beside it */
+.fwmb input.fwmb-swatch.fwmb-swatch--slim {
+    height: 1.5rem;
+    padding: 0;
+}
+
+.fwmb .fwmb-swatch.fwmb-swatch--round {
+    border-radius: 50%;
+}
+
+/* A small checkbox and its name inside a field row (a fill style's "use the level's colour") */
+.fwmb .fwmb-inline-check {
+    font-size: 0.8em;
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-size-4);
+    cursor: pointer;
+}
+
+/* The line sample beside a river, a fault or a land mask in their lists */
+.fwmb .fwmb-route-swatch.fwmb-route-swatch--solid {
+    height: 0.3125rem;
+    border-style: solid;
+}
+
+.fwmb .fwmb-route-swatch.fwmb-route-swatch--river {
+    background-color: #78aad2;
+    height: 0.1875rem;
+    border-style: solid;
+}
+
+/* A destructive item set apart from the items above it in a row's option menu */
+.fwmb .fwmb-dropdown-menu .fwmb-menu-item--separated {
+    border-block-start: 1px solid var(--fwmb-border-subtle);
+}
+
+/* A nested list of a saved map's regional maps, under the map's own card */
+.fwmb .fwmb-accordion-content.fwmb-accordion-content--nested {
+    margin-inline-start: 0.75rem;
+    padding-inline-start: var(--fwmb-size-8);
+    border-inline-start: 0.125rem solid var(--fwmb-border-subtle);
 }

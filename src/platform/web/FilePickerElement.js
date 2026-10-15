@@ -58,7 +58,7 @@ export class FilePickerElement extends HTMLElement {
         button.className = "fwmb-btn";
         button.setAttribute("aria-label", FilePickerElement.browseLabel);
         button.dataset.tooltip = FilePickerElement.browseLabel;
-        button.innerHTML = '<i class="fwmb-icon folder-open"></i>';
+        button.innerHTML = '<i class="fwmb-icon fwmb-icon--folder-open"></i>';
         button.addEventListener("click", () => this.#browse());
         this.append(button);
     }

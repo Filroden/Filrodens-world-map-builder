@@ -57,9 +57,9 @@ export class MapDialogManager {
             title: platform.i18n.localize("FILRODENSWMB.UI.Warning"),
             content: `<p>${platform.i18n.localize("FILRODENSWMB.UI.UnsavedChangesWarning")}</p>`,
             buttons: [
-                { action: "discard", label: platform.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon delete", tone: "negative" },
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", tone: "caution" },
-                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", tone: "positive", default: true },
+                { action: "discard", label: platform.i18n.localize("FILRODENSWMB.UI.Discard"), icon: "fwmb-icon fwmb-icon--delete", tone: "negative" },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "caution" },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon fwmb-icon--save", tone: "positive", default: true },
             ],
             dismissed: "cancel",
         });
@@ -83,8 +83,8 @@ export class MapDialogManager {
             title: platform.i18n.localize(title),
             content: `<p>${platform.i18n.localize(message)}</p>`,
             buttons: [
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", tone: "negative" },
-                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon save", tone: "positive", default: true },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative" },
+                { action: "save", label: platform.i18n.localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon fwmb-icon--save", tone: "positive", default: true },
             ],
             dismissed: "cancel",
         });
@@ -132,14 +132,14 @@ export class MapDialogManager {
                 {
                     action: "keep",
                     label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateKeep"),
-                    icon: "fwmb-icon cancel",
+                    icon: "fwmb-icon fwmb-icon--cancel",
                     tone: "negative",
                     callback: (form) => ({ apply: false, dismiss: readDismiss(form) }),
                 },
                 {
                     action: "apply",
                     label: platform.i18n.localize("FILRODENSWMB.UI.TerrainUpdateApply"),
-                    icon: "fwmb-icon sync",
+                    icon: "fwmb-icon fwmb-icon--sync",
                     tone: "positive",
                     default: true,
                     callback: () => ({ apply: true, dismiss: false }),
@@ -260,7 +260,7 @@ export class MapDialogManager {
 
     /**
      * Sets an `.fwmb-icon` glyph element to render a given pin icon key correctly, whether
-     * it's a built-in (a compiled `.fwmb-icon.<key>` CSS class already exists for it) or a
+     * it's a built-in (a compiled `.fwmb-icon--<key>` CSS class already exists for it) or a
      * custom icon (no compiled class exists for runtime-registered data, so its mask is set
      * inline instead, straight from its resolved path).
      */
@@ -271,7 +271,7 @@ export class MapDialogManager {
             element.className = "fwmb-icon";
             element.style.setProperty("--fwmb-mask", `url('${path}')`);
         } else {
-            element.className = `fwmb-icon ${key}`;
+            element.className = `fwmb-icon fwmb-icon--${key}`;
             element.style.removeProperty("--fwmb-mask");
         }
     }
@@ -303,7 +303,7 @@ export class MapDialogManager {
         const show = (button) => {
             hiddenInput.value = button.dataset.icon;
             this._applyIconGlyph(triggerIcon, button.dataset.icon, button.dataset.path, button.dataset.custom === "true");
-            buttons.forEach((other) => other.classList.toggle("active", other === button));
+            buttons.forEach((other) => other.setAttribute("aria-pressed", String(other === button)));
         };
         const { toggle, close } = this.#pickerMenu(trigger, optionsMenu);
         trigger.addEventListener("click", toggle);
@@ -1216,7 +1216,7 @@ export class MapDialogManager {
     // --- MASS EDIT ---
 
     /**
-     * Wires up the opt-in checkboxes in a Mass Edit dialogue. Every field row is a `.form-group`
+     * Wires up the opt-in checkboxes in a Mass Edit dialogue. Every field row is a `.fwmb-form-group`
      * containing one gate checkbox (name starting "apply...") plus the field(s) it controls;
      * this leaves every other control in that row disabled until its checkbox is ticked, which
      * both prevents an accidental submit of a field the GM never meant to touch and gives free
@@ -1227,7 +1227,7 @@ export class MapDialogManager {
      */
     static bindMassEditToggles(html) {
         html.querySelectorAll('input[type="checkbox"][name^="apply"]').forEach((gate) => {
-            const row = gate.closest(".form-group");
+            const row = gate.closest(".fwmb-form-group");
             if (!row) return;
 
             const controls = Array.from(row.querySelectorAll("input, select, textarea")).filter((el) => el !== gate);

@@ -82,11 +82,11 @@ export class RouteEditor {
     static #buttons() {
         const localize = (key) => platform.i18n.localize(key);
         return [
-            { action: "delete", label: localize("FILRODENSWMB.UI.Delete"), icon: "fwmb-icon delete", tone: "negative", callback: () => ({ action: "delete" }) },
-            { action: "simplify", label: localize("FILRODENSWMB.UI.SimplifyRoute"), icon: "fwmb-icon remove", tone: "caution", callback: (form) => ({ action: "simplify", values: this.#read(form), detail: Number(form.elements.routeDetail.value) }) },
-            { action: "repath", label: localize("FILRODENSWMB.UI.RepathRoute"), icon: "fwmb-icon sync", tone: "caution", callback: (form) => ({ action: "repath", values: this.#read(form) }) },
-            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", tone: "negative", callback: () => null },
-            { action: "save", label: localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon accept", tone: "positive", default: true, callback: (form) => ({ action: "save", values: this.#read(form) }) },
+            { action: "delete", label: localize("FILRODENSWMB.UI.Delete"), icon: "fwmb-icon fwmb-icon--delete", tone: "negative", callback: () => ({ action: "delete" }) },
+            { action: "simplify", label: localize("FILRODENSWMB.UI.SimplifyRoute"), icon: "fwmb-icon fwmb-icon--remove", tone: "caution", callback: (form) => ({ action: "simplify", values: this.#read(form), detail: Number(form.elements.routeDetail.value) }) },
+            { action: "repath", label: localize("FILRODENSWMB.UI.RepathRoute"), icon: "fwmb-icon fwmb-icon--sync", tone: "caution", callback: (form) => ({ action: "repath", values: this.#read(form) }) },
+            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", callback: () => null },
+            { action: "save", label: localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true, callback: (form) => ({ action: "save", values: this.#read(form) }) },
         ];
     }
 

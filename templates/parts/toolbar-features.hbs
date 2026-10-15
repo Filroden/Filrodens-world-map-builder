@@ -1,13 +1,13 @@
 <div class="fwmb-toolbar-content">
     <div class="fwmb-brush-tools">
-        <button type="button" data-action="setFeatureMode" data-mode="spring" class="fwmb-btn {{#if (eq uiState.activeFeatureMode 'spring')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolAddSpring'}}">
-            <i class="fwmb-icon water-drop"></i>
+        <button type="button" data-action="setFeatureMode" data-mode="spring" class="fwmb-btn" aria-pressed="{{#if (eq uiState.activeFeatureMode 'spring')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolAddSpring'}}">
+            <i class="fwmb-icon fwmb-icon--water-drop"></i>
         </button>
-        <button type="button" data-action="setFeatureMode" data-mode="river" class="fwmb-btn {{#if (eq uiState.activeFeatureMode 'river')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolDrawRiver'}}">
-            <i class="fwmb-icon water"></i>
+        <button type="button" data-action="setFeatureMode" data-mode="river" class="fwmb-btn" aria-pressed="{{#if (eq uiState.activeFeatureMode 'river')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolDrawRiver'}}">
+            <i class="fwmb-icon fwmb-icon--water"></i>
         </button>
-        <button type="button" data-action="setFeatureMode" data-mode="fault" class="fwmb-btn {{#if (eq uiState.activeFeatureMode 'fault')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolDrawFault'}}">
-            <i class="fwmb-icon timeline"></i>
+        <button type="button" data-action="setFeatureMode" data-mode="fault" class="fwmb-btn" aria-pressed="{{#if (eq uiState.activeFeatureMode 'fault')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolDrawFault'}}">
+            <i class="fwmb-icon fwmb-icon--timeline"></i>
         </button>
     </div>
 
@@ -64,10 +64,10 @@
 
     <div class="fwmb-divider-vertical"></div>
 
-    <button type="button" class="fwmb-btn {{#if uiState.liveFeatureUpdates}}active{{/if}}" data-action="toggleLiveFeatureUpdates" data-tooltip="{{#if uiState.liveFeatureUpdates}}{{localize 'FILRODENSWMB.UI.PauseTerrainGeneration'}}{{else}}{{localize 'FILRODENSWMB.UI.ResumeTerrainGeneration'}}{{/if}}">
-        <i class="fwmb-icon {{#if uiState.liveFeatureUpdates}}sync{{else}}sync_disabled{{/if}}"></i>
+    <button type="button" class="fwmb-btn" aria-pressed="{{#if uiState.liveFeatureUpdates}}true{{else}}false{{/if}}" data-action="toggleLiveFeatureUpdates" data-tooltip="{{#if uiState.liveFeatureUpdates}}{{localize 'FILRODENSWMB.UI.PauseTerrainGeneration'}}{{else}}{{localize 'FILRODENSWMB.UI.ResumeTerrainGeneration'}}{{/if}}">
+        <i class="fwmb-icon {{#if uiState.liveFeatureUpdates}}fwmb-icon--sync{{else}}fwmb-icon--sync_disabled{{/if}}"></i>
     </button>
-    <button type="button" class="fwmb-btn wide {{#unless hasPendingFeatureMath}}disabled{{/unless}}" data-action="applyFeatureMath" {{#unless hasPendingFeatureMath}}disabled{{/unless}}>
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="applyFeatureMath" {{#unless hasPendingFeatureMath}}disabled{{/unless}}>
         {{localize "FILRODENSWMB.UI.ApplyChanges"}}
     </button>
 </div>

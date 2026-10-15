@@ -79,12 +79,12 @@ export class RuleEditorDialog {
         const action = await platform.dialogs.choose({
             classes: ["fwmb", "fwmb-rule-editor-dialog"],
             title: platform.i18n.localize("FILRODENSWMB.UI.RuleEditorTitle"),
-            icon: "fwmb-icon tune",
+            icon: "fwmb-icon fwmb-icon--tune",
             resizable: true,
             content,
             buttons: [
-                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", tone: "negative" },
-                { action: "accept", label: platform.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon accept", tone: "positive", default: true },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative" },
+                { action: "accept", label: platform.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true },
             ],
             dismissed: "cancel",
             onRender: (element) => RuleEditorDialog.#renderContent(element, customBiomes, defaultBiomes, seaLevel),
@@ -554,7 +554,7 @@ export class RuleEditorDialog {
     /** Builds one default biome's card: its label plus one row per (always ≥1) reference row. */
     static #buildDefaultGroup({ color, name, rows, seaLevel }) {
         const group = document.createElement("div");
-        group.className = "fwmb-rule-group locked";
+        group.className = "fwmb-rule-group fwmb-is-locked";
 
         rows.forEach((row, index) => {
             group.appendChild(

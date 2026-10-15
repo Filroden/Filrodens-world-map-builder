@@ -37,6 +37,7 @@ import { PinStyles } from "./PinStyles.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
+import { isPressed, setPressed, togglePressed } from "../ui/aria.js";
 import { currentTheme, setTheme, THEME_SETTINGS } from "../ui/Theme.js";
 
 // Turns a fraction into a percentage for the timing summary
@@ -635,7 +636,7 @@ export class MapStudio {
         if (!rtlLanguages.includes(platform.i18n.lang)) return;
 
         element.setAttribute("dir", "rtl");
-        element.classList.add("rtl");
+        element.classList.add("fwmb-rtl");
     }
 
     /**
@@ -1513,7 +1514,7 @@ export class MapStudio {
 
         this.hasBooted = true;
         const layerBtns = this.root.querySelectorAll('[data-action="toggleLayer"]');
-        for (const btn of layerBtns) btn.classList.add("active");
+        for (const btn of layerBtns) setPressed(btn, true);
 
         const activeWindow = this.root.ownerDocument.defaultView || window;
         activeWindow.setTimeout(async () => {
@@ -2381,8 +2382,8 @@ export class MapStudio {
             if (!container) continue;
 
             const button = container.querySelector('[data-action="toggleLayerMenu"]');
-            button?.classList.toggle("active", group.state === "on");
-            button?.classList.toggle("partial", group.state === "partial");
+            setPressed(button, group.state === "on");
+            button?.classList.toggle("fwmb-is-partial", group.state === "partial");
             container.querySelector('[data-terrain-layer="all"]')?.setAttribute("aria-checked", group.allChecked);
             for (const item of group.items) {
                 container.querySelector(`[data-terrain-layer="${item.key}"]`)?.setAttribute("aria-checked", item.checked);
@@ -4171,8 +4172,8 @@ export class MapStudio {
         if (!layerId) return; // If the tool doesn't have an auto-layer, do nothing
 
         const btn = this.root.querySelector(`[data-layer="${layerId}"]`);
-        if (btn && !btn.classList.contains("active")) {
-            btn.classList.add("active");
+        if (btn && !isPressed(btn)) {
+            setPressed(btn, true);
             this.canvasEngine?.toggleLayer(layerId, true);
         }
     }
@@ -4991,7 +4992,7 @@ export class MapStudio {
 
             // Query the button safely to remove the active state
             const btn = this.root.querySelector('[data-action="threeDView"]');
-            if (btn) btn.classList.remove("active");
+            setPressed(btn, false);
 
             // Restore the manual layout wrappers
             const mapControls = this.root.querySelector(".fwmb-map-controls");
@@ -5020,7 +5021,7 @@ export class MapStudio {
         const freshTarget = this.root.querySelector('[data-action="threeDView"]');
 
         overlay.classList.remove("fwmb-hidden");
-        if (freshTarget) freshTarget.classList.add("active");
+        setPressed(freshTarget, true);
 
         // Manually hide layout wrappers so the 3D canvas fills the entire screen
         if (mapControls) mapControls.classList.add("fwmb-hidden");
@@ -5087,7 +5088,7 @@ export class MapStudio {
 
     _onToggleGrid(event, target) {
         this.uiState.gridVisible = !this.uiState.gridVisible;
-        target.classList.toggle("active", this.uiState.gridVisible);
+        setPressed(target, this.uiState.gridVisible);
         this.#updateGrid();
 
         this.markDirty();
@@ -5119,7 +5120,7 @@ export class MapStudio {
         const layerId = target.dataset.layer;
         if (!layerId || !this.canvasEngine) return;
 
-        const isVisible = target.classList.toggle("active");
+        const isVisible = togglePressed(target);
 
         this.canvasEngine.toggleLayer(layerId, isVisible);
     }
@@ -5151,7 +5152,7 @@ export class MapStudio {
 
         // Invert the state and visually toggle the button
         this.viewFilters[filter] = !this.viewFilters[filter];
-        target.classList.toggle("active", this.viewFilters[filter]);
+        setPressed(target, this.viewFilters[filter]);
 
         // Push to canvas and redraw
         this.canvasEngine.setViewFilters(this.viewFilters);

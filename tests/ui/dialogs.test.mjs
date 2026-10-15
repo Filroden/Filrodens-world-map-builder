@@ -41,7 +41,7 @@ test("confirm resolves true for Yes and false for No, with No first and the defa
     const yes = dialogs.confirm({ title: "Delete?", content: "<p>Sure?</p>" });
     assert.equal(dialog().querySelector("h2").textContent, "Delete?");
     assert.deepEqual([...dialog().querySelectorAll(".fwmb-overlay-footer button")].map((b) => b.textContent), ["No", "Yes"]);
-    assert.ok(button("no").classList.contains("primary"));
+    assert.ok(button("no").classList.contains("fwmb-btn--primary"));
     assert.equal(document.activeElement, button("no"), "with no fields, focus starts on the default button");
     button("yes").click();
     assert.equal(await yes, true);
@@ -100,13 +100,13 @@ test("prompt reads its result from the form, runs onRender with the element and 
         title: "Rename",
         content: '<label>Name</label><input type="text" name="name" value="Harbour">',
         classes: ["fwmb", "fwmb-test-dialog"],
-        icon: "fwmb-icon tune",
+        icon: "fwmb-icon fwmb-icon--tune",
         onRender: (element) => (rendered = element),
         onSubmit: (form) => form.elements.name.value,
     });
     assert.equal(rendered, dialog());
     assert.ok(dialog().classList.contains("fwmb-test-dialog"));
-    assert.ok(dialog().querySelector(".fwmb-overlay-header i.fwmb-icon.tune"));
+    assert.ok(dialog().querySelector(".fwmb-overlay-header i.fwmb-icon.fwmb-icon--tune"));
     assert.deepEqual([...dialog().querySelectorAll(".fwmb-overlay-footer button")].map((b) => b.textContent), ["Cancel", "Confirm"]);
     const input = dialog().querySelector('input[name="name"]');
     assert.equal(document.activeElement, input);

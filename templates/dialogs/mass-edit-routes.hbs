@@ -5,138 +5,162 @@
         {{/each}}
     </datalist>
 
-    <div class="fwmb-hint" style="margin-bottom: var(--fwmb-size-10);">
+    <div class="fwmb-hint fwmb-space-after">
         {{localize "FILRODENSWMB.UI.MassEditHint"}}
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label class="fwmb-mass-edit-label">
             <input type="checkbox" class="fwmb-checkbox" name="applyQuickStyle" />
             {{localize "FILRODENSWMB.UI.QuickStyles"}}
         </label>
-        <select name="massQuickStyle">
-            <option value="custom">{{localize "FILRODENSWMB.UI.Custom"}}</option>
-            {{#each customRouteStyles}}
-                <option value="{{this.id}}">{{this.name}}</option>
-            {{/each}}
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label class="fwmb-mass-edit-label">
-            <input type="checkbox" class="fwmb-checkbox" name="applyColor" />
-            {{localize "FILRODENSWMB.UI.LineColor"}}
-        </label>
-        <input type="color" name="massColor" value="{{defaults.color}}" list="fwmb-standard-colors" />
-    </div>
-
-    <div class="form-group">
-        <label class="fwmb-mass-edit-label">
-            <input type="checkbox" class="fwmb-checkbox" name="applyThickness" />
-            {{localize "FILRODENSWMB.UI.LineThickness"}}
-        </label>
-        <div class="fwmb-slider-group">
-            <input type="range" name="massThickness" value="{{defaults.thickness}}" min="{{thicknessStep}}" max="10" step="{{thicknessStep}}" />
-            <output>{{defaults.thickness}}</output>
-        </div>
-    </div>
-
-    <div class="form-group">
-        <label class="fwmb-mass-edit-label">
-            <input type="checkbox" class="fwmb-checkbox" name="applyStyle" />
-            {{localize "FILRODENSWMB.UI.LineStyle"}}
-        </label>
-        <select name="massStyle">
-            <option value="solid" {{#if (eq defaults.style "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
-            <option value="dashed" {{#if (eq defaults.style "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
-            <option value="dotted" {{#if (eq defaults.style "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label class="fwmb-mass-edit-label">
-            <input type="checkbox" class="fwmb-checkbox" name="applyOutline" />
-            {{localize "FILRODENSWMB.UI.RouteOutline"}}
-        </label>
-        <input type="checkbox" class="fwmb-checkbox" name="massOutline" {{#if defaults.outline}}checked{{/if}} />
-    </div>
-
-    <div class="form-group">
-        <label class="fwmb-mass-edit-label">
-            <input type="checkbox" class="fwmb-checkbox" name="applySmoothing" />
-            {{localize "FILRODENSWMB.UI.RouteSmoothing"}}
-        </label>
-        <input type="checkbox" class="fwmb-checkbox" name="massSmoothing" {{#if defaults.smoothing}}checked{{/if}} />
-    </div>
-
-    <fieldset class="fwmb-fieldset" style="margin-top: var(--fwmb-size-16);">
-        <legend>{{localize "FILRODENSWMB.UI.SettingsLabelQuickStyles"}}</legend>
-        <div class="fwmb-hint" style="margin-bottom: var(--fwmb-size-10);">
-            {{localize "FILRODENSWMB.UI.MassEditHint"}}
-        </div>
-
-        <div class="form-group">
-            <label class="fwmb-mass-edit-label">
-                <input type="checkbox" class="fwmb-checkbox" name="applyLabelQuickStyle" />
-                {{localize "FILRODENSWMB.UI.QuickStyles"}}
-            </label>
-            <select name="labelQuickStyle">
+        <div class="fwmb-form-fields">
+            <select name="massQuickStyle">
                 <option value="custom">{{localize "FILRODENSWMB.UI.Custom"}}</option>
-                {{#each customLabelStyles}}
+                {{#each customRouteStyles}}
                     <option value="{{this.id}}">{{this.name}}</option>
                 {{/each}}
             </select>
         </div>
+    </div>
 
-        <div class="form-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-mass-edit-label">
+            <input type="checkbox" class="fwmb-checkbox" name="applyColor" />
+            {{localize "FILRODENSWMB.UI.LineColor"}}
+        </label>
+        <div class="fwmb-form-fields">
+            <input type="color" name="massColor" value="{{defaults.color}}" list="fwmb-standard-colors" />
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <label class="fwmb-mass-edit-label">
+            <input type="checkbox" class="fwmb-checkbox" name="applyThickness" />
+            {{localize "FILRODENSWMB.UI.LineThickness"}}
+        </label>
+        <div class="fwmb-form-fields">
+            <div class="fwmb-slider-group">
+                <input type="range" name="massThickness" value="{{defaults.thickness}}" min="{{thicknessStep}}" max="10" step="{{thicknessStep}}" />
+                <output>{{defaults.thickness}}</output>
+            </div>
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <label class="fwmb-mass-edit-label">
+            <input type="checkbox" class="fwmb-checkbox" name="applyStyle" />
+            {{localize "FILRODENSWMB.UI.LineStyle"}}
+        </label>
+        <div class="fwmb-form-fields">
+            <select name="massStyle">
+                <option value="solid" {{#if (eq defaults.style "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
+                <option value="dashed" {{#if (eq defaults.style "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
+                <option value="dotted" {{#if (eq defaults.style "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <label class="fwmb-mass-edit-label">
+            <input type="checkbox" class="fwmb-checkbox" name="applyOutline" />
+            {{localize "FILRODENSWMB.UI.RouteOutline"}}
+        </label>
+        <div class="fwmb-form-fields">
+            <input type="checkbox" class="fwmb-checkbox" name="massOutline" {{#if defaults.outline}}checked{{/if}} />
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <label class="fwmb-mass-edit-label">
+            <input type="checkbox" class="fwmb-checkbox" name="applySmoothing" />
+            {{localize "FILRODENSWMB.UI.RouteSmoothing"}}
+        </label>
+        <div class="fwmb-form-fields">
+            <input type="checkbox" class="fwmb-checkbox" name="massSmoothing" {{#if defaults.smoothing}}checked{{/if}} />
+        </div>
+    </div>
+
+    <fieldset class="fwmb-fieldset fwmb-space-before-large">
+        <legend>{{localize "FILRODENSWMB.UI.SettingsLabelQuickStyles"}}</legend>
+        <div class="fwmb-hint fwmb-space-after">
+            {{localize "FILRODENSWMB.UI.MassEditHint"}}
+        </div>
+
+        <div class="fwmb-form-group">
+            <label class="fwmb-mass-edit-label">
+                <input type="checkbox" class="fwmb-checkbox" name="applyLabelQuickStyle" />
+                {{localize "FILRODENSWMB.UI.QuickStyles"}}
+            </label>
+            <div class="fwmb-form-fields">
+                <select name="labelQuickStyle">
+                    <option value="custom">{{localize "FILRODENSWMB.UI.Custom"}}</option>
+                    {{#each customLabelStyles}}
+                        <option value="{{this.id}}">{{this.name}}</option>
+                    {{/each}}
+                </select>
+            </div>
+        </div>
+
+        <div class="fwmb-form-group">
             <label class="fwmb-mass-edit-label">
                 <input type="checkbox" class="fwmb-checkbox" name="applyLabelFontFamily" />
                 {{localize "FILRODENSWMB.UI.FontFamily"}}
             </label>
-            <select name="labelFontFamily">
-                {{#each fonts}}
-                    <option value="{{this}}" {{#if (eq ../labelDefaults.fontFamily this)}}selected{{/if}}>{{this}}</option>
-                {{/each}}
-            </select>
+            <div class="fwmb-form-fields">
+                <select name="labelFontFamily">
+                    {{#each fonts}}
+                        <option value="{{this}}" {{#if (eq ../labelDefaults.fontFamily this)}}selected{{/if}}>{{this}}</option>
+                    {{/each}}
+                </select>
+            </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label class="fwmb-mass-edit-label">
                 <input type="checkbox" class="fwmb-checkbox" name="applyLabelFontSize" />
                 {{localize "FILRODENSWMB.UI.FontSize"}}
             </label>
-            <div class="fwmb-slider-group">
-                <input type="range" name="labelFontSize" value="{{labelDefaults.fontSize}}" min="0.2" max="5.0" step="0.1" />
-                <output>{{labelDefaults.fontSize}}</output>
+            <div class="fwmb-form-fields">
+                <div class="fwmb-slider-group">
+                    <input type="range" name="labelFontSize" value="{{labelDefaults.fontSize}}" min="0.2" max="5.0" step="0.1" />
+                    <output>{{labelDefaults.fontSize}}</output>
+                </div>
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label class="fwmb-mass-edit-label">
                 <input type="checkbox" class="fwmb-checkbox" name="applyLabelFillColor" />
                 {{localize "FILRODENSWMB.UI.FontColor"}}
             </label>
-            <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{labelDefaults.fillColor}}" list="fwmb-standard-colors" />
+            <div class="fwmb-form-fields">
+                <input type="color" class="fwmb-swatch fwmb-wide" name="labelFillColor" value="{{labelDefaults.fillColor}}" list="fwmb-standard-colors" />
+            </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label class="fwmb-mass-edit-label">
                 <input type="checkbox" class="fwmb-checkbox" name="applyLabelMaxChars" />
                 {{localize "FILRODENSWMB.UI.MaxWidth"}}
             </label>
-            <input type="number" name="labelMaxChars" value="{{labelDefaults.maxChars}}" min="0" step="1" placeholder="0" />
+            <div class="fwmb-form-fields">
+                <input type="number" name="labelMaxChars" value="{{labelDefaults.maxChars}}" min="0" step="1" placeholder="0" />
+            </div>
         </div>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label class="fwmb-mass-edit-label">
                 <input type="checkbox" class="fwmb-checkbox" name="applyLabelJustify" />
                 {{localize "FILRODENSWMB.UI.Justify"}}
             </label>
-            <select name="labelJustify">
-                <option value="left" {{#if (eq labelDefaults.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
-                <option value="center" {{#if (eq labelDefaults.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
-                <option value="right" {{#if (eq labelDefaults.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
-            </select>
+            <div class="fwmb-form-fields">
+                <select name="labelJustify">
+                    <option value="left" {{#if (eq labelDefaults.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
+                    <option value="center" {{#if (eq labelDefaults.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
+                    <option value="right" {{#if (eq labelDefaults.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
+                </select>
+            </div>
         </div>
     </fieldset>
 </div>

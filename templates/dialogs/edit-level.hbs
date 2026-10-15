@@ -1,94 +1,112 @@
 <div class="fwmb-dialog-content">
     {{!-- The level editor (see RegionPanel.editLevel). The border fields can be filled from another level through "Copy style from". --}}
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
-        <input type="text" name="levelName" value="{{level.name}}" autofocus />
+        <div class="fwmb-form-fields">
+            <input type="text" name="levelName" value="{{level.name}}" autofocus />
+        </div>
     </div>
-    <div class="form-group stacked">
-        <label>{{localize "FILRODENSWMB.UI.LevelTitleTemplate"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.LevelTitleTemplateHint'}}"></i></label>
-        <input type="text" name="levelTitleTemplate" value="{{level.titleTemplate}}" />
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label>{{localize "FILRODENSWMB.UI.LevelTitleTemplate"}} <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LevelTitleTemplateHint'}}"></i></label>
+        <div class="fwmb-form-fields">
+            <input type="text" name="levelTitleTemplate" value="{{level.titleTemplate}}" />
+        </div>
     </div>
 
     <div class="fwmb-divider"></div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.LevelParent"}}</label>
-        <select name="levelParent">
-            <option value="">{{localize "FILRODENSWMB.UI.LevelNoParent"}}</option>
-            {{#each parents}}
-                <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
-            {{/each}}
-        </select>
+        <div class="fwmb-form-fields">
+            <select name="levelParent">
+                <option value="">{{localize "FILRODENSWMB.UI.LevelNoParent"}}</option>
+                {{#each parents}}
+                    <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
+                {{/each}}
+            </select>
+        </div>
     </div>
-    <div class="form-group">
-        <label>{{localize "FILRODENSWMB.UI.LevelNesting"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.LevelNestingHint'}}"></i></label>
-        <select name="levelNesting">
-            {{#each nestingModes}}
-                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
-            {{/each}}
-        </select>
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.LevelNesting"}} <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LevelNestingHint'}}"></i></label>
+        <div class="fwmb-form-fields">
+            <select name="levelNesting">
+                {{#each nestingModes}}
+                    <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
     </div>
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.Visibility"}}</label>
-        <select name="levelVisibility">
-            {{#each visibilities}}
-                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
-            {{/each}}
-        </select>
+        <div class="fwmb-form-fields">
+            <select name="levelVisibility">
+                {{#each visibilities}}
+                    <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
     </div>
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="levelOpacity" label="FILRODENSWMB.UI.LevelOpacity" value=level.opacity min=0 max=1 step=0.05}}
     </div>
 
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="levelWatersPx" label="FILRODENSWMB.UI.LevelWaters" hint="FILRODENSWMB.UI.LevelWatersHint" value=level.watersPx min=0 max=waters.MAX_PX step=waters.STEP_PX}}
     </div>
 
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.LevelBorders"}}</legend>
         {{#if copySources.length}}
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.LevelCopyStyle"}}</label>
-            <select name="levelCopyStyle">
-                <option value="">{{localize "FILRODENSWMB.UI.LevelCopyStyleChoose"}}</option>
-                {{#each copySources}}
-                    <option value="{{this.id}}">{{this.name}}</option>
-                {{/each}}
-            </select>
+            <div class="fwmb-form-fields">
+                <select name="levelCopyStyle">
+                    <option value="">{{localize "FILRODENSWMB.UI.LevelCopyStyleChoose"}}</option>
+                    {{#each copySources}}
+                        <option value="{{this.id}}">{{this.name}}</option>
+                    {{/each}}
+                </select>
+            </div>
         </div>
         {{/if}}
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
-            <input type="color" class="fwmb-swatch fwmb-wide" name="levelLineColor" value="{{level.style.lineColor}}" />
+            <div class="fwmb-form-fields">
+                <input type="color" class="fwmb-swatch fwmb-wide" name="levelLineColor" value="{{level.style.lineColor}}" />
+            </div>
         </div>
-        <div class="form-group stacked">
+        <div class="fwmb-form-group fwmb-form-group--stacked">
             {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="levelLineThickness" label="FILRODENSWMB.UI.LandBorderThickness" value=level.style.lineThickness min=0 max=8 step=thicknessStep}}
         </div>
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.LandBorderStyle"}}</label>
-            <select name="levelLineStyle">
-                {{#each lineStyles}}
-                    <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
-                {{/each}}
-            </select>
+            <div class="fwmb-form-fields">
+                <select name="levelLineStyle">
+                    {{#each lineStyles}}
+                        <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                    {{/each}}
+                </select>
+            </div>
         </div>
-        <div class="form-group stacked">
+        <div class="fwmb-form-group fwmb-form-group--stacked">
             {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="levelSeaLineThickness" label="FILRODENSWMB.UI.SeaBorderThickness" value=level.style.seaLineThickness min=0 max=8 step=thicknessStep}}
         </div>
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.SeaBorderStyle"}}</label>
-            <select name="levelSeaLineStyle">
-                {{#each seaLineStyles}}
-                    <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
-                {{/each}}
-            </select>
+            <div class="fwmb-form-fields">
+                <select name="levelSeaLineStyle">
+                    {{#each seaLineStyles}}
+                        <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                    {{/each}}
+                </select>
+            </div>
         </div>
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label class="fwmb-checkbox-label">
                 <input type="checkbox" class="fwmb-checkbox" name="levelScaleWithMap" {{#if level.style.scaleWithMap}}checked{{/if}} />
                 {{localize "FILRODENSWMB.UI.LevelScaleWithMap"}}
             </label>
-            <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.LevelScaleWithMapHint'}}"></i>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LevelScaleWithMapHint'}}"></i>
         </div>
     </fieldset>
 </div>

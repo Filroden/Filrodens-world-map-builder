@@ -29,7 +29,7 @@ function createMapBuilderButton() {
     button.dataset.tooltip = game.i18n.localize("FILRODENSWMB.UI.ControlTitle");
 
     const icon = document.createElement("i");
-    icon.className = "fwmb-icon map";
+    icon.className = "fwmb-icon fwmb-icon--map";
 
     // Add text label with a leading space for padding, natively localised
     const buttonText = " " + game.i18n.localize("FILRODENSWMB.UI.SidebarButton");

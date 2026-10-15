@@ -4,53 +4,59 @@
         <legend>{{localize "FILRODENSWMB.UI.CanvasSettings"}}</legend>
 
         {{#if terrainUpgradeAvailable}}
-            <button type="button" class="fwmb-btn subtle danger" data-action="updateMapTerrain" data-tooltip="{{localize 'FILRODENSWMB.UI.UpdateMapHint'}}">
-                <i class="fwmb-icon sync"></i> {{localize "FILRODENSWMB.UI.UpdateMap"}}
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--danger" data-action="updateMapTerrain" data-tooltip="{{localize 'FILRODENSWMB.UI.UpdateMapHint'}}">
+                <i class="fwmb-icon fwmb-icon--sync"></i> {{localize "FILRODENSWMB.UI.UpdateMap"}}
             </button>
         {{/if}}
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label data-tooltip="">{{localize "FILRODENSWMB.UI.GenerationEngine"}}</label>
-            <select name="generationEngine">
-                <option value="standard" {{#if (eq uiState.generationEngine "standard")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StandardGeneration"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineStandardHint'}}"></i></option>
-                <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.FlatCanvas"}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineFlatHint'}}"></i></option>
-                <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{engineLabels.advanced}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}"></i></option>
-                <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{engineLabels.guided}} <i class="fwmb-icon info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}"></i></option>
-            </select>
+            <div class="fwmb-form-fields">
+                <select name="generationEngine">
+                    <option value="standard" {{#if (eq uiState.generationEngine "standard")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StandardGeneration"}} <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineStandardHint'}}"></i></option>
+                    <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.FlatCanvas"}} <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineFlatHint'}}"></i></option>
+                    <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{engineLabels.advanced}} <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}"></i></option>
+                    <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{engineLabels.guided}} <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}"></i></option>
+                </select>
+            </div>
         </div>
 
         {{#if (eq uiState.generationEngine "guided")}}
-            <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLandMaskHint'}}">
+            <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditLandMaskHint'}}">
                 {{localize "FILRODENSWMB.UI.EditLandMask"}}
             </button>
-            <div class="fwmb-divider" style="margin: var(--fwmb-size-10) 0;"></div>
+            <div class="fwmb-divider fwmb-divider--spaced"></div>
         {{/if}}
 
         {{#unless (eq uiState.generationEngine "flat")}}
-            <div class="form-group stacked">
+            <div class="fwmb-form-group fwmb-form-group--stacked">
                 <label>{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
-                <div class="fwmb-flex-row">
-                    <input type="text" name="mapSeed" class="fwmb-flex-1" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" />
-                    <button type="button" class="fwmb-btn square" data-action="randomizeSeed" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
-                        <i class="fwmb-icon shuffle"></i>
-                    </button>
+                <div class="fwmb-form-fields">
+                    <div class="fwmb-flex-row">
+                        <input type="text" name="mapSeed" class="fwmb-flex-1" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" />
+                        <button type="button" class="fwmb-btn fwmb-btn--square" data-action="randomizeSeed" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
+                            <i class="fwmb-icon fwmb-icon--shuffle"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.SeedHint"}}</div>
             </div>
         {{/unless}}
 
-        <div class="form-group stacked">
+        <div class="fwmb-form-group fwmb-form-group--stacked">
             <label>{{localize "FILRODENSWMB.UI.MapResolution"}}</label>
-            <div class="fwmb-flex-row">
-                <input type="number" name="mapWidth" class="fwmb-flex-1" value="{{uiState.mapWidth}}" min="500" max="4000" step="100" />
-                <span style="align-self: center;">x</span>
-                <input type="number" name="mapHeight" class="fwmb-flex-1" value="{{uiState.mapHeight}}" min="500" max="4000" step="100" />
+            <div class="fwmb-form-fields">
+                <div class="fwmb-flex-row">
+                    <input type="number" name="mapWidth" class="fwmb-flex-1" value="{{uiState.mapWidth}}" min="500" max="4000" step="100" />
+                    <span class="fwmb-times">x</span>
+                    <input type="number" name="mapHeight" class="fwmb-flex-1" value="{{uiState.mapHeight}}" min="500" max="4000" step="100" />
+                </div>
             </div>
         </div>
 
         {{#if (eq uiState.generationEngine "flat")}}
             <!-- Read when the map is created (Create New Map), not when it is ticked -->
-            <div class="form-group">
+            <div class="fwmb-form-group">
                 <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.FlatTextureHint'}}">
                     <input type="checkbox" name="flatTexture" class="fwmb-checkbox" {{#if uiState.flatTexture}}checked{{/if}} />
                     {{localize "FILRODENSWMB.UI.FlatTexture"}}
@@ -67,13 +73,13 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.Latitude"}}</legend>
 
-        <div class="form-group stacked">
+        <div class="fwmb-form-group fwmb-form-group--stacked">
             <div class="fwmb-flex-row">
-                <div class="fwmb-flex-1 form-group">
+                <div class="fwmb-flex-1 fwmb-form-group">
                     <label class="fwmb-hint">{{localize "FILRODENSWMB.UI.LatTop"}}</label>
                     <input type="number" name="latTop" value="{{lookup uiState 'latTop'}}" min="-90" max="90" />
                 </div>
-                <div class="fwmb-flex-1 form-group">
+                <div class="fwmb-flex-1 fwmb-form-group">
                     <label class="fwmb-hint">{{localize "FILRODENSWMB.UI.LatBottom"}}</label>
                     <input type="number" name="latBottom" value="{{lookup uiState 'latBottom'}}" min="-90" max="90" />
                 </div>
@@ -85,14 +91,16 @@
     <fieldset class="fwmb-fieldset">
         <legend>{{localize "FILRODENSWMB.UI.GridSettings"}}</legend>
 
-        <div class="form-group">
+        <div class="fwmb-form-group">
             <label>{{localize "FILRODENSWMB.UI.GridType"}}</label>
-            <select name="gridType">
-                <option value="none" {{#if (eq uiState.gridType "none")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridNone"}}</option>
-                <option value="square" {{#if (eq uiState.gridType "square")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridSquare"}}</option>
-                <option value="hexR" {{#if (eq uiState.gridType "hexR")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridHexRows"}}</option>
-                <option value="hexC" {{#if (eq uiState.gridType "hexC")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridHexCols"}}</option>
-            </select>
+            <div class="fwmb-form-fields">
+                <select name="gridType">
+                    <option value="none" {{#if (eq uiState.gridType "none")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridNone"}}</option>
+                    <option value="square" {{#if (eq uiState.gridType "square")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridSquare"}}</option>
+                    <option value="hexR" {{#if (eq uiState.gridType "hexR")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridHexRows"}}</option>
+                    <option value="hexC" {{#if (eq uiState.gridType "hexC")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridHexCols"}}</option>
+                </select>
+            </div>
         </div>
 
         {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="gridSize" label="FILRODENSWMB.UI.GridSize" value=(lookup uiState 'gridSize') min=20 max=300 step=5}}
@@ -102,23 +110,23 @@
         <details class="fwmb-fieldset fwmb-list-section" data-section="landMasks" {{#unless collapsedSections.landMasks}}open{{/unless}}>
             <summary>{{localize "FILRODENSWMB.UI.LandMasks"}}</summary>
 
-            <div id="fwmb-scroll-landMasks" class="fwmb-list-container fwmb-scrollable stable">
+            <div id="fwmb-scroll-landMasks" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
                 {{#each landMasks}}
                     <div class="fwmb-list-item" data-id="{{this.id}}" data-type="landMask">
-                        <div class="fwmb-route-swatch" style="background-color: {{this.swatchColor}}; height: 5px; border-style: solid;" data-tooltip="{{#if (eq this.operation 'subtract')}}{{localize 'FILRODENSWMB.UI.LandMaskTypeOcean'}}{{else}}{{localize 'FILRODENSWMB.UI.LandMaskTypeLand'}}{{/if}}"></div>
+                        <div class="fwmb-route-swatch fwmb-route-swatch--solid" style="background-color: {{this.swatchColor}};" data-tooltip="{{#if (eq this.operation 'subtract')}}{{localize 'FILRODENSWMB.UI.LandMaskTypeOcean'}}{{else}}{{localize 'FILRODENSWMB.UI.LandMaskTypeLand'}}{{/if}}"></div>
 
                         <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
 
-                        <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                            <i class="fwmb-icon center-focus"></i>
+                        <button type="button" class="fwmb-btn fwmb-btn--small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                            <i class="fwmb-icon fwmb-icon--center-focus"></i>
                         </button>
 
-                        <button type="button" class="fwmb-btn small" data-action="editLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                            <i class="fwmb-icon edit"></i>
+                        <button type="button" class="fwmb-btn fwmb-btn--small" data-action="editLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                            <i class="fwmb-icon fwmb-icon--edit"></i>
                         </button>
 
-                        <button type="button" class="fwmb-btn small muted danger" data-action="deleteLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                            <i class="fwmb-icon delete"></i>
+                        <button type="button" class="fwmb-btn fwmb-btn--small fwmb-btn--muted fwmb-btn--danger" data-action="deleteLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                            <i class="fwmb-icon fwmb-icon--delete"></i>
                         </button>
                     </div>
                 {{else}}
@@ -127,8 +135,8 @@
             </div>
         </details>
 
-        <button type="button" class="fwmb-btn subtle danger" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
-            <i class="fwmb-icon delete"></i> {{localize "FILRODENSWMB.UI.DeleteAllLandMasksTitle"}}
+        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--danger" data-action="deleteAllLandMasks" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteAllLandMasksHint'}}" {{#unless landMasks.length}}disabled{{/unless}}>
+            <i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.DeleteAllLandMasksTitle"}}
         </button>
     {{/if}}
 
@@ -136,7 +144,7 @@
         <!-- Rendered inside the Canvas Settings fieldset above -->
     {{else if canCreateRegionalMap}}
         <div class="fwmb-divider"></div>
-        <button type="button" class="fwmb-btn primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditCanvasHint'}}">
+        <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="toggleEditMode" data-tooltip="{{localize 'FILRODENSWMB.UI.EditCanvasHint'}}">
             {{localize "FILRODENSWMB.UI.EditCanvas"}}
         </button>
     {{else}}

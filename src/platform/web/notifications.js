@@ -23,7 +23,7 @@ export function createNotifications(frame, { closeLabel = "Close" } = {}) {
 
     function show(kind, text, { permanent = false } = {}) {
         const item = doc.createElement("li");
-        item.className = `fwmb-notification ${kind}`;
+        item.className = `fwmb-notification fwmb-notification--${kind}`;
         item.setAttribute("role", kind === "error" ? "alert" : "status");
 
         const message = doc.createElement("span");
@@ -32,7 +32,7 @@ export function createNotifications(frame, { closeLabel = "Close" } = {}) {
         close.type = "button";
         close.className = "fwmb-notification-close";
         close.setAttribute("aria-label", closeLabel);
-        close.innerHTML = '<i class="fwmb-icon cancel"></i>';
+        close.innerHTML = '<i class="fwmb-icon fwmb-icon--cancel"></i>';
         close.addEventListener("click", () => item.remove());
 
         item.append(message, close);

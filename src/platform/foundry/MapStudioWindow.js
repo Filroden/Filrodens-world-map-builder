@@ -27,7 +27,7 @@ export class MapStudioWindow extends HandlebarsApplicationMixin(ApplicationV2) {
         position: { width: 1300, height: 900 },
         window: {
             title: "FILRODENSWMB.UI.ControlTitle",
-            icon: "fwmb-icon map",
+            icon: "fwmb-icon fwmb-icon--map",
             resizable: true,
         },
     };

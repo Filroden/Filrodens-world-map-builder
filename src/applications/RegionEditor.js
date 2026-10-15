@@ -61,10 +61,10 @@ export class RegionEditor {
     static #buttons() {
         const localize = (key) => platform.i18n.localize(key);
         return [
-            { action: "delete", label: localize("FILRODENSWMB.UI.Delete"), icon: "fwmb-icon delete", tone: "negative", callback: () => ({ action: "delete" }) },
-            { action: "merge", label: localize("FILRODENSWMB.UI.MergeInto"), icon: "fwmb-icon merge", tone: "caution", callback: () => ({ action: "merge" }) },
-            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel", tone: "negative", callback: () => null },
-            { action: "save", label: localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon accept", tone: "positive", default: true, callback: (form) => ({ action: "save", values: this.#read(form) }) },
+            { action: "delete", label: localize("FILRODENSWMB.UI.Delete"), icon: "fwmb-icon fwmb-icon--delete", tone: "negative", callback: () => ({ action: "delete" }) },
+            { action: "merge", label: localize("FILRODENSWMB.UI.MergeInto"), icon: "fwmb-icon fwmb-icon--merge", tone: "caution", callback: () => ({ action: "merge" }) },
+            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", callback: () => null },
+            { action: "save", label: localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true, callback: (form) => ({ action: "save", values: this.#read(form) }) },
         ];
     }
 

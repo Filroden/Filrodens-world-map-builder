@@ -5,71 +5,83 @@
         {{/each}}
     </datalist>
 
-    <div class="fwmb-hint" style="margin-bottom: var(--fwmb-size-10);">
+    <div class="fwmb-hint fwmb-space-after">
         {{localize "FILRODENSWMB.UI.MassEditHint"}}
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label class="fwmb-mass-edit-label">
             <input type="checkbox" class="fwmb-checkbox" name="applyQuickStyle" />
             {{localize "FILRODENSWMB.UI.QuickStyles"}}
         </label>
-        <select name="massQuickStyle">
-            <option value="custom">{{localize "FILRODENSWMB.UI.Custom"}}</option>
-            {{#each customLabelStyles}}
-                <option value="{{this.id}}">{{this.name}}</option>
-            {{/each}}
-        </select>
+        <div class="fwmb-form-fields">
+            <select name="massQuickStyle">
+                <option value="custom">{{localize "FILRODENSWMB.UI.Custom"}}</option>
+                {{#each customLabelStyles}}
+                    <option value="{{this.id}}">{{this.name}}</option>
+                {{/each}}
+            </select>
+        </div>
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label class="fwmb-mass-edit-label">
             <input type="checkbox" class="fwmb-checkbox" name="applyFontFamily" />
             {{localize "FILRODENSWMB.UI.FontFamily"}}
         </label>
-        <select name="massFontFamily">
-            {{#each fonts}}
-                <option value="{{this}}" {{#if (eq ../defaults.fontFamily this)}}selected{{/if}}>{{this}}</option>
-            {{/each}}
-        </select>
+        <div class="fwmb-form-fields">
+            <select name="massFontFamily">
+                {{#each fonts}}
+                    <option value="{{this}}" {{#if (eq ../defaults.fontFamily this)}}selected{{/if}}>{{this}}</option>
+                {{/each}}
+            </select>
+        </div>
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label class="fwmb-mass-edit-label">
             <input type="checkbox" class="fwmb-checkbox" name="applyFontSize" />
             {{localize "FILRODENSWMB.UI.FontSize"}}
         </label>
-        <div class="fwmb-slider-group">
-            <input type="range" name="massFontSize" value="{{defaults.fontSize}}" min="0.2" max="5.0" step="0.1" />
-            <output>{{defaults.fontSize}}</output>
+        <div class="fwmb-form-fields">
+            <div class="fwmb-slider-group">
+                <input type="range" name="massFontSize" value="{{defaults.fontSize}}" min="0.2" max="5.0" step="0.1" />
+                <output>{{defaults.fontSize}}</output>
+            </div>
         </div>
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label class="fwmb-mass-edit-label">
             <input type="checkbox" class="fwmb-checkbox" name="applyFillColor" />
             {{localize "FILRODENSWMB.UI.FontColor"}}
         </label>
-        <input type="color" class="fwmb-swatch fwmb-wide" name="massFillColor" value="{{defaults.fillColor}}" list="fwmb-standard-colors" />
+        <div class="fwmb-form-fields">
+            <input type="color" class="fwmb-swatch fwmb-wide" name="massFillColor" value="{{defaults.fillColor}}" list="fwmb-standard-colors" />
+        </div>
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label class="fwmb-mass-edit-label">
             <input type="checkbox" class="fwmb-checkbox" name="applyMaxChars" />
             {{localize "FILRODENSWMB.UI.MaxWidth"}}
         </label>
-        <input type="number" name="massMaxChars" value="{{defaults.maxChars}}" min="0" step="1" placeholder="0" />
+        <div class="fwmb-form-fields">
+            <input type="number" name="massMaxChars" value="{{defaults.maxChars}}" min="0" step="1" placeholder="0" />
+        </div>
     </div>
 
-    <div class="form-group">
+    <div class="fwmb-form-group">
         <label class="fwmb-mass-edit-label">
             <input type="checkbox" class="fwmb-checkbox" name="applyJustify" />
             {{localize "FILRODENSWMB.UI.Justify"}}
         </label>
-        <select name="massJustify">
-            <option value="left" {{#if (eq defaults.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
-            <option value="center" {{#if (eq defaults.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
-            <option value="right" {{#if (eq defaults.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
-        </select>
+        <div class="fwmb-form-fields">
+            <select name="massJustify">
+                <option value="left" {{#if (eq defaults.justify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
+                <option value="center" {{#if (eq defaults.justify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
+                <option value="right" {{#if (eq defaults.justify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
+            </select>
+        </div>
     </div>
 </div>

@@ -1,10 +1,10 @@
 <div class="fwmb-toolbar-content">
     <div class="fwmb-brush-tools">
-        <button type="button" data-action="setInfraMode" data-mode="pin" class="fwmb-btn {{#if (eq uiState.activeInfraMode 'pin')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ModePin'}}">
-            <i class="fwmb-icon place"></i>
+        <button type="button" data-action="setInfraMode" data-mode="pin" class="fwmb-btn" aria-pressed="{{#if (eq uiState.activeInfraMode 'pin')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ModePin'}}">
+            <i class="fwmb-icon fwmb-icon--place"></i>
         </button>
-        <button type="button" data-action="setInfraMode" data-mode="route" class="fwmb-btn {{#if (eq uiState.activeInfraMode 'route')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ModeRoute'}}">
-            <i class="fwmb-icon timeline"></i>
+        <button type="button" data-action="setInfraMode" data-mode="route" class="fwmb-btn" aria-pressed="{{#if (eq uiState.activeInfraMode 'route')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ModeRoute'}}">
+            <i class="fwmb-icon fwmb-icon--timeline"></i>
         </button>
     </div>
 
@@ -23,13 +23,13 @@
                 <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
                 <div class="fwmb-custom-select" id="fwmb-pin-select">
                     <div class="fwmb-select-trigger" data-action="togglePinDropdown">
-                        <i class="fwmb-icon {{#unless activeIconIsCustom}}{{uiState.activeIcon}}{{/unless}}" {{#if activeIconIsCustom}}style="--fwmb-mask: url('{{activeIconPath}}');"{{/if}}></i>
-                        <i class="fwmb-icon arrow-drop-down"></i>
+                        <i class="fwmb-icon {{#unless activeIconIsCustom}}fwmb-icon--{{uiState.activeIcon}}{{/unless}}" {{#if activeIconIsCustom}}style="--fwmb-mask: url('{{activeIconPath}}');"{{/if}}></i>
+                        <i class="fwmb-icon fwmb-icon--arrow-drop-down"></i>
                     </div>
                     <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
                         {{#each infrastructureIcons}}
-                            <button type="button" class="fwmb-btn {{#if (eq ../uiState.activeIcon this.key)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.key}}" data-tooltip="{{this.label}}">
-                                <i class="fwmb-icon {{#unless this.isCustom}}{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} alt="{{this.label}}"></i>
+                            <button type="button" class="fwmb-btn" aria-pressed="{{#if (eq ../uiState.activeIcon this.key)}}true{{else}}false{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.key}}" data-tooltip="{{this.label}}">
+                                <i class="fwmb-icon {{#unless this.isCustom}}fwmb-icon--{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} alt="{{this.label}}"></i>
                             </button>
                         {{/each}}
                     </div>
@@ -54,8 +54,8 @@
         <div class="fwmb-divider-vertical"></div>
         <div class="fwmb-brush-tools">
             {{#each routeToolbar.modes}}
-                <button type="button" data-action="setRouteMode" data-mode="{{this.value}}" class="fwmb-btn {{#if this.active}}active{{/if}}" data-tooltip="{{localize this.label}}" aria-label="{{localize this.label}}">
-                    <i class="fwmb-icon {{this.icon}}"></i>
+                <button type="button" data-action="setRouteMode" data-mode="{{this.value}}" class="fwmb-btn" aria-pressed="{{#if this.active}}true{{else}}false{{/if}}" data-tooltip="{{localize this.label}}" aria-label="{{localize this.label}}">
+                    <i class="fwmb-icon fwmb-icon--{{this.icon}}"></i>
                 </button>
             {{/each}}
         </div>

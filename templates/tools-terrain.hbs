@@ -17,33 +17,33 @@
             <input type="hidden" name="noise.offsetX" value="{{lookup uiState 'noise.offsetX'}}" />
             <input type="hidden" name="noise.offsetY" value="{{lookup uiState 'noise.offsetY'}}" />
 
-            <div class="form-group stacked">
+            <div class="fwmb-form-group fwmb-form-group--stacked">
                 <div class="fwmb-transform-controls">
                     <div class="fwmb-transform-zoom">
                         <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomIn'}}">
-                            <i class="fwmb-icon zoom-in"></i>
+                            <i class="fwmb-icon fwmb-icon--zoom-in"></i>
                         </button>
                         <button type="button" class="fwmb-btn" data-action="resetNoiseScale" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseReset'}}">
-                            <i class="fwmb-icon center-focus"></i>
+                            <i class="fwmb-icon fwmb-icon--center-focus"></i>
                         </button>
                         <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomOut'}}">
-                            <i class="fwmb-icon zoom-out"></i>
+                            <i class="fwmb-icon fwmb-icon--zoom-out"></i>
                         </button>
                     </div>
 
                     <div class="fwmb-transform-dpad">
-                        <button type="button" class="dpad-up" data-action="nudgeNoise" data-dx="0" data-dy="-50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
-                                class="fwmb-icon edit-arrow-up"
+                        <button type="button" class="fwmb-dpad-up" data-action="nudgeNoise" data-dx="0" data-dy="-50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
+                                class="fwmb-icon fwmb-icon--edit-arrow-up"
                             ></i></button>
-                        <button type="button" class="dpad-left" data-action="nudgeNoise" data-dx="-50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
-                                class="fwmb-icon edit-arrow-up fwmb-rotate-270"
+                        <button type="button" class="fwmb-dpad-left" data-action="nudgeNoise" data-dx="-50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
+                                class="fwmb-icon fwmb-icon--edit-arrow-up fwmb-rotate-270"
                             ></i></button>
-                        <button type="button" class="dpad-center" data-action="resetNoisePan" data-tooltip="{{localize 'FILRODENSWMB.UI.PanReset'}}"><i class="fwmb-icon center-focus"></i></button>
-                        <button type="button" class="dpad-right" data-action="nudgeNoise" data-dx="50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
-                                class="fwmb-icon edit-arrow-up fwmb-rotate-90"
+                        <button type="button" class="fwmb-dpad-center" data-action="resetNoisePan" data-tooltip="{{localize 'FILRODENSWMB.UI.PanReset'}}"><i class="fwmb-icon fwmb-icon--center-focus"></i></button>
+                        <button type="button" class="fwmb-dpad-right" data-action="nudgeNoise" data-dx="50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
+                                class="fwmb-icon fwmb-icon--edit-arrow-up fwmb-rotate-90"
                             ></i></button>
-                        <button type="button" class="dpad-down" data-action="nudgeNoise" data-dx="0" data-dy="50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
-                                class="fwmb-icon edit-arrow-down"
+                        <button type="button" class="fwmb-dpad-down" data-action="nudgeNoise" data-dx="0" data-dy="50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
+                                class="fwmb-icon fwmb-icon--edit-arrow-down"
                             ></i></button>
                     </div>
                 </div>
@@ -145,8 +145,8 @@
     <div class="fwmb-divider"></div>
 
     <!-- The brush tool activation button remains globally available -->
-    <button type="button" class="fwmb-btn primary" data-action="toggleEditMode">
-        <i class="fwmb-icon brush"></i>
+    <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="toggleEditMode">
+        <i class="fwmb-icon fwmb-icon--brush"></i>
         {{localize "FILRODENSWMB.UI.EditTerrain"}}
     </button>
 
