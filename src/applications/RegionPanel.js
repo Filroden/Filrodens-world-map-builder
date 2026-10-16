@@ -26,8 +26,8 @@ const DIALOG_ROOT = "modules/filrodens-world-map-builder/templates/dialogs/";
  * snapshot taken first, plus the owner changes it made, as one composite entry where cells
  * changed too (see VectorHistory).
  *
- * The level and set editors are modal dialogues; the region editor is docked beside the map (see
- * RegionEditor), so the map can be painted and looked at while it is open.
+ * The level and set editors are modal dialogues; a region opens in the inspector, docked beside the
+ * map (see RegionEditor and Inspector), so the map can be painted and looked at while it is open.
  */
 export class RegionPanel {
     // ------------------------------------------------------------------ the panel's context
@@ -162,7 +162,7 @@ export class RegionPanel {
 
     /**
      * Makes a region the region being edited, with its level and set (a pick on the map, or the
-     * region editor opening); null ids let go of the region.
+     * region opening in the inspector); null ids let go of the region.
      */
     static selectRegionById(app, levelId, regionId) {
         if (!regionId) {

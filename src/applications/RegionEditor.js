@@ -1,135 +1,135 @@
 import { FILRODENSWMB } from "../config.js";
-import { MapDialogManager } from "./MapDialogManager.js";
+import { Inspector } from "./Inspector.js";
+import { InspectorFields } from "./InspectorFields.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { MeshIntegration } from "./MeshIntegration.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { regionFillColor } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
 
-const TEMPLATE = "modules/filrodens-world-map-builder/templates/dialogs/edit-regions.hbs";
+/** The fill patterns a region can have, with their names. */
+const PATTERNS = Object.freeze({ solid: "FILRODENSWMB.UI.StyleSolid", diagonal: "FILRODENSWMB.UI.StyleDiagonalHatch", crosshatch: "FILRODENSWMB.UI.StyleCrossHatch" });
+
+/** The fill fields a region style sets, by their names in the form. */
+const FILL_FIELDS = Object.freeze({ regionFillColor: true, regionFillTransparent: true, regionFillStyle: true });
 
 /**
- * The region editor: a region's name, description, visibility, fill (its own colour and pattern,
- * or a region quick style) and label, with Delete and Merge Into beside Cancel and Save.
+ * A region in the inspector (see Inspector): its name, description and visibility, its fill (a
+ * region style, or its own colour and pattern), its label, and Focus view, Merge into… and Delete.
  *
- * It is docked along the edge of the studio rather than modal, so the map can be painted, panned
- * and zoomed while it is open. One region is edited at a time: opening another region's editor
- * closes the one open (discarding its unsaved changes, as Cancel would), and switching tool closes
- * it too. Opening it makes its region the region being edited, so painting goes into the region
- * whose details are showing.
- *
- * Nothing changes until Save, which is one undo step. The region is looked up again when the
- * editor closes, since it may have been deleted (by an undo, say) while the editor was open.
+ * Opening it makes its region the one being painted, so the paint goes into the region whose
+ * details are showing. A region without a fill of its own is drawn in its level's preset colour,
+ * which the inspector shows as its colour, so changing anything else keeps its look.
  */
 export class RegionEditor {
     /**
-     * Opens the editor for a region.
+     * Opens the inspector on a region.
      * @param {object} app
      * @param {string} levelId
      * @param {string} regionId
+     * @returns {Promise<boolean>}
      */
-    static async open(app, levelId, regionId) {
-        const region = this.#find(app, levelId, regionId);
-        if (!region) return;
-        platform.dialogs.dismiss({ placement: "docked" });
-        RegionPanel.selectRegionById(app, levelId, regionId);
-
-        const safeRegion = MapDialogManager._withLabelDefaults(app, region);
-        const content = await platform.templates.render(TEMPLATE, {
-            // A region without a fill of its own is drawn in its preset colour, which the editor
-            // starts from so saving it unchanged keeps the region's look
-            region: { ...safeRegion, fillColor: regionFillColor(region), fillStyle: region.fillStyle ?? "solid" },
-            visibilities: RegionPanel.visibilityChoices(region.visibility),
-            rotationRange: FILRODENSWMB.UI.ROTATION,
-            fonts: platform.fonts.list(),
-            palette: FILRODENSWMB.LABELS?.PRESETS || [],
-            customLabelStyles: app.uiState.customLabelStyles || [],
-            customRegionStyles: app.uiState.customRegionStyles || [],
-        });
-
-        const choice = await platform.dialogs.choose({
-            placement: "docked",
-            classes: ["fwmb", "fwmb-region-editor"],
-            title: platform.i18n.format("FILRODENSWMB.UI.EditRegionTitle", { name: region.name }),
-            content,
-            onRender: (element) => this.#bind(app, element),
-            buttons: this.#buttons(),
-            dismissed: null,
-        });
-        await this.#finish(app, levelId, regionId, choice);
+    static open(app, levelId, regionId) {
+        return Inspector.open(app, this.KIND, { levelId, id: regionId });
     }
 
-    static #buttons() {
-        const localize = (key) => platform.i18n.localize(key);
-        return [
-            { action: "delete", label: localize("FILRODENSWMB.UI.Delete"), icon: "fwmb-icon fwmb-icon--delete", tone: "negative", callback: () => ({ action: "delete" }) },
-            { action: "merge", label: localize("FILRODENSWMB.UI.MergeInto"), icon: "fwmb-icon fwmb-icon--merge", tone: "caution", callback: () => ({ action: "merge" }) },
-            { action: "cancel", label: localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative", callback: () => null },
-            { action: "save", label: localize("FILRODENSWMB.UI.Save"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true, callback: (form) => ({ action: "save", values: this.#read(form) }) },
-        ];
+    static #find(app, { levelId, id }) {
+        return app.regionLevels.find((level) => level.id === levelId)?.regions.find((candidate) => candidate.id === id) ?? null;
     }
 
-    static async #finish(app, levelId, regionId, choice) {
-        if (!choice) return;
-        if (choice.action === "delete") {
-            await RegionPanel.deleteRegion(app, levelId, regionId);
-            return;
-        }
-        if (choice.action === "merge") {
-            await RegionPanel.mergeRegion(app, levelId, regionId);
-            return;
-        }
-        const region = this.#find(app, levelId, regionId);
-        if (!region) return;
-        MapStateManager.pushVectorState(app);
-        platform.utils.mergeObject(region, choice.values);
-        app._repaintVectors();
-        app.view?.render(["context", "editToolbar"]);
-        app.markDirty();
-    }
+    /** The region's kind of inspector. */
+    static KIND = Object.freeze({
+        id: "region",
+        template: "modules/filrodens-world-map-builder/templates/parts/inspector-region.hbs",
+        find: (app, ref) => RegionEditor.#find(app, ref),
+        opened: (app, _region, ref) => RegionPanel.selectRegionById(app, ref.levelId, ref.id),
+        header: (app, region, ref) => ({
+            title: region.name,
+            subtitle: platform.i18n.format("FILRODENSWMB.UI.InspectorSubtitleRegion", { level: app.regionLevels.find((level) => level.id === ref.levelId)?.name ?? "" }),
+            swatch: region.fillColor === "transparent" ? null : regionFillColor(region),
+        }),
+        context: (app, region) => RegionEditor.#context(app, region),
+        apply: (app, region, ref, form, field) => RegionEditor.#apply(app, region, form, field),
+        actions: {
+            zoom: (app, region) => {
+                const points = MeshIntegration.outlinePoints(app, region);
+                if (points.length) app.canvasEngine?.zoomToFeature(points);
+            },
+            merge: (app, _region, ref) => RegionPanel.mergeRegion(app, ref.levelId, ref.id),
+            delete: (app, _region, ref) => RegionPanel.deleteRegion(app, ref.levelId, ref.id),
+            saveStyle: (app, region, ref, button) => RegionEditor.#saveStyle(app, region, button.dataset.styleType),
+        },
+    });
 
-    static #find(app, levelId, regionId) {
-        return app.regionLevels.find((level) => level.id === levelId)?.regions.find((candidate) => candidate.id === regionId) ?? null;
-    }
-
-    /** What the editor's fields hold, as region fields. */
-    static #read(form) {
-        const elements = form.elements;
+    static #context(app, region) {
+        const fill = regionFillColor(region);
+        const noFill = region.fillColor === "transparent";
+        const label = InspectorFields.label(app, region);
         return {
-            name: elements.regionName.value.trim() || elements.regionName.defaultValue,
+            region,
+            visibilities: RegionPanel.visibilityChoices(region.visibility),
+            fillStyles: InspectorFields.styleChoices(app.uiState.customRegionStyles, region.quickStyle),
+            fillStyleName: InspectorFields.styleName(app.uiState.customRegionStyles, region.quickStyle),
+            fillHex: noFill || !fill ? "#000000" : fill,
+            noFill,
+            patterns: Object.entries(PATTERNS).map(([value, labelKey]) => ({ value, label: labelKey, selected: value === (region.fillStyle ?? "solid") })),
+            label,
+            labelChoices: InspectorFields.labelChoices(app, label),
+            labelStyleName: InspectorFields.styleName(app.uiState.customLabelStyles, label.quickStyle),
+            palette: FILRODENSWMB.LABELS?.PRESETS || [],
+        };
+    }
+
+    /** What the form holds, as region fields, once `field` has taken effect (see InspectorFields). */
+    static read(app, region, form, field) {
+        const elements = form.elements;
+        const values = {
+            name: elements.regionName.value.trim() || region.name,
             description: elements.regionDesc.value,
             visibility: elements.regionVisibility.value,
             quickStyle: elements.regionQuickStyle.value,
             fillColor: elements.regionFillTransparent.checked ? "transparent" : elements.regionFillColor.value,
             fillStyle: elements.regionFillStyle.value,
-            label: MapDialogManager._extractLabelResultFields(form),
         };
+        InspectorFields.settleStyle(values, field, {
+            pickerField: "regionQuickStyle",
+            styledFields: FILL_FIELDS,
+            styles: app.uiState.customRegionStyles,
+            fields: InspectorFields.STYLE_TYPES.Region.fields,
+            key: "quickStyle",
+        });
+        values.label = InspectorFields.readLabel(form, field, app);
+        return values;
     }
 
-    /**
-     * Choosing a quick style fills the fill fields from it; changing a fill field by hand leaves the
-     * quick style for Custom. The label fields work as in every other editor.
-     */
-    static #bind(app, element) {
-        const quickStyle = element.querySelector('select[name="regionQuickStyle"]');
-        const transparent = element.querySelector('input[name="regionFillTransparent"]');
-        const color = element.querySelector('input[name="regionFillColor"]');
-        const style = element.querySelector('select[name="regionFillStyle"]');
+    /** Applies the form to the region as one undo step, when anything changed. */
+    static #apply(app, region, form, field) {
+        const values = this.read(app, region, form, field);
+        // A region drawn in its preset colour holds no fill of its own until one is given
+        const current = { ...region, fillColor: region.fillColor ?? regionFillColor(region), fillStyle: region.fillStyle ?? "solid", label: InspectorFields.label(app, region) };
+        if (!InspectorFields.differs(current, values)) return false;
+        MapStateManager.pushVectorState(app);
+        const { label, ...fields } = values;
+        Object.assign(region, fields);
+        region.label = { ...region.label, ...label };
+        this.#redraw(app);
+        return true;
+    }
 
-        quickStyle?.addEventListener("change", () => {
-            const chosen = (app.uiState.customRegionStyles ?? []).find((candidate) => candidate.id === quickStyle.value);
-            if (!chosen) return;
-            const isTransparent = chosen.fillColor === "transparent";
-            if (transparent) transparent.checked = isTransparent;
-            if (color) color.value = isTransparent ? "#000000" : chosen.fillColor;
-            if (style) style.value = chosen.fillStyle;
-        });
-        const toCustom = () => {
-            if (quickStyle) quickStyle.value = "custom";
-        };
-        transparent?.addEventListener("change", toCustom);
-        color?.addEventListener("input", toCustom);
-        style?.addEventListener("change", toCustom);
+    /** Save as…: a region style from the region's fill, or a label style from its label. */
+    static async #saveStyle(app, region, type) {
+        const source = type === "Label" ? InspectorFields.label(app, region) : { fillColor: region.fillColor ?? regionFillColor(region), fillStyle: region.fillStyle ?? "solid" };
+        const id = await InspectorFields.saveStyleAs(app, type, source);
+        if (!id) return;
+        MapStateManager.pushVectorState(app);
+        if (type === "Label") region.label = { ...source, ...region.label, quickStyle: id };
+        else Object.assign(region, source, { quickStyle: id });
+        this.#redraw(app);
+    }
 
-        MapDialogManager.bindLabelPropertiesDialog(element, app.uiState);
+    static #redraw(app) {
+        app._repaintVectors();
+        app.view?.render(["context", "editToolbar"]);
+        app.markDirty();
     }
 }

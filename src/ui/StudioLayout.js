@@ -9,14 +9,15 @@ import { mustFoldMapControls } from "./MapControls.js";
  * they find as attributes and custom properties, and the stylesheet does the rest:
  *
  * - `data-fwmb-width` on the studio: `wide` (1,400px or more), `compact` (1,200 to 1,399px: the
- *   compact rail, panel and inspector widths) or `narrow` (below 1,200px: the inspector lies over
- *   the canvas as well).
+ *   compact rail, panel and inspector widths) or `narrow` (below 1,200px: the same widths; kept
+ *   for rules that need the narrowest studio).
  * - `data-fwmb-short` on the studio while it is less than 680px high: the rail folds its
  *   occasional tools into More.
  * - `--fwmb-readout-w` on the map preview: the information bar's width, which the hint (top end)
  *   leaves free beside it.
- * - `--fwmb-end-inset` on the map preview while a docked panel lies over the canvas's end edge:
- *   how far the end-edge overlays (hint, undo/redo) move to stay clear of it.
+ * - `--fwmb-end-inset` on the map preview should a docked panel ever lie over the canvas's end
+ *   edge: how far the end-edge overlays (hint, undo/redo) move to stay clear of it. The inspector
+ *   takes its own column at every width, so today this stays at its resting value.
  * - `data-fold` on the map controls when their full row does not fit beside undo/redo: the layer
  *   toggles give way to the Layers menu.
  * - `data-fold` on the context bar (0 to 3): how far it folds to stay on one row (see BarFold).

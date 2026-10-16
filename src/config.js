@@ -450,12 +450,12 @@ export const FILRODENSWMB = {
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
                 line: ["AddPoint", "FinishLine", "MovePoint", "InsertPoint", "DeletePoint", "EditLine"],
                 // The Regions tool, by edit mode (see RegionPainter)
-                regionSelect: ["SelectRegion", "EditRegion"],
+                regionSelect: ["SelectRegion"],
                 regionPaint: ["RegionPaint", "RegionPaintShift"],
                 regionErase: ["RegionErase", "RegionEraseShift"],
                 regionFill: ["RegionFill", "RegionFillShift"],
                 // The Routes tool (Infrastructure in Route mode), by edit mode (see RouteTool)
-                routeSelect: ["SelectRoute", "EditRoute"],
+                routeSelect: ["SelectRoute"],
                 routeDraw: ["RouteAddWaypoint", "RouteTrace", "RouteFinish", "RouteUndoWaypoint", "RouteCancel"],
                 routeEdit: ["RouteMoveWaypoint", "RouteInsertWaypoint", "RouteRemoveWaypoint", "RouteSplit", "RouteJoin", "EditRoute"],
                 mask: ["AddPoint", "FinishMask", "MovePoint", "MoveMask", "InsertPoint", "DeletePoint", "EditMask"],

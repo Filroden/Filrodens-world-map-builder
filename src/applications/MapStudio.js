@@ -30,6 +30,7 @@ import { NoiseTransform } from "./NoiseTransform.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { RegionPainter } from "./RegionPainter.js";
+import { Inspector } from "./Inspector.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RouteTool } from "./RouteTool.js";
 import { RouteEditor } from "./RouteEditor.js";
@@ -162,7 +163,7 @@ export class MapStudio {
         autoAssignLevel(_e, t)      { RegionPanel.autoAssign(this, t); },
         fixLevelNesting(_e, t)      { RegionPanel.fixNesting(this, t); },
         addRegion()                 { RegionPanel.addRegion(this); },
-        selectRegion(_e, t)         { RegionPanel.selectRegion(this, t); },
+        selectRegion(_e, t)         { this.#selectRegionRow(t); },
         mergeRegion(_e, t)          { RegionPanel.mergeRegion(this, ...RegionPanel.regionIdsOf(t)); },
 
         // --- DIALOG MANAGER: Pin Icons ---
@@ -1210,6 +1211,28 @@ export class MapStudio {
         this.#updateCanvasHint();
         MeshIntegration.updateOutline(this);
         RouteTool.updateOverlays(this);
+        // The inspector shows the object as it is now: a change made in the panel, the bar or by
+        // an undo redraws the panel, and the inspector with it (or closes it, if the object went)
+        if (regions.includes("context")) Inspector.refresh(this);
+    }
+
+    /**
+     * A click on a region's row: the region becomes the one painted and opens in the inspector, or,
+     * clicked again, is let go and the inspector closes.
+     */
+    #selectRegionRow(target) {
+        const [levelId, regionId] = RegionPanel.regionIdsOf(target);
+        RegionPanel.selectRegion(this, target);
+        if (this.activeRegionId === regionId) RegionEditor.open(this, levelId, regionId);
+        else if (Inspector.shows(this, "region", regionId)) Inspector.close(this);
+    }
+
+    /**
+     * Measures the studio's layout again (see StudioLayout), after something it watches came or
+     * went outside a redraw of the regions: the inspector opening or closing.
+     */
+    refreshLayout() {
+        this.#layout?.start();
     }
 
     /**
@@ -4447,7 +4470,7 @@ export class MapStudio {
         else if (maskCompleted) this.requestTerrainUpdate();
         this.#deactivateEditMode();
         this.#clearMassEditState();
-        // An editor docked beside the map belongs to the tool it was opened from
+        // The inspector belongs to the tool its object was opened from
         platform.dialogs.dismiss({ placement: "docked" });
 
         // 2. Setup new state
@@ -5303,7 +5326,7 @@ export class MapStudio {
 
     /**
      * Leaving Route mode (for Pin mode, or another tool) abandons the route being placed, lets go
-     * of the picked route and closes its docked editor, so nothing of the Routes tool stays on the
+     * of the picked route and closes the inspector, so nothing of the Routes tool stays on the
      * map or in the toolbar.
      */
     #leaveRouteMode() {

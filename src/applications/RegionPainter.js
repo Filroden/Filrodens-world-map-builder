@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { MeshIntegration } from "./MeshIntegration.js";
+import { Inspector } from "./Inspector.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { VectorHistory } from "./VectorHistory.js";
@@ -118,6 +119,7 @@ export class RegionPainter {
             return true;
         }
         if (!app.activeRegionId) return false;
+        if (Inspector.current(app)?.kind.id === "region") Inspector.close(app);
         RegionPanel.selectRegionById(app, null, null);
         return true;
     }
@@ -169,7 +171,7 @@ export class RegionPainter {
         this.#clearPreview(app, this.#state(app));
     }
 
-    /** Select mode opens the region under the pointer in the docked editor. */
+    /** Select mode opens the region under the pointer in the inspector (as a click does). */
     static #doubleClick(app, x, y) {
         if (this.mode(app) !== "select") return;
         const hit = this.#regionAt(app, x, y);
@@ -191,11 +193,18 @@ export class RegionPainter {
         return null;
     }
 
-    /** Select mode: the region under the pointer becomes the region being edited (none over unclaimed ground). */
+    /**
+     * Select mode: the region under the pointer becomes the region being edited and opens in the
+     * inspector; a click on unclaimed ground lets go of it and closes the inspector.
+     */
     static #select(app, x, y) {
         const hit = this.#regionAt(app, x, y);
-        if (hit) RegionPanel.selectRegionById(app, hit.level.id, hit.region.id);
-        else RegionPanel.selectRegionById(app, null, null);
+        if (hit) {
+            RegionEditor.open(app, hit.level.id, hit.region.id);
+            return;
+        }
+        if (Inspector.current(app)?.kind.id === "region") Inspector.close(app);
+        RegionPanel.selectRegionById(app, null, null);
     }
 
     static #beginBrush(app, mode, x, y, invert) {

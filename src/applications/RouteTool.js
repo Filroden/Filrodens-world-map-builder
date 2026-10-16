@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MeshIntegration } from "./MeshIntegration.js";
+import { Inspector } from "./Inspector.js";
 import { RouteEditor } from "./RouteEditor.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { RouteDraft, insertWaypoint, joinRoutes, moveWaypoint, nearestLegCell, removeWaypoint, splitRoute, strokeWaypoints, waypointAt } from "../mesh/RouteEdits.js";
@@ -188,6 +189,7 @@ export class RouteTool {
             return true;
         }
         if (!app.activeRouteId) return false;
+        if (Inspector.current(app)?.kind.id === "route") Inspector.close(app);
         this.select(app, null);
         return true;
     }
@@ -271,9 +273,17 @@ export class RouteTool {
     static #down(app, x, y, event) {
         if (!app.meshSession) return;
         switch (this.mode(app)) {
-            case "select":
-                this.select(app, MeshIntegration.routeAt(app, x, y, this.#hitRadius(app)));
+            case "select": {
+                // The route under the pointer is picked and opens in the inspector; a click away
+                // from every route lets go and closes it
+                const route = MeshIntegration.routeAt(app, x, y, this.#hitRadius(app));
+                if (route) RouteEditor.open(app, route.id);
+                else {
+                    if (Inspector.current(app)?.kind.id === "route") Inspector.close(app);
+                    this.select(app, null);
+                }
                 break;
+            }
             case "draw":
                 this.#state(app).press = { x, y, stroke: null };
                 break;

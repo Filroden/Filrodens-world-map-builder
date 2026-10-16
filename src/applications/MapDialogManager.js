@@ -151,7 +151,7 @@ export class MapDialogManager {
 
     /**
      * Fills a dialogue's line fields from a route quick style: colour, thickness, style, outline and
-     * smoothing. Each field is optional, since the mass-edit dialogue and the route editor offer
+     * smoothing. Each field is optional, since the mass-edit dialogue and the route quick style editor offer
      * different sets of them. The thickness slider's value display follows the slider.
      * @param {object} style - A route quick style.
      * @param {{color?: HTMLInputElement, thickness?: HTMLInputElement, style?: HTMLSelectElement, outline?: HTMLInputElement, smoothing?: HTMLInputElement}} fields

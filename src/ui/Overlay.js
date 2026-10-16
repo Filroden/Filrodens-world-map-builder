@@ -27,6 +27,13 @@
  * A modal dialogue opens centred (by CSS) and can be moved by dragging its header, within the
  * host. The first move or resize fixes its position as an offset in the host, so from then on a
  * resize grows the dialogue from its fixed corner with the pointer, instead of around its centre.
+ *
+ * A docked dialogue (the inspector, see Inspector) is part of the studio rather than in front of
+ * it: Tab moves through it and on to the rest of the studio as the page's own order has it,
+ * instead of being kept inside, and it can be given a header that names what it shows (a swatch
+ * and a kind beside the title), updated while it is open. `Overlay.show()` returns the open
+ * dialogue itself, for a caller that keeps it open and updates it; `Overlay.open()` returns only
+ * the promise of how it closed.
  */
 
 /** What Tab moves between: the controls a keyboard user can reach. */
@@ -76,11 +83,34 @@ export class Overlay {
      * @param {string} [options.closeLabel] - The close control's accessible name.
      * @param {unknown} [options.dismissed] - What closing without a button resolves with.
      * @param {(element: HTMLDialogElement) => void} [options.onRender] - Runs once the dialogue is in the page.
+     * @param {{swatch?: string|null, subtitle?: string|null}} [options.header] - A swatch before the
+     *     title and a line naming what the dialogue shows after it (the inspector's header).
+     * @param {"field" | "dialogue"} [options.focus] - Where focus goes on opening: the first field
+     *     (the default), or the dialogue itself, so a key pressed next types into nothing.
      * @returns {Promise<unknown>}
      */
     static open(options) {
-        return new Promise((resolve) => new Overlay(options, resolve).#show(options.onRender));
+        return Overlay.show(options).closed;
     }
+
+    /**
+     * Opens a dialogue as open() does, returning the dialogue itself; its `closed` promise resolves
+     * as open()'s would.
+     *
+     * @param {object} options - As for open().
+     * @returns {Overlay}
+     */
+    static show(options) {
+        let resolve;
+        const closed = new Promise((done) => (resolve = done));
+        const overlay = new Overlay(options, resolve);
+        overlay.closed = closed;
+        overlay.#show(options.onRender, options.focus);
+        return overlay;
+    }
+
+    /** Resolves with how the dialogue closed (see open()). Set by show(). */
+    closed = null;
 
     /**
      * Closes every dialogue open in `host` (or only those in one placement), each resolving with its
@@ -112,13 +142,53 @@ export class Overlay {
     /** Keeps a placed dialogue inside the host when the host changes size. */
     #hostObserver = null;
 
-    constructor({ host, placement = "modal", title, icon, content, buttons = [], classes = [], resizable = false, closeLabel = "Close", dismissed = null }, resolve) {
+    constructor({ host, placement = "modal", title, icon, content, buttons = [], classes = [], resizable = false, closeLabel = "Close", dismissed = null, header = null }, resolve) {
         this.#host = host;
         this.#placement = placement;
         this.#buttons = buttons;
         this.#dismissed = dismissed;
         this.#resolve = resolve;
         this.#dialog = this.#build({ title, icon, content, classes, resizable, closeLabel });
+        if (header) this.setHeader({ title, ...header });
+    }
+
+    /** The dialogue's form (its body), which holds the content. */
+    get body() {
+        return this.#dialog.querySelector(".fwmb-overlay-body");
+    }
+
+    /**
+     * Updates the header: the title, and the swatch and the line after the title that name what
+     * the dialogue shows. A part left out keeps what it shows; null removes it.
+     *
+     * @param {{title?: string, swatch?: string|null, subtitle?: string|null}} parts
+     */
+    setHeader({ title, swatch, subtitle }) {
+        const header = this.#dialog.querySelector(".fwmb-overlay-header");
+        const heading = header.querySelector("h2");
+        const doc = this.#host.ownerDocument;
+        if (title !== undefined) heading.textContent = title ?? "";
+        if (swatch !== undefined) {
+            let chip = header.querySelector(".fwmb-chip-swatch");
+            if (swatch && !chip) {
+                chip = doc.createElement("span");
+                chip.className = "fwmb-chip-swatch";
+                chip.setAttribute("aria-hidden", "true");
+                header.prepend(chip);
+            }
+            if (swatch) chip.style.setProperty("--swatch", swatch);
+            else chip?.remove();
+        }
+        if (subtitle !== undefined) {
+            let line = header.querySelector(".fwmb-kind");
+            if (subtitle && !line) {
+                line = doc.createElement("span");
+                line.className = "fwmb-kind";
+                heading.after(line);
+            }
+            if (subtitle) line.textContent = subtitle;
+            else line?.remove();
+        }
     }
 
     /** The dialogue's element (null once it has closed). */
@@ -205,7 +275,7 @@ export class Overlay {
         return footer;
     }
 
-    #show(onRender) {
+    #show(onRender, focus = "field") {
         this.#previousFocus = this.#host.ownerDocument.activeElement;
         if (this.#placement === "modal") {
             this.#scrim = this.#host.ownerDocument.createElement("div");
@@ -223,7 +293,10 @@ export class Overlay {
         openByHost.get(this.#host).add(this);
 
         onRender?.(this.#dialog);
-        this.#focusFirst();
+        if (focus === "dialogue") {
+            this.#dialog.tabIndex = -1;
+            this.#dialog.focus();
+        } else this.#focusFirst();
     }
 
     /** Focus goes to the first field, or failing that the default button, then any control. */
@@ -320,7 +393,7 @@ export class Overlay {
     };
 
     /**
-     * Keys pressed in a dialogue belong to it, so none of them travel on to the page. In Foundry
+     * Keys pressed in a modal dialogue belong to it, so none of them travel on to the page. In Foundry
      * this matters: its keybindings listen on the window and act on any key whose target is not a
      * text field (Tab cycles through tokens on the canvas, Escape closes the top window), and they
      * cancel the browser's own handling when they do. The studio's own shortcuts (undo and redo)
@@ -328,11 +401,16 @@ export class Overlay {
      * has focus and whatever else on the page listens for it.
      */
     #onKeydown = (event) => {
-        event.stopPropagation();
+        // A docked dialogue is part of the studio, whose own key handling (which leaves alone keys
+        // typed into a field, and keeps Tab from Foundry) takes the keys it does not use: Undo and
+        // Redo work with focus in the inspector, as anywhere else in the studio
+        if (this.#placement !== "docked" || event.key === "Escape") event.stopPropagation();
         if (event.key === "Escape") {
             event.preventDefault();
             this.dismiss();
         } else if (event.key === "Tab") {
+            // A docked dialogue is part of the studio: Tab goes on past it in the page's order
+            if (this.#placement === "docked") return;
             event.preventDefault();
             this.#moveFocus(event.shiftKey ? -1 : 1);
         } else if (event.key === "Enter" && Overlay.#enterSubmits(event.target)) {

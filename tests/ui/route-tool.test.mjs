@@ -4,7 +4,11 @@
 // inserts, removes and splits waypoints and joins routes end to end, and the toolbar's fields
 // follow the picked route. Each finished change is one undo step.
 import assert from "node:assert/strict";
-import { beforeEach, test } from "node:test";
+import { after, beforeEach, test } from "node:test";
+import { Window } from "happy-dom";
+
+const window = new Window({ url: "http://localhost/" });
+after(() => window.happyDOM.close());
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 
@@ -31,6 +35,7 @@ installPlatform({
 
 const { RouteTool } = await import("../../src/applications/RouteTool.js");
 const { RouteEditor } = await import("../../src/applications/RouteEditor.js");
+const { Inspector } = await import("../../src/applications/Inspector.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
 const { isContiguous, smallSession } = await import("../mesh/helpers.mjs");
 
@@ -361,18 +366,18 @@ test("the toolbar's fields apply to the picked route: a quick style sets every l
     assert.ok(legsOk(session, picked));
 });
 
-test("the route editor opens docked, replacing any docked editor, with the route picked", async () => {
+test("a route opens in the inspector, closing anything docked, with the route picked", async () => {
     const { app } = await studio();
+    app.root = window.document.body.appendChild(window.document.createElement("div"));
     const route = placeRoad(app, RouteTool.tool(app));
     RouteTool.select(app, null);
-    await RouteEditor.open(app, route.id);
+    assert.equal(await RouteEditor.open(app, route.id), true);
     assert.deepEqual(dialogs.dismissed, [{ placement: "docked" }]);
-    assert.equal(dialogs.opened.length, 1);
-    assert.equal(dialogs.opened[0].placement, "docked");
-    assert.deepEqual(dialogs.opened[0].buttons.map((button) => button.action), ["delete", "simplify", "repath", "cancel", "save"]);
+    assert.ok(Inspector.shows(app, "route", route.id));
     assert.equal(app.activeRouteId, route.id);
-    await RouteEditor.open(app, "missing");
-    assert.equal(dialogs.opened.length, 1, "a route that is not on the map opens nothing");
+    assert.equal(await RouteEditor.open(app, "missing"), false, "a route that is not on the map opens nothing");
+    assert.ok(Inspector.shows(app, "route", route.id));
+    Inspector.close(app);
 });
 
 test("deleting a route from its editor is one undo step, and lets go of it", async () => {

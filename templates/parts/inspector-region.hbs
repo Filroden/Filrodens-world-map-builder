@@ -1,0 +1,68 @@
+{{!--
+    The inspector's region (see RegionEditor): its name, description and visibility; its fill (a
+    region style, or its own colour and pattern); its label; and Focus view, Merge into… and Delete.
+    Every field applies when committed, one undo step each (see Inspector).
+--}}
+<datalist id="fwmb-inspector-colors">
+    {{#each palette}}
+    <option value="{{this}}"></option>
+    {{/each}}
+</datalist>
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-name" name="regionName" value="{{region.name}}" />
+        </div>
+    </div>
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label class="fwmb-label" for="fwmb-inspector-description">{{localize "FILRODENSWMB.UI.Description"}}</label>
+        <div class="fwmb-form-fields">
+            <textarea id="fwmb-inspector-description" class="fwmb-scrollable" name="regionDesc" rows="3">{{region.description}}</textarea>
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-visibility">{{localize "FILRODENSWMB.UI.Visibility"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-visibility" name="regionVisibility">
+                {{#each visibilities}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="fwmb-group">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.InspectorFill"}}{{#if fillStyleName}} <span class="fwmb-badge fwmb-badge--style">{{fillStyleName}}</span>{{/if}}</div>
+    {{> "modules/filrodens-world-map-builder/templates/parts/style-picker.hbs" name="regionQuickStyle" choices=fillStyles type="Region"}}
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-fill-color">{{localize "FILRODENSWMB.UI.InspectorColor"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="color" id="fwmb-inspector-fill-color" class="fwmb-swatch" name="regionFillColor" value="{{fillHex}}" list="fwmb-inspector-colors" {{#if noFill}}disabled{{/if}} />
+            <label class="fwmb-checkbox-label">
+                <input type="checkbox" class="fwmb-checkbox" name="regionFillTransparent" {{#if noFill}}checked{{/if}} />
+                {{localize "FILRODENSWMB.UI.InspectorNoFill"}}
+            </label>
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-pattern">{{localize "FILRODENSWMB.UI.InspectorPattern"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-pattern" name="regionFillStyle">
+                {{#each patterns}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+</div>
+
+{{> "modules/filrodens-world-map-builder/templates/parts/inspector-label.hbs" label=label choices=labelChoices styleName=labelStyleName}}
+
+<div class="fwmb-inspector-actions">
+    <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="zoom"><i class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ZoomTo"}}</button>
+    <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="merge"><i class="fwmb-icon fwmb-icon--merge" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.InspectorMergeInto"}}</button>
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-inspector-delete" data-inspector-action="delete"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Delete"}}</button>
+</div>
+<p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorApplyHint"}}</p>

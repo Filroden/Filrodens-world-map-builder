@@ -2973,6 +2973,17 @@
     flex: none;
     flex-wrap: wrap;
     row-gap: 0.125rem;
+    box-sizing: border-box;
+    min-height: 2.75rem;
+    padding-block: 0.25rem;
+}
+
+/* The panel's header, the context bar and the inspector's header are one band across the studio:
+   each is the bar's height (2.75rem, its border inside), and grows only when its text wraps */
+.fwmb .fwmb-inspector .fwmb-overlay-header {
+    box-sizing: border-box;
+    min-height: 2.75rem;
+    padding-block: 0.25rem;
 }
 
 .fwmb .fwmb-panel-header .fwmb-panel-title {
@@ -3782,13 +3793,24 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     margin: 0;
 }
 
-/* Docked: a panel along the end edge, the full height of the studio less a margin */
+/* Docked: the inspector, at the studio's end edge (see Inspector). It is the studio's last
+   column at every width, the full height of the studio, and pushes the canvas narrower, so nothing
+   of the map is hidden under it; below 1,400px it takes its compact width and stacks its fields
+   (Ken, 2026-10-16: one placement rather than lying over the canvas below 1,200px) */
 .fwmb .fwmb-overlay-docked {
-    inset-block: 1rem;
-    inset-inline: auto 1rem;
-    width: 25rem;
+    position: relative;
+    inset: auto;
+    order: 10;
+    flex: 0 0 var(--fwmb-inspector-width);
+    width: var(--fwmb-inspector-width);
     height: auto;
+    max-width: none;
     max-height: none;
+    border-width: 0;
+    border-inline-start: 1px solid var(--fwmb-border-main);
+    border-radius: 0;
+    box-shadow: none;
+    z-index: 5;
 }
 
 /* A docked dialogue is as wide as it is and no wider (it cannot be resized, as a modal one can),
@@ -3919,6 +3941,75 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 .fwmb .fwmb-overlay-footer .fwmb-btn {
     flex: 1;
+}
+
+/* --- INSPECTOR ---
+   The inspector's header names what it shows: a swatch, the name, then its kind and where it is,
+   cut short before the name is; its body is groups of fields (the design system's .fwmb-group),
+   collapsible sections, then its actions, with Delete at the end. Its rows keep a label column
+   while it is wide, and stack as every side surface does when it is compact. */
+.fwmb .fwmb-inspector .fwmb-overlay-header h2 {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fwmb .fwmb-inspector .fwmb-overlay-header .fwmb-kind {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fwmb .fwmb-inspector .fwmb-overlay-body {
+    gap: 0.75rem;
+}
+
+.fwmb .fwmb-inspector .fwmb-overlay-body .fwmb-form-group {
+    margin: 0;
+}
+
+.fwmb .fwmb-inspector .fwmb-overlay-body .fwmb-form-group > label {
+    font-weight: normal;
+}
+
+@container fwmb-side (width > 17.5rem) {
+    .fwmb .fwmb-inspector .fwmb-form-group:not(.fwmb-form-group--stacked) {
+        display: grid;
+        grid-template-columns: 6.5rem minmax(0, 1fr);
+        column-gap: 0.5rem;
+    }
+}
+
+.fwmb .fwmb-inspector .fwmb-form-fields > :is(select, input[type="text"]) {
+    flex: 1;
+    min-width: 0;
+}
+
+.fwmb .fwmb-inspector .fwmb-label--inline {
+    flex: none;
+    width: auto;
+}
+
+.fwmb .fwmb-inspector .fwmb-section {
+    margin: 0;
+}
+
+.fwmb .fwmb-inspector-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.fwmb .fwmb-inspector-actions .fwmb-inspector-delete {
+    margin-inline-start: auto;
+}
+
+.fwmb .fwmb-inspector-hint {
+    margin: 0;
 }
 
 /* --- PROCESSING OVERLAY --- */

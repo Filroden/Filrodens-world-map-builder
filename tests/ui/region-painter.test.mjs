@@ -1,8 +1,12 @@
 // The Regions tool's pointer input (RegionPainter): Select picks the region under the pointer, a
 // drag paints one undo step with the waters that follow it, a refused stroke explains itself,
-// Fill previews what it would take, and the docked editor replaces any editor already docked.
+// Fill previews what it would take, and Select opens the region in the inspector.
 import assert from "node:assert/strict";
-import { beforeEach, test } from "node:test";
+import { after, beforeEach, test } from "node:test";
+import { Window } from "happy-dom";
+
+const window = new Window({ url: "http://localhost/" });
+after(() => window.happyDOM.close());
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
 
@@ -28,6 +32,7 @@ installPlatform({
 });
 
 const { RegionPainter } = await import("../../src/applications/RegionPainter.js");
+const { Inspector } = await import("../../src/applications/Inspector.js");
 const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
 const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
@@ -149,12 +154,15 @@ test("Fill previews the land a click would take once the pointer rests, and clea
     assert.equal(app.pinHistory.length, 1);
 });
 
-test("the docked editor makes its region the one painted, and closes any editor already docked", async () => {
+test("Select opens the region in the inspector, closing anything docked, and makes it the one painted", async () => {
     const { app } = await studio();
+    app.root = window.document.body.appendChild(window.document.createElement("div"));
     RegionPainter.setMode(app, { dataset: { mode: "select" } });
     RegionPainter.tool(app).doubleClick(200, 150, press);
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.deepEqual(dialogs.dismissed, [{ placement: "docked" }]);
-    assert.equal(dialogs.opened[0].placement, "docked");
+    assert.ok(Inspector.shows(app, "region", "west"));
+    assert.ok(app.root.querySelector("dialog.fwmb-overlay-docked.fwmb-inspector"));
     assert.equal(app.activeRegionId, "west");
+    Inspector.close(app);
 });
