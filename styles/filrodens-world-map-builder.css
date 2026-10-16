@@ -89,12 +89,6 @@
 .fwmb-icon--zoom-out {
     --fwmb-mask: url("../assets/icons/zoom_out.svg");
 }
-.fwmb-icon--zoom-in-map {
-    --fwmb-mask: url("../assets/icons/zoom_in_map.svg");
-}
-.fwmb-icon--zoom-out-map {
-    --fwmb-mask: url("../assets/icons/zoom_out_map.svg");
-}
 .fwmb-icon--center-focus {
     --fwmb-mask: url("../assets/icons/center_focus_strong.svg");
 }
@@ -893,6 +887,13 @@
 .fwmb-list-item:hover {
     background: var(--fwmb-bg-hover);
 }
+/* A row's own buttons show their hover over the row's: one step up from the row's hover */
+.fwmb .fwmb-list-item :is(button, .fwmb-btn, .fwmb-eye, a):hover {
+    background: var(--fwmb-bg-highlight);
+}
+.fwmb .fwmb-list-item:is([aria-selected="true"], .fwmb-is-working) :is(button, .fwmb-btn, .fwmb-eye, a):hover {
+    background: var(--fwmb-bg-hover);
+}
 .fwmb-list-item[aria-selected="true"] {
     background: var(--fwmb-bg-highlight);
 }
@@ -1197,6 +1198,10 @@
     font-size: 0.75rem;
     line-height: 1rem;
 }
+/* The 3D view covers the flat map, and the flat map's overlays go with it */
+.fwmb .fwmb-map-preview.fwmb-is-3d .fwmb-map-overlay {
+    display: none;
+}
 .fwmb-canvas-readout .fwmb-legend {
     border-top: 1px solid rgba(255, 255, 255, 0.12);
     padding: 0.375rem 0.625rem 0.5rem;
@@ -1373,7 +1378,8 @@
     .fwmb-section > summary .fwmb-section-title {
         flex: 1;
     }
-    .fwmb-section > summary .fwmb-badge {
+    /* A cost badge drops beneath the title; a list's count stays beside it */
+    .fwmb-section > summary .fwmb-badge:not(.fwmb-badge--count) {
         order: 2;
         margin-inline-start: 1.5rem;
     }
@@ -2774,75 +2780,305 @@
     display: none !important;
 }
 
+/* --- THE CONTEXT BAR ---
+   Above the canvas, never over it, and always present (so the canvas never moves when a mode
+   starts): the tool's modes, the mode's few settings, then the state readout at the end. It stays
+   on one row: when it runs short it folds (data-fold, set by BarFold through StudioLayout), first
+   moving the least-used modes into More, then showing the modes not in use as icons, then the
+   sliders' labels as icons. The mode in use always keeps its label. */
 .fwmb .fwmb-edit-toolbar {
     flex: 0 0 auto;
     display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
+    gap: 0.625rem;
     min-height: 2.75rem;
-    padding: var(--fwmb-size-8) var(--fwmb-space-3);
+    padding: 0 0.75rem;
     background: var(--fwmb-bg-panel);
     border-block-end: 1px solid var(--fwmb-border-main);
-    gap: var(--fwmb-size-8) var(--fwmb-size-10);
-    white-space: normal;
-    overflow: visible;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
-.fwmb .fwmb-toolbar-content {
-    display: contents;
-}
-
-/* A narrow studio wraps the edit toolbar onto more rows, and the toolbar grows to hold them (the
-   map below takes what is left). Each group wraps its own controls too, and a divider spans the
-   row it sits in rather than the whole toolbar. */
-
-.fwmb .fwmb-edit-toolbar :is(.fwmb-brush-settings, .fwmb-brush-tools, .fwmb-brush-history, .fwmb-mask-settings) {
-    flex-wrap: wrap;
+/* The modes and settings: they clip at their end when even the last fold cannot fit them, so the
+   readout after them always stays */
+.fwmb .fwmb-edit-toolbar .fwmb-bar-main {
+    flex: 1;
     min-width: 0;
-}
-
-.fwmb .fwmb-edit-toolbar .fwmb-divider-vertical {
-    height: auto;
-    align-self: stretch;
-}
-
-.fwmb .fwmb-brush-settings,
-.fwmb .fwmb-brush-setting,
-.fwmb .fwmb-brush-tools,
-.fwmb .fwmb-brush-history,
-.fwmb .fwmb-mask-settings {
     display: flex;
-    flex-direction: row;
     align-items: center;
-    gap: var(--fwmb-size-10);
+    gap: 0.625rem;
+    overflow: hidden;
 }
 
-.fwmb .fwmb-brush-settings label {
-    font-size: var(--fwmb-size-13);
+.fwmb .fwmb-edit-toolbar .fwmb-bar-main > * {
+    flex: none;
+}
+
+.fwmb .fwmb-edit-toolbar .fwmb-state {
+    flex: 0 1 auto;
+    min-width: 0;
     color: var(--fwmb-text-secondary);
-    margin-inline-end: var(--fwmb-size-4);
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.fwmb .fwmb-brush-setting .fwmb-slider-group input[type="range"] {
-    width: 5rem;
+.fwmb .fwmb-edit-toolbar .fwmb-state .fwmb-chip-swatch {
+    display: inline-block;
+    vertical-align: middle;
 }
 
-.fwmb .fwmb-brush-setting .fwmb-slider-group output {
-    width: 4ch;
+/* A field on the bar: its short label beside the control */
+.fwmb .fwmb-bar-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin: 0;
+}
+
+.fwmb .fwmb-bar-field > .fwmb-label {
+    color: var(--fwmb-text-secondary);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.fwmb .fwmb-bar-field select,
+.fwmb .fwmb-bar-field input:is([type="text"], [type="number"]) {
+    height: var(--fwmb-control-height);
+    width: auto;
+    max-width: 11rem;
+}
+
+.fwmb .fwmb-bar-field input[type="text"] {
+    width: 9rem;
+}
+
+/* The bar's selects are a control's height, shorter than their inherited line, which would push
+   the chosen option and the arrow down: their content is centred on a line no taller than the text */
+.fwmb .fwmb-bar-field select {
+    align-items: center;
+    line-height: 1rem;
+}
+
+/* A slider on the bar: label, track and value in one row; the label gives way to an icon at fold 3 */
+.fwmb .fwmb-edit-toolbar .fwmb-bar-range {
+    display: grid;
+    grid-template-columns: auto 6rem auto;
+    align-items: center;
+    column-gap: 0.5rem;
+}
+
+.fwmb .fwmb-bar-range .fwmb-bar-range-label {
+    color: var(--fwmb-text-secondary);
+    font-size: 0.8125rem;
+}
+
+.fwmb .fwmb-bar-range .fwmb-bar-range-icon {
+    display: none;
+    width: 1rem;
+    height: 1rem;
+    min-width: 1rem;
+    color: var(--fwmb-text-secondary);
+}
+
+.fwmb .fwmb-bar-range input[type="range"] {
+    grid-column: auto;
+    width: 100%;
+    margin: 0;
+}
+
+.fwmb .fwmb-bar-range output {
+    min-width: 2.5rem;
+    margin: 0;
+    text-align: start;
+    font: 500 0.8125rem/1rem var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+    color: var(--fwmb-text-primary);
+}
+
+.fwmb .fwmb-edit-toolbar .fwmb-mode .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+    min-width: 1rem;
+}
+
+/* A mode is named by its label, as on the design system's bar; its icon stands in for the label
+   only once the bar folds that far (data-fold 2), and never for the mode in use */
+.fwmb .fwmb-edit-toolbar .fwmb-modes .fwmb-mode .fwmb-icon {
+    display: none;
+}
+
+.fwmb .fwmb-edit-toolbar:is([data-fold="2"], [data-fold="3"]) .fwmb-modes .fwmb-mode:not([aria-checked="true"]) .fwmb-icon {
+    display: inline-block;
+}
+
+/* More: the folded modes, in a menu; shown only once the bar folds */
+.fwmb .fwmb-edit-toolbar .fwmb-bar-more {
+    display: none;
+}
+
+.fwmb .fwmb-edit-toolbar .fwmb-bar-more > .fwmb-mode {
+    width: auto;
+    height: 1.75rem;
+    padding-inline: 0.625rem 0.375rem;
+    gap: 0.25rem;
+    border: 1px solid var(--fwmb-border-main);
+    background: var(--fwmb-bg-panel);
+    color: var(--fwmb-text-primary);
+}
+
+.fwmb .fwmb-edit-toolbar .fwmb-bar-more > .fwmb-mode:hover {
+    background: var(--fwmb-bg-hover);
+}
+
+.fwmb .fwmb-edit-toolbar:is([data-fold="1"], [data-fold="2"], [data-fold="3"]) .fwmb-mode[data-fold-rank]:not([aria-checked="true"]) {
+    display: none;
+}
+
+.fwmb .fwmb-edit-toolbar:is([data-fold="1"], [data-fold="2"], [data-fold="3"]) .fwmb-bar-more {
+    display: inline-flex;
+}
+
+.fwmb .fwmb-edit-toolbar:is([data-fold="2"], [data-fold="3"]) .fwmb-modes .fwmb-mode:not([aria-checked="true"]) .fwmb-mode-label {
+    display: none;
+}
+
+.fwmb .fwmb-edit-toolbar:is([data-fold="2"], [data-fold="3"]) .fwmb-modes .fwmb-mode:not([aria-checked="true"]) {
+    padding-inline: 0.375rem;
+}
+
+.fwmb .fwmb-edit-toolbar[data-fold="3"] .fwmb-bar-range .fwmb-bar-range-label {
+    display: none;
+}
+
+.fwmb .fwmb-edit-toolbar[data-fold="3"] .fwmb-bar-range .fwmb-bar-range-icon {
+    display: inline-block;
+}
+
+.fwmb .fwmb-edit-toolbar[data-fold="3"] .fwmb-bar-range {
+    grid-template-columns: auto 4.5rem auto;
+}
+
+/* A menu row that is chosen (a mode in More, the tool in use in the rail's More) */
+.fwmb .fwmb-dropdown-menu button:is([aria-current="page"], [aria-checked="true"]) {
+    background: var(--fwmb-bg-highlight);
+    font-weight: 700;
+}
+
+/* --- THE TOOL PANEL ---
+   The header (title and the tool's place in the order of work), the sections, the state block
+   while the tool can edit the map, and the Next footer, all in one scrolling column. */
+.fwmb .fwmb-panel-header {
+    flex: none;
+    flex-wrap: wrap;
+    row-gap: 0.125rem;
+}
+
+.fwmb .fwmb-panel-header .fwmb-panel-title {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font: 600 0.9375rem/1.25rem var(--fwmb-font-display);
+    color: var(--fwmb-text-primary);
+}
+
+.fwmb .fwmb-panel-scroll {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-block: 0.25rem 0;
+}
+
+.fwmb .fwmb-panel-scroll > .fwmb-region-panel {
+    display: contents;
+}
+
+.fwmb .fwmb-section {
+    flex: none;
+}
+
+.fwmb .fwmb-section > summary .fwmb-section-title {
+    flex: 1;
+}
+
+.fwmb .fwmb-section > summary .fwmb-section-action {
+    margin-inline-start: auto;
+}
+
+.fwmb .fwmb-section > summary .fwmb-badge + .fwmb-section-action,
+.fwmb .fwmb-section > summary .fwmb-section-action + .fwmb-section-action {
     margin-inline-start: 0;
 }
 
-/* --- CONTEXT PANEL LOCK STATE --- */
-.fwmb .fwmb-context-panel.fwmb-locked fieldset {
-    opacity: 0.4;
+/* Fields side by side in a row (a size, a latitude range) share its width */
+.fwmb .fwmb-section .fwmb-form-fields > input:is([type="number"], [type="text"]) {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+}
+
+/* A list in a section scrolls on its own beyond a height, so a long list never pushes the rest
+   of the panel out of reach */
+.fwmb .fwmb-section .fwmb-list-container {
+    max-height: 18rem;
+    overflow-y: auto;
+}
+
+.fwmb .fwmb-section .fwmb-body > .fwmb-hint,
+.fwmb .fwmb-next .fwmb-hint {
+    margin: 0;
+}
+
+.fwmb .fwmb-subsection-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: var(--fwmb-text-secondary);
+    font-weight: 700;
+    font-size: 0.8125rem;
+}
+
+/* The state block: what the pointer does now, and the one button that stops it */
+.fwmb .fwmb-section--state {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.75rem;
+}
+
+.fwmb .fwmb-section--state .fwmb-section-title {
+    margin: 0;
+}
+
+.fwmb .fwmb-section--state.fwmb-is-on {
+    border-color: var(--fwmb-accent-secondary);
+}
+
+/* The Next footer sits at the panel's foot */
+.fwmb .fwmb-next {
+    flex: none;
+}
+
+.fwmb .fwmb-next .fwmb-next-btn {
+    flex: 1;
+}
+
+/* --- CONTEXT PANEL LOCK STATE ---
+   While a brush is in use the sections whose settings regenerate the map are paused: their title
+   and the line saying why stay readable, their settings are dimmed and take no input. */
+.fwmb .fwmb-context-panel.fwmb-locked .fwmb-section--rebuilds .fwmb-body > :not(.fwmb-section-paused) {
+    opacity: 0.45;
     pointer-events: none;
     transition: opacity 0.2s ease;
 }
 
-.fwmb .fwmb-context-panel.fwmb-locked fieldset legend {
-    color: var(--fwmb-text-muted);
+.fwmb .fwmb-section-paused {
+    color: var(--fwmb-text-secondary);
 }
 
 /* --- BIOME LEGEND --- */
@@ -4257,8 +4493,15 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 /* --- REGIONS PANEL (templates/tools-regions.hbs) --- */
 
 /* Each list's heading: its name, an info icon explaining the tier, then its actions at the end */
+/* The Regions sections' summaries space their chevron, title and info icon as every section's do */
 .fwmb .fwmb-region-panel .fwmb-legend-with-action {
-    gap: var(--fwmb-size-4);
+    gap: 0.5rem;
+}
+
+/* Their titles (which name the set or level shown) take the room they need, and are cut short
+   only when the summary has none left; the spacer after the info icon takes what remains */
+.fwmb .fwmb-region-panel .fwmb-section > summary .fwmb-section-title {
+    flex: 0 1 auto;
 }
 
 .fwmb .fwmb-legend-info {

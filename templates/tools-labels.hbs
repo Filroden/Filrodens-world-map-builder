@@ -1,78 +1,64 @@
-<div class="fwmb-tool-content fwmb-fixed-lists">
-
-    <details class="fwmb-fieldset fwmb-list-section" data-section="autoLabels" {{#unless collapsedSections.autoLabels}}open{{/unless}}>
-        <summary>{{localize "FILRODENSWMB.UI.AutoLabels"}}</summary>
-        <div id="fwmb-scroll-auto-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+{{!--
+    Labels: the labels made with the map's regions, pins and routes, and the labels placed by hand.
+    Placing a label is the state block's (and the bar's) work.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="autoLabels" title="FILRODENSWMB.UI.AutoLabels" count=autoLabels.length}}
+    <div id="fwmb-scroll-auto-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
             
-            {{#each autoLabels}}
-            <div class="fwmb-list-item" data-id="{{this.id}}" data-type="{{this.dataType}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}}>
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                    <i class="fwmb-icon {{#if (eq this.displayVisibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.displayVisibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
-                </button>
-                <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                    <i class="fwmb-icon fwmb-icon--center-focus"></i>
-                </button>
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                    <i class="fwmb-icon fwmb-icon--edit"></i>
-                </button>
-            </div>
-            {{else}}
-            <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLabels"}}</div>
-            {{/each}}
-
-        </div>
-    </details>
-
-    <details class="fwmb-fieldset fwmb-list-section" data-section="customLabels" {{#unless collapsedSections.customLabels}}open{{/unless}}>
-        <summary class="fwmb-legend-with-action">
-            <span>{{localize "FILRODENSWMB.UI.CustomLabels"}}</span>
-            <a class="fwmb-legend-action" aria-pressed="{{#if massEditMode.label}}true{{else}}false{{/if}}" data-action="toggleMassEditMode" data-type="label" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip-class="fwmb-tooltip">
-                <i class="fwmb-icon fwmb-icon--edit-square"></i>
-            </a>
-        </summary>
-
-        {{#if massEditMode.label}}
-        <div class="fwmb-mass-edit-bar">
-            <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
-            <a class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
-            <span class="fwmb-flex-1"></span>
-            <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="openMassEdit" data-type="label" {{#unless massEditCount.label}}disabled{{/unless}}>
-                {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.label}})
+        {{#each autoLabels}}
+        <div class="fwmb-list-item" data-id="{{this.id}}" data-type="{{this.dataType}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}}>
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                <i class="fwmb-icon {{#if (eq this.displayVisibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.displayVisibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
+            </button>
+            <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                <i class="fwmb-icon fwmb-icon--center-focus"></i>
+            </button>
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabel" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                <i class="fwmb-icon fwmb-icon--edit"></i>
             </button>
         </div>
-        {{/if}}
+        {{else}}
+        <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLabels"}}</div>
+        {{/each}}
 
-        <div id="fwmb-scroll-custom-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
-            {{#each mapLabels}}
-            <div class="fwmb-list-item" data-id="{{this.id}}" data-type="custom">
-                {{#if ../massEditMode.label}}
-                    <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="label" {{#if this.massEditSelected}}checked{{/if}} />
-                {{/if}}
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                    <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
-                </button>
-                <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                    <i class="fwmb-icon fwmb-icon--center-focus"></i>
-                </button>
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                    <i class="fwmb-icon fwmb-icon--edit"></i>
-                </button>
-                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                    <i class="fwmb-icon fwmb-icon--delete"></i>
-                </button>
-            </div>
-            {{else}}
-            <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLabels"}}</div>
-            {{/each}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="customLabels" title="FILRODENSWMB.UI.CustomLabels" count=mapLabels.length massType="label"}}
+    {{#if massEditMode.label}}
+    <div class="fwmb-mass-edit-bar">
+        <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
+        <a class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
+        <span class="fwmb-flex-1"></span>
+        <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="openMassEdit" data-type="label" {{#unless massEditCount.label}}disabled{{/unless}}>
+            {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.label}})
+        </button>
+    </div>
+    {{/if}}
+
+    <div id="fwmb-scroll-custom-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+        {{#each mapLabels}}
+        <div class="fwmb-list-item" data-id="{{this.id}}" data-type="custom">
+            {{#if ../massEditMode.label}}
+                <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="label" {{#if this.massEditSelected}}checked{{/if}} />
+            {{/if}}
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
+            </button>
+            <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                <i class="fwmb-icon fwmb-icon--center-focus"></i>
+            </button>
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabel" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                <i class="fwmb-icon fwmb-icon--edit"></i>
+            </button>
+            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLabel" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                <i class="fwmb-icon fwmb-icon--delete"></i>
+            </button>
         </div>
-    </details>
-    
-    <div class="fwmb-divider"></div>
-    
-    <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="toggleEditMode">
-        <i class="fwmb-icon fwmb-icon--brush"></i>
-        {{localize "FILRODENSWMB.UI.EditLabel"}}
-    </button>
-</div>
+        {{else}}
+        <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLabels"}}</div>
+        {{/each}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

@@ -18,24 +18,25 @@ Hooks.once("init", async () => {
 
     // Pre-load Handlebars partials so the UI can construct itself dynamically
     await foundry.applications.handlebars.loadTemplates([
+        // Every template drawn as a partial must be here (tests/ui/templates.test.mjs checks): the
+        // studio's regions, the tools' panels, and the panel and bar parts
+        "modules/filrodens-world-map-builder/templates/context.hbs",
+        "modules/filrodens-world-map-builder/templates/journal-summary.hbs",
         "modules/filrodens-world-map-builder/templates/map.hbs",
         "modules/filrodens-world-map-builder/templates/toolbar.hbs",
-        "modules/filrodens-world-map-builder/templates/context.hbs",
-
-        "modules/filrodens-world-map-builder/templates/tools-scene.hbs",
-        "modules/filrodens-world-map-builder/templates/tools-terrain.hbs",
         "modules/filrodens-world-map-builder/templates/tools-biomes.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-cartography.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-export.hbs",
         "modules/filrodens-world-map-builder/templates/tools-features.hbs",
         "modules/filrodens-world-map-builder/templates/tools-infrastructure.hbs",
-        "modules/filrodens-world-map-builder/templates/tools-regions.hbs",
-        "modules/filrodens-world-map-builder/templates/tools-cartography.hbs",
         "modules/filrodens-world-map-builder/templates/tools-labels.hbs",
-        "modules/filrodens-world-map-builder/templates/tools-reference.hbs",
-        "modules/filrodens-world-map-builder/templates/tools-settings.hbs",
         "modules/filrodens-world-map-builder/templates/tools-library.hbs",
         "modules/filrodens-world-map-builder/templates/tools-manage.hbs",
-
-        "modules/filrodens-world-map-builder/templates/journal-summary.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-reference.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-regions.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-scene.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-settings.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-terrain.hbs",
 
         "modules/filrodens-world-map-builder/templates/dialogs/add-decoration.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs",
@@ -54,19 +55,26 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs",
 
+        "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/bar-pause.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/bar-state.hbs",
         "modules/filrodens-world-map-builder/templates/parts/edit-map-tools.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/next.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/panel-header.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/section.hbs",
         "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-regional-crop.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/toolbar-scene.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/toolbar-terrain.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/state-block.hbs",
         "modules/filrodens-world-map-builder/templates/parts/toolbar-biomes.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/toolbar-features.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/toolbar-infrastructure.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/toolbar-regions.hbs",
-        "modules/filrodens-world-map-builder/templates/parts/toolbar-labels.hbs",
         "modules/filrodens-world-map-builder/templates/parts/toolbar-cartography.hbs",
         "modules/filrodens-world-map-builder/templates/parts/toolbar-empty.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/toolbar-features.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/toolbar-infrastructure.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/toolbar-labels.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/toolbar-regions.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/toolbar-scene.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/toolbar-terrain.hbs",
     ]);
 
     // Enforce custom styling classes on tooltips generated by FWMB elements

@@ -1,0 +1,13 @@
+{{!-- The bar's state readout: what the tool is doing (Viewing, or its state word while editing) and
+     the object being worked on, in the secondary accent. See MapStudio's #barContext. --}}
+<span class="fwmb-state" role="status">
+    {{#if bar.state.object}}
+        {{bar.state.word}}
+        {{#if bar.state.swatch}}<span class="fwmb-chip-swatch" style="--swatch: {{bar.state.swatch}};" aria-hidden="true"></span>{{/if}}
+        <b>{{bar.state.object}}</b>
+    {{else if bar.state.editing}}
+        <b>{{bar.state.word}}</b>
+    {{else}}
+        {{bar.state.word}}
+    {{/if}}
+</span>

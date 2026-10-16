@@ -1,3 +1,13 @@
-<form class="{{#if isLocked}}fwmb-locked{{/if}}">
-    {{> (lookup . 'toolPartial') }}
+{{!--
+    The tool panel: its header, the tool's own sections (templates/tools-<tool>.hbs), the state
+    block while the tool can edit the map, and the Next footer. While a brush is in use the
+    sections whose settings regenerate the map are paused (fwmb-locked).
+--}}
+<form class="{{#if isLocked}}fwmb-locked{{/if}}" aria-label="{{panel.title}}">
+    {{> "modules/filrodens-world-map-builder/templates/parts/panel-header.hbs"}}
+    <div class="fwmb-panel-scroll fwmb-scrollable">
+        {{> (lookup . 'toolPartial') }}
+        {{> "modules/filrodens-world-map-builder/templates/parts/state-block.hbs"}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/next.hbs"}}
+    </div>
 </form>

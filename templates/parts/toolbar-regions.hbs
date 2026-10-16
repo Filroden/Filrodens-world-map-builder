@@ -1,47 +1,21 @@
-<div class="fwmb-toolbar-content">
-    {{!-- The Regions tool's edit toolbar (see RegionPainter.toolbarContext): its modes, the brush size for the brush modes, the region being painted, whether every level is drawn while painting, and the quick style new regions start with. --}}
-    <div class="fwmb-brush-tools">
-        {{#each regionToolbar.modes}}
-            <button type="button" data-action="setRegionMode" data-mode="{{this.value}}" class="fwmb-btn" aria-pressed="{{#if this.active}}true{{else}}false{{/if}}" data-tooltip="{{localize this.label}}" aria-label="{{localize this.label}}">
-                <i class="fwmb-icon fwmb-icon--{{this.icon}}"></i>
-            </button>
+{{!-- The Regions tool's bar (see RegionPainter.toolbarContext): Select (which does not edit) and the
+     painting modes, the brush size for the brush modes, whether every level is drawn while painting,
+     and the style new regions start with. The region being painted is in the readout. --}}
+{{#each bar.modeGroups}}{{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}{{/each}}
+{{#if regionToolbar.usesBrush}}
+    <span class="fwmb-sep"></span>
+    {{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs"}}
+{{/if}}
+<span class="fwmb-sep"></span>
+<button type="button" data-action="toggleRegionShowAll" class="fwmb-btn fwmb-btn--subtle" aria-pressed="{{#if regionToolbar.showAll}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ShowAllLevelsHint'}}">
+    <i class="fwmb-icon fwmb-icon--layers" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.ShowAllLevels"}}
+</button>
+<label class="fwmb-bar-field">
+    <span class="fwmb-label">{{localize "FILRODENSWMB.UI.NewRegionStyle"}}</span>
+    <select name="activeRegionQuickStyle">
+        <option value="custom" {{#if (eq uiState.activeRegionQuickStyle "custom")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.PresetColors"}}</option>
+        {{#each regionStyles}}
+            <option value="{{this.id}}" {{#if (eq ../uiState.activeRegionQuickStyle this.id)}}selected{{/if}}>{{this.label}}</option>
         {{/each}}
-    </div>
-
-    <div class="fwmb-divider-vertical"></div>
-
-    <div class="fwmb-brush-settings">
-        {{#if regionToolbar.usesBrush}}
-            {{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs"}}
-        {{/if}}
-
-        <div class="fwmb-brush-setting">
-            <label>{{localize "FILRODENSWMB.UI.PaintingRegion"}}</label>
-            <div class="fwmb-active-region">
-                {{#if regionToolbar.activeRegion}}
-                    <span class="fwmb-swatch fwmb-swatch--small" style="background-color: {{regionToolbar.activeRegion.swatch}};"></span>
-                    <span class="fwmb-active-region-name" title="{{regionToolbar.activeLevel}}">{{regionToolbar.activeRegion.name}}</span>
-                {{else}}
-                    <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.NoActiveRegion"}}</span>
-                {{/if}}
-            </div>
-        </div>
-
-        <div class="fwmb-brush-setting">
-            <label>{{localize "FILRODENSWMB.UI.ShowAllLevels"}}</label>
-            <button type="button" data-action="toggleRegionShowAll" class="fwmb-btn" aria-pressed="{{#if regionToolbar.showAll}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ShowAllLevelsHint'}}" aria-pressed="{{#if regionToolbar.showAll}}true{{else}}false{{/if}}">
-                <i class="fwmb-icon fwmb-icon--layers"></i>
-            </button>
-        </div>
-
-        <div class="fwmb-brush-setting">
-            <label>{{localize "FILRODENSWMB.UI.NewRegionStyle"}}</label>
-            <select name="activeRegionQuickStyle">
-                <option value="custom" {{#if (eq uiState.activeRegionQuickStyle "custom")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.PresetColors"}}</option>
-                {{#each regionStyles}}
-                    <option value="{{this.id}}" {{#if (eq ../uiState.activeRegionQuickStyle this.id)}}selected{{/if}}>{{this.label}}</option>
-                {{/each}}
-            </select>
-        </div>
-    </div>
-</div>
+    </select>
+</label>

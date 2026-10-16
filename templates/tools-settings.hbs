@@ -1,68 +1,25 @@
-<div class="fwmb-tool-content fwmb-scrollable">
-
-    <!-- The reader's own colour theme (not part of the map; see src/ui/Theme.js) -->
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.SettingsAppearance"}}</legend>
-        <div class="fwmb-form-group">
-            <label data-tooltip="{{localize 'FILRODENSWMB.UI.ThemeModeHint'}}">{{localize "FILRODENSWMB.UI.ThemeMode"}}</label>
-            <div class="fwmb-form-fields">
-                <select name="themeMode">
-                    <option value="auto" {{#if (eq theme.mode "auto")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ThemeModeAuto"}}</option>
-                    <option value="light" {{#if (eq theme.mode "light")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ThemeModeLight"}}</option>
-                    <option value="dark" {{#if (eq theme.mode "dark")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ThemeModeDark"}}</option>
-                </select>
-            </div>
+{{!--
+    Settings: the reader's own appearance for the studio (not part of the map; see src/ui/Theme.js).
+    Every setting of the map lives in the tool it configures.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="appearance" title="FILRODENSWMB.UI.SettingsAppearance"}}
+    <div class="fwmb-form-group">
+        <label data-tooltip="{{localize 'FILRODENSWMB.UI.ThemeModeHint'}}">{{localize "FILRODENSWMB.UI.ThemeMode"}}</label>
+        <div class="fwmb-form-fields">
+            <select name="themeMode">
+                <option value="auto" {{#if (eq theme.mode "auto")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ThemeModeAuto"}}</option>
+                <option value="light" {{#if (eq theme.mode "light")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ThemeModeLight"}}</option>
+                <option value="dark" {{#if (eq theme.mode "dark")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.ThemeModeDark"}}</option>
+            </select>
         </div>
-        <div class="fwmb-form-group">
-            <label data-tooltip="{{localize 'FILRODENSWMB.Settings.ThemeHue.Hint'}}">{{localize "FILRODENSWMB.Settings.ThemeHue.Name"}}</label>
-            <div class="fwmb-form-fields">
-                <select name="themeHue">
-                    <option value="gold" {{#if (eq theme.hue "gold")}}selected{{/if}}>{{localize "FILRODENSWMB.Settings.ThemeHue.Gold"}}</option>
-                    <option value="teal" {{#if (eq theme.hue "teal")}}selected{{/if}}>{{localize "FILRODENSWMB.Settings.ThemeHue.Teal"}}</option>
-                </select>
-            </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label data-tooltip="{{localize 'FILRODENSWMB.Settings.ThemeHue.Hint'}}">{{localize "FILRODENSWMB.Settings.ThemeHue.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <select name="themeHue">
+                <option value="gold" {{#if (eq theme.hue "gold")}}selected{{/if}}>{{localize "FILRODENSWMB.Settings.ThemeHue.Gold"}}</option>
+                <option value="teal" {{#if (eq theme.hue "teal")}}selected{{/if}}>{{localize "FILRODENSWMB.Settings.ThemeHue.Teal"}}</option>
+            </select>
         </div>
-    </fieldset>
-
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.SettingsVisuals"}}</legend>
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="contourInterval" label="FILRODENSWMB.UI.ContourInterval" value=(lookup uiState 'contourInterval') min=0.02 max=0.3 step=0.02}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="reliefShading" label="FILRODENSWMB.UI.ReliefShading" hint="FILRODENSWMB.UI.ReliefShadingHint" value=(lookup uiState 'reliefShading') min=0 max=1 step=0.05 class="fwmb-range--spaced"}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="seabedRelief" label="FILRODENSWMB.UI.SeabedRelief" hint="FILRODENSWMB.UI.SeabedReliefHint" value=(lookup uiState 'seabedRelief') min=0 max=1 step=0.05}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="biomeAlphaActive" label="FILRODENSWMB.UI.ActiveBiomeOpacity" value=(lookup uiState 'biomeAlphaActive') min=0 max=1 step=0.05 class="fwmb-range--spaced"}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="biomeAlphaInactive" label="FILRODENSWMB.UI.InactiveBiomeOpacity" value=(lookup uiState 'biomeAlphaInactive') min=0 max=1 step=0.05}}
-    </fieldset>
-
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.SettingsWater"}}</legend>
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="waterHue" label="FILRODENSWMB.UI.WaterHue" hint="FILRODENSWMB.UI.WaterHueHint" value=(lookup uiState 'waterHue') min=config.DISPLAY.WATER.HUE_MIN max=config.DISPLAY.WATER.HUE_MAX step=1}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="waterSaturation" label="FILRODENSWMB.UI.WaterSaturation" value=(lookup uiState 'waterSaturation') min=0 max=1.5 step=0.05}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="waterClarity" label="FILRODENSWMB.UI.WaterClarity" hint="FILRODENSWMB.UI.WaterClarityHint" value=(lookup uiState 'waterClarity') min=0.5 max=2 step=0.05}}
-    </fieldset>
-
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.SettingsHydrology"}}</legend>
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="springAltOffset" label="FILRODENSWMB.UI.SpringAltMin" value=(lookup uiState 'springAltOffset') min=0 max=0.8 step=0.05}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="springMoistMin" label="FILRODENSWMB.UI.SpringMoistMin" value=(lookup uiState 'springMoistMin') min=0 max=1 step=0.05}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="riverWidthScale" label="FILRODENSWMB.UI.RiverWidth" hint="FILRODENSWMB.UI.RiverWidthHint" value=(lookup uiState 'riverWidthScale') min=0.25 max=3 step=0.05}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="riverMeander" label="FILRODENSWMB.UI.RiverMeander" hint="FILRODENSWMB.UI.RiverMeanderHint" value=(lookup uiState 'riverMeander') min=0 max=2 step=0.05}}
-    </fieldset>
-
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.SettingsWorld"}}</legend>
-        <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.AreaFactorHint"}}</div>
-        <div class="fwmb-form-group">
-            <label>{{localize "FILRODENSWMB.UI.AreaFactor"}}</label>
-            <div class="fwmb-form-fields">
-                <input type="number" name="worldAreaFactor" value="{{worldAreaFactor}}" min="{{areaFactorRange.min}}" max="{{areaFactorRange.max}}" step="1" />
-            </div>
-        </div>
-    </fieldset>
-
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.SettingsClimate"}}</legend>
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="altCooling" label="FILRODENSWMB.UI.AltitudeCooling" value=(lookup uiState 'altCooling') min=0 max=1 step=0.05}}
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="freezingThreshold" label="FILRODENSWMB.UI.FreezingThreshold" value=(lookup uiState 'freezingThreshold') min=0 max=1 step=0.05}}
-    </fieldset>
-
-</div>
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

@@ -1,66 +1,18 @@
-<div class="fwmb-toolbar-content">
+{{!-- New map's bar: a guided map's land mask modes (Land, Ocean), with random masks and maps and
+     the pause on regeneration; and Crop, which marks the area of a regional map (its size and the
+     Generate button are in the panel's Regional map section). --}}
+{{#each bar.modeGroups}}{{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}{{/each}}
 
-    {{#if (eq uiState.generationEngine "guided")}}
-        <label>{{localize "FILRODENSWMB.UI.LandMaskHint"}}</label>
-        <div class="fwmb-mask-settings">
-            <button type="button" class="fwmb-btn" aria-pressed="{{#if (eq uiState.sceneMode 'addMask')}}true{{else}}false{{/if}}" data-action="setSceneMode" data-mode="addMask" data-tooltip="{{localize 'FILRODENSWMB.UI.DrawLandMaskHint'}}">
-                <i class="fwmb-icon fwmb-icon--add"></i>
-            </button>
-
-            <button type="button" class="fwmb-btn" aria-pressed="{{#if (eq uiState.sceneMode 'subtractMask')}}true{{else}}false{{/if}}" data-action="setSceneMode" data-mode="subtractMask" data-tooltip="{{localize 'FILRODENSWMB.UI.DrawOceanMaskHint'}}">
-                <i class="fwmb-icon fwmb-icon--remove"></i>
-            </button>
-
-            <button type="button" class="fwmb-btn" data-action="generateRandomLandMask" {{#if (eq uiState.sceneMode 'crop')}}disabled{{/if}} data-tooltip="{{localize 'FILRODENSWMB.UI.RandomLandMaskHint'}}">
-                <i class="fwmb-icon fwmb-icon--shuffle"></i>
-            </button>
-
-            <button type="button" class="fwmb-btn" data-action="generateRandomLandMap" {{#if (eq uiState.sceneMode 'crop')}}disabled{{/if}} data-tooltip="{{localize 'FILRODENSWMB.UI.RandomLandMapHint'}}">
-                <i class="fwmb-icon fwmb-icon--travel-explore"></i>
-            </button>
-
-            <div class="fwmb-divider-vertical"></div>
-
-            <button type="button" class="fwmb-btn" aria-pressed="{{#if (eq uiState.sceneMode 'crop')}}true{{else}}false{{/if}}" data-action="setSceneMode" data-mode="crop" {{#if canCreateRegionalMap}}data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegionalMap'}}"{{else}}disabled data-tooltip="{{localize 'FILRODENSWMB.UI.RegionalMapNeedsUpdate'}}"{{/if}}>
-                <i class="fwmb-icon fwmb-icon--crop"></i>
-            </button>
-        </div>
-
-        <div class="fwmb-divider-vertical"></div>
-
-        {{#if (eq uiState.sceneMode "crop")}}
-            <div class="fwmb-brush-settings">
-                {{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-regional-crop.hbs"}}
-            </div>
-            <div class="fwmb-divider-vertical"></div>
-            <button type="button" data-action="generateRegionalMap" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide">
-                <i class="fwmb-icon fwmb-icon--map"></i> {{localize "FILRODENSWMB.UI.GenerateMap"}}
-            </button>
-        {{else}}
-            <button type="button" class="fwmb-btn" aria-pressed="{{#if uiState.liveFeatureUpdates}}true{{else}}false{{/if}}" data-action="toggleLiveFeatureUpdates" data-tooltip="{{#if uiState.liveFeatureUpdates}}{{localize 'FILRODENSWMB.UI.PauseTerrainGeneration'}}{{else}}{{localize 'FILRODENSWMB.UI.ResumeTerrainGeneration'}}{{/if}}">
-                <i class="fwmb-icon {{#if uiState.liveFeatureUpdates}}fwmb-icon--sync{{else}}fwmb-icon--sync_disabled{{/if}}"></i>
-            </button>
-            <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="applyFeatureMath" {{#unless hasPendingFeatureMath}}disabled{{/unless}}>
-                {{localize "FILRODENSWMB.UI.ApplyChanges"}}
-            </button>
-        {{/if}}
-
-        <div class="fwmb-divider-vertical"></div>
-
-        <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="toggleEditMode">
-            <i class="fwmb-icon fwmb-icon--edit-off"></i> {{localize "FILRODENSWMB.UI.EndEdit"}}
+{{#if (eq uiState.generationEngine "guided")}}
+    {{#unless (eq uiState.sceneMode "crop")}}
+        <span class="fwmb-sep"></span>
+        <button type="button" class="fwmb-btn" data-action="generateRandomLandMask" data-tooltip="{{localize 'FILRODENSWMB.UI.RandomLandMaskHint'}}">
+            <i class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.RandomMask"}}
         </button>
-    {{else}}
-        <div class="fwmb-brush-settings">
-            <button type="button" data-action="setBrushTool" data-tool="crop" class="fwmb-btn" aria-pressed="{{#if (eq uiState.sceneBrushTool 'crop')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRegionalMap'}}">
-                <i class="fwmb-icon fwmb-icon--crop"></i>
-            </button>
-            {{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-regional-crop.hbs"}}
-        </div>
-        <div class="fwmb-divider-vertical"></div>
-        <button type="button" data-action="generateRegionalMap" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide">
-            <i class="fwmb-icon fwmb-icon--map"></i> {{localize "FILRODENSWMB.UI.GenerateMap"}}
+        <button type="button" class="fwmb-btn" data-action="generateRandomLandMap" data-tooltip="{{localize 'FILRODENSWMB.UI.RandomLandMapHint'}}">
+            <i class="fwmb-icon fwmb-icon--travel-explore" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.RandomMap"}}
         </button>
-    {{/if}}
-
-</div>
+        <span class="fwmb-sep"></span>
+        {{> "modules/filrodens-world-map-builder/templates/parts/bar-pause.hbs"}}
+    {{/unless}}
+{{/if}}

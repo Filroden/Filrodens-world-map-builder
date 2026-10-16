@@ -598,6 +598,64 @@ export const FILRODENSWMB = {
             { tool: "settings" },
             { action: "threeDView", icon: "three-d", label: "FILRODENSWMB.UI.ThreeDView" },
         ],
+        // The panel's header: each stage's tools are numbered in order ("Shape · 2 of 4") except
+        // Populate's, which are worked in any order. The engine is named for the tools it shapes.
+        UNNUMBERED_STAGES: ["populate"],
+        ENGINE_IN_HEADER: ["scene", "terrain"],
+        // Each tool's Next footer: the tool that follows and why (a localisation key). Tools outside
+        // the stages, and the last one, have none.
+        NEXT: {
+            scene: { tool: "terrain", reason: "FILRODENSWMB.UI.NextReasonScene" },
+            terrain: { tool: "biomes", reason: "FILRODENSWMB.UI.NextReasonTerrain" },
+            biomes: { tool: "features", reason: "FILRODENSWMB.UI.NextReasonBiomes" },
+            features: { tool: "regions", reason: "FILRODENSWMB.UI.NextReasonFeatures" },
+            regions: { tool: "infrastructure", reason: "FILRODENSWMB.UI.NextReasonRegions" },
+            infrastructure: { tool: "labels", reason: "FILRODENSWMB.UI.NextReasonInfrastructure" },
+            labels: { tool: "cartography", reason: "FILRODENSWMB.UI.NextReasonLabels" },
+            cartography: { tool: "export", reason: "FILRODENSWMB.UI.NextReasonCartography" },
+            export: null,
+            reference: null,
+            library: null,
+            settings: null,
+            manage: null,
+        },
+        // What the pointer does while a tool is editing, named in the state block and on the bar:
+        // a word per tool, or per mode where the tool's modes do different things. Cartography has
+        // no edit toggle (its decorations can always be moved), so its word stands for the tool.
+        // Tools with null have no editing at all.
+        STATE_WORD: {
+            scene: { addMask: "drawing", subtractMask: "drawing", crop: "cropping" },
+            terrain: "terraforming",
+            biomes: "painting",
+            features: { spring: "placing", river: "drawing", fault: "drawing" },
+            regions: "painting",
+            infrastructure: { pin: "placing", route: "drawing" },
+            labels: "placing",
+            cartography: "placing",
+            export: null,
+            reference: null,
+            library: null,
+            settings: null,
+            manage: null,
+        },
+        // The localisation keys of each state word: its name, the state block's start and stop
+        // buttons, and the line in a section its editing pauses
+        STATE_WORDS: {
+            terraforming: "Terraforming",
+            painting: "Painting",
+            drawing: "Drawing",
+            placing: "Placing",
+            cropping: "Cropping",
+        },
+        // The bar's modes that fold into More when the bar runs short (see BarFold), per tool and
+        // group, least used first. Modes not listed stay on the bar at every width, as does the
+        // mode in use.
+        FOLD_RANK: {
+            terrain: ["slopeDown", "slopeUp", "level", "roughen", "smooth"],
+            features: ["spring"],
+            regions: ["fill", "erase"],
+            route: ["edit"],
+        },
         // The map controls' layer toggles after the Terrain and Biomes groups, in their order: the
         // layers drawn on the map, then those drawn over it (the grid is a setting of the map, so it
         // has its own action)

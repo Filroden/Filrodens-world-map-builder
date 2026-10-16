@@ -1,0 +1,13 @@
+{{!--
+    A slider on the bar: its label (which gives way to an icon when the bar runs short; see
+    BarFold), the track and the value. RangeDisplay keeps the value in step with the track.
+
+    Parameters: name (the uiState key), label (localisation key), icon, value, min, max, step,
+    hint (optional localisation key for the tooltip)
+--}}
+<div class="fwmb-slider-group fwmb-bar-range" {{#if hint}}data-tooltip="{{localize hint}}"{{/if}}>
+    <span class="fwmb-label fwmb-bar-range-label">{{localize label}}</span>
+    <span class="fwmb-icon fwmb-icon--{{icon}} fwmb-bar-range-icon" role="img" aria-label="{{localize label}}" data-tooltip="{{localize label}}"></span>
+    <input type="range" class="fwmb-range-input" name="{{name}}" value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}" aria-label="{{localize label}}" />
+    <output class="fwmb-readout">{{value}}</output>
+</div>

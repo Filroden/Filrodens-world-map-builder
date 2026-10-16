@@ -39,6 +39,7 @@ import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
 import { syncMapControls, VIEW_LAYERS } from "../ui/MapControls.js";
 import { StudioLayout } from "../ui/StudioLayout.js";
+import { moveAlongModes } from "../ui/BarFold.js";
 import { currentTheme, setTheme, THEME_SETTINGS } from "../ui/Theme.js";
 
 // Turns a fraction into a percentage for the timing summary
@@ -179,6 +180,8 @@ export class MapStudio {
         applyResolution(e, t)           { this._onApplyResolution(e, t); },
         cancelProcessing()              { this.#cancelRunning?.abort(); },
         changeTool(e, t)                { this._onChangeTool(e, t); },
+        // The panel's Next footer: the following tool in the order of work (STUDIO.NEXT)
+        nextTool(e, t)                  { this._onChangeTool(e, t); },
         exportPng(e, t)                 { this._onExportPng(e, t); },
         exportScene(e, t)               { this._onExportScene(e, t); },
         // The keyboard shortcuts sheet; also opened with "?" (the About tool will offer it too)
@@ -206,9 +209,9 @@ export class MapStudio {
         setBrushTool(e, t)              { this._onSetBrushTool(e, t); },
         setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
         setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
-        setRegionMode(_e, t)            { RegionPainter.setMode(this, t); },
+        setRegionMode(_e, t)            { RegionPainter.setMode(this, t); this.#modeChosen(RegionPainter.mode(this) !== "select"); },
         toggleRegionShowAll()           { RegionPainter.toggleShowAll(this); },
-        setRouteMode(_e, t)             { RouteTool.setMode(this, t); },
+        setRouteMode(_e, t)             { RouteTool.setMode(this, t); this.#modeChosen(RouteTool.mode(this) !== "select"); },
         setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
         setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
         threeDView(e, t)                { this._onThreeDView(e, t); },
@@ -384,7 +387,8 @@ export class MapStudio {
         // Studio-session UI state, not map data - deliberately not part of uiState (which is
         // cloned into saved map payloads) since whether this panel is expanded has nothing to
         // do with any particular map.
-        this._builtinPinIconsExpanded = false;
+        // Panel sections the reader has opened that start closed (see the section partial)
+        this._expandedSections = new Set();
         // Which collapsible list sections in the tool panels the GM has collapsed, by their
         // data-section key (see #bindCollapsibleFieldsets). Studio-session UI state like the flag
         // above: every section starts open whenever the Studio is opened.
@@ -629,6 +633,227 @@ export class MapStudio {
         };
     }
 
+    /** The engines' short names, for the panel header (STUDIO.ENGINE_IN_HEADER). */
+    static #ENGINE_NAMES = Object.freeze({
+        standard: "FILRODENSWMB.UI.EngineShortStandard",
+        flat: "FILRODENSWMB.UI.EngineShortFlat",
+        advanced: "FILRODENSWMB.UI.EngineShortAdvanced",
+        guided: "FILRODENSWMB.UI.EngineShortGuided",
+    });
+
+    /**
+     * The state word of what the active tool's editing does now (STUDIO.STATE_WORD), as the key
+     * its strings are named by ("Terraforming"), or null for a tool that cannot edit the map.
+     */
+    #stateWordKey() {
+        const { STATE_WORD, STATE_WORDS } = FILRODENSWMB.STUDIO;
+        const entry = STATE_WORD[this.activeTool];
+        if (!entry) return null;
+        if (typeof entry === "string") return STATE_WORDS[entry];
+        const mode = {
+            scene: this.#sceneModeKey(),
+            features: this.uiState.activeFeatureMode,
+            infrastructure: this.uiState.activeInfraMode,
+        }[this.activeTool];
+        return STATE_WORDS[entry[mode]] ?? null;
+    }
+
+    /**
+     * What New map's editing does: a guided map's mask drawing or crop (its scene mode), or the
+     * crop alone for any other map that can make regional maps; null when there is nothing to do.
+     */
+    #sceneModeKey() {
+        if (this.uiState.generationEngine === "guided") return ["addMask", "subtractMask", "crop"].includes(this.uiState.sceneMode) ? this.uiState.sceneMode : "addMask";
+        return TerrainVersion.canCreateRegionalMap(this.uiState) ? "crop" : null;
+    }
+
+    /**
+     * The object the active tool is working on, for the state block and the bar's readout: the
+     * region being painted, the route picked, the land mask, river or fault being drawn.
+     *
+     * @returns {{name: string, swatch?: string}|null}
+     */
+    #workingObject() {
+        switch (this.activeTool) {
+            case "regions": {
+                const region = RegionPanel.activeRegion(this);
+                return region ? { name: region.name, swatch: RegionPainter.toolbarContext(this).activeRegion?.swatch } : null;
+            }
+            case "infrastructure": {
+                if (!this.#isRouteMode()) return null;
+                const route = RouteTool.activeRoute(this);
+                return route ? { name: route.name, swatch: route.color } : null;
+            }
+            case "scene": {
+                const mask = this.landMasks?.find((entry) => entry.id === this.activeLandMaskId);
+                return mask ? { name: mask.name } : null;
+            }
+            case "features": {
+                const line = this.manualRivers?.find((entry) => entry.id === this.activeRiverId) ?? this.tectonicFaults?.find((entry) => entry.id === this.activeFaultId);
+                return line ? { name: line.name } : null;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * The panel's frame (context.hbs): its header (the tool's name, its stage and step, and the
+     * engine where it matters), the state block, and the Next footer.
+     */
+    #panelContext() {
+        const { i18n } = platform;
+        const { TOOLS, STAGES, UNNUMBERED_STAGES, ENGINE_IN_HEADER, NEXT } = FILRODENSWMB.STUDIO;
+        const tool = this.activeTool;
+
+        let meta = "";
+        const stage = STAGES.find((entry) => entry.tools.includes(tool));
+        if (stage) {
+            const stageName = i18n.localize(stage.label);
+            meta = UNNUMBERED_STAGES.includes(stage.id) ? stageName : i18n.format("FILRODENSWMB.UI.PanelStep", { stage: stageName, step: stage.tools.indexOf(tool) + 1, count: stage.tools.length });
+        }
+        if (ENGINE_IN_HEADER.includes(tool)) {
+            const engine = i18n.localize(MapStudio.#ENGINE_NAMES[this.uiState.generationEngine] ?? MapStudio.#ENGINE_NAMES.standard);
+            meta = meta ? i18n.format("FILRODENSWMB.UI.PanelMetaEngine", { meta, engine }) : engine;
+        }
+
+        const next = NEXT[tool];
+        return {
+            title: i18n.localize(TOOLS[tool]?.label ?? ""),
+            meta,
+            state: this.#stateBlockContext(),
+            next: next ? { tool: next.tool, name: i18n.localize(TOOLS[next.tool].label), reason: i18n.localize(next.reason) } : null,
+        };
+    }
+
+    /**
+     * The state block: the tool's state word, whether it is editing, the object it is working on
+     * (or "on"), and the start and stop buttons' names. Cartography has no edit toggle, and tools
+     * that cannot edit the map have no block.
+     */
+    #stateBlockContext() {
+        if (this.activeTool === "cartography") return null;
+        const word = this.#stateWordKey();
+        if (!word) return null;
+        const localize = (key) => platform.i18n.localize(key);
+        return {
+            on: !!this.uiState.isEditMode,
+            word: localize(`FILRODENSWMB.UI.StateWord${word}`),
+            start: localize(`FILRODENSWMB.UI.StateStart${word}`),
+            stop: localize(`FILRODENSWMB.UI.StateStop${word}`),
+            badge: this.#workingObject()?.name ?? localize("FILRODENSWMB.UI.StateOn"),
+        };
+    }
+
+    /** One of the bar's modes (see parts/bar-modes.hbs). */
+    static #barMode(action, attr, value, label, tooltip, icon, checked, extra = {}) {
+        return { action, attr, value, label, tooltip, icon, checked, ...extra };
+    }
+
+    /**
+     * The bar's mode groups for the active tool. Modes listed in STUDIO.FOLD_RANK for their group
+     * fold into More when the bar runs short (their rank: least used first).
+     */
+    #barModeGroups() {
+        const mode = MapStudio.#barMode;
+        const s = this.uiState;
+        const foldable = (group, value) => {
+            const index = (FILRODENSWMB.STUDIO.FOLD_RANK[group] ?? []).indexOf(value);
+            return index === -1 ? 0 : index + 1;
+        };
+        const group = (label, key, modes) => {
+            for (const entry of modes) entry.foldable = foldable(key, entry.value);
+            return { label, modes, hasFoldable: modes.some((entry) => entry.foldable) };
+        };
+        const ui = (suffix) => `FILRODENSWMB.UI.${suffix}`;
+
+        switch (this.activeTool) {
+            case "terrain": {
+                const tool = s.terrainBrushTool;
+                const brush = (value, label, tooltip, icon, iconClass) => mode("setBrushTool", "tool", value, ui(label), ui(tooltip), icon, tool === value, iconClass ? { iconClass } : {});
+                return [
+                    group(ui("ModesBrush"), "terrain", [
+                        brush("raise", "ModeRaise", "ToolRaise", "edit-arrow-up"),
+                        brush("lower", "ModeLower", "ToolLower", "edit-arrow-down"),
+                        brush("smooth", "ModeSmooth", "ToolSmooth", "landscape"),
+                        brush("roughen", "ModeRoughen", "ToolRoughen", "scatter-plot"),
+                        brush("slopeUp", "ModeSlopeUp", "ToolSlopeUp", "slope"),
+                        brush("level", "ModeLevel", "ToolLevel", "plateau"),
+                        brush("slopeDown", "ModeSlopeDown", "ToolSlopeDown", "slope", "fwmb-icon--reverse"),
+                    ]),
+                ];
+            }
+            case "biomes": {
+                const erasing = s.brushBiome === FILRODENSWMB.BIOME_IDS.ERASER;
+                return [
+                    group(ui("ModesBrush"), "biomes", [
+                        mode("setBrushTool", "tool", "paint", ui("ModePaint"), ui("ToolPaint"), "format-paint", !erasing),
+                        mode("setBrushBiome", "biome", String(FILRODENSWMB.BIOME_IDS.ERASER), ui("ModeErase"), ui("ToolEraseBiome"), "ink-eraser", erasing),
+                    ]),
+                ];
+            }
+            case "features": {
+                const current = s.activeFeatureMode;
+                const feature = (value, label, tooltip, icon) => mode("setFeatureMode", "mode", value, ui(label), ui(tooltip), icon, current === value);
+                return [group(ui("ModesFeatures"), "features", [feature("spring", "ModeSource", "ToolAddSpring", "water-drop"), feature("river", "ModeRiver", "ToolDrawRiver", "water"), feature("fault", "ModeFault", "ToolDrawFault", "timeline")])];
+            }
+            case "scene": {
+                const canCrop = TerrainVersion.canCreateRegionalMap(this.uiState);
+                const cropTip = canCrop ? ui("ToolRegionalMap") : ui("RegionalMapNeedsUpdate");
+                if (s.generationEngine === "guided") {
+                    const current = s.sceneMode;
+                    return [
+                        group(ui("ModesMask"), "scene", [
+                            mode("setSceneMode", "mode", "addMask", ui("ModeLand"), ui("DrawLandMaskHint"), "add", current === "addMask"),
+                            mode("setSceneMode", "mode", "subtractMask", ui("ModeOcean"), ui("DrawOceanMaskHint"), "remove", current === "subtractMask"),
+                            mode("setSceneMode", "mode", "crop", ui("ModeCrop"), cropTip, "crop", current === "crop", { disabled: !canCrop }),
+                        ]),
+                    ];
+                }
+                if (!canCrop) return [];
+                return [group(ui("ModesMask"), "scene", [mode("setBrushTool", "tool", "crop", ui("ModeCrop"), cropTip, "crop", true)])];
+            }
+            case "regions":
+                return [group(ui("ModesRegion"), "regions", RegionPainter.toolbarContext(this).modes.map((entry) => mode("setRegionMode", "mode", entry.value, ui(`Mode${entry.value.charAt(0).toUpperCase()}${entry.value.slice(1)}`), entry.label, entry.icon, entry.active)))];
+            case "infrastructure": {
+                const groups = [
+                    group(ui("ModesPlace"), "place", [
+                        mode("setInfraMode", "mode", "pin", ui("ModePinShort"), ui("ModePin"), "place", s.activeInfraMode === "pin"),
+                        mode("setInfraMode", "mode", "route", ui("ModeRouteShort"), ui("ModeRoute"), "timeline", s.activeInfraMode === "route"),
+                    ]),
+                ];
+                if (this.#isRouteMode()) {
+                    const labels = { select: "ModeSelect", draw: "ModeDraw", edit: "ModeWaypoints" };
+                    groups.push(group(ui("ModesRoute"), "route", RouteTool.toolbarContext(this).modes.map((entry) => mode("setRouteMode", "mode", entry.value, ui(labels[entry.value]), entry.label, entry.icon, entry.active))));
+                }
+                return groups;
+            }
+            default:
+                return [];
+        }
+    }
+
+    /**
+     * The bar's own context: its name, its mode groups and the state readout (the state word and
+     * the object being worked on while editing, or Viewing).
+     */
+    #barContext() {
+        const localize = (key) => platform.i18n.localize(key);
+        const word = this.#stateWordKey();
+        const working = this.#workingObject();
+        const editing = word && (this.uiState.isEditMode || this.activeTool === "cartography");
+        return {
+            label: localize("FILRODENSWMB.UI.BarLabel"),
+            modeGroups: this.#barModeGroups(),
+            state: {
+                editing: !!editing,
+                word: editing ? localize(`FILRODENSWMB.UI.StateWord${word}`) : localize("FILRODENSWMB.UI.StateViewing"),
+                object: working?.name ?? null,
+                swatch: working?.swatch ?? null,
+            },
+        };
+    }
+
     /** The map controls' single toggles, for map.hbs (the terrain groups come from #layerGroupsContext). */
     static #mapControlsContext() {
         return { viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS };
@@ -747,7 +972,6 @@ export class MapStudio {
         const context = {};
 
         context.hasPendingFeatureMath = this.hasPendingFeatureMath;
-        this.uiState.isEditMode = this.canvasEngine?.isEditMode ?? false;
 
         context.config = FILRODENSWMB;
         context.activeTool = this.activeTool;
@@ -760,7 +984,12 @@ export class MapStudio {
         if (regionId === "map") Object.assign(context, MapStudio.#mapControlsContext());
 
         const isVectorTool = FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool);
-        context.isLocked = this.uiState.isEditMode && !isVectorTool;
+        context.isLocked = !!this.uiState.isEditMode && !isVectorTool;
+        // The line a paused section shows: "Paused while terraforming."
+        const word = this.#stateWordKey();
+        context.pausedLine = context.isLocked && word ? platform.i18n.localize(`FILRODENSWMB.UI.StatePaused${word}`) : null;
+        if (regionId === "context") context.panel = this.#panelContext();
+        if (regionId === "editToolbar") context.bar = this.#barContext();
 
         if (regionId === "editToolbar") {
             const editableTools = FILRODENSWMB.UI.EDITABLE_TOOLS;
@@ -827,10 +1056,12 @@ export class MapStudio {
 
         context.infrastructureIcons = getPinIconPickerList(this.uiState.activeIcon);
         context.builtinPinIcons = getBuiltinPinIconList();
-        context.builtinPinIconsExpanded = this._builtinPinIconsExpanded;
         // Read by the templates as collapsedSections.<key>, so a section drawn again stays as the
         // GM left it rather than springing open
         context.collapsedSections = Object.fromEntries([...this._collapsedSections].map((key) => [key, true]));
+        // Sections that start closed but were opened (see the section partial)
+        context.expandedSections = Object.fromEntries([...this._expandedSections].map((key) => [key, true]));
+        context.fontFamilies = platform.fonts.list();
         context.customPinIcons = getCustomPinIconList();
 
         const activeIconEntry = context.infrastructureIcons.find((icon) => icon.key === this.uiState.activeIcon);
@@ -904,7 +1135,7 @@ export class MapStudio {
             const { ADD: landColor, SUBTRACT: oceanColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
             context.landMasks = [...(this.landMasks || [])]
                 .sort(alphaSort)
-                .map((m) => ({ ...m, swatchColor: m.operation === "subtract" ? oceanColor : landColor }));
+                .map((m) => ({ ...m, swatchColor: m.operation === "subtract" ? oceanColor : landColor, isActive: m.id === this.activeLandMaskId }));
 
             const autoLabels = [];
 
@@ -922,7 +1153,6 @@ export class MapStudio {
 
             // Sort the unified list alphabetically by name
             context.autoLabels = autoLabels.toSorted(alphaSort);
-            context.fontFamilies = platform.fonts.list();
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
             if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this);
@@ -970,8 +1200,9 @@ export class MapStudio {
     #afterRegionsDrawn(regions) {
         if (this.#shutDown) return;
         if (regions.includes("map")) this.#onMapDrawn();
-        // The rail is redrawn with the tool, so it is laid out again (the More menu's place)
-        if (regions.includes("toolbar")) this.#layout?.update();
+        // Every redraw can change what the layout measures (the bar's folding, the rail's More
+        // menu), and may have replaced an element it watches
+        this.#layout?.start();
         this.#bindCollapsibleFieldsets();
         this.#bindCanvasCallbacks();
         this.#applyInitialBootState();
@@ -1064,8 +1295,8 @@ export class MapStudio {
 
         const isCtrlOrCmd = event.ctrlKey || event.metaKey;
 
-        // Arrow keys move along the rail, as along any toolbar
-        if (this.#moveAlongRail(event)) {
+        // Arrow keys move between the bar's modes, and along the rail, as along any toolbar
+        if (moveAlongModes(event) || this.#moveAlongRail(event)) {
             event.preventDefault();
             return;
         }
@@ -1353,13 +1584,6 @@ export class MapStudio {
      * data-section. They are open by default, so only the collapsed ones are remembered.
      */
     #bindCollapsibleFieldsets() {
-        const builtinIconsDetails = this.root.querySelector("#fwmb-builtin-pin-icons");
-        if (builtinIconsDetails) {
-            builtinIconsDetails.ontoggle = () => {
-                this._builtinPinIconsExpanded = builtinIconsDetails.open;
-            };
-        }
-
         for (const section of this.root.querySelectorAll("details[data-section]")) {
             section.ontoggle = () => this.#rememberSectionState(section);
             section.querySelector(":scope > summary").onclick = MapStudio.#keepSummaryControlsFromToggling;
@@ -1369,8 +1593,13 @@ export class MapStudio {
     /** Records whether a collapsible list section is collapsed (see #bindCollapsibleFieldsets). */
     #rememberSectionState(section) {
         const key = section.dataset.section;
-        if (section.open) this._collapsedSections.delete(key);
-        else this._collapsedSections.add(key);
+        if (section.open) {
+            this._collapsedSections.delete(key);
+            this._expandedSections.add(key);
+        } else {
+            this._collapsedSections.add(key);
+            this._expandedSections.delete(key);
+        }
     }
 
     /**
@@ -1400,6 +1629,8 @@ export class MapStudio {
         // The resolution fields describe the next map Create New Map will build, not the open
         // map, so changing them neither marks the map unsaved nor regenerates anything
         if (MapStudio.#NEW_MAP_SIZE_INPUTS.has(name)) return this.#recordNewMapSize(target, name);
+        // The regional map's size is in New map's Regional map section; the crop on the map follows it
+        if (name === "regionalTargetWidth") return this.#handleToolbarInput(event);
 
         // Skip marking dirty for temporary visual overlays
         if (!name.startsWith("reference")) this.markDirty();
@@ -1735,7 +1966,8 @@ export class MapStudio {
 
         const context = CanvasHints.resolveContext({
             is3DView: !!this.scene3D,
-            isEditMode: !!this.uiState.isEditMode,
+            // Cartography and the Select modes take clicks without editing (see #canvasInteractive)
+            isEditMode: this.#canvasInteractive(),
             activeTool: this.activeTool,
             isCropMode: !!this.canvasEngine?.isCropMode,
             isReferenceMode: !!this.canvasEngine?.isReferenceMode,
@@ -4190,9 +4422,6 @@ export class MapStudio {
             this.uiState.isEditMode = false;
         }
 
-        if (this.canvasEngine) {
-            this.canvasEngine.setEditMode(this.uiState.isEditMode);
-        }
         this.#updateCanvasModes(this.activeTool);
 
         await this.generateTerrain();
@@ -4318,10 +4547,7 @@ export class MapStudio {
         if (!this.canvasEngine) return;
 
         this.canvasEngine.setReferenceMode(newTool === "reference");
-
-        if (this.canvasEngine.setCropMode) {
-            this.canvasEngine.setCropMode(newTool === "scene" && this.canvasEngine.isEditMode && this.#isCropToolSelected());
-        }
+        this.#applyCanvasInteractivity();
     }
 
     /**
@@ -5023,7 +5249,7 @@ export class MapStudio {
             this.uiState.brushBiome = this.uiState.lastPaintBiome ?? FILRODENSWMB.BIOME_IDS.GRASSLAND;
         }
 
-        this.view?.render(["toolbar", "editToolbar"]);
+        this.#modeChosen(true);
     }
 
     /**
@@ -5045,13 +5271,13 @@ export class MapStudio {
         }
 
         this.uiState.brushBiome = biome;
-        this.view?.render(["toolbar", "editToolbar"]);
+        this.#modeChosen(true);
     }
 
     _onSetFeatureMode(event, target) {
         this.uiState.activeFeatureMode = target.dataset.mode;
         this.activeFaultId = null; // Ends the current fault line natively
-        this.view?.render(["toolbar", "editToolbar"]);
+        this.#modeChosen(true);
     }
 
     /**
@@ -5060,7 +5286,8 @@ export class MapStudio {
     _onSetInfraMode(event, target) {
         this.uiState.activeInfraMode = target.dataset.mode;
         this.#leaveRouteMode();
-        this.view?.render(["toolbar", "editToolbar"]);
+        // Pins are placed; a route's Select mode only picks routes, so it does not edit
+        this.#modeChosen(!this.#isRouteMode() || RouteTool.mode(this) !== "select");
     }
 
     _onSetInfrastructureIcon(event, target) {
@@ -5105,10 +5332,8 @@ export class MapStudio {
         }
 
         // The crop takes over canvas clicks while it is showing, so it is shown only in its own
-        // mode, never while land masks are being drawn
-        this.canvasEngine?.setCropMode?.(this.uiState.isEditMode && this.activeTool === "scene" && this.#isCropToolSelected());
-
-        this.view?.render(["toolbar", "editToolbar"]);
+        // mode, never while land masks are being drawn (see #applyCanvasInteractivity)
+        this.#modeChosen(true);
     }
 
     /**
@@ -5125,7 +5350,9 @@ export class MapStudio {
             this.scene3D = null;
 
             overlay.classList.add("fwmb-hidden");
+            overlay.closest(".fwmb-map-preview")?.classList.remove("fwmb-is-3d");
             this.#syncMapControls();
+            this.#applyCanvasInteractivity();
 
             // Restore the manual layout wrappers
             const mapControls = this.root.querySelector(".fwmb-map-controls");
@@ -5152,6 +5379,9 @@ export class MapStudio {
         const contextPanel = this.root.querySelector(".fwmb-context-panel");
         const editToolbar = this.root.querySelector(".fwmb-edit-toolbar");
         overlay.classList.remove("fwmb-hidden");
+        // The canvas's overlays (information bar, hint, map controls, undo and redo) belong to the
+        // flat map and are hidden while the 3D view covers it
+        overlay.closest(".fwmb-map-preview")?.classList.add("fwmb-is-3d");
 
         // Manually hide layout wrappers so the 3D canvas fills the entire screen
         if (mapControls) mapControls.classList.add("fwmb-hidden");
@@ -5177,22 +5407,34 @@ export class MapStudio {
         this.#updateCanvasHint();
     }
 
+    /** The state block's Start and Stop button. */
     _onToggleEditMode(_event, _target) {
-        const toolbar = this.root.querySelector(".fwmb-edit-toolbar");
-        if (!toolbar) return;
+        this.#setEditing(!this.uiState.isEditMode);
+    }
 
-        const isActivating = !this.uiState.isEditMode;
-        this.uiState.isEditMode = isActivating;
+    /**
+     * Turns the active tool's editing on or off (uiState.isEditMode): the state block's button, or
+     * choosing a mode on the bar (see #modeChosen).
+     *
+     * @param {boolean} on
+     */
+    #setEditing(on) {
+        if (!this.root?.querySelector(".fwmb-edit-toolbar")) return;
+        this.uiState.isEditMode = on;
 
-        if (isActivating) {
-            // Auto-activate the mask drawing tool
-            if (this.uiState.generationEngine === "guided") {
+        if (on) {
+            // A guided map's New map tool draws land masks unless its Crop mode was chosen
+            if (this.uiState.generationEngine === "guided" && !["addMask", "subtractMask", "crop"].includes(this.uiState.sceneMode)) {
                 this.uiState.sceneMode = "addMask";
             }
 
+            // Editing starts in an editing mode: a tool left in its Select mode paints or draws
+            if (this.activeTool === "regions" && RegionPainter.mode(this) === "select") this.uiState.regionPaintMode = "paint";
+            if (this.#isRouteMode() && RouteTool.mode(this) === "select") this.uiState.routeToolMode = "draw";
+
             RegionPanel.settleActive(this);
         } else {
-            // Leaving edit mode ends the pause: the Apply button is hidden with the toolbar, so
+            // Leaving edit mode ends the pause: the Apply button goes with the editing, so
             // deferred changes are generated now (covering a mask completed below) and the next
             // edit session starts with automatic generation on.
             const hadDeferredChanges = this.#restoreLiveGeneration();
@@ -5202,19 +5444,50 @@ export class MapStudio {
             else if (maskCompleted) this.requestTerrainUpdate();
         }
 
-        if (this.canvasEngine) {
-            this.canvasEngine.setEditMode(isActivating);
-
-            if (this.canvasEngine.setCropMode) {
-                this.canvasEngine.setCropMode(isActivating && this.activeTool === "scene" && this.#isCropToolSelected());
-            }
-        }
+        this.#applyCanvasInteractivity();
 
         if (FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool)) {
             this._repaintVectors();
         }
 
         this.view?.render(["context", "toolbar", "editToolbar"]);
+    }
+
+    /**
+     * A mode was chosen on the bar. An editing mode turns editing on; a view mode (Select) turns it
+     * off, and the map still takes the clicks that pick objects (see #canvasInteractive).
+     *
+     * @param {boolean} editing - Whether the chosen mode edits the map.
+     */
+    #modeChosen(editing) {
+        if (editing !== !!this.uiState.isEditMode) {
+            this.#setEditing(editing);
+            return;
+        }
+        this.#applyCanvasInteractivity();
+        if (FILRODENSWMB.UI.VECTOR_TOOLS.includes(this.activeTool)) this._repaintVectors();
+        this.view?.render(["context", "toolbar", "editToolbar"]);
+    }
+
+    /**
+     * Whether the map takes pointer input for the active tool: while it is editing; always in
+     * Cartography (which has no edit toggle: its decorations and scale bar can be moved whenever it
+     * is open); and in the Select mode of Regions and of Routes, which pick objects without editing.
+     */
+    #canvasInteractive() {
+        if (this.uiState.isEditMode) return true;
+        if (this.activeTool === "cartography") return true;
+        if (this.activeTool === "regions") return RegionPainter.mode(this) === "select";
+        if (this.#isRouteMode()) return RouteTool.mode(this) === "select";
+        return false;
+    }
+
+    /** Brings the canvas's pointer handling (and the regional crop) in line with the tool and mode. */
+    #applyCanvasInteractivity() {
+        if (!this.canvasEngine) return;
+        this.canvasEngine.setEditMode(this.#canvasInteractive());
+        // The crop takes over canvas clicks while it is showing, so only in its own mode while editing
+        this.canvasEngine.setCropMode?.(!!this.uiState.isEditMode && this.activeTool === "scene" && this.#isCropToolSelected());
     }
 
     _onToggleGrid(_event, _target) {

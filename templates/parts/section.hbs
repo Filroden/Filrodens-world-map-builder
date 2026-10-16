@@ -1,0 +1,48 @@
+{{!--
+    A collapsible section of a tool's panel: a raised card whose summary carries its title and,
+    when the section's settings cost something to change, a badge saying so. Used as a partial
+    block, with the section's content between the tags:
+
+        {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="shading" title="…" badge="…" instant=true}}
+            …
+        {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+    Parameters:
+      id: the key the section's open or closed state is remembered by (see MapStudio's
+          #rememberSectionState); open unless the reader closed it, or `closed` is set and the
+          reader has not opened it
+      title: localisation key of the title
+      badge: optional localisation key of the cost badge ("rebuilds the whole map", "instant")
+      instant: the badge marks a section that only redraws (its quieter look)
+      count: optional number shown as a count badge (a list's length)
+      rebuilds: the section's settings regenerate the map, so they pause while a brush is in use
+                (see .fwmb-locked)
+      closed: the section starts closed
+      addAction, addLabel: optional action (and the localisation key naming it) of an Add button
+                in the summary, for a list section
+      massType: optional item type (pin, route, label) whose Mass Edit selection is toggled from
+                the summary
+      class: optional extra classes
+--}}
+<details class="fwmb-section{{#if rebuilds}} fwmb-section--rebuilds{{/if}}{{#if class}} {{class}}{{/if}}" data-section="{{id}}" {{#if (lookup @root.expandedSections id)}}open{{else}}{{#unless (lookup @root.collapsedSections id)}}{{#unless closed}}open{{/unless}}{{/unless}}{{/if}}>
+    <summary>
+        <span class="fwmb-chev" aria-hidden="true"></span>
+        <span class="fwmb-section-title" data-tooltip="{{localize title}}">{{localize title}}</span>
+        {{#if badge}}<span class="fwmb-badge{{#if instant}} fwmb-badge--instant{{/if}}">{{localize badge}}</span>{{/if}}
+        {{#if (or count (eq count 0))}}<span class="fwmb-badge fwmb-badge--count">{{count}}</span>{{/if}}
+        {{#if addAction}}
+        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-section-action" data-action="{{addAction}}" aria-label="{{localize addLabel}}" data-tooltip="{{localize addLabel}}">
+            <i class="fwmb-icon fwmb-icon--add"></i>
+        </button>
+        {{/if}}
+        {{#if massType}}
+        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-section-action" aria-pressed="{{#if (lookup @root.massEditMode massType)}}true{{else}}false{{/if}}" {{#if (lookup @root.massEditBlocked massType)}}disabled{{/if}} data-action="toggleMassEditMode" data-type="{{massType}}" aria-label="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditSelect'}}">
+            <i class="fwmb-icon fwmb-icon--edit-square"></i>
+        </button>
+        {{/if}}
+    </summary>
+    <div class="fwmb-body">
+        {{#if rebuilds}}{{#if @root.pausedLine}}<p class="fwmb-hint fwmb-section-paused">{{@root.pausedLine}}</p>{{/if}}{{/if}}
+        {{> @partial-block }}
+    </div>
+</details>

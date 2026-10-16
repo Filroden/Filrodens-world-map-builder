@@ -1,50 +1,9 @@
-<div class="fwmb-toolbar-content">
-    <div class="fwmb-brush-settings">
-        {{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs"}}
-
-        {{#unless (eq uiState.terrainBrushTool "roughen")}}
-            <!-- Roughen always lays the same texture, so it has no strength or feather -->
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.BrushStrength"}}</label>
-                <div class="fwmb-slider-group">
-                    <input type="range" name="brushStrength" value="{{lookup uiState 'brushStrength'}}" min="0.01" max="0.05" step="0.01" />
-                    <output>{{lookup uiState 'brushStrength'}}</output>
-                </div>
-            </div>
-
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.BrushFeather"}}</label>
-                <div class="fwmb-slider-group">
-                    <input type="range" name="brushFeather" value="{{lookup uiState 'brushFeather'}}" min="0" max="0.8" step="0.1" />
-                    <output>{{lookup uiState 'brushFeather'}}</output>
-                </div>
-            </div>
-        {{/unless}}
-    </div>
-
-    <div class="fwmb-divider-vertical"></div>
-
-    <div class="fwmb-brush-tools">
-        <button type="button" data-action="setBrushTool" data-tool="raise" class="fwmb-btn" aria-pressed="{{#if (eq uiState.terrainBrushTool 'raise')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRaise'}}">
-            <i class="fwmb-icon fwmb-icon--edit-arrow-up"></i>
-        </button>
-        <button type="button" data-action="setBrushTool" data-tool="lower" class="fwmb-btn" aria-pressed="{{#if (eq uiState.terrainBrushTool 'lower')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolLower'}}">
-            <i class="fwmb-icon fwmb-icon--edit-arrow-down"></i>
-        </button>
-        <button type="button" data-action="setBrushTool" data-tool="smooth" class="fwmb-btn" aria-pressed="{{#if (eq uiState.terrainBrushTool 'smooth')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSmooth'}}">
-            <i class="fwmb-icon fwmb-icon--landscape"></i>
-        </button>
-        <button type="button" data-action="setBrushTool" data-tool="roughen" class="fwmb-btn" aria-pressed="{{#if (eq uiState.terrainBrushTool 'roughen')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolRoughen'}}">
-            <i class="fwmb-icon fwmb-icon--scatter-plot"></i>
-        </button>
-        <button type="button" data-action="setBrushTool" data-tool="slopeUp" class="fwmb-btn" aria-pressed="{{#if (eq uiState.terrainBrushTool 'slopeUp')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSlopeUp'}}">
-            <i class="fwmb-icon fwmb-icon--slope"></i>
-        </button>
-        <button type="button" data-action="setBrushTool" data-tool="level" class="fwmb-btn" aria-pressed="{{#if (eq uiState.terrainBrushTool 'level')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolLevel'}}">
-            <i class="fwmb-icon fwmb-icon--plateau"></i>
-        </button>
-        <button type="button" data-action="setBrushTool" data-tool="slopeDown" class="fwmb-btn" aria-pressed="{{#if (eq uiState.terrainBrushTool 'slopeDown')}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolSlopeDown'}}">
-            <i class="fwmb-icon fwmb-icon--slope fwmb-icon--reverse"></i>
-        </button>
-    </div>
-</div>
+{{!-- Terrain's bar: the brush modes, then the brush's size, strength and feather (Roughen always
+     lays the same texture, so it has no strength or feather). --}}
+{{#each bar.modeGroups}}{{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}{{/each}}
+<span class="fwmb-sep"></span>
+{{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs"}}
+{{#unless (eq uiState.terrainBrushTool "roughen")}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="brushStrength" label="FILRODENSWMB.UI.BarBrushStrength" icon="format-paint" value=(lookup uiState 'brushStrength') min=0.01 max=0.05 step=0.01}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="brushFeather" label="FILRODENSWMB.UI.BarBrushFeather" icon="gesture" value=(lookup uiState 'brushFeather') min=0 max=0.8 step=0.1}}
+{{/unless}}

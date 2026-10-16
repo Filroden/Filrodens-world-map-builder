@@ -1,3 +1,4 @@
+import { applyBarFold } from "./BarFold.js";
 import { mustFoldMapControls } from "./MapControls.js";
 
 /**
@@ -18,6 +19,7 @@ import { mustFoldMapControls } from "./MapControls.js";
  *   how far the end-edge overlays (hint, undo/redo) move to stay clear of it.
  * - `data-fold` on the map controls when their full row does not fit beside undo/redo: the layer
  *   toggles give way to the Layers menu.
+ * - `data-fold` on the context bar (0 to 3): how far it folds to stay on one row (see BarFold).
  * - `--fwmb-layer-menu-max` on the map preview: the height the map controls' menus may take
  *   before they scroll, which is the room above the controls.
  *
@@ -86,7 +88,7 @@ export class StudioLayout {
     #observeAll() {
         if (!this.#resize) return;
         // The map controls are not watched: their width changes only when this folds them
-        const targets = [this.#root, this.#preview, this.#readout, ...this.#dockedPanels];
+        const targets = [this.#root, this.#preview, this.#readout, this.#bar, ...this.#dockedPanels];
         for (const target of targets) {
             if (target && !this.#observed.has(target)) {
                 this.#resize.observe(target);
@@ -108,6 +110,10 @@ export class StudioLayout {
 
     get #readout() {
         return this.#root.querySelector(".fwmb-canvas-readout");
+    }
+
+    get #bar() {
+        return this.#root.querySelector(".fwmb-edit-toolbar");
     }
 
     get #controls() {
@@ -133,6 +139,9 @@ export class StudioLayout {
         setAttribute(root, "data-fwmb-width", widthClass(width));
         if (isShort(height)) setAttribute(root, "data-fwmb-short", "");
         else root.removeAttribute("data-fwmb-short");
+
+        const bar = this.#bar;
+        if (bar && bar.offsetParent !== null) applyBarFold(bar);
 
         const preview = this.#preview;
         if (!preview) return;

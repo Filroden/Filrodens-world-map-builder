@@ -189,6 +189,7 @@
    themes; tests/ui/css-variables.test.mjs checks the same pairs against the values here. */
 
 :where(.theme-dark) [data-fwmb-hue="gold"]:not([data-fwmb-theme]) {
+    color-scheme: dark;
     --fwmb-bg-base: #1b1913;
     --fwmb-bg-panel: #27251b;
     --fwmb-bg-raised: #333024;
@@ -232,6 +233,7 @@
 }
 
 :where(.theme-light) [data-fwmb-hue="gold"]:not([data-fwmb-theme]) {
+    color-scheme: light;
     --fwmb-bg-base: #f6f5ee;
     --fwmb-bg-panel: #ffffff;
     --fwmb-bg-raised: #faf9f5;
@@ -275,6 +277,7 @@
 }
 
 :where(.theme-dark) [data-fwmb-hue="teal"]:not([data-fwmb-theme]) {
+    color-scheme: dark;
     --fwmb-bg-base: #13181b;
     --fwmb-bg-panel: #1b2227;
     --fwmb-bg-raised: #242d33;
@@ -318,6 +321,7 @@
 }
 
 :where(.theme-light) [data-fwmb-hue="teal"]:not([data-fwmb-theme]) {
+    color-scheme: light;
     --fwmb-bg-base: #eef3f6;
     --fwmb-bg-panel: #ffffff;
     --fwmb-bg-raised: #f5f8fa;
@@ -362,6 +366,7 @@
 
 .theme-dark[data-fwmb-hue="gold"]:not([data-fwmb-theme]),
 .theme-dark:not([data-fwmb-hue], [data-fwmb-theme]) {
+    color-scheme: dark;
     --fwmb-bg-base: #1b1913;
     --fwmb-bg-panel: #27251b;
     --fwmb-bg-raised: #333024;
@@ -406,6 +411,7 @@
 
 .theme-light[data-fwmb-hue="gold"]:not([data-fwmb-theme]),
 .theme-light:not([data-fwmb-hue], [data-fwmb-theme]) {
+    color-scheme: light;
     --fwmb-bg-base: #f6f5ee;
     --fwmb-bg-panel: #ffffff;
     --fwmb-bg-raised: #faf9f5;
@@ -449,6 +455,7 @@
 }
 
 .theme-dark[data-fwmb-hue="teal"]:not([data-fwmb-theme]) {
+    color-scheme: dark;
     --fwmb-bg-base: #13181b;
     --fwmb-bg-panel: #1b2227;
     --fwmb-bg-raised: #242d33;
@@ -492,6 +499,7 @@
 }
 
 .theme-light[data-fwmb-hue="teal"]:not([data-fwmb-theme]) {
+    color-scheme: light;
     --fwmb-bg-base: #eef3f6;
     --fwmb-bg-panel: #ffffff;
     --fwmb-bg-raised: #f5f8fa;
@@ -535,6 +543,7 @@
 }
 
 :is(body, .fwmb)[data-fwmb-theme="dark"][data-fwmb-hue="gold"] {
+    color-scheme: dark;
     --fwmb-bg-base: #1b1913;
     --fwmb-bg-panel: #27251b;
     --fwmb-bg-raised: #333024;
@@ -578,6 +587,7 @@
 }
 
 :is(body, .fwmb)[data-fwmb-theme="light"][data-fwmb-hue="gold"] {
+    color-scheme: light;
     --fwmb-bg-base: #f6f5ee;
     --fwmb-bg-panel: #ffffff;
     --fwmb-bg-raised: #faf9f5;
@@ -621,6 +631,7 @@
 }
 
 :is(body, .fwmb)[data-fwmb-theme="dark"][data-fwmb-hue="teal"] {
+    color-scheme: dark;
     --fwmb-bg-base: #13181b;
     --fwmb-bg-panel: #1b2227;
     --fwmb-bg-raised: #242d33;
@@ -664,6 +675,7 @@
 }
 
 :is(body, .fwmb)[data-fwmb-theme="light"][data-fwmb-hue="teal"] {
+    color-scheme: light;
     --fwmb-bg-base: #eef3f6;
     --fwmb-bg-panel: #ffffff;
     --fwmb-bg-raised: #f5f8fa;

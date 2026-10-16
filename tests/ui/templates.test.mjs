@@ -77,11 +77,23 @@ test("every statically named partial exists", () => {
     const missing = [];
     for (const path of templates) {
         const source = readFileSync(join(TEMPLATES, path), "utf8");
-        for (const match of source.matchAll(/\{\{>\s*"([^"]+)"/g)) {
+        // Partials ({{> "…"}}) and partial blocks ({{#> "…"}} … {{/"…"}})
+        for (const match of source.matchAll(/\{\{#?>\s*"([^"]+)"/g)) {
             const named = match[1];
             const file = named.startsWith(FOUNDRY_PREFIX) ? join(TEMPLATES, named.slice(FOUNDRY_PREFIX.length)) : join(TEMPLATES, named);
             if (!existsSync(file)) missing.push(`${path} -> ${named}`);
         }
     }
     assert.deepEqual(missing, []);
+});
+
+test("Foundry preloads every template drawn as a partial", () => {
+    // In Foundry a template is a partial only once loadTemplates has registered it (the web host
+    // registers them all); the dialogues and the window's frame are rendered by path instead
+    const main = readFileSync(join(ROOT, "main.js"), "utf8");
+    const preloaded = new Set([...main.matchAll(/"modules\/filrodens-world-map-builder\/templates\/([^"]+)"/g)].map((match) => match[1]));
+    const missing = templates.filter((path) => !path.startsWith("dialogs/") && path !== "studio.hbs" && !preloaded.has(path));
+    assert.deepEqual(missing, []);
+    const gone = [...preloaded].filter((path) => !templates.includes(path));
+    assert.deepEqual(gone, [], "preloaded templates that no longer exist");
 });
