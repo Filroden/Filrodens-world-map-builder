@@ -13,13 +13,17 @@ import { mustFoldMapControls } from "./MapControls.js";
  *   for rules that need the narrowest studio).
  * - `data-fwmb-short` on the studio while it is less than 680px high: the rail folds its
  *   occasional tools into More.
- * - `--fwmb-readout-w` on the map preview: the information bar's width, which the hint (top end)
+ * - `--fwmb-controls-w` on the map preview: the map controls' width (bottom end), which the hint
+ *   (bottom start) leaves free beside it.
+ * - `--fwmb-hint-h` on the map preview: the hint's height, which the information bar (top start)
+ *   stops short of.
+ * - `--fwmb-history-w` on the map preview: undo/redo's width (top end), which the information bar
  *   leaves free beside it.
  * - `--fwmb-end-inset` on the map preview should a docked panel ever lie over the canvas's end
- *   edge: how far the end-edge overlays (hint, undo/redo) move to stay clear of it. The inspector
- *   takes its own column at every width, so today this stays at its resting value.
- * - `data-fold` on the map controls when their full row does not fit beside undo/redo: the layer
- *   toggles give way to the Layers menu.
+ *   edge: how far the end-edge overlays (undo/redo, map controls) move to stay clear of it. The
+ *   inspector takes its own column at every width, so today this stays at its resting value.
+ * - `data-fold` on the map controls when their full row does not fit beside the hint at its
+ *   narrowest: the layer toggles give way to the Layers menu.
  * - `data-fold` on the context bar (0 to 3): how far it folds to stay on one row (see BarFold).
  * - `--fwmb-layer-menu-max` on the map preview: the height the map controls' menus may take
  *   before they scroll, which is the room above the controls.
@@ -33,6 +37,9 @@ export const STUDIO_SHORT_BELOW = 680;
 
 /** The space kept between the canvas overlays, and between them and the canvas edge, in rem. */
 const OVERLAY_GAP_REM = 0.5;
+
+/** The narrowest the hint gets beside the map controls, in rem (see .fwmb-map-hint). */
+const HINT_MIN_REM = 10;
 
 /**
  * The width class for a studio width in CSS pixels.
@@ -88,8 +95,9 @@ export class StudioLayout {
     /** Observes the studio and every part whose size the layout depends on. */
     #observeAll() {
         if (!this.#resize) return;
-        // The map controls are not watched: their width changes only when this folds them
-        const targets = [this.#root, this.#preview, this.#readout, this.#bar, ...this.#dockedPanels];
+        // The map controls are not watched: their width changes only when this folds them. The
+        // hint is, since its height changes with the tool and mode
+        const targets = [this.#root, this.#preview, this.#hint, this.#bar, ...this.#dockedPanels];
         for (const target of targets) {
             if (target && !this.#observed.has(target)) {
                 this.#resize.observe(target);
@@ -109,8 +117,8 @@ export class StudioLayout {
         return this.#root.querySelector(".fwmb-map-preview");
     }
 
-    get #readout() {
-        return this.#root.querySelector(".fwmb-canvas-readout");
+    get #hint() {
+        return this.#root.querySelector(".fwmb-map-hint");
     }
 
     get #bar() {
@@ -148,14 +156,19 @@ export class StudioLayout {
         if (!preview) return;
         const gap = OVERLAY_GAP_REM * Number.parseFloat(root.ownerDocument.defaultView.getComputedStyle(root.ownerDocument.documentElement).fontSize);
 
-        const readout = this.#readout;
-        if (readout) setProperty(preview, "--fwmb-readout-w", `${Math.ceil(readout.getBoundingClientRect().width)}px`);
-
         this.#updateEndInset(preview, gap);
         this.#foldControls(preview, gap);
 
-        // The map controls' menus open upward and scroll once they would pass the canvas's top
+        // The hint leaves the map controls their room, and the information bar stops above the hint
         const controls = this.#controls;
+        if (controls) setProperty(preview, "--fwmb-controls-w", `${Math.ceil(controls.getBoundingClientRect().width)}px`);
+        const hint = this.#hint;
+        if (hint) setProperty(preview, "--fwmb-hint-h", `${Math.ceil(hint.getBoundingClientRect().height)}px`);
+        // The information bar narrows before it would reach undo/redo, beside it at the top
+        const history = this.#history;
+        if (history) setProperty(preview, "--fwmb-history-w", `${Math.ceil(history.getBoundingClientRect().width)}px`);
+
+        // The map controls' menus open upward and scroll once they would pass the canvas's top
         if (controls) {
             const room = preview.getBoundingClientRect().height - controls.getBoundingClientRect().height - 3 * gap;
             setProperty(preview, "--fwmb-layer-menu-max", `${Math.max(0, Math.floor(room))}px`);
@@ -186,8 +199,8 @@ export class StudioLayout {
 
     /**
      * Folds the map controls' layer toggles into the Layers menu when the full row does not fit
-     * between the canvas's start edge and undo/redo. The full row is measured unfolded (no paint
-     * happens in between, so nothing flickers).
+     * beside the hint at its narrowest. The full row is measured unfolded (no paint happens in
+     * between, so nothing flickers).
      */
     #foldControls(preview, gap) {
         const controls = this.#controls;
@@ -195,9 +208,9 @@ export class StudioLayout {
         const wasFolded = controls.hasAttribute("data-fold");
         if (wasFolded) controls.removeAttribute("data-fold");
         const wideWidth = controls.getBoundingClientRect().width;
-        const historyWidth = this.#history?.getBoundingClientRect().width ?? 0;
+        const hintWidth = HINT_MIN_REM * (gap / OVERLAY_GAP_REM);
         const endInset = Number.parseFloat(preview.style.getPropertyValue("--fwmb-end-inset")) || gap;
-        const room = preview.getBoundingClientRect().width - gap - historyWidth - endInset - gap;
+        const room = preview.getBoundingClientRect().width - gap - hintWidth - endInset - gap;
         if (mustFoldMapControls(wideWidth, room)) controls.setAttribute("data-fold", "");
     }
 }

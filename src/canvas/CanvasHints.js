@@ -1,7 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 
 /**
- * The list of mouse and keyboard actions shown in the canvas's top end corner. What is listed
+ * The list of mouse and keyboard actions shown in the canvas's bottom start corner. What is listed
  * depends on what the canvas is doing: the tool in use and its mode while editing, the regional
  * map crop, the reference image, or an item held by the pointer.
  *

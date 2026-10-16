@@ -1,12 +1,12 @@
 <div class="fwmb-map-container">
 
     {{!--
-        The canvas and its four overlays, each in the corner where it has most room to grow (the
+        The canvas and its four overlays, in the corners they had before v4 (Ken, 2026-10-16; the
         corners mirror in a right-to-left language):
         - top start: the information bar (values under the pointer, and phase 5's legends);
-        - top end: the hint, one item per action (filled by CanvasHints);
-        - bottom start: the map controls (their menus open upward);
-        - bottom end: undo and redo.
+        - top end: undo and redo;
+        - bottom start: the hint, one item per action, growing upward (filled by CanvasHints);
+        - bottom end: the map controls (their menus open upward).
         They are always shown while the canvas is. This region is drawn once (the PIXI canvas lives
         in it), so their state is written in place afterwards: the readout by the pointer handler,
         the hint by #updateCanvasHint, the map controls by #syncMapControls.

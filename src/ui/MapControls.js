@@ -2,7 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { setOn, setPressed } from "./aria.js";
 
 /**
- * The map controls (bottom start of the canvas) show what the map is showing, and what an export
+ * The map controls (bottom end of the canvas) show what the map is showing, and what an export
  * will contain. The map region is drawn once, so its controls are never redrawn from a template
  * after that: every change to a view is written onto them here, from the studio's state, by
  * MapStudio#syncMapControls. Nothing else sets their state, so a control can never disagree with
@@ -87,10 +87,10 @@ export function syncMapControls(root, state, layersLabel) {
 
 /**
  * Whether the map controls must fold their layer toggles into the Layers menu: when the whole row
- * of buttons is wider than the room the canvas leaves it beside undo/redo.
+ * of buttons is wider than the room the canvas leaves it beside the hint at its narrowest.
  *
  * @param {number} wideWidth - The width of the controls with every toggle shown.
- * @param {number} room - The canvas width less undo/redo and the margins around and between them.
+ * @param {number} room - The canvas width less the hint's narrowest width and the margins around and between them.
  * @returns {boolean}
  */
 export function mustFoldMapControls(wideWidth, room) {

@@ -432,7 +432,7 @@ export const FILRODENSWMB = {
             FADE_FRAMES: 90,
             FADE_GROWTH: 0.15,
         },
-        // The list of canvas actions in the canvas's top end corner (see CanvasHints). Each context
+        // The list of canvas actions in the canvas's bottom start corner (see CanvasHints). Each context
         // lists the suffixes of its `FILRODENSWMB.UI.Hint…` localisation keys, in display order.
         // Every hint names the thing it acts on (a pin, the crop area, the whole region), so each
         // reads on its own. A context's own actions are shown first, in the normal ink; COMMON

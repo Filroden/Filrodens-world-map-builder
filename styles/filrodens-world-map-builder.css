@@ -1343,11 +1343,11 @@
     display: none;
 }
 
-/* Inspector lying over the canvas end edge (below 1,200px): end-edge overlays move clear */
+/* A docked panel lying over the canvas end edge: the end-edge overlays move clear */
 .fwmb-map-preview--covered-end {
     --fwmb-end-inset: calc(var(--fwmb-inspector-width, 16rem) + 0.5rem);
 }
-.fwmb-map-preview--covered-end :is(.fwmb-map-hint, .fwmb-map-history) {
+.fwmb-map-preview--covered-end :is(.fwmb-map-controls, .fwmb-map-history) {
     inset-inline-end: var(--fwmb-end-inset);
 }
 
@@ -2284,19 +2284,22 @@
     z-index: 20;
 }
 
-/* Top start: the information bar, growing downward and stopping 4rem short of the canvas foot
-   (clear of the map controls), then scrolling. Its width is fixed, wide enough for the values and
-   most biome names on one line, so it does not change height (or move the hint beside it) as the
-   pointer passes over biomes with longer and shorter names. */
+/* The four overlays sit where they did before v4 (Ken, 2026-10-16): the information bar top start,
+   undo and redo top end, the hint bottom start and the map controls bottom end. */
+
+/* Top start: the information bar, growing downward and stopping clear of the hint below it
+   (--fwmb-hint-h, measured by StudioLayout), then scrolling. Its width is fixed, wide enough for
+   the values and most biome names on one line, so it does not change height as the pointer passes
+   over biomes with longer and shorter names. */
 .fwmb-canvas-readout {
     top: 0.5rem;
     inset-inline-start: 0.5rem;
     display: flex;
     flex-direction: column;
     width: 25rem;
-    max-width: calc(100% - 1rem);
+    max-width: calc(100% - var(--fwmb-history-w, 4.5rem) - var(--fwmb-end-inset, 0.5rem) - 1rem);
     box-sizing: border-box;
-    max-height: calc(100% - 4rem);
+    max-height: calc(100% - var(--fwmb-hint-h, 2rem) - 1.5rem);
     overflow-y: auto;
     pointer-events: none;
 }
@@ -2320,15 +2323,15 @@
     display: none;
 }
 
-/* Top end: the hint, one item per action. Items share a row while there is room; the hint is as
-   wide as the room the information bar leaves beside it (at most 26rem, at least 10rem), so it
-   drops to one item per row as the canvas narrows rather than moving. The mode's own actions are
-   in the normal ink, movement muted. */
+/* Bottom start: the hint, one item per action. Items share a row while there is room; the hint is
+   as wide as the room the map controls leave beside it (at most 26rem, at least 10rem), so it
+   drops to one item per row as the canvas narrows, growing upward from the canvas foot rather than
+   moving. The mode's own actions are in the normal ink, movement muted. */
 .fwmb-map-hint {
-    top: 0.5rem;
-    inset-inline-end: var(--fwmb-end-inset, 0.5rem);
+    bottom: 0.5rem;
+    inset-inline-start: 0.5rem;
     padding: 0.375rem 0.625rem;
-    max-width: clamp(10rem, 100% - var(--fwmb-readout-w, 20rem) - var(--fwmb-end-inset, 0.5rem) - 1rem, 26rem);
+    max-width: clamp(10rem, 100% - var(--fwmb-controls-w, 20rem) - var(--fwmb-end-inset, 0.5rem) - 1rem, 26rem);
     display: flex;
     flex-wrap: wrap;
     gap: 0.125rem 0.75rem;
@@ -2344,21 +2347,21 @@
 .fwmb-map-hint .fwmb-more {
     color: var(--fwmb-overlay-muted);
 }
-/* Bottom end: undo and redo */
+/* Top end: undo and redo */
 .fwmb-map-history {
-    bottom: 0.5rem;
+    top: 0.5rem;
     inset-inline-end: var(--fwmb-end-inset, 0.5rem);
     display: flex;
     gap: 0.25rem;
     padding: 0.25rem;
 }
 
-/* Bottom start: the map controls, in groups (view filters | layers | contours, grid and
-   reference | zoom), a hairline between groups. When the full row does not fit beside undo/redo
-   (data-fold, see StudioLayout) the layer groups give way to the one Layers menu. */
+/* Bottom end: the map controls, in groups (view filters | layers | contours, grid and
+   reference | zoom), a hairline between groups. When the full row does not fit beside the hint at
+   its narrowest (data-fold, see StudioLayout) the layer groups give way to the one Layers menu. */
 .fwmb-map-controls {
     bottom: 0.5rem;
-    inset-inline-start: 0.5rem;
+    inset-inline-end: var(--fwmb-end-inset, 0.5rem);
     display: flex;
     align-items: center;
     gap: 0.25rem;
@@ -2416,10 +2419,11 @@
     display: flex;
 }
 
+/* Lined up with its button's end, so a menu near the canvas's end edge stays on the canvas */
 .fwmb-layer-menu {
     position: absolute;
     inset-block-end: calc(100% + 0.5rem);
-    inset-inline-start: 0;
+    inset-inline-end: 0;
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
