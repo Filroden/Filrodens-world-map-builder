@@ -893,14 +893,17 @@
     color: var(--fwmb-text-muted);
     font-size: 0.75rem;
 }
+/* A row's actions and its trailing meta and counts are always shown (Ken, 2026-10-16), so nothing
+   moves under the pointer; in a compact panel the counts give way so names keep their room */
 .fwmb-list-item .fwmb-actions {
-    display: none;
+    display: inline-flex;
+    flex: none;
     gap: 0.125rem;
 }
-.fwmb-list-item:is(:hover, :focus-within, [aria-selected="true"]) .fwmb-actions {
-    display: inline-flex;
+.fwmb-list-item > :is(.fwmb-meta, .fwmb-state, .fwmb-badge) {
+    flex: none;
 }
-.fwmb-list-item:is(:hover, :focus-within) > :is(.fwmb-meta, .fwmb-state) {
+.fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-list-item .fwmb-row-count {
     display: none;
 }
 .fwmb-list-item:hover {
@@ -946,6 +949,45 @@
 }
 .fwmb-list-item--add {
     color: var(--fwmb-text-muted);
+}
+/* Creating entries: every open branch ends with an add row that adds to that branch, indented to
+   where the new entry will sit; an empty level says so above it; a new entry is named in its row */
+.fwmb-list-add {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.125rem 0.25rem;
+    min-height: 1.5rem;
+    padding: 0 0.5rem;
+    padding-inline-start: calc(0.25rem + var(--depth, 0) * 1.25rem);
+}
+.fwmb .fwmb-list-add .fwmb-btn {
+    height: 1.5rem;
+    padding: 0 0.375rem;
+    gap: 0.25rem;
+    color: var(--fwmb-text-muted);
+    font-weight: 400;
+}
+.fwmb .fwmb-list-add .fwmb-icon {
+    width: 1rem;
+    height: 1rem;
+}
+.fwmb .fwmb-list-add .fwmb-btn:is(:hover, :focus-visible) {
+    color: var(--fwmb-accent-main);
+}
+.fwmb-list-empty {
+    min-height: 1.5rem;
+    display: flex;
+    align-items: center;
+    padding: 0 0.5rem;
+    padding-inline-start: calc(0.5rem + var(--depth, 0) * 1.25rem);
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+}
+.fwmb-list-item--naming .fwmb-input {
+    flex: 1;
+    min-width: 0;
+    height: 1.5rem;
 }
 .fwmb-eye {
     width: 1.5rem;
@@ -1695,6 +1737,12 @@
     content: none;
 }
 
+/* The room a Mass Edit tick takes, on a row that cannot be chosen (an owned label) */
+.fwmb-checkbox-gap {
+    flex: none;
+    width: calc(var(--fwmb-size-16) + 2 * var(--fwmb-size-4));
+}
+
 /* --- ACCESSIBILITY INTERACTIONS --- */
 .fwmb a:hover {
     text-shadow: none;
@@ -2115,6 +2163,11 @@
 /* The studio's frame, inside the window's content: its regions (toolbar, context panel, map) sit
    side by side in it. It has to claim the whole window, or it shrinks to the width of its
    content. It is positioned so that anything placed over the studio is placed against it. */
+/* The studio itself takes focus only when what had it has gone (see Overlay#focusHost) */
+.fwmb-studio[tabindex="-1"]:focus {
+    outline: none;
+}
+
 .fwmb .fwmb-studio {
     flex: 1;
     min-width: 0;
@@ -4680,42 +4733,84 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     cursor: help;
 }
 
-/* The level tree: each level is indented by its depth below the top of its set */
-.fwmb .fwmb-level-row {
-    padding-inline-start: calc(var(--fwmb-size-8) + var(--fwmb-level-depth, 0) * var(--fwmb-size-16));
+/* The Regions lists (see tools-regions.hbs): one foldable list per level, each filtered by the
+   region chosen in the list above; the chosen set's name is bold */
+.fwmb .fwmb-section--list > summary {
+    padding-block: 0.5rem;
 }
-
-.fwmb .fwmb-set-row,
-.fwmb .fwmb-level-row {
-    gap: var(--fwmb-size-6);
-}
-
-.fwmb .fwmb-set-row .fwmb-name,
-.fwmb .fwmb-level-row .fwmb-name,
-.fwmb .fwmb-region-row .fwmb-name {
-    cursor: pointer;
+.fwmb .fwmb-section--list > summary .fwmb-meta {
+    min-width: 0;
+    flex: 0 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-/* The set, level and region being edited */
-.fwmb .fwmb-set-row[aria-selected="true"],
-.fwmb .fwmb-level-row[aria-selected="true"],
-.fwmb .fwmb-region-row[aria-selected="true"] {
-    background: var(--fwmb-bg-highlight);
-}
-
-.fwmb .fwmb-set-row[aria-selected="true"] .fwmb-name,
-.fwmb .fwmb-level-row[aria-selected="true"] .fwmb-name,
-.fwmb .fwmb-region-row[aria-selected="true"] .fwmb-name {
-    color: var(--fwmb-accent-main);
-    font-weight: bold;
-}
-
-.fwmb .fwmb-level-branch {
-    flex: none;
     color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+}
+.fwmb .fwmb-section > summary .fwmb-head-actions {
+    margin-inline-start: auto;
+    display: inline-flex;
+    gap: 0.125rem;
+    flex: none;
+}
+/* Long lists scroll inside themselves past eight rows. The scroll clips anything drawn outside a
+   row, so a focused row (or add button) draws its ring inside itself */
+.fwmb .fwmb-section--list .fwmb-list {
+    max-height: 15rem;
+    overflow-y: auto;
+    padding: 0 0.25rem 0.375rem;
+}
+.fwmb .fwmb-section--list .fwmb-list :is(.fwmb-list-item, .fwmb-btn):focus-visible {
+    outline-offset: -2px;
+}
+
+.fwmb .fwmb-region-list .fwmb-list-item {
+    gap: var(--fwmb-size-6);
+}
+
+.fwmb .fwmb-region-list .fwmb-name b {
+    font-weight: 700;
+}
+
+.fwmb .fwmb-unassigned-row .fwmb-name {
+    color: var(--fwmb-text-secondary);
+}
+
+/* A level's name being typed in its heading */
+.fwmb .fwmb-section--list > summary .fwmb-heading-naming {
+    flex: 1;
+    min-width: 0;
+    height: 1.5rem;
+}
+
+/* + Layer below, after the last list of its chain */
+.fwmb .fwmb-add-layer-row {
+    padding-inline-start: 0.75rem;
+    margin-block-end: var(--fwmb-size-8);
+}
+
+/* Mass Edit for a level's regions: its bar above the level's list */
+.fwmb .fwmb-list-mass-edit {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--fwmb-size-4);
+    margin: 0 var(--fwmb-size-8) var(--fwmb-size-8);
+    padding: var(--fwmb-size-8);
+    border: 1px solid var(--fwmb-border-main);
+    border-radius: var(--fwmb-radius-large);
+    background: var(--fwmb-bg-panel);
+}
+
+.fwmb .fwmb-mass-edit-title {
+    font-weight: 700;
+    color: var(--fwmb-accent-secondary);
+}
+
+.fwmb .fwmb-mass-edit-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--fwmb-size-4);
 }
 
 /* How many regions a level holds, and its markers (free nesting, nesting problems) */

@@ -40,15 +40,17 @@
                 {{#if this.hasRules}}<i class="fwmb-icon fwmb-icon--tune fwmb-rule-indicator" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeHasRulesTooltip'}}"></i>{{/if}}
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
                 {{#if this.code}}<span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeCodeTooltip' code=this.code}}">{{this.code}}</span>{{/if}}
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editCustomBiome" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                    <i class="fwmb-icon fwmb-icon--edit"></i>
-                </button>
-                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteCustomBiome" aria-label="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}">
-                    <i class="fwmb-icon fwmb-icon--delete"></i>
-                </button>
+                <span class="fwmb-actions">
+                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editCustomBiome" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                        <i class="fwmb-icon fwmb-icon--edit"></i>
+                    </button>
+                    <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteCustomBiome" aria-label="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}">
+                        <i class="fwmb-icon fwmb-icon--delete"></i>
+                    </button>
+                </span>
             </div>
         {{else}}
-            <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoCustomBiomes"}}</div>
+            <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoCustomBiomes"}}</div>
         {{/each}}
     </div>
 

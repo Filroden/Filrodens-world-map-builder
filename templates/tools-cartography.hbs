@@ -91,23 +91,25 @@
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="decorations" title="FILRODENSWMB.UI.CartographyDecorations" count=mapDecorations.length}}
     <div class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
         {{#each mapDecorations}}
-        <div class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.decoration)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="decoration">
+        <div class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.decoration)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="decoration" data-action="editDecoration">
             <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                 <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
             </button>
             <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                <i class="fwmb-icon fwmb-icon--center-focus"></i>
-            </button>
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editDecoration" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                <i class="fwmb-icon fwmb-icon--edit"></i>
-            </button>
-            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteDecoration" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                <i class="fwmb-icon fwmb-icon--delete"></i>
-            </button>
+            <span class="fwmb-actions">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                    <i class="fwmb-icon fwmb-icon--center-focus"></i>
+                </button>
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editDecoration" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                    <i class="fwmb-icon fwmb-icon--edit"></i>
+                </button>
+                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteDecoration" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                    <i class="fwmb-icon fwmb-icon--delete"></i>
+                </button>
+            </span>
         </div>
         {{else}}
-        <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoDecorations"}}</div>
+        <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoDecorations"}}</div>
         {{/each}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

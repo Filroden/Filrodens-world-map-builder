@@ -6,6 +6,7 @@ import { distanceToSegment } from "../mesh/RoutePath.js";
 import { resampleOwners, retraceLine, routeMarkedLine } from "../mesh/Resample.js";
 import { VECTOR_SCHEMA_VERSION, createMeshBlock, createRoute, validateOwners } from "../mesh/Schema.js";
 import { allLevels } from "../mesh/LayerTree.js";
+import { RegionPanel } from "./RegionPanel.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { platform } from "../platform/index.js";
 
@@ -186,7 +187,8 @@ export class MeshIntegration {
         state.unavailable = false;
         const token = state.token;
         app.meshSession = null;
-        app.layerSets ??= [];
+        // A new map starts with one set and its first layer, ready for regions (S12)
+        if (!app.layerSets?.length) app.layerSets = RegionPanel.starterLayerSets();
 
         const mapData = { mapWidth: app.mapWidth, mapHeight: app.mapHeight, seed: app.uiState.mapSeed, params: { latTop: app.uiState.latTop, latBottom: app.uiState.latBottom }, world: app.uiState.world };
         this.#meshLoader()

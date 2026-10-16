@@ -30,6 +30,7 @@ import { MeshIntegration } from "./MeshIntegration.js";
 import { NoiseTransform } from "./NoiseTransform.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { RegionPanel } from "./RegionPanel.js";
+import { RegionLists } from "./RegionLists.js";
 import { RegionPainter } from "./RegionPainter.js";
 import { Inspector } from "./Inspector.js";
 import { RegionEditor } from "./RegionEditor.js";
@@ -132,16 +133,18 @@ export class MapStudio {
         deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
         deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
         deleteAllLandMasks(e, t) { MapDialogManager.onDeleteAllLandMasks(this, e, t); },
-        editLandMask(_e, t)     { LandMaskEditor.open(this, MapStudio.#rowId(t)); },
+        editLandMask(e, t)      { if (!MapStudio.#fromRowControl(e, t)) LandMaskEditor.open(this, MapStudio.#rowId(t)); },
 
         // --- DIALOG MANAGER: Entity Editing ---
-        editDecoration(_e, t) { DecorationEditor.open(this, MapStudio.#rowId(t)); },
-        editFault(_e, t)      { FaultEditor.open(this, MapStudio.#rowId(t)); },
-        editLabel(_e, t)      { LabelEditor.open(this, MapStudio.#labelRef(t)); },
-        editPin(_e, t)        { PinEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
+        // Each is a list row's own action as well as its Edit button's: a click on the row (but not
+        // on one of its controls) opens its object in the inspector
+        editDecoration(e, t)  { if (!MapStudio.#fromRowControl(e, t)) DecorationEditor.open(this, MapStudio.#rowId(t)); },
+        editFault(e, t)       { if (!MapStudio.#fromRowControl(e, t)) FaultEditor.open(this, MapStudio.#rowId(t)); },
+        editLabel(e, t)       { if (!MapStudio.#fromRowControl(e, t)) LabelEditor.open(this, MapStudio.#labelRef(t)); },
+        editPin(e, t)         { if (!MapStudio.#fromRowControl(e, t)) PinEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
         editRegion(_e, t)     { RegionEditor.open(this, ...RegionPanel.regionIdsOf(t)); },
-        editRiver(_e, t)      { RiverEditor.open(this, MapStudio.#rowId(t)); },
-        editRoute(_e, t)      { RouteEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
+        editRiver(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RiverEditor.open(this, MapStudio.#rowId(t)); },
+        editRoute(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RouteEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
 
         // --- DIALOG MANAGER: Custom Biomes & Misc ---
         addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
@@ -150,26 +153,25 @@ export class MapStudio {
         openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
         addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
 
-        // --- REGIONS PANEL: layer sets, levels and regions (see RegionPanel) ---
-        async addLayerSet()         { const id = await RegionPanel.addSet(this); if (id) LayerSetEditor.open(this, id); },
-        selectLayerSet(_e, t)       { LayerSetEditor.open(this, RegionPanel.setIdOf(t)); },
-        editLayerSet(_e, t)         { LayerSetEditor.open(this, RegionPanel.setIdOf(t)); },
+        // --- REGIONS PANEL: the cascading lists of sets and levels (see RegionPanel, RegionLists) ---
+        // A row opens in the inspector when clicked anywhere but its own controls; every list ends
+        // with an add row, whose entry is named in a row of its own first
+        addLayerSet()               { RegionLists.startNaming(this, "set"); },
+        addRegion(_e, t)            { RegionLists.startNaming(this, "region", { levelId: RegionPanel.levelIdOf(t), parentId: t.closest("[data-parent-id]")?.dataset.parentId ?? null }); },
+        addLayer(_e, t)             { RegionLists.addLayer(this, { setId: t.dataset.setId || null, levelId: t.dataset.levelId || null }); },
+        renameListEntry(_e, t)      { RegionLists.startRename(this, t.closest("[data-list-key]")?.dataset.listKey); },
+        toggleUnassigned(_e, t)     { RegionLists.toggleUnassigned(this, t.closest("[data-level-id]")?.dataset.levelId); },
+        selectLayerSet(e, t)        { if (!MapStudio.#fromRowControl(e, t)) LayerSetEditor.open(this, RegionPanel.setIdOf(t)); },
         deleteLayerSet(_e, t)       { RegionPanel.deleteSet(this, t); },
         moveLayerSetUp(_e, t)       { RegionPanel.moveSet(this, t, -1); },
         moveLayerSetDown(_e, t)     { RegionPanel.moveSet(this, t, 1); },
         toggleSetVisibility(_e, t)  { RegionPanel.toggleSetVisibility(this, t); },
-        async addLevel()            { const id = await RegionPanel.addLevel(this); if (id) LevelEditor.open(this, id); },
-        async addChildLevel(_e, t)  { const id = await RegionPanel.addChildLevel(this, t); if (id) LevelEditor.open(this, id); },
         editLevel(_e, t)            { LevelEditor.open(this, RegionPanel.levelIdOf(t)); },
         deleteLevel(_e, t)          { RegionPanel.deleteLevel(this, t); },
-        moveLevelUp(_e, t)          { RegionPanel.moveLevel(this, t, -1); },
-        moveLevelDown(_e, t)        { RegionPanel.moveLevel(this, t, 1); },
-        selectLevel(_e, t)          { LevelEditor.open(this, RegionPanel.levelIdOf(t)); },
-        toggleLevelVisibility(_e, t) { RegionPanel.toggleLevelVisibility(this, t); },
         autoAssignLevel(_e, t)      { RegionPanel.autoAssign(this, t); },
         fixLevelNesting(_e, t)      { RegionPanel.fixNesting(this, t); },
-        addRegion()                 { const region = RegionPanel.addRegion(this); if (region) RegionEditor.open(this, region.levelId, region.id, { created: true }); },
-        selectRegion(_e, t)         { this.#selectRegionRow(t); },
+        massEditLevel(_e, t)        { this.#massEditLevel(RegionPanel.levelIdOf(t)); },
+        selectRegion(e, t)          { if (!MapStudio.#fromRowControl(e, t)) this.#selectRegionRow(t); },
         mergeRegion(_e, t)          { RegionPanel.mergeRegion(this, ...RegionPanel.regionIdsOf(t)); },
 
         // --- DIALOG MANAGER: Pin Icons ---
@@ -342,6 +344,9 @@ export class MapStudio {
      */
     static MASS_EDIT_EXCLUSIVE_GROUPS = [["pin", "route"]];
 
+    /** The Labels list's filter: every label, the standalone ones, or those of one kind of owner. */
+    static LABEL_FILTERS = Object.freeze(["all", "custom", "pin", "route", "region"]);
+
     /**
      * The four Style Library registries a GM can bundle into a shareable settings file, in
      * export/import order. Each maps its uiState array key to the existing legend/fieldset
@@ -407,6 +412,15 @@ export class MapStudio {
         // itself, and should reset (not persist) whenever the Studio app is reopened.
         this.massEditMode = { pin: false, route: false, region: false, label: false };
         this.massEditSelection = { pin: new Set(), route: new Set(), region: new Set(), label: new Set() };
+        // The level whose regions Mass Edit is choosing from (see #massEditLevel)
+        this.massEditLevelId = null;
+        // The Regions lists: the region chosen in each level's list, the levels whose Unassigned row
+        // is open, and the entry being named (see RegionPanel, RegionLists)
+        this.regionPath = new Map();
+        this.regionUnassignedOpen = new Set();
+        this.regionNaming = null;
+        // What the Labels list shows (see #allLabelsContext)
+        this.labelFilter = "all";
         this.mapRoutes = [];
         this.activeRouteId = null;
         // The map's layer sets (see MeshIntegration), and the set, level and region being edited
@@ -1166,25 +1180,10 @@ export class MapStudio {
                 .sort(alphaSort)
                 .map((m) => ({ ...m, swatchColor: m.operation === "subtract" ? oceanColor : landColor, isActive: m.id === this.activeLandMaskId }));
 
-            const autoLabels = [];
-
-            context.mapPins.forEach((p) => {
-                autoLabels.push({ ...p, dataType: "pin", labelKey: "labelpin", displayVisibility: p.label?.visibility || "all" });
-            });
-
-            context.mapRoutes.forEach((r) => {
-                autoLabels.push({ ...r, dataType: "route", labelKey: "labelroute", displayVisibility: r.label?.visibility || "all" });
-            });
-
-            for (const level of this.regionLevels) {
-                for (const r of level.regions) autoLabels.push({ ...r, dataType: "region", labelKey: "labelregion", layerId: level.id, displayVisibility: r.label?.visibility || "all" });
-            }
-
-            // Sort the unified list alphabetically by name
-            context.autoLabels = autoLabels.toSorted(alphaSort);
+            if (this.activeTool === "labels") Object.assign(context, this.#allLabelsContext(context));
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
-            if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this);
+            if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
 
             if (this.activeTool === "manage") {
                 context.savedMaps = await platform.store.getSavedMaps();
@@ -1247,14 +1246,59 @@ export class MapStudio {
     }
 
     /**
-     * A click on a region's row: the region becomes the one painted and opens in the inspector, or,
-     * clicked again, is let go and the inspector closes.
+     * A click on a region's row: the region is chosen in its list, becomes the one painted and
+     * opens in the inspector (see RegionEditor's `opened`).
      */
     #selectRegionRow(target) {
         const [levelId, regionId] = RegionPanel.regionIdsOf(target);
-        RegionPanel.selectRegion(this, target);
-        if (this.activeRegionId === regionId) RegionEditor.open(this, levelId, regionId);
-        else if (Inspector.shows(this, "region", regionId)) Inspector.close(this);
+        if (levelId && regionId) RegionEditor.open(this, levelId, regionId);
+    }
+
+    /**
+     * The Labels tool's one list of every label (see tools-labels.hbs): the standalone labels and
+     * the labels of pins, routes and regions, by name, each owned label with what it belongs to as
+     * its meta ("pin", "region · Kingdoms"), narrowed by the list's filter (labelFilter).
+     */
+    #allLabelsContext(context) {
+        const owner = (key) => platform.i18n.localize(key);
+        const labels = [
+            ...context.mapLabels.map((label) => ({ id: label.id, name: label.name, type: "custom", labelKey: "labelcustom", standalone: true, visibility: label.visibility ?? "all", massEditSelected: label.massEditSelected })),
+            ...context.mapPins.map((pin) => ({ id: pin.id, name: pin.name, type: "pin", labelKey: "labelpin", meta: owner("FILRODENSWMB.UI.InspectorOwnerPin"), visibility: pin.label?.visibility ?? "all" })),
+            ...context.mapRoutes.map((route) => ({ id: route.id, name: route.name, type: "route", labelKey: "labelroute", meta: owner("FILRODENSWMB.UI.InspectorOwnerRoute"), visibility: route.label?.visibility ?? "all" })),
+            ...this.regionLevels.flatMap((level) =>
+                level.regions.map((region) => ({ id: region.id, name: region.name, type: "region", labelKey: "labelregion", layerId: level.id, meta: platform.i18n.format("FILRODENSWMB.UI.LabelOwnerRegionMeta", { kind: owner("FILRODENSWMB.UI.InspectorOwnerRegion"), level: level.name }), visibility: region.label?.visibility ?? "all" })),
+            ),
+        ];
+        const filter = MapStudio.LABEL_FILTERS.includes(this.labelFilter) ? this.labelFilter : "all";
+        const shown = filter === "all" ? labels : labels.filter((label) => label.type === filter);
+        const alphaSort = (a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
+        return {
+            allLabels: shown.toSorted(alphaSort),
+            labelFilters: MapStudio.LABEL_FILTERS.map((value) => ({ value, label: `FILRODENSWMB.UI.LabelFilter_${value}`, selected: value === filter })),
+            labelsEmpty: filter === "all" ? "FILRODENSWMB.UI.NoLabels" : "FILRODENSWMB.UI.NoLabelsOfKind",
+        };
+    }
+
+    /**
+     * "Edit several regions…" in a level's menu: Mass Edit for that level's regions, its bar above
+     * the tree and a tick on each of its region rows.
+     */
+    #massEditLevel(levelId) {
+        const level = RegionPanel.objectOf(this, `level:${levelId}`);
+        if (!level?.regions.length || this.#isMassEditBlocked("region")) return;
+        this.massEditSelection.region.clear();
+        this.massEditLevelId = levelId;
+        this.massEditMode.region = true;
+        this.view?.render(["context"]);
+    }
+
+    /**
+     * Whether a click on a row came from one of the row's own controls (its menu, a tick box)
+     * rather than from the row itself, which opens the row's object in the inspector.
+     */
+    static #fromRowControl(event, row) {
+        const control = event?.target?.closest?.("button, input, select, a, .fwmb-dropdown, .fwmb-tw");
+        return !!control && control !== row && row.contains(control);
     }
 
     /** The fields of every label on the map: standalone labels, and the labels of pins, routes and regions. */
@@ -1317,6 +1361,8 @@ export class MapStudio {
     #bindStudioListeners(root) {
         root.addEventListener("dblclick", (event) => this.#resetSliderToMapDefault(event));
         root.addEventListener("keydown", (event) => this.#handleStudioKeydown(event));
+        root.addEventListener("focusout", (event) => RegionLists.handleFocusOut(this, event));
+        root.addEventListener("input", (event) => RegionLists.handleInput(this, event));
         root.addEventListener("input", (event) => this.#routeFieldEvent(event));
         root.addEventListener("change", (event) => this.#routeFieldEvent(event));
         root.addEventListener("pointerover", (event) => this.#togglePreviewFallback(event, true));
@@ -1353,6 +1399,11 @@ export class MapStudio {
     #handleStudioKeydown(event) {
         if (event.key === "Tab") {
             event.stopPropagation();
+            return;
+        }
+        // The Regions lists' keys: moving through a list, Unassigned, and naming
+        if (RegionLists.handleKey(this, event)) {
+            event.preventDefault();
             return;
         }
 
@@ -1416,6 +1467,17 @@ export class MapStudio {
             return;
         }
         if (!target.closest(".fwmb-context-panel")) return;
+        // The Labels list's filter
+        if (target.matches("[data-label-filter]")) {
+            if (event.type === "change") {
+                this.labelFilter = target.value;
+                this.view?.render(["context"]);
+            }
+            return;
+        }
+        // Fields that only steer the panel itself (a list's filter, a name being typed in the
+        // Regions tree, a Mass Edit tick) are not map settings
+        if (target.closest("[data-panel-ui]")) return;
 
         // The colour theme is the reader's own setting, not part of the map
         if (target.name === THEME_SETTINGS.MODE || target.name === THEME_SETTINGS.HUE) {
@@ -1711,7 +1773,7 @@ export class MapStudio {
      * which listens further up the page.
      */
     static #keepSummaryControlsFromToggling(event) {
-        if (event.target.closest("[data-action], button, a, .fwmb-legend-info")) event.preventDefault();
+        if (event.target.closest("[data-action], button, a, input, .fwmb-legend-info")) event.preventDefault();
     }
 
     #handleContextPanelInput(event) {
@@ -4583,6 +4645,7 @@ export class MapStudio {
         else if (maskCompleted) this.requestTerrainUpdate();
         this.#deactivateEditMode();
         this.#clearMassEditState();
+        RegionLists.reset(this);
         // The inspector belongs to the tool its object was opened from
         platform.dialogs.dismiss({ placement: "docked" });
 
@@ -5712,8 +5775,8 @@ export class MapStudio {
 
     /**
      * Returns the ids of every entity of a given type that Mass Edit can currently offer for
-     * selection. For regions that is the regions of the level being edited, the only ones the
-     * Regions panel lists.
+     * selection. For regions that is the regions of the level whose menu started it (see
+     * #massEditLevel).
      */
     _getMassEditableIds(type) {
         switch (type) {
@@ -5724,7 +5787,7 @@ export class MapStudio {
             case "label":
                 return (this.mapLabels || []).map((l) => l.id);
             case "region":
-                return (RegionPanel.activeLevel(this)?.regions ?? []).map((r) => r.id);
+                return RegionPanel.listedRegionIds(this, this.massEditLevelId);
             default:
                 return [];
         }

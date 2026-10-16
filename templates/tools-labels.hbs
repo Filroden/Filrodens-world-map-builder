@@ -1,31 +1,22 @@
 {{!--
-    Labels: the labels made with the map's regions, pins and routes, and the labels placed by hand.
-    Placing a label is the state block's (and the bar's) work.
+    Labels: every label of the map in one list (allLabels): the labels placed by hand
+    (standalone) and the labels of pins, routes and regions, each with what it belongs to as its
+    meta. The filter narrows the list to one kind. A row opens its label in the inspector; an owned
+    label's inspector links to its owner. Mass Edit chooses among the standalone labels. Placing a
+    label is the state block's (and the bar's) work.
 --}}
-{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="autoLabels" title="FILRODENSWMB.UI.AutoLabels" count=autoLabels.length}}
-    <div id="fwmb-scroll-auto-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
-            
-        {{#each autoLabels}}
-        <div class="fwmb-list-item" aria-selected="{{#if (eq this.id (lookup @root.inspected this.labelKey))}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="{{this.dataType}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}}>
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                <i class="fwmb-icon {{#if (eq this.displayVisibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.displayVisibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
-            </button>
-            <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                <i class="fwmb-icon fwmb-icon--center-focus"></i>
-            </button>
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabel" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                <i class="fwmb-icon fwmb-icon--edit"></i>
-            </button>
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="allLabels" title="FILRODENSWMB.UI.AllLabels" count=allLabels.length massType="label"}}
+    <div class="fwmb-form-group fwmb-label-filter">
+        <label class="fwmb-label" for="fwmb-label-filter">{{localize "FILRODENSWMB.UI.LabelFilter"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-label-filter" data-label-filter data-panel-ui>
+                {{#each labelFilters}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
         </div>
-        {{else}}
-        <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLabels"}}</div>
-        {{/each}}
-
     </div>
-{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
-{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="customLabels" title="FILRODENSWMB.UI.CustomLabels" count=mapLabels.length massType="label"}}
     {{#if massEditMode.label}}
     <div class="fwmb-mass-edit-bar">
         <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
@@ -37,28 +28,37 @@
     </div>
     {{/if}}
 
-    <div id="fwmb-scroll-custom-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
-        {{#each mapLabels}}
-        <div class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.labelcustom)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="custom">
-            {{#if ../massEditMode.label}}
-                <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="label" {{#if this.massEditSelected}}checked{{/if}} />
+    <div id="fwmb-scroll-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+        {{#each allLabels}}
+        <div class="fwmb-list-item{{#if (eq this.visibility 'none')}} fwmb-is-hidden{{/if}}" aria-selected="{{#if (eq this.id (lookup @root.inspected this.labelKey))}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="{{this.type}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}} data-action="editLabel">
+            {{#if @root.massEditMode.label}}
+                {{#if this.standalone}}
+                <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="label" data-panel-ui aria-label="{{localize 'FILRODENSWMB.UI.MassEditChoose' name=this.name}}" {{#if this.massEditSelected}}checked{{/if}} />
+                {{else}}
+                <span class="fwmb-checkbox-gap" aria-hidden="true"></span>
+                {{/if}}
             {{/if}}
             <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                 <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
             </button>
-            <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                <i class="fwmb-icon fwmb-icon--center-focus"></i>
-            </button>
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabel" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                <i class="fwmb-icon fwmb-icon--edit"></i>
-            </button>
-            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLabel" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                <i class="fwmb-icon fwmb-icon--delete"></i>
-            </button>
+            <span class="fwmb-name" title="{{this.name}}">{{this.name}}</span>
+            {{#if this.meta}}<span class="fwmb-meta">{{this.meta}}</span>{{/if}}
+            <span class="fwmb-actions">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                    <i class="fwmb-icon fwmb-icon--center-focus"></i>
+                </button>
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabel" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                    <i class="fwmb-icon fwmb-icon--edit"></i>
+                </button>
+                {{#if this.standalone}}
+                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLabel" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                    <i class="fwmb-icon fwmb-icon--delete"></i>
+                </button>
+                {{/if}}
+            </span>
         </div>
         {{else}}
-        <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLabels"}}</div>
+        <div class="fwmb-list-empty">{{localize labelsEmpty}}</div>
         {{/each}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

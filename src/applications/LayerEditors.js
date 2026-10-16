@@ -24,9 +24,14 @@ function same(a, b) {
  * fill covers water, and Delete. Opening it makes it the active set.
  */
 export class LayerSetEditor {
-    /** @returns {Promise<boolean>} */
-    static open(app, setId) {
-        return Inspector.open(app, this.KIND, { id: setId });
+    /**
+     * @param {object} app
+     * @param {string} setId
+     * @param {{created?: boolean}} [options] - See Inspector.open.
+     * @returns {Promise<boolean>}
+     */
+    static open(app, setId, options) {
+        return Inspector.open(app, this.KIND, { id: setId }, options);
     }
 
     static KIND = Object.freeze({
@@ -65,9 +70,14 @@ export class LayerSetEditor {
  * RegionPanel.applyLevelEdit).
  */
 export class LevelEditor {
-    /** @returns {Promise<boolean>} */
-    static open(app, levelId) {
-        return Inspector.open(app, this.KIND, { id: levelId });
+    /**
+     * @param {object} app
+     * @param {string} levelId
+     * @param {{created?: boolean}} [options] - See Inspector.open.
+     * @returns {Promise<boolean>}
+     */
+    static open(app, levelId, options) {
+        return Inspector.open(app, this.KIND, { id: levelId }, options);
     }
 
     static #find(app, { id }) {

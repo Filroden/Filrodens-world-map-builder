@@ -81,25 +81,24 @@
     {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="landMasks" title="FILRODENSWMB.UI.LandMasks" badge="FILRODENSWMB.UI.BadgeRebuildsMap"}}
         <div id="fwmb-scroll-landMasks" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
             {{#each landMasks}}
-                <div class="fwmb-list-item{{#if this.isActive}} fwmb-is-working{{/if}}" aria-selected="{{#if (eq this.id @root.inspected.landMask)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="landMask">
+                <div class="fwmb-list-item{{#if this.isActive}} fwmb-is-working{{/if}}" aria-selected="{{#if (eq this.id @root.inspected.landMask)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="landMask" data-action="editLandMask">
                     <div class="fwmb-route-swatch fwmb-route-swatch--solid" style="background-color: {{this.swatchColor}};" data-tooltip="{{#if (eq this.operation 'subtract')}}{{localize 'FILRODENSWMB.UI.LandMaskTypeOcean'}}{{else}}{{localize 'FILRODENSWMB.UI.LandMaskTypeLand'}}{{/if}}"></div>
 
                     <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
-
-                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                        <i class="fwmb-icon fwmb-icon--center-focus"></i>
-                    </button>
-
-                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLandMask" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                        <i class="fwmb-icon fwmb-icon--edit"></i>
-                    </button>
-
-                    <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLandMask" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                        <i class="fwmb-icon fwmb-icon--delete"></i>
-                    </button>
+                    <span class="fwmb-actions">
+                        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                            <i class="fwmb-icon fwmb-icon--center-focus"></i>
+                        </button>
+                        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLandMask" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
+                            <i class="fwmb-icon fwmb-icon--edit"></i>
+                        </button>
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLandMask" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                            <i class="fwmb-icon fwmb-icon--delete"></i>
+                        </button>
+                    </span>
                 </div>
             {{else}}
-                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoLandMasks"}}</div>
+                <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoLandMasks"}}</div>
             {{/each}}
         </div>
 

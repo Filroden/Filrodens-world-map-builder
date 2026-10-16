@@ -455,9 +455,20 @@ export class Overlay {
         this.#close(this.#dismissed);
     }
 
+    /**
+     * Focus goes to the host when the dialogue held it and what had it before has gone (the row of
+     * an object an undo took away), so the studio's keys (another Ctrl+Z) still reach the studio
+     * rather than the page.
+     */
+    #focusHost() {
+        if (!this.#host.hasAttribute("tabindex")) this.#host.tabIndex = -1;
+        this.#host.focus({ preventScroll: true });
+    }
+
     /** Removes the dialogue (and its scrim), returns focus to where it was and resolves with `value`. */
     #close(value) {
         if (!this.#dialog.isConnected) return;
+        const hadFocus = this.#dialog.contains(this.#dialog.ownerDocument.activeElement);
         this.#dialog.removeEventListener("click", this.#onClick);
         this.#dialog.removeEventListener("keydown", this.#onKeydown);
         this.#dialog.removeEventListener("submit", this.#onSubmit);
@@ -468,6 +479,7 @@ export class Overlay {
         openByHost.get(this.#host)?.delete(this);
 
         if (this.#previousFocus?.isConnected && typeof this.#previousFocus.focus === "function") this.#previousFocus.focus();
+        else if (hadFocus) this.#focusHost();
         this.#resolve(value);
     }
 }
