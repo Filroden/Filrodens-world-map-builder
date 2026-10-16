@@ -538,6 +538,22 @@
     border-color: var(--fwmb-fill-secondary);
     color: var(--fwmb-text-inverse);
 }
+/* A filled button keeps its fill when hovered or pressed, darkened as the tone buttons are,
+   rather than taking the plain button's surface under its light text */
+.fwmb-btn--secondary:hover {
+    background: var(--fwmb-fill-secondary);
+    filter: brightness(0.9);
+}
+.fwmb-btn--secondary:active {
+    background: var(--fwmb-fill-secondary);
+}
+.fwmb-btn--secondary:active,
+.fwmb-btn[data-tone]:active {
+    filter: brightness(0.8);
+}
+.fwmb-btn--primary:active {
+    background: var(--fwmb-fill-accent-hover);
+}
 .fwmb-btn--subtle {
     background: transparent;
     border-color: transparent;
@@ -1636,6 +1652,16 @@
     text-transform: uppercase;
     letter-spacing: var(--fwmb-letter-spacing-wide);
     padding-block: 0.1875rem 0.0625rem;
+}
+
+/* An option in a group is drawn as an option, not as its group's heading (each label font's option
+   is drawn in its own face, see parts/font-picker.hbs) */
+.fwmb optgroup > option {
+    color: var(--fwmb-text-primary);
+    font-weight: normal;
+    font-size: var(--fwmb-size-13);
+    text-transform: none;
+    letter-spacing: normal;
 }
 
 .fwmb input:disabled,
@@ -4010,6 +4036,57 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 .fwmb .fwmb-inspector-hint {
     margin: 0;
+}
+
+/* A pin's icon: a disclosure whose summary shows the icon and its name, opening the grid below it
+   (an icon chosen applies at once and the inspector, drawn again, closes it) */
+.fwmb .fwmb-icon-picker {
+    flex: 1;
+    min-width: 0;
+}
+
+.fwmb .fwmb-icon-picker > summary {
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    width: 100%;
+    justify-content: flex-start;
+    cursor: pointer;
+}
+
+.fwmb .fwmb-icon-picker > summary::-webkit-details-marker {
+    display: none;
+}
+
+.fwmb .fwmb-icon-picker > summary > span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: start;
+}
+
+.fwmb .fwmb-icon-picker > .fwmb-icon-grid {
+    margin-block-start: 0.375rem;
+    background: var(--fwmb-bg-base);
+}
+
+.fwmb .fwmb-icon-picker .fwmb-icon-grid .fwmb-btn[aria-selected="true"] {
+    background: var(--fwmb-bg-highlight);
+    border-color: var(--fwmb-accent-main);
+}
+
+/* A label's Bold and Italic, side by side under its font */
+.fwmb .fwmb-inspector-face {
+    gap: 1rem;
+}
+
+/* What an owned label belongs to */
+.fwmb .fwmb-inspector-owner {
+    margin: 0;
+    color: var(--fwmb-text-secondary);
 }
 
 /* --- PROCESSING OVERLAY --- */

@@ -1,5 +1,6 @@
 import { Idiomorph } from "../../vendor/idiomorph/idiomorph.esm.js";
 import { Overlay } from "../ui/Overlay.js";
+import { RangeDisplay } from "../tools/RangeDisplay.js";
 import { platform } from "../platform/index.js";
 
 /**
@@ -176,10 +177,18 @@ export class Inspector {
             const field = event.target;
             if (event.key === "Enter" && field.localName === "input" && field.type !== "checkbox" && field.name) this.#commit(app, state, field.name);
         }, true);
-        // A slider reset by double-click (see StudioView) is committed once its value is back
+        // A double-click returns a slider to its default and commits it. The reset is made here, not
+        // left to the studio's own handler (see StudioView), which runs later in the event: a
+        // reader's double-click runs pending work between the two, so a commit queued here would
+        // read the slider before it was reset. The studio's handler then finds it already reset.
         dialog.addEventListener("dblclick", (event) => {
             const field = event.target;
-            if (field.localName === "input" && field.type === "range" && field.name) queueMicrotask(() => this.#commit(app, state, field.name));
+            if (field.localName !== "input" || field.type !== "range" || !field.name) return;
+            if (field.dataset.default !== undefined && field.value !== field.dataset.default) {
+                field.value = field.dataset.default;
+                RangeDisplay.sync(field);
+            }
+            this.#commit(app, state, field.name);
         });
         // A section's toggle does not bubble, so it is caught on its way down
         dialog.addEventListener("toggle", (event) => {

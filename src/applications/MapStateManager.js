@@ -192,8 +192,12 @@ export class MapStateManager {
             customPinStyles: null,
             pinColor: "#ffffff",
             pinScale: FILRODENSWMB.PINS.DEFAULT_SCALE,
+            // The modes of pins and labels: select or place (see PickTool). Every tool with a
+            // Select mode is in it while nothing is being edited (see MapStudio#returnToSelect)
+            pinToolMode: "select",
+            labelToolMode: "select",
             // The Routes tool's edit mode: select, draw or edit (see RouteTool)
-            routeToolMode: "draw",
+            routeToolMode: "select",
             // How closely a traced stroke is kept, in mesh cells (see RouteTool)
             routeDetail: FILRODENSWMB.MESH.ROUTE_DRAW.DETAIL.DEFAULT,
             // The line and leg mode a new route starts with, which also show and edit the picked route, and the transport it is made for
@@ -228,9 +232,14 @@ export class MapStateManager {
             labelFillColor: FILRODENSWMB.LABELS?.DEFAULT_COLOR,
             labelMaxChars: 0,
             labelJustify: "left",
+            // Labels were always bold before they could choose (see LabelFonts), and new ones still start so
+            labelBold: true,
+            labelItalic: false,
             activeLabelQuickStyle: "custom",
             nextLabelText: platform.i18n.localize(FILRODENSWMB.LABELS?.DEFAULT_TEXT) || "New Label",
-            customLabelStyles: [],
+            // A new map starts with a few label styles in the vendored faces, so it can look like an
+            // atlas without choosing any; a saved map keeps its own (see MapStudio's load)
+            customLabelStyles: FILRODENSWMB.LABELS.DEFAULT_STYLES.map(({ nameKey, ...style }) => ({ ...style, name: platform.i18n.localize(nameKey) })),
 
             cartographyScaleEnable: false,
             cartographyScaleUnits: "Miles",

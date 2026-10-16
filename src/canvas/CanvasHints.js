@@ -27,6 +27,7 @@ export class CanvasHints {
      * @param {string} [state.infraMode]  Infrastructure mode: pin or route.
      * @param {string} [state.regionMode]  Regions mode: select, paint, erase or fill.
      * @param {string} [state.routeMode]  Routes mode (Infrastructure in Route mode): select, draw or edit.
+     * @param {string|null} [state.pickMode]  Pins' or labels' mode (see PickTool): select or place.
      * @param {boolean} [state.isMaskDrawing]  Whether the Scene tool is drawing land masks.
      * @param {string|null} [state.heldItem]  What the pointer holds: label, decoration, pin or
      *   mask (a land mask).
@@ -58,11 +59,11 @@ export class CanvasHints {
             case "features":
                 return state.featureMode === "spring" ? "spring" : "line";
             case "infrastructure":
-                return state.infraMode === "route" ? CanvasHints.#modeContext("route", state.routeMode, "draw") : "pin";
+                return state.infraMode === "route" ? CanvasHints.#modeContext("route", state.routeMode, "draw") : CanvasHints.#modeContext("pin", state.pickMode, "place");
             case "regions":
                 return CanvasHints.#modeContext("region", state.regionMode, "select");
             case "labels":
-                return "labels";
+                return CanvasHints.#modeContext("label", state.pickMode, "place");
             case "cartography":
                 return "cartography";
             case "scene":

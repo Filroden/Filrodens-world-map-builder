@@ -1,8 +1,8 @@
-{{!-- Routes and pins' bar (tool id "infrastructure"): Pin or Route; for pins, the style, icon, colour
-     and scale the next pin gets; for routes, Select (which does not edit), Draw and Waypoints, how a
-     new route's legs are found, and the style a new route starts with (which also shows and edits
-     the picked route; step 4 moves that to the inspector). The route being edited is named in the
-     readout. --}}
+{{!-- Routes and pins' bar (tool id "infrastructure"): Pin or Route; for pins, Select (which does
+     not edit) and Place, and the style, icon, colour and scale the next pin gets; for routes,
+     Select (which does not edit), Draw and Waypoints, how a new route's legs are found, and the
+     style a new route starts with (which also shows and edits the picked route; 4c slims this).
+     The route being edited is named in the readout. --}}
 {{#each bar.modeGroups}}
     {{#unless @first}}<span class="fwmb-sep"></span>{{/unless}}
     {{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}

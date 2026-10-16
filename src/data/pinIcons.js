@@ -109,7 +109,7 @@ export function getCustomPinIconById(id) {
 }
 
 /**
- * The merged, filtered list used by every icon picker (edit-pins.hbs, the infrastructure
+ * The merged, filtered list used by every icon picker (the pin inspector, the infrastructure
  * toolbar's pin mode). Built-ins are listed first, then customs, both alphabetical - a
  * disabled built-in is hidden unless it's `currentKey`, so re-opening a pin never makes its
  * own icon vanish from the picker even after a GM has since disabled it.

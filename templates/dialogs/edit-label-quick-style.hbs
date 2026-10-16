@@ -13,13 +13,23 @@
     </div>
 
     <div class="fwmb-form-group">
-        <label>{{localize "FILRODENSWMB.UI.FontFamily"}}</label>
+        <label for="fwmb-style-font">{{localize "FILRODENSWMB.UI.FontFamily"}}</label>
         <div class="fwmb-form-fields">
-            <select name="styleFontFamily">
-                {{#each fonts}}
-                    <option value="{{this}}" {{#if (eq ../style.fontFamily this)}}selected{{/if}}>{{this}}</option>
-                {{/each}}
-            </select>
+            {{> "modules/filrodens-world-map-builder/templates/parts/font-picker.hbs" id="fwmb-style-font" name="styleFontFamily" groups=fontGroups selected=style.fontFamily missing=fontMissing}}
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <span class="fwmb-label">{{localize "FILRODENSWMB.UI.LabelFace"}}</span>
+        <div class="fwmb-form-fields">
+            <label class="fwmb-checkbox-label">
+                <input type="checkbox" class="fwmb-checkbox" name="styleBold" {{#unless (eq style.bold false)}}checked{{/unless}} />
+                {{localize "FILRODENSWMB.UI.LabelBold"}}
+            </label>
+            <label class="fwmb-checkbox-label">
+                <input type="checkbox" class="fwmb-checkbox" name="styleItalic" {{#if style.italic}}checked{{/if}} />
+                {{localize "FILRODENSWMB.UI.LabelItalic"}}
+            </label>
         </div>
     </div>
 

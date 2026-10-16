@@ -5,11 +5,11 @@
  * importing it on another host (or in a Node test that stubs only some globals) is harmless.
  */
 import { FILRODENSWMB } from "../../config.js";
+import { labelFontList } from "../../data/fonts.js";
 import { createOverlayDialogs } from "../../ui/dialogs.js";
 import * as store from "./store.js";
 
 /** Offered when Foundry's font list is not available yet. */
-const FALLBACK_FONTS = Object.freeze(["Signika", "Modesto Condensed", "Arial"]);
 
 const i18n = {
     localize: (key) => game.i18n.localize(key),
@@ -43,7 +43,8 @@ const templates = {
 };
 
 const fonts = {
-    list: () => CONFIG.fontFamilies || [...FALLBACK_FONTS],
+    // The vendored label fonts, then the world's own (Foundry's core fonts and any the world adds)
+    list: () => labelFontList(CONFIG.fontFamilies ?? []),
 };
 
 /** The module's world settings, by the key under the module's namespace. */

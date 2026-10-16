@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { labelFontGroups } from "../data/fonts.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
@@ -180,11 +181,13 @@ export class MapDialogManager {
 
         const defaults = {
             quickStyle: "custom",
-            fontFamily: app.uiState.labelFontFamily || "Signika",
+            fontFamily: app.uiState.labelFontFamily || FILRODENSWMB.LABELS.DEFAULT_FONT,
             fontSize: app.uiState.labelFontSize || 1,
             fillColor: app.uiState.labelFillColor || "#ffffff",
             maxChars: app.uiState.labelMaxChars || 0,
             justify: app.uiState.labelJustify || "left",
+            bold: app.uiState.labelBold !== false,
+            italic: app.uiState.labelItalic === true,
             rotation: 0,
         };
 
@@ -193,27 +196,6 @@ export class MapDialogManager {
         safe.label.rotation = CanvasTransforms.normalizeAngle(safe.label.rotation);
 
         return safe;
-    }
-
-    /**
-     * Extracts shared "label properties" form fields from a submitted dialogue.
-     */
-    static _extractLabelResultFields(form) {
-        const fields = {
-            quickStyle: form.elements["labelQuickStyle"].value,
-            fontFamily: form.elements["labelFontFamily"].value,
-            fontSize: Number(form.elements["labelFontSize"].value) || 1,
-            fillColor: form.elements["labelFillColor"].value,
-            maxChars: Number(form.elements["labelMaxChars"].value) || 0,
-            justify: form.elements["labelJustify"].value,
-        };
-
-        // Only dialogues that edit one placed label have a Rotation slider. Leaving the field out
-        // otherwise keeps the label's current angle when the result is merged into it.
-        const rotationInput = form.elements["labelRotation"];
-        if (rotationInput) fields.rotation = CanvasTransforms.normalizeAngle(rotationInput.value);
-
-        return fields;
     }
 
     /**
@@ -441,15 +423,18 @@ export class MapDialogManager {
                 template: "modules/filrodens-world-map-builder/templates/dialogs/edit-label-quick-style.hbs",
                 getDefaults: (app) => ({
                     name: "New Label Style",
-                    fontFamily: app.uiState.labelFontFamily || "Signika",
+                    fontFamily: app.uiState.labelFontFamily || FILRODENSWMB.LABELS.DEFAULT_FONT,
                     fontSize: app.uiState.labelFontSize || 1,
                     fillColor: app.uiState.labelFillColor || "#000000",
                     maxChars: app.uiState.labelMaxChars || 0,
                     justify: app.uiState.labelJustify || "left",
+                    bold: app.uiState.labelBold !== false,
+                    italic: app.uiState.labelItalic === true,
                 }),
                 getContext: (app, style) => ({
                     style,
-                    fonts: platform.fonts.list(),
+                    fontGroups: labelFontGroups(platform.fonts.list(), "FILRODENSWMB.UI.FontCategoryOther"),
+                    fontMissing: !!style.fontFamily && !platform.fonts.list().includes(style.fontFamily),
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
                 }),
                 onExtract: (form, fallbackName) => ({
@@ -459,6 +444,8 @@ export class MapDialogManager {
                     fillColor: form.elements["styleFillColor"].value,
                     maxChars: Number(form.elements["styleMaxChars"].value) || 0,
                     justify: form.elements["styleJustify"].value,
+                    bold: form.elements["styleBold"]?.checked !== false,
+                    italic: form.elements["styleItalic"]?.checked === true,
                 }),
                 onCascade: (app, id, result) => {
                     const aestheticProperties = {
@@ -467,6 +454,8 @@ export class MapDialogManager {
                         fillColor: result.fillColor,
                         maxChars: result.maxChars,
                         justify: result.justify,
+                        bold: result.bold !== false,
+                        italic: result.italic === true,
                     };
 
                     for (const lbl of app.mapLabels) {
@@ -505,6 +494,8 @@ export class MapDialogManager {
                     app.uiState.labelFillColor = result.fillColor;
                     app.uiState.labelMaxChars = result.maxChars;
                     app.uiState.labelJustify = result.justify;
+                    app.uiState.labelBold = result.bold !== false;
+                    app.uiState.labelItalic = result.italic === true;
                 },
             },
             Route: {
@@ -1121,10 +1112,23 @@ export class MapDialogManager {
         const config = FILRODENSWMB.ENTITY_CONFIG[entityType];
         if (!config) return;
 
-        const id = target.closest(".fwmb-list-item").dataset.id;
+        await this.deleteEntityById(app, entityType, target.closest(".fwmb-list-item").dataset.id);
+    }
+
+    /**
+     * Deletes one pin, river, fault, decoration or label (by ENTITY_CONFIG's type) after the
+     * standard confirmation, as one undo step: from its list's delete button or the inspector.
+     * @param {object} app
+     * @param {string} entityType - A key of FILRODENSWMB.ENTITY_CONFIG.
+     * @param {string} id
+     * @returns {Promise<boolean>} Whether it was deleted.
+     */
+    static async deleteEntityById(app, entityType, id) {
+        const config = FILRODENSWMB.ENTITY_CONFIG[entityType];
+        if (!config || !app[config.stateKey]?.some((item) => item.id === id)) return false;
 
         const confirmed = await this._confirmDialog();
-        if (!confirmed) return;
+        if (!confirmed) return false;
 
         MapStateManager.pushVectorState(app);
 
@@ -1139,6 +1143,7 @@ export class MapDialogManager {
 
         app.view?.render(["context"]);
         app.markDirty();
+        return true;
     }
 
     static async onDeleteLandMask(app, event, target) {
@@ -1461,55 +1466,6 @@ export class MapDialogManager {
         else delete fault.revision;
     }
 
-    static async onEditLabel(app, event, target, explicitData = null) {
-        const dataset = target?.closest(".fwmb-list-item")?.dataset || {};
-        const id = explicitData?.id || dataset.id;
-        const type = explicitData?.type || dataset.type;
-        const layerId = explicitData?.layerId || dataset.layerId;
-
-        let sourceObj = null;
-        if (type === "custom") sourceObj = app.mapLabels.find((l) => l.id === id);
-        else if (type === "pin") sourceObj = app.mapPins.find((p) => p.id === id);
-        else if (type === "route") sourceObj = app.mapRoutes.find((r) => r.id === id);
-        else if (type === "region") {
-            const layer = app.regionLevels.find((l) => l.id === layerId);
-            sourceObj = layer?.regions.find((r) => r.id === id);
-        }
-
-        if (!sourceObj) return;
-
-        let labelData = { name: sourceObj.name };
-
-        if (type === "custom") {
-            platform.utils.mergeObject(labelData, sourceObj);
-            labelData.rotation = CanvasTransforms.normalizeAngle(labelData.rotation);
-        } else {
-            const safeObj = this._withLabelDefaults(app, sourceObj);
-            platform.utils.mergeObject(labelData, safeObj.label);
-        }
-
-        await this._processEditDialog(app, sourceObj, {
-            titleKey: "FILRODENSWMB.UI.EditLabel",
-            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-labels.hbs",
-            context: {
-                label: labelData,
-                rotationRange: FILRODENSWMB.UI.ROTATION,
-                fonts: platform.fonts.list(),
-                palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                customLabelStyles: app.uiState.customLabelStyles || [],
-            },
-            onRender: (html) => {
-                this.bindLabelPropertiesDialog(html, app.uiState);
-            },
-            onExtract: (form, fallbackName) => {
-                const result = { name: form.elements["labelName"]?.value.trim() || fallbackName };
-                if (type === "custom") Object.assign(result, this._extractLabelResultFields(form));
-                else result.label = this._extractLabelResultFields(form);
-                return result;
-            },
-        });
-    }
-
     static async onEditCustomPinIcon(app, event, target) {
         const id = target.closest(".fwmb-list-item").dataset.id;
         const icon = getCustomPinIconById(id);
@@ -1520,89 +1476,6 @@ export class MapDialogManager {
 
         await updateCustomPinIcon(id, result);
         app.view?.render(["context"]);
-    }
-
-    static async onEditPin(app, event, target, explicitId = null) {
-        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
-        const pin = app.mapPins.find((p) => p.id === id);
-        if (!pin) return;
-
-        const safePin = this._withLabelDefaults(app, pin);
-        const icons = getPinIconPickerList(pin.icon).map((entry) => ({
-            key: entry.key,
-            localized: entry.label,
-            path: entry.path,
-            isCustom: entry.isCustom,
-            selected: entry.key === pin.icon,
-        }));
-        const currentIcon = icons.find((entry) => entry.selected);
-
-        await this._processEditDialog(app, pin, {
-            titleKey: "FILRODENSWMB.UI.EditPin",
-            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-pins.hbs",
-            context: {
-                pin: safePin,
-                rotationRange: FILRODENSWMB.UI.ROTATION,
-                icons,
-                pinIconPath: currentIcon?.path || "",
-                pinIconIsCustom: currentIcon?.isCustom || false,
-                pinStyles: PinStyles.choices(app, pin.pinStyle),
-                palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                fonts: platform.fonts.list(),
-                customLabelStyles: app.uiState.customLabelStyles || [],
-            },
-            onRender: (html) => this.#bindPinStyleFields(html, app),
-            onExtract: (form, fallbackName) => ({
-                name: form.elements["pinName"]?.value.trim() || fallbackName,
-                description: form.elements["pinDesc"].value,
-                pinStyle: PinStyles.find(app, form.elements["pinStyle"].value)?.id ?? null,
-                icon: form.elements["pinIcon"].value,
-                scale: Number(form.elements["pinScale"].value),
-                color: form.elements["pinColor"].value,
-                label: this._extractLabelResultFields(form),
-            }),
-        });
-    }
-
-    /**
-     * The pin editor's fields: choosing a pin style fills the icon, colour, scale and label size
-     * from it (and the label quick style, which fills the rest of the label fields as it does in
-     * every editor); changing the icon, colour or scale by hand leaves the style for "no style".
-     * The label fields work as in every other editor.
-     */
-    static #bindPinStyleFields(html, app) {
-        const styleSelect = html.querySelector('select[name="pinStyle"]');
-        const color = html.querySelector('input[name="pinColor"]');
-        const scale = html.querySelector('input[name="pinScale"]');
-        const labelSize = html.querySelector('input[name="labelFontSize"]');
-        const labelQuickStyle = html.querySelector('select[name="labelQuickStyle"]');
-        const toNone = () => {
-            if (styleSelect) styleSelect.value = PinStyles.NONE;
-        };
-        const picker = this._bindIconPicker(html, "fwmb-edit-pin", toNone);
-        this.bindLabelPropertiesDialog(html, app.uiState);
-
-        styleSelect?.addEventListener("change", () => {
-            const style = PinStyles.find(app, styleSelect.value);
-            if (!style) return;
-            const fields = PinStyles.fields(app, style);
-            picker?.choose(fields.icon);
-            if (color) color.value = fields.color;
-            if (scale) {
-                scale.value = fields.scale;
-                RangeDisplay.sync(scale);
-            }
-            if (labelQuickStyle) {
-                labelQuickStyle.value = fields.label.quickStyle;
-                labelQuickStyle.dispatchEvent(new Event("change", { bubbles: true }));
-            }
-            if (labelSize) {
-                labelSize.value = fields.label.fontSize;
-                RangeDisplay.sync(labelSize);
-            }
-        });
-        color?.addEventListener("input", toNone);
-        scale?.addEventListener("input", toNone);
     }
 
     static async onEditQuickStyle(app, event, target) {

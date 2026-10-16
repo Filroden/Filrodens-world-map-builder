@@ -9,6 +9,7 @@
  * What the web version leaves out is expressed as data: `scene.available` is false (there is no
  * Foundry scene to export to), and `grid`, which only that export uses, is not offered.
  */
+import { labelFontList } from "../../data/fonts.js";
 import { createOverlayDialogs } from "../../ui/dialogs.js";
 import { createWebAssets } from "./assets.js";
 import { createI18n } from "./i18n.js";
@@ -25,7 +26,6 @@ import * as utils from "./utils.js";
 const TITLE_ID_LENGTH = 6;
 
 /** Font families offered for labels: ones every desktop browser has. */
-const WEB_FONTS = Object.freeze(["Arial", "Georgia", "Times New Roman", "Trebuchet MS", "Verdana", "Courier New"]);
 
 /**
  * @param {object} options
@@ -50,7 +50,8 @@ export function createWebPlatform({ strings, lang, handlebars, fetchTemplate, re
         notify: createNotifications(frame, { closeLabel: i18n.localize("FILRODENSWMB.UI.Close") }),
         utils,
         templates: createWebTemplates({ handlebars, prefix, fetchText: fetchTemplate }),
-        fonts: { list: () => [...WEB_FONTS] },
+        // The vendored label fonts: the same faces as in Foundry, with no system fonts to vary by machine
+        fonts: { list: () => labelFontList() },
         dialogs: createOverlayDialogs({ localize: i18n.localize }),
         settings: createWebSettings(storage),
         store: createWebStore(records),

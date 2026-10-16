@@ -13,5 +13,8 @@
     "FILRODENSWMB.UI.EngineStandardHint": "Uses standard noise generation to create quick, randomised terrain.",
     "FILRODENSWMB.UI.ImportSettingsEmpty": "That file didn't contain any recognised custom biomes or quick styles.",
     "FILRODENSWMB.UI.FaultSpacingHint": "The typical distance between volcanoes, in island sizes. Low values merge neighbouring volcanoes into larger islands.",
-    "FILRODENSWMB.UI.PresetColors": "Preset colours"
+    "FILRODENSWMB.UI.PresetColors": "Preset colours",
+    "FILRODENSWMB.UI.SectionColours": "Colours",
+    "FILRODENSWMB.UI.CenterImage": "Centre the image",
+    "FILRODENSWMB.UI.InspectorColor": "Colour"
 }

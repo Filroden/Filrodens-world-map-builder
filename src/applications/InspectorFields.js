@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { labelFontGroups } from "../data/fonts.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { platform } from "../platform/index.js";
@@ -17,7 +18,7 @@ import { platform } from "../platform/index.js";
  */
 export class InspectorFields {
     /** The label fields a label style carries, and so the ones that make a label Custom when changed. */
-    static LABEL_STYLE_FIELDS = Object.freeze(["fontFamily", "fontSize", "fillColor", "maxChars", "justify"]);
+    static LABEL_STYLE_FIELDS = Object.freeze(["fontFamily", "fontSize", "fillColor", "maxChars", "justify", "bold", "italic"]);
 
     /**
      * The styles each styled kind can pick from, by the Save as… button's `data-style-type`: the
@@ -27,6 +28,7 @@ export class InspectorFields {
         Region: { registryKey: "customRegionStyles", fields: ["fillColor", "fillStyle"], nameKey: "FILRODENSWMB.UI.NewRegionStyleName" },
         Route: { registryKey: "customRouteStyles", fields: ["color", "thickness", "style", "outline", "smoothing"], nameKey: "FILRODENSWMB.UI.NewRouteStyleName" },
         Label: { registryKey: "customLabelStyles", fields: InspectorFields.LABEL_STYLE_FIELDS, nameKey: "FILRODENSWMB.UI.NewLabelStyleName" },
+        Pin: { registryKey: "customPinStyles", fields: ["icon", "scale", "color", "label", "detailLevel"], nameKey: "FILRODENSWMB.UI.NewPinStyleName" },
     });
 
     /**
@@ -34,13 +36,16 @@ export class InspectorFields {
      * defaults new labels get (the bar's), with its rotation wrapped into the slider's range.
      */
     static label(app, entity) {
-        return MapDialogManager._withLabelDefaults(app, entity).label;
+        const label = MapDialogManager._withLabelDefaults(app, entity).label;
+        return { ...label, visibility: label.visibility ?? "all" };
     }
 
-    /** The context the label fields partial (parts/inspector-label.hbs) needs, besides the label. */
+    /** The context the label fields partial (parts/label-fields.hbs) needs, besides the label. */
     static labelChoices(app, label) {
         return {
-            fonts: platform.fonts.list(),
+            fontGroups: labelFontGroups(platform.fonts.list(), "FILRODENSWMB.UI.FontCategoryOther"),
+            // A family the host lacks stays chosen (the label keeps it), shown as missing
+            fontMissing: !!label.fontFamily && !platform.fonts.list().includes(label.fontFamily),
             labelStyles: this.styleChoices(app.uiState.customLabelStyles, label.quickStyle),
             rotationRange: FILRODENSWMB.UI.ROTATION,
             justifications: ["left", "center", "right"].map((value) => ({ value, label: `FILRODENSWMB.UI.Justify${value === "center" ? "Center" : value === "left" ? "Left" : "Right"}`, selected: value === label.justify })),
@@ -67,7 +72,7 @@ export class InspectorFields {
     }
 
     /**
-     * Reads the label fields of an inspector's form (see parts/inspector-label.hbs), as the label
+     * Reads the label fields of an inspector's form (see parts/label-fields.hbs), as the label
      * they describe once `field` (the field just committed) has taken effect: picking a label style
      * fills the styled fields from it, and changing a styled field makes the label Custom.
      *
@@ -85,12 +90,14 @@ export class InspectorFields {
             fillColor: elements.labelFillColor.value,
             maxChars: Math.max(0, Math.round(Number(elements.labelMaxChars.value) || 0)),
             justify: elements.labelJustify.value,
+            bold: elements.labelBold.checked,
+            italic: elements.labelItalic.checked,
         };
         if (elements.labelRotation) label.rotation = CanvasTransforms.normalizeAngle(elements.labelRotation.value);
         if (elements.labelVisibility) label.visibility = elements.labelVisibility.value;
         return this.settleStyle(label, field, {
             pickerField: "labelQuickStyle",
-            styledFields: { labelFontFamily: true, labelFontSize: true, labelFillColor: true, labelMaxChars: true, labelJustify: true },
+            styledFields: { labelFontFamily: true, labelFontSize: true, labelFillColor: true, labelMaxChars: true, labelJustify: true, labelBold: true, labelItalic: true },
             styles: app.uiState.customLabelStyles,
             fields: this.LABEL_STYLE_FIELDS,
             key: "quickStyle",
@@ -134,7 +141,7 @@ export class InspectorFields {
      * the map's styles. Resolves with the new style's id, or null when the name was not given.
      *
      * @param {object} app
-     * @param {"Region"|"Route"|"Label"} type
+     * @param {"Region"|"Route"|"Label"|"Pin"} type
      * @param {object} source - The fields to copy (an object, or its label).
      * @returns {Promise<string|null>}
      */
@@ -145,7 +152,7 @@ export class InspectorFields {
         const name = await MapDialogManager._promptTextValue(localize("FILRODENSWMB.UI.SaveStyleTitle"), localize("FILRODENSWMB.UI.StyleName"), localize(spec.nameKey));
         if (!name?.trim()) return null;
         const style = { id: platform.utils.randomID(), name: name.trim() };
-        for (const field of spec.fields) if (source[field] !== undefined) style[field] = source[field];
+        for (const field of spec.fields) if (source[field] !== undefined) style[field] = structuredClone(source[field]);
         app.uiState[spec.registryKey] ??= [];
         app.uiState[spec.registryKey].push(style);
         return style.id;

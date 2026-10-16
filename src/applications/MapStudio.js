@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { StudioCanvas } from "../canvas/StudioCanvas.js";
 import { CanvasHints } from "../canvas/CanvasHints.js";
+import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
@@ -34,6 +35,9 @@ import { Inspector } from "./Inspector.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RouteTool } from "./RouteTool.js";
 import { RouteEditor } from "./RouteEditor.js";
+import { PinEditor } from "./PinEditor.js";
+import { LabelEditor } from "./LabelEditor.js";
+import { PickTool } from "./PickTool.js";
 import { PinStyles } from "./PinStyles.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
@@ -131,8 +135,8 @@ export class MapStudio {
         // --- DIALOG MANAGER: Entity Editing ---
         editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
         editFault(e, t)       { MapDialogManager.onEditFault(this, e, t); },
-        editLabel(e, t)       { MapDialogManager.onEditLabel(this, e, t); },
-        editPin(e, t)         { MapDialogManager.onEditPin(this, e, t); },
+        editLabel(_e, t)      { LabelEditor.open(this, MapStudio.#labelRef(t)); },
+        editPin(_e, t)        { PinEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
         editRegion(_e, t)     { RegionEditor.open(this, ...RegionPanel.regionIdsOf(t)); },
         editRiver(e, t)       { MapDialogManager.onEditRiver(this, e, t); },
         editRoute(_e, t)      { RouteEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
@@ -213,6 +217,7 @@ export class MapStudio {
         setRegionMode(_e, t)            { RegionPainter.setMode(this, t); this.#modeChosen(RegionPainter.mode(this) !== "select"); },
         toggleRegionShowAll()           { RegionPainter.toggleShowAll(this); },
         setRouteMode(_e, t)             { RouteTool.setMode(this, t); this.#modeChosen(RouteTool.mode(this) !== "select"); },
+        setPickMode(_e, t)              { if (PickTool.setMode(this, t.dataset.mode)) this.#modeChosen(t.dataset.mode !== "select"); },
         setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
         setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
         threeDView(e, t)                { this._onThreeDView(e, t); },
@@ -826,12 +831,22 @@ export class MapStudio {
                 if (this.#isRouteMode()) {
                     const labels = { select: "ModeSelect", draw: "ModeDraw", edit: "ModeWaypoints" };
                     groups.push(group(ui("ModesRoute"), "route", RouteTool.toolbarContext(this).modes.map((entry) => mode("setRouteMode", "mode", entry.value, ui(labels[entry.value]), entry.label, entry.icon, entry.active))));
+                } else {
+                    groups.push(this.#pickModeGroup(group, "pin", ui("ModesPin")));
                 }
                 return groups;
             }
+            case "labels":
+                return [this.#pickModeGroup(group, "label", ui("ModesLabel"))];
             default:
                 return [];
         }
+    }
+
+    /** The Select and Place modes of a tool that places things (pins, labels; see PickTool). */
+    #pickModeGroup(group, key, label) {
+        const short = { select: "FILRODENSWMB.UI.ModeSelect", place: "FILRODENSWMB.UI.ModePlace" };
+        return group(label, key, PickTool.toolbarModes(this).map((entry) => MapStudio.#barMode("setPickMode", "mode", entry.value, short[entry.value], entry.label, entry.icon, entry.active)));
     }
 
     /**
@@ -1188,6 +1203,8 @@ export class MapStudio {
         this.#bindStudioListeners(root);
         // Dialogues are drawn inside the studio while it is open
         this.#detachDialogs = platform.dialogs.attach(root);
+        // Labels naming a family this host lacks are drawn in the default label font (see LabelFonts)
+        LabelFonts.setAvailable(platform.fonts.list());
         this.view.render();
         this.#showTitle();
     }
@@ -1225,6 +1242,32 @@ export class MapStudio {
         RegionPanel.selectRegion(this, target);
         if (this.activeRegionId === regionId) RegionEditor.open(this, levelId, regionId);
         else if (Inspector.shows(this, "region", regionId)) Inspector.close(this);
+    }
+
+    /** The fields of every label on the map: standalone labels, and the labels of pins, routes and regions. */
+    #labelFields(levels = this.regionLevels) {
+        const owned = [...this.mapPins, ...this.mapRoutes, ...(levels ?? []).flatMap((level) => level.regions ?? [])].map((owner) => owner.label ?? {});
+        return [...this.mapLabels, ...owned];
+    }
+
+    /**
+     * Before an export: every label's face has loaded (or failed), and the labels are drawn in
+     * them, so no label is exported in a fallback face (see LabelFonts).
+     */
+    async #labelFacesReady() {
+        await LabelFonts.ready(this.#labelFields());
+        this._repaintVectors();
+    }
+
+    /**
+     * When a map opens, one notice names the label fonts it uses that this host lacks (a Foundry
+     * world's font opened on the web, say): those labels are drawn in the default label font, and
+     * keep their own, so they come back on a host that has it.
+     */
+    #reportMissingFonts(levels) {
+        const missing = LabelFonts.missing(this.#labelFields(levels));
+        if (missing.length === 0) return;
+        platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.LabelFontsMissing", { fonts: missing.join(", "), fallback: FILRODENSWMB.LABELS.DEFAULT_FONT }));
     }
 
     /**
@@ -1312,6 +1355,11 @@ export class MapStudio {
         }
         // The Routes tool takes Enter, Backspace and Escape while a route is placed or picked
         if (this.#isRouteMode() && RouteTool.handleKey(this, event)) {
+            event.preventDefault();
+            return;
+        }
+        // Pins' and labels' Select mode takes Escape, closing the inspector on what it picked
+        if (PickTool.handleKey(this, event)) {
             event.preventDefault();
             return;
         }
@@ -1796,7 +1844,8 @@ export class MapStudio {
         // the Infrastructure tool is in Route mode, it places and edits routes (see RouteTool)
         this.canvasEngine.pointerToolProvider = () => {
             if (this.activeTool === "regions") return RegionPainter.tool(this);
-            return this.#isRouteMode() ? RouteTool.tool(this) : null;
+            if (this.#isRouteMode()) return RouteTool.tool(this);
+            return PickTool.tool(this);
         };
         this.canvasEngine.onCanvasHover = (x, y) => {
             const isBrushActive = this.activeTool === "terrain" || this.activeTool === "biomes";
@@ -1998,11 +2047,18 @@ export class MapStudio {
             infraMode: this.uiState.activeInfraMode,
             regionMode: RegionPainter.mode(this),
             routeMode: RouteTool.mode(this),
+            pickMode: PickTool.mode(this),
             isMaskDrawing: this.#isMaskDrawingMode(),
             heldItem: this.canvasEngine?.heldItem ?? null,
         });
 
         CanvasHints.render(element, CanvasHints.getItems(context), (key) => platform.i18n.localize(key));
+    }
+
+    /** The label a Labels list row names: its id, its owner's type ("custom" for a standalone label) and level. */
+    static #labelRef(target) {
+        const row = target.closest(".fwmb-list-item");
+        return { id: row?.dataset.id, type: row?.dataset.type || "custom", layerId: row?.dataset.layerId ?? null };
     }
 
     #handleCanvasDoubleClick(hitData) {
@@ -2012,7 +2068,7 @@ export class MapStudio {
 
         switch (entityType) {
             case "pin":
-                MapDialogManager.onEditPin(this, null, null, entityId);
+                PinEditor.open(this, entityId);
                 break;
             case "route":
                 RouteEditor.open(this, entityId);
@@ -2033,7 +2089,7 @@ export class MapStudio {
                 MapDialogManager.onEditDecoration(this, null, null, entityId);
                 break;
             case "label":
-                MapDialogManager.onEditLabel(this, null, null, { id: entityId, type: parentType, layerId });
+                LabelEditor.open(this, { id: entityId, type: parentType, layerId });
                 break;
         }
     }
@@ -3548,6 +3604,7 @@ export class MapStudio {
             { mapLabels: this.mapLabels, mapPins: this.mapPins, mapRoutes: this.mapRoutes, regionLayers: payload.regionLayers ?? this.regionLevels, customLabelStyles: this.uiState.customLabelStyles },
             LabelWidth.rootFontSize(),
         );
+        this.#reportMissingFonts(payload.regionLayers ?? this.regionLevels);
 
         // brushEngine.history is loaded in full, uncapped: it's the permanent replay log this
         // map's terrain/biomes get rebuilt from (see generateTerrain() below and
@@ -3670,6 +3727,8 @@ export class MapStudio {
             fillColor: this.uiState.labelFillColor,
             maxChars: this.uiState.labelMaxChars,
             justify: this.uiState.labelJustify,
+            bold: this.uiState.labelBold !== false,
+            italic: this.uiState.labelItalic === true,
             visibility: "all",
         });
 
@@ -4533,6 +4592,7 @@ export class MapStudio {
     }
 
     async #deactivateEditMode() {
+        this.#returnToSelect();
         if (!this.uiState.isEditMode) return;
 
         this.uiState.isEditMode = false;
@@ -4598,6 +4658,7 @@ export class MapStudio {
         const mapName = this.currentSaveName || "Unsaved Map";
 
         platform.notify.info(platform.i18n.format("Exporting {name} to PNG...", { name: mapName }));
+        await this.#labelFacesReady();
         this.canvasEngine.exportToPNG(mapName);
     }
 
@@ -4639,6 +4700,7 @@ export class MapStudio {
      */
     async #executeSceneExportPipeline(config) {
         await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingScene") || "Exporting Scene...");
+        await this.#labelFacesReady();
 
         try {
             // Temporarily strip the camera transform so the PNG exports at a mathematically 1:1 scale with 0 offsets
@@ -5309,8 +5371,12 @@ export class MapStudio {
     _onSetInfraMode(event, target) {
         this.uiState.activeInfraMode = target.dataset.mode;
         this.#leaveRouteMode();
-        // Pins are placed; a route's Select mode only picks routes, so it does not edit
-        this.#modeChosen(!this.#isRouteMode() || RouteTool.mode(this) !== "select");
+        // Switching between Pin and Route keeps editing as it was: while editing, the other one
+        // starts in its editing mode (Draw, Place); while viewing, it stays in Select
+        const editing = !!this.uiState.isEditMode;
+        if (editing && this.#isRouteMode() && RouteTool.mode(this) === "select") this.uiState.routeToolMode = "draw";
+        if (editing && PickTool.selecting(this)) PickTool.settleForEditing(this);
+        this.#modeChosen(editing);
     }
 
     _onSetInfrastructureIcon(event, target) {
@@ -5454,9 +5520,12 @@ export class MapStudio {
             // Editing starts in an editing mode: a tool left in its Select mode paints or draws
             if (this.activeTool === "regions" && RegionPainter.mode(this) === "select") this.uiState.regionPaintMode = "paint";
             if (this.#isRouteMode() && RouteTool.mode(this) === "select") this.uiState.routeToolMode = "draw";
+            if (PickTool.selecting(this)) PickTool.settleForEditing(this);
 
             RegionPanel.settleActive(this);
         } else {
+            this.#returnToSelect();
+
             // Leaving edit mode ends the pause: the Apply button goes with the editing, so
             // deferred changes are generated now (covering a mask completed below) and the next
             // edit session starts with automatic generation on.
@@ -5493,6 +5562,18 @@ export class MapStudio {
     }
 
     /**
+     * Viewing is the Select mode: when editing stops (or the tool changes), every tool with a
+     * Select mode (Regions, Routes, Pins, Labels) goes back to it, so the map still picks what is
+     * clicked, and the bar never shows an editing mode while nothing is being edited.
+     */
+    #returnToSelect() {
+        this.uiState.regionPaintMode = "select";
+        this.uiState.routeToolMode = "select";
+        this.uiState.pinToolMode = "select";
+        this.uiState.labelToolMode = "select";
+    }
+
+    /**
      * Whether the map takes pointer input for the active tool: while it is editing; always in
      * Cartography (which has no edit toggle: its decorations and scale bar can be moved whenever it
      * is open); and in the Select mode of Regions and of Routes, which pick objects without editing.
@@ -5502,7 +5583,7 @@ export class MapStudio {
         if (this.activeTool === "cartography") return true;
         if (this.activeTool === "regions") return RegionPainter.mode(this) === "select";
         if (this.#isRouteMode()) return RouteTool.mode(this) === "select";
-        return false;
+        return PickTool.selecting(this);
     }
 
     /** Brings the canvas's pointer handling (and the regional crop) in line with the tool and mode. */

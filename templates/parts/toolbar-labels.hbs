@@ -1,5 +1,8 @@
-{{!-- Labels' bar: the text and look of the next label placed (step 4 slims this to the style the
-     next label gets; the rest moves to the inspector). --}}
+{{!-- Labels' bar: Select (which only picks labels, opening them in the inspector) and Place,
+     then the text and look of the next label placed (4c slims this to the style the next label
+     gets; the rest is the inspector's). --}}
+{{#each bar.modeGroups}}{{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}{{/each}}
+<span class="fwmb-sep"></span>
 <label class="fwmb-bar-field">
     <span class="fwmb-label">{{localize "FILRODENSWMB.UI.LabelText"}}</span>
     <input type="text" name="nextLabelText" value="{{lookup uiState 'nextLabelText'}}" />

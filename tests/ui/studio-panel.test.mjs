@@ -12,6 +12,7 @@ const ROOT = fileURLToPath(new URL("../..", import.meta.url));
 const STRINGS = JSON.parse(readFileSync(join(ROOT, "languages/en.json"), "utf8"));
 const CSS = readFileSync(join(ROOT, "styles/filrodens-world-map-builder.css"), "utf8");
 const STUDIO_SOURCE = readFileSync(join(ROOT, "src/applications/MapStudio.js"), "utf8");
+const PICK_TOOL_SOURCE = readFileSync(join(ROOT, "src/applications/PickTool.js"), "utf8");
 
 const { FILRODENSWMB } = await import("../../src/config.js");
 const { foldLevel, FOLD_LEVELS } = await import("../../src/ui/BarFold.js");
@@ -126,6 +127,8 @@ test("every icon the templates and the bar name has a mask, and every mask's fil
     const groups = STUDIO_SOURCE.slice(STUDIO_SOURCE.indexOf("#barModeGroups() {"), STUDIO_SOURCE.indexOf("#barContext() {"));
     for (const [, icon] of groups.matchAll(/(?:(?<!group\()ui\("[A-Za-z]+"\)|cropTip), "([a-z0-9_-]+)"/g)) named.add(icon);
     for (const [, icon] of groups.matchAll(/(?:brush|feature)\("\w+", "\w+", "\w+", "([a-z0-9_-]+)"/g)) named.add(icon);
-    assert.ok(named.has("edit-arrow-up") && named.has("format-paint"), "the bar's mode icons were found");
+    // The Select and Place modes of pins and labels, from PickTool
+    for (const [, icons] of PICK_TOOL_SOURCE.matchAll(/icons: \{([^}]+)\}/g)) for (const [, icon] of icons.matchAll(/"([a-z0-9_-]+)"/g)) named.add(icon);
+    assert.ok(named.has("edit-arrow-up") && named.has("format-paint") && named.has("insert-text"), "the bar's mode icons were found");
     for (const icon of named) assert.ok(masks.has(icon), `fwmb-icon--${icon} has a mask`);
 });

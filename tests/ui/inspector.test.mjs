@@ -30,7 +30,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs"]);
+await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/label-fields.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs"]);
 
 /** What the next prompt (Save as…'s name) answers. */
 const answers = { prompt: null };
@@ -41,7 +41,9 @@ installPlatform({
     notify: { info: () => {}, warn: () => {}, error: () => {} },
     utils: { ...platform.utils, randomID: () => `n${++nextId}`, deepClone: (value) => structuredClone(value), mergeObject: (target, source) => Object.assign(target, source), escapeHtml: (text) => handlebars.escapeExpression(text) },
     templates,
-    fonts: { list: () => ["Signika", "Noto Serif"] },
+    fonts: { list: () => ["Signika", "Noto Serif", "EB Garamond"] },
+    settings: { get: () => [] },
+    assets: { url: (path) => path, path: (path) => path },
     dialogs: {
         confirm: async () => true,
         prompt: async () => answers.prompt,
@@ -55,6 +57,9 @@ const { Inspector } = await import("../../src/applications/Inspector.js");
 const { RegionEditor } = await import("../../src/applications/RegionEditor.js");
 const { RouteEditor } = await import("../../src/applications/RouteEditor.js");
 const { RouteTool } = await import("../../src/applications/RouteTool.js");
+const { PinEditor } = await import("../../src/applications/PinEditor.js");
+const { LabelEditor } = await import("../../src/applications/LabelEditor.js");
+const { PickTool } = await import("../../src/applications/PickTool.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
 const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
 const { allLevels } = await import("../../src/mesh/LayerTree.js");
@@ -87,9 +92,9 @@ async function studio() {
         tectonicFaults: [],
         manualRivers: [],
         landMasks: [],
-        mapPins: [],
+        mapPins: [{ id: "keep", name: "Old Keep", x: 150, y: 100, icon: "castle", scale: 1, color: "#ffffff", pinStyle: null, label: { quickStyle: "custom" } }],
         mapRoutes: [],
-        mapLabels: [],
+        mapLabels: [{ id: "sea", name: "Grey Sea", x: 50, y: 150, rotation: 0, quickStyle: "custom", fontFamily: "Noto Serif", fontSize: 1, fillColor: "#ffffff", maxChars: 0, justify: "left", visibility: "all" }],
         mapDecorations: [],
         _expandedSections: new Set(),
         _collapsedSections: new Set(),
@@ -107,8 +112,9 @@ async function studio() {
             routeTransport: "road",
             activeRouteQuickStyle: "custom",
             customRouteStyles: [{ id: "trade", name: "Trade", color: "#00ff00", thickness: 3.5, style: "dashed", outline: false, smoothing: true }],
+            customPinStyles: [{ id: "city", name: "City", icon: "star", scale: 2, color: "#ffcc00", label: { fontSize: 1.5, visibility: "all", quickStyle: "realm" }, detailLevel: 3 }],
             customRegionStyles: [{ id: "kingdom", name: "Kingdom", fillColor: "#aa3322", fillStyle: "diagonal" }],
-            customLabelStyles: [{ id: "realm", name: "Realm", fontFamily: "Noto Serif", fontSize: 2, fillColor: "#112233", maxChars: 12, justify: "center" }],
+            customLabelStyles: [{ id: "realm", name: "Realm", fontFamily: "Noto Serif", fontSize: 2, fillColor: "#112233", maxChars: 12, justify: "center", bold: false, italic: true }],
             customBiomes: [],
             labelFontFamily: "Signika",
             labelFontSize: 1,
@@ -317,4 +323,167 @@ test("Simplify and Re-path are one undo step each", async () => {
     form(app).querySelector('[data-inspector-action="simplify"]').click();
     await settle();
     assert.equal(steps(app), before + 2);
+});
+
+test("a pin's style writes its look and label onto it; a colour or icon chosen by hand leaves the style", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    await PinEditor.open(app, "keep");
+    assert.equal(field(app, "pinName").value, "Old Keep");
+
+    await commit(app, "pinStyle", "city");
+    assert.deepEqual([pin.pinStyle, pin.icon, pin.scale, pin.color, pin.label.fontSize, pin.label.quickStyle, pin.label.fontFamily], ["city", "star", 2, "#ffcc00", 1.5, "realm", "Noto Serif"]);
+    assert.ok(form(app).querySelector('[data-icon="star"][aria-selected="true"]'), "the style's icon is the one shown chosen");
+
+    await commit(app, "pinColor", "#00ff00");
+    assert.equal(pin.pinStyle, null);
+    await commit(app, "pinStyle", "city");
+    form(app).querySelector('[data-inspector-action="pickIcon"][data-icon="castle"]').click();
+    await settle();
+    await settle();
+    assert.deepEqual([pin.icon, pin.pinStyle], ["castle", null]);
+    assert.equal(steps(app), 4);
+});
+
+test("Save as… makes a pin style of the pin's look and label size, and the pin follows it", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    await PinEditor.open(app, "keep");
+    answers.prompt = "Keep";
+    form(app).querySelector('[data-inspector-action="saveStyle"][data-style-type="Pin"]').click();
+    await settle();
+    await settle();
+    const style = app.uiState.customPinStyles.at(-1);
+    assert.deepEqual([style.name, style.icon, style.scale, style.color], ["Keep", "castle", 1, "#ffffff"]);
+    assert.equal(pin.pinStyle, style.id);
+});
+
+test("a standalone label's text, face and style apply one step each; Bold and Italic are label fields", async () => {
+    const { app } = await studio();
+    const label = app.mapLabels[0];
+    await LabelEditor.open(app, { type: "custom", id: "sea" });
+    assert.equal(field(app, "labelName").value, "Grey Sea");
+    assert.equal(field(app, "labelBold").checked, true, "a label without Bold is drawn bold, as labels always were");
+
+    await commit(app, "labelItalic", true);
+    assert.equal(label.italic, true);
+    await commit(app, "labelBold", false);
+    assert.equal(label.bold, false);
+    await commit(app, "labelQuickStyle", "realm");
+    assert.deepEqual([label.quickStyle, label.fontSize, label.bold, label.italic, label.justify], ["realm", 2, false, true, "center"]);
+    await commit(app, "labelBold", true);
+    assert.equal(label.quickStyle, "custom", "Bold is styled, so changing it leaves the style");
+    assert.equal(steps(app), 4);
+    assert.ok(form(app).querySelector('[data-inspector-action="delete"]'), "a standalone label can be deleted here");
+});
+
+test("the font picker groups the fonts, each named in its own face", async () => {
+    const { app } = await studio();
+    await LabelEditor.open(app, { type: "custom", id: "sea" });
+    const picker = field(app, "labelFontFamily");
+    const groups = [...picker.querySelectorAll("optgroup")].map((group) => group.label);
+    assert.deepEqual(groups, ["FILRODENSWMB.UI.FontCategoryBook", "FILRODENSWMB.UI.FontCategoryWide", "FILRODENSWMB.UI.FontCategoryOther"]);
+    assert.match(picker.querySelector('option[value="EB Garamond"]').getAttribute("style"), /font-family: "EB Garamond"/);
+    assert.equal(picker.value, "Noto Serif");
+});
+
+test("an owned label shows its owner, links to it and has no Delete; its fields are the owner's label", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    await LabelEditor.open(app, { type: "pin", id: "keep" });
+    assert.ok(form(app).querySelector(".fwmb-inspector-owner").textContent.includes("Old Keep"));
+    assert.equal(form(app).querySelector('[data-inspector-action="delete"]'), null);
+    await commit(app, "labelVisibility", "gm");
+    assert.equal(pin.label.visibility, "gm");
+
+    app._onChangeTool = (_event, target) => (app.activeTool = target.dataset.tool);
+    app.activeTool = "labels";
+    form(app).querySelector('[data-inspector-action="goToOwner"]').click();
+    await settle();
+    await settle();
+    assert.equal(app.activeTool, "infrastructure");
+    assert.ok(Inspector.shows(app, "pin", "keep"));
+});
+
+test("a pin's label fields apply to the pin's label, one step each", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    await PinEditor.open(app, "keep");
+    await commit(app, "labelFontSize", "2.5");
+    await commit(app, "labelItalic", true);
+    await commit(app, "labelFillColor", "#123456");
+    await commit(app, "labelFontFamily", "EB Garamond");
+    assert.deepEqual([pin.label.fontSize, pin.label.italic, pin.label.fillColor, pin.label.fontFamily], [2.5, true, "#123456", "EB Garamond"]);
+    assert.equal(steps(app), 4);
+});
+
+test("a double-click returns a slider to its default and applies it, before the studio's own reset runs", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    await PinEditor.open(app, "keep");
+    await commit(app, "labelFontSize", "3");
+    const slider = field(app, "labelFontSize");
+    assert.equal(slider.dataset.default, "1", "the slider's default is its value when the inspector opened");
+    // The studio's handler (StudioView) listens further up and would reset the slider later in the event
+    let resetLater = null;
+    app.root.addEventListener("dblclick", (event) => (resetLater = event.target.value));
+    slider.dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true }));
+    assert.equal(pin.label.fontSize, 1, "applied at once, from the reset value");
+    assert.equal(resetLater, "1", "already reset when the studio's handler sees it");
+    assert.equal(form(app).querySelector('input[name="labelFontSize"]').closest(".fwmb-range").querySelector("output").value, "1", "the value shown follows");
+    assert.equal(steps(app), 2);
+});
+
+/** The canvas's items for PickTool: a pin and a label, each with its reach. */
+function pickable(app) {
+    const items = [
+        { entityType: "pin", entityId: "keep", x: 150, y: 100, radius: 10 },
+        { entityType: "label", entityId: "sea", parentType: "custom", x: 50, y: 150, radius: 20 },
+        { entityType: "label", entityId: "keep", parentType: "pin", x: 170, y: 80, radius: 10 },
+    ];
+    app.canvasEngine.hitTest = (x, y, type) => items.find((item) => item.entityType === type && Math.hypot(item.x - x, item.y - y) <= item.radius) ?? null;
+}
+
+test("pins and labels have Select (the default) and Place; Select picks without editing, Place edits", () => {
+    const { app } = { app: { activeTool: "labels", uiState: { activeInfraMode: "pin" } } };
+    assert.equal(PickTool.mode(app), "select");
+    assert.deepEqual(PickTool.toolbarModes(app).map((entry) => [entry.value, entry.active, entry.icon]), [["select", true, "select"], ["place", false, "insert-text"]]);
+    assert.equal(PickTool.setMode(app, "place"), true);
+    assert.equal(PickTool.mode(app), "place");
+    assert.equal(PickTool.tool(app), null, "Place leaves the map to placing and moving");
+    app.activeTool = "infrastructure";
+    assert.equal(PickTool.mode(app), "select", "each tool keeps its own mode");
+    app.uiState.activeInfraMode = "route";
+    assert.equal(PickTool.which(app), null, "Route mode has its own Select (RouteTool)");
+    assert.equal(PickTool.setMode(app, "place"), false);
+    app.activeTool = "infrastructure";
+    app.uiState.activeInfraMode = "pin";
+    PickTool.settleForEditing(app);
+    assert.equal(PickTool.mode(app), "place", "editing starts in Place");
+});
+
+test("in Select, a click on a pin or label opens it, a click away or Escape closes it", async () => {
+    const { app } = await studio();
+    pickable(app);
+    app.activeTool = "infrastructure";
+    app.uiState.activeInfraMode = "pin";
+    app.uiState.isEditMode = false;
+    const tool = PickTool.tool(app);
+    tool.down(152, 98);
+    await settle();
+    await settle();
+    assert.ok(Inspector.shows(app, "pin", "keep"));
+    tool.down(400, 400);
+    assert.equal(Inspector.current(app), null);
+    assert.equal(steps(app), 0, "picking changes nothing");
+
+    app.activeTool = "labels";
+    tool.doubleClick(170, 80);
+    await settle();
+    await settle();
+    assert.deepEqual(Inspector.current(app)?.ref, { type: "pin", id: "keep", layerId: null }, "a pin's label opens as the pin's label");
+    assert.ok(form(app).querySelector('[data-inspector-action="goToOwner"]'));
+    assert.equal(PickTool.handleKey(app, { key: "Escape" }), true);
+    assert.equal(Inspector.current(app), null);
+    assert.equal(PickTool.handleKey(app, { key: "Escape" }), false, "nothing left to close");
 });

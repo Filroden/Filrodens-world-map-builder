@@ -1,3 +1,5 @@
+import { DEFAULT_LABEL_FONT } from "./data/fonts.js";
+
 export const FILRODENSWMB = {
     ID: "filrodens-world-map-builder",
     FLAGS: {
@@ -459,8 +461,11 @@ export const FILRODENSWMB = {
                 routeDraw: ["RouteAddWaypoint", "RouteTrace", "RouteFinish", "RouteUndoWaypoint", "RouteCancel"],
                 routeEdit: ["RouteMoveWaypoint", "RouteInsertWaypoint", "RouteRemoveWaypoint", "RouteSplit", "RouteJoin", "EditRoute"],
                 mask: ["AddPoint", "FinishMask", "MovePoint", "MoveMask", "InsertPoint", "DeletePoint", "EditMask"],
-                pin: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
-                labels: ["PlaceLabel", "MoveLabel", "RotateLabel", "ResizeLabel", "EditLabel"],
+                // Pins (Infrastructure in Pin mode) and labels, by mode (see PickTool)
+                pinSelect: ["SelectPin"],
+                pinPlace: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
+                labelSelect: ["SelectLabel"],
+                labelPlace: ["PlaceLabel", "MoveLabel", "RotateLabel", "ResizeLabel", "EditLabel"],
                 cartography: ["MoveDecoration", "RotateDecoration", "ResizeDecoration", "EditDecoration"],
                 heldLabel: ["RotateHeldLabel", "ResizeHeldLabel"],
                 heldDecoration: ["RotateHeldDecoration", "ResizeHeldDecoration"],
@@ -473,7 +478,7 @@ export const FILRODENSWMB = {
         // `FILRODENSWMB.UI.Shortcut…` keys; "everywhere" holds those that work in every tool. SHEET
         // is the sheet's order: one table per tool, a caption per mode, each naming the hint
         // context whose actions it lists. Keep KEYS in step with the key handling in MapStudio
-        // (#handleStudioKeydown), RegionPainter.handleKey and RouteTool.handleKey.
+        // (#handleStudioKeydown), RegionPainter.handleKey, RouteTool.handleKey and PickTool.handleKey.
         SHORTCUTS: {
             KEYS: {
                 everywhere: ["Undo", "Redo", "Sheet", "Escape"],
@@ -481,6 +486,8 @@ export const FILRODENSWMB = {
                 regionPaint: ["RegionStopStroke"],
                 regionErase: ["RegionStopStroke"],
                 routeSelect: ["RouteLetGo"],
+                pinSelect: ["PickClose"],
+                labelSelect: ["PickClose"],
             },
             SHEET: [
                 { title: "FILRODENSWMB.UI.ShortcutsEverywhere", tables: [{ caption: null, context: "everywhere" }] },
@@ -512,13 +519,20 @@ export const FILRODENSWMB = {
                 {
                     title: "FILRODENSWMB.UI.ToolInfrastructure",
                     tables: [
-                        { caption: "FILRODENSWMB.UI.ShortcutsPins", context: "pin" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsPinSelect", context: "pinSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsPinPlace", context: "pinPlace" },
                         { caption: "FILRODENSWMB.UI.ShortcutsRouteSelect", context: "routeSelect" },
                         { caption: "FILRODENSWMB.UI.ShortcutsRouteDraw", context: "routeDraw" },
                         { caption: "FILRODENSWMB.UI.ShortcutsRouteEdit", context: "routeEdit" },
                     ],
                 },
-                { title: "FILRODENSWMB.UI.ToolLabels", tables: [{ caption: null, context: "labels" }] },
+                {
+                    title: "FILRODENSWMB.UI.ToolLabels",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsSelect", context: "labelSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsPlace", context: "labelPlace" },
+                    ],
+                },
                 { title: "FILRODENSWMB.UI.ToolCartography", tables: [{ caption: null, context: "cartography" }] },
                 {
                     title: "FILRODENSWMB.UI.ShortcutsHolding",
@@ -1140,10 +1154,18 @@ export const FILRODENSWMB = {
         PRESETS: ["#C84B31", "#E28743", "#E8B851", "#4F7942", "#8A9A5B", "#3B8388", "#2D70B3", "#4A4E69", "#7A5C9B", "#B56576", "#A0522D", "#CC7161", "#6C7A89", "#A89F91", "#E08E79"],
     },
     LABELS: {
-        DEFAULT_FONT: "Signika",
+        DEFAULT_FONT: DEFAULT_LABEL_FONT,
         DEFAULT_SIZE: 1,
         DEFAULT_COLOR: "#DEDCD3",
         DEFAULT_TEXT: "FILRODENSWMB.LABELS.DefaultLabel",
+        // The label styles a new map starts with (Ken, 2026-10-16): realm names in engraved
+        // capitals, places in a book serif, water in its italic, and notes in handwriting
+        DEFAULT_STYLES: Object.freeze([
+            Object.freeze({ id: "label-style-realm", nameKey: "FILRODENSWMB.LABELS.StyleRealm", fontFamily: "Cinzel", fontSize: 1.8, fillColor: "#DEDCD3", maxChars: 0, justify: "center", bold: true, italic: false }),
+            Object.freeze({ id: "label-style-place", nameKey: "FILRODENSWMB.LABELS.StylePlace", fontFamily: "EB Garamond", fontSize: 1, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: true, italic: false }),
+            Object.freeze({ id: "label-style-water", nameKey: "FILRODENSWMB.LABELS.StyleWater", fontFamily: "EB Garamond", fontSize: 1.2, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
+            Object.freeze({ id: "label-style-note", nameKey: "FILRODENSWMB.LABELS.StyleNote", fontFamily: "Kalam", fontSize: 0.8, fillColor: "#DEDCD3", maxChars: 24, justify: "left", bold: false, italic: false }),
+        ]),
         PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
     },
     PINS: {

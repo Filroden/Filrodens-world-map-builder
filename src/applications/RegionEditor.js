@@ -76,6 +76,7 @@ export class RegionEditor {
             label,
             labelChoices: InspectorFields.labelChoices(app, label),
             labelStyleName: InspectorFields.styleName(app.uiState.customLabelStyles, label.quickStyle),
+            labelVisibilities: RegionPanel.visibilityChoices(label.visibility),
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
         };
     }

@@ -1,0 +1,66 @@
+{{!--
+    The label fields of a pin, route or region in the inspector, as a collapsible section: the
+    label style (with Save as…), then the font (grouped, each in its own face), bold and italic,
+    size, rotation, colour, line width and justification. Read back by InspectorFields.readLabel.
+
+    Parameters:
+      label: the label's fields (InspectorFields.label: its own over the defaults)
+      choices: InspectorFields.labelChoices: fontGroups, labelStyles, rotationRange, justifications
+      styleName: the label style it follows, or null for Custom
+      sectionId, sectionTitle, closed: the section's id (its open state is remembered by it),
+                title key, and whether it starts closed
+      visibilities: optional choices for the label's own visibility (a pin's, route's or
+                region's label can be hidden apart from its owner)
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id=sectionId title=sectionTitle styleBadge=styleName closed=closed}}
+{{> "modules/filrodens-world-map-builder/templates/parts/style-picker.hbs" name="labelQuickStyle" choices=choices.labelStyles type="Label"}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-label-font">{{localize "FILRODENSWMB.UI.InspectorFont"}}</label>
+    <div class="fwmb-form-fields">
+        {{> "modules/filrodens-world-map-builder/templates/parts/font-picker.hbs" id="fwmb-inspector-label-font" name="labelFontFamily" groups=choices.fontGroups selected=label.fontFamily missing=choices.fontMissing}}
+    </div>
+</div>
+<div class="fwmb-row fwmb-inspector-face">
+    <label class="fwmb-checkbox-label">
+        <input type="checkbox" class="fwmb-checkbox" name="labelBold" {{#if label.bold}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.LabelBold"}}
+    </label>
+    <label class="fwmb-checkbox-label">
+        <input type="checkbox" class="fwmb-checkbox" name="labelItalic" {{#if label.italic}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.LabelItalic"}}
+    </label>
+</div>
+{{#if visibilities}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-label-visibility">{{localize "FILRODENSWMB.UI.Visibility"}}</label>
+    <div class="fwmb-form-fields">
+        <select id="fwmb-inspector-label-visibility" name="labelVisibility">
+            {{#each visibilities}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+    </div>
+</div>
+{{/if}}
+{{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="labelFontSize" label="FILRODENSWMB.UI.InspectorFontSize" value=label.fontSize min=0.2 max=5 step=0.1}}
+{{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="labelRotation" label="FILRODENSWMB.UI.InspectorRotation" value=label.rotation min=choices.rotationRange.MIN max=choices.rotationRange.MAX step=choices.rotationRange.STEP}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-label-color">{{localize "FILRODENSWMB.UI.InspectorColor"}}</label>
+    <div class="fwmb-form-fields">
+        <input type="color" id="fwmb-inspector-label-color" class="fwmb-swatch" name="labelFillColor" value="{{label.fillColor}}" list="fwmb-inspector-colors" />
+        <label class="fwmb-label fwmb-label--inline" for="fwmb-inspector-label-justify">{{localize "FILRODENSWMB.UI.InspectorJustify"}}</label>
+        <select id="fwmb-inspector-label-justify" name="labelJustify">
+            {{#each choices.justifications}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+    </div>
+</div>
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-label-width">{{localize "FILRODENSWMB.UI.InspectorLineWidth"}}</label>
+    <div class="fwmb-form-fields">
+        <input type="number" id="fwmb-inspector-label-width" class="fwmb-input-short" name="labelMaxChars" value="{{label.maxChars}}" min="0" step="1" />
+        <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.MaxWidthHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.MaxWidthHint'}}"></i>
+    </div>
+</div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

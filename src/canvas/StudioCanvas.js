@@ -5,6 +5,7 @@ import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { getRegionUploadResource } from "./RegionUploadResource.js";
 import { TerrainCompositor } from "./TerrainCompositor.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
+import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
 import { RegionOverlays } from "./RegionOverlays.js";
@@ -273,6 +274,29 @@ export class StudioCanvas {
         // dragged: it carries selectOnly.
         if (!closest && this.isEditMode && this.meshHitTest) {
             closest = this.meshHitTest(x, y, FILRODENSWMB.MESH.ROUTE_HIT_PX / (this.stage.scale.x || 1));
+        }
+        return closest;
+    }
+
+    /**
+     * The nearest of the interactive items of one type (a pin, a label) whose reach covers a map
+     * point, or null: what a Select mode picks (see PickTool).
+     *
+     * @param {number} x
+     * @param {number} y
+     * @param {string} entityType
+     * @returns {object|null} The item's hit data (entityType, entityId, and for a label its parentType and layerId).
+     */
+    hitTest(x, y, entityType) {
+        let closest = null;
+        let minDist = Infinity;
+        for (const item of this.interactiveTargets) {
+            if (item.entityType !== entityType) continue;
+            const dist = Math.hypot(item.x - x, item.y - y);
+            if (dist <= item.radius && dist < minDist) {
+                minDist = dist;
+                closest = item;
+            }
         }
         return closest;
     }
@@ -1581,6 +1605,10 @@ export class StudioCanvas {
 
     renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], isEditMode = false, meshSession = null) {
         this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
+        const args = [mapLabels, mapPins, mapRoutes, isEditMode, meshSession];
+        this.#labelArgs = args;
+        // The faces the labels are drawn in, so any still loading are drawn again once they arrive
+        const drawn = [];
 
         // Extract native OS root font size to mimic CSS 'rem' behaviour
         const rootFontSize = LabelWidth.rootFontSize();
@@ -1600,17 +1628,18 @@ export class StudioCanvas {
             const y = labelData.y ?? defaultY;
             const rotation = labelData.rotation ?? 0;
 
-            const font = labelData.fontFamily || "Signika";
+            drawn.push(labelData);
             const size = (labelData.fontSize || 1) * rootFontSize * resScale;
             const fill = labelData.fillColor || "#ffffff";
             const stroke = ColorMath.getContrastColor(fill);
 
             // 1. Setup Base Style
             const styleConfig = {
-                fontFamily: font,
+                fontFamily: LabelFonts.family(labelData),
                 fontSize: size,
                 fill: fill,
-                fontWeight: "bold",
+                fontWeight: LabelFonts.weight(labelData),
+                fontStyle: LabelFonts.style(labelData),
                 stroke: stroke,
                 strokeThickness: 3,
                 dropShadow: true,
@@ -1668,7 +1697,16 @@ export class StudioCanvas {
         });
 
         this.#drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession);
+
+        // A face still loading was drawn in the fallback: once it arrives the labels are drawn
+        // again, unless they have been drawn since (see LabelFonts)
+        LabelFonts.load(drawn).then((asked) => {
+            if (asked && this.#labelArgs === args && !this.#destroyed) this.renderLabels(...args);
+        });
     }
+
+    /** What the labels were last drawn from, so they can be drawn again when a face loads. */
+    #labelArgs = null;
 
     /**
      * Route and region labels on the display mesh. A route's label sits above the middle point of

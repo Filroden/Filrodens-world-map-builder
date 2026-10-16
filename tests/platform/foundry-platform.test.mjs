@@ -76,11 +76,13 @@ test("the language falls back to English before Foundry's localisation is ready"
     assert.equal(platform.i18n.lang, "ar");
 });
 
-test("fonts fall back to a fixed list when Foundry's is not set", () => {
+test("the label fonts are the vendored ones, then the world's own that are not among them", async () => {
+    const { labelFontNames } = await import("../../src/data/fonts.js");
+    const vendored = labelFontNames();
     globalThis.CONFIG = {};
-    assert.deepEqual(platform.fonts.list(), ["Signika", "Modesto Condensed", "Arial"]);
-    globalThis.CONFIG = { fontFamilies: ["Roboto"] };
-    assert.deepEqual(platform.fonts.list(), ["Roboto"]);
+    assert.deepEqual(platform.fonts.list(), vendored);
+    globalThis.CONFIG = { fontFamilies: ["Roboto", "Noto Serif", "Signika", "Roboto"] };
+    assert.deepEqual(platform.fonts.list(), [...vendored, "Roboto", "Signika"]);
 });
 
 test("installPlatform replaces the services callers read", async () => {
