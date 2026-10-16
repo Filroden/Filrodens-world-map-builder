@@ -173,7 +173,7 @@ test("a sea route cannot start on land, and says so", async () => {
     assert.equal(notices[0], "FILRODENSWMB.UI.WarnRouteUnreachable");
 });
 
-test("Select picks the route under the pointer and reads its fields into the toolbar; Escape lets go of it", async () => {
+test("Select picks the route under the pointer, leaving the bar's settings for the next route; Escape lets go of it", async () => {
     const { app, overlays, at } = await studio();
     const tool = RouteTool.tool(app);
     const route = placeRoad(app, tool);
@@ -186,8 +186,7 @@ test("Select picks the route under the pointer and reads its fields into the too
     const middle = route.legs[0][Math.floor(route.legs[0].length / 2)];
     tool.down(app.meshSession.mesh.siteX(middle), app.meshSession.mesh.siteY(middle), press);
     assert.equal(app.activeRouteId, route.id);
-    assert.equal(app.uiState.routeColor, "#123456");
-    assert.equal(app.uiState.routeThickness, 0.75);
+    assert.notEqual(app.uiState.routeColor, "#123456", "the bar is for the next route; the picked route's own look is its inspector's");
     assert.equal(overlays.handles.points.length, 6, "the picked route's three waypoints show");
     assert.equal(overlays.handles.points[0], app.meshSession.mesh.siteX(at(150, 50)));
 
@@ -330,47 +329,29 @@ test("Draw: a loose Detail keeps fewer bends, and a stroke over ground the trans
     assert.ok(app.mapRoutes[1].waypoints.every((cell) => app.meshSession.aggregates.land[cell] === 1), "the bends over water were left out");
 });
 
-test("the toolbar's fields apply to the picked route: a quick style sets every line field, the transport never changes, and a drag is one undo step", async () => {
-    const { app, session } = await studio();
+test("a route is drawn with the bar's style, or with no style the map's default line; the bar never changes the picked route", async () => {
+    const { app } = await studio();
     const tool = RouteTool.tool(app);
-    const route = placeRoad(app, tool);
-    const steps = app.pinHistory.length;
+    const plain = placeRoad(app, tool);
+    assert.deepEqual([plain.quickStyle, plain.color, plain.thickness, plain.style], ["custom", app.uiState.routeColor, app.uiState.routeThickness, app.uiState.routeStyle]);
 
-    app.uiState.routeThickness = 4;
-    RouteTool.applyToolbarField(app, "routeThickness", false);
-    app.uiState.routeThickness = 5;
-    RouteTool.applyToolbarField(app, "routeThickness", true);
-    assert.equal(route.thickness, 5);
-    assert.equal(route.quickStyle, "custom");
-    assert.equal(app.pinHistory.length, steps + 1, "the live steps of a slider drag are one undo step");
-    VectorHistory.step(app, true);
-    assert.equal(app.mapRoutes[0].thickness, 2, "undo restores the thickness before the drag");
-    VectorHistory.step(app, false);
-
-    const picked = app.mapRoutes[0];
     app.uiState.activeRouteQuickStyle = "trade";
-    Object.assign(app.uiState, { routeColor: "#00ff00", routeThickness: 3.5, routeStyle: "dashed", routeOutline: false, routeSmoothing: true });
-    RouteTool.applyToolbarField(app, "activeRouteQuickStyle");
-    assert.equal(picked.quickStyle, "trade");
-    assert.equal(picked.color, "#00ff00");
-    assert.equal(picked.outline, false);
-    assert.equal(picked.smoothing, true);
-
-    app.uiState.routeMode = "direct";
-    RouteTool.applyToolbarField(app, "routeMode");
-    assert.equal(picked.mode, "direct");
-    assert.ok(picked.legs[0].length > 2, "a new leg mode leaves the legs placed as they are");
-    app.uiState.routeTransport = "sea";
-    RouteTool.applyToolbarField(app, "routeTransport");
-    assert.equal(picked.transport, "road", "the transport is fixed once a route is drawn");
-    assert.ok(legsOk(session, picked));
+    const styled = placeRoad(app, tool);
+    assert.deepEqual([styled.quickStyle, styled.color, styled.thickness, styled.style, styled.outline, styled.smoothing], ["trade", "#00ff00", 3.5, "dashed", false, true]);
+    assert.equal(app.activeRouteId, styled.id);
+    assert.deepEqual([plain.quickStyle, plain.color], ["custom", app.uiState.routeColor], "the first route keeps its own look");
+    assert.equal(RouteTool.applyToolbarField, undefined, "the bar has no fields that edit the picked route");
 });
 
 test("a route opens in the inspector, closing anything docked, with the route picked", async () => {
     const { app } = await studio();
     app.root = window.document.body.appendChild(window.document.createElement("div"));
     const route = placeRoad(app, RouteTool.tool(app));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.ok(Inspector.shows(app, "route", route.id), "a finished route opens in the inspector");
+    Inspector.close(app);
     RouteTool.select(app, null);
+    dialogs.dismissed.length = 0;
     assert.equal(await RouteEditor.open(app, route.id), true);
     assert.deepEqual(dialogs.dismissed, [{ placement: "docked" }]);
     assert.ok(Inspector.shows(app, "route", route.id));

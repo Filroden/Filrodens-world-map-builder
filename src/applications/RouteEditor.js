@@ -38,8 +38,8 @@ export class RouteEditor {
      * @param {string} routeId
      * @returns {Promise<boolean>}
      */
-    static open(app, routeId) {
-        return Inspector.open(app, this.KIND, { id: routeId });
+    static open(app, routeId, options) {
+        return Inspector.open(app, this.KIND, { id: routeId }, options);
     }
 
     static #find(app, { id }) {
@@ -139,7 +139,7 @@ export class RouteEditor {
         const { label, ...fields } = values;
         Object.assign(route, fields);
         route.label = { ...route.label, ...label };
-        this.#redraw(app, route);
+        this.#redraw(app);
         return true;
     }
 
@@ -148,7 +148,7 @@ export class RouteEditor {
         if (!app.meshSession) return;
         MapStateManager.pushVectorState(app);
         change(app.meshSession);
-        this.#redraw(app, route);
+        this.#redraw(app);
     }
 
     /** Save as…: a route style from the route's line, or a label style from its label. */
@@ -159,11 +159,10 @@ export class RouteEditor {
         MapStateManager.pushVectorState(app);
         if (type === "Label") route.label = { ...source, ...route.label, quickStyle: id };
         else route.quickStyle = id;
-        this.#redraw(app, route);
+        this.#redraw(app);
     }
 
-    static #redraw(app, route) {
-        RouteTool.syncToolbar(app, route);
+    static #redraw(app) {
         app._repaintVectors();
         app.view?.render(["context", "editToolbar"]);
         app.markDirty();

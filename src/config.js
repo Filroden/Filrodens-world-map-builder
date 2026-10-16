@@ -466,6 +466,10 @@ export const FILRODENSWMB = {
                 pinPlace: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
                 labelSelect: ["SelectLabel"],
                 labelPlace: ["PlaceLabel", "MoveLabel", "RotateLabel", "ResizeLabel", "EditLabel"],
+                // Rivers and faults, land masks and decorations in their Select modes (see PickTool)
+                featureSelect: ["SelectFeature"],
+                maskSelect: ["SelectMask"],
+                cartographySelect: ["SelectDecoration"],
                 cartography: ["MoveDecoration", "RotateDecoration", "ResizeDecoration", "EditDecoration"],
                 heldLabel: ["RotateHeldLabel", "ResizeHeldLabel"],
                 heldDecoration: ["RotateHeldDecoration", "ResizeHeldDecoration"],
@@ -488,12 +492,16 @@ export const FILRODENSWMB = {
                 routeSelect: ["RouteLetGo"],
                 pinSelect: ["PickClose"],
                 labelSelect: ["PickClose"],
+                featureSelect: ["PickClose"],
+                maskSelect: ["PickClose"],
+                cartographySelect: ["PickClose"],
             },
             SHEET: [
                 { title: "FILRODENSWMB.UI.ShortcutsEverywhere", tables: [{ caption: null, context: "everywhere" }] },
                 {
                     title: "FILRODENSWMB.UI.ToolCreateMap",
                     tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsLandMaskSelect", context: "maskSelect" },
                         { caption: "FILRODENSWMB.UI.ShortcutsLandMasks", context: "mask" },
                         { caption: "FILRODENSWMB.UI.ShortcutsRegionalCrop", context: "crop" },
                     ],
@@ -503,6 +511,7 @@ export const FILRODENSWMB = {
                 {
                     title: "FILRODENSWMB.UI.ToolFeatures",
                     tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsSelect", context: "featureSelect" },
                         { caption: "FILRODENSWMB.UI.ShortcutsRiverSources", context: "spring" },
                         { caption: "FILRODENSWMB.UI.ShortcutsLines", context: "line" },
                     ],
@@ -533,7 +542,13 @@ export const FILRODENSWMB = {
                         { caption: "FILRODENSWMB.UI.ShortcutsPlace", context: "labelPlace" },
                     ],
                 },
-                { title: "FILRODENSWMB.UI.ToolCartography", tables: [{ caption: null, context: "cartography" }] },
+                {
+                    title: "FILRODENSWMB.UI.ToolCartography",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsSelect", context: "cartographySelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsMove", context: "cartography" },
+                    ],
+                },
                 {
                     title: "FILRODENSWMB.UI.ShortcutsHolding",
                     tables: [
@@ -641,7 +656,8 @@ export const FILRODENSWMB = {
             scene: { addMask: "drawing", subtractMask: "drawing", crop: "cropping" },
             terrain: "terraforming",
             biomes: "painting",
-            features: { spring: "placing", river: "drawing", fault: "drawing" },
+            // Select starts editing in River (see PickTool.settleForEditing)
+            features: { select: "drawing", spring: "placing", river: "drawing", fault: "drawing" },
             regions: "painting",
             infrastructure: { pin: "placing", route: "drawing" },
             labels: "placing",
@@ -1171,6 +1187,9 @@ export const FILRODENSWMB = {
     PINS: {
         // The size new pins (and their labels) start with: small, so a map of many places stays readable
         DEFAULT_SCALE: 0.6,
+        // The look of a pin placed with no style (its icon and colour are changed in the inspector)
+        DEFAULT_ICON: "map_pin",
+        DEFAULT_COLOR: "#ffffff",
         // The pin styles every map starts with (see PinStyles): one per settlement or site tier,
         // each a built-in icon, a scale, the label's size, and a detail level (0 is always shown;
         // higher levels are the first hidden when a map is viewed at world scale, which the

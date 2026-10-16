@@ -2127,7 +2127,12 @@ export class StudioCanvas {
         this.stage.hitArea = new PIXI.Rectangle(-buffer, -buffer, this.mapWidth + buffer * 2, this.mapHeight + buffer * 2);
     }
 
-    renderFaultLines(faults = [], isEditMode = false, activeFaultId = null) {
+    /**
+     * Draws the fault lines and tectonic features while Rivers and faults is in use (`isEditMode`:
+     * the map takes its clicks), with their points as handles only while they are being edited
+     * (`showNodes`; not in its Select mode, which picks whole lines).
+     */
+    renderFaultLines(faults = [], isEditMode = false, activeFaultId = null, showNodes = isEditMode) {
         if (this.haloGraphics) this.haloGraphics.clear();
 
         if (this.faultGraphics) {
@@ -2189,7 +2194,7 @@ export class StudioCanvas {
             }
 
             // 2. Draw Edit Nodes LAST so they always render on top of the geometry
-            if (isEditMode) {
+            if (showNodes) {
                 const isActive = fault.id === activeFaultId;
                 this.#renderEditNodes(fault.points, this.faultGraphics, isActive, fault, "fault");
             }
@@ -2281,7 +2286,8 @@ export class StudioCanvas {
         graphics.endFill();
     }
 
-    renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null) {
+    /** Draws the river guides, as renderFaultLines draws the faults. */
+    renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null, showNodes = isEditMode) {
         if (!this.manualRiverGraphics) return;
 
         // Aggressively purge memory and nested nodes to prevent WebGL leaks
@@ -2307,7 +2313,7 @@ export class StudioCanvas {
             }
 
             // Draw edit nodes
-            if (isEditMode) {
+            if (showNodes) {
                 const isActive = river.id === activeRiverId;
                 this.#renderEditNodes(points, this.manualRiverGraphics, isActive, river, "river");
             }

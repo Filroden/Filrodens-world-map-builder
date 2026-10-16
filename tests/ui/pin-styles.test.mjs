@@ -113,19 +113,14 @@ test("the quick style dialogue reads a style's fields from its form, and the def
     assert.equal(config.onExtract(form, "Fallback").name, "Fallback");
 });
 
-test("the toolbar's choice of style fills its icon, colour and scale; no style leaves them alone", () => {
+test("the bar's choice of style is the style new pins take, none for no style; its choices are by name", () => {
     const app = studio();
     PinStyles.ensure(app);
     const capital = app.uiState.customPinStyles[0];
     app.uiState.activePinStyle = capital.id;
-    PinStyles.readIntoToolbar(app, PinStyles.active(app));
-    assert.equal(app.uiState.activeIcon, "circle_outline_with_star");
-    assert.equal(app.uiState.pinScale, 1);
-
+    assert.equal(PinStyles.active(app), capital);
     app.uiState.activePinStyle = "custom";
     assert.equal(PinStyles.active(app), null);
-    PinStyles.readIntoToolbar(app, PinStyles.active(app));
-    assert.equal(app.uiState.activeIcon, "circle_outline_with_star", "nothing changes for no style");
 
     const choices = PinStyles.choices(app, capital.id);
     assert.equal(choices.length, FILRODENSWMB.PINS.DEFAULT_STYLES.length);

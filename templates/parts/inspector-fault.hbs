@@ -1,0 +1,76 @@
+{{!--
+    The inspector's fault line or tectonic feature (see FaultEditor): its name and description,
+    its type, and the settings of that type (the others are not drawn, so a new type shows its own
+    as soon as it applies); and Focus view and Delete. Every field applies when committed, one
+    undo step each (see Inspector); all but the name and description shape the terrain again.
+--}}
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-name" name="faultName" value="{{fault.name}}" />
+        </div>
+    </div>
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label class="fwmb-label" for="fwmb-inspector-description">{{localize "FILRODENSWMB.UI.Description"}}</label>
+        <div class="fwmb-form-fields">
+            <textarea id="fwmb-inspector-description" class="fwmb-scrollable" name="faultDesc" rows="3">{{fault.description}}</textarea>
+        </div>
+    </div>
+</div>
+
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-fault-type">{{localize "FILRODENSWMB.UI.FaultType"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-fault-type" name="faultType">
+                {{#each tectonicTypes}}
+                <option value="{{this.id}}" {{#if (eq ../fault.type this.id)}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+    {{#if (eq fault.type "range")}}
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-fault-style">{{localize "FILRODENSWMB.UI.FaultStyle"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-fault-style" name="faultStyle" data-tooltip="{{localize 'FILRODENSWMB.UI.FaultStyleHint'}}">
+                {{#each rangeStyles}}
+                <option value="{{this.id}}" {{#if (eq ../settings.style this.id)}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+    {{/if}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="faultThickness" label="FILRODENSWMB.UI.FaultThickness" hint="FILRODENSWMB.UI.FaultThicknessHint" value=fault.thickness min=10 max=1000 step=1}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="faultStrength" label="FILRODENSWMB.UI.FaultStrength" hint="FILRODENSWMB.UI.FaultStrengthHint" value=fault.strength min=0.1 max=1 step=0.05}}
+    {{#if (eq fault.type "subduction")}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="arcDistance" label="FILRODENSWMB.UI.FaultArcDistance" hint="FILRODENSWMB.UI.FaultArcDistanceHint" value=settings.arcDistance min=0.3 max=0.9 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="trenchDepth" label="FILRODENSWMB.UI.FaultTrenchDepth" hint="FILRODENSWMB.UI.FaultTrenchDepthHint" value=settings.trenchDepth min=0 max=1 step=0.05}}
+    {{/if}}
+    {{#if (eq fault.type "rift")}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="floorTexture" label="FILRODENSWMB.UI.FaultFloorTexture" hint="FILRODENSWMB.UI.FaultFloorTextureHint" value=settings.floorTexture min=0 max=1 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="volcanoes" label="FILRODENSWMB.UI.FaultVolcanoes" hint="FILRODENSWMB.UI.FaultVolcanoesHint" value=settings.volcanoes min=0 max=1 step=0.05}}
+    {{/if}}
+    {{#if (eq fault.type "hotspot")}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="spacing" label="FILRODENSWMB.UI.FaultSpacing" hint="FILRODENSWMB.UI.FaultSpacingHint" value=settings.spacing min=0.8 max=3 step=0.1}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="spacingTrend" label="FILRODENSWMB.UI.FaultSpacingTrend" hint="FILRODENSWMB.UI.FaultSpacingTrendHint" value=settings.spacingTrend min=-1 max=1 step=0.1}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="scatter" label="FILRODENSWMB.UI.FaultScatter" hint="FILRODENSWMB.UI.FaultScatterHint" value=settings.scatter min=0 max=1 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="variation" label="FILRODENSWMB.UI.FaultVariation" hint="FILRODENSWMB.UI.FaultVariationHint" value=settings.variation min=0 max=1 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="pulses" label="FILRODENSWMB.UI.FaultPulses" hint="FILRODENSWMB.UI.FaultPulsesHint" value=settings.pulses min=0 max=1 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="vents" label="FILRODENSWMB.UI.FaultVents" hint="FILRODENSWMB.UI.FaultVentsHint" value=settings.vents min=0 max=1 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="drowned" label="FILRODENSWMB.UI.FaultDrowned" hint="FILRODENSWMB.UI.FaultDrownedHint" value=settings.drowned min=0 max=0.9 step=0.05}}
+    {{/if}}
+    {{#if isFeature}}
+    <label class="fwmb-checkbox-label" data-tooltip="{{localize 'FILRODENSWMB.UI.FaultReverseHint'}}">
+        <input type="checkbox" class="fwmb-checkbox" name="faultReverse" {{#if fault.reversed}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.FaultReverse"}}
+    </label>
+    {{/if}}
+</div>
+
+<div class="fwmb-inspector-actions">
+    <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="zoom"><i class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ZoomTo"}}</button>
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-inspector-delete" data-inspector-action="delete"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Delete"}}</button>
+</div>
+<p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorApplyHint"}}</p>

@@ -29,8 +29,8 @@ export class RegionEditor {
      * @param {string} regionId
      * @returns {Promise<boolean>}
      */
-    static open(app, levelId, regionId) {
-        return Inspector.open(app, this.KIND, { levelId, id: regionId });
+    static open(app, levelId, regionId, options) {
+        return Inspector.open(app, this.KIND, { levelId, id: regionId }, options);
     }
 
     static #find(app, { levelId, id }) {

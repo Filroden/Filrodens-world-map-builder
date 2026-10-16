@@ -36,8 +36,8 @@ export class LabelEditor {
      * @param {{type: string, id: string, layerId?: string}} ref
      * @returns {Promise<boolean>}
      */
-    static open(app, ref) {
-        return Inspector.open(app, this.KIND, { type: ref.type ?? "custom", id: ref.id, layerId: ref.layerId ?? null });
+    static open(app, ref, options) {
+        return Inspector.open(app, this.KIND, { type: ref.type ?? "custom", id: ref.id, layerId: ref.layerId ?? null }, options);
     }
 
     /** The label's object: the standalone label, or the pin, route or region that owns it. */

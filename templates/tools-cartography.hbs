@@ -91,7 +91,7 @@
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="decorations" title="FILRODENSWMB.UI.CartographyDecorations" count=mapDecorations.length}}
     <div class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
         {{#each mapDecorations}}
-        <div class="fwmb-list-item" data-id="{{this.id}}" data-type="decoration">
+        <div class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.decoration)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="decoration">
             <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                 <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
             </button>

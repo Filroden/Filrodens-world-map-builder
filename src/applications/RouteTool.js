@@ -33,7 +33,7 @@ const MODE_ICONS = Object.freeze({ select: "select", draw: "gesture", edit: "edi
 /** The canvas cursor for each mode while the pointer is over the map. */
 const MODE_CURSORS = Object.freeze({ select: "pointer", draw: "crosshair", edit: "default" });
 
-/** The fields of the toolbar's route style, with the uiState key each reads and the route field it sets. */
+/** A route's line fields, with the uiState key holding the map's default for each (a route drawn with no style takes those). */
 const STYLE_FIELDS = Object.freeze([
     ["routeColor", "color"],
     ["routeThickness", "thickness"],
@@ -41,15 +41,6 @@ const STYLE_FIELDS = Object.freeze([
     ["routeOutline", "outline"],
     ["routeSmoothing", "smoothing"],
 ]);
-
-/** The toolbar's path fields, with the uiState key each reads and the route field it sets; they apply to legs found from then on. */
-const PATH_FIELDS = Object.freeze([
-    ["routeMode", "mode"],
-    ["routeSpanWater", "spanWater"],
-]);
-
-/** Every toolbar field that applies to the picked route (see applyToolbarField). */
-const TOOLBAR_FIELDS = new Set([...STYLE_FIELDS.map(([key]) => key), ...PATH_FIELDS.map(([key]) => key), "activeRouteQuickStyle"]);
 
 /**
  * The Routes tool: the Infrastructure tool's Route mode on the map while editing. Its modes:
@@ -78,13 +69,13 @@ const TOOLBAR_FIELDS = new Set([...STYLE_FIELDS.map(([key]) => key), ...PATH_FIE
 export class RouteTool {
     /**
      * Per-studio state: the draft being drawn, the press under way in Draw mode (where it began,
-     * and its stroke once it has moved far enough to be a trace), the waypoint drag, the preview
-     * frame, and the vector state before a run of live toolbar changes.
+     * and its stroke once it has moved far enough to be a trace), the waypoint drag and the preview
+     * frame.
      */
     static #states = new WeakMap();
 
     static #state(app) {
-        if (!this.#states.has(app)) this.#states.set(app, { draft: null, steps: [], press: null, drag: null, frame: 0, tool: null, pendingBefore: null });
+        if (!this.#states.has(app)) this.#states.set(app, { draft: null, steps: [], press: null, drag: null, frame: 0, tool: null });
         return this.#states.get(app);
     }
 
@@ -208,7 +199,6 @@ export class RouteTool {
         state.draft = null;
         state.steps = [];
         state.press = null;
-        state.pendingBefore = null;
         this.#drawDraft(app, state, null);
     }
 
@@ -226,39 +216,6 @@ export class RouteTool {
         this.#drawDraft(app, state, null);
         if (route) this.#addRoute(app, route);
         return true;
-    }
-
-    /** The uiState names of the toolbar's line fields, for the studio's field handling. */
-    static STYLE_FIELD_NAMES = Object.freeze(STYLE_FIELDS.map(([key]) => key));
-
-    /**
-     * The toolbar's route fields: a change to one applies to the picked route. A quick style
-     * applies every line field; a new leg mode or water spanning applies to legs found from now
-     * on (Re-path in the editor applies it to the legs there are). Changing a line field by hand
-     * also leaves the route's quick style for whatever the toolbar's now shows (Custom).
-     *
-     * The route follows the field live, but the undo step is recorded only when `commit` is set
-     * (the field's change event): the vector state is snapshotted before the first live change
-     * and pushed at the commit, so a slider drag is one step rather than one per pixel.
-     */
-    static applyToolbarField(app, name, commit = true) {
-        const route = this.activeRoute(app);
-        if (!route || !TOOLBAR_FIELDS.has(name)) return;
-        const state = this.#state(app);
-        state.pendingBefore ??= VectorHistory.snapshot(app);
-        const fields = app.uiState;
-        if (name === "activeRouteQuickStyle") for (const [key, field] of STYLE_FIELDS) route[field] = fields[key];
-        const field = STYLE_FIELDS.find(([key]) => key === name)?.[1];
-        if (field) route[field] = fields[name];
-        if (field || name === "activeRouteQuickStyle") route.quickStyle = fields.activeRouteQuickStyle;
-        const pathField = PATH_FIELDS.find(([key]) => key === name)?.[1];
-        if (pathField) route[pathField] = fields[name];
-        if (commit) {
-            VectorHistory.push(app, state.pendingBefore);
-            state.pendingBefore = null;
-        }
-        app._repaintVectors();
-        app.markDirty();
     }
 
     /** Draws the picked route's waypoint handles and the draft (after any redraw of the map). */
@@ -336,8 +293,8 @@ export class RouteTool {
     // ------------------------------------------------------------------ select and new
 
     /**
-     * Makes a route the picked route (null lets go of it): its waypoint handles show, and its own
-     * fields become the toolbar's, so the toolbar shows and edits it.
+     * Makes a route the picked route (null lets go of it): its waypoint handles show. The bar's
+     * settings are for the next route drawn; the picked route's own are in its inspector.
      * @param {object} app
      * @param {object|null} route
      */
@@ -345,15 +302,8 @@ export class RouteTool {
         const id = route?.id ?? null;
         if (id === app.activeRouteId) return;
         app.activeRouteId = id;
-        if (route) this.syncToolbar(app, route);
         this.#drawHandles(app, this.#state(app));
         app.view?.render(["editToolbar", "context"]);
-    }
-
-    /** Reads a route's fields into the toolbar's (after picking it, or after its editor saved). */
-    static syncToolbar(app, route) {
-        for (const [key, field] of [...STYLE_FIELDS, ...PATH_FIELDS]) app.uiState[key] = route[field];
-        app.uiState.activeRouteQuickStyle = route.quickStyle ?? "custom";
     }
 
     // ------------------------------------------------------------------ draw
@@ -403,17 +353,22 @@ export class RouteTool {
         this.#drawDraft(app, state, null);
     }
 
-    /** The fields a route drawn now starts with: the toolbar's style, leg mode and transport. */
+    /**
+     * The fields a route drawn now starts with: the bar's style (its line fields; with no style,
+     * the map's default line), leg mode and transport.
+     */
     static #newRouteFields(app) {
         const state = app.uiState;
+        const style = (state.customRouteStyles ?? []).find((candidate) => candidate.id === state.activeRouteQuickStyle) ?? null;
+        const line = Object.fromEntries(STYLE_FIELDS.map(([key, field]) => [field, style?.[field] ?? state[key]]));
         return {
             name: uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewRouteName"), app.mapRoutes ?? []),
-            quickStyle: state.activeRouteQuickStyle ?? "custom",
-            color: state.routeColor,
-            thickness: state.routeThickness,
-            style: state.routeStyle,
-            outline: state.routeOutline !== false,
-            smoothing: state.routeSmoothing === true,
+            quickStyle: style?.id ?? "custom",
+            color: line.color,
+            thickness: line.thickness,
+            style: line.style,
+            outline: line.outline !== false,
+            smoothing: line.smoothing === true,
             mode: state.routeMode,
             spanWater: state.routeSpanWater === true,
             transport: this.transport(app),
@@ -421,7 +376,10 @@ export class RouteTool {
         };
     }
 
-    /** Adds a finished route to the map as the picked route, one undo step. */
+    /**
+     * Adds a finished route to the map as the picked route, one undo step, and opens it in the
+     * inspector (focus staying on the map, so the next route can be drawn at once).
+     */
     static #addRoute(app, route) {
         MapStateManager.pushVectorState(app);
         app.mapRoutes.push(route);
@@ -429,6 +387,7 @@ export class RouteTool {
         app._repaintVectors();
         app.view?.render(["context", "editToolbar"]);
         app.markDirty();
+        RouteEditor.open(app, route.id, { created: true });
     }
 
     // ------------------------------------------------------------------ edit

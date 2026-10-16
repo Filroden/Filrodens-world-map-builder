@@ -6,7 +6,7 @@
     <div id="fwmb-scroll-auto-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
             
         {{#each autoLabels}}
-        <div class="fwmb-list-item" data-id="{{this.id}}" data-type="{{this.dataType}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}}>
+        <div class="fwmb-list-item" aria-selected="{{#if (eq this.id (lookup @root.inspected this.labelKey))}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="{{this.dataType}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}}>
             <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                 <i class="fwmb-icon {{#if (eq this.displayVisibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.displayVisibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
             </button>
@@ -39,7 +39,7 @@
 
     <div id="fwmb-scroll-custom-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
         {{#each mapLabels}}
-        <div class="fwmb-list-item" data-id="{{this.id}}" data-type="custom">
+        <div class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.labelcustom)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="custom">
             {{#if ../massEditMode.label}}
                 <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="label" {{#if this.massEditSelected}}checked{{/if}} />
             {{/if}}

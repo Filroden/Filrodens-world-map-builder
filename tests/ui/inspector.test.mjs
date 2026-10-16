@@ -30,7 +30,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/label-fields.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs"]);
+await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/label-fields.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs", "parts/inspector-river.hbs", "parts/inspector-fault.hbs", "parts/inspector-decoration.hbs", "parts/inspector-land-mask.hbs", "parts/inspector-level.hbs", "parts/inspector-set.hbs"]);
 
 /** What the next prompt (Save as…'s name) answers. */
 const answers = { prompt: null };
@@ -53,6 +53,7 @@ installPlatform({
     },
 });
 
+const { FILRODENSWMB } = await import("../../src/config.js");
 const { Inspector } = await import("../../src/applications/Inspector.js");
 const { RegionEditor } = await import("../../src/applications/RegionEditor.js");
 const { RouteEditor } = await import("../../src/applications/RouteEditor.js");
@@ -60,6 +61,8 @@ const { RouteTool } = await import("../../src/applications/RouteTool.js");
 const { PinEditor } = await import("../../src/applications/PinEditor.js");
 const { LabelEditor } = await import("../../src/applications/LabelEditor.js");
 const { PickTool } = await import("../../src/applications/PickTool.js");
+const { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } = await import("../../src/applications/FeatureEditors.js");
+const { LayerSetEditor, LevelEditor } = await import("../../src/applications/LayerEditors.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
 const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
 const { allLevels } = await import("../../src/mesh/LayerTree.js");
@@ -89,13 +92,17 @@ async function studio() {
         activeLevelId: "realms",
         activeRegionId: null,
         activeRouteId: null,
-        tectonicFaults: [],
-        manualRivers: [],
-        landMasks: [],
+        tectonicFaults: [{ id: "spine", name: "Spine", type: "range", style: "fold", thickness: 120, strength: 0.6, color: "#aa0000", points: [{ x: 120, y: 200 }, { x: 260, y: 200 }] }],
+        manualRivers: [{ id: "silver", name: "Silver", width: 4, points: [{ x: 100, y: 60 }, { x: 300, y: 60 }] }],
+        landMasks: [{ id: "isle", name: "Isle", operation: "add", points: [{ x: 300, y: 300 }, { x: 380, y: 300 }, { x: 380, y: 380 }, { x: 300, y: 380 }] }],
+        terrainUpdates: 0,
+        requestTerrainUpdate() {
+            this.terrainUpdates++;
+        },
         mapPins: [{ id: "keep", name: "Old Keep", x: 150, y: 100, icon: "castle", scale: 1, color: "#ffffff", pinStyle: null, label: { quickStyle: "custom" } }],
         mapRoutes: [],
         mapLabels: [{ id: "sea", name: "Grey Sea", x: 50, y: 150, rotation: 0, quickStyle: "custom", fontFamily: "Noto Serif", fontSize: 1, fillColor: "#ffffff", maxChars: 0, justify: "left", visibility: "all" }],
-        mapDecorations: [],
+        mapDecorations: [{ id: "rose", name: "Rose", src: "rose.webp", x: 40, y: 40, scale: 1, rotation: 0, opacity: 1 }],
         _expandedSections: new Set(),
         _collapsedSections: new Set(),
         uiState: {
@@ -486,4 +493,116 @@ test("in Select, a click on a pin or label opens it, a click away or Escape clos
     assert.equal(PickTool.handleKey(app, { key: "Escape" }), true);
     assert.equal(Inspector.current(app), null);
     assert.equal(PickTool.handleKey(app, { key: "Escape" }), false, "nothing left to close");
+});
+
+test("a river's name and width apply one step each; only a new width carves the terrain again", async () => {
+    const { app } = await studio();
+    const river = app.manualRivers[0];
+    await RiverEditor.open(app, "silver");
+    await commit(app, "riverName", "Silverrun");
+    assert.equal(app.terrainUpdates, 0);
+    await commit(app, "riverWidth", "8");
+    assert.deepEqual([river.name, river.width, app.terrainUpdates, steps(app)], ["Silverrun", 8, 1, 2]);
+});
+
+test("a fault's type shows that type's settings at their defaults, drops the old ones, and shapes the terrain", async () => {
+    const { app } = await studio();
+    const fault = app.tectonicFaults[0];
+    app.uiState.terrainVersion = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+    await FaultEditor.open(app, "spine");
+    assert.ok(field(app, "faultStyle"), "a range shows its style");
+    await commit(app, "faultDesc", "The old mountains");
+    assert.equal(app.terrainUpdates, 0, "a description is only words");
+    await commit(app, "faultType", "hotspot");
+    assert.equal(fault.type, "hotspot");
+    assert.equal(fault.style, undefined, "the range's style goes");
+    assert.ok(fault.spacing > 0, "a hotspot's settings start at their defaults");
+    assert.ok(field(app, "spacing") && !field(app, "faultStyle"), "the inspector shows the new type's settings");
+    await commit(app, "spacing", "2");
+    assert.deepEqual([fault.spacing, app.terrainUpdates, steps(app)], [2, 2, 3]);
+});
+
+test("a decoration's look applies one step each; a land mask's type shapes the land again", async () => {
+    const { app } = await studio();
+    await DecorationEditor.open(app, "rose");
+    await commit(app, "decorationOpacity", "0.5");
+    await commit(app, "decorationVisibility", "gm");
+    assert.deepEqual([app.mapDecorations[0].opacity, app.mapDecorations[0].visibility, app.mapDecorations[0].scale], [0.5, "gm", 1]);
+
+    await LandMaskEditor.open(app, "isle");
+    await commit(app, "maskName", "Isle of Mist");
+    assert.equal(app.terrainUpdates, 0);
+    await commit(app, "maskOperation", "subtract");
+    assert.deepEqual([app.landMasks[0].name, app.landMasks[0].operation, app.terrainUpdates, steps(app)], ["Isle of Mist", "subtract", 1, 4]);
+});
+
+test("a set and a level open as the active ones; their fields apply one step each, and Copy style fills a level's borders", async () => {
+    const { app } = await studio();
+    const other = createLevel({ id: "duchies", name: "Duchies", style: { lineColor: "#123456", lineThickness: 3, lineStyle: "dotted" } });
+    app.layerSets[0].levels.push(other);
+    const set = app.layerSets[0];
+    await LayerSetEditor.open(app, "political");
+    assert.equal(app.activeLayerSetId, "political");
+    await commit(app, "setOpacity", "0.4");
+    await commit(app, "setWaterTint", false);
+    assert.deepEqual([set.opacity, set.waterTint, steps(app)], [0.4, false, 2]);
+
+    const realms = set.levels[0];
+    await LevelEditor.open(app, "realms");
+    assert.equal(app.activeLevelId, "realms");
+    await commit(app, "levelName", "Kingdoms");
+    await commit(app, "levelCopyStyle", "duchies");
+    assert.deepEqual([realms.name, realms.style.lineColor, realms.style.lineThickness, realms.style.lineStyle], ["Kingdoms", "#123456", 3, "dotted"]);
+    assert.equal(field(app, "levelCopyStyle").value, "", "Copy style is a one-off, not a setting");
+    assert.equal(steps(app), 4);
+});
+
+test("Select on rivers and faults, land masks and decorations picks what is under the pointer", async () => {
+    const { app } = await studio();
+    pickable(app);
+    app.canvasEngine.hitTest = (x, y, type) => (type === "decoration" && Math.hypot(x - 40, y - 40) < 20 ? { entityType: "decoration", entityId: "rose" } : null);
+    app.activeTool = "features";
+    app.uiState.activeFeatureMode = "select";
+    const tool = PickTool.tool(app);
+    tool.down(200, 63);
+    await settle();
+    assert.ok(Inspector.shows(app, "river", "silver"), "a click near the river picks it");
+    tool.down(200, 204);
+    await settle();
+    assert.ok(Inspector.shows(app, "fault", "spine"));
+    tool.down(200, 140);
+    await settle();
+    assert.ok(Inspector.shows(app, "fault", "spine"), "a click in a fault's area of effect picks it");
+    tool.down(30, 330);
+    await settle();
+    assert.equal(Inspector.current(app), null, "a click away closes it");
+
+    app.activeTool = "scene";
+    app.uiState.generationEngine = "guided";
+    app.uiState.sceneMode = "select";
+    tool.down(340, 340);
+    await settle();
+    assert.ok(Inspector.shows(app, "landMask", "isle"), "a click inside a land mask picks it");
+
+    app.activeTool = "cartography";
+    app.uiState.cartographyMode = "select";
+    tool.down(45, 42);
+    await settle();
+    assert.ok(Inspector.shows(app, "decoration", "rose"));
+    app.uiState.cartographyMode = "move";
+    assert.equal(PickTool.tool(app), null, "Move leaves decorations to be dragged");
+    assert.equal(steps(app), 0, "picking changes nothing");
+});
+
+test("the lists learn which object the inspector shows, a label by its owner's type", async () => {
+    const { app } = await studio();
+    assert.deepEqual(Inspector.inspected(app), {});
+    await PinEditor.open(app, "keep");
+    assert.deepEqual(Inspector.inspected(app), { pin: "keep" });
+    await LabelEditor.open(app, { type: "pin", id: "keep" });
+    assert.deepEqual(Inspector.inspected(app), { labelpin: "keep" });
+    assert.ok(app.rendered.includes("context"), "the panel is drawn again to mark the row");
+    Inspector.close(app);
+    await settle();
+    assert.deepEqual(Inspector.inspected(app), {});
 });

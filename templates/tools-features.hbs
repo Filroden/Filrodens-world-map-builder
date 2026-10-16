@@ -6,7 +6,7 @@
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="rivers" title="FILRODENSWMB.UI.ManualRivers" count=manualRivers.length}}
     <div id="fwmb-scroll-rivers" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
         {{#each manualRivers}}
-            <div class="fwmb-list-item" data-id="{{this.id}}" data-type="river">
+            <div class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.river)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="river">
                 <div class="fwmb-route-swatch fwmb-route-swatch--river"></div>
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
                 <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
@@ -28,7 +28,7 @@
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="faults" title="FILRODENSWMB.UI.TectonicFaults" count=tectonicFaults.length}}
     <div id="fwmb-scroll-faults" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
         {{#each tectonicFaults}}
-            <div class="fwmb-list-item" data-id="{{this.id}}" data-type="fault">
+            <div class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.fault)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="fault">
                 <div class="fwmb-route-swatch fwmb-route-swatch--solid" style="background-color: {{this.color}};"></div>
 
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>

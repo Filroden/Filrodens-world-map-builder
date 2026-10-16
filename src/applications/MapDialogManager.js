@@ -4,8 +4,6 @@ import { MapStateManager } from "./MapStateManager.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { RuleEditorDialog } from "./RuleEditorDialog.js";
-import { TerrainVersion } from "../tools/TerrainVersion.js";
-import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import {
@@ -488,15 +486,6 @@ export class MapDialogManager {
                     for (const level of app.regionLevels) count += level.regions.filter(isAttachedMatch).length;
                     return count;
                 },
-                onUpdateActiveUI: (app, result) => {
-                    app.uiState.labelFontFamily = result.fontFamily;
-                    app.uiState.labelFontSize = result.fontSize;
-                    app.uiState.labelFillColor = result.fillColor;
-                    app.uiState.labelMaxChars = result.maxChars;
-                    app.uiState.labelJustify = result.justify;
-                    app.uiState.labelBold = result.bold !== false;
-                    app.uiState.labelItalic = result.italic === true;
-                },
             },
             Route: {
                 registryKey: "customRouteStyles",
@@ -533,13 +522,6 @@ export class MapDialogManager {
                     for (const route of app.mapRoutes) if (route.quickStyle === id) route.quickStyle = "custom";
                 },
                 getUsageCount: (app, id) => app.mapRoutes.filter((route) => route.quickStyle === id).length,
-                onUpdateActiveUI: (app, result) => {
-                    app.uiState.routeColor = result.color;
-                    app.uiState.routeThickness = result.thickness;
-                    app.uiState.routeStyle = result.style;
-                    app.uiState.routeOutline = result.outline !== false;
-                    app.uiState.routeSmoothing = result.smoothing === true;
-                },
             },
             // Region quick styles hold a region's fill only: a region's border belongs to its level
             // (the level's line style), so the line and smoothing fields older styles carry are
@@ -586,7 +568,6 @@ export class MapDialogManager {
                 onCascade: (app, id, result) => PinStyles.cascade(app, { id, ...result }),
                 onDisconnect: (app, id) => PinStyles.disconnect(app, id),
                 getUsageCount: (app, id) => PinStyles.usageCount(app, id),
-                onUpdateActiveUI: (app, result) => PinStyles.readIntoToolbar(app, result),
             },
             Region: {
                 registryKey: "customRegionStyles",
@@ -1147,23 +1128,28 @@ export class MapDialogManager {
     }
 
     static async onDeleteLandMask(app, event, target) {
-        const id = target.closest(".fwmb-list-item").dataset.id;
+        await this.deleteLandMaskById(app, target.closest(".fwmb-list-item").dataset.id);
+    }
 
+    /**
+     * Deletes one land mask after the standard confirmation, as one undo step, and shapes the land
+     * again: from its list's delete button or the inspector.
+     * @returns {Promise<boolean>} Whether it was deleted.
+     */
+    static async deleteLandMaskById(app, id) {
+        if (!app.landMasks.some((mask) => mask.id === id)) return false;
         const confirmed = await this._confirmDialog();
-        if (!confirmed) return;
+        if (!confirmed) return false;
 
         MapStateManager.pushVectorState(app);
-
-        app.landMasks = app.landMasks.filter((m) => m.id !== id);
-
-        if (app.activeLandMaskId === id) {
-            app.activeLandMaskId = null;
-        }
+        app.landMasks = app.landMasks.filter((mask) => mask.id !== id);
+        if (app.activeLandMaskId === id) app.activeLandMaskId = null;
 
         app._repaintVectors();
         app.requestTerrainUpdate();
         app.view?.render(["context"]);
         app.markDirty();
+        return true;
     }
 
     /**
@@ -1317,155 +1303,6 @@ export class MapDialogManager {
 
     // --- EDIT ACTIONS ---
 
-    static async onEditDecoration(app, event, target, explicitId = null) {
-        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
-        const dec = app.mapDecorations.find((d) => d.id === id);
-        if (!dec) return;
-
-        await this._processEditDialog(app, dec, {
-            titleKey: "FILRODENSWMB.UI.Edit",
-            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-decoration.hbs",
-            context: {
-                decoration: {
-                    name: dec.name,
-                    opacity: dec.opacity ?? 1,
-                    // Snapped to the slider's grid, so the value shown matches the slider's position
-                    // even for a scale saved before scales were stepped (1.157625 shows as 1.15)
-                    scale: CanvasTransforms.stepValue(dec.scale ?? 1, 0, FILRODENSWMB.UI.WHEEL_RESIZE.DECORATION_SCALE),
-                    rotation: CanvasTransforms.normalizeAngle(dec.rotation),
-                },
-                scaleRange: FILRODENSWMB.UI.WHEEL_RESIZE.DECORATION_SCALE,
-                rotationRange: FILRODENSWMB.UI.ROTATION,
-            },
-            onExtract: (form) => ({
-                name: form.elements["decorationName"].value,
-                opacity: Number(form.elements["decorationOpacity"].value),
-                scale: Number(form.elements["decorationScale"].value) || 1,
-                rotation: CanvasTransforms.normalizeAngle(form.elements["decorationRotation"].value),
-            }),
-        });
-    }
-
-    static async onEditFault(app, event, target, explicitId = null) {
-        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
-        const fault = app.tectonicFaults.find((f) => f.id === id);
-        if (!fault) return;
-
-        const currentMap = TerrainVersion.getVersion(app.uiState) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
-
-        await this._processEditDialog(app, fault, {
-            titleKey: "FILRODENSWMB.UI.EditFault",
-            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-tectonics.hbs",
-            context: {
-                fault,
-                tectonicTypes: TectonicFeatureEngine.typeOptions(currentMap, fault.type),
-                rangeStyles: Object.entries(FILRODENSWMB.TECTONICS.FEATURES.RANGE_STYLES).map(([styleId, label]) => ({ id: styleId, label })),
-                settings: this.#featureSettings(fault),
-                isFeature: TectonicFeatureEngine.isFeatureType(fault.type),
-            },
-            onRender: (html) => this.#watchFaultType(html),
-            onExtract: (form) => this.#extractFault(form),
-            onSave: (entity, result) => {
-                this.#finishFaultEdit(entity, result);
-                if (app.activeFaultId === id) {
-                    app.uiState.faultType = entity.type;
-                    app.uiState.faultThickness = entity.thickness;
-                    app.uiState.faultStrength = entity.strength;
-                    if (entity.style) app.uiState.faultStyle = entity.style;
-                    app.view?.render(["editToolbar"]);
-                }
-            },
-            triggersTerrain: true,
-        });
-    }
-
-    /**
-     * The settings of every tectonic feature type for the edit dialogue: the fault's own values
-     * where it has them, the defaults otherwise, so switching type in the dialogue shows sensible
-     * starting values.
-     */
-    static #featureSettings(fault) {
-        const features = FILRODENSWMB.TECTONICS.FEATURES;
-        return {
-            style: fault.style ?? features.RANGE.DEFAULT_STYLE,
-            arcDistance: fault.arcDistance ?? features.SUBDUCTION.DEFAULT_ARC_DISTANCE,
-            trenchDepth: fault.trenchDepth ?? features.SUBDUCTION.DEFAULT_TRENCH_DEPTH,
-            floorTexture: fault.floorTexture ?? features.RIFT.DEFAULT_FLOOR_TEXTURE,
-            volcanoes: fault.volcanoes ?? 0,
-            spacing: fault.spacing ?? features.HOTSPOT.DEFAULT_SPACING,
-            spacingTrend: fault.spacingTrend ?? features.HOTSPOT.DEFAULT_SPACING_TREND,
-            scatter: fault.scatter ?? features.HOTSPOT.DEFAULT_SCATTER,
-            variation: fault.variation ?? features.HOTSPOT.DEFAULT_VARIATION,
-            pulses: fault.pulses ?? features.HOTSPOT.DEFAULT_PULSES,
-            vents: fault.vents ?? features.HOTSPOT.DEFAULT_VENTS,
-            drowned: fault.drowned ?? features.HOTSPOT.DEFAULT_DROWNED,
-        };
-    }
-
-    /** The settings each tectonic feature type reads, beyond thickness and strength. */
-    static #FEATURE_FIELDS = {
-        range: ["style"],
-        subduction: ["arcDistance", "trenchDepth"],
-        rift: ["floorTexture", "volcanoes"],
-        hotspot: ["spacing", "spacingTrend", "scatter", "variation", "pulses", "vents", "drowned"],
-    };
-
-    /**
-     * Shows the dialogue's settings for the chosen fault type and hides the rest, now and whenever
-     * the type changes (see edit-tectonics.hbs).
-     */
-    static #watchFaultType(html) {
-        const select = html.querySelector('select[name="faultType"]');
-        if (!select) return;
-        const update = () => {
-            for (const section of html.querySelectorAll("[data-fault-types]")) {
-                section.hidden = !section.dataset.faultTypes.split(" ").includes(select.value);
-            }
-        };
-        select.addEventListener("change", update);
-        update();
-    }
-
-    /**
-     * Reads the edit dialogue: the shared fields, plus the settings of the chosen type only, so
-     * a fault never keeps settings of a type it no longer is.
-     */
-    static #extractFault(form) {
-        const elements = form.elements;
-        const type = elements["faultType"].value;
-        const result = {
-            name: elements["faultName"].value,
-            description: elements["faultDesc"].value,
-            type,
-            thickness: Number(elements["faultThickness"].value),
-            strength: Number(elements["faultStrength"].value),
-            reversed: elements["faultReverse"]?.checked === true,
-        };
-        for (const field of this.#FEATURE_FIELDS[type] ?? []) {
-            const input = field === "style" ? elements["faultStyle"] : elements[field];
-            if (input) result[field] = field === "style" ? input.value : Number(input.value);
-        }
-        return result;
-    }
-
-    /**
-     * Completes an edited fault after the dialogue's values are merged into it: its colour, whether
-     * it is a tectonic feature, and dropping settings of other types. Its direction is a setting
-     * (`reversed`, see TectonicFeatureEngine), kept only while it is on and only for a feature.
-     */
-    static #finishFaultEdit(fault, result) {
-        fault.color = TectonicFeatureEngine.colorOf(fault.type);
-        if (!result.reversed || !TectonicFeatureEngine.isFeatureType(fault.type)) delete fault.reversed;
-
-        const keep = new Set(this.#FEATURE_FIELDS[fault.type] ?? []);
-        for (const fields of Object.values(this.#FEATURE_FIELDS)) {
-            for (const field of fields) if (!keep.has(field)) delete fault[field];
-        }
-
-        if (TectonicFeatureEngine.isFeatureType(fault.type)) fault.revision = FILRODENSWMB.TECTONICS.FEATURES.REVISION;
-        else delete fault.revision;
-    }
-
     static async onEditCustomPinIcon(app, event, target) {
         const id = target.closest(".fwmb-list-item").dataset.id;
         const icon = getCustomPinIconById(id);
@@ -1498,66 +1335,6 @@ export class MapDialogManager {
                 config.onSave?.(entity, result);
                 if (config.onCascade) config.onCascade(app, id, result);
 
-                if (app.uiState[config.activeStateKey] === id) {
-                    if (config.onUpdateActiveUI) config.onUpdateActiveUI(app, result);
-                }
-            },
-        });
-    }
-
-    static async onEditRiver(app, event, target, explicitId = null) {
-        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
-        const river = app.manualRivers.find((r) => r.id === id);
-        if (!river) return;
-
-        await this._processEditDialog(app, river, {
-            titleKey: "FILRODENSWMB.UI.EditRiver",
-            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-rivers.hbs",
-            context: { river },
-            onExtract: (form) => ({
-                name: form.elements["riverName"].value,
-                width: Number(form.elements["riverWidth"].value),
-            }),
-            onSave: (entity, result) => {
-                if (app.activeRiverId === id) {
-                    app.uiState.riverWidth = result.width;
-                    app.view?.render(["toolbar"]);
-                }
-            },
-            triggersTerrain: true,
-        });
-    }
-
-    /**
-     * Opens the edit dialogue for a guided-mode land mask: its name, and whether it marks land
-     * ("add") or an ocean hole ("subtract").
-     *
-     * The name is only a label, so renaming never touches the terrain. Changing the type does
-     * change what the guided generator produces, so that alone requests a terrain update.
-     */
-    static async onEditLandMask(app, event, target, explicitId = null) {
-        const id = explicitId || target.closest(".fwmb-list-item").dataset.id;
-
-        // Finish any mask still being drawn first (discarding it if it never became a shape), as
-        // that shape may be the one being opened, and its nodes must not keep growing underneath
-        // the dialogue.
-        if (app._finishActiveLandMask()) app.requestTerrainUpdate();
-
-        const mask = app.landMasks.find((m) => m.id === id);
-        if (!mask) return;
-
-        const previousOperation = mask.operation === "subtract" ? "subtract" : "add";
-
-        await this._processEditDialog(app, mask, {
-            titleKey: "FILRODENSWMB.UI.EditLandMaskDetails",
-            template: "modules/filrodens-world-map-builder/templates/dialogs/edit-land-masks.hbs",
-            context: { mask },
-            onExtract: (form, fallbackName) => ({
-                name: form.elements["maskName"].value.trim() || fallbackName,
-                operation: form.elements["maskOperation"].value === "subtract" ? "subtract" : "add",
-            }),
-            onSave: (entity, result) => {
-                if (result.operation !== previousOperation) app.requestTerrainUpdate();
             },
         });
     }

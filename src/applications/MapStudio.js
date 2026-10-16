@@ -14,7 +14,7 @@ import { RefreshQueue } from "../tools/RefreshQueue.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
-import { bindDropdownMenus } from "../ui/dropdowns.js";
+import { bindDropdownMenus, positionPopoverMenu } from "../ui/dropdowns.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
@@ -38,6 +38,8 @@ import { RouteEditor } from "./RouteEditor.js";
 import { PinEditor } from "./PinEditor.js";
 import { LabelEditor } from "./LabelEditor.js";
 import { PickTool } from "./PickTool.js";
+import { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } from "./FeatureEditors.js";
+import { LayerSetEditor, LevelEditor } from "./LayerEditors.js";
 import { PinStyles } from "./PinStyles.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
@@ -130,15 +132,15 @@ export class MapStudio {
         deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
         deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
         deleteAllLandMasks(e, t) { MapDialogManager.onDeleteAllLandMasks(this, e, t); },
-        editLandMask(e, t)      { MapDialogManager.onEditLandMask(this, e, t); },
+        editLandMask(_e, t)     { LandMaskEditor.open(this, MapStudio.#rowId(t)); },
 
         // --- DIALOG MANAGER: Entity Editing ---
-        editDecoration(e, t)  { MapDialogManager.onEditDecoration(this, e, t); },
-        editFault(e, t)       { MapDialogManager.onEditFault(this, e, t); },
+        editDecoration(_e, t) { DecorationEditor.open(this, MapStudio.#rowId(t)); },
+        editFault(_e, t)      { FaultEditor.open(this, MapStudio.#rowId(t)); },
         editLabel(_e, t)      { LabelEditor.open(this, MapStudio.#labelRef(t)); },
         editPin(_e, t)        { PinEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
         editRegion(_e, t)     { RegionEditor.open(this, ...RegionPanel.regionIdsOf(t)); },
-        editRiver(e, t)       { MapDialogManager.onEditRiver(this, e, t); },
+        editRiver(_e, t)      { RiverEditor.open(this, MapStudio.#rowId(t)); },
         editRoute(_e, t)      { RouteEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
 
         // --- DIALOG MANAGER: Custom Biomes & Misc ---
@@ -149,24 +151,24 @@ export class MapStudio {
         addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
 
         // --- REGIONS PANEL: layer sets, levels and regions (see RegionPanel) ---
-        addLayerSet()               { RegionPanel.addSet(this); },
-        selectLayerSet(_e, t)       { RegionPanel.selectSet(this, t); },
-        editLayerSet(_e, t)         { RegionPanel.editSet(this, t); },
+        async addLayerSet()         { const id = await RegionPanel.addSet(this); if (id) LayerSetEditor.open(this, id); },
+        selectLayerSet(_e, t)       { LayerSetEditor.open(this, RegionPanel.setIdOf(t)); },
+        editLayerSet(_e, t)         { LayerSetEditor.open(this, RegionPanel.setIdOf(t)); },
         deleteLayerSet(_e, t)       { RegionPanel.deleteSet(this, t); },
         moveLayerSetUp(_e, t)       { RegionPanel.moveSet(this, t, -1); },
         moveLayerSetDown(_e, t)     { RegionPanel.moveSet(this, t, 1); },
         toggleSetVisibility(_e, t)  { RegionPanel.toggleSetVisibility(this, t); },
-        addLevel()                  { RegionPanel.addLevel(this); },
-        addChildLevel(_e, t)        { RegionPanel.addChildLevel(this, t); },
-        editLevel(_e, t)            { RegionPanel.editLevel(this, t); },
+        async addLevel()            { const id = await RegionPanel.addLevel(this); if (id) LevelEditor.open(this, id); },
+        async addChildLevel(_e, t)  { const id = await RegionPanel.addChildLevel(this, t); if (id) LevelEditor.open(this, id); },
+        editLevel(_e, t)            { LevelEditor.open(this, RegionPanel.levelIdOf(t)); },
         deleteLevel(_e, t)          { RegionPanel.deleteLevel(this, t); },
         moveLevelUp(_e, t)          { RegionPanel.moveLevel(this, t, -1); },
         moveLevelDown(_e, t)        { RegionPanel.moveLevel(this, t, 1); },
-        selectLevel(_e, t)          { RegionPanel.selectLevel(this, t); },
+        selectLevel(_e, t)          { LevelEditor.open(this, RegionPanel.levelIdOf(t)); },
         toggleLevelVisibility(_e, t) { RegionPanel.toggleLevelVisibility(this, t); },
         autoAssignLevel(_e, t)      { RegionPanel.autoAssign(this, t); },
         fixLevelNesting(_e, t)      { RegionPanel.fixNesting(this, t); },
-        addRegion()                 { RegionPanel.addRegion(this); },
+        addRegion()                 { const region = RegionPanel.addRegion(this); if (region) RegionEditor.open(this, region.levelId, region.id, { created: true }); },
         selectRegion(_e, t)         { this.#selectRegionRow(t); },
         mergeRegion(_e, t)          { RegionPanel.mergeRegion(this, ...RegionPanel.regionIdsOf(t)); },
 
@@ -217,16 +219,17 @@ export class MapStudio {
         setRegionMode(_e, t)            { RegionPainter.setMode(this, t); this.#modeChosen(RegionPainter.mode(this) !== "select"); },
         toggleRegionShowAll()           { RegionPainter.toggleShowAll(this); },
         setRouteMode(_e, t)             { RouteTool.setMode(this, t); this.#modeChosen(RouteTool.mode(this) !== "select"); },
+        setInfrastructureIcon(_e, t)    { this.#choosePinIcon(t.dataset.icon); },
+        togglePinDropdown(_e, t)        { this.#togglePinIcons(t); },
         setPickMode(_e, t)              { if (PickTool.setMode(this, t.dataset.mode)) this.#modeChosen(t.dataset.mode !== "select"); },
-        setInfrastructureIcon(e, t)     { this._onSetInfrastructureIcon(e, t); },
         setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
+        setCartographyMode(_e, t)       { this.uiState.cartographyMode = t.dataset.mode === "move" ? "move" : "select"; this.#modeChosen(false); },
         threeDView(e, t)                { this._onThreeDView(e, t); },
         toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
         toggleGrid(e, t)                { this._onToggleGrid(e, t); },
         toggleLayer(e, t)               { this._onToggleLayer(e, t); },
         toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
         toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
-        togglePinDropdown(e, t)         { this._onTogglePinDropdown(e, t); },
         toggleTerrainLayer(e, t)        { this._onToggleTerrainLayer(e, t); },
         toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
         toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
@@ -801,7 +804,7 @@ export class MapStudio {
             case "features": {
                 const current = s.activeFeatureMode;
                 const feature = (value, label, tooltip, icon) => mode("setFeatureMode", "mode", value, ui(label), ui(tooltip), icon, current === value);
-                return [group(ui("ModesFeatures"), "features", [feature("spring", "ModeSource", "ToolAddSpring", "water-drop"), feature("river", "ModeRiver", "ToolDrawRiver", "water"), feature("fault", "ModeFault", "ToolDrawFault", "timeline")])];
+                return [group(ui("ModesFeatures"), "features", [feature("select", "ModeSelect", "FeatureModeSelect", "select"), feature("spring", "ModeSource", "ToolAddSpring", "water-drop"), feature("river", "ModeRiver", "ToolDrawRiver", "water"), feature("fault", "ModeFault", "ToolDrawFault", "timeline")])];
             }
             case "scene": {
                 const canCrop = TerrainVersion.canCreateRegionalMap(this.uiState);
@@ -810,6 +813,7 @@ export class MapStudio {
                     const current = s.sceneMode;
                     return [
                         group(ui("ModesMask"), "scene", [
+                            mode("setSceneMode", "mode", "select", ui("ModeSelect"), ui("MaskModeSelect"), "select", current === "select"),
                             mode("setSceneMode", "mode", "addMask", ui("ModeLand"), ui("DrawLandMaskHint"), "add", current === "addMask"),
                             mode("setSceneMode", "mode", "subtractMask", ui("ModeOcean"), ui("DrawOceanMaskHint"), "remove", current === "subtractMask"),
                             mode("setSceneMode", "mode", "crop", ui("ModeCrop"), cropTip, "crop", current === "crop", { disabled: !canCrop }),
@@ -838,6 +842,15 @@ export class MapStudio {
             }
             case "labels":
                 return [this.#pickModeGroup(group, "label", ui("ModesLabel"))];
+            case "cartography": {
+                const moving = s.cartographyMode === "move";
+                return [
+                    group(ui("ModesCartography"), "cartography", [
+                        mode("setCartographyMode", "mode", "select", ui("ModeSelect"), ui("DecorationModeSelect"), "select", !moving),
+                        mode("setCartographyMode", "mode", "move", ui("ModeMove"), ui("DecorationModeMove"), "open-with", moving),
+                    ]),
+                ];
+            }
             default:
                 return [];
         }
@@ -1070,19 +1083,19 @@ export class MapStudio {
         context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
         context.engineLabels = this.#getEngineLabels();
 
+        // The object the inspector shows, whose row the lists mark as selected
+        context.inspected = Inspector.inspected(this);
         context.infrastructureIcons = getPinIconPickerList(this.uiState.activeIcon);
+        const activeIconEntry = context.infrastructureIcons.find((icon) => icon.key === this.uiState.activeIcon);
+        context.activeIconPath = activeIconEntry?.path || "";
+        context.activeIconIsCustom = activeIconEntry?.isCustom || false;
         context.builtinPinIcons = getBuiltinPinIconList();
         // Read by the templates as collapsedSections.<key>, so a section drawn again stays as the
         // GM left it rather than springing open
         context.collapsedSections = Object.fromEntries([...this._collapsedSections].map((key) => [key, true]));
         // Sections that start closed but were opened (see the section partial)
         context.expandedSections = Object.fromEntries([...this._expandedSections].map((key) => [key, true]));
-        context.fontFamilies = platform.fonts.list();
         context.customPinIcons = getCustomPinIconList();
-
-        const activeIconEntry = context.infrastructureIcons.find((icon) => icon.key === this.uiState.activeIcon);
-        context.activeIconPath = activeIconEntry?.path || "";
-        context.activeIconIsCustom = activeIconEntry?.isCustom || false;
 
         context.routeStyles = (this.uiState.customRouteStyles || []).map((style) => ({
             id: style.id,
@@ -1156,15 +1169,15 @@ export class MapStudio {
             const autoLabels = [];
 
             context.mapPins.forEach((p) => {
-                autoLabels.push({ ...p, dataType: "pin", displayVisibility: p.label?.visibility || "all" });
+                autoLabels.push({ ...p, dataType: "pin", labelKey: "labelpin", displayVisibility: p.label?.visibility || "all" });
             });
 
             context.mapRoutes.forEach((r) => {
-                autoLabels.push({ ...r, dataType: "route", displayVisibility: r.label?.visibility || "all" });
+                autoLabels.push({ ...r, dataType: "route", labelKey: "labelroute", displayVisibility: r.label?.visibility || "all" });
             });
 
             for (const level of this.regionLevels) {
-                for (const r of level.regions) autoLabels.push({ ...r, dataType: "region", layerId: level.id, displayVisibility: r.label?.visibility || "all" });
+                for (const r of level.regions) autoLabels.push({ ...r, dataType: "region", labelKey: "labelregion", layerId: level.id, displayVisibility: r.label?.visibility || "all" });
             }
 
             // Sort the unified list alphabetically by name
@@ -1540,26 +1553,64 @@ export class MapStudio {
 
         // 2. Delegate to Sub-Systems
         this.#syncFaultLiveEdits(name);
-        this.#syncRouteLiveEdits(name, event.type === "change");
-        this.#syncPinLiveEdits(name);
+        this.#syncPinStyle(name);
         this.#syncCropLiveEdits(name);
     }
 
     /**
-     * The toolbar's pin style: choosing one fills the icon, colour and scale new pins get from it;
-     * changing the colour or scale by hand (or the icon, see _onSetInfrastructureIcon) leaves the
-     * choice for "no style".
+     * The bar's pin style and icon: choosing a style shows its icon (the one the next pin gets);
+     * choosing an icon leaves the style for "no style", so the next pin is the default pin in that icon.
      */
-    #syncPinLiveEdits(name) {
-        if (name === "activePinStyle") {
-            PinStyles.readIntoToolbar(this, PinStyles.active(this));
-            this.view?.render(["editToolbar"]);
+    #syncPinStyle(name) {
+        if (name !== "activePinStyle") return;
+        const style = PinStyles.active(this);
+        if (style) this.uiState.activeIcon = style.icon;
+        this.view?.render(["editToolbar"]);
+    }
+
+    /** The pin icons grids that close themselves on an outside press or Escape (see #togglePinIcons). */
+    #pinIconGrids = new WeakSet();
+
+    /**
+     * Opens or closes the bar's pin icon grid. It opens as a popover placed against its trigger,
+     * drawn in the top layer: the bar clips anything that overflows it, so the grid could not show
+     * inside it. A press outside the picker, or Escape, closes it.
+     */
+    #togglePinIcons(trigger) {
+        const menu = trigger.closest(".fwmb-custom-select")?.querySelector(".fwmb-select-options");
+        if (!menu?.showPopover) return;
+        if (menu.matches(":popover-open")) {
+            menu.hidePopover();
             return;
         }
-        if ((name === "pinColor" || name === "pinScale") && this.uiState.activePinStyle !== PinStyles.NONE) {
-            this.uiState.activePinStyle = PinStyles.NONE;
-            this.view?.render(["editToolbar"]);
+        if (!this.#pinIconGrids.has(menu)) {
+            this.#pinIconGrids.add(menu);
+            const document = menu.ownerDocument;
+            const onPointerDown = (event) => {
+                if (!trigger.contains(event.target) && !menu.contains(event.target) && menu.matches(":popover-open")) menu.hidePopover();
+            };
+            const onKeyDown = (event) => {
+                if (event.key !== "Escape" || !menu.matches(":popover-open")) return;
+                menu.hidePopover();
+                event.stopPropagation();
+            };
+            menu.addEventListener("toggle", (event) => {
+                const listen = event.newState === "open" ? "addEventListener" : "removeEventListener";
+                document[listen]("pointerdown", onPointerDown, true);
+                document[listen]("keydown", onKeyDown, true);
+            });
         }
+        menu.showPopover();
+        positionPopoverMenu(trigger, menu);
+    }
+
+    #choosePinIcon(icon) {
+        if (!icon) return;
+        const grid = this.root?.querySelector("#fwmb-pin-select .fwmb-select-options");
+        if (grid?.matches?.(":popover-open")) grid.hidePopover();
+        this.uiState.activeIcon = icon;
+        this.uiState.activePinStyle = PinStyles.NONE;
+        this.view?.render(["editToolbar"]);
     }
 
     #syncFaultLiveEdits(name) {
@@ -1612,27 +1663,6 @@ export class MapStudio {
         const offered = TectonicFeatureEngine.typeOptions(current).map((option) => option.id);
         if (offered.includes(this.uiState.faultType)) return this.uiState.faultType;
         return current ? FILRODENSWMB.TECTONICS.FEATURES.DEFAULT_TYPE : FILRODENSWMB.TECTONICS.TYPES.CONVERGENT;
-    }
-
-    /**
-     * The toolbar's route fields. Changing a line field by hand leaves the quick style for Custom;
-     * choosing a quick style fills the line fields from it. Either way the picked route follows
-     * the toolbar live (see RouteTool.applyToolbarField), recorded as one undo step when the
-     * field's change event arrives, so a slider drag is a single step.
-     */
-    #syncRouteLiveEdits(name, commit) {
-        if (RouteTool.STYLE_FIELD_NAMES.includes(name)) {
-            this.uiState.activeRouteQuickStyle = "custom";
-            this.view?.render(["toolbar", "editToolbar"]);
-        }
-        if (name === "activeRouteQuickStyle") {
-            const style = (this.uiState.customRouteStyles ?? []).find((candidate) => candidate.id === this.uiState.activeRouteQuickStyle);
-            if (style) {
-                MapDialogManager.QUICK_STYLE_CONFIG.Route.onUpdateActiveUI(this, style);
-                this.view?.render(["toolbar", "editToolbar"]);
-            }
-        }
-        RouteTool.applyToolbarField(this, name, commit);
     }
 
     #syncCropLiveEdits(name) {
@@ -2048,11 +2078,17 @@ export class MapStudio {
             regionMode: RegionPainter.mode(this),
             routeMode: RouteTool.mode(this),
             pickMode: PickTool.mode(this),
+            selecting: PickTool.selecting(this),
             isMaskDrawing: this.#isMaskDrawingMode(),
             heldItem: this.canvasEngine?.heldItem ?? null,
         });
 
         CanvasHints.render(element, CanvasHints.getItems(context), (key) => platform.i18n.localize(key));
+    }
+
+    /** The id of the list row an action's button sits in. */
+    static #rowId(target) {
+        return target.closest(".fwmb-list-item")?.dataset.id ?? null;
     }
 
     /** The label a Labels list row names: its id, its owner's type ("custom" for a standalone label) and level. */
@@ -2077,16 +2113,16 @@ export class MapStudio {
                 RegionEditor.open(this, layerId, entityId);
                 break;
             case "landMask":
-                MapDialogManager.onEditLandMask(this, null, null, entityId);
+                LandMaskEditor.open(this, entityId);
                 break;
             case "fault":
-                MapDialogManager.onEditFault(this, null, null, entityId);
+                FaultEditor.open(this, entityId);
                 break;
             case "river":
-                MapDialogManager.onEditRiver(this, null, null, entityId);
+                RiverEditor.open(this, entityId);
                 break;
             case "decoration":
-                MapDialogManager.onEditDecoration(this, null, null, entityId);
+                DecorationEditor.open(this, entityId);
                 break;
             case "label":
                 LabelEditor.open(this, { id: entityId, type: parentType, layerId });
@@ -2556,6 +2592,8 @@ export class MapStudio {
             const newMask = this.#createLandMask(this.#selectedMaskOperation(), []);
             this.landMasks.push(newMask);
             this.activeLandMaskId = newMask.id;
+            // A new object opens in the inspector, focus staying on the map
+            LandMaskEditor.open(this, newMask.id, { created: true });
         }
 
         // Locate the active mask and append the new vertex
@@ -2619,8 +2657,10 @@ export class MapStudio {
         }
 
         MapStateManager.pushVectorState(this);
-        this.landMasks.push(this.#createLandMask(operation, points));
+        const mask = this.#createLandMask(operation, points);
+        this.landMasks.push(mask);
         this.#refreshAfterLandMaskChange(true);
+        LandMaskEditor.open(this, mask.id, { created: true });
     }
 
     /**
@@ -2710,6 +2750,7 @@ export class MapStudio {
                 };
                 MapStudio.#applyFeatureFields(fault, this.uiState);
                 this.tectonicFaults.push(fault);
+                FaultEditor.open(this, fault.id, { created: true });
             }
             activeEntity = this.tectonicFaults.find((f) => f.id === this.activeFaultId);
             const newBounds = SpatialMath.getVectorBounds(activeEntity);
@@ -2730,6 +2771,7 @@ export class MapStudio {
                     width: this.uiState.riverWidth,
                     visibility: "all",
                 });
+                RiverEditor.open(this, this.activeRiverId, { created: true });
             }
             activeEntity = this.manualRivers.find((r) => r.id === this.activeRiverId);
             const newBounds = SpatialMath.getVectorBounds(activeEntity);
@@ -3080,18 +3122,21 @@ export class MapStudio {
         const isEditModeActive = this.canvasEngine.isEditMode;
         MeshIntegration.prepareRender(this);
 
+        // Select modes pick objects without editing them, so no points or handles are drawn
+        const picking = PickTool.selecting(this);
+
         // 1. Render Springs, Faults and custom river guides
-        const showPins = this.activeTool === "features" && isEditModeActive;
+        const showPins = this.activeTool === "features" && isEditModeActive && !picking;
         this.canvasEngine.renderFeaturePins(this.mapPins, showPins, this.proceduralSprings);
 
         if (this.canvasEngine.renderFaultLines) {
             const isFaultEdit = this.activeTool === "features" && isEditModeActive;
-            this.canvasEngine.renderFaultLines(this.tectonicFaults, isFaultEdit, this.activeFaultId);
+            this.canvasEngine.renderFaultLines(this.tectonicFaults, isFaultEdit, this.activeFaultId, isFaultEdit && !picking);
         }
 
         if (this.canvasEngine.renderManualRivers) {
             const isRiverEdit = this.activeTool === "features" && isEditModeActive;
-            this.canvasEngine.renderManualRivers(this.manualRivers, isRiverEdit, this.activeRiverId);
+            this.canvasEngine.renderManualRivers(this.manualRivers, isRiverEdit, this.activeRiverId, isRiverEdit && !picking);
         }
 
         // 2. Render Infrastructure
@@ -3111,7 +3156,7 @@ export class MapStudio {
             // Visible if in Guided Mode and on the Scene Tool, regardless of Edit Mode
             const isGuidedScene = this.uiState.generationEngine === "guided" && this.activeTool === "scene";
 
-            this.canvasEngine.renderLandMasks(this.landMasks, isEditModeActive, this.activeLandMaskId, isGuidedScene);
+            this.canvasEngine.renderLandMasks(this.landMasks, isEditModeActive && !picking, this.activeLandMaskId, isGuidedScene);
         }
 
         // 6. Render Cartography
@@ -3687,21 +3732,22 @@ export class MapStudio {
         if (this.uiState.activeInfraMode !== "pin" || x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
         MapStateManager.pushVectorState(this);
-        // A pin made with a style is named after the style (a "Town", say) and takes its look from it
+        // A pin made with a style is named after the style (a "Town", say) and takes its look from
+        // it; with no style it is the default pin in the bar's icon, changed in the inspector
         const style = PinStyles.active(this);
+        const { DEFAULT_ICON, DEFAULT_SCALE, DEFAULT_COLOR } = FILRODENSWMB.PINS;
+        const icon = this.uiState.activeIcon || DEFAULT_ICON;
         const pin = {
             id: platform.utils.randomID(),
-            name: style?.name ?? getPinIconLabel(this.uiState.activeIcon),
-            icon: this.uiState.activeIcon,
+            name: style?.name ?? getPinIconLabel(icon),
+            icon,
             x,
             y,
-            scale: this.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
+            scale: DEFAULT_SCALE,
             visibility: "all",
-            color: this.uiState.pinColor || "#ffffff",
+            color: DEFAULT_COLOR,
             pinStyle: null,
-            label: {
-                fontSize: this.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
-            },
+            label: { fontSize: DEFAULT_SCALE },
         };
         if (style) PinStyles.apply(this, pin, style);
         this.mapPins.push(pin);
@@ -3709,32 +3755,40 @@ export class MapStudio {
         this._repaintVectors();
         this.view?.render(["context"]);
         this.markDirty();
+        PinEditor.open(this, pin.id, { created: true });
     }
 
     #handleLabelClick(x, y) {
         if (x < 0 || x > this.mapWidth || y < 0 || y > this.mapHeight) return;
 
         MapStateManager.pushVectorState(this);
+        // A new label takes the bar's style (with no style, the map's label defaults) and is
+        // given its text in the inspector
+        const style = (this.uiState.customLabelStyles ?? []).find((candidate) => candidate.id === this.uiState.activeLabelQuickStyle) ?? null;
+        const look = (field, key) => style?.[field] ?? this.uiState[key];
+        const id = platform.utils.randomID();
         this.mapLabels.push({
-            id: platform.utils.randomID(),
-            name: this.uiState.nextLabelText || "New Label",
+            id,
+            name: platform.i18n.localize(FILRODENSWMB.LABELS.DEFAULT_TEXT),
             x: x,
             y: y,
             rotation: 0,
-            quickStyle: this.uiState.activeLabelQuickStyle,
-            fontFamily: this.uiState.labelFontFamily,
-            fontSize: this.uiState.labelFontSize,
-            fillColor: this.uiState.labelFillColor,
-            maxChars: this.uiState.labelMaxChars,
-            justify: this.uiState.labelJustify,
-            bold: this.uiState.labelBold !== false,
-            italic: this.uiState.labelItalic === true,
+            quickStyle: style?.id ?? "custom",
+            fontFamily: look("fontFamily", "labelFontFamily"),
+            fontSize: look("fontSize", "labelFontSize"),
+            fillColor: look("fillColor", "labelFillColor"),
+            maxChars: look("maxChars", "labelMaxChars"),
+            justify: look("justify", "labelJustify"),
+            bold: look("bold", "labelBold") !== false,
+            italic: look("italic", "labelItalic") === true,
             visibility: "all",
         });
 
         this._repaintVectors();
         this.view?.render(["context"]);
         this.markDirty();
+        // Its text is given in the inspector, which opens on it with focus left on the map
+        LabelEditor.open(this, { type: "custom", id }, { created: true });
     }
 
     #updateReferenceLayer() {
@@ -5362,7 +5416,8 @@ export class MapStudio {
     _onSetFeatureMode(event, target) {
         this.uiState.activeFeatureMode = target.dataset.mode;
         this.activeFaultId = null; // Ends the current fault line natively
-        this.#modeChosen(true);
+        // Select only picks rivers and faults, so it does not edit
+        this.#modeChosen(target.dataset.mode !== "select");
     }
 
     /**
@@ -5377,17 +5432,6 @@ export class MapStudio {
         if (editing && this.#isRouteMode() && RouteTool.mode(this) === "select") this.uiState.routeToolMode = "draw";
         if (editing && PickTool.selecting(this)) PickTool.settleForEditing(this);
         this.#modeChosen(editing);
-    }
-
-    _onSetInfrastructureIcon(event, target) {
-        const newIcon = target.dataset.icon;
-
-        this.uiState.activeIcon = newIcon;
-        this.uiState.activeInfraMode = "pin";
-        this.uiState.activePinStyle = PinStyles.NONE;
-        this.#leaveRouteMode();
-
-        this.view?.render(["toolbar", "editToolbar"]);
     }
 
     /**
@@ -5421,8 +5465,9 @@ export class MapStudio {
         }
 
         // The crop takes over canvas clicks while it is showing, so it is shown only in its own
-        // mode, never while land masks are being drawn (see #applyCanvasInteractivity)
-        this.#modeChosen(true);
+        // mode, never while land masks are being drawn (see #applyCanvasInteractivity). Select
+        // only picks land masks, so it does not edit.
+        this.#modeChosen(target.dataset.mode !== "select");
     }
 
     /**
@@ -5563,7 +5608,8 @@ export class MapStudio {
 
     /**
      * Viewing is the Select mode: when editing stops (or the tool changes), every tool with a
-     * Select mode (Regions, Routes, Pins, Labels) goes back to it, so the map still picks what is
+     * Select mode (Regions, Routes, Pins, Labels, Rivers and faults, land masks, Cartography)
+     * goes back to it, so the map still picks what is
      * clicked, and the bar never shows an editing mode while nothing is being edited.
      */
     #returnToSelect() {
@@ -5571,6 +5617,9 @@ export class MapStudio {
         this.uiState.routeToolMode = "select";
         this.uiState.pinToolMode = "select";
         this.uiState.labelToolMode = "select";
+        this.uiState.activeFeatureMode = "select";
+        this.uiState.sceneMode = "select";
+        this.uiState.cartographyMode = "select";
     }
 
     /**
@@ -5642,11 +5691,6 @@ export class MapStudio {
             this.generateTerrain();
         }
         this.view?.render(["editToolbar"]);
-    }
-
-    _onTogglePinDropdown(event, target) {
-        const dropdown = target.closest(".fwmb-custom-select").querySelector(".fwmb-select-options");
-        if (dropdown) dropdown.classList.toggle("fwmb-hidden");
     }
 
     /**

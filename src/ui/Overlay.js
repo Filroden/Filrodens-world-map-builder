@@ -85,8 +85,9 @@ export class Overlay {
      * @param {(element: HTMLDialogElement) => void} [options.onRender] - Runs once the dialogue is in the page.
      * @param {{swatch?: string|null, subtitle?: string|null}} [options.header] - A swatch before the
      *     title and a line naming what the dialogue shows after it (the inspector's header).
-     * @param {"field" | "dialogue"} [options.focus] - Where focus goes on opening: the first field
-     *     (the default), or the dialogue itself, so a key pressed next types into nothing.
+     * @param {"field" | "dialogue" | "none"} [options.focus] - Where focus goes on opening: the first
+     *     field (the default), the dialogue itself, so a key pressed next types into nothing, or
+     *     nowhere: it stays where it was (a docked dialogue opened by work on the map).
      * @returns {Promise<unknown>}
      */
     static open(options) {
@@ -293,7 +294,10 @@ export class Overlay {
         openByHost.get(this.#host).add(this);
 
         onRender?.(this.#dialog);
-        if (focus === "dialogue") {
+        if (focus === "none") {
+            this.#dialog.tabIndex = -1;
+            this.#previousFocus?.focus?.({ preventScroll: true });
+        } else if (focus === "dialogue") {
             this.#dialog.tabIndex = -1;
             this.#dialog.focus();
         } else this.#focusFirst();

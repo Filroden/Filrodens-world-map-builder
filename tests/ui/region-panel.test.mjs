@@ -12,7 +12,7 @@ let nextId = 0;
 installPlatform({
     i18n: { localize: (key) => key, format: (key, data) => `${key} ${JSON.stringify(data)}`, lang: "en" },
     notify: { info: (text) => notices.push(text), warn: (text) => notices.push(text), error: (text) => notices.push(text) },
-    utils: { ...platform.utils, randomID: () => `n${++nextId}`, deepClone: (value) => structuredClone(value) },
+    utils: { ...platform.utils, randomID: () => `n${++nextId}`, deepClone: (value) => structuredClone(value), escapeHtml: (text) => String(text) },
     templates: { render: async () => "" },
     dialogs: { confirm: async () => answers.confirm, prompt: async () => answers.prompt, choose: async () => null, attach: () => () => {} },
 });
@@ -117,14 +117,14 @@ test("the panel lists the first set's level tree and settles on its first level"
 test("choosing a set, a level and a region keeps the three together", async () => {
     const { app } = await studio();
     RegionPanel.context(app);
-    RegionPanel.selectLevel(app, levelControl("counties"));
+    RegionPanel.selectLevelById(app, "counties");
     assert.equal(app.activeLevelId, "counties");
     RegionPanel.selectRegion(app, regionControl("counties", "northwest"));
     assert.equal(app.activeRegionId, "northwest");
     RegionPanel.selectRegion(app, regionControl("counties", "northwest"));
     assert.equal(app.activeRegionId, null, "a second click lets go of the region");
 
-    RegionPanel.selectSet(app, setControl("other"));
+    RegionPanel.selectSetById(app, "other");
     const context = RegionPanel.context(app);
     assert.equal(app.activeLevelId, null, "the other set has no levels");
     assert.deepEqual(context.levels, []);
@@ -134,12 +134,17 @@ test("choosing a set, a level and a region keeps the three together", async () =
 test("new levels go at the end of the set or below their parent, and each is one undo step", async () => {
     const { app } = await studio();
     RegionPanel.context(app);
-    RegionPanel.addChildLevel(app, levelControl("realms"));
-    const child = app.activeLevelId;
+    answers.prompt = "Shires";
+    const child = await RegionPanel.addChildLevel(app, levelControl("realms"));
+    assert.equal(child, app.activeLevelId);
+    assert.equal(app.layerSets[0].levels.find((level) => level.id === child).name, "Shires", "a new level is named first");
     assert.deepEqual(levelIds(app), ["realms", "counties", child, "zones"]);
     assert.equal(app.layerSets[0].levels[2].parentLevelId, "realms");
 
-    RegionPanel.addLevel(app);
+    answers.prompt = "  ";
+    assert.equal(await RegionPanel.addLevel(app), null, "no name, no level");
+    answers.prompt = "Duchies";
+    await RegionPanel.addLevel(app);
     assert.equal(levelIds(app).at(-1), app.activeLevelId);
     assert.equal(app.pinHistory.length, 2);
     VectorHistory.step(app, true);
@@ -198,17 +203,16 @@ test("auto-assign fills a child level in one undo step, and a cancelled run reco
     await RegionPanel.autoAssign(app, levelControl("counties"));
     assert.equal(app.pinHistory.length, 1);
     assert.equal(notices.length, 1);
-    RegionPanel.selectLevel(app, levelControl("counties"));
+    RegionPanel.selectLevelById(app, "counties");
     const counties = RegionPanel.context(app).levels.find((level) => level.id === "counties");
     assert.ok(counties.unassigned > 0, "East's land stays unassigned: it has no county");
 });
 
-test("the level editor applies a new parent and re-parents the level's regions", async () => {
+test("a level's edit applies a new parent and re-parents the level's regions, as one undo step", async () => {
     const { app } = await studio();
     RegionPanel.context(app);
     const counties = app.layerSets[0].levels[1];
-    answers.prompt = { name: "Shires", titleTemplate: "Shire of {name}", parentLevelId: "zones", nestingMode: "free", visibility: "gm", opacity: 0.5, style: { ...counties.style, lineThickness: 2.25 } };
-    await RegionPanel.editLevel(app, levelControl("counties"));
+    RegionPanel.applyLevelEdit(app, app.layerSets[0], counties, { name: "Shires", titleTemplate: "Shire of {name}", parentLevelId: "zones", nestingMode: "free", visibility: "gm", opacity: 0.5, watersPx: counties.watersPx, style: { ...counties.style, lineThickness: 2.25 } });
     assert.deepEqual(levelIds(app), ["realms", "zones", "counties"]);
     assert.equal(counties.name, "Shires");
     assert.equal(counties.style.lineThickness, 2.25);
@@ -259,7 +263,7 @@ test("deleting the level being painted leaves the map drawn for the level that t
     const { describeLevels } = await import("../../src/canvas/RegionLevelLayers.js");
     const { app, session } = await studio();
     RegionPanel.context(app);
-    RegionPanel.selectLevel(app, levelControl("counties"));
+    RegionPanel.selectLevelById(app, "counties");
     const drawnFor = (levelId) => describeLevels(session, () => true, levelId).map((entry) => entry.level.id);
     assert.deepEqual(drawnFor("counties"), ["realms", "counties"], "the painted level and its parent");
     await RegionPanel.deleteLevel(app, levelControl("counties"));

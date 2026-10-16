@@ -1,44 +1,13 @@
-{{!-- Labels' bar: Select (which only picks labels, opening them in the inspector) and Place,
-     then the text and look of the next label placed (4c slims this to the style the next label
-     gets; the rest is the inspector's). --}}
+{{!-- Labels' bar: Select (which only picks labels, opening them in the inspector) and Place, and
+     the style the next label placed gets. A label's text and look are its inspector's. --}}
 {{#each bar.modeGroups}}{{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}{{/each}}
 <span class="fwmb-sep"></span>
-<label class="fwmb-bar-field">
-    <span class="fwmb-label">{{localize "FILRODENSWMB.UI.LabelText"}}</span>
-    <input type="text" name="nextLabelText" value="{{lookup uiState 'nextLabelText'}}" />
-</label>
-<span class="fwmb-sep"></span>
-<label class="fwmb-bar-field">
-    <span class="fwmb-label">{{localize "FILRODENSWMB.UI.QuickStyles"}}</span>
+<label class="fwmb-bar-field" data-tooltip="{{localize 'FILRODENSWMB.UI.NextLabelStyleHint'}}">
+    <span class="fwmb-label">{{localize "FILRODENSWMB.UI.InspectorStyle"}}</span>
     <select name="activeLabelQuickStyle">
-        <option value="custom" {{#if (eq uiState.activeLabelQuickStyle "custom")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.Custom"}}</option>
+        <option value="custom" {{#if (eq uiState.activeLabelQuickStyle "custom")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleNone"}}</option>
         {{#each customLabelStyles}}
             <option value="{{this.id}}" {{#if (eq ../uiState.activeLabelQuickStyle this.id)}}selected{{/if}}>{{this.name}}</option>
         {{/each}}
-    </select>
-</label>
-<label class="fwmb-bar-field">
-    <span class="fwmb-label">{{localize "FILRODENSWMB.UI.FontFamily"}}</span>
-    <select name="labelFontFamily">
-        {{#each fontFamilies}}
-            <option value="{{this}}" {{#if (eq ../uiState.labelFontFamily this)}}selected{{/if}}>{{this}}</option>
-        {{/each}}
-    </select>
-</label>
-{{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="labelFontSize" label="FILRODENSWMB.UI.FontSize" icon="insert-text" value=(lookup uiState 'labelFontSize') min=0.2 max=5.0 step=0.1}}
-<label class="fwmb-bar-field">
-    <span class="fwmb-label">{{localize "FILRODENSWMB.UI.FontColor"}}</span>
-    <input type="color" class="fwmb-swatch" name="labelFillColor" value="{{lookup uiState 'labelFillColor'}}" list="fwmb-standard-colors" />
-</label>
-<label class="fwmb-bar-field">
-    <span class="fwmb-label">{{localize "FILRODENSWMB.UI.MaxWidth"}}</span>
-    <input type="number" class="fwmb-input-short" name="labelMaxChars" value="{{lookup uiState 'labelMaxChars'}}" min="0" step="1" placeholder="0" data-tooltip="{{localize 'FILRODENSWMB.UI.MaxWidthHint'}}" />
-</label>
-<label class="fwmb-bar-field">
-    <span class="fwmb-label">{{localize "FILRODENSWMB.UI.Justify"}}</span>
-    <select name="labelJustify">
-        <option value="left" {{#if (eq uiState.labelJustify "left")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyLeft"}}</option>
-        <option value="center" {{#if (eq uiState.labelJustify "center")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyCenter"}}</option>
-        <option value="right" {{#if (eq uiState.labelJustify "right")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.JustifyRight"}}</option>
     </select>
 </label>

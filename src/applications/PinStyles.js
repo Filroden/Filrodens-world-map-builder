@@ -100,21 +100,13 @@ export class PinStyles {
     }
 
     /**
-     * The toolbar's choice of style for new pins: choosing one sets the toolbar's icon, colour
-     * and scale from it; changing any of those by hand leaves the choice for "no style".
+     * The bar's choice of style for new pins: a pin placed with one takes its look; with "no
+     * style" it is the plain default pin (see MapStudio#handleInfrastructureClick).
      * @param {object} app
      * @returns {object|null} The chosen style.
      */
     static active(app) {
         return this.find(app, app.uiState.activePinStyle);
-    }
-
-    /** Puts a style's icon, colour and scale into the toolbar's fields (nothing for no style). */
-    static readIntoToolbar(app, style) {
-        if (!style) return;
-        app.uiState.activeIcon = style.icon;
-        app.uiState.pinColor = style.color;
-        app.uiState.pinScale = style.scale;
     }
 
     /** The choices a style select offers: "no style" first, then the map's styles by name. */

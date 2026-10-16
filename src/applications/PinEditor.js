@@ -27,8 +27,8 @@ export class PinEditor {
      * @param {string} pinId
      * @returns {Promise<boolean>}
      */
-    static open(app, pinId) {
-        return Inspector.open(app, this.KIND, { id: pinId });
+    static open(app, pinId, options) {
+        return Inspector.open(app, this.KIND, { id: pinId }, options);
     }
 
     static #find(app, { id }) {

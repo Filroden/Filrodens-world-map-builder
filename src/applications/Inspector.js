@@ -22,7 +22,9 @@ import { platform } from "../platform/index.js";
  * shows at once. Redrawing morphs the form in place (idiomorph), so focus and a half-typed value in
  * another field survive it.
  *
- * Each kind of object (region, route, and the kinds that follow) is a plain object:
+ * Each kind of object is a plain object: RegionEditor, RouteEditor, PinEditor, LabelEditor,
+ * RiverEditor, FaultEditor, DecorationEditor, LandMaskEditor (FeatureEditors.js), LevelEditor and
+ * LayerSetEditor (LayerEditors.js) each hold one:
  *
  * - `id`: the kind's name ("region").
  * - `template`: the body's template path (`templates/parts/inspector-<kind>.hbs`).
@@ -51,9 +53,11 @@ export class Inspector {
      * @param {object} app - The studio.
      * @param {object} kind - The object's kind (see above).
      * @param {object} ref - Names the object.
+     * @param {{created?: boolean}} [options] - `created`: the object was just made on the map, so
+     *   focus stays there and the next click goes on placing or drawing.
      * @returns {Promise<boolean>} Whether it opened (false when the object is not on the map).
      */
-    static async open(app, kind, ref) {
+    static async open(app, kind, ref, { created = false } = {}) {
         const object = kind.find(app, ref);
         if (!object) return false;
         // One docked dialogue at a time: the inspector replaces any other, and the one open
@@ -77,7 +81,7 @@ export class Inspector {
             content,
             classes: ["fwmb", "fwmb-inspector", `fwmb-inspector--${kind.id}`],
             closeLabel: platform.i18n.localize("FILRODENSWMB.UI.Close"),
-            focus: "dialogue",
+            focus: created ? "none" : "dialogue",
         });
         const state = { kind, ref, overlay, defaults: new Map() };
         this.#open.set(app, state);
@@ -86,9 +90,32 @@ export class Inspector {
         overlay.closed.then(() => {
             if (this.#open.get(app) === state) this.#open.delete(app);
             app.refreshLayout?.();
+            this.#markRows(app);
         });
         app.refreshLayout?.();
+        this.#markRows(app);
         return true;
+    }
+
+    /**
+     * The panel's lists mark the row of the object the inspector shows (see MapStudio's
+     * `inspected` context), so they are drawn again whenever it opens, changes or closes.
+     */
+    static #markRows(app) {
+        app.view?.render(["context"]);
+    }
+
+    /**
+     * Which object the inspector shows, as the panel's lists look for it: its id under its kind's
+     * name ("pin", "river"…), or for a label under "label" plus its owner's type ("labelcustom",
+     * "labelpin"…). Empty when the inspector is closed.
+     * @returns {Record<string, string>}
+     */
+    static inspected(app) {
+        const state = this.#open.get(app);
+        if (!state) return {};
+        const key = state.kind.id === "label" ? `label${state.ref.type ?? "custom"}` : state.kind.id;
+        return { [key]: state.ref.id };
     }
 
     /** What the inspector shows: `{ kind, ref }`, or null when it is closed. */

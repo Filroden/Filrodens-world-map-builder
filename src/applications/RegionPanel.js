@@ -2,15 +2,12 @@ import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { VectorHistory } from "./VectorHistory.js";
-import { addRegion, childLevelFields, createLayerSet, createLevel, defaultLevelStyle, NESTING_MODES, regionFillColor, UNCLAIMED, VISIBILITIES } from "../mesh/Schema.js";
-import { childLevels, insertLevel, levelDepth, moveLevel, parentCandidates, setOfLevel, setParent, uniqueName } from "../mesh/LayerTree.js";
+import { addRegion, childLevelFields, createLayerSet, createLevel, regionFillColor, UNCLAIMED, VISIBILITIES } from "../mesh/Schema.js";
+import { childLevels, insertLevel, levelDepth, moveLevel, setOfLevel, setParent, uniqueName } from "../mesh/LayerTree.js";
 import { assignToParents, autoAssign, claimWaters, deleteLevel, deleteRegion, deleteSet, levelCounts, mergeRegion, nestingProblems, regionParents, unassignedCount } from "../mesh/RegionEdits.js";
 import { platform } from "../platform/index.js";
 
-/** The level editor's names for the nesting modes (see Schema.NESTING_MODES). */
-const NESTING_LABELS = Object.freeze({ constrained: "FILRODENSWMB.UI.NestingConstrained", free: "FILRODENSWMB.UI.NestingFree" });
-
-/** Where the dialogue templates live. */
+/** Where the dialogue templates live (Merge Into's). */
 const DIALOG_ROOT = "modules/filrodens-world-map-builder/templates/dialogs/";
 
 /**
@@ -26,8 +23,9 @@ const DIALOG_ROOT = "modules/filrodens-world-map-builder/templates/dialogs/";
  * snapshot taken first, plus the owner changes it made, as one composite entry where cells
  * changed too (see VectorHistory).
  *
- * The level and set editors are modal dialogues; a region opens in the inspector, docked beside the
- * map (see RegionEditor and Inspector), so the map can be painted and looked at while it is open.
+ * Sets, levels and regions open in the inspector, docked beside the map (see LayerSetEditor,
+ * LevelEditor, RegionEditor and Inspector), so the map can be painted and looked at while one is
+ * open. A new set or level is named first (a prompt), then opens there.
  */
 export class RegionPanel {
     // ------------------------------------------------------------------ the panel's context
@@ -133,9 +131,18 @@ export class RegionPanel {
 
     // ------------------------------------------------------------------ choosing
 
-    /** A click on a layer set's name. */
-    static selectSet(app, target) {
-        const setId = this.#setIdOf(target);
+    /** The layer set a row names (its `data-set-id`), or null. */
+    static setIdOf(target) {
+        return this.#setIdOf(target);
+    }
+
+    /** The level a row names (its `data-level-id`), or null. */
+    static levelIdOf(target) {
+        return this.#levelIdOf(target);
+    }
+
+    /** Makes a layer set the active one (a click on its row, or its opening in the inspector). */
+    static selectSetById(app, setId) {
         if (!setId || setId === app.activeLayerSetId) return;
         app.activeLayerSetId = setId;
         app.activeLevelId = null;
@@ -143,10 +150,11 @@ export class RegionPanel {
         this.#refresh(app, { vectors: false });
     }
 
-    /** A click on a level's name. */
-    static selectLevel(app, target) {
-        const levelId = this.#levelIdOf(target);
-        if (!levelId || levelId === app.activeLevelId) return;
+    /** Makes a level the active one, with its set (a click on its row, or its opening in the inspector). */
+    static selectLevelById(app, levelId) {
+        const set = setOfLevel(app.layerSets ?? [], levelId);
+        if (!set || (levelId === app.activeLevelId && set.id === app.activeLayerSetId)) return;
+        app.activeLayerSetId = set.id;
         app.activeLevelId = levelId;
         app.activeRegionId = null;
         this.#refresh(app, { vectors: false });
@@ -181,12 +189,15 @@ export class RegionPanel {
 
     // ------------------------------------------------------------------ layer sets
 
-    /** New Set: a set with one level, which become the active set and level. */
+    /**
+     * New Set: asks for its name, then makes a set with one level, which become the active set and
+     * level. Resolves with the new set's id (null when no name was given), for the inspector to open.
+     */
     static async addSet(app) {
-        const values = await this.#editSetDialog(app, { name: uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewSetName"), app.layerSets ?? []), visibility: "all", waterTint: true, opacity: 1 }, "FILRODENSWMB.UI.NewLayerSet");
-        if (!values) return;
+        const name = await this.#askName(app, "FILRODENSWMB.UI.NewLayerSet", uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewSetName"), app.layerSets ?? []));
+        if (!name) return null;
         MapStateManager.pushVectorState(app);
-        const set = createLayerSet({ ...values, kind: "custom" }, this.#idFactory);
+        const set = createLayerSet({ name, visibility: "all", waterTint: true, opacity: 1, kind: "custom" }, this.#idFactory);
         const level = createLevel({ name: platform.i18n.localize("FILRODENSWMB.UI.NewLevelName") }, this.#idFactory);
         set.levels.push(level);
         app.layerSets.push(set);
@@ -194,37 +205,30 @@ export class RegionPanel {
         app.activeLevelId = level.id;
         app.activeRegionId = null;
         this.#refresh(app);
+        return set.id;
     }
 
-    /** The set editor (modal): name, visibility, opacity and fill over water. */
-    static async editSet(app, target) {
-        const set = this.#setOf(app, target);
-        if (!set) return;
-        const values = await this.#editSetDialog(app, set, "FILRODENSWMB.UI.EditLayerSet");
-        if (!values) return;
+    /** Asks for a new set's or level's name; resolves with it trimmed, or null when none was given. */
+    static async #askName(app, titleKey, suggested) {
+        const name = await MapDialogManager._promptTextValue(platform.i18n.localize(titleKey), platform.i18n.localize("FILRODENSWMB.UI.Name"), suggested);
+        return name?.trim() || null;
+    }
+
+    /** Applies a set's changed fields (from its inspector) as one undo step. */
+    static applySetEdit(app, set, values) {
         MapStateManager.pushVectorState(app);
         Object.assign(set, values);
         this.#refresh(app);
     }
 
-    static async #editSetDialog(app, set, titleKey) {
-        const content = await platform.templates.render(`${DIALOG_ROOT}edit-layer-set.hbs`, { set, visibilities: this.visibilityChoices(set.visibility) });
-        return platform.dialogs.prompt({
-            classes: ["fwmb"],
-            title: platform.i18n.localize(titleKey),
-            content,
-            onSubmit: (form) => ({
-                name: form.elements.setName.value.trim() || set.name,
-                visibility: form.elements.setVisibility.value,
-                waterTint: form.elements.setWaterTint.checked,
-                opacity: Number(form.elements.setOpacity.value),
-            }),
-        });
+    /** Delete Set (a row's menu): see deleteSetById. */
+    static deleteSet(app, target) {
+        return this.deleteSetById(app, this.#setIdOf(target));
     }
 
     /** Delete Set: after confirming with what it holds, the set and all its levels go. One undo step. */
-    static async deleteSet(app, target) {
-        const set = this.#setOf(app, target);
+    static async deleteSetById(app, setId) {
+        const set = (app.layerSets ?? []).find((candidate) => candidate.id === setId);
         if (!set || !app.meshSession) return;
         const regions = set.levels.reduce((sum, level) => sum + level.regions.length, 0);
         const confirmed = await MapDialogManager._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.DeleteLayerSetTitle"), platform.i18n.format("FILRODENSWMB.UI.DeleteLayerSetConfirm", { name: set.name, levels: set.levels.length, regions }));
@@ -261,8 +265,13 @@ export class RegionPanel {
 
     // ------------------------------------------------------------------ levels
 
-    /** New Level: a top level at the end of the active set (a set is made first when there is none). */
-    static addLevel(app) {
+    /**
+     * New Level: asks for its name, then adds a top level at the end of the active set (a set is
+     * made first when there is none). Resolves with the new level's id, or null.
+     */
+    static async addLevel(app) {
+        const name = await this.#askName(app, "FILRODENSWMB.UI.NewLevel", uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewLevelName"), this.activeSet(app)?.levels ?? []));
+        if (!name) return null;
         MapStateManager.pushVectorState(app);
         let set = this.activeSet(app);
         if (!set) {
@@ -270,25 +279,27 @@ export class RegionPanel {
             app.layerSets.push(set);
             app.activeLayerSetId = set.id;
         }
-        this.#insertNewLevel(app, set, null);
+        return this.#insertNewLevel(app, set, null, name);
     }
 
-    /** Add Child Level: an empty level below the chosen one, constrained to it. */
-    static addChildLevel(app, target) {
+    /** Add Child Level: asks for its name, then adds an empty level below the chosen one, constrained to it. */
+    static async addChildLevel(app, target) {
         const set = this.activeSet(app);
         const parentId = this.#levelIdOf(target);
-        if (!set?.levels.some((level) => level.id === parentId)) return;
+        if (!set?.levels.some((level) => level.id === parentId)) return null;
+        const name = await this.#askName(app, "FILRODENSWMB.UI.NewLevel", uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewLevelName"), set.levels));
+        if (!name) return null;
         MapStateManager.pushVectorState(app);
-        this.#insertNewLevel(app, set, parentId);
+        return this.#insertNewLevel(app, set, parentId, name);
     }
 
-    static #insertNewLevel(app, set, parentLevelId) {
-        const name = uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewLevelName"), set.levels);
+    static #insertNewLevel(app, set, parentLevelId, name) {
         const level = createLevel({ name, ...(parentLevelId ? childLevelFields(parentLevelId) : {}) }, this.#idFactory);
         insertLevel(set, level);
         app.activeLevelId = level.id;
         app.activeRegionId = null;
         this.#refresh(app);
+        return level.id;
     }
 
     static moveLevel(app, target, step) {
@@ -310,64 +321,13 @@ export class RegionPanel {
         this.#refresh(app);
     }
 
-    /** The level editor (modal): name, title template, parent, nesting, visibility, opacity and borders. */
-    static async editLevel(app, target) {
-        const set = this.activeSet(app);
-        const level = set?.levels.find((candidate) => candidate.id === this.#levelIdOf(target));
-        if (!level) return;
-
-        const copySources = (app.layerSets ?? []).flatMap((candidate) => candidate.levels.filter((other) => other.id !== level.id).map((other) => ({ id: other.id, name: candidate === set ? other.name : `${candidate.name}: ${other.name}`, style: other.style })));
-        const content = await platform.templates.render(`${DIALOG_ROOT}edit-level.hbs`, {
-            level: { ...level, style: { ...defaultLevelStyle(), ...level.style } },
-            parents: parentCandidates(set, level.id).map((candidate) => ({ id: candidate.id, name: candidate.name, selected: candidate.id === level.parentLevelId })),
-            visibilities: this.visibilityChoices(level.visibility),
-            nestingModes: NESTING_MODES.map((mode) => ({ value: mode, label: NESTING_LABELS[mode], selected: mode === level.nestingMode })),
-            lineStyles: this.#lineStyleChoices(level.style?.lineStyle),
-            seaLineStyles: this.#lineStyleChoices(level.style?.seaLineStyle ?? "dashed"),
-            copySources,
-            thicknessStep: FILRODENSWMB.MESH.ARCS.THICKNESS_STEP,
-            waters: FILRODENSWMB.MESH.WATERS,
-        });
-        const values = await platform.dialogs.prompt({
-            classes: ["fwmb", "fwmb-level-editor"],
-            title: platform.i18n.localize("FILRODENSWMB.UI.EditLevel"),
-            content,
-            onRender: (element) => this.#bindCopyStyle(element, copySources),
-            onSubmit: (form) => this.#readLevelForm(form, level),
-        });
-        if (!values) return;
-        this.#applyLevelEdit(app, set, level, values);
-    }
-
-    static #readLevelForm(form, level) {
-        const elements = form.elements;
-        return {
-            name: elements.levelName.value.trim() || level.name,
-            titleTemplate: elements.levelTitleTemplate.value.trim() || "{name}",
-            parentLevelId: elements.levelParent.value || null,
-            nestingMode: elements.levelNesting.value,
-            visibility: elements.levelVisibility.value,
-            opacity: Number(elements.levelOpacity.value),
-            watersPx: Math.max(0, Number(elements.levelWatersPx.value) || 0),
-            style: {
-                ...level.style,
-                lineColor: elements.levelLineColor.value,
-                lineThickness: Number(elements.levelLineThickness.value),
-                lineStyle: elements.levelLineStyle.value,
-                seaLineThickness: Number(elements.levelSeaLineThickness.value),
-                seaLineStyle: elements.levelSeaLineStyle.value,
-                scaleWithMap: elements.levelScaleWithMap.checked,
-            },
-        };
-    }
-
     /**
-     * Applies the level editor's values as one undo step. A new parent moves the level (and the
+     * Applies a level's changed fields (from its inspector) as one undo step. A new parent moves the level (and the
      * levels below it) after that parent where needed, and each region of the level is given the
      * region of its new parent level holding most of its cells. A new territorial waters distance
      * (or a new parent, which changes where waters may lie) claims the waters again.
      */
-    static #applyLevelEdit(app, set, level, values) {
+    static applyLevelEdit(app, set, level, values) {
         const before = VectorHistory.snapshot(app);
         const { parentLevelId, ...fields } = values;
         const watersChanged = fields.watersPx !== level.watersPx;
@@ -397,37 +357,17 @@ export class RegionPanel {
         return result ? VectorHistory.owners(levelId, result.patch) : null;
     }
 
-    /** The level editor's "Copy style from level" list fills the border fields from the chosen level. */
-    static #bindCopyStyle(element, sources) {
-        const select = element.querySelector('select[name="levelCopyStyle"]');
-        select?.addEventListener("change", () => {
-            const source = sources.find((candidate) => candidate.id === select.value);
-            if (!source) return;
-            const style = { ...defaultLevelStyle(), ...source.style };
-            const set = (name, value) => {
-                const field = element.querySelector(`[name="${name}"]`);
-                if (!field) return;
-                if (field.type === "checkbox") field.checked = value;
-                else field.value = value;
-                field.dispatchEvent(new Event("input", { bubbles: true }));
-            };
-            set("levelLineColor", style.lineColor);
-            set("levelLineThickness", style.lineThickness);
-            set("levelLineStyle", style.lineStyle);
-            set("levelSeaLineThickness", style.seaLineThickness);
-            set("levelSeaLineStyle", style.seaLineStyle);
-            set("levelScaleWithMap", style.scaleWithMap === true);
-            select.value = "";
-        });
-    }
-
     /**
      * Delete Level: after confirming with what it holds, the level goes, with its cells; the
      * levels below it move up to its parent. One undo step.
      */
-    static async deleteLevel(app, target) {
-        const levelId = this.#levelIdOf(target);
-        const level = this.activeSet(app)?.levels.find((candidate) => candidate.id === levelId);
+    static deleteLevel(app, target) {
+        return this.deleteLevelById(app, this.#levelIdOf(target));
+    }
+
+    /** Delete Level by id: see deleteLevel. */
+    static async deleteLevelById(app, levelId) {
+        const level = setOfLevel(app.layerSets ?? [], levelId)?.levels.find((candidate) => candidate.id === levelId);
         if (!level || !app.meshSession) return;
 
         const counts = levelCounts(app.meshSession, app.layerSets, levelId);
@@ -474,7 +414,8 @@ export class RegionPanel {
     /**
      * New Region: an empty region in the active level, which becomes the active region, ready to be
      * painted. Its fill is left to the level's preset colours (see Schema.regionFillColor) unless a region
-     * quick style is chosen in the toolbar.
+     * quick style is chosen in the toolbar. Returns `{ levelId, id }` of the new region (undefined
+     * when there is no level), for the inspector to open.
      */
     static addRegion(app) {
         const level = this.activeLevel(app);
@@ -488,6 +429,7 @@ export class RegionPanel {
         const region = addRegion(level, { name, quickStyle: style ? style.id : "custom", fillColor: style?.fillColor ?? null, fillStyle: style?.fillStyle ?? null, label: { visibility: "all" } }, this.#idFactory);
         app.activeRegionId = region.id;
         this.#refresh(app, { toolbar: true });
+        return { levelId: level.id, id: region.id };
     }
 
     /**
@@ -576,7 +518,7 @@ export class RegionPanel {
         return VISIBILITIES.map((value) => ({ value, label: labels[value], selected: value === (selected ?? "all") }));
     }
 
-    static #lineStyleChoices(selected) {
+    static lineStyleChoices(selected) {
         const styles = { solid: "FILRODENSWMB.UI.StyleSolid", dashed: "FILRODENSWMB.UI.StyleDashed", dotted: "FILRODENSWMB.UI.StyleDotted", dashdot: "FILRODENSWMB.UI.StyleDashDot" };
         return Object.entries(styles).map(([value, label]) => ({ value, label, selected: value === (selected ?? "solid") }));
     }

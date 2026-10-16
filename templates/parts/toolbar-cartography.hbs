@@ -1,5 +1,8 @@
-{{!-- Cartography's bar: adding a decoration. Decorations and the scale bar can be moved on the map
-     whenever the tool is open. --}}
+{{!-- Cartography's bar: Select (the default, which only picks decorations, opening them in the
+     inspector) and Move (which drags, turns and resizes them and the scale bar), then adding a
+     decoration. Neither mode is editing: Cartography has no edit toggle. --}}
+{{#each bar.modeGroups}}{{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}{{/each}}
+<span class="fwmb-sep"></span>
 <button type="button" class="fwmb-btn" data-action="addDecoration" data-tooltip="{{localize 'FILRODENSWMB.UI.AddDecoration'}}">
     <i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.AddDecorationShort"}}
 </button>
