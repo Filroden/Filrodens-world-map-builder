@@ -7,9 +7,13 @@
         - top end: undo and redo;
         - bottom start: the hint, one item per action, growing upward (filled by CanvasHints);
         - bottom end: the map controls (their menus open upward).
-        They are always shown while the canvas is. This region is drawn once (the PIXI canvas lives
-        in it), so their state is written in place afterwards: the readout by the pointer handler,
-        the hint by #updateCanvasHint, the map controls by #syncMapControls.
+        They are always shown while the flat map is. The 3D view hides them all but the hint, which
+        shows the 3D view's own gestures there. A fifth overlay is the reverse: the 3D view's
+        settings (Relief Emphasis), shown only in the 3D view, in the top-start corner the
+        information bar leaves free. This region is drawn once (the PIXI canvas lives in it), so
+        their state is written in place afterwards: the readout by the pointer handler, the hint by
+        #updateCanvasHint, the map controls by #syncMapControls, the 3D view's slider when the view
+        opens (see _onThreeDView).
     --}}
     <div class="fwmb-map-preview">
         <!-- The PIXI canvas is drawn in here -->
@@ -28,6 +32,11 @@
         <div class="fwmb-map-overlay fwmb-map-hint" role="group" aria-label="{{localize 'FILRODENSWMB.UI.HintLabel'}}"></div>
 
         <div id="fwmb-3d-overlay" class="fwmb-3d-overlay fwmb-hidden"></div>
+
+        {{!-- Not inside #fwmb-3d-overlay: Scene3D adds and removes its canvas there --}}
+        <div class="fwmb-map-overlay fwmb-map-overlay-3d fwmb-3d-controls" role="group" aria-label="{{localize 'FILRODENSWMB.UI.ThreeDControlsLabel'}}">
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="reliefEmphasis" label="FILRODENSWMB.UI.ReliefEmphasis" hint="FILRODENSWMB.UI.ReliefEmphasisHint" value=(lookup uiState 'reliefEmphasis') min=0 max=30 step=1}}
+        </div>
 
         <div class="fwmb-map-overlay fwmb-map-controls" role="toolbar" aria-label="{{localize 'FILRODENSWMB.UI.MapControlsLabel'}}">
             {{!-- View filters: who the map is shown for --}}

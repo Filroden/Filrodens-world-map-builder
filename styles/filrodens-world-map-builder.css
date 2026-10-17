@@ -1259,9 +1259,40 @@
     font-size: 0.75rem;
     line-height: 1rem;
 }
-/* The 3D view covers the flat map, and the flat map's overlays go with it */
+/* The 3D view covers the flat map, and the flat map's overlays go with it, all but the hint,
+   which shows the 3D view's own gestures. The 3D view's settings are the reverse: shown only in
+   the 3D view. */
 .fwmb .fwmb-map-preview.fwmb-is-3d .fwmb-map-overlay {
     display: none;
+}
+.fwmb .fwmb-map-preview.fwmb-is-3d .fwmb-map-hint:not(:empty) {
+    display: flex;
+}
+.fwmb .fwmb-map-preview:not(.fwmb-is-3d) .fwmb-map-overlay-3d {
+    display: none;
+}
+.fwmb .fwmb-map-preview.fwmb-is-3d .fwmb-map-overlay-3d {
+    display: block;
+}
+
+/* The 3D view's settings (Relief Emphasis): top start, where the information bar is on the flat
+   map, above the 3D canvas, in the overlays' dark ink. The slider takes the overlay's colours. */
+.fwmb .fwmb-3d-controls {
+    top: 0.5rem;
+    inset-inline-start: 0.5rem;
+    width: 15rem;
+    max-width: calc(100% - var(--fwmb-history-w, 4.5rem) - 1rem);
+    box-sizing: border-box;
+    padding: 0.5rem 0.625rem 0.25rem;
+    --fwmb-range-track: var(--fwmb-overlay-border);
+    --fwmb-range-fill: var(--fwmb-overlay-accent);
+    --fwmb-bg-panel: var(--fwmb-overlay-bg);
+}
+.fwmb .fwmb-3d-controls .fwmb-range-label {
+    color: var(--fwmb-overlay-muted);
+}
+.fwmb .fwmb-3d-controls .fwmb-range-value {
+    color: var(--fwmb-overlay-accent);
 }
 .fwmb-canvas-readout .fwmb-legend {
     border-top: 1px solid rgba(255, 255, 255, 0.12);

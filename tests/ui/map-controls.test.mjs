@@ -32,8 +32,9 @@ function drawMap() {
     const handlebars = Handlebars.create();
     handlebars.registerHelper("localize", (key) => key);
     handlebars.registerHelper("eq", (a, b) => a === b);
+    handlebars.registerPartial("modules/filrodens-world-map-builder/templates/parts/shared-range.hbs", readFileSync(join(ROOT, "templates/parts/shared-range.hbs"), "utf8"));
     const template = handlebars.compile(readFileSync(join(ROOT, "templates/map.hbs"), "utf8"));
-    document.body.innerHTML = template({ layerGroups: TERRAIN_GROUPS, viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS });
+    document.body.innerHTML = template({ uiState: { reliefEmphasis: 20 }, layerGroups: TERRAIN_GROUPS, viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS });
     return document.body;
 }
 

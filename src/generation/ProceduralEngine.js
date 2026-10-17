@@ -2994,9 +2994,7 @@ export class ProceduralEngine {
      */
     static #resolveReliefLight(params, width, height) {
         const display = FILRODENSWMB.DISPLAY;
-        const world = params?.terrain?.world;
-        const rootSize = world ? Math.max(world.rootW, world.rootH) : Math.max(width, height);
-        const pixelsPerBaseline = ((world?.zoom ?? 1) * rootSize) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        const pixelsPerBaseline = ProceduralEngine.pixelsPerBaseline(params?.terrain?.world, width, height);
 
         // The light's direction is a fixed compass bearing (0 from the north, the top of the map,
         // turning clockwise), and it shines down from RELIEF.ALTITUDE degrees above the horizon
@@ -3009,6 +3007,21 @@ export class ProceduralEngine {
             lightY: -Math.cos(bearing) * Math.cos(altitude),
             lightZ: Math.sin(altitude),
         };
+    }
+
+    /**
+     * How many of a map's pixels span one pixel of a baseline map: the map at the top of its chain
+     * of crops (`world`) sets the scale, scaled again by how far the crop zooms in; a map without
+     * one is its own top map. Relief shading and the 3D view's lighting measure slopes over the
+     * same ground at any resolution with it.
+     * @param {{rootW: number, rootH: number, zoom?: number}|null|undefined} world
+     * @param {number} width - The map's width, when it has no `world`.
+     * @param {number} height
+     * @returns {number}
+     */
+    static pixelsPerBaseline(world, width, height) {
+        const rootSize = world ? Math.max(world.rootW, world.rootH) : Math.max(width, height);
+        return ((world?.zoom ?? 1) * rootSize) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
     }
 
     /**

@@ -3,6 +3,7 @@ import { StudioCanvas } from "../canvas/StudioCanvas.js";
 import { CanvasHints } from "../canvas/CanvasHints.js";
 import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
+import { RangeDisplay } from "../tools/RangeDisplay.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
@@ -1464,6 +1465,14 @@ export class MapStudio {
         const target = event.target;
         if (target.closest(".fwmb-edit-toolbar")) {
             this.#handleToolbarInput(event);
+            return;
+        }
+        // The 3D view's Relief Emphasis: live while it is dragged, a change of the map once let go
+        if (target.closest(".fwmb-3d-controls")) {
+            if (target.name !== "reliefEmphasis") return;
+            this.uiState.reliefEmphasis = Number(target.value);
+            if (event.type === "input") this.scene3D?.setReliefEmphasis(this.uiState.reliefEmphasis);
+            else this.markDirty();
             return;
         }
         if (!target.closest(".fwmb-context-panel")) return;
@@ -3601,6 +3610,10 @@ export class MapStudio {
         this.uiState.freezingThreshold = p.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
         this.uiState.contourInterval = p.display?.contourInterval ?? 0.1;
         this.uiState.reliefShading = p.display?.reliefShading ?? FILRODENSWMB.DISPLAY.RELIEF_SHADING;
+        // Maps saved before Relief Emphasis take its default
+        this.uiState.reliefEmphasis = p.display?.reliefEmphasis ?? FILRODENSWMB.DISPLAY.THREE_D.RELIEF.EMPHASIS;
+        // Its slider is in the map region, drawn once, and a save reads the value back from it
+        this.#syncReliefEmphasisSlider();
         this.uiState.seabedRelief = p.display?.seabedRelief ?? FILRODENSWMB.DISPLAY.WATER.SEABED_RELIEF;
         this.uiState.waterClarity = p.display?.waterClarity ?? FILRODENSWMB.DISPLAY.WATER.CLARITY;
         this.uiState.waterHue = p.display?.waterHue ?? FILRODENSWMB.DISPLAY.WATER.HUE;
@@ -4550,6 +4563,7 @@ export class MapStudio {
         PinStyles.ensure(this);
         // The new map's grid starts hidden
         this.#syncMapControls();
+        this.#syncReliefEmphasisSlider();
         this.uiState.mapSeed = newSeed;
 
         // Inject the engine choice into the wiped state
@@ -5576,9 +5590,11 @@ export class MapStudio {
         const contextPanel = this.root.querySelector(".fwmb-context-panel");
         const editToolbar = this.root.querySelector(".fwmb-edit-toolbar");
         overlay.classList.remove("fwmb-hidden");
-        // The canvas's overlays (information bar, hint, map controls, undo and redo) belong to the
-        // flat map and are hidden while the 3D view covers it
+        // The canvas's overlays (information bar, map controls, undo and redo) belong to the flat
+        // map and are hidden while the 3D view covers it; the hint stays, with the 3D view's own
+        // gestures, and the 3D view's settings (Relief Emphasis) show in the top-start corner
         overlay.closest(".fwmb-map-preview")?.classList.add("fwmb-is-3d");
+        this.#syncReliefEmphasisSlider();
 
         // Manually hide layout wrappers so the 3D canvas fills the entire screen
         if (mapControls) mapControls.classList.add("fwmb-hidden");
@@ -5597,11 +5613,25 @@ export class MapStudio {
             waterMask: this.bufferWaterMask,
             terrain: this.#terrainBuffers(),
             settings: this.#terrainSettings(),
+            reliefEmphasis: this.uiState.reliefEmphasis ?? FILRODENSWMB.DISPLAY.THREE_D.RELIEF.EMPHASIS,
+            pixelsPerBaseline: ProceduralEngine.pixelsPerBaseline(TerrainVersion.getTerrainParams(this.uiState).world, this.mapWidth, this.mapHeight),
         });
         this.#syncMapControls();
 
         // The 3D view has its own camera gestures; no render follows this, so refresh directly
         this.#updateCanvasHint();
+    }
+
+    /**
+     * The 3D view's Relief Emphasis slider shows the map's value (when a map opens, and when the
+     * view does): the map region is drawn once, so the slider is set in place rather than by a
+     * redraw, and a save reads the value back from it (see MapStateManager.getMapParameters).
+     */
+    #syncReliefEmphasisSlider() {
+        const slider = this.root?.querySelector('.fwmb-3d-controls input[name="reliefEmphasis"]');
+        if (!slider) return;
+        slider.value = String(this.uiState.reliefEmphasis ?? FILRODENSWMB.DISPLAY.THREE_D.RELIEF.EMPHASIS);
+        RangeDisplay.sync(slider);
     }
 
     /** The state block's Start and Stop button. */

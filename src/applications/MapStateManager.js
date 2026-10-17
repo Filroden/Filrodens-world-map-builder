@@ -169,6 +169,8 @@ export class MapStateManager {
 
             contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
             reliefShading: FILRODENSWMB.DISPLAY.RELIEF_SHADING,
+            // The 3D view's Relief Emphasis (see Scene3D), set from its slider there
+            reliefEmphasis: FILRODENSWMB.DISPLAY.THREE_D.RELIEF.EMPHASIS,
             seabedRelief: FILRODENSWMB.DISPLAY.WATER.SEABED_RELIEF,
             waterClarity: FILRODENSWMB.DISPLAY.WATER.CLARITY,
             waterHue: FILRODENSWMB.DISPLAY.WATER.HUE,
@@ -438,6 +440,7 @@ export class MapStateManager {
             display: {
                 contourInterval: state.contourInterval,
                 reliefShading: state.reliefShading,
+                reliefEmphasis: state.reliefEmphasis,
                 seabedRelief: state.seabedRelief,
                 waterClarity: state.waterClarity,
                 waterHue: state.waterHue,

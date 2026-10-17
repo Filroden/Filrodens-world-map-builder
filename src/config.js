@@ -821,6 +821,29 @@ export const FILRODENSWMB = {
             // How far above the sea's surface a surface biome (Pack Ice and the like) is raised,
             // so the surface does not cover it.
             SURFACE_LIFT: 0.05,
+            // The light (see Scene3D). The sun comes from the flat map's bearing
+            // (DISPLAY.LIGHT_DIRECTION), lower in the sky and over a weaker ambient than before, and
+            // is made just strong enough that flat ground stays as bright as it was: the old ambient
+            // 0.8 plus the old 1.2 sun at its old height, 0.8 + 1.2 × 2000 / |(-1000, 2000, 1000)|
+            FLAT_BRIGHTNESS: 0.8 + (1.2 * 2000) / Math.hypot(1000, 2000, 1000),
+            AMBIENT: 0.4,
+            // Degrees above the horizon
+            SUN_ALTITUDE: 35,
+            // How the terrain's lighting normals add its broad slope to each vertex's own (see
+            // LightingNormals), so land that rises gently over large areas reads as relief
+            RELIEF: {
+                // The per-map Relief Emphasis (params.display.reliefEmphasis): its default and most
+                EMPHASIS: 20,
+                EMPHASIS_MAX: 30,
+                // Baseline pixels the broad slope is measured over (scaled to the map's resolution)
+                RADIUS: 25,
+                // A soft cap on the broad slope's added tilt, as a gradient (1 = 45°)
+                TILT_LIMIT: 0.6,
+                // How strongly each vertex's own slope counts
+                FINE_GAIN: 1.5,
+                // The share of the emphasis the sea bed takes
+                SEABED_SHARE: 0.5,
+            },
         },
         // How far past a repaint area the colour, biome and contour painters also write: each pixel
         // there depends on its neighbours (contour lines sit between two pixels), so the ring just
