@@ -1449,6 +1449,29 @@
 .fwmb-form-group--stacked > .fwmb-label {
     width: auto;
 }
+/* A field's unit, after the field rather than in its label (S10): its long form, or its short one
+   where the row is stacked (a stacked group, or a narrow side surface, below) */
+.fwmb-unit {
+    flex: none;
+    color: var(--fwmb-text-secondary);
+    font-size: var(--fwmb-size-12);
+    white-space: nowrap;
+}
+.fwmb-unit-short,
+.fwmb-form-group--stacked .fwmb-unit-long {
+    display: none;
+}
+.fwmb-form-group--stacked .fwmb-unit-short {
+    display: inline;
+}
+@container fwmb-side (max-width: 17.5rem) {
+    .fwmb-unit-long {
+        display: none;
+    }
+    .fwmb-unit-short {
+        display: inline;
+    }
+}
 /* Side surfaces stack their fields when they are narrow (compact panel 14rem, compact inspector 16rem) */
 .fwmb-panel,
 .fwmb-overlay-docked {

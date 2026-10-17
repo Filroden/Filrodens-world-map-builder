@@ -2,6 +2,7 @@ import { LayerSetEditor, LevelEditor } from "./LayerEditors.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { FILRODENSWMB } from "../config.js";
+import { ListNav } from "../ui/ListNav.js";
 
 /** The accessible names of the naming row's field, by what it names. */
 const NAMING_LABELS = Object.freeze({
@@ -20,9 +21,8 @@ const NAMING_LABELS = Object.freeze({
  *   painted. Escape, or an empty name, takes the row away and records nothing. A level is renamed
  *   in its heading the same way. The naming state lives on the studio (`app.regionNaming`), so a
  *   redraw of the panel keeps the row and what was typed in it.
- * - **Keys.** Each list is one tab stop (see RegionPanel.context). Up and Down move through its
- *   rows and its add row, Home and End to the first and last; Enter opens a row in the inspector
- *   (or opens and closes Unassigned, as Right and Left do).
+ * - **Keys.** Each list moves and opens as every list does (see ListNav); here Enter, Right and
+ *   Left also open and close Unassigned.
  */
 export class RegionLists {
     /**
@@ -142,7 +142,7 @@ export class RegionLists {
         const target = (key && panel.querySelector(`[data-list-key="${CSS.escape(key)}"]`)) || panel.querySelector('.fwmb-region-list [tabindex="0"]');
         if (!target) return;
         const list = target.closest(".fwmb-region-list");
-        if (list) this.#moveTo(list, target);
+        if (list) ListNav.moveTo(list, target);
         else (target.localName === "details" ? target.querySelector(":scope > summary") : target).focus();
     }
 
@@ -156,39 +156,16 @@ export class RegionLists {
     static handleKey(app, event) {
         const target = event.target;
         if (target?.matches?.("[data-list-naming]")) return this.#namingKey(app, event, target);
-        const list = target?.closest?.(".fwmb-region-list");
-        if (!list || !target.matches("[data-list-item]") || event.altKey || event.ctrlKey || event.metaKey) return false;
-
-        const items = [...list.querySelectorAll("[data-list-item]")];
-        const index = items.indexOf(target);
-        const unassigned = target.dataset.listKey?.startsWith("unassigned:");
-        switch (event.key) {
-            case "ArrowDown":
-                if (index < items.length - 1) this.#moveTo(list, items[index + 1]);
+        // Unassigned opens and closes; everything else moves and opens as in any list (see ListNav)
+        if (target?.matches?.("[data-list-item]") && target.dataset.listKey?.startsWith("unassigned:") && !event.altKey && !event.ctrlKey && !event.metaKey) {
+            const expanded = target.getAttribute("aria-expanded") === "true";
+            if (event.key === "Enter" || (event.key === "ArrowRight" && !expanded) || (event.key === "ArrowLeft" && expanded)) {
+                this.toggleUnassigned(app, target.dataset.levelId);
                 return true;
-            case "ArrowUp":
-                if (index > 0) this.#moveTo(list, items[index - 1]);
-                return true;
-            case "Home":
-                this.#moveTo(list, items[0]);
-                return true;
-            case "End":
-                this.#moveTo(list, items.at(-1));
-                return true;
-            case "ArrowRight":
-            case "ArrowLeft":
-                if (!unassigned) return false;
-                if ((target.getAttribute("aria-expanded") === "true") !== (event.key === "ArrowRight")) this.toggleUnassigned(app, target.dataset.levelId);
-                return true;
-            case "Enter":
-                // An add button is a button: the browser presses it
-                if (target.localName === "button") return false;
-                if (unassigned) this.toggleUnassigned(app, target.dataset.levelId);
-                else this.#open(app, target);
-                return true;
-            default:
-                return false;
+            }
+            if (event.key === "ArrowRight" || event.key === "ArrowLeft") return true;
         }
+        return false;
     }
 
     /**
@@ -229,14 +206,6 @@ export class RegionLists {
         return false;
     }
 
-    /** Enter on a row: its inspector (a region is chosen and painted, as a click does). */
-    static #open(app, row) {
-        const [type, id] = (row.dataset.listKey ?? "").split(":");
-        if (type === "set") LayerSetEditor.open(app, id);
-        else if (type === "level") LevelEditor.open(app, id);
-        else if (type === "region") RegionEditor.open(app, row.dataset.layerId, id);
-    }
-
     /** Draws the naming row and puts the cursor in it, its name chosen so typing replaces it. */
     static async #focusNaming(app) {
         await app.view?.render(["context"]);
@@ -245,14 +214,6 @@ export class RegionLists {
         field.focus();
         field.select();
         field.scrollIntoView?.({ block: "nearest" });
-    }
-
-    /** Makes an item its list's tab stop and focuses it. */
-    static #moveTo(list, item) {
-        for (const other of list.querySelectorAll('[data-list-item][tabindex="0"]')) if (other !== item) other.tabIndex = -1;
-        item.tabIndex = 0;
-        item.focus();
-        item.scrollIntoView?.({ block: "nearest" });
     }
 
     /** The colour a new region of a level will be filled with (the level's next preset, or the bar's style). */

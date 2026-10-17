@@ -64,10 +64,12 @@
     <div class="fwmb-form-group">
         <label class="fwmb-mass-edit-label">
             <input type="checkbox" class="fwmb-checkbox" name="applyMaxChars" />
-            {{localize "FILRODENSWMB.UI.MaxWidth"}}
+            {{localize "FILRODENSWMB.UI.LabelLineWidth"}}
         </label>
         <div class="fwmb-form-fields">
-            <input type="number" name="massMaxChars" value="{{defaults.maxChars}}" min="0" step="1" placeholder="0" />
+            <input type="number" name="massMaxChars" value="{{defaults.maxChars}}" min="0" step="1" placeholder="0" class="fwmb-input-short" aria-describedby="fwmb-mass-labels-width-unit" />
+            <span class="fwmb-unit" id="fwmb-mass-labels-width-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitCharacters"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitCharactersShort"}}</span></span>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LabelLineWidthHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.LabelLineWidthHint'}}"></i>
         </div>
     </div>
 

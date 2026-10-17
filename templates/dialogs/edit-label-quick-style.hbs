@@ -51,9 +51,11 @@
     </div>
 
     <div class="fwmb-form-group">
-        <label>{{localize "FILRODENSWMB.UI.MaxWidth"}}</label>
+        <label for="fwmb-label-style-width">{{localize "FILRODENSWMB.UI.LabelLineWidth"}}</label>
         <div class="fwmb-form-fields">
-            <input type="number" name="styleMaxChars" value="{{style.maxChars}}" min="0" step="1" />
+            <input type="number" id="fwmb-label-style-width" class="fwmb-input-short" name="styleMaxChars" value="{{style.maxChars}}" min="0" step="1" aria-describedby="fwmb-label-style-width-unit" />
+            <span class="fwmb-unit" id="fwmb-label-style-width-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitCharacters"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitCharactersShort"}}</span></span>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LabelLineWidthHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.LabelLineWidthHint'}}"></i>
         </div>
     </div>
 

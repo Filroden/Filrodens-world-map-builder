@@ -4,6 +4,7 @@ import { CanvasHints } from "../canvas/CanvasHints.js";
 import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
+import { ListNav } from "../ui/ListNav.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
@@ -108,10 +109,10 @@ export class MapStudio {
         addRouteQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
         addPinQuickStyle(e, t)       { MapDialogManager.onAddQuickStyle(this, e, t); },
         addRegionQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
-        editLabelQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
-        editRouteQuickStyle(e, t)    { MapDialogManager.onEditQuickStyle(this, e, t); },
-        editPinQuickStyle(e, t)      { MapDialogManager.onEditQuickStyle(this, e, t); },
-        editRegionQuickStyle(e, t)   { MapDialogManager.onEditQuickStyle(this, e, t); },
+        editLabelQuickStyle(e, t)    { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditQuickStyle(this, e, t); },
+        editRouteQuickStyle(e, t)    { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditQuickStyle(this, e, t); },
+        editPinQuickStyle(e, t)      { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditQuickStyle(this, e, t); },
+        editRegionQuickStyle(e, t)   { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditQuickStyle(this, e, t); },
         deleteLabelQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
         deleteRouteQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
         deletePinQuickStyle(e, t)    { MapDialogManager.onDeleteQuickStyle(this, e, t); },
@@ -134,22 +135,22 @@ export class MapStudio {
         deleteRoute(e, t)       { MapDialogManager.onDeleteEntity(this, e, t); },
         deleteLandMask(e, t)    { MapDialogManager.onDeleteLandMask(this, e, t); },
         deleteAllLandMasks(e, t) { MapDialogManager.onDeleteAllLandMasks(this, e, t); },
-        editLandMask(e, t)      { if (!MapStudio.#fromRowControl(e, t)) LandMaskEditor.open(this, MapStudio.#rowId(t)); },
+        editLandMask(e, t)      { if (!MapStudio.#fromRowControl(e, t)) LandMaskEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
 
         // --- DIALOG MANAGER: Entity Editing ---
-        // Each is a list row's own action as well as its Edit button's: a click on the row (but not
-        // on one of its controls) opens its object in the inspector
-        editDecoration(e, t)  { if (!MapStudio.#fromRowControl(e, t)) DecorationEditor.open(this, MapStudio.#rowId(t)); },
-        editFault(e, t)       { if (!MapStudio.#fromRowControl(e, t)) FaultEditor.open(this, MapStudio.#rowId(t)); },
-        editLabel(e, t)       { if (!MapStudio.#fromRowControl(e, t)) LabelEditor.open(this, MapStudio.#labelRef(t)); },
-        editPin(e, t)         { if (!MapStudio.#fromRowControl(e, t)) PinEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
+        // Each is a list row's action: a click on the row (but not on one of its controls), or Enter
+        // on it, opens its object in the inspector, focus staying in the list (see ListNav)
+        editDecoration(e, t)  { if (!MapStudio.#fromRowControl(e, t)) DecorationEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
+        editFault(e, t)       { if (!MapStudio.#fromRowControl(e, t)) FaultEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
+        editLabel(e, t)       { if (!MapStudio.#fromRowControl(e, t)) LabelEditor.open(this, MapStudio.#labelRef(t), MapStudio.#FROM_LIST); },
+        editPin(e, t)         { if (!MapStudio.#fromRowControl(e, t)) PinEditor.open(this, t.closest(".fwmb-list-item").dataset.id, MapStudio.#FROM_LIST); },
         editRegion(_e, t)     { RegionEditor.open(this, ...RegionPanel.regionIdsOf(t)); },
-        editRiver(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RiverEditor.open(this, MapStudio.#rowId(t)); },
-        editRoute(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RouteEditor.open(this, t.closest(".fwmb-list-item").dataset.id); },
+        editRiver(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RiverEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
+        editRoute(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RouteEditor.open(this, t.closest(".fwmb-list-item").dataset.id, MapStudio.#FROM_LIST); },
 
         // --- DIALOG MANAGER: Custom Biomes & Misc ---
         addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
-        editCustomBiome(e, t)   { MapDialogManager.onEditCustomBiome(this, e, t); },
+        editCustomBiome(e, t)   { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditCustomBiome(this, e, t); },
         deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
         openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
         addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
@@ -162,7 +163,7 @@ export class MapStudio {
         addLayer(_e, t)             { RegionLists.addLayer(this, { setId: t.dataset.setId || null, levelId: t.dataset.levelId || null }); },
         renameListEntry(_e, t)      { RegionLists.startRename(this, t.closest("[data-list-key]")?.dataset.listKey); },
         toggleUnassigned(_e, t)     { RegionLists.toggleUnassigned(this, t.closest("[data-level-id]")?.dataset.levelId); },
-        selectLayerSet(e, t)        { if (!MapStudio.#fromRowControl(e, t)) LayerSetEditor.open(this, RegionPanel.setIdOf(t)); },
+        selectLayerSet(e, t)        { if (!MapStudio.#fromRowControl(e, t)) LayerSetEditor.open(this, RegionPanel.setIdOf(t), MapStudio.#FROM_LIST); },
         deleteLayerSet(_e, t)       { RegionPanel.deleteSet(this, t); },
         moveLayerSetUp(_e, t)       { RegionPanel.moveSet(this, t, -1); },
         moveLayerSetDown(_e, t)     { RegionPanel.moveSet(this, t, 1); },
@@ -177,7 +178,7 @@ export class MapStudio {
 
         // --- DIALOG MANAGER: Pin Icons ---
         addCustomPinIcon(e, t)     { MapDialogManager.onAddCustomPinIcon(this, e, t); },
-        editCustomPinIcon(e, t)    { MapDialogManager.onEditCustomPinIcon(this, e, t); },
+        editCustomPinIcon(e, t)    { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditCustomPinIcon(this, e, t); },
         removeCustomPinIcon(e, t)  { MapDialogManager.onRemoveCustomPinIcon(this, e, t); },
         toggleBuiltinPinIcon(e, t) { MapDialogManager.onToggleBuiltinPinIcon(this, e, t); },
         hideAllBuiltinPinIcons(e, t)   { MapDialogManager.onHideAllBuiltinPinIcons(this, e, t); },
@@ -1244,6 +1245,8 @@ export class MapStudio {
         // The inspector shows the object as it is now: a change made in the panel, the bar or by
         // an undo redraws the panel, and the inspector with it (or closes it, if the object went)
         if (regions.includes("context")) Inspector.refresh(this);
+        // Each list is one tab stop, its rows' controls none (see ListNav)
+        if (regions.includes("context")) ListNav.settle(this.root);
     }
 
     /**
@@ -1252,7 +1255,7 @@ export class MapStudio {
      */
     #selectRegionRow(target) {
         const [levelId, regionId] = RegionPanel.regionIdsOf(target);
-        if (levelId && regionId) RegionEditor.open(this, levelId, regionId);
+        if (levelId && regionId) RegionEditor.open(this, levelId, regionId, MapStudio.#FROM_LIST);
     }
 
     /**
@@ -1297,6 +1300,9 @@ export class MapStudio {
      * Whether a click on a row came from one of the row's own controls (its menu, a tick box)
      * rather than from the row itself, which opens the row's object in the inspector.
      */
+    /** How a list's row opens its object in the inspector: focus stays on the row (see ListNav). */
+    static #FROM_LIST = Object.freeze({ keepFocus: true });
+
     static #fromRowControl(event, row) {
         const control = event?.target?.closest?.("button, input, select, a, .fwmb-dropdown, .fwmb-tw");
         return !!control && control !== row && row.contains(control);
@@ -1397,13 +1403,22 @@ export class MapStudio {
      * the window), cancelling the browser's move to the next control. Stopping the key here leaves
      * Tab to move focus through the studio's controls as it does anywhere else.
      */
+    /** An arrow key, Home, End, Page Up or Page Down, or W, A, S or D without a modifier. */
+    static #isMovementKey(event) {
+        if (/^(Arrow(Up|Down|Left|Right)|Home|End|PageUp|PageDown)$/.test(event.key)) return true;
+        return !event.ctrlKey && !event.metaKey && !event.altKey && /^[wasd]$/i.test(event.key);
+    }
+
     #handleStudioKeydown(event) {
         if (event.key === "Tab") {
             event.stopPropagation();
             return;
         }
+        // Keys that move go no further than the studio: in Foundry the arrows (and W, A, S and D)
+        // would otherwise reach the window and pan the scene behind it
+        if (MapStudio.#isMovementKey(event)) event.stopPropagation();
         // The Regions lists' keys: moving through a list, Unassigned, and naming
-        if (RegionLists.handleKey(this, event)) {
+        if (RegionLists.handleKey(this, event) || ListNav.handleKey(event)) {
             event.preventDefault();
             return;
         }

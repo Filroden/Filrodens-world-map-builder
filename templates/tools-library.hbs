@@ -18,89 +18,77 @@
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="pinStyles" title="FILRODENSWMB.UI.SettingsPinQuickStyles" count=customPinStyles.length addAction="addPinQuickStyle" addLabel="FILRODENSWMB.UI.AddPinQuickStyle"}}
-    <div class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SettingsPinQuickStyles'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
         {{#each customPinStyles}}
-            <div class="fwmb-list-item" data-id="{{this.id}}">
+            <div role="option" aria-selected="false" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editPinQuickStyle">
                 <i class="fwmb-icon fwmb-pin-style-glyph {{#unless this.iconIsCustom}}fwmb-icon--{{this.icon}}{{/unless}}" {{#if this.iconIsCustom}}style="--fwmb-mask: url('{{this.iconPath}}');"{{/if}}></i>
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
                 <span class="fwmb-badge fwmb-row-count" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
                 <span class="fwmb-actions">
-                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editPinQuickStyle" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                        <i class="fwmb-icon fwmb-icon--edit"></i>
-                    </button>
                     <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deletePinQuickStyle" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                         <i class="fwmb-icon fwmb-icon--delete"></i>
                     </button>
                 </span>
             </div>
         {{else}}
-            <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
+            <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
         {{/each}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="routeStyles" title="FILRODENSWMB.UI.SettingsRouteQuickStyles" count=customRouteStyles.length addAction="addRouteQuickStyle" addLabel="FILRODENSWMB.UI.AddRouteQuickStyle"}}
-    <div class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SettingsRouteQuickStyles'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
         {{#each customRouteStyles}}
-            <div class="fwmb-list-item" data-id="{{this.id}}">
+            <div role="option" aria-selected="false" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editRouteQuickStyle">
                 <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: calc({{this.thickness}} * 0.0625rem); border-style: {{this.style}};"></div>
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
                 <span class="fwmb-badge fwmb-row-count" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
                 <span class="fwmb-actions">
-                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editRouteQuickStyle" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                        <i class="fwmb-icon fwmb-icon--edit"></i>
-                    </button>
                     <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteRouteQuickStyle" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                         <i class="fwmb-icon fwmb-icon--delete"></i>
                     </button>
                 </span>
             </div>
         {{else}}
-            <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
+            <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
         {{/each}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="regionStyles" title="FILRODENSWMB.UI.SettingsRegionQuickStyles" count=customRegionStyles.length addAction="addRegionQuickStyle" addLabel="FILRODENSWMB.UI.AddRegionQuickStyle"}}
-    <div class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SettingsRegionQuickStyles'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
         {{#each customRegionStyles}}
-            <div class="fwmb-list-item" data-id="{{this.id}}">
+            <div role="option" aria-selected="false" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editRegionQuickStyle">
                 <div class="fwmb-swatch fwmb-swatch--small" style="background-color: {{this.fillColor}}; border-color: {{this.lineColor}};"></div>
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
                 <span class="fwmb-badge fwmb-row-count" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
                 <span class="fwmb-actions">
-                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editRegionQuickStyle" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                        <i class="fwmb-icon fwmb-icon--edit"></i>
-                    </button>
                     <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteRegionQuickStyle" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                         <i class="fwmb-icon fwmb-icon--delete"></i>
                     </button>
                 </span>
             </div>
         {{else}}
-            <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
+            <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
         {{/each}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="labelStyles" title="FILRODENSWMB.UI.SettingsLabelQuickStyles" count=customLabelStyles.length addAction="addLabelQuickStyle" addLabel="FILRODENSWMB.UI.AddLabelQuickStyle"}}
-    <div class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SettingsLabelQuickStyles'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
         {{#each customLabelStyles}}
-            <div class="fwmb-list-item" data-id="{{this.id}}">
+            <div role="option" aria-selected="false" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editLabelQuickStyle">
                 <div class="fwmb-swatch fwmb-swatch--round" style="background-color: {{this.fillColor}};"></div>
                 <span class="fwmb-name fwmb-flex-1" style="font-family: '{{this.fontFamily}}';">{{this.name}}</span>
                 <span class="fwmb-badge fwmb-row-count" data-tooltip="{{localize 'FILRODENSWMB.UI.QuickStyleUsageTooltip' count=this.usageCount}}">{{this.usageCount}}</span>
                 <span class="fwmb-actions">
-                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editLabelQuickStyle" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                        <i class="fwmb-icon fwmb-icon--edit"></i>
-                    </button>
                     <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLabelQuickStyle" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                         <i class="fwmb-icon fwmb-icon--delete"></i>
                     </button>
                 </span>
             </div>
         {{else}}
-            <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
+            <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoCustomStyles"}}</div>
         {{/each}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
@@ -138,22 +126,19 @@
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="customPinIcons" title="FILRODENSWMB.UI.SettingsCustomPinIcons" count=customPinIcons.length addAction="addCustomPinIcon" addLabel="FILRODENSWMB.UI.AddCustomPinIcon"}}
-    <div class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SettingsCustomPinIcons'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
         {{#each customPinIcons}}
-            <div class="fwmb-list-item" data-id="{{this.id}}">
+            <div role="option" aria-selected="false" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editCustomPinIcon">
                 <i class="fwmb-icon fwmb-list-icon" style="--fwmb-mask: url('{{this.path}}');"></i>
                 <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
                 <span class="fwmb-actions">
-                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editCustomPinIcon" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                        <i class="fwmb-icon fwmb-icon--edit"></i>
-                    </button>
                     <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeCustomPinIcon" aria-label="{{localize 'FILRODENSWMB.UI.RemovePinIcon'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.RemovePinIcon'}}">
                         <i class="fwmb-icon fwmb-icon--variable-remove"></i>
                     </button>
                 </span>
             </div>
         {{else}}
-            <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoCustomPinIcons"}}</div>
+            <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoCustomPinIcons"}}</div>
         {{/each}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

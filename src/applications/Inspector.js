@@ -53,11 +53,13 @@ export class Inspector {
      * @param {object} app - The studio.
      * @param {object} kind - The object's kind (see above).
      * @param {object} ref - Names the object.
-     * @param {{created?: boolean}} [options] - `created`: the object was just made on the map, so
-     *   focus stays there and the next click goes on placing or drawing.
+     * @param {{created?: boolean, keepFocus?: boolean}} [options] - `created`: the object was just
+     *   made on the map, so focus stays there and the next click goes on placing or drawing.
+     *   `keepFocus`: it was opened from a list's row, where focus stays, so the reader can go on
+     *   through the list.
      * @returns {Promise<boolean>} Whether it opened (false when the object is not on the map).
      */
-    static async open(app, kind, ref, { created = false } = {}) {
+    static async open(app, kind, ref, { created = false, keepFocus = false } = {}) {
         const object = kind.find(app, ref);
         if (!object) return false;
         // One docked dialogue at a time: the inspector replaces any other, and the one open
@@ -81,7 +83,7 @@ export class Inspector {
             content,
             classes: ["fwmb", "fwmb-inspector", `fwmb-inspector--${kind.id}`],
             closeLabel: platform.i18n.localize("FILRODENSWMB.UI.Close"),
-            focus: created ? "none" : "dialogue",
+            focus: created || keepFocus ? "none" : "dialogue",
         });
         const state = { kind, ref, overlay, defaults: new Map() };
         this.#open.set(app, state);

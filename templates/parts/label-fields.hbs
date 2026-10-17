@@ -57,10 +57,11 @@
     </div>
 </div>
 <div class="fwmb-form-group">
-    <label class="fwmb-label" for="fwmb-inspector-label-width">{{localize "FILRODENSWMB.UI.InspectorLineWidth"}}</label>
+    <label class="fwmb-label" for="fwmb-inspector-label-width">{{localize "FILRODENSWMB.UI.LabelLineWidth"}}</label>
     <div class="fwmb-form-fields">
-        <input type="number" id="fwmb-inspector-label-width" class="fwmb-input-short" name="labelMaxChars" value="{{label.maxChars}}" min="0" step="1" />
-        <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.MaxWidthHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.MaxWidthHint'}}"></i>
+        <input type="number" id="fwmb-inspector-label-width" class="fwmb-input-short" name="labelMaxChars" value="{{label.maxChars}}" min="0" step="1" aria-describedby="fwmb-inspector-label-width-unit" />
+        <span class="fwmb-unit" id="fwmb-inspector-label-width-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitCharacters"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitCharactersShort"}}</span></span>
+        <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LabelLineWidthHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.LabelLineWidthHint'}}"></i>
     </div>
 </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

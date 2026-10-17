@@ -14,9 +14,9 @@
     </div>
     {{/if}}
 
-    <div id="fwmb-scroll-pins" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionPins'}}" data-list-nav id="fwmb-scroll-pins" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
         {{#each mapPins}}
-        <div class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.pin)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="pin" data-action="editPin">
+        <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.pin)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="pin" data-action="editPin">
             {{#if ../massEditMode.pin}}
                 <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="pin" data-panel-ui {{#if this.massEditSelected}}checked{{/if}} />
             {{/if}}
@@ -32,16 +32,13 @@
                 <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon fwmb-icon--center-focus"></i>
                 </button>
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editPin" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                    <i class="fwmb-icon fwmb-icon--edit"></i>
-                </button>
                 <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deletePin" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                     <i class="fwmb-icon fwmb-icon--delete"></i>
                 </button>
             </span>
         </div>
         {{else}}
-        <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoPoints"}}</div>
+        <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoPoints"}}</div>
         {{/each}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
@@ -58,9 +55,9 @@
     </div>
     {{/if}}
 
-    <div id="fwmb-scroll-routes" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.Routes'}}" data-list-nav id="fwmb-scroll-routes" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
         {{#each mapRoutes}}
-        <div class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.route)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="route" data-action="editRoute">
+        <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.route)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="route" data-action="editRoute">
             {{#if ../massEditMode.route}}
                 <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="route" data-panel-ui {{#if this.massEditSelected}}checked{{/if}} />
             {{/if}}
@@ -73,16 +70,13 @@
                 <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon fwmb-icon--center-focus"></i>
                 </button>
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="editRoute" aria-label="{{localize 'FILRODENSWMB.UI.Edit'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                    <i class="fwmb-icon fwmb-icon--edit"></i>
-                </button>
                 <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteRoute" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
                     <i class="fwmb-icon fwmb-icon--delete"></i>
                 </button>
             </span>
         </div>
         {{else}}
-        <div class="fwmb-list-empty">{{localize "FILRODENSWMB.UI.NoRoutes"}}</div>
+        <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoRoutes"}}</div>
         {{/each}}
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
