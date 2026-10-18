@@ -5,7 +5,7 @@
 
     Parameters:
       label: the label's fields (InspectorFields.label: its own over the defaults)
-      choices: InspectorFields.labelChoices: fontGroups, labelStyles, rotationRange, justifications
+      choices: InspectorFields.labelChoices: face, fontGroups, labelStyles, rotationRange, justifications
       styleName: the label style it follows, or null for Custom
       sectionId, sectionTitle, closed: the section's id (its open state is remembered by it),
                 title key, and whether it starts closed
@@ -20,16 +20,7 @@
         {{> "modules/filrodens-world-map-builder/templates/parts/font-picker.hbs" id="fwmb-inspector-label-font" name="labelFontFamily" groups=choices.fontGroups selected=label.fontFamily missing=choices.fontMissing}}
     </div>
 </div>
-<div class="fwmb-row fwmb-inspector-face">
-    <label class="fwmb-checkbox-label">
-        <input type="checkbox" class="fwmb-checkbox" name="labelBold" {{#if label.bold}}checked{{/if}} />
-        {{localize "FILRODENSWMB.UI.LabelBold"}}
-    </label>
-    <label class="fwmb-checkbox-label">
-        <input type="checkbox" class="fwmb-checkbox" name="labelItalic" {{#if label.italic}}checked{{/if}} />
-        {{localize "FILRODENSWMB.UI.LabelItalic"}}
-    </label>
-</div>
+{{> "modules/filrodens-world-map-builder/templates/parts/face-fields.hbs" bold=label.bold italic=label.italic face=choices.face boldName="labelBold" italicName="labelItalic"}}
 {{#if visibilities}}
 <div class="fwmb-form-group">
     <label class="fwmb-label" for="fwmb-inspector-label-visibility">{{localize "FILRODENSWMB.UI.Visibility"}}</label>

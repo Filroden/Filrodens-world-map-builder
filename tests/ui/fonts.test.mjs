@@ -8,7 +8,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_LABEL_FONT, FONT_FAMILIES, FONTS_FOLDER, LABEL_FONT_CATEGORIES, fontFaces, fontLicencePath, labelFontGroups, labelFontList, labelFontNames } from "../../src/data/fonts.js";
+import { DEFAULT_LABEL_FONT, FONT_FAMILIES, FONTS_FOLDER, LABEL_FONT_CATEGORIES, fontFaces, fontLicencePath, hasStyle, hasWeight, labelFontGroups, labelFontList, labelFontNames } from "../../src/data/fonts.js";
 import { FILRODENSWMB } from "../../src/config.js";
 import { LabelFonts } from "../../src/tools/LabelFonts.js";
 
@@ -68,7 +68,8 @@ test("every family carries its licence and credit", () => {
 
 const STRINGS = JSON.parse(readFileSync(join(ROOT, "languages/en.json"), "utf8"));
 const README = readFileSync(join(ROOT, "README.md"), "utf8");
-const labelFamilies = FONT_FAMILIES.filter((family) => !family.ui);
+// Every vendored family is a label font; the interface's own are the picker's "Studio faces"
+const labelFamilies = FONT_FAMILIES;
 
 test("every label font is in a category with a name, and every family is credited in the README", () => {
     const categories = new Set(LABEL_FONT_CATEGORIES.map((category) => category.id));
@@ -96,6 +97,38 @@ test("the picker groups the fonts by category in order, the host's own last", ()
     assert.deepEqual(groups.map((group) => [group.id, group.fonts.map((font) => font.name)]), [["book", ["EB Garamond", "Alegreya"]], ["engraved", ["Cinzel"]], ["handwritten", ["Kalam"]], ["other", ["Signika"]]]);
     assert.deepEqual(groups[0].fonts[0], { name: "EB Garamond", bold: true, italic: true });
     assert.equal(groups[1].fonts[0].italic, false, "Cinzel has no italic of its own");
+});
+
+test("the studio's own faces are label fonts, first in the picker, with regular, bold and the italics vendored", () => {
+    const studio = FONT_FAMILIES.filter((family) => family.ui);
+    assert.deepEqual(studio.map((family) => family.name), ["Atkinson Hyperlegible", "Sora", "Barlow Semi Condensed"]);
+    for (const family of studio) {
+        assert.equal(family.category, "studio");
+        assert.ok(family.weights.includes(400) && family.weights.includes(700), `${family.name} has regular and bold`);
+    }
+    assert.equal(LABEL_FONT_CATEGORIES[0].id, "studio");
+    const groups = labelFontGroups(["EB Garamond", "Sora", "Barlow Semi Condensed", "Atkinson Hyperlegible"], "Other");
+    assert.deepEqual(groups[0], { label: "FILRODENSWMB.UI.FontCategoryStudio", id: "studio", fonts: [{ name: "Sora", bold: true, italic: false }, { name: "Barlow Semi Condensed", bold: true, italic: true }, { name: "Atkinson Hyperlegible", bold: true, italic: true }] });
+    // Barlow's italic is only in the label weights, not the interface's 500 and 600
+    const barlow = FONT_FAMILIES.find((family) => family.id === "barlow-semi-condensed");
+    assert.deepEqual([...new Set(fontFaces(barlow).filter((face) => face.style === "italic").map((face) => face.weight))], [400, 700]);
+});
+
+test("what a family can be drawn in: a vendored family's own faces, a host's font anything", () => {
+    assert.equal(hasStyle("Sora", "italic"), false);
+    assert.equal(hasStyle("EB Garamond", "italic"), true);
+    assert.equal(hasWeight("Uncial Antiqua", 700), false);
+    assert.equal(hasWeight("Cinzel", 700), true);
+    assert.equal(hasStyle("Signika", "italic"), true, "a host's own font");
+});
+
+test("a label in a family without an italic (or bold) face is drawn upright (or regular), its setting kept", () => {
+    LabelFonts.setAvailable(null);
+    const label = { fontFamily: "Sora", bold: true, italic: true };
+    assert.equal(LabelFonts.spec(label), 'normal bold 16px "Sora"');
+    assert.equal(label.italic, true);
+    assert.equal(LabelFonts.spec({ fontFamily: "Uncial Antiqua", italic: true }), 'normal normal 16px "Uncial Antiqua"');
+    assert.equal(LabelFonts.spec({ fontFamily: "Barlow Semi Condensed", italic: true }), 'italic bold 16px "Barlow Semi Condensed"');
 });
 
 test("a label is drawn bold unless it says otherwise, upright unless italic, in its family or the default", () => {

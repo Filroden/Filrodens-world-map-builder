@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
-import { labelFontGroups } from "../data/fonts.js";
+import { DEFAULT_LABEL_FONT, hasStyle, hasWeight, labelFontGroups } from "../data/fonts.js";
 import { MapDialogManager } from "./MapDialogManager.js";
+import { MapStateManager } from "./MapStateManager.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { platform } from "../platform/index.js";
 
@@ -13,8 +14,8 @@ import { platform } from "../platform/index.js";
  * the style's values) or is Custom. Picking a style in the inspector copies the style's fields onto
  * the object; changing any styled field by hand makes it Custom, so the style never claims an
  * object that no longer looks like it. Save as… names a new style made from the object's fields
- * and connects the object to it. Styles are kept with the map's settings, outside the undo history
- * (as when they are made in Styles and icons); the object's connection to one is undone with it.
+ * and connects the object to it. The map's styles are part of the undo history (see
+ * MapStateManager.getVectorStateSnapshot), so a style's change and its objects' are undone together.
  */
 export class InspectorFields {
     /** The label fields a label style carries, and so the ones that make a label Custom when changed. */
@@ -26,7 +27,7 @@ export class InspectorFields {
      */
     static STYLE_TYPES = Object.freeze({
         Region: { registryKey: "customRegionStyles", fields: ["fillColor", "fillStyle"], nameKey: "FILRODENSWMB.UI.NewRegionStyleName" },
-        Route: { registryKey: "customRouteStyles", fields: ["color", "thickness", "style", "outline", "smoothing"], nameKey: "FILRODENSWMB.UI.NewRouteStyleName" },
+        Route: { registryKey: "customRouteStyles", fields: ["color", "thickness", "style", "outline", "smoothing", "transport"], nameKey: "FILRODENSWMB.UI.NewRouteStyleName" },
         Label: { registryKey: "customLabelStyles", fields: InspectorFields.LABEL_STYLE_FIELDS, nameKey: "FILRODENSWMB.UI.NewLabelStyleName" },
         Pin: { registryKey: "customPinStyles", fields: ["icon", "scale", "color", "label", "detailLevel"], nameKey: "FILRODENSWMB.UI.NewPinStyleName" },
     });
@@ -43,6 +44,7 @@ export class InspectorFields {
     /** The context the label fields partial (parts/label-fields.hbs) needs, besides the label. */
     static labelChoices(app, label) {
         return {
+            face: this.faceChoices(label.fontFamily),
             fontGroups: labelFontGroups(platform.fonts.list(), "FILRODENSWMB.UI.FontCategoryOther"),
             // A family the host lacks stays chosen (the label keeps it), shown as missing
             fontMissing: !!label.fontFamily && !platform.fonts.list().includes(label.fontFamily),
@@ -53,17 +55,49 @@ export class InspectorFields {
     }
 
     /**
+     * Whether a family offers Bold and Italic, and if not, the tooltip saying so: a label in a
+     * family without the face keeps its setting but is drawn without it (see LabelFonts), so the
+     * control is shown disabled.
+     * @param {string|undefined} name
+     * @returns {{bold: boolean, italic: boolean, boldHint: string|null, italicHint: string|null}}
+     */
+    static faceChoices(name) {
+        const family = name || DEFAULT_LABEL_FONT;
+        const bold = hasWeight(family, 700);
+        const italic = hasStyle(family, "italic");
+        return {
+            bold,
+            italic,
+            boldHint: bold ? null : platform.i18n.format("FILRODENSWMB.UI.FontNoBold", { family }),
+            italicHint: italic ? null : platform.i18n.format("FILRODENSWMB.UI.FontNoItalic", { family }),
+        };
+    }
+
+    /**
      * A style picker's choices: Custom, then every style of the list, with the one named selected
-     * (Custom when it names none of them).
+     * (Custom when it names none of them). `offered`, when given, narrows the list (a route's
+     * styles to those for its transport); the selected style is always kept, so an object never
+     * appears to lose a style it follows.
      *
      * @param {{id: string, name: string}[]|undefined} styles
      * @param {string|null|undefined} selected
+     * @param {(style: object) => boolean} [offered]
      * @returns {{value: string, name: string|null, selected: boolean}[]}
      */
-    static styleChoices(styles, selected) {
-        const list = styles ?? [];
+    static styleChoices(styles, selected, offered = null) {
+        const list = (styles ?? []).filter((style) => style.id === selected || !offered || offered(style));
         const known = list.some((style) => style.id === selected);
         return [{ value: "custom", name: null, selected: !known }, ...list.map((style) => ({ value: style.id, name: style.name, selected: style.id === selected }))];
+    }
+
+    /**
+     * Whether a route style is offered for a transport: a style for that transport, or one for
+     * any (no `transport`).
+     * @param {string|undefined} transport
+     * @returns {(style: object) => boolean}
+     */
+    static forTransport(transport) {
+        return (style) => !style.transport || style.transport === transport;
     }
 
     /** The name of the style an object follows, for its group's badge, or null when it is Custom. */
@@ -138,7 +172,9 @@ export class InspectorFields {
 
     /**
      * Save as…: asks for a name and makes a style of `type` from `source`'s styled fields, added to
-     * the map's styles. Resolves with the new style's id, or null when the name was not given.
+     * the map's styles. Records the undo step first, so the caller connects the object to the style
+     * within it (and undo takes the style away again). Resolves with the new style's id, or null
+     * when the name was not given (nothing recorded).
      *
      * @param {object} app
      * @param {"Region"|"Route"|"Label"|"Pin"} type
@@ -153,6 +189,8 @@ export class InspectorFields {
         if (!name?.trim()) return null;
         const style = { id: platform.utils.randomID(), name: name.trim() };
         for (const field of spec.fields) if (source[field] !== undefined) style[field] = structuredClone(source[field]);
+        // One undo step: the new style, and the object the caller then connects to it
+        MapStateManager.pushVectorState(app);
         app.uiState[spec.registryKey] ??= [];
         app.uiState[spec.registryKey].push(style);
         return style.id;

@@ -1,5 +1,4 @@
 import { FILRODENSWMB } from "../config.js";
-import { labelFontGroups } from "../data/fonts.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
@@ -411,51 +410,45 @@ export class MapDialogManager {
     }
 
     /**
-     * Unified Configuration for all Add/Edit/Delete Quick Style operations.
+     * The map's styles, by type: where each type's list is kept, the bar's choice of style for the
+     * next object, the fields a new style starts with, and how a style reaches the objects that
+     * follow it: the cascade (a change written onto them), the disconnect (a deleted style leaves
+     * them Custom, keeping their look) and the usage count. The styles are edited in the inspector
+     * (StyleEditors) and listed in Styles and icons (StyleLists). Custom biomes, edited in their
+     * dialogue, are the last entry.
      */
     static get QUICK_STYLE_CONFIG() {
+        const labelStyleFields = (style) => ({
+            fontFamily: style.fontFamily,
+            fontSize: style.fontSize,
+            fillColor: style.fillColor,
+            maxChars: style.maxChars,
+            justify: style.justify,
+            bold: style.bold !== false,
+            italic: style.italic === true,
+        });
+        // The style the bar has chosen for the next object of a kind, if any
+        const barStyle = (app, registryKey, activeStateKey) => (app.uiState[registryKey] ?? []).find((style) => style.id === app.uiState[activeStateKey]) ?? null;
         return {
             Label: {
                 registryKey: "customLabelStyles",
                 activeStateKey: "activeLabelQuickStyle",
-                template: "modules/filrodens-world-map-builder/templates/dialogs/edit-label-quick-style.hbs",
-                getDefaults: (app) => ({
-                    name: "New Label Style",
-                    fontFamily: app.uiState.labelFontFamily || FILRODENSWMB.LABELS.DEFAULT_FONT,
-                    fontSize: app.uiState.labelFontSize || 1,
-                    fillColor: app.uiState.labelFillColor || "#000000",
-                    maxChars: app.uiState.labelMaxChars || 0,
-                    justify: app.uiState.labelJustify || "left",
-                    bold: app.uiState.labelBold !== false,
-                    italic: app.uiState.labelItalic === true,
-                }),
-                getContext: (app, style) => ({
-                    style,
-                    fontGroups: labelFontGroups(platform.fonts.list(), "FILRODENSWMB.UI.FontCategoryOther"),
-                    fontMissing: !!style.fontFamily && !platform.fonts.list().includes(style.fontFamily),
-                    palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                }),
-                onExtract: (form, fallbackName) => ({
-                    name: form.elements["styleName"].value.trim() || fallbackName,
-                    fontFamily: form.elements["styleFontFamily"].value,
-                    fontSize: Number(form.elements["styleFontSize"].value) || 1,
-                    fillColor: form.elements["styleFillColor"].value,
-                    maxChars: Number(form.elements["styleMaxChars"].value) || 0,
-                    justify: form.elements["styleJustify"].value,
-                    bold: form.elements["styleBold"]?.checked !== false,
-                    italic: form.elements["styleItalic"]?.checked === true,
-                }),
-                onCascade: (app, id, result) => {
-                    const aestheticProperties = {
-                        fontFamily: result.fontFamily,
-                        fontSize: result.fontSize,
-                        fillColor: result.fillColor,
-                        maxChars: result.maxChars,
-                        justify: result.justify,
-                        bold: result.bold !== false,
-                        italic: result.italic === true,
+                // A new style starts as the next label would: the bar's style, or the bar's own fields
+                getDefaults: (app) => {
+                    const style = barStyle(app, "customLabelStyles", "activeLabelQuickStyle");
+                    if (style) return labelStyleFields(style);
+                    return {
+                        fontFamily: app.uiState.labelFontFamily || FILRODENSWMB.LABELS.DEFAULT_FONT,
+                        fontSize: app.uiState.labelFontSize || 1,
+                        fillColor: app.uiState.labelFillColor || "#000000",
+                        maxChars: app.uiState.labelMaxChars || 0,
+                        justify: app.uiState.labelJustify || "left",
+                        bold: app.uiState.labelBold !== false,
+                        italic: app.uiState.labelItalic === true,
                     };
-
+                },
+                onCascade: (app, id, result) => {
+                    const aestheticProperties = labelStyleFields(result);
                     for (const lbl of app.mapLabels) {
                         if (lbl.quickStyle === id) platform.utils.mergeObject(lbl, aestheticProperties);
                     }
@@ -475,9 +468,8 @@ export class MapDialogManager {
                     app.mapRoutes.forEach(disconnectAttached);
                     app.regionLevels.forEach((level) => level.regions.forEach(disconnectAttached));
                 },
-                // Mirrors onDisconnect's traversal (standalone Custom Labels, plus the attached
-                // `.label` sub-object every pin/route/region carries) but tallies matches instead
-                // of resetting them - powers the usage count shown on this style's card.
+                // Mirrors onDisconnect's traversal (standalone labels, plus the label every pin,
+                // route and region carries), counting instead of resetting
                 getUsageCount: (app, id) => {
                     let count = app.mapLabels.filter((lbl) => lbl.quickStyle === id).length;
                     const isAttachedMatch = (ent) => ent.label && ent.label.quickStyle === id;
@@ -490,28 +482,13 @@ export class MapDialogManager {
             Route: {
                 registryKey: "customRouteStyles",
                 activeStateKey: "activeRouteQuickStyle",
-                template: "modules/filrodens-world-map-builder/templates/dialogs/edit-route-quick-style.hbs",
-                getDefaults: () => ({
-                    name: "New Quick Style",
-                    color: "#ffffff",
-                    thickness: 2,
-                    style: "solid",
-                    outline: true,
-                    smoothing: false,
-                }),
-                getContext: (app, style) => ({
-                    style: { ...style, outline: style.outline !== false, smoothing: style.smoothing === true },
-                    thicknessStep: ROUTE_THICKNESS_STEP,
-                    palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                }),
-                onExtract: (form, fallbackName) => ({
-                    name: form.elements["styleName"].value.trim() || fallbackName,
-                    color: form.elements["styleColor"].value,
-                    thickness: roundRouteThickness(form.elements["styleThickness"].value),
-                    style: form.elements["styleStyle"].value,
-                    outline: form.elements["styleOutline"].checked,
-                    smoothing: form.elements["styleSmoothing"].checked,
-                }),
+                // As the next route would be drawn: the bar's style or its own line, for the bar's transport
+                getDefaults: (app) => {
+                    const style = barStyle(app, "customRouteStyles", "activeRouteQuickStyle");
+                    const state = app.uiState;
+                    const line = style ? this.routeStyleFields(style) : this.routeStyleFields({ color: state.routeColor, thickness: state.routeThickness, style: state.routeStyle, outline: state.routeOutline, smoothing: state.routeSmoothing });
+                    return { ...line, transport: state.routeTransport || "road" };
+                },
                 onCascade: (app, id, result) => {
                     const aestheticProperties = this.routeStyleFields(result);
                     for (const route of app.mapRoutes) {
@@ -523,72 +500,33 @@ export class MapDialogManager {
                 },
                 getUsageCount: (app, id) => app.mapRoutes.filter((route) => route.quickStyle === id).length,
             },
-            // Region quick styles hold a region's fill only: a region's border belongs to its level
-            // (the level's line style), so the line and smoothing fields older styles carry are
-            // dropped when such a style is next saved (see onSave)
             Pin: {
                 registryKey: "customPinStyles",
                 activeStateKey: "activePinStyle",
-                template: "modules/filrodens-world-map-builder/templates/dialogs/edit-pin-quick-style.hbs",
-                getDefaults: (app) => ({
-                    name: "New Pin Style",
-                    icon: app.uiState.activeIcon || FILRODENSWMB.PIN_ICONS.DEFAULT,
-                    scale: app.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
-                    color: app.uiState.pinColor || FILRODENSWMB.PINS.DEFAULT_STYLE_COLOR,
-                    label: { fontSize: app.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE, visibility: "all", quickStyle: PinStyles.NONE },
-                    detailLevel: FILRODENSWMB.PINS.DETAIL_LEVELS.at(-1),
-                }),
-                getContext: (app, style) => {
-                    const icons = getPinIconPickerList(style.icon).map((entry) => ({ key: entry.key, localized: entry.label, path: entry.path, isCustom: entry.isCustom, selected: entry.key === style.icon }));
-                    const current = icons.find((entry) => entry.selected);
+                // As the next pin would be placed: the bar's style, or its icon, colour and scale
+                getDefaults: (app) => {
+                    const style = PinStyles.active(app);
+                    if (style) return { icon: style.icon, scale: style.scale, color: style.color, label: structuredClone(style.label ?? { fontSize: style.scale, visibility: "all", quickStyle: PinStyles.NONE }), detailLevel: style.detailLevel ?? FILRODENSWMB.PINS.DETAIL_LEVELS.at(-1) };
                     return {
-                        style,
-                        icons,
-                        pinIconPath: current?.path || "",
-                        pinIconIsCustom: current?.isCustom || false,
-                        palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                        customLabelStyles: app.uiState.customLabelStyles || [],
-                        detailLevels: PinStyles.detailLevelChoices(style.detailLevel),
-                        visibilities: PinStyles.visibilityChoices(style.label?.visibility),
+                        icon: app.uiState.activeIcon || FILRODENSWMB.PIN_ICONS.DEFAULT,
+                        scale: app.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE,
+                        color: app.uiState.pinColor || FILRODENSWMB.PINS.DEFAULT_STYLE_COLOR,
+                        label: { fontSize: app.uiState.pinScale ?? FILRODENSWMB.PINS.DEFAULT_SCALE, visibility: "all", quickStyle: PinStyles.NONE },
+                        detailLevel: FILRODENSWMB.PINS.DETAIL_LEVELS.at(-1),
                     };
                 },
-                onRender: (html) => this._bindIconPicker(html, "fwmb-pin-style"),
-                onExtract: (form, fallbackName) => ({
-                    name: form.elements["styleName"].value.trim() || fallbackName,
-                    icon: form.elements["styleIcon"].value,
-                    scale: Number(form.elements["styleScale"].value) || FILRODENSWMB.PINS.DEFAULT_SCALE,
-                    color: form.elements["styleColor"].value,
-                    label: {
-                        fontSize: Number(form.elements["styleLabelSize"].value) || FILRODENSWMB.PINS.DEFAULT_SCALE,
-                        visibility: form.elements["styleLabelVisibility"].value,
-                        quickStyle: form.elements["styleLabelQuickStyle"].value,
-                    },
-                    detailLevel: Number(form.elements["styleDetailLevel"].value) || 0,
-                }),
-                onCascade: (app, id, result) => PinStyles.cascade(app, { id, ...result }),
+                onCascade: (app, id, result) => PinStyles.cascade(app, { ...result, id }),
                 onDisconnect: (app, id) => PinStyles.disconnect(app, id),
                 getUsageCount: (app, id) => PinStyles.usageCount(app, id),
             },
+            // Region styles hold a region's fill only: a region's border belongs to its level
             Region: {
                 registryKey: "customRegionStyles",
                 activeStateKey: "activeRegionQuickStyle",
-                template: "modules/filrodens-world-map-builder/templates/dialogs/edit-region-quick-style.hbs",
-                getDefaults: () => ({
-                    name: "New Region Style",
-                    fillColor: "#c6af53",
-                    fillStyle: "solid",
-                }),
-                getContext: (app, style) => ({
-                    style,
-                    palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                }),
-                onExtract: (form, fallbackName) => ({
-                    name: form.elements["styleName"].value.trim() || fallbackName,
-                    fillColor: form.elements["styleFillTransparent"].checked ? "transparent" : form.elements["styleFillColor"].value,
-                    fillStyle: form.elements["styleFillStyle"].value,
-                }),
-                onSave: (style) => {
-                    for (const key of MapDialogManager.#LEGACY_REGION_STYLE_FIELDS) delete style[key];
+                // As the next region would be filled with the bar's style, or the default fill
+                getDefaults: (app) => {
+                    const style = barStyle(app, "customRegionStyles", "activeRegionQuickStyle");
+                    return style ? { fillColor: style.fillColor, fillStyle: style.fillStyle ?? "solid" } : { fillColor: "#c6af53", fillStyle: "solid" };
                 },
                 onCascade: (app, id, result) => {
                     const aestheticProperties = { fillColor: result.fillColor, fillStyle: result.fillStyle };
@@ -630,9 +568,6 @@ export class MapDialogManager {
             },
         };
     }
-
-    /** The border fields region quick styles held before borders belonged to the level. */
-    static #LEGACY_REGION_STYLE_FIELDS = ["lineColor", "lineThickness", "lineStyle", "smoothing"];
 
     /**
      * The choices for a custom biome's Placement select, in the order they are offered, with the
@@ -994,27 +929,6 @@ export class MapDialogManager {
         }
     }
 
-    static async onAddQuickStyle(app, event, target) {
-        const type = target.dataset.action.replace("add", "").replace("QuickStyle", ""); // e.g. "Label"
-        const config = this.QUICK_STYLE_CONFIG[type];
-        if (!config) return;
-
-        const newStyle = config.getDefaults(app);
-
-        await this._processEditDialog(app, newStyle, {
-            titleKey: `FILRODENSWMB.UI.Add${type}QuickStyle`,
-            template: config.template,
-            context: config.getContext(app, newStyle),
-            renderParts: ["context", "toolbar"],
-            onRender: config.onRender,
-            onExtract: (form) => config.onExtract(form, newStyle.name),
-            onSave: (entity, result) => {
-                const id = platform.utils.randomID();
-                app.uiState[config.registryKey].push({ id, ...result });
-            },
-        });
-    }
-
     // --- DELETE ACTIONS ---
 
     /**
@@ -1180,30 +1094,6 @@ export class MapDialogManager {
         app.markDirty();
     }
 
-    static async onDeleteQuickStyle(app, event, target) {
-        const type = target.dataset.action.replace("delete", "").replace("QuickStyle", "");
-        const config = this.QUICK_STYLE_CONFIG[type];
-        if (!config) return;
-
-        const id = target.closest(".fwmb-list-item").dataset.id;
-        const confirmed = await this._confirmDialog();
-        if (!confirmed) return;
-
-        MapStateManager.pushVectorState(app);
-
-        app.uiState[config.registryKey] = app.uiState[config.registryKey].filter((s) => s.id !== id);
-
-        if (config.onDisconnect) config.onDisconnect(app, id);
-
-        if (app.uiState[config.activeStateKey] === id) {
-            app.uiState[config.activeStateKey] = "custom";
-            app.view?.render(["toolbar", "context"]);
-        }
-
-        app.markDirty();
-        app.view?.render(["context", "toolbar"]);
-    }
-
     // --- MASS EDIT ---
 
     /**
@@ -1313,29 +1203,5 @@ export class MapDialogManager {
 
         await updateCustomPinIcon(id, result);
         app.view?.render(["context"]);
-    }
-
-    static async onEditQuickStyle(app, event, target) {
-        const type = target.dataset.action.replace("edit", "").replace("QuickStyle", "");
-        const config = this.QUICK_STYLE_CONFIG[type];
-        if (!config) return;
-
-        const id = target.closest(".fwmb-list-item").dataset.id;
-        const style = app.uiState[config.registryKey].find((s) => s.id === id);
-        if (!style) return;
-
-        await this._processEditDialog(app, style, {
-            titleKey: "FILRODENSWMB.UI.Edit",
-            template: config.template,
-            context: config.getContext(app, style),
-            renderParts: ["context", "toolbar"],
-            onRender: config.onRender,
-            onExtract: (form) => config.onExtract(form, style.name),
-            onSave: (entity, result) => {
-                config.onSave?.(entity, result);
-                if (config.onCascade) config.onCascade(app, id, result);
-
-            },
-        });
     }
 }

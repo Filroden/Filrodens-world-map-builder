@@ -96,7 +96,7 @@ test("editing a style cascades to the pins that use it, deleting one lets them g
     assert.equal(config.getUsageCount(app, city.id), 0);
 });
 
-test("the quick style dialogue reads a style's fields from its form, and the defaults come from the toolbar", () => {
+test("a new pin style starts as the next pin would: the bar's style, or its icon, colour and scale", () => {
     const app = studio();
     app.uiState.activeIcon = "anchor";
     app.uiState.pinScale = 1.5;
@@ -107,10 +107,12 @@ test("the quick style dialogue reads a style's fields from its form, and the def
     assert.equal(defaults.color, "#00ff00");
     assert.equal(defaults.label.fontSize, 1.5);
 
-    const form = { elements: { styleName: { value: "  Harbour " }, styleIcon: { value: "anchor" }, styleScale: { value: "1.2" }, styleColor: { value: "#123456" }, styleLabelSize: { value: "0.9" }, styleLabelVisibility: { value: "gm" }, styleLabelQuickStyle: { value: "serif" }, styleDetailLevel: { value: "1" } } };
-    assert.deepEqual(config.onExtract(form, "Fallback"), { name: "Harbour", icon: "anchor", scale: 1.2, color: "#123456", label: { fontSize: 0.9, visibility: "gm", quickStyle: "serif" }, detailLevel: 1 });
-    form.elements.styleName.value = "";
-    assert.equal(config.onExtract(form, "Fallback").name, "Fallback");
+    PinStyles.ensure(app);
+    const capital = app.uiState.customPinStyles[0];
+    app.uiState.activePinStyle = capital.id;
+    const fromStyle = config.getDefaults(app);
+    assert.deepEqual({ icon: fromStyle.icon, scale: fromStyle.scale, label: fromStyle.label, detailLevel: fromStyle.detailLevel }, { icon: capital.icon, scale: capital.scale, label: capital.label, detailLevel: capital.detailLevel });
+    assert.notEqual(fromStyle.label, capital.label, "the label is copied, not shared");
 });
 
 test("the bar's choice of style is the style new pins take, none for no style; its choices are by name", () => {

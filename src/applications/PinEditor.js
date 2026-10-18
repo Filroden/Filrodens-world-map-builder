@@ -117,7 +117,6 @@ export class PinEditor {
             const source = InspectorFields.label(app, pin);
             const id = await InspectorFields.saveStyleAs(app, "Label", source);
             if (!id) return;
-            MapStateManager.pushVectorState(app);
             pin.label = { ...source, ...pin.label, quickStyle: id };
             this.#redraw(app);
             return;
@@ -132,7 +131,6 @@ export class PinEditor {
         };
         const id = await InspectorFields.saveStyleAs(app, "Pin", source);
         if (!id) return;
-        MapStateManager.pushVectorState(app);
         pin.pinStyle = id;
         this.#redraw(app);
     }

@@ -33,10 +33,13 @@ import { NoiseTransform } from "./NoiseTransform.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { RegionLists } from "./RegionLists.js";
+import { StyleEditors } from "./StyleEditors.js";
+import { StyleLists } from "./StyleLists.js";
 import { RegionPainter } from "./RegionPainter.js";
 import { Inspector } from "./Inspector.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RouteTool } from "./RouteTool.js";
+import { InspectorFields } from "./InspectorFields.js";
 import { RouteEditor } from "./RouteEditor.js";
 import { PinEditor } from "./PinEditor.js";
 import { LabelEditor } from "./LabelEditor.js";
@@ -104,19 +107,12 @@ export class MapStudio {
      */
     // prettier-ignore
     static ACTIONS = {
-        // --- DIALOG MANAGER: Quick Styles ---
-        addLabelQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
-        addRouteQuickStyle(e, t)     { MapDialogManager.onAddQuickStyle(this, e, t); },
-        addPinQuickStyle(e, t)       { MapDialogManager.onAddQuickStyle(this, e, t); },
-        addRegionQuickStyle(e, t)    { MapDialogManager.onAddQuickStyle(this, e, t); },
-        editLabelQuickStyle(e, t)    { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditQuickStyle(this, e, t); },
-        editRouteQuickStyle(e, t)    { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditQuickStyle(this, e, t); },
-        editPinQuickStyle(e, t)      { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditQuickStyle(this, e, t); },
-        editRegionQuickStyle(e, t)   { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditQuickStyle(this, e, t); },
-        deleteLabelQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
-        deleteRouteQuickStyle(e, t)  { MapDialogManager.onDeleteQuickStyle(this, e, t); },
-        deletePinQuickStyle(e, t)    { MapDialogManager.onDeleteQuickStyle(this, e, t); },
-        deleteRegionQuickStyle(e, t) { MapDialogManager.onDeleteQuickStyle(this, e, t); },
+        // --- STYLES AND ICONS: the map's styles (see StyleLists) ---
+        openStyle(e, t)      { if (!MapStudio.#fromRowControl(e, t)) StyleEditors.open(this, t.dataset.styleType, t.dataset.id, MapStudio.#FROM_LIST); },
+        addStyle(_e, t)      { StyleLists.startAdding(this, t.dataset.styleType); },
+        renameStyle(_e, t)   { const row = t.closest("[data-style-type][data-id]"); StyleLists.startRename(this, row?.dataset.styleType, row?.dataset.id); },
+        duplicateStyle(_e, t) { const row = t.closest("[data-style-type][data-id]"); StyleLists.duplicate(this, row?.dataset.styleType, row?.dataset.id); },
+        deleteStyle(_e, t)   { const row = t.closest("[data-style-type][data-id]"); StyleLists.delete(this, row?.dataset.styleType, row?.dataset.id); },
 
         // --- MASS EDIT ---
         toggleMassEditMode(e, t)   { this._onToggleMassEditMode(e, t); },
@@ -421,6 +417,8 @@ export class MapStudio {
         this.regionPath = new Map();
         this.regionUnassignedOpen = new Set();
         this.regionNaming = null;
+        // The style being named in Styles and icons (see StyleLists)
+        this.styleNaming = null;
         // What the Labels list shows (see #allLabelsContext)
         this.labelFilter = "all";
         this.mapRoutes = [];
@@ -1113,11 +1111,16 @@ export class MapStudio {
         context.expandedSections = Object.fromEntries([...this._expandedSections].map((key) => [key, true]));
         context.customPinIcons = getCustomPinIconList();
 
-        context.routeStyles = (this.uiState.customRouteStyles || []).map((style) => ({
-            id: style.id,
-            label: style.name,
-            isCustom: true,
-        }));
+        // The bar's next-route style: the styles for the bar's transport (and those for any),
+        // keeping the one chosen
+        const offeredRouteStyle = InspectorFields.forTransport(RouteTool.transport(this));
+        context.routeStyles = (this.uiState.customRouteStyles || [])
+            .filter((style) => style.id === this.uiState.activeRouteQuickStyle || offeredRouteStyle(style))
+            .map((style) => ({
+                id: style.id,
+                label: style.name,
+                isCustom: true,
+            }));
         context.pinStyles = PinStyles.choices(this, this.uiState.activePinStyle);
 
         if (this.activeTool === "regions") context.regionToolbar = RegionPainter.toolbarContext(this);
@@ -1129,34 +1132,15 @@ export class MapStudio {
             isCustom: true,
         }));
 
-        // Decorates a sorted quick-style list with how many features on this map are currently
-        // using each entry, via that type's QUICK_STYLE_CONFIG.getUsageCount - the same
-        // traversal onDisconnect uses when a style is deleted, just counting instead of resetting.
-        const withUsageCount = (config) => (style) => ({ ...style, usageCount: config.getUsageCount(this, style.id) });
-
-        // Custom Biomes get no usageCount badge yet (unlike the three below) - "in use" for a
-        // biome would mean scanning the full currentBiomeOverrides raster rather than a small
-        // vector array, a different enough cost profile that it's deliberately left for later.
+        // Custom Biomes get no usage count (unlike the styles): "in use" for a biome would mean
+        // scanning the biome raster rather than a small vector array.
         context.customBiomes = [...(this.uiState.customBiomes || [])].sort(alphaSort).map((cb) => ({ ...cb, hex: ColorMath.rgbToHex(cb.color), hasRules: !!cb.rules?.length }));
-
-        context.customRouteStyles = [...(this.uiState.customRouteStyles || [])]
-            .sort(alphaSort)
-            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Route));
-        context.customLabelStyles = [...(this.uiState.customLabelStyles || [])]
-            .sort(alphaSort)
-            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Label));
-        context.customRegionStyles = [...(this.uiState.customRegionStyles || [])]
-            .sort(alphaSort)
-            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Region));
-        // Each pin style's row shows its icon, which may be a custom icon drawn from its own image
-        const iconList = getPinIconPickerList();
-        context.customPinStyles = [...PinStyles.list(this)]
-            .sort(alphaSort)
-            .map(withUsageCount(MapDialogManager.QUICK_STYLE_CONFIG.Pin))
-            .map((style) => {
-                const entry = iconList.find((icon) => icon.key === style.icon);
-                return { ...style, iconIsCustom: entry?.isCustom || false, iconPath: entry?.path || "" };
-            });
+        // The map's styles, as the bar's and the mass edit dialogues' choices read them
+        context.customRouteStyles = [...(this.uiState.customRouteStyles || [])].sort(alphaSort);
+        context.customLabelStyles = [...(this.uiState.customLabelStyles || [])].sort(alphaSort);
+        context.customRegionStyles = [...(this.uiState.customRegionStyles || [])].sort(alphaSort);
+        // Styles and icons' style lists
+        if (this.activeTool === "library") context.styleLists = StyleLists.context(this);
 
         if (regionId === "context") {
             context.toolPartial = `${TEMPLATE_ROOT}tools-${this.activeTool}.hbs`;
@@ -1368,8 +1352,14 @@ export class MapStudio {
     #bindStudioListeners(root) {
         root.addEventListener("dblclick", (event) => this.#resetSliderToMapDefault(event));
         root.addEventListener("keydown", (event) => this.#handleStudioKeydown(event));
-        root.addEventListener("focusout", (event) => RegionLists.handleFocusOut(this, event));
-        root.addEventListener("input", (event) => RegionLists.handleInput(this, event));
+        root.addEventListener("focusout", (event) => {
+            RegionLists.handleFocusOut(this, event);
+            StyleLists.handleFocusOut(this, event);
+        });
+        root.addEventListener("input", (event) => {
+            RegionLists.handleInput(this, event);
+            StyleLists.handleInput(this, event);
+        });
         root.addEventListener("input", (event) => this.#routeFieldEvent(event));
         root.addEventListener("change", (event) => this.#routeFieldEvent(event));
         root.addEventListener("pointerover", (event) => this.#togglePreviewFallback(event, true));
@@ -1418,7 +1408,7 @@ export class MapStudio {
         // would otherwise reach the window and pan the scene behind it
         if (MapStudio.#isMovementKey(event)) event.stopPropagation();
         // The Regions lists' keys: moving through a list, Unassigned, and naming
-        if (RegionLists.handleKey(this, event) || ListNav.handleKey(event)) {
+        if (RegionLists.handleKey(this, event) || StyleLists.handleKey(this, event) || ListNav.handleKey(event)) {
             event.preventDefault();
             return;
         }
@@ -1641,6 +1631,8 @@ export class MapStudio {
         this.#syncFaultLiveEdits(name);
         this.#syncPinStyle(name);
         this.#syncCropLiveEdits(name);
+        // The next-route style offers the styles for the transport chosen
+        if (name === "routeTransport") this.view?.render(["editToolbar"]);
     }
 
     /**
@@ -4675,6 +4667,7 @@ export class MapStudio {
         this.#deactivateEditMode();
         this.#clearMassEditState();
         RegionLists.reset(this);
+        StyleLists.reset(this);
         // The inspector belongs to the tool its object was opened from
         platform.dialogs.dismiss({ placement: "docked" });
 

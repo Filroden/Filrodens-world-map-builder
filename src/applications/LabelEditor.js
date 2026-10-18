@@ -112,7 +112,6 @@ export class LabelEditor {
         const source = this.#label(app, object, ref);
         const id = await InspectorFields.saveStyleAs(app, "Label", source);
         if (!id) return;
-        MapStateManager.pushVectorState(app);
         if (ref.type === "custom") object.quickStyle = id;
         else object.label = { ...source, ...object.label, quickStyle: id };
         this.#redraw(app);

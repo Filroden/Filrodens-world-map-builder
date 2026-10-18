@@ -30,7 +30,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/label-fields.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs", "parts/inspector-river.hbs", "parts/inspector-fault.hbs", "parts/inspector-decoration.hbs", "parts/inspector-land-mask.hbs", "parts/inspector-level.hbs", "parts/inspector-set.hbs"]);
+await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/face-fields.hbs", "parts/label-fields.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs", "parts/inspector-river.hbs", "parts/inspector-fault.hbs", "parts/inspector-decoration.hbs", "parts/inspector-land-mask.hbs", "parts/inspector-level.hbs", "parts/inspector-set.hbs"]);
 
 /** What the next prompt (Save as…'s name) answers. */
 const answers = { prompt: null };

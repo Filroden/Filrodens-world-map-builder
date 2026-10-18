@@ -88,6 +88,7 @@ export class Inspector {
         const state = { kind, ref, overlay, defaults: new Map() };
         this.#open.set(app, state);
         this.#rememberDefaults(state);
+        RangeDisplay.syncAllFills(overlay.body);
         this.#bind(app, state);
         overlay.closed.then(() => {
             if (this.#open.get(app) === state) this.#open.delete(app);
@@ -162,6 +163,8 @@ export class Inspector {
         for (const option of state.overlay.body.querySelectorAll("option")) option.selected = option.hasAttribute("selected");
         state.overlay.setHeader(state.kind.header(app, object, state.ref));
         this.#rememberDefaults(state);
+        // The morph takes away the sliders' filled tracks (a style the template does not write)
+        RangeDisplay.syncAllFills(state.overlay.body);
     }
 
     /**

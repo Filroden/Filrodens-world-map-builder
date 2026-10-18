@@ -1,0 +1,20 @@
+{{!--
+    A label's Bold and Italic. A family without the face shows its control disabled, with a
+    tooltip saying so: the label keeps its setting (so it returns in a family with the face) but
+    is drawn without it (see LabelFonts).
+
+    Parameters:
+      bold, italic: the label's settings
+      face: InspectorFields.faceChoices of its family: bold, italic, boldHint, italicHint
+      boldName, italicName: the fields' names
+--}}
+<div class="fwmb-row fwmb-inspector-face">
+    <label class="fwmb-checkbox-label" {{#if face.boldHint}}data-tooltip="{{face.boldHint}}"{{/if}}>
+        <input type="checkbox" class="fwmb-checkbox" name="{{boldName}}" {{#if bold}}checked{{/if}} {{#unless face.bold}}disabled aria-description="{{face.boldHint}}"{{/unless}} />
+        {{localize "FILRODENSWMB.UI.LabelBold"}}
+    </label>
+    <label class="fwmb-checkbox-label" {{#if face.italicHint}}data-tooltip="{{face.italicHint}}"{{/if}}>
+        <input type="checkbox" class="fwmb-checkbox" name="{{italicName}}" {{#if italic}}checked{{/if}} {{#unless face.italic}}disabled aria-description="{{face.italicHint}}"{{/unless}} />
+        {{localize "FILRODENSWMB.UI.LabelItalic"}}
+    </label>
+</div>

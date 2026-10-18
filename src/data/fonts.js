@@ -12,8 +12,12 @@
  * used as published and never re-subset: several Open Font License fonts declare Reserved Font
  * Names, and a modified file of one of those would have to be renamed.
  *
- * `ui: true` marks the interface fonts. They draw the studio itself and are not offered as label
- * fonts; the label fonts join this list with `ui: false`.
+ * `ui: true` marks the interface fonts, which draw the studio itself. They are label fonts too, the
+ * picker's "Studio faces" group, so a map can be lettered in the studio's own faces.
+ *
+ * A family's faces are every weight in every style (see fontFaces), except where `italicWeights`
+ * names the only weights its italic is vendored in (Barlow Semi Condensed's interface weights have
+ * no italic). `hasStyle` and `hasWeight` say what a label can be drawn in.
  */
 
 /**
@@ -34,12 +38,14 @@ export const FONT_SUBSETS = Object.freeze({
 
 /**
  * The label fonts' categories, in the picker's order, each with its localisation key (see the
- * scoping in v4-label-fonts.md): book serifs for towns and regions (their italics for water), old
+ * scoping in v4-label-fonts.md): the studio's own faces first (the only ones that match the
+ * interface), then book serifs for towns and regions (their italics for water), old
  * print for an antique atlas, engraved capitals for realms and oceans, calligraphic and blackletter
  * faces for fantasy and gothic realms, handwriting for notes, clean sans for modern maps, and the
  * wide-coverage Noto faces for names in other scripts.
  */
 export const LABEL_FONT_CATEGORIES = Object.freeze([
+    Object.freeze({ id: "studio", label: "FILRODENSWMB.UI.FontCategoryStudio" }),
     Object.freeze({ id: "book", label: "FILRODENSWMB.UI.FontCategoryBook" }),
     Object.freeze({ id: "old-print", label: "FILRODENSWMB.UI.FontCategoryOldPrint" }),
     Object.freeze({ id: "engraved", label: "FILRODENSWMB.UI.FontCategoryEngraved" }),
@@ -64,11 +70,11 @@ export const FONT_FAMILIES = Object.freeze([
     Object.freeze({
         id: "atkinson-hyperlegible",
         name: "Atkinson Hyperlegible",
-        category: "sans",
+        category: "studio",
         ui: true,
         role: "interface",
         weights: Object.freeze([400, 700]),
-        styles: Object.freeze(["normal"]),
+        styles: Object.freeze(["normal", "italic"]),
         subsets: Object.freeze(["latin", "latin-ext"]),
         licence: "OFL-1.1",
         copyright: "Copyright 2020 Braille Institute of America, Inc.",
@@ -77,10 +83,10 @@ export const FONT_FAMILIES = Object.freeze([
     Object.freeze({
         id: "sora",
         name: "Sora",
-        category: "sans",
+        category: "studio",
         ui: true,
         role: "titles",
-        weights: Object.freeze([600, 700]),
+        weights: Object.freeze([400, 600, 700]),
         styles: Object.freeze(["normal"]),
         subsets: Object.freeze(["latin", "latin-ext"]),
         licence: "OFL-1.1",
@@ -90,11 +96,12 @@ export const FONT_FAMILIES = Object.freeze([
     Object.freeze({
         id: "barlow-semi-condensed",
         name: "Barlow Semi Condensed",
-        category: "sans",
+        category: "studio",
         ui: true,
         role: "readouts",
-        weights: Object.freeze([500, 600]),
-        styles: Object.freeze(["normal"]),
+        weights: Object.freeze([400, 500, 600, 700]),
+        styles: Object.freeze(["normal", "italic"]),
+        italicWeights: Object.freeze([400, 700]),
         subsets: Object.freeze(["latin", "latin-ext"]),
         licence: "OFL-1.1",
         copyright: "Copyright 2017 The Barlow Project Authors",
@@ -426,6 +433,7 @@ export function fontFaces(family) {
     const faces = [];
     for (const weight of family.weights) {
         for (const style of family.styles) {
+            if (style === "italic" && family.italicWeights && !family.italicWeights.includes(weight)) continue;
             for (const subset of family.subsets) {
                 faces.push({
                     weight,
@@ -447,7 +455,35 @@ export function fontLicencePath(family) {
 
 /** The vendored label fonts' names, in the picker's order. */
 export function labelFontNames() {
-    return FONT_FAMILIES.filter((family) => !family.ui).map((family) => family.name);
+    return FONT_FAMILIES.map((family) => family.name);
+}
+
+/** The vendored family of a name, or undefined for a host's own font. */
+function familyNamed(name) {
+    return FONT_FAMILIES.find((family) => family.name === name);
+}
+
+/**
+ * Whether a label can be drawn in a family in a style ("italic"): a vendored family only if it has
+ * that style's faces; a host's own font is assumed to (the browser draws it as it can).
+ * @param {string} name
+ * @param {string} style
+ * @returns {boolean}
+ */
+export function hasStyle(name, style) {
+    const family = familyNamed(name);
+    return family ? family.styles.includes(style) : true;
+}
+
+/**
+ * Whether a label can be drawn in a family at a weight (700 for bold), as hasStyle.
+ * @param {string} name
+ * @param {number} weight
+ * @returns {boolean}
+ */
+export function hasWeight(name, weight) {
+    const family = familyNamed(name);
+    return family ? family.weights.includes(weight) : true;
 }
 
 /**
@@ -472,7 +508,7 @@ export function labelFontList(hostFonts = []) {
  * @returns {{label: string, fonts: {name: string, bold: boolean, italic: boolean}[]}[]}
  */
 export function labelFontGroups(names, otherLabel) {
-    const byName = new Map(FONT_FAMILIES.filter((family) => !family.ui).map((family) => [family.name, family]));
+    const byName = new Map(FONT_FAMILIES.map((family) => [family.name, family]));
     const groups = LABEL_FONT_CATEGORIES.map((category) => ({ label: category.label, id: category.id, fonts: [] }));
     const other = { label: otherLabel, id: "other", fonts: [] };
     for (const name of names) {

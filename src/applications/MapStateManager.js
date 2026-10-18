@@ -212,7 +212,8 @@ export class MapStateManager {
             routeSpanWater: false,
             routeTransport: "road",
             activeRouteQuickStyle: "custom",
-            customRouteStyles: [],
+            // A new map starts with the route styles for roads and sea lanes; a saved map keeps its own
+            customRouteStyles: FILRODENSWMB.ROUTES.DEFAULT_STYLES.map(({ nameKey, ...style }) => ({ ...style, name: platform.i18n.localize(nameKey) })),
 
             referenceImage: "",
             referenceAlpha: 0.5,
@@ -273,6 +274,10 @@ export class MapStateManager {
      * The layer sets are included (their levels, regions and styles), but not the owner arrays
      * of the levels: those are far larger and change by patches, which have history entries of
      * their own (see VectorHistory).
+     *
+     * The map's styles (`uiState.custom{Route,Region,Label,Pin}Styles`) are included as well: a
+     * style edited in the inspector changes every object that follows it, so one undo step puts
+     * the style and its objects back together, and undoing a Save as… takes away the style it made.
      */
     static getVectorStateSnapshot(app) {
         return {
@@ -290,6 +295,7 @@ export class MapStateManager {
             activeRouteId: app.activeRouteId,
             activeRegionId: app.activeRegionId,
             customBiomes: platform.utils.deepClone(app.uiState?.customBiomes || []),
+            styles: Object.fromEntries(MapStateManager.STYLE_LISTS.map((key) => [key, platform.utils.deepClone(app.uiState?.[key] ?? null)])),
         };
     }
 
@@ -321,7 +327,11 @@ export class MapStateManager {
         app.activeRouteId = state.activeRouteId || null;
         app.activeRegionId = state.activeRegionId || null;
         app.uiState.customBiomes = state.customBiomes || app.uiState.customBiomes;
+        for (const key of MapStateManager.STYLE_LISTS) if (state.styles && key in state.styles) app.uiState[key] = state.styles[key];
     }
+
+    /** The map's style lists in uiState, which the undo history keeps (see getVectorStateSnapshot). */
+    static STYLE_LISTS = Object.freeze(["customRouteStyles", "customRegionStyles", "customLabelStyles", "customPinStyles"]);
 
     /**
      * Syncs the active UI state from the DOM, then gets derived map parameters.

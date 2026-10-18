@@ -122,7 +122,6 @@ export class RegionEditor {
         const source = type === "Label" ? InspectorFields.label(app, region) : { fillColor: region.fillColor ?? regionFillColor(region), fillStyle: region.fillStyle ?? "solid" };
         const id = await InspectorFields.saveStyleAs(app, type, source);
         if (!id) return;
-        MapStateManager.pushVectorState(app);
         if (type === "Label") region.label = { ...source, ...region.label, quickStyle: id };
         else Object.assign(region, source, { quickStyle: id });
         this.#redraw(app);

@@ -1,4 +1,4 @@
-import { DEFAULT_LABEL_FONT } from "../data/fonts.js";
+import { DEFAULT_LABEL_FONT, hasStyle, hasWeight } from "../data/fonts.js";
 
 /**
  * The face a map label is drawn in: its family (or the default label font when the host lacks it),
@@ -11,7 +11,10 @@ import { DEFAULT_LABEL_FONT } from "../data/fonts.js";
  *
  * **Bold and italic.** A label's `bold` and `italic` are optional. Labels were always drawn bold
  * before they could choose, so a label without `bold` is bold; one without `italic` is upright. A
- * family without a bold or italic face has one made by the browser.
+ * vendored family without an italic (or bold) face is drawn upright (or regular) whatever the label
+ * holds, rather than slanted or thickened by the browser; the label keeps its setting, so it comes
+ * back in a family that has the face (the inspector shows the control disabled meanwhile). A host's
+ * own font is drawn as the label asks.
  *
  * **Loading.** The vendored faces are declared in the stylesheet, which costs nothing until a face
  * is used; the browser fetches a face when text in it is first laid out on the page. The map's
@@ -45,14 +48,14 @@ export class LabelFonts {
         return !this.#available || this.#available.has(name) ? name : DEFAULT_LABEL_FONT;
     }
 
-    /** "bold" unless the label has turned bold off. */
+    /** "bold" unless the label has turned bold off, or its family has no bold face. */
     static weight(label) {
-        return label?.bold === false ? "normal" : "bold";
+        return label?.bold === false || !hasWeight(this.family(label), 700) ? "normal" : "bold";
     }
 
-    /** "italic" when the label has turned italic on. */
+    /** "italic" when the label has turned italic on and its family has an italic face. */
     static style(label) {
-        return label?.italic === true ? "italic" : "normal";
+        return label?.italic === true && hasStyle(this.family(label), "italic") ? "italic" : "normal";
     }
 
     /**

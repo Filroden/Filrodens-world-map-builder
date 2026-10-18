@@ -84,7 +84,8 @@ export class RouteEditor {
             strokes: choices(Object.keys(STROKE_LABELS), STROKE_LABELS, route.style ?? "solid"),
             thicknessStep: ROUTE_THICKNESS_STEP,
             detail: { ...FILRODENSWMB.MESH.ROUTE_DRAW.DETAIL, value: RouteTool.detail(app) },
-            lineStyles: InspectorFields.styleChoices(app.uiState.customRouteStyles, route.quickStyle),
+            // The styles for the route's transport (and those for any); one it follows is kept
+            lineStyles: InspectorFields.styleChoices(app.uiState.customRouteStyles, route.quickStyle, InspectorFields.forTransport(route.transport ?? "road")),
             lineStyleName: InspectorFields.styleName(app.uiState.customRouteStyles, route.quickStyle),
             label,
             labelChoices: InspectorFields.labelChoices(app, label),
@@ -153,10 +154,10 @@ export class RouteEditor {
 
     /** Save as…: a route style from the route's line, or a label style from its label. */
     static async #saveStyle(app, route, type) {
-        const source = type === "Label" ? InspectorFields.label(app, route) : MapDialogManager.routeStyleFields(route);
+        // A route style is for the route's transport, so it is offered for routes of that transport
+        const source = type === "Label" ? InspectorFields.label(app, route) : { ...MapDialogManager.routeStyleFields(route), transport: route.transport ?? "road" };
         const id = await InspectorFields.saveStyleAs(app, type, source);
         if (!id) return;
-        MapStateManager.pushVectorState(app);
         if (type === "Label") route.label = { ...source, ...route.label, quickStyle: id };
         else route.quickStyle = id;
         this.#redraw(app);

@@ -1022,6 +1022,30 @@
     background: var(--swatch);
     flex: none;
 }
+/* A fill of none: the swatch's outline, crossed */
+.fwmb-chip-swatch--none {
+    background: linear-gradient(135deg, transparent 45%, var(--fwmb-text-muted) 45% 55%, transparent 55%);
+    box-shadow: inset 0 0 0 1px var(--fwmb-border-subtle);
+}
+
+/* A style row's preview (Styles and icons): a route style's line as it is drawn (its colour,
+   width and stroke), a label style's "Aa" in its face and colour */
+.fwmb-style-preview {
+    flex: none;
+    inline-size: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.fwmb-style-preview--line::before {
+    content: "";
+    inline-size: 100%;
+    border-block-start: max(1px, var(--line-width)) var(--line-style) var(--line-color);
+}
+.fwmb-style-preview--text {
+    font-size: var(--fwmb-size-14);
+    line-height: 1;
+}
 
 /* ---------- Menus (popover) ---------- */
 .fwmb-dropdown-menu {
@@ -4912,6 +4936,11 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     align-items: center;
     gap: var(--fwmb-size-4);
     cursor: pointer;
+}
+/* A checkbox that cannot be changed (Italic in a family with no italic face): its text greys with it */
+.fwmb .fwmb-checkbox-label:has(> .fwmb-checkbox:disabled) {
+    color: var(--fwmb-text-muted);
+    cursor: default;
 }
 
 .fwmb .fwmb-text-truncate {

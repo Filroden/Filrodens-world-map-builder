@@ -478,8 +478,15 @@ export class Overlay {
         this.#scrim?.remove();
         openByHost.get(this.#host)?.delete(this);
 
-        if (this.#previousFocus?.isConnected && typeof this.#previousFocus.focus === "function") this.#previousFocus.focus();
-        else if (hadFocus) this.#focusHost();
+        // Focus goes back where it was only when it was in the dialogue (or has gone nowhere): a
+        // docked dialogue opened without focus (the inspector, from a list's row) may close as the
+        // reader moves on to another row, and taking focus back would undo that move
+        const doc = this.#dialog.ownerDocument;
+        const lost = !doc.activeElement || doc.activeElement === doc.body;
+        if (hadFocus || lost) {
+            if (this.#previousFocus?.isConnected && typeof this.#previousFocus.focus === "function") this.#previousFocus.focus();
+            else if (hadFocus) this.#focusHost();
+        }
         this.#resolve(value);
     }
 }

@@ -1204,8 +1204,25 @@ export const FILRODENSWMB = {
             Object.freeze({ id: "label-style-place", nameKey: "FILRODENSWMB.LABELS.StylePlace", fontFamily: "EB Garamond", fontSize: 1, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: true, italic: false }),
             Object.freeze({ id: "label-style-water", nameKey: "FILRODENSWMB.LABELS.StyleWater", fontFamily: "EB Garamond", fontSize: 1.2, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
             Object.freeze({ id: "label-style-note", nameKey: "FILRODENSWMB.LABELS.StyleNote", fontFamily: "Kalam", fontSize: 0.8, fillColor: "#DEDCD3", maxChars: 24, justify: "left", bold: false, italic: false }),
+            // For the routes' labels (see ROUTES.DEFAULT_STYLES)
+            Object.freeze({ id: "label-style-road", nameKey: "FILRODENSWMB.LABELS.StyleRoad", fontFamily: "Barlow Semi Condensed", fontSize: 0.8, fillColor: "#5a3a1e", maxChars: 0, justify: "center", bold: false, italic: false }),
+            Object.freeze({ id: "label-style-sea-lane", nameKey: "FILRODENSWMB.LABELS.StyleSeaLane", fontFamily: "Noto Serif", fontSize: 0.8, fillColor: "#2e5f8a", maxChars: 0, justify: "center", bold: false, italic: true }),
         ]),
         PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
+    },
+    ROUTES: {
+        // The route styles a new map starts with (a saved map keeps its own), each for one
+        // transport, so the bar and the inspector offer a road's styles to roads and a sea lane's
+        // to sea routes. The generator (phase 4) uses the same names and looks. Their names come
+        // from the localisation keys, so a map keeps the names it was made with.
+        DEFAULT_STYLES: Object.freeze([
+            Object.freeze({ id: "route-style-trunk-road", nameKey: "FILRODENSWMB.UI.RouteStyleTrunkRoad", transport: "road", color: "#6b3a1f", thickness: 3, style: "solid", outline: true, smoothing: false }),
+            Object.freeze({ id: "route-style-main-road", nameKey: "FILRODENSWMB.UI.RouteStyleMainRoad", transport: "road", color: "#8a5a2b", thickness: 2, style: "solid", outline: true, smoothing: false }),
+            Object.freeze({ id: "route-style-minor-road", nameKey: "FILRODENSWMB.UI.RouteStyleMinorRoad", transport: "road", color: "#8a6a45", thickness: 1.25, style: "solid", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-track", nameKey: "FILRODENSWMB.UI.RouteStyleTrack", transport: "road", color: "#7a6a55", thickness: 1, style: "dotted", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleSeaLane", transport: "sea", color: "#2e5f8a", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-minor-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleMinorSeaLane", transport: "sea", color: "#5f89ad", thickness: 1, style: "dashed", outline: false, smoothing: false }),
+        ]),
     },
     PINS: {
         // The size new pins (and their labels) start with: small, so a map of many places stays readable
