@@ -1,0 +1,96 @@
+{{!--
+    Mass edit (see MassEdit and FieldSpecs): the inspector's fields for several items at once, the
+    item's fields then its label's. Each row shows the value the items share, or Mixed; a row
+    touched is marked changed and shows ↺, which puts it back. Apply writes only the changed rows.
+
+    Context: count; sections: [{ legend, rows }], each row a FieldSpecs field with its name, id,
+    value, mixed, initial (what ↺ puts back) and its choices; palette.
+--}}
+<div class="fwmb-dialog-content fwmb-mass-edit-body">
+    <datalist id="fwmb-mass-edit-colors">
+        {{#each palette}}
+        <option value="{{this}}"></option>
+        {{/each}}
+    </datalist>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.MassEditHint"}}</p>
+    {{#each sections}}
+    <fieldset class="fwmb-fieldset">
+        <legend>{{localize this.legend}}</legend>
+        {{#each this.rows}}{{> massRow}}{{/each}}
+    </fieldset>
+    {{/each}}
+</div>
+
+{{#*inline "massRow"}}
+<div class="fwmb-form-group fwmb-mass-row" data-mass-row="{{name}}" data-mixed="{{#if mixed}}true{{else}}false{{/if}}" data-initial="{{initial}}" {{#if styleRow}}data-style-row{{/if}} {{#if styled}}data-styled{{/if}}>
+    {{#if isIcon}}<span class="fwmb-label">{{localize label}}</span>{{else}}<label class="fwmb-label" for="{{id}}">{{localize label}}</label>{{/if}}
+    <div class="fwmb-form-fields">
+        {{#if isStyle}}{{> massSelect}}{{/if}}
+        {{#if isSelect}}{{> massSelect}}{{/if}}
+        {{#if isVisibility}}{{> massSelect}}{{/if}}
+        {{#if isBool}}{{> massSelect}}{{/if}}
+        {{#if isFont}}
+        <select id="{{id}}" name="{{name}}" class="fwmb-font-picker">
+            <option value="" {{#if mixed}}selected{{/if}}>{{localize "FILRODENSWMB.UI.LeaveAsIs"}}</option>
+            {{#each groups}}
+            <optgroup label="{{localize this.label}}">
+                {{#each this.fonts}}
+                <option value="{{this.name}}" style="font-family: &quot;{{this.name}}&quot;" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
+                {{/each}}
+            </optgroup>
+            {{/each}}
+        </select>
+        {{/if}}
+        {{#if isColor}}
+        <span class="fwmb-mass-swatch"><input type="color" id="{{id}}" class="fwmb-swatch" name="{{name}}" value="{{value}}" list="fwmb-mass-edit-colors" /></span>
+        {{/if}}
+        {{#if isFill}}
+        <span class="fwmb-mass-swatch"><input type="color" id="{{id}}" class="fwmb-swatch" name="{{name}}" value="{{value}}" list="fwmb-mass-edit-colors" /></span>
+        <label class="fwmb-checkbox-label">
+            <input type="checkbox" class="fwmb-checkbox" name="{{name}}.none" {{#if none}}checked{{/if}} />
+            {{localize "FILRODENSWMB.UI.InspectorNoFill"}}
+        </label>
+        {{/if}}
+        {{#if isRange}}
+        <div class="fwmb-slider-group">
+            <input type="range" id="{{id}}" name="{{name}}" value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}" />
+            <output>{{#if mixed}}{{localize "FILRODENSWMB.UI.Mixed"}}{{else}}{{value}}{{/if}}</output>
+        </div>
+        {{/if}}
+        {{#if isNumber}}
+        <input type="number" id="{{id}}" class="fwmb-input-short" name="{{name}}" value="{{value}}" min="{{min}}" step="{{step}}" placeholder="{{localize 'FILRODENSWMB.UI.Mixed'}}" {{#if unit}}aria-describedby="{{id}}-unit"{{/if}} />
+        {{#if unit}}<span class="fwmb-unit" id="{{id}}-unit"><span class="fwmb-unit-long">{{localize unit}}</span><span class="fwmb-unit-short">{{localize unitShort}}</span></span>{{/if}}
+        {{#if hint}}<i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize hint}}" aria-label="{{localize hint}}"></i>{{/if}}
+        {{/if}}
+        {{#if isIcon}}
+        <div class="fwmb-custom-select" id="fwmb-mass-edit-pin-select">
+            <input type="hidden" name="{{name}}" value="{{value}}" id="fwmb-mass-edit-pin-icon-input" />
+            <button type="button" class="fwmb-select-trigger fwmb-btn{{#if mixed}} fwmb-is-mixed{{/if}}" aria-label="{{localize 'FILRODENSWMB.UI.InspectorChooseIcon'}}">
+                <i class="fwmb-icon {{#if icon}}{{#unless icon.isCustom}}fwmb-icon--{{icon.key}}{{/unless}}{{/if}}" {{#if icon.isCustom}}style="--fwmb-mask: url('{{icon.path}}');"{{/if}} id="fwmb-mass-edit-pin-trigger-icon" aria-hidden="true"></i>
+                <span class="fwmb-mass-mixed">{{localize "FILRODENSWMB.UI.Mixed"}}</span>
+                <i class="fwmb-icon fwmb-icon--arrow-drop-down" aria-hidden="true"></i>
+            </button>
+            <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
+                {{#each icons}}
+                <button type="button" class="fwmb-btn" aria-pressed="{{#if this.selected}}true{{else}}false{{/if}}" data-icon="{{this.key}}" data-path="{{this.path}}" data-custom="{{this.isCustom}}" data-tooltip="{{this.localized}}" aria-label="{{this.localized}}">
+                    <i class="fwmb-icon {{#unless this.isCustom}}fwmb-icon--{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} aria-hidden="true"></i>
+                </button>
+                {{/each}}
+            </div>
+        </div>
+        {{/if}}
+    </div>
+    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-mass-reset" data-mass-reset aria-label="{{localize 'FILRODENSWMB.UI.MassEditReset'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MassEditReset'}}" hidden>
+        <i class="fwmb-icon fwmb-icon--undo" aria-hidden="true"></i>
+    </button>
+</div>
+{{/inline}}
+
+{{#*inline "massSelect"}}
+<select id="{{id}}" name="{{name}}">
+    <option value="" {{#if mixed}}selected{{/if}}>{{localize "FILRODENSWMB.UI.LeaveAsIs"}}</option>
+    {{#each options}}
+    <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{#if this.name}}{{this.name}}{{else}}{{localize this.label}}{{/if}}</option>
+    {{/each}}
+</select>
+{{/inline}}

@@ -1962,12 +1962,56 @@
     background: var(--fwmb-bg-highlight);
 }
 
-/* The checkbox + field-name label pairing used for every opt-in row in a Mass Edit dialogue. */
-.fwmb-mass-edit-label {
-    display: flex;
+/* Mass edit (see MassEdit): a row the reader has changed is marked in the accent, with its ↺ shown;
+   a row whose items differ shows Mixed (a slider's value display, a colour's split swatch, the
+   icon picker's word) until it is changed */
+.fwmb .fwmb-overlay-body .fwmb-mass-row {
+    display: grid;
+    grid-template-columns: 7rem minmax(0, 1fr) var(--fwmb-control-height);
     align-items: center;
-    gap: var(--fwmb-size-4);
-    cursor: pointer;
+    column-gap: var(--fwmb-size-8);
+}
+.fwmb .fwmb-overlay-body .fwmb-mass-row > .fwmb-label {
+    font-weight: normal;
+    color: var(--fwmb-text-primary);
+    line-height: var(--fwmb-control-height);
+}
+.fwmb .fwmb-mass-row > .fwmb-form-fields > :is(select, .fwmb-slider-group) {
+    flex: 1;
+    min-width: 0;
+}
+.fwmb .fwmb-overlay-body .fwmb-mass-row.fwmb-is-changed > .fwmb-label,
+.fwmb .fwmb-mass-row.fwmb-is-changed .fwmb-slider-group output {
+    color: var(--fwmb-accent-main);
+}
+.fwmb .fwmb-mass-reset[hidden] {
+    display: none;
+}
+.fwmb .fwmb-mass-reset {
+    grid-column: 3;
+}
+.fwmb-mass-swatch {
+    position: relative;
+    display: inline-flex;
+}
+.fwmb-mass-row.fwmb-is-mixed .fwmb-mass-swatch::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(135deg, var(--fwmb-bg-raised) 50%, var(--fwmb-text-muted) 50%);
+    box-shadow: inset 0 0 0 1px var(--fwmb-border-subtle);
+}
+.fwmb-mass-mixed {
+    display: none;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-select-trigger.fwmb-is-mixed .fwmb-mass-mixed {
+    display: inline;
+}
+.fwmb-select-trigger.fwmb-is-mixed > .fwmb-icon:first-child {
+    display: none;
 }
 
 .fwmb .fwmb-form-group {
@@ -3752,14 +3796,6 @@ input.fwmb-swatch {
 ========================================== */
 .fwmb-custom-select {
     position: relative;
-}
-
-/* Mass Edit's opt-in field gating (see bindMassEditToggles) can't use the native `disabled`
-   attribute on this widget since it's a div-based picker, not a form control - this class is
-   toggled instead to give it the same "inactive until ticked" look and behaviour. */
-.fwmb-custom-select.fwmb-mass-edit-locked {
-    pointer-events: none;
-    opacity: 0.5;
 }
 
 .fwmb-select-trigger {

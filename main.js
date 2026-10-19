@@ -41,6 +41,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/dialogs/add-decoration.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-pin-icon.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/merge-region.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/mass-edit.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs",
 
