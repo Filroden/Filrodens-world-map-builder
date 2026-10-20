@@ -8,7 +8,7 @@
         {{#each manualRivers}}
             <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.river)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="river" data-action="editRiver">
                 <div class="fwmb-route-swatch fwmb-route-swatch--river"></div>
-                <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
                 <span class="fwmb-actions">
                     <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                         <i class="fwmb-icon fwmb-icon--center-focus"></i>
@@ -30,7 +30,7 @@
             <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.fault)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="fault" data-action="editFault">
                 <div class="fwmb-route-swatch fwmb-route-swatch--solid" style="background-color: {{this.color}};"></div>
 
-                <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
                 <span class="fwmb-actions">
                     <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                         <i class="fwmb-icon fwmb-icon--center-focus"></i>
@@ -49,6 +49,6 @@
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="hydrology" title="FILRODENSWMB.UI.SettingsHydrology" badge="FILRODENSWMB.UI.BadgeRebuildsRivers" closed=true}}
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="springAltOffset" label="FILRODENSWMB.UI.SpringAltMin" value=(lookup uiState 'springAltOffset') min=0 max=0.8 step=0.05}}
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="springMoistMin" label="FILRODENSWMB.UI.SpringMoistMin" value=(lookup uiState 'springMoistMin') min=0 max=1 step=0.05}}
-    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="riverWidthScale" label="FILRODENSWMB.UI.RiverWidth" hint="FILRODENSWMB.UI.RiverWidthHint" value=(lookup uiState 'riverWidthScale') min=0.25 max=3 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="riverWidthScale" label="FILRODENSWMB.UI.RiverWidthScale" hint="FILRODENSWMB.UI.RiverWidthHint" value=(lookup uiState 'riverWidthScale') min=0.25 max=3 step=0.05}}
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="riverMeander" label="FILRODENSWMB.UI.RiverMeander" hint="FILRODENSWMB.UI.RiverMeanderHint" value=(lookup uiState 'riverMeander') min=0 max=2 step=0.05}}
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

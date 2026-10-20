@@ -58,7 +58,7 @@
         <input type="checkbox" class="fwmb-checkbox" name="routeSpanWater" {{#if uiState.routeSpanWater}}checked{{/if}} />
         {{localize "FILRODENSWMB.UI.RouteSpanWater"}}
     </label>
-    {{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="routeDetail" label="FILRODENSWMB.UI.RouteDetail" hint="FILRODENSWMB.UI.RouteDetailHint" icon="gesture" value=routeToolbar.detail.value min=routeToolbar.detail.MIN max=routeToolbar.detail.MAX step=1}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="routeDetail" label="FILRODENSWMB.UI.RouteDetail" hint="FILRODENSWMB.UI.RouteDetailHint" icon="gesture" value=routeToolbar.detail.value min=routeToolbar.detail.MIN max=routeToolbar.detail.MAX step=1 unit="FILRODENSWMB.UI.UnitCells"}}
     <span class="fwmb-sep"></span>
     <label class="fwmb-bar-field" data-tooltip="{{localize 'FILRODENSWMB.UI.NextRouteStyleHint'}}">
         <span class="fwmb-label">{{localize "FILRODENSWMB.UI.InspectorStyle"}}</span>

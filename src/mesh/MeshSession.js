@@ -296,6 +296,20 @@ export class MeshSession {
         return line;
     }
 
+    /**
+     * The point of a route's line where its label and its scene note go: the vertex halfway along
+     * its points (not its length, so it is always on the drawn line), or null for a route too
+     * short to draw.
+     * @param {object} route
+     * @returns {{x: number, y: number}|null}
+     */
+    routeMidpoint(route) {
+        const line = this.routeLine(route);
+        if (line.length < 4) return null;
+        const mid = Math.floor(line.length / 4) * 2;
+        return { x: line[mid], y: line[mid + 1] };
+    }
+
     /** Drops a route's cached line (a route deleted, or changed in place). */
     forgetRoute(routeId) {
         this.#routeLines.delete(routeId);

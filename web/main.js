@@ -65,6 +65,12 @@ async function openRecords({ IndexedDbRecords, MemoryRecords }) {
     }
 }
 
+/**
+ * How a failure to start is put into words. Until the strings are loaded it can only be English
+ * (the failure may be loading them); once the platform is installed, the reader's language.
+ */
+let describeFailure = (detail) => `The map builder could not start: ${detail}`;
+
 async function start() {
     followSystemTheme();
     const frame = document.getElementById("fwmb-app");
@@ -94,6 +100,7 @@ async function start() {
             baseUrl: document.baseURI,
         }),
     );
+    describeFailure = (detail) => platform.i18n.format("FILRODENSWMB.Web.StartFailed", { detail });
     FilePickerElement.define(customElements, { browseLabel: platform.i18n.localize("FILRODENSWMB.UI.BrowseFiles") });
 
     const [{ registerPinIconSettings }, { MapStudio }, { attachTheme, registerThemeSettings }] = await Promise.all([
@@ -127,6 +134,6 @@ start().catch((error) => {
     console.error("FWMB | The map builder could not start.", error);
     const status = document.createElement("p");
     status.className = "fwmb-web-status";
-    status.textContent = `The map builder could not start: ${error?.message ?? error}`;
+    status.textContent = describeFailure(error?.message ?? error);
     document.getElementById("fwmb-app")?.replaceChildren(status);
 });

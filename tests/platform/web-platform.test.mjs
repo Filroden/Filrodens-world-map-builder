@@ -167,7 +167,7 @@ test("rename, duplicate, delete and field updates work on saved maps", async () 
     const store = createWebStore(new MemoryRecords(), { newId: () => `id${++next}` });
     await store.saveMapData("Island", { seed: 1, pins: [] });
     assert.deepEqual(await store.renameSavedMap("id1", "Isle"), { id: "id1", name: "Isle" });
-    assert.deepEqual(await store.duplicateSavedMap("id1"), { id: "id2", name: "Isle (Copy)" });
+    assert.deepEqual(await store.duplicateSavedMap("id1", "Isle (copy)"), { id: "id2", name: "Isle (copy)" }, "the copy takes the name it is given");
     assert.equal(await store.updateMapDataFields("id1", { dismissed: true }), true);
     assert.deepEqual(await store.loadMapData("id1"), { seed: 1, pins: [], dismissed: true });
     assert.deepEqual(await store.loadMapData("id2"), { seed: 1, pins: [] }, "the copy is its own map");

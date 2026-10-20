@@ -20,8 +20,8 @@
         <label>{{localize "FILRODENSWMB.UI.ScaleInterval"}}</label>
         <div class="fwmb-form-fields">
             <div class="fwmb-setting-row">
-                <input type="number" name="cartographyScaleInterval" value="{{uiState.cartographyScaleInterval}}" min="10" step="10">
-                <span class="fwmb-hint">px</span>
+                <input type="number" name="cartographyScaleInterval" value="{{uiState.cartographyScaleInterval}}" min="10" step="10" aria-describedby="fwmb-scale-interval-unit">
+                <span class="fwmb-unit" id="fwmb-scale-interval-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
             </div>
         </div>
     </div>
@@ -85,7 +85,7 @@
         </div>
     </div>
 
-    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="gridSize" label="FILRODENSWMB.UI.GridSize" value=(lookup uiState 'gridSize') min=20 max=300 step=5}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="gridSize" label="FILRODENSWMB.UI.GridSize" value=(lookup uiState 'gridSize') min=20 max=300 step=5 unit="FILRODENSWMB.UI.UnitPixels" unitShort="FILRODENSWMB.UI.UnitPixelsShort"}}
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="decorations" title="FILRODENSWMB.UI.CartographyDecorations" count=mapDecorations.length}}
@@ -95,7 +95,7 @@
             <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                 <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
             </button>
-            <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
+            <span class="fwmb-name fwmb-flex-1 fwmb-truncate" title="{{this.name}}">{{this.name}}</span>
             <span class="fwmb-actions">
                 <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon fwmb-icon--center-focus"></i>

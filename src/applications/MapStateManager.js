@@ -239,7 +239,7 @@ export class MapStateManager {
             labelBold: true,
             labelItalic: false,
             activeLabelQuickStyle: "custom",
-            nextLabelText: platform.i18n.localize(FILRODENSWMB.LABELS?.DEFAULT_TEXT) || "New Label",
+            nextLabelText: platform.i18n.localize(FILRODENSWMB.LABELS.DEFAULT_TEXT),
             // A new map starts with a few label styles in the vendored faces, so it can look like an
             // atlas without choosing any; a saved map keeps its own (see MapStudio's load)
             customLabelStyles: FILRODENSWMB.LABELS.DEFAULT_STYLES.map(({ nameKey, ...style }) => ({ ...style, name: platform.i18n.localize(nameKey) })),

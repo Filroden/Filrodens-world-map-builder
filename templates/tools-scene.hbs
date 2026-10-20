@@ -41,6 +41,7 @@
             <input type="number" name="mapWidth" value="{{uiState.mapWidth}}" min="500" max="4000" step="100" aria-label="{{localize 'FILRODENSWMB.UI.MapWidth'}}" />
             <span class="fwmb-times">×</span>
             <input type="number" name="mapHeight" value="{{uiState.mapHeight}}" min="500" max="4000" step="100" aria-label="{{localize 'FILRODENSWMB.UI.MapHeight'}}" />
+            <span class="fwmb-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
         </div>
     </div>
 
@@ -84,7 +85,7 @@
                 <div role="option" tabindex="-1" data-list-item class="fwmb-list-item{{#if this.isActive}} fwmb-is-working{{/if}}" aria-selected="{{#if (eq this.id @root.inspected.landMask)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="landMask" data-action="editLandMask">
                     <div class="fwmb-route-swatch fwmb-route-swatch--solid" style="background-color: {{this.swatchColor}};" data-tooltip="{{#if (eq this.operation 'subtract')}}{{localize 'FILRODENSWMB.UI.LandMaskTypeOcean'}}{{else}}{{localize 'FILRODENSWMB.UI.LandMaskTypeLand'}}{{/if}}"></div>
 
-                    <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                    <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
                     <span class="fwmb-actions">
                         <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                             <i class="fwmb-icon fwmb-icon--center-focus"></i>
@@ -114,6 +115,7 @@
                 <input type="number" name="regionalTargetWidth" value="{{lookup uiState 'regionalTargetWidth'}}" step="100" min="500" aria-label="{{localize 'FILRODENSWMB.UI.TargetWidth'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.TargetWidth'}}" />
                 <span class="fwmb-times">×</span>
                 <input type="number" name="regionalTargetHeight" value="{{lookup uiState 'regionalTargetHeight'}}" disabled aria-label="{{localize 'FILRODENSWMB.UI.CalculatedHeight'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.CalculatedHeight'}}" />
+                <span class="fwmb-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
             </div>
         </div>
         <div class="fwmb-form-group">

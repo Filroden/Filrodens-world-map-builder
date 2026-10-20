@@ -364,7 +364,7 @@ export class MapStudio {
      * that's plain, self-contained JSON.
      */
     static STYLE_LIBRARY_CATEGORIES = [
-        { key: "customBiomes", labelKey: "FILRODENSWMB.UI.SettingsBiomeColors" },
+        { key: "customBiomes", labelKey: "FILRODENSWMB.UI.SettingsCustomBiomes" },
         { key: "customPinStyles", labelKey: "FILRODENSWMB.UI.SettingsPinQuickStyles" },
         { key: "customRouteStyles", labelKey: "FILRODENSWMB.UI.SettingsRouteQuickStyles" },
         { key: "customRegionStyles", labelKey: "FILRODENSWMB.UI.SettingsRegionQuickStyles" },
@@ -1221,7 +1221,7 @@ export class MapStudio {
             if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
 
             if (this.activeTool === "manage") {
-                context.savedMaps = await platform.store.getSavedMaps();
+                context.savedMaps = MapStudio.#namedMaps(await platform.store.getSavedMaps());
             }
         }
 
@@ -1923,6 +1923,19 @@ export class MapStudio {
         this.uiState.world = { ...TerrainVersion.resolveWorld(this.uiState), areaFactor };
         this.uiState.generatorStale = true;
         if (this.meshSession) this.meshSession.mesh.kmPerPx = effectiveKmPerPx({ mapHeight: this.mapHeight, params: { latTop: this.uiState.latTop, latBottom: this.uiState.latBottom }, world: this.uiState.world });
+    }
+
+    /**
+     * Carries the panel's latitude and area factor into a new map's state, which was rebuilt from
+     * the defaults. A top map's world is taken afresh (a regional map's zoom and origin are not
+     * the new map's), with the area factor that was set.
+     */
+    #keepNewMapPlace({ latTop, latBottom, areaFactor }) {
+        if (Number.isFinite(latTop) && Number.isFinite(latBottom)) {
+            this.uiState.latTop = latTop;
+            this.uiState.latBottom = latBottom;
+        }
+        if (areaFactor !== undefined) this.uiState.world = { ...TerrainVersion.resolveWorld({ ...this.uiState, world: null, mapWidth: this.mapWidth, mapHeight: this.mapHeight }), areaFactor: clampAreaFactor(areaFactor) };
     }
 
     #updateBiomeAlphas() {
@@ -3389,7 +3402,7 @@ export class MapStudio {
      */
     async #refreshRivers() {
         await this.#runTimed("Features refresh (rivers only)", async () => {
-            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures"));
 
             try {
                 const waterBounds = ProceduralOrchestrator.processFeaturePhase(this, true);
@@ -3458,7 +3471,7 @@ export class MapStudio {
         // The run starts before the overlay's paint pause so the summary's total covers everything
         // the user waits for, not just the phases that log their own times
         await this.#runTimed("Full render", async () => {
-            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingTopography") || "Generating Topography...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingTopography"));
 
             try {
                 // Hand off the mathematical heavy lifting to the Orchestrator
@@ -3485,7 +3498,7 @@ export class MapStudio {
         }
 
         await this.#runTimed(`Climate refresh (${activeBounds ? "bounded" : "whole map"})`, async () => {
-            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingClimate") || "Generating Climate...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingClimate"));
 
             try {
                 // The climate is recomputed over a wider area than the one that changed, and the
@@ -3504,7 +3517,7 @@ export class MapStudio {
         const bounds = this.#resolveRefreshBounds(requestedBounds);
 
         await this.#runTimed(`Features refresh (${bounds ? "bounded" : "whole map"})`, async () => {
-            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures") || "Generating Features...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingFeatures"));
 
             try {
                 // Rivers are traced over the whole map, so the water can change well outside the
@@ -4198,11 +4211,10 @@ export class MapStudio {
         // Map the raster layer to its localisation key
         const isBiome = targetStroke.layer === "biome";
         const locKey = isBiome ? "FILRODENSWMB.UI.ActionBiomeBrush" : "FILRODENSWMB.UI.ActionTerrainBrush";
-        const fallback = isBiome ? "Biome Brush" : "Terrain Brush";
 
         return {
             bounds: this.#calculatePointBounds(targetStroke.points, targetStroke.size || DEFAULT_STROKE_PREVIEW_SIZE),
-            label: platform.i18n.localize(locKey) || fallback,
+            label: platform.i18n.localize(locKey),
         };
     }
 
@@ -4320,27 +4332,25 @@ export class MapStudio {
      * Resolves the localised UI label for a modified vector entity.
      */
     #getActionLabel(key, entity) {
-        if (!key) return platform.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
+        if (!key) return platform.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit");
 
         if (key === "pins") {
             const isSpring = entity?.type === "spring" || entity?.type === "block_spring";
             const pinKey = isSpring ? "FILRODENSWMB.UI.ActionRiverSpring" : "FILRODENSWMB.UI.ActionInfrastructurePin";
-            return platform.i18n.localize(pinKey) || (isSpring ? "River Spring" : "Infrastructure Pin");
+            return platform.i18n.localize(pinKey);
         }
 
-        const labelConfig = {
-            tectonicFaults: ["FILRODENSWMB.UI.ActionTectonicFault", "Tectonic Fault"],
-            manualRivers: ["FILRODENSWMB.UI.ActionCustomRiver", "Custom River"],
-            routes: ["FILRODENSWMB.UI.ActionRoute", "Route"],
-            layerSets: ["FILRODENSWMB.UI.ActionRegion", "Region"],
-            landMasks: ["FILRODENSWMB.UI.ActionLandMask", "Land Mask"],
-            mapLabels: ["FILRODENSWMB.UI.ActionLabel", "Label"],
-            mapDecorations: ["FILRODENSWMB.UI.ActionDecoration", "Decoration"],
+        const labelKeys = {
+            tectonicFaults: "FILRODENSWMB.UI.ActionTectonicFault",
+            manualRivers: "FILRODENSWMB.UI.ActionCustomRiver",
+            routes: "FILRODENSWMB.UI.ActionRoute",
+            layerSets: "FILRODENSWMB.UI.ActionRegion",
+            landMasks: "FILRODENSWMB.UI.ActionLandMask",
+            mapLabels: "FILRODENSWMB.UI.ActionLabel",
+            mapDecorations: "FILRODENSWMB.UI.ActionDecoration",
         };
 
-        const match = labelConfig[key];
-
-        return match ? platform.i18n.localize(match[0]) || match[1] : platform.i18n.localize("FILRODENSWMB.UI.ActionVectorEdit") || "Vector Edit";
+        return platform.i18n.localize(labelKeys[key] ?? "FILRODENSWMB.UI.ActionVectorEdit");
     }
 
     /**
@@ -4511,7 +4521,7 @@ export class MapStudio {
         const targetScale = Math.max(FILRODENSWMB.LIMITS.NOISE_SCALE_MIN, Math.min(frame.scale + dir * FILRODENSWMB.LIMITS.NOISE_SCALE_STEP, maxScale));
 
         if (frame.scale === targetScale) {
-            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnScaleLimit") || "Noise scale limit reached.");
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnScaleLimit"));
             return;
         }
         this.#moveNoiseFrame({ ...frame, scale: targetScale });
@@ -4602,6 +4612,10 @@ export class MapStudio {
             return false;
         }
 
+        // The latitude and area factor in the panel are the new map's too: they apply to the open
+        // map as they are typed, so they are read before the state is rebuilt from the defaults
+        const kept = { latTop: this.uiState.latTop, latBottom: this.uiState.latBottom, areaFactor: this.uiState.world?.areaFactor };
+
         // Calculate the centre-anchor offset
         const dx = (newWidth - this.mapWidth) / 2;
         const dy = (newHeight - this.mapHeight) / 2;
@@ -4623,6 +4637,7 @@ export class MapStudio {
 
         // Inject the engine choice into the wiped state
         this.uiState.generationEngine = newEngine;
+        this.#keepNewMapPlace(kept);
         // Textured ground is chosen when a Flat map is created (the checkbox only shows while the
         // open map is Flat, so a map switched to Flat from another engine starts smooth)
         this.uiState.flatTexture = newEngine === "flat" && formData.flatTexture === true;
@@ -4841,13 +4856,13 @@ export class MapStudio {
      */
     async _onExportPng(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
-            platform.notify.warn("No map is currently generated to export.");
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.ExportNoMap"));
             return;
         }
 
-        const mapName = this.currentSaveName || "Unsaved Map";
+        const mapName = this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.UnsavedMapName");
 
-        platform.notify.info(platform.i18n.format("Exporting {name} to PNG...", { name: mapName }));
+        platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ExportPngStarted", { name: mapName }));
         await this.#labelFacesReady();
         this.canvasEngine.exportToPNG(mapName);
     }
@@ -4857,18 +4872,18 @@ export class MapStudio {
      */
     async _onExportScene(_event, _target) {
         if (!this.canvasEngine || !this.currentElevationData) {
-            platform.notify.warn("No map is currently generated to export.");
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.ExportNoMap"));
             return;
         }
 
-        const defaultName = this.currentSaveName || "New Map Scene";
+        const defaultName = this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.DefaultSceneName");
         const defaultFolder = "fwmb-exports";
 
         const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder });
 
         const config = await platform.dialogs.prompt({
             classes: ["fwmb"],
-            title: platform.i18n.localize("FILRODENSWMB.UI.ExportScene") || "Export to Scene",
+            title: platform.i18n.localize("FILRODENSWMB.UI.ExportScene"),
             content: content,
             onSubmit: (form) => ({
                 sceneName: form.elements["sceneName"].value.trim() || defaultName,
@@ -4889,7 +4904,7 @@ export class MapStudio {
      * The background orchestrator for slicing the canvas and creating the Foundry Documents.
      */
     async #executeSceneExportPipeline(config) {
-        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingScene") || "Exporting Scene...");
+        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingScene"));
         await this.#labelFacesReady();
 
         try {
@@ -4906,7 +4921,7 @@ export class MapStudio {
             const textEl = this.root.querySelector(".fwmb-processing-text");
 
             // --- 1. PLAYER PASS ---
-            if (textEl) textEl.textContent = "Extracting Player View...";
+            if (textEl) textEl.textContent = platform.i18n.localize("FILRODENSWMB.UI.ExportStepPlayer");
 
             this.canvasEngine.setRenderPass("player");
             this._repaintVectors(); // Rebuilds the vectors based on player visibility
@@ -4919,7 +4934,7 @@ export class MapStudio {
             // --- 2. GM OVERLAY PASS ---
             let gmBlob = null;
             if (config.createGmOverlay) {
-                if (textEl) textEl.textContent = "Extracting GM Overlay...";
+                if (textEl) textEl.textContent = platform.i18n.localize("FILRODENSWMB.UI.ExportStepGm");
 
                 this.canvasEngine.setRenderPass("gm");
                 this._repaintVectors(); // Rebuilds the vectors based on GM visibility
@@ -4930,7 +4945,7 @@ export class MapStudio {
                 gmBlob = await this.canvasEngine.extractCanvasBlob("gm");
             }
 
-            if (textEl) textEl.textContent = "Building Foundry Scene...";
+            if (textEl) textEl.textContent = platform.i18n.localize("FILRODENSWMB.UI.ExportStepScene");
 
             // Restore the normal view and the exact camera transform the user was looking at
             this.canvasEngine.stage.position.set(origX, origY);
@@ -4942,7 +4957,7 @@ export class MapStudio {
             await platform.scene.run(this, config, playerBlob, gmBlob);
         } catch (err) {
             console.error("FWMB | Pipeline Error:", err);
-            platform.notify.error("Export pipeline failed. See console for details.");
+            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ExportSceneFailed"));
         } finally {
             this.#endProcessing();
         }
@@ -4963,7 +4978,7 @@ export class MapStudio {
         // 1. Validate Crop Box
         const cropBox = this.canvasEngine.getCropData();
         if (!cropBox || cropBox.width <= 0 || cropBox.height <= 0) {
-            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnInvalidCrop") || "Please draw a valid crop area first.");
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.WarnInvalidCrop"));
             return;
         }
 
@@ -4975,12 +4990,12 @@ export class MapStudio {
         }
 
         // 2. Prompt for save name
-        const mapName = await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.SaveRegionalMap"), platform.i18n.localize("FILRODENSWMB.UI.Name"), `${this.currentSaveName || "Map"} (Region)`);
+        const mapName = await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.SaveRegionalMap"), platform.i18n.localize("FILRODENSWMB.UI.Name"), platform.i18n.format("FILRODENSWMB.UI.RegionalMapName", { name: this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.MapNameFallback") }));
 
         if (!mapName) return;
 
         // 3. Lock UI
-        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingRegion") || "Extracting Region...");
+        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.GeneratingRegion"));
 
         try {
             // 4. Delegate heavy mathematical payload extraction
@@ -4988,10 +5003,10 @@ export class MapStudio {
 
             // 5. Save to database
             const journal = await platform.store.saveMapData(mapName, payload, null, { owners });
-            if (journal) platform.notify.info(`Regional Map '${journal.name}' created successfully.`);
+            if (journal) platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.RegionalMapCreated", { name: journal.name }));
         } catch (err) {
             console.error("FWMB | Regional Map Generation Failed:", err);
-            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.RegionalGenerationError") || "Failed to generate regional map.");
+            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.RegionalGenerationError"));
         } finally {
             // 6. Cleanup
             this.#endProcessing();
@@ -5011,7 +5026,7 @@ export class MapStudio {
             const file = e.target.files[0];
             if (!file) return;
 
-            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ImportingMap") || "Importing Map...");
+            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ImportingMap"));
 
             try {
                 const text = await file.text();
@@ -5024,7 +5039,7 @@ export class MapStudio {
                 const cleanName = file.name.replace(".json", "").replace("fwmb_", "");
                 // A file carries the owner arrays inside it (see MapJson); the compendium keeps them apart
                 const { mapData, owners } = MapJson.fromImport(parsedData);
-                await platform.store.saveMapData(`${cleanName} (Imported)`, mapData, null, { owners });
+                await platform.store.saveMapData(platform.i18n.format("FILRODENSWMB.UI.ImportedMapName", { name: cleanName }), mapData, null, { owners });
 
                 platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.ImportSuccess"));
 
@@ -5275,7 +5290,7 @@ export class MapStudio {
             load: () => this.#handleMapLoad(mapId, card),
             delete: () => this.#handleMapDelete(mapId),
             rename: () => this.#handleMapRename(mapId, card),
-            duplicate: () => this.#handleMapDuplicate(mapId),
+            duplicate: () => this.#handleMapDuplicate(mapId, card),
             promote: () => this.#handleMapPromote(mapId, card),
             export: () => this.#handleMapExport(mapId, card),
         };
@@ -5371,9 +5386,14 @@ export class MapStudio {
         this.view?.render(["context"]);
     }
 
+    /** The saved maps as the Maps tool lists them, a map saved without a name named "Unnamed map". */
+    static #namedMaps(maps) {
+        return maps.map((map) => ({ ...map, name: map.name || platform.i18n.localize("FILRODENSWMB.UI.UnnamedMap"), children: MapStudio.#namedMaps(map.children ?? []) }));
+    }
+
     async #handleMapRename(mapId, card) {
         const currentName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-        const newName = await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.Rename"), platform.i18n.localize("FILRODENSWMB.UI.Name") || "Name", currentName);
+        const newName = await MapDialogManager._promptTextValue(platform.i18n.localize("FILRODENSWMB.UI.Rename"), platform.i18n.localize("FILRODENSWMB.UI.Name"), currentName);
 
         if (newName && newName !== currentName) {
             const updatedDoc = await platform.store.renameSavedMap(mapId, newName);
@@ -5388,15 +5408,16 @@ export class MapStudio {
         }
     }
 
-    async #handleMapDuplicate(mapId) {
-        await platform.store.duplicateSavedMap(mapId);
+    async #handleMapDuplicate(mapId, card) {
+        const name = card.querySelector(".fwmb-map-card-info").textContent.trim();
+        await platform.store.duplicateSavedMap(mapId, platform.i18n.format("FILRODENSWMB.UI.CopyMapName", { name }));
         this.view?.render(["context"]);
     }
 
     async #handleMapPromote(mapId, card) {
         const confirmed = await MapDialogManager._confirmDialog(
-            platform.i18n.localize("FILRODENSWMB.UI.Promote") || "Promote Map",
-            platform.i18n.localize("FILRODENSWMB.UI.PromoteConfirm") || "Create a standalone copy of this regional map?",
+            platform.i18n.localize("FILRODENSWMB.UI.Promote"),
+            platform.i18n.localize("FILRODENSWMB.UI.PromoteConfirm"),
         );
         if (!confirmed) return;
 
@@ -5405,11 +5426,11 @@ export class MapStudio {
             delete exportData.parentId;
 
             const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-            const newName = `${originalName} (Standalone)`;
+            const newName = platform.i18n.format("FILRODENSWMB.UI.StandaloneMapName", { name: originalName });
 
             await platform.store.saveMapData(newName, exportData, null, { owners: await platform.store.loadMapOwners(mapId) });
 
-            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.PromoteSuccess") || "Standalone map created successfully.");
+            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.PromoteSuccess"));
             this.view?.render(["context"]);
         }
     }

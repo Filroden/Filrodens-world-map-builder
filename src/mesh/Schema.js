@@ -314,6 +314,7 @@ export function createRoute(fields = {}, idFactory = randomId) {
         class: fields.class ?? null,
         transport: fields.transport ?? "road",
         spanWater: fields.spanWater ?? false,
+        journalPageId: fields.journalPageId ?? null,
         generated: fields.generated ?? null,
     };
     if (fields.legacy) route.legacy = fields.legacy;

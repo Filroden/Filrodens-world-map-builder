@@ -12,7 +12,7 @@
                     </button>
 
                     <div class="fwmb-dropdown" tabindex="0">
-                        <button type="button" data-tooltip="Options">
+                        <button type="button" aria-label="{{localize 'FILRODENSWMB.UI.MapActions'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MapActions'}}">
                             <i class="fwmb-icon fwmb-icon--more-vert"></i>
                         </button>
 
@@ -25,10 +25,13 @@
                                 <i class="fwmb-icon fwmb-icon--content-copy"></i>
                                 {{localize "FILRODENSWMB.UI.Duplicate"}}
                             </button>
+                            {{!-- Only a regional map has a parent to leave; a top map's copy is Duplicate --}}
+                            {{#if this.parentId}}
                             <button type="button" data-action="manageMap" data-action-type="promote">
                                 <i class="fwmb-icon fwmb-icon--upgrade"></i>
                                 {{localize "FILRODENSWMB.UI.Promote"}}
                             </button>
+                            {{/if}}
                             <button type="button" data-action="manageMap" data-action-type="export">
                                 <i class="fwmb-icon fwmb-icon--file-export"></i>
                                 {{localize "FILRODENSWMB.UI.Export"}}

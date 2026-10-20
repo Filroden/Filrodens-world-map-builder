@@ -9,7 +9,7 @@ Hooks.once("init", async () => {
         config: FILRODENSWMB,
     };
 
-    // The colour theme is chosen in the studio's Settings tool; <body> carries it so the tooltip
+    // The colour theme is chosen in the studio's Appearance menu; <body> carries it so the tooltip
     // (which Foundry draws there) follows it too. The studio's window carries it as well.
     registerThemeSettings();
     attachTheme(document.body);

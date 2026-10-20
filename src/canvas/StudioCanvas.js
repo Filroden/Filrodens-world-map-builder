@@ -1257,10 +1257,13 @@ export class StudioCanvas {
      * Triggers a detached link click to bypass Electron's DOM navigation interceptors.
      */
     exportToPNG(filename = "world-map") {
-        // The reference image is never exported; it is shown again afterwards only if it was showing
+        // The reference image and the land masks' outlines are working aids, never exported (as
+        // scene export leaves them out too); each is shown again afterwards only if it was showing
         const referenceVisible = this.layers.reference.visible;
+        const landMasksVisible = this.layers.landMasks.visible;
         try {
             this.layers.reference.visible = false;
+            this.layers.landMasks.visible = false;
 
             const optimalRes = 2000 / this.mapWidth;
             const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
@@ -1289,6 +1292,7 @@ export class StudioCanvas {
             this.stage.scale.set(origScaleX, origScaleY);
 
             this.layers.reference.visible = referenceVisible;
+            this.layers.landMasks.visible = landMasksVisible;
 
             const dataUrl = canvas.toDataURL("image/png");
             const byteString = atob(dataUrl.split(",")[1]);
@@ -1315,8 +1319,9 @@ export class StudioCanvas {
             renderTexture.destroy(true);
         } catch (err) {
             this.layers.reference.visible = referenceVisible;
+            this.layers.landMasks.visible = landMasksVisible;
             console.error("FWMB | Failed to export PNG:", err);
-            platform.notify.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
+            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ExportPngFailed"));
         }
     }
 
@@ -1718,11 +1723,10 @@ export class StudioCanvas {
         const ROUTE_LABEL_RISE = 15;
 
         for (const route of mapRoutes) {
-            if (route.visibility === "none" || !this.#isVisibleInCurrentPass(route.visibility, "all", true)) continue;
-            const line = meshSession.routeLine(route);
-            if (line.length < 4) continue;
-            const mid = Math.floor(line.length / 4) * 2;
-            drawLabel(route.name, ensureLabelData(route), line[mid], line[mid + 1] - ROUTE_LABEL_RISE, route.visibility, route.id, "route");
+            if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) continue;
+            const point = meshSession.routeMidpoint(route);
+            if (!point) continue;
+            drawLabel(route.name, ensureLabelData(route), point.x, point.y - ROUTE_LABEL_RISE, route.visibility, route.id, "route");
         }
 
         for (const set of meshSession.layerSets) {
@@ -1800,8 +1804,9 @@ export class StudioCanvas {
         scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
 
         const interval = uiState.cartographyScaleInterval || 100;
+        // 0 minor subdivisions is a choice (no minor ticks), so only a missing value takes the default
         const majorTicks = uiState.cartographyScaleMajorTicks || 4;
-        const minorTicks = uiState.cartographyScaleMinorTicks || 4;
+        const minorTicks = uiState.cartographyScaleMinorTicks ?? 4;
         const scaleValue = uiState.cartographyScaleValue || 1;
         const units = uiState.cartographyScaleUnits || "Miles";
 
@@ -2004,7 +2009,9 @@ export class StudioCanvas {
             vis = "gm";
         }
 
-        if (vis === "none") return false;
+        // A hidden item is drawn only on the map being worked on, and only while the Hidden view
+        // filter is on; an export never includes it
+        if (vis === "none") return this.renderPassMode === "normal" && this.viewFilters.none === true;
 
         // Strict Export Overrides
         if (this.renderPassMode === "player") {

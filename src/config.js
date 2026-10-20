@@ -574,7 +574,12 @@ export const FILRODENSWMB = {
         REFERENCE_IMAGE: {
             SCALE_MIN: 0.1,
             SCALE_MAX: 10,
+            // Per wheel notch (Shift+Scroll over the image)
             SCALE_FACTOR: 1.01,
+            // Per press of the panel's Zoom in and Zoom out buttons: one is the other's inverse, so
+            // a zoom in then a zoom out returns the image to the same scale
+            IN_FACTOR: 1.1,
+            OUT_FACTOR: 1 / 1.1,
         },
         REGIONAL_CROP: {
             PADDING: 50,

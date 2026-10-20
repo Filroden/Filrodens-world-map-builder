@@ -15,7 +15,7 @@
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.moisture.scale" label="FILRODENSWMB.UI.MoistureScale" value=(lookup uiState 'noise.moisture.scale') min=100 max=8000 step=10 display=(numberFormat (lookup uiState "noise.moisture.scale") decimals=0)}}
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
-{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="biomeColours" title="FILRODENSWMB.UI.SectionColours" badge="FILRODENSWMB.UI.BadgeInstant" instant=true closed=true}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="biomeColours" title="FILRODENSWMB.UI.SectionEditBiomes" badge="FILRODENSWMB.UI.BadgeInstant" instant=true closed=true}}
     <div class="fwmb-biome-legend">
         {{#each biomeList}}
             {{#unless this.isCustom}}
@@ -33,12 +33,12 @@
             <i class="fwmb-icon fwmb-icon--add"></i>
         </button>
     </div>
-    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionColours'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SettingsCustomBiomes'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
         {{#each customBiomes}}
             <div role="option" aria-selected="false" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editCustomBiome">
                 <div class="fwmb-swatch" style="background-color: {{this.hex}};"></div>
                 {{#if this.hasRules}}<i class="fwmb-icon fwmb-icon--tune fwmb-rule-indicator" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeHasRulesTooltip'}}"></i>{{/if}}
-                <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
                 {{#if this.code}}<span class="fwmb-badge" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeCodeTooltip' code=this.code}}">{{this.code}}</span>{{/if}}
                 <span class="fwmb-actions">
                     <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteCustomBiome" aria-label="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DeleteBiome'}}">

@@ -27,7 +27,7 @@
             <i class="fwmb-icon fwmb-list-icon fwmb-icon--{{this.icon}}"></i>
             <div class="fwmb-pin" style="background-color: {{this.color}};"></div>
 
-            <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+            <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
             <span class="fwmb-actions">
                 <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon fwmb-icon--center-focus"></i>
@@ -65,7 +65,7 @@
                 <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
             </button>
             <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: calc({{this.thickness}} * 0.0625rem); border-style: {{this.style}};"></div>
-            <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+            <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
             <span class="fwmb-actions">
                 <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                     <i class="fwmb-icon fwmb-icon--center-focus"></i>

@@ -848,9 +848,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+/* A section's badge keeps to one line where it fits, and wraps inside its pill rather than
+   running past the card where a translation is longer than the room it has */
 .fwmb-section > summary .fwmb-badge {
-    flex: none;
-    white-space: nowrap;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 .fwmb-section .fwmb-body {
     padding: 0 0.75rem 0.75rem;
@@ -1746,14 +1748,19 @@
 /* A full-width button paired with an icon-only companion action (for example the Biome Rule
    Editor button and the rule coverage preview beside it): the first child grows to fill the
    row, later children keep their own size (usually a square button). */
+/* A row of buttons wraps onto a second line rather than running past its card when their
+   labels are longer than the room they have */
 .fwmb .fwmb-btn-row {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     gap: var(--fwmb-size-8);
 }
 
+/* The first button takes the room the row leaves; its basis is its own width (not 0), so a row
+   too narrow for its buttons wraps instead of squeezing the first one */
 .fwmb .fwmb-btn-row > .fwmb-btn:first-child {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
 }
 
@@ -1762,6 +1769,17 @@
 }
 
 /* --- INPUTS AND SELECTS --- */
+/* Numbers read left to right in every language, so a negative latitude stays "-90" in a
+   right-to-left studio; the field still lines up with the studio's start (its right edge) */
+.fwmb input[type="number"]:dir(rtl) {
+    direction: ltr;
+    text-align: right;
+}
+.fwmb :is(output, .fwmb-range-value):dir(rtl) {
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
 .fwmb input[type="text"],
 .fwmb input[type="number"],
 .fwmb input[type="time"],
@@ -2963,10 +2981,21 @@
     color: var(--fwmb-text-secondary);
 }
 
+/* A slider's name wraps rather than being cut short: a longer translation must still be read in
+   full, and the value beside it keeps its place at the end of the first line */
 .fwmb .fwmb-range-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+}
+.fwmb .fwmb-range-header {
+    align-items: flex-start;
+}
+
+/* The value and its unit stay together at the end of the header, apart from the name */
+.fwmb .fwmb-range-reading {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--fwmb-size-4);
+    flex-shrink: 0;
 }
 
 .fwmb .fwmb-range-value {
@@ -3211,6 +3240,18 @@
     column-gap: 0.5rem;
 }
 
+/* A slider with a unit (px, cells) gives it a fourth column, close after the value */
+.fwmb .fwmb-edit-toolbar .fwmb-bar-range:has(> .fwmb-unit) {
+    grid-template-columns: auto 6rem auto auto;
+}
+.fwmb .fwmb-bar-range > .fwmb-unit {
+    margin-inline-start: -0.25rem;
+}
+.fwmb .fwmb-bar-range:has(> .fwmb-unit) output {
+    min-width: 1.75rem;
+    text-align: end;
+}
+
 .fwmb .fwmb-bar-range .fwmb-bar-range-label {
     color: var(--fwmb-text-secondary);
     font-size: 0.8125rem;
@@ -3435,9 +3476,12 @@
 }
 
 /* --- BIOME LEGEND --- */
+/* Two columns of biome colours where the panel has room for them, one where it hasn't (the
+   compact panel, or longer names in another language); a name wraps rather than pushing its
+   column past the card */
 .fwmb-biome-legend {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
     gap: var(--fwmb-size-8);
     font-size: var(--fwmb-size-13);
 }
@@ -3446,12 +3490,15 @@
     display: flex;
     align-items: center;
     gap: var(--fwmb-size-10);
+    min-width: 0;
     color: var(--fwmb-text-primary);
 }
 
 .fwmb-biome-label {
     font-size: var(--fwmb-size-13);
     flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .fwmb-swatch {
@@ -3559,11 +3606,14 @@ input.fwmb-swatch {
     padding: 0;
 }
 
+/* The d-pad nudges the map's east and west, which stay on the right and left in a right-to-left
+   studio too, so its grid is laid out left to right whatever the reading direction */
 .fwmb-transform-dpad {
     display: grid;
     grid-template-columns: repeat(3, 2.25rem);
     grid-template-rows: repeat(3, 2.25rem);
     gap: var(--fwmb-size-4);
+    direction: ltr;
 }
 
 .fwmb-transform-dpad button {

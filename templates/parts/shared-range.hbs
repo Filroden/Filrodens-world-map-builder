@@ -11,6 +11,9 @@
       display: optional text to show as the value when first drawn, if it should be formatted
                 differently from the raw value (for example with thousands separators); once the
                 slider moves, the raw value is shown
+      unit, unitShort: optional localisation keys for the value's unit, shown after the value
+                rather than in the label (the short form where the row is stacked); the unit sits
+                outside the output so RangeDisplay's updates leave it alone
       class: optional extra classes for the wrapper
 
     The value display and the slider's filled portion are kept in step with the slider by
@@ -22,7 +25,10 @@
             <span class="fwmb-range-name">{{localize label}}</span>
             {{#if hint}}<i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize hint}}"></i>{{/if}}
         </label>
-        <output class="fwmb-range-value">{{#if display}}{{display}}{{else}}{{value}}{{/if}}</output>
+        <span class="fwmb-range-reading">
+            <output class="fwmb-range-value">{{#if display}}{{display}}{{else}}{{value}}{{/if}}</output>
+            {{#if unit}}<span class="fwmb-unit"><span class="fwmb-unit-long">{{localize unit}}</span><span class="fwmb-unit-short">{{#if unitShort}}{{localize unitShort}}{{else}}{{localize unit}}{{/if}}</span></span>{{/if}}
+        </span>
     </div>
     <input type="range" class="fwmb-range-input" name="{{name}}" value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}" aria-label="{{localize label}}" />
 </div>

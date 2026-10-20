@@ -63,7 +63,7 @@ export async function getSavedMaps() {
     index.forEach((entry) => {
         mapDict[entry._id] = {
             id: entry._id,
-            name: entry.name || "Unnamed Map",
+            name: entry.name || "",
             parentId: entry.flags?.[FILRODENSWMB.ID]?.mapData?.parentId || null,
             children: [],
         };
@@ -274,7 +274,7 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null, { 
 
     const pages = [
         {
-            name: "Cartographic Data",
+            name: game.i18n.localize("FILRODENSWMB.JOURNAL.CartographicData"),
             type: "text",
             text: { content: narrativeHtml, format: 1 },
         },
@@ -331,14 +331,19 @@ export async function renameSavedMap(id, newName) {
     return await doc.update({ name: newName });
 }
 
-export async function duplicateSavedMap(id) {
+/**
+ * Copies a saved map under a new name. The shared code names the copy, in the reader's language.
+ * @param {string} id - The saved map to copy.
+ * @param {string} [name] - The copy's name; the original's when left out.
+ */
+export async function duplicateSavedMap(id, name) {
     const pack = game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
     if (!pack) return null;
     const doc = await pack.getDocument(id);
     if (!doc) return null;
 
     const clonedData = doc.toObject();
-    clonedData.name = `${clonedData.name} (Copy)`;
+    clonedData.name = name ?? clonedData.name;
     delete clonedData._id;
 
     return await JournalEntry.create(clonedData, { pack: pack.collection });

@@ -146,13 +146,17 @@ export class SceneExporter {
         for (const pin of app.mapPins) {
             if (pin.type === "spring" || pin.type === "block_spring") continue;
 
-            await syncJournalPage(pin, "Unnamed Location");
+            await syncJournalPage(pin, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedLocation"));
         }
 
         for (const level of app.regionLevels) {
             for (const region of level.regions) {
-                await syncJournalPage(region, "Unnamed Region");
+                await syncJournalPage(region, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedRegion"));
             }
+        }
+
+        for (const route of app.mapRoutes ?? []) {
+            await syncJournalPage(route, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedRoute"));
         }
 
         return parentJournal;
@@ -309,7 +313,7 @@ export class SceneExporter {
         }
     }
 
-    /** Adds a map note for every icon pin and region that has a journal page. */
+    /** Adds a map note for every icon pin, region and route that has a journal page. */
     static async #createMapNotes(app, scene, journalObj) {
         try {
             // Scale note icons with the map's width, within fixed limits
@@ -317,7 +321,8 @@ export class SceneExporter {
 
             const pinNotes = app.mapPins.filter((pin) => pin.icon && pin.journalPageId).map((pin) => this.#pinNote(pin, journalObj, iconSize));
             const regionNotes = this.regionNoteAnchors(app).map(({ region, x, y }) => ({ entryId: journalObj.id, pageId: region.journalPageId, x, y, iconSize }));
-            const noteData = [...pinNotes, ...regionNotes];
+            const routeNotes = this.routeNoteAnchors(app).map(({ route, x, y }) => ({ entryId: journalObj.id, pageId: route.journalPageId, x, y, iconSize }));
+            const noteData = [...pinNotes, ...regionNotes, ...routeNotes];
 
             if (noteData.length > 0) {
                 await scene.createEmbeddedDocuments("Note", noteData);
@@ -357,6 +362,24 @@ export class SceneExporter {
                 const anchor = app.meshSession?.labelAnchor(layer.id, region.key) ?? null;
                 if (anchor) anchors.push({ region, x: anchor.x, y: anchor.y });
             }
+        }
+        return anchors;
+    }
+
+    /**
+     * Where each route with a journal page gets its map note: the point its label is drawn above
+     * (see MeshSession.routeMidpoint), always on the route's line. Without a mesh session routes
+     * have no line, and no notes.
+     *
+     * @param {object} app - Reads mapRoutes and meshSession.
+     * @returns {Array<{route: object, x: number, y: number}>}
+     */
+    static routeNoteAnchors(app) {
+        const anchors = [];
+        for (const route of app.mapRoutes ?? []) {
+            if (!route.journalPageId) continue;
+            const point = app.meshSession?.routeMidpoint(route) ?? null;
+            if (point) anchors.push({ route, x: point.x, y: point.y });
         }
         return anchors;
     }

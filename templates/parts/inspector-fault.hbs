@@ -42,7 +42,7 @@
         </div>
     </div>
     {{/if}}
-    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="faultThickness" label="FILRODENSWMB.UI.FaultThickness" hint="FILRODENSWMB.UI.FaultThicknessHint" value=fault.thickness min=10 max=1000 step=1}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="faultThickness" label="FILRODENSWMB.UI.FaultThickness" hint="FILRODENSWMB.UI.FaultThicknessHint" value=fault.thickness min=10 max=1000 step=1 unit="FILRODENSWMB.UI.UnitPixels" unitShort="FILRODENSWMB.UI.UnitPixelsShort"}}
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="faultStrength" label="FILRODENSWMB.UI.FaultStrength" hint="FILRODENSWMB.UI.FaultStrengthHint" value=fault.strength min=0.1 max=1 step=0.05}}
     {{#if (eq fault.type "subduction")}}
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="arcDistance" label="FILRODENSWMB.UI.FaultArcDistance" hint="FILRODENSWMB.UI.FaultArcDistanceHint" value=settings.arcDistance min=0.3 max=0.9 step=0.05}}

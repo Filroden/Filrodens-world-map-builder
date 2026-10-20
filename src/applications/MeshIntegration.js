@@ -339,13 +339,18 @@ export class MeshIntegration {
      */
     static #regionHit(app, x, y) {
         const active = app.activeLevelId ? app.meshSession.level(app.activeLevelId) : null;
-        const visible = [...app.meshSession.levels()].filter((level) => level.visibility !== "none").reverse();
+        const visible = [...app.meshSession.levels()].filter((level) => this.#shown(app, level.visibility)).reverse();
         const levels = active ? [active] : visible;
         for (const level of levels) {
             const region = app.meshSession.regionAt(level.id, x, y);
-            if (region && region.visibility !== "none") return { target: region, x, y, radius: 0, entityType: "region", entityId: region.id, layerId: level.id, selectOnly: true };
+            if (region && this.#shown(app, region.visibility)) return { target: region, x, y, radius: 0, entityType: "region", entityId: region.id, layerId: level.id, selectOnly: true };
         }
         return null;
+    }
+
+    /** Whether an item of a visibility can be picked: a hidden one only while the Hidden view filter shows it. */
+    static #shown(app, visibility) {
+        return visibility !== "none" || app.viewFilters?.none === true;
     }
 
     static #routeHit(app, x, y, radius) {
@@ -365,7 +370,7 @@ export class MeshIntegration {
         if (!app.meshSession) return null;
         let best = null;
         for (const route of app.mapRoutes ?? []) {
-            if (route.visibility === "none") continue;
+            if (!this.#shown(app, route.visibility)) continue;
             const distance = distanceToLine(app.meshSession.routeLine(route), x, y, radius);
             if (distance <= radius && (!best || distance < best.distance)) best = { route, distance };
         }

@@ -621,7 +621,7 @@ export class MapDialogManager {
             app.mapDecorations.push({
                 id: platform.utils.randomID(),
                 type: "decoration",
-                name: result.name || "Unnamed Decoration",
+                name: result.name || platform.i18n.localize("FILRODENSWMB.UI.UnnamedDecoration"),
                 src: result.src,
                 x: spawnX,
                 y: spawnY,

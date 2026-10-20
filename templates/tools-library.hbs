@@ -68,7 +68,7 @@
         {{#each builtinPinIcons}}
             <div class="fwmb-list-item">
                 <i class="fwmb-icon fwmb-list-icon fwmb-icon--{{this.key}}"></i>
-                <span class="fwmb-name fwmb-flex-1">{{this.label}}</span>
+                <span class="fwmb-name fwmb-flex-1" title="{{this.label}}">{{this.label}}</span>
                 {{#if this.isProtected}}
                     <input type="checkbox" class="fwmb-checkbox" disabled aria-label="{{localize 'FILRODENSWMB.UI.PinIconProtected'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PinIconProtected'}}" />
                 {{else}}
@@ -93,7 +93,7 @@
         {{#each customPinIcons}}
             <div role="option" aria-selected="false" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editCustomPinIcon">
                 <i class="fwmb-icon fwmb-list-icon" style="--fwmb-mask: url('{{this.path}}');"></i>
-                <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
+                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
                 <span class="fwmb-actions">
                     <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeCustomPinIcon" aria-label="{{localize 'FILRODENSWMB.UI.RemovePinIcon'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.RemovePinIcon'}}">
                         <i class="fwmb-icon fwmb-icon--variable-remove"></i>

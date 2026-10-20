@@ -121,7 +121,7 @@ export function createWebStore(records, { newId = randomID } = {}) {
          * @returns {Promise<Array<{id: string, name: string, parentId: string|null, children: Array}>>}
          */
         async getSavedMaps() {
-            const entries = (await records.all()).map((record) => ({ id: record.id, name: record.name || "Unnamed Map", parentId: record.mapData?.parentId || null, children: [] }));
+            const entries = (await records.all()).map((record) => ({ id: record.id, name: record.name || "", parentId: record.mapData?.parentId || null, children: [] }));
             const byId = new Map(entries.map((entry) => [entry.id, entry]));
             const roots = [];
             for (const entry of entries) {
@@ -163,10 +163,11 @@ export function createWebStore(records, { newId = randomID } = {}) {
             return summary(record);
         },
 
-        async duplicateSavedMap(id) {
+        /** Copies a saved map under a new name (the shared code names it, in the reader's language). */
+        async duplicateSavedMap(id, name) {
             const record = await records.get(id);
             if (!record) return null;
-            const copy = { ...record, id: newId(), name: `${record.name} (Copy)` };
+            const copy = { ...record, id: newId(), name: name ?? record.name };
             await records.put(copy);
             return summary(copy);
         },
