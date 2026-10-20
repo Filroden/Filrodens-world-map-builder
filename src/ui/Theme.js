@@ -1,6 +1,7 @@
 /**
  * The studio's colour theme: light or dark, and the gold or teal hue, chosen in the studio itself
- * (the Settings tool) and kept as the reader's own settings, the same in Foundry and on the web.
+ * (the rail's Appearance menu, see AppearanceMenu) and kept as the reader's own settings, the same
+ * in Foundry and on the web.
  *
  * The module's colour tokens (styles/fwmb-theme.css) are defined on theme and hue selectors, so
  * they apply to whatever element carries them and everything inside it. The choice is written as

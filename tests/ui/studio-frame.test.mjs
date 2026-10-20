@@ -42,8 +42,8 @@ test("the rail holds the three stages in order, then the occasional tools", () =
         ],
     );
     assert.deepEqual(
-        OCCASIONAL.map((entry) => entry.tool ?? entry.action),
-        ["reference", "library", "settings", "threeDView"],
+        OCCASIONAL.map((entry) => entry.tool ?? entry.action ?? entry.menu),
+        ["reference", "library", "appearance", "threeDView", "toggleFullscreen"],
     );
 });
 
@@ -57,10 +57,15 @@ test("every tool on the rail has an icon with a mask and a name in en.json, and 
         assert.doesNotThrow(() => readFileSync(join(ROOT, `templates/tools-${id}.hbs`)), `templates/tools-${id}.hbs exists`);
     }
     for (const stage of STAGES) assert.ok(STRINGS[stage.label], `${stage.label} is in en.json`);
-    for (const entry of OCCASIONAL.filter((item) => item.action)) {
-        assert.ok(MapStudio.ACTIONS[entry.action], `${entry.action} has a handler`);
+    for (const entry of OCCASIONAL.filter((item) => item.action || item.menu)) {
+        if (entry.action) assert.ok(MapStudio.ACTIONS[entry.action], `${entry.action} has a handler`);
         assert.ok(STRINGS[entry.label], `${entry.label} is in en.json`);
+        assert.match(CSS, new RegExp(`\\.fwmb-icon--${entry.icon} \\{`), `${entry.icon} has an icon mask`);
     }
+    // The Appearance menu's actions, and full screen's other face
+    for (const action of ["toggleAppearance", "chooseAppearance"]) assert.ok(MapStudio.ACTIONS[action], `${action} has a handler`);
+    assert.match(CSS, /\.fwmb-icon--fullscreen_exit \{/);
+    assert.ok(STRINGS["FILRODENSWMB.UI.ExitFullScreen"] && STRINGS["FILRODENSWMB.UI.AppearanceTooltip"]);
 });
 
 test("the map controls' toggles have names in en.json and icons with masks", () => {

@@ -164,6 +164,15 @@
 .fwmb-icon--more-vert {
     --fwmb-mask: url("../assets/icons/more_vert.svg");
 }
+.fwmb-icon--contrast {
+    --fwmb-mask: url("../assets/icons/contrast.svg");
+}
+.fwmb-icon--fullscreen {
+    --fwmb-mask: url("../assets/icons/fullscreen.svg");
+}
+.fwmb-icon--fullscreen_exit {
+    --fwmb-mask: url("../assets/icons/fullscreen_exit.svg");
+}
 .fwmb-icon--image {
     --fwmb-mask: url("../assets/icons/image.svg");
 }
@@ -5113,6 +5122,38 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     background-color: #78aad2;
     height: 0.1875rem;
     border-style: solid;
+}
+
+/* A menu's group of choices under its own heading (the Appearance menu's Mode and Hue, in the
+   menu and inline in the rail's More); the chosen item carries a dot */
+.fwmb .fwmb-menu-group + .fwmb-menu-group,
+.fwmb .fwmb-dropdown-menu > button + .fwmb-menu-group {
+    border-block-start: 1px solid var(--fwmb-border-subtle);
+    margin-block-start: var(--fwmb-size-4);
+    padding-block-start: var(--fwmb-size-4);
+}
+.fwmb .fwmb-menu-heading {
+    padding: var(--fwmb-size-4) var(--fwmb-size-8);
+    font-size: var(--fwmb-size-12);
+    font-weight: 700;
+    color: var(--fwmb-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.fwmb .fwmb-dropdown-menu button[role="menuitemradio"]::before {
+    content: "";
+    flex: none;
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px var(--fwmb-text-muted);
+}
+.fwmb .fwmb-dropdown-menu button[role="menuitemradio"][aria-checked="true"]::before {
+    background: var(--fwmb-accent-main);
+    box-shadow: none;
+}
+.fwmb .fwmb-appearance-menu:popover-open {
+    padding: var(--fwmb-space-1);
 }
 
 /* A destructive item set apart from the items above it in a row's option menu */

@@ -43,7 +43,9 @@
  *   `run(app, config, playerBlob, gmBlob)`.
  * - `frame`: `setTitle(text)`, the title of what holds the studio (Foundry's window, or the web
  *   page), and `idLength`, how many characters of a saved map's id the title shows (undefined
- *   for all of them).
+ *   for all of them). On the web only, `fullscreen`: `enabled()` (whether the page can go full
+ *   screen), `active()`, `toggle()`, and `onChange(callback)` (returns a function that stops it).
+ *   Foundry offers none, so the studio shows no full-screen toggle there.
  */
 import { foundryPlatform } from "./foundry/index.js";
 

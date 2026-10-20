@@ -73,6 +73,25 @@ export function createWebPlatform({ strings, lang, handlebars, fetchTemplate, re
             setTitle: (text) => {
                 frame.ownerDocument.title = text;
             },
+            fullscreen: createFullscreen(frame.ownerDocument),
+        },
+    };
+}
+
+/**
+ * Full screen for the page (the Fullscreen API, which needs a user's gesture): the whole page, so
+ * the studio fills the screen. The browser's own full screen (F11) is not this one and is not seen
+ * by the page. Esc leaves full screen before the page sees the key.
+ * @param {Document} doc
+ */
+function createFullscreen(doc) {
+    return {
+        enabled: () => doc.fullscreenEnabled === true,
+        active: () => !!doc.fullscreenElement,
+        toggle: () => Promise.resolve(doc.fullscreenElement ? doc.exitFullscreen() : doc.documentElement.requestFullscreen()).catch(() => {}),
+        onChange(callback) {
+            doc.addEventListener("fullscreenchange", callback);
+            return () => doc.removeEventListener("fullscreenchange", callback);
         },
     };
 }

@@ -53,7 +53,7 @@ import { StudioView } from "../ui/StudioView.js";
 import { syncMapControls, VIEW_LAYERS } from "../ui/MapControls.js";
 import { StudioLayout } from "../ui/StudioLayout.js";
 import { moveAlongModes } from "../ui/BarFold.js";
-import { currentTheme, setTheme, THEME_SETTINGS } from "../ui/Theme.js";
+import { AppearanceMenu } from "../ui/AppearanceMenu.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -225,6 +225,9 @@ export class MapStudio {
         setSceneMode(e, t)              { this._onSetSceneMode(e, t); },
         setCartographyMode(_e, t)       { this.uiState.cartographyMode = t.dataset.mode === "move" ? "move" : "select"; this.#modeChosen(false); },
         threeDView(e, t)                { this._onThreeDView(e, t); },
+        toggleAppearance(_e, t)         { AppearanceMenu.toggle(this.root, t); },
+        chooseAppearance(_e, t)         { AppearanceMenu.choose(this.root, t); },
+        toggleFullscreen()              { platform.frame?.fullscreen?.toggle(); },
         toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
         toggleGrid(e, t)                { this._onToggleGrid(e, t); },
         toggleLayer(e, t)               { this._onToggleLayer(e, t); },
@@ -271,6 +274,9 @@ export class MapStudio {
 
     /** Stops dialogues being drawn in the studio (see platform.dialogs.attach); null when closed. */
     #detachDialogs = null;
+
+    /** Stops following the page's full screen (see platform.frame.fullscreen). */
+    #stopFullscreenWatch = null;
 
     /** The save under way, or null (see saveCurrentMap). */
     #activeSave = null;
@@ -643,8 +649,12 @@ export class MapStudio {
     /** The rail's groups and buttons, for toolbar.hbs (see FILRODENSWMB.STUDIO). */
     #railContext() {
         const { TOOLS, STAGES, OCCASIONAL } = FILRODENSWMB.STUDIO;
-        const occasional = OCCASIONAL.map((entry) => {
+        // Full screen only where the host offers it and the page may use it (see platform.frame)
+        const fullscreen = platform.frame?.fullscreen;
+        const occasional = OCCASIONAL.filter((entry) => entry.host !== "fullscreen" || fullscreen?.enabled()).map((entry) => {
             if (entry.tool) return { tool: entry.tool, ...TOOLS[entry.tool] };
+            if (entry.menu) return { ...entry, appearance: AppearanceMenu.context() };
+            if (entry.host === "fullscreen") return { ...entry, ...this.#fullscreenState() };
             return { ...entry, pressed: entry.action === "threeDView" && !!this.scene3D };
         });
         return {
@@ -654,6 +664,30 @@ export class MapStudio {
             isDirty: this.#dirty,
             saveLabel: this.#saveLabel(),
         };
+    }
+
+    /** The full-screen toggle as it stands: pressed, its icon and its name. */
+    #fullscreenState() {
+        const pressed = !!platform.frame?.fullscreen?.active();
+        return { pressed, icon: pressed ? "fullscreen_exit" : "fullscreen", label: pressed ? "FILRODENSWMB.UI.ExitFullScreen" : "FILRODENSWMB.UI.FullScreen" };
+    }
+
+    /** Shows full screen's state on its rail button and its More item, in place (see fullscreenchange). */
+    #syncFullscreen() {
+        const { pressed, icon, label } = this.#fullscreenState();
+        const name = platform.i18n.localize(label);
+        for (const control of this.root?.querySelectorAll('[data-action="toggleFullscreen"]') ?? []) {
+            if (control.getAttribute("role") === "menuitemcheckbox") control.setAttribute("aria-checked", String(pressed));
+            else {
+                control.setAttribute("aria-pressed", String(pressed));
+                control.setAttribute("aria-label", name);
+                control.dataset.tooltip = name;
+            }
+            const glyph = control.querySelector(".fwmb-icon");
+            if (glyph) glyph.className = `fwmb-icon fwmb-icon--${icon}`;
+            const text = control.querySelector(".fwmb-menu-text");
+            if (text) text.textContent = name;
+        }
     }
 
     /** The engines' short names, for the panel header (STUDIO.ENGINE_IN_HEADER). */
@@ -912,7 +946,7 @@ export class MapStudio {
      */
     #moveAlongRail(event) {
         const rail = event.target.closest?.(".fwmb-toolbar");
-        if (!rail || event.target.closest(".fwmb-dropdown-menu")) return false;
+        if (!rail || event.target.closest(".fwmb-dropdown-menu, .fwmb-appearance-menu")) return false;
         const rtl = rail.ownerDocument.defaultView.getComputedStyle(rail).direction === "rtl";
         const steps = { ArrowDown: 1, ArrowUp: -1, ArrowRight: rtl ? -1 : 1, ArrowLeft: rtl ? 1 : -1 };
         if (!(event.key in steps) && event.key !== "Home" && event.key !== "End") return false;
@@ -1020,8 +1054,6 @@ export class MapStudio {
         context.activeTool = this.activeTool;
         // Whether the host can export to a scene (Foundry can; the web version cannot)
         context.sceneExport = platform.scene.available;
-        // The colour theme's two settings, for the Settings tool
-        context.theme = currentTheme();
 
         if (regionId === "toolbar") Object.assign(context, this.#railContext());
         if (regionId === "map") Object.assign(context, MapStudio.#mapControlsContext());
@@ -1201,6 +1233,8 @@ export class MapStudio {
         this.#bindStudioListeners(root);
         // Dialogues are drawn inside the studio while it is open
         this.#detachDialogs = platform.dialogs.attach(root);
+        // Full screen on the web: its toggle follows the page going in and out of it (Esc included)
+        this.#stopFullscreenWatch = platform.frame?.fullscreen?.onChange(() => this.#syncFullscreen()) ?? null;
         // Labels naming a family this host lacks are drawn in the default label font (see LabelFonts)
         LabelFonts.setAvailable(platform.fonts.list());
         this.view.render();
@@ -1408,7 +1442,7 @@ export class MapStudio {
         // would otherwise reach the window and pan the scene behind it
         if (MapStudio.#isMovementKey(event)) event.stopPropagation();
         // The Regions lists' keys: moving through a list, Unassigned, and naming
-        if (RegionLists.handleKey(this, event) || StyleLists.handleKey(this, event) || ListNav.handleKey(event)) {
+        if (AppearanceMenu.handleKey(this.root, event) || RegionLists.handleKey(this, event) || StyleLists.handleKey(this, event) || ListNav.handleKey(event)) {
             event.preventDefault();
             return;
         }
@@ -1492,12 +1526,6 @@ export class MapStudio {
         // Fields that only steer the panel itself (a list's filter, a name being typed in the
         // Regions tree, a Mass Edit tick) are not map settings
         if (target.closest("[data-panel-ui]")) return;
-
-        // The colour theme is the reader's own setting, not part of the map
-        if (target.name === THEME_SETTINGS.MODE || target.name === THEME_SETTINGS.HUE) {
-            if (event.type === "change") setTheme(target.name, target.value);
-            return;
-        }
 
         if (event.type === "change" && target.matches('file-picker[name="referenceImage"]')) {
             this.uiState.referenceImage = target.value;
@@ -2093,6 +2121,9 @@ export class MapStudio {
         // A dialogue still open is dismissed, so whatever opened it carries on as if it were cancelled
         this.#detachDialogs?.();
         this.#detachDialogs = null;
+        this.#stopFullscreenWatch?.();
+        this.#stopFullscreenWatch = null;
+        AppearanceMenu.close(this.root);
         // A redraw still queued would draw into a window that is going away
         this.view?.destroy();
         if (this.canvasEngine) this.canvasEngine.destroy();
@@ -4654,8 +4685,9 @@ export class MapStudio {
     }
 
     _onChangeTool(event, target) {
-        const newTool = target.dataset.tool;
-        if (!newTool || this.activeTool === newTool) return;
+        // A tool that is no longer on the rail (the Settings tool, now the Appearance menu) opens New map
+        const newTool = FILRODENSWMB.STUDIO.TOOLS[target.dataset.tool] ? target.dataset.tool : "scene";
+        if (this.activeTool === newTool) return;
 
         // 1. Teardown current state. Automatic generation always comes back on when the tool
         // changes; changes deferred by the pause toggle are generated now (which also covers a

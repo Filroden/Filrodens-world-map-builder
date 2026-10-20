@@ -598,8 +598,8 @@ export const FILRODENSWMB = {
     },
     // The studio's frame (see toolbar.hbs). The rail groups the tools by the stage of making a map
     // they belong to; each tool has its rail icon and name. The occasional tools sit below the
-    // stages (folding into More when the studio is short): a tool, or an action of its own (the 3D
-    // view). Tool ids are the ones uiState.activeTool and the changeTool action use.
+    // stages (folding into More when the studio is short): a tool, an action of its own (the 3D
+    // view, full screen) or a menu (Appearance). Tool ids are the ones the changeTool action uses.
     STUDIO: {
         TOOLS: {
             scene: { icon: "grid-on", label: "FILRODENSWMB.UI.ToolCreateMap" },
@@ -613,7 +613,6 @@ export const FILRODENSWMB = {
             export: { icon: "png", label: "FILRODENSWMB.UI.ToolExport" },
             reference: { icon: "image", label: "FILRODENSWMB.UI.ToolReference" },
             library: { icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary" },
-            settings: { icon: "tune", label: "FILRODENSWMB.UI.ToolSettings" },
             manage: { icon: "folder-open", label: "FILRODENSWMB.UI.ToolManage" },
         },
         STAGES: [
@@ -621,11 +620,14 @@ export const FILRODENSWMB = {
             { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["regions", "infrastructure", "labels"] },
             { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
         ],
+        // The Appearance menu (the reader's colour theme, see AppearanceMenu) sits among them, and on
+        // the web the full-screen toggle (shown only where the host can go full screen)
         OCCASIONAL: [
             { tool: "reference" },
             { tool: "library" },
-            { tool: "settings" },
+            { menu: "appearance", icon: "contrast", label: "FILRODENSWMB.UI.Appearance" },
             { action: "threeDView", icon: "three-d", label: "FILRODENSWMB.UI.ThreeDView" },
+            { action: "toggleFullscreen", icon: "fullscreen", label: "FILRODENSWMB.UI.FullScreen", host: "fullscreen" },
         ],
         // The panel's header: each stage's tools are numbered in order ("Shape · 2 of 4") except
         // Populate's, which are worked in any order. The engine is named for the tools it shapes.
@@ -645,7 +647,6 @@ export const FILRODENSWMB = {
             export: null,
             reference: null,
             library: null,
-            settings: null,
             manage: null,
         },
         // What the pointer does while a tool is editing, named in the state block and on the bar:
@@ -665,7 +666,6 @@ export const FILRODENSWMB = {
             export: null,
             reference: null,
             library: null,
-            settings: null,
             manage: null,
         },
         // The localisation keys of each state word: its name, the state block's start and stop

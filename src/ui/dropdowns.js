@@ -140,7 +140,8 @@ export function bindDropdownMenus(root) {
         if (dropdown && !dropdown.contains(event.relatedTarget)) closeMenu(dropdown.querySelector(":scope > .fwmb-dropdown-menu"));
     };
     const onClick = (event) => {
-        const entry = event.target.closest?.(".fwmb-dropdown-menu button");
+        // A dropdown's own menu (the Appearance menu, a menu of its own, stays open as it is used)
+        const entry = event.target.closest?.(".fwmb-dropdown > .fwmb-dropdown-menu button");
         if (!entry) return;
         closeMenu(entry.closest(".fwmb-dropdown-menu"));
         entry.blur();

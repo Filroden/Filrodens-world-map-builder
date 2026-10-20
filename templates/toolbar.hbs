@@ -4,8 +4,10 @@
     icon-only, named by its aria-label and tooltip, and the arrow keys move along the rail (see
     MapStudio's rail keys).
 
-    When the studio is short (data-fwmb-short, see StudioLayout) the occasional tools fold into
-    the More menu, which holds the same four; the file actions never fold. When it is narrow the
+    The occasional group holds the occasional tools, the 3D view, the Appearance menu (the reader's
+    colour theme, see AppearanceMenu) and, on the web, full screen. When the studio is short
+    (data-fwmb-short, see StudioLayout) they fold into the More menu, Appearance's two groups
+    inline; the file actions never fold. When it is narrow the
     rail goes compact and the stage names are hidden visually, but stay as the groups' names.
 --}}
 <nav aria-label="{{localize 'FILRODENSWMB.UI.RailLabel'}}">
@@ -28,6 +30,23 @@
         <button type="button" class="fwmb-rail-btn" data-action="changeTool" data-tool="{{this.tool}}" aria-label="{{localize this.label}}" data-tooltip="{{localize this.label}}" aria-current="{{#if (eq ../activeTool this.tool)}}page{{else}}false{{/if}}">
             <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
         </button>
+        {{else if this.menu}}
+        {{!-- The Appearance menu (see AppearanceMenu): a popover beside its button --}}
+        <div class="fwmb-appearance fwmb-dropdown--beside">
+            <button type="button" class="fwmb-rail-btn" data-action="toggleAppearance" aria-haspopup="menu" aria-expanded="false" aria-label="{{this.appearance.tooltip}}" data-tooltip="{{this.appearance.tooltip}}">
+                <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+            </button>
+            <div class="fwmb-dropdown-menu fwmb-appearance-menu" popover="manual" role="menu" aria-label="{{localize this.label}}">
+                {{#each this.appearance.groups}}
+                <div role="group" class="fwmb-menu-group" aria-labelledby="fwmb-appearance-{{this.key}}">
+                    <div class="fwmb-menu-heading" id="fwmb-appearance-{{this.key}}">{{localize this.label}}</div>
+                    {{#each this.items}}
+                    <button type="button" role="menuitemradio" tabindex="-1" aria-checked="{{#if this.checked}}true{{else}}false{{/if}}" data-action="chooseAppearance" data-theme-key="{{../key}}" data-value="{{this.value}}">{{localize this.label}}</button>
+                    {{/each}}
+                </div>
+                {{/each}}
+            </div>
+        </div>
         {{else}}
         <button type="button" class="fwmb-rail-btn" data-action="{{this.action}}" aria-label="{{localize this.label}}" data-tooltip="{{localize this.label}}" aria-pressed="{{#if this.pressed}}true{{else}}false{{/if}}">
             <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
@@ -47,12 +66,24 @@
             <button type="button" role="menuitem" data-action="changeTool" data-tool="{{this.tool}}" aria-current="{{#if (eq ../activeTool this.tool)}}page{{else}}false{{/if}}">
                 <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span> {{localize this.label}}
             </button>
+            {{else if this.menu}}
             {{else}}
             <button type="button" role="menuitemcheckbox" data-action="{{this.action}}" aria-checked="{{#if this.pressed}}true{{else}}false{{/if}}">
-                <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span> {{localize this.label}}
+                <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span> <span class="fwmb-menu-text">{{localize this.label}}</span>
             </button>
             {{/if}}
             {{/each}}
+            {{!-- The Appearance menu's two groups, inline --}}
+            {{#each railOccasional}}{{#if this.menu}}
+            {{#each this.appearance.groups}}
+            <div role="group" class="fwmb-menu-group" aria-labelledby="fwmb-more-appearance-{{this.key}}">
+                <div class="fwmb-menu-heading" id="fwmb-more-appearance-{{this.key}}">{{localize this.label}}</div>
+                {{#each this.items}}
+                <button type="button" role="menuitemradio" aria-checked="{{#if this.checked}}true{{else}}false{{/if}}" data-action="chooseAppearance" data-theme-key="{{../key}}" data-value="{{this.value}}">{{localize this.label}}</button>
+                {{/each}}
+            </div>
+            {{/each}}
+            {{/if}}{{/each}}
         </div>
     </div>
 

@@ -39,8 +39,8 @@ function toIconUrl(path) {
 
 /**
  * Registers the two world settings backing the custom pin icon registry. Both are
- * `config: false` - they're managed entirely through the Pin Icons fieldsets in
- * tools-settings.hbs, not Foundry's native settings sheet.
+ * `config: false` - they're managed entirely through the pin icon sections of Styles and icons
+ * (tools-library.hbs), not Foundry's native settings sheet.
  */
 export function registerPinIconSettings() {
     platform.settings.register(FILRODENSWMB.PIN_ICONS.SETTINGS.DISABLED, {
