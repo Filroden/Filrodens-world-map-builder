@@ -54,6 +54,7 @@ import { syncMapControls, VIEW_LAYERS } from "../ui/MapControls.js";
 import { StudioLayout } from "../ui/StudioLayout.js";
 import { moveAlongModes } from "../ui/BarFold.js";
 import { AppearanceMenu } from "../ui/AppearanceMenu.js";
+import { HelpPanel } from "./HelpPanel.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -228,6 +229,7 @@ export class MapStudio {
         toggleAppearance(_e, t)         { AppearanceMenu.toggle(this.root, t); },
         chooseAppearance(_e, t)         { AppearanceMenu.choose(this.root, t); },
         toggleFullscreen()              { platform.frame?.fullscreen?.toggle(); },
+        toggleHelp()                    { HelpPanel.toggle(this); },
         toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
         toggleGrid(e, t)                { this._onToggleGrid(e, t); },
         toggleLayer(e, t)               { this._onToggleLayer(e, t); },
@@ -635,15 +637,24 @@ export class MapStudio {
 
     /**
      * Marks the rail's Save button with the unsaved-changes dot, in place: the dot comes and goes
-     * with every edit, which is no reason to redraw the rail.
+     * with every edit, which is no reason to redraw the rail. Save in More (a very short studio)
+     * follows, its text the same name, and More shows the dot while it holds Save.
      */
     #showDirty() {
-        const button = this.root?.querySelector('.fwmb-toolbar [data-action="saveMap"]');
-        if (!button) return;
-        button.classList.toggle("fwmb-is-dirty", this.#dirty);
+        const button = this.root?.querySelector('.fwmb-rail-files [data-action="saveMap"]');
+        const item = this.root?.querySelector('.fwmb-rail-more-files [data-action="saveMap"]');
+        if (!button && !item) return;
         const label = this.#saveLabel();
-        button.setAttribute("aria-label", label);
-        button.dataset.tooltip = label;
+        if (button) {
+            button.classList.toggle("fwmb-is-dirty", this.#dirty);
+            button.setAttribute("aria-label", label);
+            button.dataset.tooltip = label;
+        }
+        if (item) {
+            item.classList.toggle("fwmb-is-dirty", this.#dirty);
+            const text = item.querySelector(".fwmb-menu-text");
+            if (text) text.textContent = label;
+        }
     }
 
     /** The rail's groups and buttons, for toolbar.hbs (see FILRODENSWMB.STUDIO). */
@@ -663,6 +674,7 @@ export class MapStudio {
             railOccasionalActive: occasional.some((entry) => entry.tool === this.activeTool),
             isDirty: this.#dirty,
             saveLabel: this.#saveLabel(),
+            helpOpen: HelpPanel.shows(this),
         };
     }
 
@@ -959,6 +971,11 @@ export class MapStudio {
         else next = (index + steps[event.key] + buttons.length) % buttons.length;
         buttons[next]?.focus();
         return true;
+    }
+
+    /** Opens the keyboard shortcuts sheet (Help's Show all shortcuts). */
+    openShortcuts() {
+        return this.#openShortcuts();
     }
 
     /** Opens the keyboard shortcuts sheet (see CanvasHints.sheet). */
@@ -4700,6 +4717,8 @@ export class MapStudio {
         this.#clearMassEditState();
         RegionLists.reset(this);
         StyleLists.reset(this);
+        // Help closes with the inspector below, and what it covered belongs to the tool being left
+        HelpPanel.forget(this);
         // The inspector belongs to the tool its object was opened from
         platform.dialogs.dismiss({ placement: "docked" });
 

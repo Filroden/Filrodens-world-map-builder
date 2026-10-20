@@ -67,6 +67,10 @@ const moduleInfo = {
     get version() {
         return game.modules.get(FILRODENSWMB.ID)?.version || "unknown";
     },
+    host: "foundry",
+    get hostVersion() {
+        return game.version ?? "unknown";
+    },
 };
 
 /**

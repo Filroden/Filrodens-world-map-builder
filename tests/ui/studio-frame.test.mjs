@@ -14,22 +14,27 @@ const STRINGS = JSON.parse(readFileSync(join(ROOT, "languages/en.json"), "utf8")
 const CSS = readFileSync(join(ROOT, "styles/filrodens-world-map-builder.css"), "utf8");
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { widthClass, isShort, STUDIO_WIDTH, STUDIO_SHORT_BELOW } = await import("../../src/ui/StudioLayout.js");
+const { widthClass, railFold, RAIL_FOLDS, STUDIO_WIDTH } = await import("../../src/ui/StudioLayout.js");
 const { CanvasHints } = await import("../../src/canvas/CanvasHints.js");
 const { MapStudio } = await import("../../src/applications/MapStudio.js");
 
 const { TOOLS, STAGES, OCCASIONAL } = FILRODENSWMB.STUDIO;
 
-test("the studio's width classes switch at 1,400 and 1,200px, and it is short below 680px", () => {
-    assert.deepEqual([STUDIO_WIDTH.COMPACT_BELOW, STUDIO_WIDTH.NARROW_BELOW, STUDIO_SHORT_BELOW], [1400, 1200, 680]);
+test("the studio's width classes switch at 1,400 and 1,200px, and the rail folds only as far as it must to fit", () => {
+    assert.deepEqual([STUDIO_WIDTH.COMPACT_BELOW, STUDIO_WIDTH.NARROW_BELOW], [1400, 1200]);
     assert.equal(widthClass(3840), "wide");
     assert.equal(widthClass(1400), "wide");
     assert.equal(widthClass(1399), "compact");
     assert.equal(widthClass(1200), "compact");
     assert.equal(widthClass(1199), "narrow");
     assert.equal(widthClass(1100), "narrow");
-    assert.equal(isShort(679), true);
-    assert.equal(isShort(680), false);
+    // A rail of a given length at each fold, in a studio of a given height
+    const fold = (height, lengths) => railFold((at) => lengths[RAIL_FOLDS.indexOf(at)] > height);
+    const rail = [800, 640, 530];
+    assert.equal(fold(900, rail), null, "it all fits");
+    assert.equal(fold(700, rail), "", "the occasional tools fold");
+    assert.equal(fold(600, rail), "files", "the file actions fold too");
+    assert.equal(fold(400, rail), "files", "no further: the rail scrolls");
 });
 
 test("the rail holds the three stages in order, then the occasional tools", () => {

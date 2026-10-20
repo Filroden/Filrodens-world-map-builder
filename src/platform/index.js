@@ -36,7 +36,8 @@
  * - `store`: the saved maps (see foundry/store.js for the methods and what they return).
  * - `assets`: `url(path)`, a stored asset path as a URL that resolves the same from any page or
  *   stylesheet.
- * - `module`: `version`, the module's version string.
+ * - `module`: `version`, the module's version string; `host`, "foundry" or "web"; `hostVersion`,
+ *   Foundry's version (null on the web).
  * - `grid`: `create({ type, size })`, a grid offering `getOffsetRange(rect)` and
  *   `getVertices({ i, j })` for "square", "hexR" and "hexC".
  * - `scene`: `available` (whether maps can be exported to a scene) and

@@ -56,7 +56,7 @@ export function createWebPlatform({ strings, lang, handlebars, fetchTemplate, re
         settings: createWebSettings(storage),
         store: createWebStore(records),
         assets: createWebAssets({ moduleId: manifest.id, baseUrl }),
-        module: { version: manifest.version },
+        module: { version: manifest.version, host: "web", hostVersion: null },
         grid: {
             create() {
                 throw new Error("Grids are only used by the scene export, which the web version does not offer");

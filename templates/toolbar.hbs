@@ -5,9 +5,10 @@
     MapStudio's rail keys).
 
     The occasional group holds the occasional tools, the 3D view, the Appearance menu (the reader's
-    colour theme, see AppearanceMenu) and, on the web, full screen. When the studio is short
-    (data-fwmb-short, see StudioLayout) they fold into the More menu, Appearance's two groups
-    inline; the file actions never fold. When it is narrow the
+    colour theme, see AppearanceMenu) and, on the web, full screen. When the whole rail does not fit
+    the studio's height (data-fwmb-short, see StudioLayout) they fold into the More menu,
+    Appearance's two groups inline; should that still not fit (data-fwmb-short="files"), the file
+    actions follow them into More. Help, last, never folds. When it is narrow the
     rail goes compact and the stage names are hidden visually, but stay as the groups' names.
 --}}
 <nav aria-label="{{localize 'FILRODENSWMB.UI.RailLabel'}}">
@@ -84,10 +85,23 @@
             </div>
             {{/each}}
             {{/if}}{{/each}}
+            {{!-- The file actions, in a very short studio --}}
+            <div role="group" class="fwmb-menu-group fwmb-rail-more-files" aria-labelledby="fwmb-more-files">
+                <div class="fwmb-menu-heading" id="fwmb-more-files">{{localize "FILRODENSWMB.UI.RailFiles"}}</div>
+                <button type="button" role="menuitem" class="{{#if isDirty}}fwmb-is-dirty{{/if}}" data-action="saveMap">
+                    <span class="fwmb-icon fwmb-icon--save" aria-hidden="true"></span> <span class="fwmb-menu-text">{{saveLabel}}</span>
+                </button>
+                <button type="button" role="menuitem" data-action="saveMapAs">
+                    <span class="fwmb-icon fwmb-icon--save-as" aria-hidden="true"></span> <span class="fwmb-menu-text">{{localize "FILRODENSWMB.UI.SaveMapAs"}}</span>
+                </button>
+                <button type="button" role="menuitem" data-action="changeTool" data-tool="manage" aria-current="{{#if (eq activeTool 'manage')}}page{{else}}false{{/if}}">
+                    <span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span> <span class="fwmb-menu-text">{{localize "FILRODENSWMB.UI.ToolManage"}}</span>
+                </button>
+            </div>
         </div>
     </div>
 
-    <span class="fwmb-rail-sep"></span>
+    <span class="fwmb-rail-sep fwmb-rail-sep--files"></span>
 
     <div class="fwmb-rail-group fwmb-rail-files" role="group" aria-label="{{localize 'FILRODENSWMB.UI.RailFiles'}}">
         <button type="button" class="fwmb-rail-btn{{#if isDirty}} fwmb-is-dirty{{/if}}" data-action="saveMap" aria-label="{{saveLabel}}" data-tooltip="{{saveLabel}}">
@@ -98,6 +112,14 @@
         </button>
         <button type="button" class="fwmb-rail-btn" data-action="changeTool" data-tool="manage" aria-label="{{localize 'FILRODENSWMB.UI.ToolManage'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToolManage'}}" aria-current="{{#if (eq activeTool 'manage')}}page{{else}}false{{/if}}">
             <span class="fwmb-icon fwmb-icon--folder-open" aria-hidden="true"></span>
+        </button>
+    </div>
+
+    {{!-- Help, last, in the inspector's column (see HelpPanel); never folded into More --}}
+    <span class="fwmb-rail-sep"></span>
+    <div class="fwmb-rail-group fwmb-rail-help" role="group" aria-label="{{localize 'FILRODENSWMB.UI.Help'}}">
+        <button type="button" class="fwmb-rail-btn" data-action="toggleHelp" aria-pressed="{{#if helpOpen}}true{{else}}false{{/if}}" aria-label="{{localize 'FILRODENSWMB.UI.Help'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Help'}}">
+            <span class="fwmb-icon fwmb-icon--help" aria-hidden="true"></span>
         </button>
     </div>
 </nav>

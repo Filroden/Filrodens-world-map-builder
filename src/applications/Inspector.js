@@ -37,6 +37,10 @@ import { platform } from "../platform/index.js";
  * - `actions`: optional buttons in the body (`data-inspector-action="name"`), each
  *   `(app, object, ref, button) => unknown`; the inspector is drawn again after one runs (or closed,
  *   if the object has gone).
+ * - `closed(app, ref, { replaced })`: optional; called once the inspector has closed, `replaced`
+ *   when another object opened in its place (Help uses it to bring back what it covered).
+ *
+ * Besides objects, the column shows Help (HelpPanel), a kind with nothing to apply.
  *
  * `ref` names the object: `{ id }`, plus whatever else the kind needs to find it (a region's level).
  */
@@ -63,7 +67,7 @@ export class Inspector {
         const object = kind.find(app, ref);
         if (!object) return false;
         // One docked dialogue at a time: the inspector replaces any other, and the one open
-        this.close(app);
+        this.close(app, { replaced: true });
         platform.dialogs.dismiss({ placement: "docked" });
         kind.opened?.(app, object, ref);
         if (!app.root) return false;
@@ -94,6 +98,7 @@ export class Inspector {
             if (this.#open.get(app) === state) this.#open.delete(app);
             app.refreshLayout?.();
             this.#markRows(app);
+            kind.closed?.(app, ref, { replaced: state.replaced === true });
         });
         app.refreshLayout?.();
         this.#markRows(app);
@@ -133,11 +138,17 @@ export class Inspector {
         return !!state && state.kind.id === kindId && state.ref.id === id;
     }
 
-    /** Closes the inspector, if open. */
-    static close(app) {
+    /**
+     * Closes the inspector, if open.
+     * @param {object} app
+     * @param {{replaced?: boolean}} [options] - `replaced`: another kind is opening in its place
+     *   (see the kind's `closed`).
+     */
+    static close(app, { replaced = false } = {}) {
         const state = this.#open.get(app);
         if (!state) return;
         this.#open.delete(app);
+        state.replaced = replaced;
         state.overlay.dismiss();
     }
 

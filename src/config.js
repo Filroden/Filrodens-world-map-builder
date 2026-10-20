@@ -701,6 +701,20 @@ export const FILRODENSWMB = {
             { id: "reference", action: "toggleLayer", icon: "image", label: "FILRODENSWMB.UI.LayerReference" },
         ],
     },
+    // Help's links (see HelpPanel). The tutorial's link is null until the tutorial exists, which
+    // hides it.
+    HELP: {
+        REPOSITORY: "https://github.com/Filroden/Filrodens-world-map-builder",
+        LICENCE: "https://github.com/Filroden/Filrodens-world-map-builder/blob/main/LICENSE.md",
+        SPONSOR: "https://github.com/sponsors/Filroden",
+        CHANGELOG: "https://filroden.com/modules/filroden-s-world-map-builder/",
+        WIKI: "https://github.com/Filroden/Filrodens-world-map-builder/wiki",
+        TUTORIAL: null,
+        ISSUE: "https://github.com/Filroden/Filrodens-world-map-builder/issues/new",
+        // The other host: the web version from Foundry, the Foundry module from the web
+        WEB_VERSION: "https://fwmb.filroden.com",
+        FOUNDRY_PACKAGE: "https://foundryvtt.com/packages/filrodens-world-map-builder",
+    },
     DISPLAY: {
         ALPHA: 0.8,
         GRID_ALPHA: 0.15,

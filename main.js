@@ -58,6 +58,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/parts/font-picker.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-decoration.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-fault.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/inspector-help.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-label-style.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-label.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-land-mask.hbs",

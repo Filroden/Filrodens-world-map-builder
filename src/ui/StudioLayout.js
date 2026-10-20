@@ -11,8 +11,10 @@ import { mustFoldMapControls } from "./MapControls.js";
  * - `data-fwmb-width` on the studio: `wide` (1,400px or more), `compact` (1,200 to 1,399px: the
  *   compact rail, panel and inspector widths) or `narrow` (below 1,200px: the same widths; kept
  *   for rules that need the narrowest studio).
- * - `data-fwmb-short` on the studio while it is less than 680px high: the rail folds its
- *   occasional tools into More.
+ * - `data-fwmb-short` on the studio while the whole rail would not fit its height: the rail folds
+ *   its occasional tools into More (`""`), and should that still not fit, its file actions too
+ *   (`"files"`). Help, last, never folds. The rail is measured rather than given a fixed height,
+ *   since its length depends on the host (full screen on the web) and the width (stage names).
  * - `--fwmb-controls-w` on the map preview: the map controls' width (bottom end), which the hint
  *   (bottom start) leaves free beside it.
  * - `--fwmb-hint-h` on the map preview: the hint's height, which the information bar (top start)
@@ -33,7 +35,9 @@ import { mustFoldMapControls } from "./MapControls.js";
  * and Foundry's interface scale as the rem lengths around them do.
  */
 export const STUDIO_WIDTH = Object.freeze({ COMPACT_BELOW: 1400, NARROW_BELOW: 1200 });
-export const STUDIO_SHORT_BELOW = 680;
+
+/** How far the rail folds, least first: nothing, the occasional tools, then the file actions too. */
+export const RAIL_FOLDS = Object.freeze([null, "", "files"]);
 
 /** The space kept between the canvas overlays, and between them and the canvas edge, in rem. */
 const OVERLAY_GAP_REM = 0.5;
@@ -52,12 +56,13 @@ export function widthClass(width) {
 }
 
 /**
- * Whether a studio height in CSS pixels is short enough for the rail to fold its occasional tools.
- * @param {number} height
- * @returns {boolean}
+ * How far the rail folds: the least fold it fits at, or the most if it fits at none.
+ * @param {(fold: string|null) => boolean} overflowsAt - Whether the rail overflows at a fold.
+ * @returns {string|null} The `data-fwmb-short` value, null for none.
  */
-export function isShort(height) {
-    return height < STUDIO_SHORT_BELOW;
+export function railFold(overflowsAt) {
+    const most = RAIL_FOLDS.at(-1);
+    return RAIL_FOLDS.find((fold) => fold === most || !overflowsAt(fold));
 }
 
 export class StudioLayout {
@@ -141,13 +146,12 @@ export class StudioLayout {
     update() {
         const root = this.#root;
         if (!root.isConnected) return;
-        const { width, height } = root.getBoundingClientRect();
+        const { width } = root.getBoundingClientRect();
         // A studio not laid out yet (a window still opening) measures 0; nothing to decide yet
         if (width === 0) return;
 
         setAttribute(root, "data-fwmb-width", widthClass(width));
-        if (isShort(height)) setAttribute(root, "data-fwmb-short", "");
-        else root.removeAttribute("data-fwmb-short");
+        this.#foldRail();
 
         const bar = this.#bar;
         if (bar && bar.offsetParent !== null) applyBarFold(bar);
@@ -173,6 +177,26 @@ export class StudioLayout {
             const room = preview.getBoundingClientRect().height - controls.getBoundingClientRect().height - 3 * gap;
             setProperty(preview, "--fwmb-layer-menu-max", `${Math.max(0, Math.floor(room))}px`);
         }
+    }
+
+    /**
+     * Folds the rail as far as it must to fit the studio's height (see railFold). Each fold is
+     * tried and measured in turn within this one task, so only the last is ever drawn.
+     */
+    #foldRail() {
+        const root = this.#root;
+        const rail = root.querySelector(".fwmb-toolbar");
+        // A rail not laid out (hidden, or no layout at all) keeps its fold
+        if (!rail || rail.clientHeight === 0) return;
+        const at = (fold) => {
+            if (fold === null) root.removeAttribute("data-fwmb-short");
+            else root.setAttribute("data-fwmb-short", fold);
+        };
+        const fold = railFold((fold) => {
+            at(fold);
+            return rail.scrollHeight > rail.clientHeight + 1;
+        });
+        at(fold);
     }
 
     /**
