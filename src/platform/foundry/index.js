@@ -8,6 +8,7 @@ import { FILRODENSWMB } from "../../config.js";
 import { labelFontList } from "../../data/fonts.js";
 import { createOverlayDialogs } from "../../ui/dialogs.js";
 import * as store from "./store.js";
+import { foundryAssets } from "./assets.js";
 
 /** Offered when Foundry's font list is not available yet. */
 
@@ -60,14 +61,6 @@ const settings = {
     set: (key, value) => game.settings.set(FILRODENSWMB.ID, key, value),
 };
 
-const assets = {
-    /**
-     * A stored asset path made root-relative (with any route prefix Foundry is configured with),
-     * so it resolves the same from any page or stylesheet. Complete URLs (http, https, and the data
-     * URLs a map made in the web version holds for its images) are returned unchanged.
-     */
-    url: (path) => (!path || /^(?:https?|data|blob):/i.test(path) ? path : foundry.utils.getRoute(path)),
-};
 
 const moduleInfo = {
     get version() {
@@ -122,4 +115,4 @@ const scene = {
     },
 };
 
-export const foundryPlatform = Object.freeze({ i18n, notify, utils, templates, fonts, dialogs, settings, store, assets, module: moduleInfo, grid, scene, frame: foundryFrame });
+export const foundryPlatform = Object.freeze({ i18n, notify, utils, templates, fonts, dialogs, settings, store, assets: foundryAssets, module: moduleInfo, grid, scene, frame: foundryFrame });

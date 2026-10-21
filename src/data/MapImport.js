@@ -1,6 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
 import { normaliseAreaFactor, ownersKeyFor, randomId, resolveSpacing } from "../mesh/Schema.js";
-import { ImageCheck } from "./ImageCheck.js";
 import { clean, cleanContext, RULES, STYLE_LIST_RULES } from "./MapRules.js";
 import { ImportRefusal, Sanitize } from "./Sanitize.js";
 
@@ -20,8 +19,9 @@ import { ImportRefusal, Sanitize } from "./Sanitize.js";
  * 4. **Consistency:** the map's size, the mesh's spacing and the ids other objects refer to are
  *    checked; a map that fails these is refused as damaged, since repairing them would lose data.
  * 5. **Text:** free text longer than its limit (LIMITS.TEXT) refuses the file, naming where.
- * 6. **Images:** an embedded image (a data URL) is checked by its bytes and kept only as what it
- *    really is; an SVG is cleaned (see ImageCheck).
+ * 6. **Images:** done afterwards by MapPackage.resolve: an embedded or packaged image is checked
+ *    by its bytes and kept only as what it really is (an SVG is cleaned, see ImageCheck), then
+ *    stored the host's way.
  *
  * Nothing is merged into existing state: the result is a new object the caller saves as a new map.
  */
@@ -54,14 +54,17 @@ export class MapImport {
 
     /**
      * A parsed map file made safe: the map data, its owner arrays (by level id) and how many values
-     * were dropped or replaced because they failed their rules. Embedded images are not checked
-     * here (that is asynchronous); call checkImages on the result before saving it.
+     * were dropped or replaced because they failed their rules. Embedded and packaged images are
+     * not checked here (that is asynchronous and depends on the host); MapPackage.resolve checks
+     * and stores them before the map is saved.
      *
      * @param {*} parsed - The file's JSON.
      * @param {{newId?: Function}} [options]
-     * @returns {{mapData: object, owners: Object<string, string>, name: string|null, corrected: number}}
+     * @returns {{mapData: object, owners: Object<string, string>, name: string|null, pinIcons: object[], corrected: number}}
      *     `name` is the map's name as the file carries it (see MapJson.toExport), or null for a
-     *     file from before exports carried one; it is kept apart from the map data, as a save keeps it.
+     *     file from before exports carried one; it is kept apart from the map data, as a save keeps
+     *     it. `pinIcons` are the custom pin icons the file carries for the map (see MapPackage),
+     *     which belong to the host's settings rather than the map.
      * @throws {ImportRefusal}
      */
     static read(parsed, { newId = randomId } = {}) {
@@ -80,25 +83,10 @@ export class MapImport {
         refuseOverLimit(context);
         normaliseAreaFactor(mapData);
         const name = typeof mapData.name === "string" && mapData.name.trim() ? mapData.name.trim() : null;
+        const pinIcons = mapData.pinIcons ?? [];
         delete mapData.name;
-        return { mapData, owners, name, corrected: context.corrected };
-    }
-
-    /**
-     * Checks every embedded image of a map (its decorations' data URLs) and keeps each as what its
-     * bytes are; an SVG is kept cleaned. A path is left alone: it names a file in the host's own
-     * data, which the host serves and the asset resolver reaches.
-     *
-     * @param {object} mapData - Changed in place.
-     * @param {object} [options] - Passed to ImageCheck (a decoder and a purifier, for tests).
-     * @returns {Promise<object>} The same mapData.
-     * @throws {ImportRefusal}
-     */
-    static async checkImages(mapData, options = {}) {
-        for (const decoration of mapData.mapDecorations ?? []) {
-            if (typeof decoration.src === "string" && decoration.src.startsWith("data:")) decoration.src = await ImageCheck.checkDataUrl(decoration.src, options);
-        }
-        return mapData;
+        delete mapData.pinIcons;
+        return { mapData, owners, name, pinIcons, corrected: context.corrected };
     }
 
     /**

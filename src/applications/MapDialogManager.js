@@ -41,13 +41,15 @@ export class MapDialogManager {
     /**
      * Says why an export was refused: the texts longer than an export allows, one per line, so
      * the user knows exactly what to shorten (see MapRules.overLimit). The list stops after
-     * OVER_LIMIT_SHOWN lines, with a count of the rest.
-     * @param {{where?: string, item?: string, field?: string, length: number, limit: number}[]} entries
+     * OVER_LIMIT_SHOWN lines, with a count of the rest. An entry naming its `map` (a backup's
+     * check of every map) is listed under that map's name.
+     * @param {{where?: string, item?: string, field?: string, length: number, limit: number, map?: string}[]} entries
      */
     static async showOverLimit(entries) {
         const { i18n } = platform;
         const escape = Sanitize.escapeHtml;
-        const shown = entries.slice(0, OVER_LIMIT_SHOWN).map((entry) => `<li>${escape(Sanitize.limitLine(entry, i18n))}</li>`);
+        const line = (entry) => (entry.map ? i18n.format("FILRODENSWMB.UI.LimitLineInMap", { map: entry.map, line: Sanitize.limitLine(entry, i18n) }) : Sanitize.limitLine(entry, i18n));
+        const shown = entries.slice(0, OVER_LIMIT_SHOWN).map((entry) => `<li>${escape(line(entry))}</li>`);
         const rest = entries.length - shown.length;
         const more = rest > 0 ? `<p>${escape(i18n.format("FILRODENSWMB.UI.ImportRefusedMore", { count: rest }))}</p>` : "";
         await platform.dialogs.choose({

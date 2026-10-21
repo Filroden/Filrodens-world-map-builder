@@ -40,6 +40,12 @@ const FONT_PATTERN = /^[\p{L}\p{N} _.'-]+$/u;
 const FONT_LENGTH = 100;
 /** An embedded image: a data URL of one of the image types the studio accepts, in base64. */
 const DATA_IMAGE = /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/]*={0,2}$/;
+/**
+ * A packaged image: a reference, by content hash, to an image file carried beside a map in a
+ * backup (see MapPackage). Only an import accepts one, and it is resolved before anything is saved.
+ */
+export const ASSET_SCHEME = "fwmb-asset:";
+const ASSET_REFERENCE = /^fwmb-asset:[0-9a-f]{32}$/;
 /** A URL scheme at the start of a string ("https:", "javascript:"). */
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 /** Characters that would end a quoted CSS url() or attribute, or start an escape, plus whitespace and controls. */
@@ -54,7 +60,7 @@ const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'
  */
 export class ImportRefusal extends Error {
     /**
-     * @param {"tooLarge"|"notMap"|"notStyles"|"damaged"|"textTooLong"|"image"} reason
+     * @param {"tooLarge"|"notMap"|"notStyles"|"notBackup"|"damaged"|"textTooLong"|"image"} reason
      * @param {object} [data]
      */
     constructor(reason, data = {}) {
@@ -72,6 +78,7 @@ const REFUSAL_KEYS = Object.freeze({
     notStyles: "FILRODENSWMB.UI.ImportRefusedNotStyles",
     damaged: "FILRODENSWMB.UI.ImportRefusedDamaged",
     textTooLong: "FILRODENSWMB.UI.ImportRefusedTextTooLong",
+    notBackup: "FILRODENSWMB.UI.ImportRefusedNotBackup",
     image: "FILRODENSWMB.UI.ImportRefusedImage",
 });
 
@@ -241,13 +248,17 @@ export class Sanitize {
      * library, but data from a file someone else made should not make the studio fetch from
      * anywhere it chooses.
      *
+     * A packaged image (`fwmb-asset:<hash>`) passes only when `packaged` is set, for an import
+     * that resolves it before saving (see MapPackage).
+     *
      * @param {*} value
-     * @param {{remote?: boolean, fallback?: string|null}} [options]
+     * @param {{remote?: boolean, packaged?: boolean, fallback?: string|null}} [options]
      * @returns {string|null}
      */
-    static imageSource(value, { remote = false, fallback = null } = {}) {
+    static imageSource(value, { remote = false, packaged = false, fallback = null } = {}) {
         if (typeof value !== "string" || value.length === 0) return fallback;
         if (value.startsWith("data:")) return DATA_IMAGE.test(value) ? value : fallback;
+        if (value.startsWith(ASSET_SCHEME)) return packaged && ASSET_REFERENCE.test(value) ? value : fallback;
         if (PATH_BREAKERS.test(value)) return fallback;
         if (SCHEME.test(value)) return remote && value.startsWith("https://") ? value : fallback;
         if (value.startsWith("/") || value.split("/").includes("..")) return fallback;

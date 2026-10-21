@@ -493,6 +493,10 @@ const MAP = obj({
     landMasks: list(LAND_MASK),
     mapLabels: list(LABEL),
     mapDecorations: list(DECORATION),
+    reference: obj({ src: { t: "image" }, alpha: num(RANGE.UNIT), scale: num(RANGE.SCALE), x: num(RANGE.COORD), y: num(RANGE.COORD) }, { nullable: true }),
+    // The custom pin icons the map's pins and pin styles use, which a file carries beside the map
+    // (see MapPackage); an import registers them and keeps them apart from the map data
+    pinIcons: list(obj({ id: { t: "id", strict: true }, name: name("FILRODENSWMB.UI.LimitKindIcon"), src: { t: "image" } })),
     parentId: ref(),
     vectorSchemaVersion: int(0, 1000),
     mesh: obj({
@@ -603,7 +607,7 @@ const CLEANERS = {
     bool: (value) => orDrop(Sanitize.bool(value)),
     null: () => null,
     font: (value) => orDrop(Sanitize.fontFamily(value)),
-    image: (value) => orDrop(Sanitize.imageSource(value)),
+    image: (value) => orDrop(Sanitize.imageSource(value, { packaged: true })),
     base64: (value) => (typeof value === "string" && /^[A-Za-z0-9+/]*={0,2}$/.test(value) ? value : DROP),
     points: (value) => (Array.isArray(value) ? value.filter(isPoint) : DROP),
     cells: (value) => (Array.isArray(value) ? value.filter(isCell) : DROP),

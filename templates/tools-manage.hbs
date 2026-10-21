@@ -75,4 +75,17 @@
         <i class="fwmb-icon fwmb-icon--upload-file"></i>
         {{localize "FILRODENSWMB.UI.ImportJSON"}}
     </button>
+
+    {{!-- Every saved map in one file (MapTransfer): the web's safeguard against cleared browser storage, a world's backup in Foundry --}}
+    <div class="fwmb-backup">
+        <h4 class="fwmb-backup-heading">{{localize "FILRODENSWMB.UI.BackupHeading"}}</h4>
+        <button type="button" class="fwmb-btn" data-action="backUpMaps" data-tooltip="{{localize 'FILRODENSWMB.UI.BackUpAllMapsHint'}}">
+            <i class="fwmb-icon fwmb-icon--file-export"></i>
+            {{localize "FILRODENSWMB.UI.BackUpAllMaps"}}
+        </button>
+        <button type="button" class="fwmb-btn" data-action="restoreBackup" data-tooltip="{{localize 'FILRODENSWMB.UI.RestoreFromBackupHint'}}">
+            <i class="fwmb-icon fwmb-icon--upload-file"></i>
+            {{localize "FILRODENSWMB.UI.RestoreFromBackup"}}
+        </button>
+    </div>
 </div>

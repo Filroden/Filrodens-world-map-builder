@@ -3736,6 +3736,42 @@ input.fwmb-swatch {
     background-color: #689cd1;
 }
 
+/* Maps tool: the Backup group under the import (Back up all maps, Restore from backup) */
+.fwmb-backup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-size-4);
+    margin-block-start: var(--fwmb-size-10);
+}
+.fwmb-backup-heading {
+    font-family: var(--fwmb-font-display);
+    font-weight: 600;
+    color: var(--fwmb-text-secondary);
+    font-size: var(--fwmb-size-12);
+    margin: 0;
+}
+
+/* Restore from backup: the backup's maps as a tree of ticks, regional maps indented */
+.fwmb-restore-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-size-4);
+}
+.fwmb-restore > .fwmb-restore-list {
+    max-height: 20rem;
+    overflow-y: auto;
+}
+.fwmb-restore-list--nested {
+    padding-inline-start: 1.25rem;
+    margin-block-start: var(--fwmb-size-4);
+}
+.fwmb-restore-name {
+    overflow-wrap: anywhere;
+}
+
 /* Manage Maps Card UI */
 .fwmb-panel-header h3 {
     font-family: var(--fwmb-font-display);

@@ -9,10 +9,8 @@ import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { RenderTimer } from "../tools/RenderTimer.js";
-import { MapJson } from "../data/MapJson.js";
 import { MapImport } from "../data/MapImport.js";
-import { MapNames } from "../data/MapNames.js";
-import { overLimit } from "../data/MapRules.js";
+import { MapTransfer } from "./MapTransfer.js";
 import { ImportRefusal, Sanitize } from "../data/Sanitize.js";
 import { Scene3D } from "../canvas/Scene3D.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
@@ -203,6 +201,8 @@ export class MapStudio {
         generateRandomLandMask(e, t)    { this._onGenerateRandomLandMask(e, t); },
         generateRegionalMap(e, t)       { this._onGenerateRegionalMap(e, t); },
         importMapJson(e, t)             { this._onImportMapJson(e, t); },
+        backUpMaps(e, t)                { this._onBackUpMaps(e, t); },
+        restoreBackup(e, t)             { this._onRestoreBackup(e, t); },
         importSettings(e, t)            { this._onImportSettings(e, t); },
         manageMap(e, t)                 { this._onManageMapAction(e, t); },
         nudgeNoise(e, t)                { this._onNudgeNoise(e, t); },
@@ -3817,13 +3817,39 @@ export class MapStudio {
         this.globalHistoryLedger = [];
         this.globalRedoLedger = [];
 
+        // The map's own reference image, or none for a map saved without one (or before maps
+        // kept it), so the previous map's image is not left behind on this one
+        this.#applyReferenceData(payload.reference);
+
         this.defaultUiState = platform.utils.deepClone(this.uiState);
 
         this.view?.render(["toolbar", "context"]);
         await this.generateTerrain();
         await MeshIntegration.finishLoad(this, this.#processingOverlay());
         this.#updateGrid();
+        this.#updateReferenceLayer({ changed: false });
         this.canvasEngine.resetCamera();
+    }
+
+    /** The reference image as a save writes it (see _buildSavePayload), or null when there is none. */
+    #referenceData() {
+        const { referenceImage, referenceAlpha, referenceScale, referenceX, referenceY } = this.uiState;
+        return referenceImage ? { src: referenceImage, alpha: referenceAlpha, scale: referenceScale, x: referenceX, y: referenceY } : null;
+    }
+
+    /**
+     * Sets the reference image from a loaded map's saved one, or clears it (centred, full size,
+     * half opacity) when the map has none.
+     * @param {{src: string, alpha?: number, scale?: number, x?: number, y?: number}|null|undefined} reference
+     */
+    #applyReferenceData(reference) {
+        const defaults = MapStateManager.buildDefaultUiState(this.mapWidth, this.mapHeight);
+        const src = reference?.src ? Sanitize.imageSource(reference.src, { remote: true }) : null;
+        this.uiState.referenceImage = src ?? "";
+        this.uiState.referenceAlpha = Number.isFinite(reference?.alpha) && src ? reference.alpha : defaults.referenceAlpha;
+        this.uiState.referenceScale = Number.isFinite(reference?.scale) && src ? reference.scale : defaults.referenceScale;
+        this.uiState.referenceX = Number.isFinite(reference?.x) && src ? reference.x : defaults.referenceX;
+        this.uiState.referenceY = Number.isFinite(reference?.y) && src ? reference.y : defaults.referenceY;
     }
 
     /** Stops the cancellable work under way (see runCancellable); null when there is none. */
@@ -3939,10 +3965,16 @@ export class MapStudio {
         LabelEditor.open(this, { type: "custom", id }, { created: true });
     }
 
-    #updateReferenceLayer() {
+    /**
+     * Draws the reference image as uiState describes it. It is saved with the map, so a change to
+     * it is a change to the map; a map opening with its own image (`changed: false`) is not.
+     * @param {{changed?: boolean}} [options]
+     */
+    #updateReferenceLayer({ changed = true } = {}) {
         if (this.canvasEngine) {
             this.canvasEngine.updateReferenceImage(this.uiState.referenceImage, this.uiState.referenceX, this.uiState.referenceY, this.uiState.referenceScale, this.uiState.referenceAlpha);
         }
+        if (changed) this.markDirty();
     }
 
     /**
@@ -4050,6 +4082,9 @@ export class MapStudio {
             landMasks: this.landMasks,
             mapLabels: this.mapLabels,
             mapDecorations: this.mapDecorations,
+            // The reference image with its place, size and opacity, so it is there again when the
+            // map is opened; null when the map has none
+            reference: this.#referenceData(),
             parentId: this.currentParentId,
         };
 
@@ -5032,59 +5067,65 @@ export class MapStudio {
     }
 
     /**
-     * Opens a system file dialogue and imports the chosen map file as a new saved map. The file
-     * goes through MapImport (size, structure, the allow-list of fields, consistency, text limits
-     * and embedded images) before anything is saved, and a file it refuses is reported with the
-     * reason, localised. The map keeps the name it was saved under (or, from a file exported before
-     * files carried it, the file's name), numbered when a saved map already has it.
+     * Opens a system file dialogue and imports the chosen map file as a new saved map (see
+     * MapTransfer.importMap: the file's data through MapImport, its images and custom pin icons
+     * through MapPackage). A file that is refused is reported with the reason, localised.
      */
     async _onImportMapJson(_event, _target) {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".json";
+        const file = await MapStudio.#chooseFile(".json");
+        if (!file) return;
 
-        input.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ImportingMap"));
-
-            try {
-                const parsed = MapImport.parse(await MapImport.readText(file));
-                // A file carries the owner arrays inside it (see MapJson); the compendium keeps them apart
-                const { mapData, owners, name: savedName, corrected } = MapImport.read(parsed, { newId: () => platform.utils.randomID() });
-                await MapImport.checkImages(mapData);
-                // The name the map was saved under, which the file carries; an older file has none,
-                // and the map is named after the file instead
-                const baseName = savedName ?? MapNames.fromFileName(file.name, platform.i18n.localize("FILRODENSWMB.UI.UnnamedMap"));
-                const name = MapNames.unique(baseName, MapNames.namesIn(await platform.store.getSavedMaps()), this.#numberedMapName);
-                await platform.store.saveMapData(name, mapData, null, { owners });
-
-                platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ImportSuccess", { name }));
-                if (corrected > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.ImportCorrected", { count: corrected }));
-
-                // Flag now, at import time, rather than waiting for the GM to load the map -
-                // custom pin icons are world-local (see pinIcons.js), so a JSON export from a
-                // different world commonly won't resolve here.
-                const { affectedPinCount } = findUnresolvedPinIcons(mapData.mapPins);
-                if (affectedPinCount > 0) {
-                    platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
-                }
-
-                this.view?.render(["toolbar", "context"]);
-            } catch (err) {
-                console.error("FWMB | Import Failed:", err);
-                platform.notify.error(err instanceof ImportRefusal ? Sanitize.refusalMessage(err, platform.i18n) : platform.i18n.localize("FILRODENSWMB.UI.ImportError"));
-            } finally {
-                this.#endProcessing();
-            }
-        };
-
-        input.click();
+        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ImportingMap"));
+        try {
+            const { name, corrected, missing, unresolvedIcons } = await MapTransfer.importMap(file);
+            platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ImportSuccess", { name }));
+            if (corrected > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.ImportCorrected", { count: corrected }));
+            if (missing > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.ImportImagesLeftOut", { count: missing }));
+            // Pins on a custom icon the file did not carry (from an older export) fall back to the default
+            if (unresolvedIcons > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: unresolvedIcons }));
+            this.view?.render(["toolbar", "context"]);
+        } catch (err) {
+            console.error("FWMB | Import Failed:", err);
+            platform.notify.error(err instanceof ImportRefusal ? Sanitize.refusalMessage(err, platform.i18n) : platform.i18n.localize("FILRODENSWMB.UI.ImportError"));
+        } finally {
+            this.#endProcessing();
+        }
     }
 
-    /** A map name with a number after it, for an import whose name is already taken (see MapNames). */
-    #numberedMapName = (name, number) => platform.i18n.format("FILRODENSWMB.UI.NumberedMapName", { name, number });
+    /** Back up all maps: every saved map, with its images and custom pin icons, in one zip (see MapTransfer.backUp). */
+    async _onBackUpMaps(_event, _target) {
+        await MapTransfer.backUp(this.#processingOverlay());
+    }
+
+    /** Restore from backup: maps from a backup zip added as new saved maps (see MapTransfer.restore). */
+    async _onRestoreBackup(_event, _target) {
+        const file = await MapStudio.#chooseFile(".zip");
+        if (!file) return;
+        try {
+            if (await MapTransfer.restore(file, this.#processingOverlay())) this.view?.render(["toolbar", "context"]);
+        } catch (err) {
+            console.error("FWMB | Restore Failed:", err);
+            platform.notify.error(err instanceof ImportRefusal ? Sanitize.refusalMessage(err, platform.i18n) : platform.i18n.localize("FILRODENSWMB.UI.ImportError"));
+        }
+    }
+
+    /**
+     * Opens the browser's file chooser and resolves with the chosen file, or null. A chooser
+     * closed without a choice fires no event in every browser, so that case simply never resolves
+     * the caller's work; nothing is left waiting on it but this promise.
+     * @param {string} accept
+     * @returns {Promise<File|null>}
+     */
+    static #chooseFile(accept) {
+        return new Promise((resolve) => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = accept;
+            input.addEventListener("change", () => resolve(input.files?.[0] ?? null));
+            input.addEventListener("cancel", () => resolve(null));
+            input.click();
+        });
+    }
 
     /**
      * Prompts the GM to choose which Style Library registries to bundle into a shareable JSON
@@ -5455,28 +5496,9 @@ export class MapStudio {
         }
     }
 
+    /** Export JSON: the map in one file, with its images and custom pin icons (see MapTransfer.exportMap). */
     async #handleMapExport(mapId, card) {
-        const exportData = await platform.store.loadMapData(mapId);
-        if (!exportData) return;
-
-        const rawName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-        const mapName = rawName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-
-        // An export never writes text an import would refuse: it is refused here instead, naming
-        // what to shorten (the limits are FILRODENSWMB.LIMITS.TEXT)
-        const tooLong = overLimit(exportData, { "FILRODENSWMB.UI.LimitFieldName": rawName });
-        if (tooLong.length) {
-            await MapDialogManager.showOverLimit(tooLong);
-            return;
-        }
-
-        // The owner arrays and the map's name travel inside the file (see MapJson)
-        const blob = new Blob([JSON.stringify(MapJson.toExport(exportData, await platform.store.loadMapOwners(mapId), rawName), null, 2)], { type: "application/json" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `fwmb_${mapName}.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        await MapTransfer.exportMap(mapId, card.querySelector(".fwmb-map-card-info").textContent.trim());
     }
 
     _onNudgeNoise(event, target) {

@@ -349,6 +349,21 @@ export const FILRODENSWMB = {
             // The longest id or key
             ID_LENGTH: 64,
         },
+        // A backup of every saved map (a zip: manifest.json, maps/<id>.json, assets/<hash>.<ext>)
+        BACKUP: {
+            // A backup larger than this is offered without its images ("Maps only") as well
+            WARN_BYTES: 209715200,
+            // The largest backup file read, in bytes
+            BYTES: 1073741824,
+            // The most entries a backup may hold
+            ENTRIES: 10000,
+            // The most its entries may hold once unpacked, in bytes
+            UNPACKED_BYTES: 2147483648,
+            // An entry that unpacks to more than RATIO times its packed size is refused (a zip
+            // bomb); entries unpacking to less than RATIO_FLOOR bytes are too small to matter
+            RATIO: 100,
+            RATIO_FLOOR: 1048576,
+        },
         // Images a user picks or a file brings in (reference images, decorations, custom pin icons)
         IMAGE: {
             // The largest image file, in bytes

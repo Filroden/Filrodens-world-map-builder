@@ -105,6 +105,14 @@ export function getCustomPinIconList() {
 }
 
 /**
+ * Every custom icon's raw stored entry (`{ id, name, path }`, the path as stored), for carrying
+ * the icons a map uses in an export or backup (see MapPackage).
+ */
+export function getCustomPinIconEntries() {
+    return getCustomPinIcons().map((entry) => ({ ...entry }));
+}
+
+/**
  * A single custom icon's raw stored entry, exactly as FilePicker returned its path - used to
  * prefill the add/edit dialogue, where the native `<file-picker>` element needs the original
  * Data-relative path rather than the mask-safe URL getCustomPinIconList() exposes.
