@@ -263,6 +263,9 @@
 .fwmb-icon--palette {
     --fwmb-mask: url("../assets/icons/palette.svg");
 }
+.fwmb-icon--ssid-chart {
+    --fwmb-mask: url("../assets/icons/ssid_chart.svg");
+}
 
 /* --- PINHEAD ICONS --- */
 .fwmb-icon--anchor {

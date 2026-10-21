@@ -664,7 +664,7 @@ export const FILRODENSWMB = {
             scene: { icon: "grid-on", label: "FILRODENSWMB.UI.ToolCreateMap" },
             terrain: { icon: "landscape", label: "FILRODENSWMB.UI.ToolTerrain" },
             biomes: { icon: "forest", label: "FILRODENSWMB.UI.ToolBiomes" },
-            features: { icon: "water-drop", label: "FILRODENSWMB.UI.ToolFeatures" },
+            features: { icon: "ssid-chart", label: "FILRODENSWMB.UI.ToolFeatures" },
             regions: { icon: "pentagon", label: "FILRODENSWMB.UI.ToolRegions" },
             infrastructure: { icon: "location-city", label: "FILRODENSWMB.UI.ToolInfrastructure" },
             labels: { icon: "insert-text", label: "FILRODENSWMB.UI.ToolLabels" },
