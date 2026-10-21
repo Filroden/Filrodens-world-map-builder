@@ -36,6 +36,14 @@ import { RangeDisplay } from "../tools/RangeDisplay.js";
 /** Elements carrying this attribute are never changed or removed by a redraw. */
 const MORPH_IGNORE_ATTRIBUTE = "data-morph-ignore";
 
+/**
+ * A list whose rows are drawn by version (see ListQuery): its template draws it empty, naming its
+ * rows (data-list-rows) and their version; the rows are put in from listRows only when the version
+ * changes, and left alone otherwise.
+ */
+const LIST_VERSION_ATTRIBUTE = "data-list-version";
+const LIST_ROWS_ATTRIBUTE = "data-list-rows";
+
 /** Marks a region's element (and its placeholder before the first draw) with the region's id. */
 const REGION_ATTRIBUTE = "data-region";
 
@@ -80,6 +88,12 @@ export class StudioView {
     /** Regions drawn at least once. */
     #drawn = new Set();
 
+    /** @type {(list: string) => string} */
+    #listRows;
+
+    /** The version of the rows each versioned list on the page holds. */
+    #listVersions = new WeakMap();
+
     #destroyed = false;
 
     /**
@@ -92,8 +106,10 @@ export class StudioView {
      * @param {object} options.controller - `this` for the handlers.
      * @param {(regions: string[]) => void} [options.afterRender] - Runs after each redraw with the
      *     regions that were drawn, for updates made straight to the page.
+     * @param {(list: string) => string} [options.listRows] - The HTML of a versioned list's rows, by
+     *     the name its data-list-rows gives.
      */
-    constructor({ root, regions, renderTemplate, buildContext, actions, controller, afterRender = () => {} }) {
+    constructor({ root, regions, renderTemplate, buildContext, actions, controller, afterRender = () => {}, listRows = () => "" }) {
         this.#root = root;
         this.#regions = regions;
         this.#renderTemplate = renderTemplate;
@@ -101,6 +117,7 @@ export class StudioView {
         this.#actions = actions;
         this.#controller = controller;
         this.#afterRender = afterRender;
+        this.#listRows = listRows;
 
         root.addEventListener("click", this.#onClick);
         root.addEventListener("input", this.#onSliderInput);
@@ -172,6 +189,26 @@ export class StudioView {
                 beforeNodeRemoved: (oldNode) => !StudioView.#isIgnored(oldNode),
             },
         });
+        this.#fillLists(this.#regionElement(id));
+    }
+
+    /**
+     * Puts their rows into the region's versioned lists whose version has changed (or that are new
+     * on the page), in one go: comparing thousands of rows one by one would take seconds. A list
+     * keeps its scroll position, and the row that had focus gets it back.
+     */
+    #fillLists(region) {
+        for (const list of region.querySelectorAll(`[${LIST_VERSION_ATTRIBUTE}]`)) {
+            const version = list.getAttribute(LIST_VERSION_ATTRIBUTE);
+            if (this.#listVersions.get(list) === version) continue;
+            const focused = list.ownerDocument.activeElement;
+            const focusedId = list.contains(focused) ? focused.closest("[data-id]")?.dataset.id : null;
+            const scrollTop = list.scrollTop;
+            list.innerHTML = this.#listRows(list.getAttribute(LIST_ROWS_ATTRIBUTE)) ?? "";
+            list.scrollTop = scrollTop;
+            if (focusedId) list.querySelector(`[data-id="${CSS.escape(focusedId)}"]`)?.focus({ preventScroll: true });
+            this.#listVersions.set(list, version);
+        }
     }
 
     /** The region's element, or its placeholder, creating the placeholder in its slot if needed. */
@@ -217,9 +254,26 @@ export class StudioView {
      */
     static #allowMorph(oldNode, newNode) {
         if (StudioView.#isIgnored(oldNode)) return false;
+        if (StudioView.#isVersionedList(oldNode, newNode)) return StudioView.#morphList(oldNode, newNode);
         if (oldNode.nodeType !== Node.ELEMENT_NODE || !oldNode.localName.includes("-")) return true;
         StudioView.#syncCustomElement(oldNode, newNode);
         return false;
+    }
+
+    /** Whether both elements are a list drawn by version (data-list-version; see ListQuery). */
+    static #isVersionedList(oldNode, newNode) {
+        return oldNode.nodeType === Node.ELEMENT_NODE && oldNode.hasAttribute(LIST_VERSION_ATTRIBUTE) && newNode.nodeType === Node.ELEMENT_NODE && newNode.hasAttribute(LIST_VERSION_ATTRIBUTE);
+    }
+
+    /** A versioned list's own attributes are brought up to date; its rows are #fillLists' to change. */
+    static #morphList(oldList, newList) {
+        StudioView.#syncAttributes(oldList, newList);
+        return false;
+    }
+
+    static #syncAttributes(oldElement, newElement) {
+        for (const { name, value } of [...newElement.attributes]) if (oldElement.getAttribute(name) !== value) oldElement.setAttribute(name, value);
+        for (const { name } of [...oldElement.attributes]) if (!newElement.hasAttribute(name) && name !== REGION_ATTRIBUTE) oldElement.removeAttribute(name);
     }
 
     static #syncCustomElement(oldElement, newElement) {

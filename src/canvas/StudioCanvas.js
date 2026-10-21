@@ -1631,10 +1631,10 @@ export class StudioCanvas {
             return obj.label;
         };
 
-        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all", parentId = null, parentType = "custom", layerId = null) => {
+        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all", parentId = null, parentType = "custom", layerId = null, { startsAtDefault = false } = {}) => {
             if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name) return;
 
-            const x = labelData.x ?? defaultX;
+            let x = labelData.x ?? defaultX;
             const y = labelData.y ?? defaultY;
             const rotation = labelData.rotation ?? 0;
 
@@ -1671,6 +1671,9 @@ export class StudioCanvas {
             const style = new PIXI.TextStyle(styleConfig);
 
             const text = new PIXI.Text(name, style);
+            // A label not yet placed that starts at its default point (a pin's) is centred half its
+            // own width further on, so its first letter is where the point is
+            if (startsAtDefault && labelData.x === undefined) x += text.width / 2;
             text.anchor.set(0.5);
             text.x = x;
             text.y = y;
@@ -1679,9 +1682,8 @@ export class StudioCanvas {
             this.layers.labels.addChild(text);
 
             if (isEditMode) {
-                labelData.x = x;
-                labelData.y = y;
-
+                // The label's own position is written only when it is dragged (see #dragHeldItem):
+                // until then it follows its pin, route or region
                 const hitRadius = Math.max(text.width, text.height) / 2;
                 this.interactiveTargets.push({
                     target: labelData,
@@ -1700,10 +1702,12 @@ export class StudioCanvas {
         // Custom Labels
         mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all", label.id, "custom"));
 
-        // Auto-Labels: Pins (Offset Top Right)
+        // Pins' labels: beside the pin, starting one pin width to its right and centred on it
+        // vertically, so the gap grows only with the pin
+        const pinWidth = (pin) => FILRODENSWMB.SYMBOLS.PIN_PX * FILRODENSWMB.SYMBOLS.UNIT * resScale * (pin.scale || FILRODENSWMB.PINS.DEFAULT_SCALE);
         mapPins.forEach((pin) => {
             if (!pin.icon) return;
-            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility, pin.id, "pin");
+            drawLabel(pin.name, ensureLabelData(pin), pin.x + pinWidth(pin), pin.y, pin.visibility, pin.id, "pin", null, { startsAtDefault: true });
         });
 
         this.#drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession);

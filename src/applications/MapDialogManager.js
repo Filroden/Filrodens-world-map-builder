@@ -766,6 +766,40 @@ export class MapDialogManager {
         await this.deleteEntityById(app, entityType, target.closest(".fwmb-list-item").dataset.id);
     }
 
+    /** The lists Mass Edit can delete from, with the noun its confirmation counts. */
+    static #MASS_DELETE = Object.freeze({
+        pin: "FILRODENSWMB.UI.MassDeletePins",
+        route: "FILRODENSWMB.UI.MassDeleteRoutes",
+        label: "FILRODENSWMB.UI.MassDeleteLabels",
+    });
+
+    /**
+     * Mass Edit's Delete: every pin, route or standalone label chosen in its list, after a
+     * confirmation giving how many, as one undo step. The choice is cleared afterwards.
+     * @param {object} app
+     * @param {string} type - "pin", "route" or "label".
+     * @returns {Promise<boolean>} Whether anything was deleted.
+     */
+    static async massDelete(app, type) {
+        const config = FILRODENSWMB.ENTITY_CONFIG[type];
+        const selection = app.massEditSelection?.[type];
+        if (!config || !this.#MASS_DELETE[type] || !selection?.size) return false;
+        const count = selection.size.toLocaleString(platform.i18n.lang);
+        const confirmed = await this._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.MassDeleteTitle"), platform.i18n.format(this.#MASS_DELETE[type], { count }));
+        if (!confirmed) return false;
+
+        MapStateManager.pushVectorState(app);
+        app[config.stateKey] = app[config.stateKey].filter((item) => !selection.has(item.id));
+        if (config.activeKey && selection.has(app[config.activeKey])) app[config.activeKey] = null;
+        if (type === "route") for (const id of selection) app.meshSession?.forgetRoute(id);
+        selection.clear();
+
+        app._repaintVectors();
+        app.view?.render(["context"]);
+        app.markDirty();
+        return true;
+    }
+
     /**
      * Deletes one pin, river, fault, decoration or label (by ENTITY_CONFIG's type) after the
      * standard confirmation, as one undo step: from its list's delete button or the inspector.

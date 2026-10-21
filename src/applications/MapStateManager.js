@@ -1,3 +1,4 @@
+import { panelSettings } from "../generator/GeneratorSettings.js";
 import { FILRODENSWMB } from "../config.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
@@ -108,6 +109,9 @@ export class MapStateManager {
             world: null,
             // Whether the generator's outputs were made with a different km scale than the map has now (see MapStudio's area factor setting)
             generatorStale: false,
+            // The Generate panel's settings: the run's seed (empty for the map's), name style,
+            // world multipliers and output switches (see GeneratePanel)
+            generatorSettings: panelSettings(),
             // Set when the owner of a legacy map declined updating it and asked not to be asked
             // again (see TerrainUpgrade.dismiss); never true for a map built at the current revision.
             terrainUpgradeDismissed: false,

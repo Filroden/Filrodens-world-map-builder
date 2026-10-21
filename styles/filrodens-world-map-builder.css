@@ -44,6 +44,9 @@
 .fwmb-icon--pentagon {
     --fwmb-mask: url("../assets/icons/pentagon.svg");
 }
+.fwmb-icon--generate {
+    --fwmb-mask: url("../assets/icons/castle.svg");
+}
 .fwmb-icon--elevation {
     --fwmb-mask: url("../assets/icons/elevation.svg");
 }
@@ -1500,6 +1503,71 @@
     color: var(--fwmb-overlay-text);
     box-shadow: var(--fwmb-shadow-window);
 }
+/* A long list's search and filters (parts/list-query.hbs) */
+.fwmb-list-query {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin-block-end: 0.5rem;
+}
+.fwmb-list-search {
+    width: 100%;
+}
+.fwmb-list-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.375rem;
+}
+.fwmb-list-filters select {
+    min-width: 0;
+}
+/* A long list's rows are laid out and painted only near the view, so thousands stay quick */
+.fwmb-list-container[data-list-version] > .fwmb-list-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 2rem;
+}
+/* A long list's Mass Edit bar: choosing on one line, deleting and editing on the next */
+.fwmb-mass-edit-bar.fwmb-mass-edit-bar--list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.375rem;
+}
+.fwmb .fwmb-mass-edit-bar--list .fwmb-btn {
+    justify-content: center;
+    min-width: 0;
+    text-align: center;
+}
+
+/* The Generate panel (tools-generate.hbs): its notices and the last run's figures */
+.fwmb-generate-notice {
+    color: var(--fwmb-color-warning);
+}
+.fwmb-generate-action {
+    display: flex;
+    margin: 0.5rem;
+}
+.fwmb .fwmb-generate-action .fwmb-btn {
+    flex: 1;
+    justify-content: center;
+}
+.fwmb-generate-results {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.25rem 0.75rem;
+    margin: 0;
+}
+.fwmb-generate-results dt {
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-generate-results dd {
+    margin: 0;
+    text-align: end;
+}
+.fwmb-processing-detail {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--fwmb-overlay-muted);
+}
 .fwmb-progress {
     height: 0.375rem;
     border-radius: 0.1875rem;
@@ -1792,6 +1860,7 @@
 }
 
 .fwmb input[type="text"],
+.fwmb input[type="search"],
 .fwmb input[type="number"],
 .fwmb input[type="time"],
 .fwmb select,
@@ -1819,11 +1888,12 @@
     width: 8ch;
 }
 
-.fwmb :is(input[type="text"], input[type="number"], input[type="time"], select, textarea):hover {
+.fwmb :is(input[type="text"], input[type="search"], input[type="number"], input[type="time"], select, textarea):hover {
     border-color: var(--fwmb-accent-main);
 }
 
 .fwmb input[type="text"]:focus,
+.fwmb input[type="search"]:focus,
 .fwmb input[type="number"]:focus,
 .fwmb input[type="time"]:focus,
 .fwmb select:focus,

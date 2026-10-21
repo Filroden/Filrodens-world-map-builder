@@ -1,82 +1,40 @@
 {{!--
-    Routes and pins (tool id "infrastructure"): the map's pins and routes. Placing pins and drawing
-    routes are the bar's modes; Mass Edit is toggled from each list's title.
+    Routes and pins (tool id "infrastructure"): the map's pins and routes, each list searched
+    and filtered, its rows rendered only when they change (see ListQuery). Placing pins and drawing routes are the
+    bar's modes; Mass Edit (with Delete) is toggled from each list's title.
 --}}
-{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="pins" title="FILRODENSWMB.UI.SectionPins" count=mapPins.length massType="pin"}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="pins" title="FILRODENSWMB.UI.SectionPins" count=pinList.total massType="pin"}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/list-query.hbs" query=pinList.controls kindLabel="FILRODENSWMB.UI.ListKindPin"}}
     {{#if massEditMode.pin}}
-    <div class="fwmb-mass-edit-bar">
-        <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="pin">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
-        <a class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="pin">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
-        <span class="fwmb-flex-1"></span>
+    <div class="fwmb-mass-edit-bar fwmb-mass-edit-bar--list">
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="massEditSelectAll" data-type="pin">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="massEditSelectNone" data-type="pin">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-action="massDelete" data-type="pin" {{#unless massEditCount.pin}}disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.MassDeleteHint'}}">
+            {{localize "FILRODENSWMB.UI.MassDelete" count=massEditCount.pin}}
+        </button>
         <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="openMassEdit" data-type="pin" {{#unless massEditCount.pin}}disabled{{/unless}}>
             {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.pin}})
         </button>
     </div>
     {{/if}}
 
-    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionPins'}}" data-list-nav id="fwmb-scroll-pins" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
-        {{#each mapPins}}
-        <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.pin)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="pin" data-action="editPin">
-            {{#if ../massEditMode.pin}}
-                <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="pin" data-panel-ui {{#if this.massEditSelected}}checked{{/if}} />
-            {{/if}}
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
-            </button>
-                
-            <i class="fwmb-icon fwmb-list-icon fwmb-icon--{{this.icon}}"></i>
-            <div class="fwmb-pin" style="background-color: {{this.color}};"></div>
-
-            <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
-            <span class="fwmb-actions">
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                    <i class="fwmb-icon fwmb-icon--center-focus"></i>
-                </button>
-                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deletePin" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                    <i class="fwmb-icon fwmb-icon--delete"></i>
-                </button>
-            </span>
-        </div>
-        {{else}}
-        <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoPoints"}}</div>
-        {{/each}}
-    </div>
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionPins'}}" data-list-nav id="fwmb-scroll-pins" data-list-version="{{pinList.version}}" data-list-rows="pin" data-list-selected="{{pinList.selected}}" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable"></div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
-{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="routes" title="FILRODENSWMB.UI.Routes" count=mapRoutes.length massType="route"}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="routes" title="FILRODENSWMB.UI.Routes" count=routeList.total massType="route"}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/list-query.hbs" query=routeList.controls kindLabel="FILRODENSWMB.UI.ListKindRoute"}}
     {{#if massEditMode.route}}
-    <div class="fwmb-mass-edit-bar">
-        <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="route">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
-        <a class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="route">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
-        <span class="fwmb-flex-1"></span>
+    <div class="fwmb-mass-edit-bar fwmb-mass-edit-bar--list">
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="massEditSelectAll" data-type="route">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="massEditSelectNone" data-type="route">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-action="massDelete" data-type="route" {{#unless massEditCount.route}}disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.MassDeleteHint'}}">
+            {{localize "FILRODENSWMB.UI.MassDelete" count=massEditCount.route}}
+        </button>
         <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="openMassEdit" data-type="route" {{#unless massEditCount.route}}disabled{{/unless}}>
             {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.route}})
         </button>
     </div>
     {{/if}}
 
-    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.Routes'}}" data-list-nav id="fwmb-scroll-routes" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
-        {{#each mapRoutes}}
-        <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.route)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="route" data-action="editRoute">
-            {{#if ../massEditMode.route}}
-                <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="route" data-panel-ui {{#if this.massEditSelected}}checked{{/if}} />
-            {{/if}}
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
-            </button>
-            <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: calc({{this.thickness}} * 0.0625rem); border-style: {{this.style}};"></div>
-            <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
-            <span class="fwmb-actions">
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                    <i class="fwmb-icon fwmb-icon--center-focus"></i>
-                </button>
-                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteRoute" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                    <i class="fwmb-icon fwmb-icon--delete"></i>
-                </button>
-            </span>
-        </div>
-        {{else}}
-        <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoRoutes"}}</div>
-        {{/each}}
-    </div>
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.Routes'}}" data-list-nav id="fwmb-scroll-routes" data-list-version="{{routeList.version}}" data-list-rows="route" data-list-selected="{{routeList.selected}}" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable"></div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

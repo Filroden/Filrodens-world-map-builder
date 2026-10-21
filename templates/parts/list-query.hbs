@@ -1,0 +1,24 @@
+{{!--
+    A long list's search field and filters (see ListQuery): the name to search for, who made the
+    items, and one kind of item. The fields steer the panel only (data-panel-ui), carrying their
+    list's name and the setting they write.
+
+    Parameters: query, the list's controls from ListQuery.page; kindLabel, the localisation key
+    naming the kind filter.
+--}}
+<div class="fwmb-list-query">
+    <input type="search" class="fwmb-list-search" name="listSearch-{{query.list}}" value="{{query.search}}" placeholder="{{localize 'FILRODENSWMB.UI.ListSearchPlaceholder'}}" aria-label="{{localize 'FILRODENSWMB.UI.ListSearch'}}" maxlength="{{fwmbTextLimit 'name'}}" data-list-query="{{query.list}}" data-query-field="search" data-panel-ui />
+    <div class="fwmb-list-filters">
+        <select aria-label="{{localize 'FILRODENSWMB.UI.ListOrigin'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ListOrigin'}}" data-list-query="{{query.list}}" data-query-field="origin" data-panel-ui>
+            {{#each query.origins}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+        <select aria-label="{{localize kindLabel}}" data-tooltip="{{localize kindLabel}}" data-list-query="{{query.list}}" data-query-field="kind" data-panel-ui>
+            {{#each query.kinds}}
+            <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+    </div>
+    {{#if query.counted}}<p class="fwmb-hint">{{query.counted}}</p>{{/if}}
+</div>

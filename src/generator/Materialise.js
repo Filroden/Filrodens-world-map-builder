@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { resolveOutput } from "./GeneratorSettings.js";
 import { buildPolitical, installPolitical } from "./MaterialiseRegions.js";
 import { buildRoutes } from "./MaterialiseRoutes.js";
 
@@ -43,24 +44,45 @@ export function placeTier(place) {
  * @param {function(object, object): void} options.applyPinStyle - Writes a style's look onto a pin.
  * @param {function(string): object} [options.regionLabel] - The label look of a political level's
  *     regions by kind (realm, duchy, county).
+ * @param {object} [options.output] - What to write (see GeneratorSettings.resolveOutput): the levels
+ *     below Realms, the settlement tiers, the kinds of route and whether names are shown.
  * @returns {{set: object, owners: Object<string, string>, routes: object[], pins: object[]}} The
  *     political set and its levels' encoded owners (already installed in the session), the routes
  *     and the pins, for the caller to add to the map.
  */
 export function materialise(session, result, options) {
     const { runId, idFactory } = options;
-    const political = buildPolitical(session, result, { runId, idFactory, names: options.names, watersPx: options.watersPx, regionLabel: options.regionLabel });
+    const output = resolveOutput(options.output);
+    const political = buildPolitical(session, result, { runId, idFactory, names: options.names, watersPx: options.watersPx, regionLabel: options.regionLabel, output });
     const owners = installPolitical(session, options.layerSets, political.set, political.owners);
-    const routes = buildRoutes(session, result, { runId, idFactory, styleFor: options.routeStyleFor, styleFields: options.routeStyleFields });
-    const pins = buildPins(session, result, options);
+    const routes = buildRoutes(session, result, { runId, idFactory, styleFor: options.routeStyleFor, styleFields: options.routeStyleFields, transports: output.routes });
+    const pins = buildPins(session, result, { ...options, output });
     return { set: political.set, owners, routes, pins };
 }
 
-/** A pin for every place, on its tier's style; only capitals' and cities' labels are shown. */
-function buildPins(session, result, { runId, idFactory, names, pinStyleFor, applyPinStyle }) {
+/** The Output switch of each settlement size tier (a place's tier 0, 1 and 2). */
+const SIZE_TIERS = Object.freeze(["city", "largeTown", "town"]);
+
+/**
+ * Whether a place gets a pin: a capital always; otherwise as its kind or size tier is switched on
+ * (castles; cities, large towns and towns by their tier 0, 1 and 2).
+ */
+function placeWanted(place, places) {
+    if (place.capital) return true;
+    if (place.kind === "castle") return places.castle !== false;
+    return places[SIZE_TIERS[place.tier] ?? "town"] !== false;
+}
+
+/**
+ * A pin for every place wanted, on its tier's style; only capitals' and cities' labels are shown
+ * (none when names are switched off). Each keeps its place's index in the run as its sourceId.
+ */
+function buildPins(session, result, { runId, idFactory, names, pinStyleFor, applyPinStyle, output }) {
     const { mesh } = session;
-    const labelled = new Set(FILRODENSWMB.GENERATOR.LABELLED_TIERS);
-    return result.places.map((place, index) => {
+    const labelled = new Set(output.labels ? FILRODENSWMB.GENERATOR.LABELLED_TIERS : []);
+    const pins = [];
+    result.places.forEach((place, index) => {
+        if (!placeWanted(place, output.places)) return;
         const tier = placeTier(place);
         const pin = {
             id: idFactory(),
@@ -80,8 +102,9 @@ function buildPins(session, result, { runId, idFactory, names, pinStyleFor, appl
         const style = pinStyleFor(tier);
         if (style) applyPinStyle(pin, style);
         if (!labelled.has(tier)) pin.label.visibility = "none";
-        return pin;
+        pins.push(pin);
     });
+    return pins;
 }
 
 /** A place's name: a town's own, or a castle's name with its kind of keep ("Ashford Keep"). */

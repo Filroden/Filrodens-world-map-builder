@@ -152,6 +152,9 @@
                 <span class="fwmb-icon fwmb-icon--sync fwmb-spin" aria-hidden="true"></span>
                 <b class="fwmb-processing-text"></b>
             </div>
+            <!-- Shown only while work reports how far it has come (see MapStudio.runCancellable) -->
+            <div class="fwmb-progress fwmb-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+            <p class="fwmb-processing-detail fwmb-hidden"></p>
             <!-- Shown only while work that can stop part-way is running (see MapStudio.runCancellable) -->
             <div class="fwmb-processing-actions fwmb-processing-cancel fwmb-hidden">
                 <button type="button" class="fwmb-btn" data-tone="negative" data-action="cancelProcessing">{{localize "FILRODENSWMB.UI.Cancel"}}</button>

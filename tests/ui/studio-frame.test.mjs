@@ -42,7 +42,7 @@ test("the rail holds the three stages in order, then the occasional tools", () =
         STAGES.map((stage) => [stage.id, stage.tools]),
         [
             ["shape", ["scene", "terrain", "biomes", "features"]],
-            ["populate", ["regions", "infrastructure", "labels"]],
+            ["populate", ["generate", "regions", "infrastructure", "labels"]],
             ["finish", ["cartography", "export"]],
         ],
     );

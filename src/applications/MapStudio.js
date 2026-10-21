@@ -49,7 +49,9 @@ import { PickTool } from "./PickTool.js";
 import { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } from "./FeatureEditors.js";
 import { LayerSetEditor, LevelEditor } from "./LayerEditors.js";
 import { PinStyles } from "./PinStyles.js";
-import { Generation } from "./Generation.js";
+import { GeneratePanel } from "./GeneratePanel.js";
+import { ListQuery } from "./ListQuery.js";
+import { panelSettings } from "../generator/GeneratorSettings.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
@@ -125,6 +127,7 @@ export class MapStudio {
         massEditSelectAll(e, t)    { this._onMassEditSelectAll(e, t); },
         massEditSelectNone(e, t)   { this._onMassEditSelectNone(e, t); },
         openMassEdit(e, t)         { MapDialogManager.onMassEdit(this, e, t); },
+        massDelete(_e, t)          { MapDialogManager.massDelete(this, t.dataset.type); },
 
         // --- DIALOG MANAGER: Entity Deletion ---
         deleteDecoration(e, t)  { MapDialogManager.onDeleteEntity(this, e, t); },
@@ -176,8 +179,9 @@ export class MapStudio {
         massEditLevel(_e, t)        { this.#massEditLevel(RegionPanel.levelIdOf(t)); },
         selectRegion(e, t)          { if (!MapStudio.#fromRowControl(e, t)) this.#selectRegionRow(t); },
         mergeRegion(_e, t)          { RegionPanel.mergeRegion(this, ...RegionPanel.regionIdsOf(t)); },
-        // The generator's preview button (GENERATOR.PREVIEW_BUTTON): runs it with its defaults
-        generateWorld()             { Generation.run(this); },
+        // --- GENERATE ---
+        generateWorld()             { GeneratePanel.generate(this); },
+        randomizeGeneratorSeed()    { GeneratePanel.randomizeSeed(this); },
 
         // --- DIALOG MANAGER: Pin Icons ---
         addCustomPinIcon(e, t)     { MapDialogManager.onAddCustomPinIcon(this, e, t); },
@@ -358,9 +362,6 @@ export class MapStudio {
      */
     static MASS_EDIT_EXCLUSIVE_GROUPS = [["pin", "route"]];
 
-    /** The Labels list's filter: every label, the standalone ones, or those of one kind of owner. */
-    static LABEL_FILTERS = Object.freeze(["all", "custom", "pin", "route", "region"]);
-
     /**
      * The four Style Library registries a GM can bundle into a shareable settings file, in
      * export/import order. Each maps its uiState array key to the existing legend/fieldset
@@ -435,8 +436,8 @@ export class MapStudio {
         this.regionNaming = null;
         // The style being named in Styles and icons (see StyleLists)
         this.styleNaming = null;
-        // What the Labels list shows (see #allLabelsContext)
-        this.labelFilter = "all";
+        // Each long list's search, filters and page (see ListQuery), for the session
+        this.listQueries = {};
         this.mapRoutes = [];
         this.activeRouteId = null;
         // The map's layer sets (see MeshIntegration), and the set, level and region being edited
@@ -1213,25 +1214,22 @@ export class MapStudio {
             };
             context.massEditBlocked = Object.fromEntries(Object.keys(this.massEditMode).map((type) => [type, this.#isMassEditBlocked(type)]));
 
-            context.mapPins = (this.mapPins || [])
-                .filter((p) => !!p.icon)
-                .sort(alphaSort)
-                .map((p) => ({ ...p, massEditSelected: this.massEditSelection.pin.has(p.id) }));
-            context.mapRoutes = [...(this.mapRoutes || [])].sort(alphaSort).map((r) => ({ ...r, massEditSelected: this.massEditSelection.route.has(r.id) }));
-            context.mapLabels = [...(this.mapLabels || [])].sort(alphaSort).map((l) => ({ ...l, massEditSelected: this.massEditSelection.label.has(l.id) }));
+            // The long lists, searched and filtered, their rows rendered only when they change (see ListQuery)
+            if (this.activeTool === "infrastructure") {
+                context.pinList = await this.#listContext("pin", context);
+                context.routeList = await this.#listContext("route", context);
+            }
+            if (this.activeTool === "labels") context.labelList = await this.#listContext("label", context);
             context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
             const { ADD: landColor, SUBTRACT: oceanColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
             context.landMasks = [...(this.landMasks || [])]
                 .sort(alphaSort)
                 .map((m) => ({ ...m, swatchColor: m.operation === "subtract" ? oceanColor : landColor, isActive: m.id === this.activeLandMaskId }));
 
-            if (this.activeTool === "labels") Object.assign(context, this.#allLabelsContext(context));
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
-            if (this.activeTool === "regions") {
-                context.regionPanel = RegionPanel.context(this, context.inspected);
-                context.generatorPreview = FILRODENSWMB.GENERATOR.PREVIEW_BUTTON === true;
-            }
+            if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
+            if (this.activeTool === "generate") context.generate = GeneratePanel.context(this);
 
             if (this.activeTool === "manage") {
                 context.savedMaps = MapStudio.#namedMaps(await platform.store.getSavedMaps());
@@ -1259,6 +1257,7 @@ export class MapStudio {
             actions: MapStudio.ACTIONS,
             controller: this,
             afterRender: (regions) => this.#afterRegionsDrawn(regions),
+            listRows: (list) => this.listHtml?.[list]?.html ?? "",
         });
         this.#bindStudioListeners(root);
         // Dialogues are drawn inside the studio while it is open
@@ -1294,7 +1293,10 @@ export class MapStudio {
         // an undo redraws the panel, and the inspector with it (or closes it, if the object went)
         if (regions.includes("context")) Inspector.refresh(this);
         // Each list is one tab stop, its rows' controls none (see ListNav)
-        if (regions.includes("context")) ListNav.settle(this.root);
+        if (regions.includes("context")) {
+            ListQuery.settle(this, this.root);
+            ListNav.settle(this.root);
+        }
     }
 
     /**
@@ -1306,29 +1308,65 @@ export class MapStudio {
         if (levelId && regionId) RegionEditor.open(this, levelId, regionId, MapStudio.#FROM_LIST);
     }
 
+    /** The kinds the pin, route and label lists can be narrowed to (value to localisation key). */
+    static #PIN_KINDS = Object.freeze({ ...Object.fromEntries(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style.name])), other: "FILRODENSWMB.UI.ListKindOther" });
+    static #ROUTE_KINDS = Object.freeze({ road: "FILRODENSWMB.UI.TransportRoad", river: "FILRODENSWMB.UI.TransportRiver", sea: "FILRODENSWMB.UI.TransportSea" });
+    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region" });
+
     /**
-     * The Labels tool's one list of every label (see tools-labels.hbs): the standalone labels and
-     * the labels of pins, routes and regions, by name, each owned label with what it belongs to as
-     * its meta ("pin", "region · Kingdoms"), narrowed by the list's filter (labelFilter).
+     * Each long list's kinds, rows template, and the fields of a row its template shows (a row's
+     * tick is marked after each draw, so it is not among them; see ListQuery.settle).
      */
-    #allLabelsContext(context) {
+    static #LISTS = Object.freeze({
+        pin: { kinds: MapStudio.#PIN_KINDS, template: "parts/list-rows-pin.hbs", shown: (row) => [row.id, row.name, row.icon, row.color, row.visibility] },
+        route: { kinds: MapStudio.#ROUTE_KINDS, template: "parts/list-rows-route.hbs", shown: (row) => [row.id, row.name, row.color, row.thickness, row.style, row.visibility] },
+        label: { kinds: MapStudio.#LABEL_KINDS, template: "parts/list-rows-label.hbs", shown: (row) => [row.id, row.name, row.type, row.layerId, row.meta, row.visibility] },
+    });
+
+    /**
+     * A long list's context: its rows' version (their HTML is kept in listHtml, for the view to put
+     * in when it changes), the row in the inspector, its controls and its count.
+     */
+    async #listContext(type, context) {
+        const { kinds, template, shown } = MapStudio.#LISTS[type];
+        const view = ListQuery.view(this, type, this.#listRows(type), kinds);
+        const rowsContext = { rows: view.rows, massEdit: !!this.massEditMode[type], noMatches: view.controls.noMatches };
+        const { version } = await ListQuery.html(this, type, `${TEMPLATE_ROOT}${template}`, rowsContext, shown);
+        const inspected = context.inspected ?? {};
+        const selected = type === "label" ? view.rows.find((row) => row.id === inspected[row.labelKey])?.id : inspected[type];
+        return { ...view, rows: null, version, selected: selected ?? "" };
+    }
+
+    /**
+     * Every row of a long list, by name, each with whether a run made it and its kind (see
+     * ListQuery): the pins (their tier, or their style's), the routes (their transport) and the
+     * labels (standalone, and those of pins, routes and regions that have a name).
+     */
+    #listRows(type) {
+        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+        const byName = (a, b) => collator.compare(a.name || "", b.name || "");
+        const selected = this.massEditSelection[type];
+        if (type === "pin") {
+            const tierOf = (pin) => pin.generated?.tier ?? PinStyles.find(this, pin.pinStyle)?.tier ?? "other";
+            return (this.mapPins || []).filter((pin) => !!pin.icon).map((pin) => ({ ...pin, generated: !!pin.generated, kind: tierOf(pin), massEditSelected: selected.has(pin.id) })).sort(byName);
+        }
+        if (type === "route") return (this.mapRoutes || []).map((route) => ({ ...route, generated: !!route.generated, kind: route.transport ?? "road", massEditSelected: selected.has(route.id) })).sort(byName);
+        return this.#labelRows(selected).sort(byName);
+    }
+
+    /** The Labels list's rows: every label with a name, each with what it belongs to as its meta. */
+    #labelRows(selected) {
         const owner = (key) => platform.i18n.localize(key);
-        const labels = [
-            ...context.mapLabels.map((label) => ({ id: label.id, name: label.name, type: "custom", labelKey: "labelcustom", standalone: true, visibility: label.visibility ?? "all", massEditSelected: label.massEditSelected })),
-            ...context.mapPins.map((pin) => ({ id: pin.id, name: pin.name, type: "pin", labelKey: "labelpin", meta: owner("FILRODENSWMB.UI.InspectorOwnerPin"), visibility: pin.label?.visibility ?? "all" })),
-            ...context.mapRoutes.map((route) => ({ id: route.id, name: route.name, type: "route", labelKey: "labelroute", meta: owner("FILRODENSWMB.UI.InspectorOwnerRoute"), visibility: route.label?.visibility ?? "all" })),
+        const named = (item) => !!item.name;
+        const ownerMeta = { pin: owner("FILRODENSWMB.UI.InspectorOwnerPin"), route: owner("FILRODENSWMB.UI.InspectorOwnerRoute") };
+        return [
+            ...(this.mapLabels || []).filter(named).map((label) => ({ id: label.id, name: label.name, type: "custom", kind: "custom", generated: false, labelKey: "labelcustom", standalone: true, visibility: label.visibility ?? "all", massEditSelected: selected.has(label.id) })),
+            ...(this.mapPins || []).filter((pin) => !!pin.icon && named(pin)).map((pin) => ({ id: pin.id, name: pin.name, type: "pin", kind: "pin", generated: !!pin.generated, labelKey: "labelpin", meta: ownerMeta.pin, visibility: pin.label?.visibility ?? "all" })),
+            ...(this.mapRoutes || []).filter(named).map((route) => ({ id: route.id, name: route.name, type: "route", kind: "route", generated: !!route.generated, labelKey: "labelroute", meta: ownerMeta.route, visibility: route.label?.visibility ?? "all" })),
             ...this.regionLevels.flatMap((level) =>
-                level.regions.map((region) => ({ id: region.id, name: region.name, type: "region", labelKey: "labelregion", layerId: level.id, meta: platform.i18n.format("FILRODENSWMB.UI.LabelOwnerRegionMeta", { kind: owner("FILRODENSWMB.UI.InspectorOwnerRegion"), level: level.name }), visibility: region.label?.visibility ?? "all" })),
+                level.regions.filter(named).map((region) => ({ id: region.id, name: region.name, type: "region", kind: "region", generated: !!region.generated, labelKey: "labelregion", layerId: level.id, meta: platform.i18n.format("FILRODENSWMB.UI.LabelOwnerRegionMeta", { kind: owner("FILRODENSWMB.UI.InspectorOwnerRegion"), level: level.name }), visibility: region.label?.visibility ?? "all" })),
             ),
         ];
-        const filter = MapStudio.LABEL_FILTERS.includes(this.labelFilter) ? this.labelFilter : "all";
-        const shown = filter === "all" ? labels : labels.filter((label) => label.type === filter);
-        const alphaSort = (a, b) => (a.name || "").localeCompare(b.name || "", undefined, { numeric: true, sensitivity: "base" });
-        return {
-            allLabels: shown.toSorted(alphaSort),
-            labelFilters: MapStudio.LABEL_FILTERS.map((value) => ({ value, label: `FILRODENSWMB.UI.LabelFilter_${value}`, selected: value === filter })),
-            labelsEmpty: filter === "all" ? "FILRODENSWMB.UI.NoLabels" : "FILRODENSWMB.UI.NoLabelsOfKind",
-        };
     }
 
     /**
@@ -1545,17 +1583,13 @@ export class MapStudio {
             return;
         }
         if (!target.closest(".fwmb-context-panel")) return;
-        // The Labels list's filter
-        if (target.matches("[data-label-filter]")) {
-            if (event.type === "change") {
-                this.labelFilter = target.value;
-                this.view?.render(["context"]);
-            }
-            return;
-        }
+        // A long list's search field and filters (see ListQuery)
+        if (ListQuery.handleInput(this, event)) return;
         // Fields that only steer the panel itself (a list's filter, a name being typed in the
         // Regions tree, a Mass Edit tick) are not map settings
         if (target.closest("[data-panel-ui]")) return;
+        // The Generate panel's settings (see GeneratePanel)
+        if (GeneratePanel.handleInput(this, event)) return;
 
         if (event.type === "change" && target.matches('file-picker[name="referenceImage"]')) {
             // Only a source the studio accepts reaches the canvas (see Sanitize.imageSource)
@@ -1935,7 +1969,7 @@ export class MapStudio {
         const areaFactor = clampAreaFactor(target.value);
         target.value = areaFactor;
         this.uiState.world = { ...TerrainVersion.resolveWorld(this.uiState), areaFactor };
-        this.uiState.generatorStale = true;
+        this.#markGeneratorStale();
         if (this.meshSession) this.meshSession.mesh.kmPerPx = effectiveKmPerPx({ mapHeight: this.mapHeight, params: { latTop: this.uiState.latTop, latBottom: this.uiState.latBottom }, world: this.uiState.world });
     }
 
@@ -2000,6 +2034,7 @@ export class MapStudio {
     }
 
     #routeProceduralGenerators(target) {
+        if (target.matches(MapStudio.#GENERATOR_INPUTS)) this.#markGeneratorStale();
         if (
             target.matches(
                 'input[name="seaLevel"], input[name="tectonicPlates"], input[name="coastlineFracture"], input[name="continentalGrouping"], input[name="shelfRange"], input[name="coastalPlain"], input[name="continentScale"], input[name="oceanScale"], input[name="oceanRidges"], input[name^="noise.elevation"], input[name^="noise.offsetX"], input[name^="noise.offsetY"]',
@@ -2400,6 +2435,8 @@ export class MapStudio {
         }
 
         this.markDirty();
+        // A terrain or biome stroke changes what the generator reads
+        if (this.brushEngine?.history?.length > prevLength) this.#markGeneratorStale();
 
         // Rebuild history if vector features exist so they re-carve and re-deform the newly painted
         // terrain. The area painted so far stays in pendingTerrainBounds for that rebuild to pick up.
@@ -2434,11 +2471,14 @@ export class MapStudio {
         this.canvasEngine.clearInteractiveTargets();
 
         const isEdit = this.canvasEngine.isEditMode;
-        const infraPins = this.mapPins.filter((p) => !!p.icon);
 
-        const isInfraEdit = this.activeTool === "infrastructure" && isEdit;
-        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.meshSession);
-        MeshIntegration.renderRegions(this);
+        // Only the layer being worked on is drawn again while something is dragged: a map with
+        // thousands of generated pins and routes would otherwise redraw them at every move
+        if (this.activeTool === "infrastructure") {
+            const infraPins = this.mapPins.filter((p) => !!p.icon);
+            this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isEdit, this.meshSession);
+        }
+        if (this.activeTool === "regions") MeshIntegration.renderRegions(this);
 
         if (this.activeTool === "features") {
             this.canvasEngine.renderFeaturePins(this.mapPins, isEdit, this.proceduralSprings);
@@ -3611,6 +3651,7 @@ export class MapStudio {
         this.uiState.terrainVersion = TerrainVersion.getVersion(payload);
         this.uiState.world = payload.world ?? null;
         this.uiState.generatorStale = payload.generatorStale === true;
+        this.uiState.generatorSettings = panelSettings(payload.generatorSettings);
         this.upwindMargin = payload.upwindMargin ?? null;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
@@ -3877,8 +3918,9 @@ export class MapStudio {
      * than sharing a Cancel button that would stop both.
      *
      * @param {string} message - The overlay's text, already localised.
-     * @param {(signal: AbortSignal, overlay: {text: function(string): void}) => Promise<*>} work - Also
-     *     handed the overlay, whose text it may change as it goes (to show its progress).
+     * @param {(signal: AbortSignal, overlay: {text: function(string): void, detail: function(?string): void, progress: function(?number): void}) => Promise<*>} work - Also
+     *     handed the overlay, whose text it may change as it goes (to show its progress), with a
+     *     line under it (detail; null hides it) and a bar (progress, 0 to 1; null hides it).
      * @returns {Promise<*>} What the work resolves with, or null when it could not start.
      */
     async runCancellable(message, work) {
@@ -3888,8 +3930,12 @@ export class MapStudio {
         this.#showCancelButton(true);
         await this.#startProcessing(message);
         try {
-            return await work(controller.signal, { text: (text) => this.#processingOverlay().text(text) });
+            const overlay = this.#processingOverlay();
+            return await work(controller.signal, { text: overlay.text, detail: overlay.detail, progress: overlay.progress });
         } finally {
+            const overlay = this.#processingOverlay();
+            overlay.detail(null);
+            overlay.progress(null);
             this.#cancelRunning = null;
             this.#showCancelButton(false);
             this.#endProcessing();
@@ -3908,6 +3954,22 @@ export class MapStudio {
             text: (message) => {
                 const textEl = this.root?.querySelector(".fwmb-processing-text");
                 if (textEl) textEl.textContent = message;
+            },
+            detail: (message) => {
+                const detailEl = this.root?.querySelector(".fwmb-processing-detail");
+                if (!detailEl) return;
+                detailEl.textContent = message ?? "";
+                detailEl.classList.toggle("fwmb-hidden", !message);
+            },
+            progress: (fraction) => {
+                const bar = this.root?.querySelector(".fwmb-processing .fwmb-progress");
+                if (!bar) return;
+                const shown = Number.isFinite(fraction);
+                bar.classList.toggle("fwmb-hidden", !shown);
+                if (!shown) return;
+                const percent = Math.round(Math.min(1, Math.max(0, fraction)) * 100);
+                bar.style.setProperty("--done", `${percent}%`);
+                bar.setAttribute("aria-valuenow", String(percent));
             },
         };
     }
@@ -4076,6 +4138,7 @@ export class MapStudio {
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             world: this.uiState.world,
             generatorStale: this.uiState.generatorStale === true,
+            generatorSettings: panelSettings(this.uiState.generatorSettings),
             upwindMargin: this.upwindMargin ?? null,
             terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
             springsBaked: this.uiState.springsBaked,
@@ -4208,6 +4271,7 @@ export class MapStudio {
      * @param {Function} generate - The debounced generator to run when updates are live.
      */
     requestTerrainUpdate(bounds = null, generate = this.debouncedCanvasTerrain) {
+        this.#markGeneratorStale();
         this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, bounds);
         if (this.uiState.liveFeatureUpdates) {
             generate();
@@ -4215,6 +4279,22 @@ export class MapStudio {
             this.hasPendingFeatureMath = true;
             this.view?.render(["editToolbar"]);
         }
+    }
+
+    /**
+     * The panel settings that change what the generator reads (the land, the climate and the
+     * rivers), so a run made before them is out of date.
+     */
+    static #GENERATOR_INPUTS = 'input[name="seaLevel"], input[name="tectonicPlates"], input[name="coastlineFracture"], input[name="continentalGrouping"], input[name="shelfRange"], input[name="coastalPlain"], input[name="continentScale"], input[name="oceanScale"], input[name="oceanRidges"], input[name^="noise."], input[name="globalTemp"], input[name="globalMoisture"], input[name="latTop"], input[name="latBottom"], input[name="seasonOffset"], input[name="altCooling"], input[name="freezingThreshold"], input[name="riverDensity"], input[name="springAltOffset"], input[name="springMoistMin"], input[name="riverMeander"], input[name="riverWidthScale"]';
+
+    /**
+     * Marks the last generator run out of date (the Generate panel says so) once what it read has
+     * changed. A map without a run has nothing to be out of date.
+     */
+    #markGeneratorStale() {
+        if (!this.modelRun || this.uiState.generatorStale) return;
+        this.uiState.generatorStale = true;
+        if (this.activeTool === "generate") this.view?.render(["context"]);
     }
 
     /**
@@ -5959,12 +6039,14 @@ export class MapStudio {
      */
     _getMassEditableIds(type) {
         switch (type) {
+            // Every row that matches the list's search and filters, drawn or not (see ListQuery)
             case "pin":
-                return (this.mapPins || []).filter((p) => !!p.icon).map((p) => p.id);
             case "route":
-                return (this.mapRoutes || []).map((r) => r.id);
+                return ListQuery.matching(this.#listRows(type), ListQuery.of(this, type)).map((row) => row.id);
             case "label":
-                return (this.mapLabels || []).map((l) => l.id);
+                return ListQuery.matching(this.#listRows(type), ListQuery.of(this, type))
+                    .filter((row) => row.standalone)
+                    .map((row) => row.id);
             case "region":
                 return RegionPanel.listedRegionIds(this, this.massEditLevelId);
             default:

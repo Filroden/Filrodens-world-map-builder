@@ -52,6 +52,7 @@ function v4Map() {
     mapData.customLabelStyles = [{ id: "label-style-realm", name: "Realm", fontFamily: "Cinzel", fontSize: 1.8, fillColor: "#dedcd3", maxChars: 0, justify: "center", bold: true, italic: false }];
     mapData.customPinStyles = [{ id: "pinStyleAAAAAAAA", name: "Town", icon: "map_pin", scale: 1, color: "#ffffff", detailLevel: 1, label: { fontSize: 1, visibility: "all", quickStyle: "custom" } }];
     mapData.sizeRevision = FILRODENSWMB.SYMBOLS.REVISION;
+    mapData.generatorSettings = { seed: "Avalon", nameBase: "Nordic", world: { density: 1.5, urbanisation: 1, realmSpacing: 0.8, fragmentation: 1 }, output: { duchies: true, counties: false, places: { city: true, largeTown: true, town: false, castle: true }, routes: { road: true, river: false, sea: true }, labels: true } };
     mapData.customBiomes = [{ id: 14, name: "Moor", code: "MR", color: [90, 80, 70], placement: "land", rules: [{ elevation: [[0.2, 0.4, false, true]], moisture: [], temperature: [] }] }];
     return JSON.parse(JSON.stringify(MapJson.toExport(mapData, { levelAAAAAAAAAAA: encodeOwners(new Int32Array([0, 0, -1, 0])) })));
 }

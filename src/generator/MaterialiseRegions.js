@@ -36,28 +36,33 @@ import { floodOwners, relaxBorders } from "../mesh/Territory.js";
  * @param {number} options.watersPx - The realms' territorial waters, in map pixels.
  * @param {function(string): object} [options.regionLabel] - The label look of a level's regions by kind
  *     (realm, duchy, county): a label style's fields and its id as quickStyle.
+ * @param {{duchies?: boolean, counties?: boolean, labels?: boolean}} [options.output] - Which levels
+ *     below Realms the set holds (the counties are laid out either way, since the levels above are
+ *     made from them), and whether the realms' names are shown.
  * @returns {{set: object, owners: Object<string, Int32Array>}}
  */
-export function buildPolitical(session, result, { runId, idFactory, names, watersPx, regionLabel = () => ({}) }) {
+export function buildPolitical(session, result, { runId, idFactory, names, watersPx, regionLabel = () => ({}), output = {} }) {
     const units = politicalUnits(result);
     const set = createLayerSet({ name: names.set, kind: "political", visibility: "all", waterTint: true, opacity: 1 }, idFactory);
     const levels = [
         createLevel({ name: names.levels[0], titleTemplate: names.titles.kingdom, watersPx }, idFactory),
     ];
-    levels.push(createLevel({ name: names.levels[1], titleTemplate: names.titles.duchy, ...childLevelFields(levels[0].id) }, idFactory));
-    levels.push(createLevel({ name: names.levels[2], titleTemplate: names.titles.county, ...childLevelFields(levels[1].id) }, idFactory));
+    const withDuchies = output.duchies !== false;
+    const withCounties = withDuchies && output.counties !== false;
+    if (withDuchies) levels.push(createLevel({ name: names.levels[1], titleTemplate: names.titles.duchy, ...childLevelFields(levels[0].id) }, idFactory));
+    if (withCounties) levels.push(createLevel({ name: names.levels[2], titleTemplate: names.titles.county, ...childLevelFields(levels[1].id) }, idFactory));
     set.levels.push(...levels);
 
-    addRealms(levels[0], result, { runId, idFactory, titles: names.titles, label: regionLabel("realm") });
-    addChildren(levels[1], units.duchies, units.duchyParent, { kind: "duchy", template: names.titles.duchy, units: result.duchies }, { runId, idFactory, label: regionLabel("duchy") });
-    addChildren(levels[2], units.counties, units.countyParent, { kind: "county", template: names.titles.county, units: result.counties }, { runId, idFactory, label: regionLabel("county") });
+    addRealms(levels[0], result, { runId, idFactory, titles: names.titles, label: { ...regionLabel("realm"), visibility: output.labels === false ? "none" : "all" } });
+    if (withDuchies) addChildren(levels[1], units.duchies, units.duchyParent, { kind: "duchy", template: names.titles.duchy, units: result.duchies }, { runId, idFactory, label: regionLabel("duchy") });
+    if (withCounties) addChildren(levels[2], units.counties, units.countyParent, { kind: "county", template: names.titles.county, units: result.counties }, { runId, idFactory, label: regionLabel("county") });
 
     const counties = carry(session, result, "county", units.countyKey);
     joinCoast(session, result, counties);
     relaxBorders(session.mesh, counties, session.aggregates, {}, { anchors: units.counties.map((index) => result.counties[index].seat) });
     const duchies = upward(counties.owners, units.countyParent);
     const realms = upward(duchies, units.duchyParent);
-    const owners = { [levels[0].id]: realms, [levels[1].id]: duchies, [levels[2].id]: counties.owners };
+    const owners = Object.fromEntries([realms, duchies, counties.owners].slice(0, levels.length).map((array, depth) => [levels[depth].id, array]));
     colourRealms(levels[0], result);
     return { set, owners };
 }
@@ -122,7 +127,8 @@ function addRealms(level, result, { runId, idFactory, titles, label }) {
         const template = realm.kind === "kingdom" ? titles.kingdom : titles.duchy;
         addRegion(level, {
             name: titled(template, realm.name),
-            label: { ...label, visibility: "all" },
+            // Each region its own label (a moved label keeps its own position)
+            label: { ...label },
             generated: generatedFor(runId, "realm", index, { tier: realm.kind, population: realm.population, culture: realm.cultures?.[0]?.[0] ?? null }),
         }, idFactory);
     });

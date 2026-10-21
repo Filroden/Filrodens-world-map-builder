@@ -1,61 +1,26 @@
 {{!--
     Labels: every label of the map in one list (allLabels): the labels placed by hand
     (standalone) and the labels of pins, routes and regions, each with what it belongs to as its
-    meta. The filter narrows the list to one kind. A row opens its label in the inspector; an owned
-    label's inspector links to its owner. Mass Edit chooses among the standalone labels. Placing a
-    label is the state block's (and the bar's) work.
+    meta. The list is searched and filtered (by who made it and its kind), its rows
+    rendered only when they change (see ListQuery). A row opens its label in the inspector; an owned label's inspector links to its
+    owner. Mass Edit (with Delete) chooses among the standalone labels. Placing a label is the state
+    block's (and the bar's) work.
 --}}
-{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="allLabels" title="FILRODENSWMB.UI.AllLabels" count=allLabels.length massType="label"}}
-    <div class="fwmb-form-group fwmb-label-filter">
-        <label class="fwmb-label" for="fwmb-label-filter">{{localize "FILRODENSWMB.UI.LabelFilter"}}</label>
-        <div class="fwmb-form-fields">
-            <select id="fwmb-label-filter" data-label-filter data-panel-ui>
-                {{#each labelFilters}}
-                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
-                {{/each}}
-            </select>
-        </div>
-    </div>
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="allLabels" title="FILRODENSWMB.UI.AllLabels" count=labelList.total massType="label"}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/list-query.hbs" query=labelList.controls kindLabel="FILRODENSWMB.UI.LabelFilter"}}
 
     {{#if massEditMode.label}}
-    <div class="fwmb-mass-edit-bar">
-        <a class="fwmb-bulk-action-button" data-action="massEditSelectAll" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</a>
-        <a class="fwmb-bulk-action-button" data-action="massEditSelectNone" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</a>
-        <span class="fwmb-flex-1"></span>
+    <div class="fwmb-mass-edit-bar fwmb-mass-edit-bar--list">
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="massEditSelectAll" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="massEditSelectNone" data-type="label">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-action="massDelete" data-type="label" {{#unless massEditCount.label}}disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.MassDeleteHint'}}">
+            {{localize "FILRODENSWMB.UI.MassDelete" count=massEditCount.label}}
+        </button>
         <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="openMassEdit" data-type="label" {{#unless massEditCount.label}}disabled{{/unless}}>
             {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.label}})
         </button>
     </div>
     {{/if}}
 
-    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.AllLabels'}}" data-list-nav id="fwmb-scroll-labels" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
-        {{#each allLabels}}
-        <div role="option" tabindex="-1" data-list-item class="fwmb-list-item{{#if (eq this.visibility 'none')}} fwmb-is-hidden{{/if}}" aria-selected="{{#if (eq this.id (lookup @root.inspected this.labelKey))}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="{{this.type}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}} data-action="editLabel">
-            {{#if @root.massEditMode.label}}
-                {{#if this.standalone}}
-                <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="label" data-panel-ui aria-label="{{localize 'FILRODENSWMB.UI.MassEditChoose' name=this.name}}" {{#if this.massEditSelected}}checked{{/if}} />
-                {{else}}
-                <span class="fwmb-checkbox-gap" aria-hidden="true"></span>
-                {{/if}}
-            {{/if}}
-            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
-            </button>
-            <span class="fwmb-name" title="{{this.name}}">{{this.name}}</span>
-            {{#if this.meta}}<span class="fwmb-meta">{{this.meta}}</span>{{/if}}
-            <span class="fwmb-actions">
-                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                    <i class="fwmb-icon fwmb-icon--center-focus"></i>
-                </button>
-                {{#if this.standalone}}
-                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLabel" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                    <i class="fwmb-icon fwmb-icon--delete"></i>
-                </button>
-                {{/if}}
-            </span>
-        </div>
-        {{else}}
-        <div class="fwmb-list-empty" role="none">{{localize labelsEmpty}}</div>
-        {{/each}}
-    </div>
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.AllLabels'}}" data-list-nav id="fwmb-scroll-labels" data-list-version="{{labelList.version}}" data-list-rows="label" data-list-selected="{{labelList.selected}}" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before"></div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

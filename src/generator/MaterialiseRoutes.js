@@ -25,12 +25,15 @@ const CLASS_ORDER = Object.freeze({ trunk: 0, main: 1, minor: 2 });
  * @param {Function} options.idFactory
  * @param {function(string, string): object|null} options.styleFor - The route style for a transport and class.
  * @param {function(object): object} options.styleFields - A style's fields as written onto a route.
+ * @param {Object<string, boolean>} [options.transports] - The kinds of route to lay (road, river,
+ *     sea); all when left out.
  * @returns {object[]} The routes, in the mesh shape (Schema.createRoute).
  */
-export function buildRoutes(session, result, { runId, idFactory, styleFor, styleFields }) {
+export function buildRoutes(session, result, { runId, idFactory, styleFor, styleFields, transports = {} }) {
     const finder = new LegFinder(session);
     const chains = result.routes
         .map((chain, index) => ({ ...chain, index }))
+        .filter((chain) => transports[chain.transport] !== false)
         .sort((a, b) => CLASS_ORDER[a.class] - CLASS_ORDER[b.class] || a.index - b.index);
     const routes = [];
     for (const chain of chains) {

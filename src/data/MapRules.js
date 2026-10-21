@@ -240,6 +240,37 @@ const LAYER_SET = obj({
     levels: list(LEVEL),
 });
 
+// ------------------------------------------------------------------ the generator's settings
+
+const generatorText = (field) => text("name", "FILRODENSWMB.UI.LimitKindGenerator", field);
+
+/** The settings a run was made with (see GeneratorSettings.resolveSettings). */
+const GENERATOR_SETTINGS = obj({
+    seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
+    nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
+    world: obj({ density: num(RANGE.SCALE), urbanisation: num(RANGE.SCALE), realmSpacing: num(RANGE.SCALE), fragmentation: num(RANGE.SCALE) }),
+    ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strifeName: key, strife: num(RANGE.UNIT) })),
+    cultures: list(obj({ name: generatorText("FILRODENSWMB.UI.LimitFieldName"), nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), openness: num(RANGE.UNIT), density: num(RANGE.SCALE), homelandCell: int(0, 1e9, { nullable: true }), habitat: numTree })),
+});
+
+/** An object of on and off switches, by name. */
+const flags = (keys) => obj(Object.fromEntries(keys.map((field) => [field, bool])));
+
+/** The Generate panel's settings a map keeps (see GeneratorSettings.panelSettings). */
+const GENERATOR_PANEL = obj({
+    seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
+    nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
+    world: GENERATOR_SETTINGS.fields.world,
+    output: obj({
+        duchies: bool,
+        counties: bool,
+        places: flags(Object.keys(FILRODENSWMB.GENERATOR.OUTPUT.places)),
+        routes: flags(Object.keys(FILRODENSWMB.GENERATOR.OUTPUT.routes)),
+        labels: bool,
+        defaultStyles: bool,
+    }),
+});
+
 /** An older map's region layer and its polygon regions, before they move onto the mesh. */
 const LEGACY_REGION_LAYER = obj({
     id: { t: "id", strict: true },
@@ -482,6 +513,7 @@ const MAP = obj({
         { nullable: true },
     ),
     generatorStale: bool,
+    generatorSettings: GENERATOR_PANEL,
     upwindMargin: obj(
         {
             format: int(0, 1000),
@@ -542,17 +574,6 @@ const MAP = obj({
 
 /** One packed array of a run's model-cell outputs (see ModelRun.packArray). */
 const PACKED_ARRAY = obj({ type: enumOf(["u8", "u16", "u32"]), scale: num({ min: 1e-9, max: 1e9 }), offset: num(RANGE.SIGNED), data: { t: "base64" } });
-
-const generatorText = (field) => text("name", "FILRODENSWMB.UI.LimitKindGenerator", field);
-
-/** The settings a run was made with (see GeneratorSettings.resolveSettings). */
-const GENERATOR_SETTINGS = obj({
-    seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
-    nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
-    world: obj({ density: num(RANGE.SCALE), urbanisation: num(RANGE.SCALE), realmSpacing: num(RANGE.SCALE), fragmentation: num(RANGE.SCALE) }),
-    ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strifeName: key, strife: num(RANGE.UNIT) })),
-    cultures: list(obj({ name: generatorText("FILRODENSWMB.UI.LimitFieldName"), nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), openness: num(RANGE.UNIT), density: num(RANGE.SCALE), homelandCell: int(0, 1e9, { nullable: true }), habitat: numTree })),
-});
 
 /**
  * A run's saved model-cell outputs (see ModelRun), kept beside the map data. MapImport also checks

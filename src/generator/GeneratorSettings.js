@@ -63,3 +63,39 @@ export function resolveSettings(settings = {}, mapSeed = "") {
         cultures: Array.isArray(settings?.cultures) ? settings.cultures : [],
     };
 }
+
+/**
+ * What a run writes onto the map (see GENERATOR.OUTPUT): each switch as given, or its default.
+ * @param {object} [output]
+ * @returns {{duchies: boolean, counties: boolean, places: Object<string, boolean>, routes: Object<string, boolean>, labels: boolean, defaultStyles: boolean|null}}
+ */
+export function resolveOutput(output = {}) {
+    const defaults = FILRODENSWMB.GENERATOR.OUTPUT;
+    const flag = (value, fallback) => (typeof value === "boolean" ? value : fallback);
+    const flags = (given, fallbacks) => Object.fromEntries(Object.entries(fallbacks).map(([key, fallback]) => [key, flag(given?.[key], fallback)]));
+    return {
+        duchies: flag(output?.duchies, defaults.duchies),
+        // Counties sit below duchies, so there are none without them
+        counties: flag(output?.duchies, defaults.duchies) && flag(output?.counties, defaults.counties),
+        places: flags(output?.places, defaults.places),
+        routes: flags(output?.routes, defaults.routes),
+        labels: flag(output?.labels, defaults.labels),
+        // Whether the run first sets the styles it uses back to the defaults; null until chosen
+        defaultStyles: typeof output?.defaultStyles === "boolean" ? output.defaultStyles : null,
+    };
+}
+
+/**
+ * The Generate panel's settings as a map keeps them: the seed (empty for the map's own), the name
+ * style, the world multipliers and the output switches, each valid.
+ * @param {object} [settings]
+ * @returns {{seed: string, nameBase: string, world: object, output: object}}
+ */
+export function panelSettings(settings = {}) {
+    return {
+        seed: typeof settings?.seed === "string" ? settings.seed.trim() : "",
+        nameBase: typeof settings?.nameBase === "string" && settings.nameBase ? settings.nameBase : FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE,
+        world: resolveWorld(settings?.world),
+        output: resolveOutput(settings?.output),
+    };
+}

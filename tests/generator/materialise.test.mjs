@@ -80,6 +80,14 @@ test("every child cell lies inside its region's parent, and the realms claim the
     assert.equal(Object.keys(made.owners).length, 3, "each level's owners come back encoded");
 });
 
+test("each region has a label of its own, so moving one moves no other", async () => {
+    const { made } = await materialised();
+    for (const level of made.set.levels) {
+        const labels = new Set(level.regions.map((region) => region.label));
+        assert.equal(labels.size, level.regions.length, `${level.name}: labels shared`);
+    }
+});
+
 test("every region keeps ground and every county holds its seat", async () => {
     const { session, result, made } = await materialised();
     for (const level of made.set.levels) {

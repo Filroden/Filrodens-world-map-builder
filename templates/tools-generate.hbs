@@ -1,0 +1,111 @@
+{{!--
+    Generate (tool id "generate"; see GeneratePanel): the run itself at the top, then the settings
+    the settlements, routes and realms are made with, and what the last run made. Fields are named
+    "generator.<path>" and kept with the map. The estimate and the notices come from GeneratePanel.
+--}}
+<div class="fwmb-generate-action">
+    <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-action="generateWorld" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateRunHint'}}">
+        {{#if generate.hasRun}}{{localize "FILRODENSWMB.UI.GenerateAgain"}}{{else}}{{localize "FILRODENSWMB.UI.GenerateRun"}}{{/if}}
+    </button>
+</div>
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateRun" title="FILRODENSWMB.UI.SectionGeneration" badge=generate.runBadge}}
+    <div class="fwmb-form-group">
+        <label for="fwmb-generator-seed">{{localize "FILRODENSWMB.UI.GenerateSeed"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-generator-seed" name="generator.seed" maxlength="{{fwmbTextLimit 'name'}}" value="{{generate.seed}}" placeholder="{{generate.mapSeed}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateSeedHint'}}" />
+            <button type="button" class="fwmb-btn fwmb-btn--square" data-action="randomizeGeneratorSeed" aria-label="{{localize 'FILRODENSWMB.UI.Randomize'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
+                <i class="fwmb-icon fwmb-icon--shuffle"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="fwmb-form-group">
+        <label for="fwmb-generator-name-base">{{localize "FILRODENSWMB.UI.GenerateNameStyle"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-generator-name-base" name="generator.nameBase">
+                {{#each generate.nameBases}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateNameStyleHint'}}"></i>
+        </div>
+    </div>
+
+    {{#if generate.estimate}}
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.GenerateEstimate"}}</label>
+        <div class="fwmb-form-fields fwmb-setting-row--readout">
+            <output class="fwmb-readout">{{localize "FILRODENSWMB.UI.GenerateEstimateValue" value=generate.estimate.value}}</output>
+            <span class="fwmb-unit">{{localize generate.estimate.unit}}</span>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateEstimateHint'}}"></i>
+        </div>
+    </div>
+    {{#if generate.estimate.long}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateLongRun"}}</p>{{/if}}
+    {{/if}}
+
+    {{#if generate.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOutOfDateHint"}}</p>{{/if}}
+    {{#each generate.notices}}<p class="fwmb-hint fwmb-generate-notice">{{localize this}}</p>{{/each}}
+
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateWorld" title="FILRODENSWMB.UI.SectionGenerateWorld" badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
+    {{#each generate.world}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name=this.name label=this.label hint=this.hint value=this.value min=this.min max=this.max step=this.step}}
+    {{/each}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateOutput" title="FILRODENSWMB.UI.SectionGenerateOutput"}}
+    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.GenerateLevels"}}</div>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateLevelsHint"}}</p>
+    <label class="fwmb-setting-row">
+        <input type="checkbox" name="generator.output.duchies" class="fwmb-checkbox" {{#if generate.output.duchies}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.GenerateDuchies"}}
+    </label>
+    <label class="fwmb-setting-row">
+        <input type="checkbox" name="generator.output.counties" class="fwmb-checkbox" {{#if generate.output.counties}}checked{{/if}} {{#unless generate.output.duchies}}disabled{{/unless}} />
+        {{localize "FILRODENSWMB.UI.GenerateCounties"}}
+    </label>
+
+    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.GeneratePlaces"}}</div>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GeneratePlacesHint"}}</p>
+    {{#each generate.output.places}}
+    <label class="fwmb-setting-row">
+        <input type="checkbox" name="{{this.name}}" class="fwmb-checkbox" {{#if this.checked}}checked{{/if}} />
+        {{localize this.label}}
+    </label>
+    {{/each}}
+
+    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.GenerateRoutes"}}</div>
+    {{#each generate.output.routes}}
+    <label class="fwmb-setting-row">
+        <input type="checkbox" name="{{this.name}}" class="fwmb-checkbox" {{#if this.checked}}checked{{/if}} />
+        {{localize this.label}}
+    </label>
+    {{/each}}
+
+    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.GenerateNames"}}</div>
+    <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateLabelsHint'}}">
+        <input type="checkbox" name="generator.output.labels" class="fwmb-checkbox" {{#if generate.output.labels}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.GenerateLabels"}}
+    </label>
+
+    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.GenerateStyles"}}</div>
+    <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateDefaultStylesHint'}}">
+        <input type="checkbox" name="generator.output.defaultStyles" class="fwmb-checkbox" {{#if generate.output.defaultStyles}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.GenerateDefaultStyles"}}
+    </label>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#if generate.results}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateResults" title="FILRODENSWMB.UI.SectionGenerateResults" badge="FILRODENSWMB.UI.BadgeLastRun" instant=true}}
+    <dl class="fwmb-generate-results">
+        {{#each generate.results.rows}}
+        <dt>{{localize this.label}}</dt>
+        <dd class="fwmb-readout">{{this.value}}</dd>
+        {{/each}}
+        <dt>{{localize "FILRODENSWMB.UI.GenerateResultPopulation"}}</dt>
+        <dd class="fwmb-readout">{{generate.results.population}}</dd>
+    </dl>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}

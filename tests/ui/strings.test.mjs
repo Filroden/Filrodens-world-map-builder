@@ -53,6 +53,10 @@ const FAMILIES = [
     "FILRODENSWMB.UI.RouteClass",
     "FILRODENSWMB.UI.RuleEditorZone",
     "FILRODENSWMB.BIOMES.",
+    // The generator's stages, by their ids in GENERATOR.STAGES (and writing onto the map)
+    { prefix: "FILRODENSWMB.UI.GenerateStage", values: CONFIG + '"materialise"' },
+    // The name styles, by the name bases' names with their spaces taken out
+    { prefix: "FILRODENSWMB.NameBase.", values: readFileSync(join(ROOT, "vendor/azgaar-names/name-bases.js"), "utf8").replaceAll(" ", "") },
 ];
 
 function usedByFamily(key) {
@@ -97,7 +101,7 @@ const US_GB = {
     color: "colour", colors: "colours", colored: "coloured", center: "centre", centers: "centres", centered: "centred",
     initialization: "initialisation", randomize: "randomise", randomized: "randomised", recognized: "recognised",
     neighbor: "neighbour", neighbors: "neighbours", neighboring: "neighbouring", dialog: "dialogue", dialogs: "dialogues",
-    license: "licence", gray: "grey", behavior: "behaviour", favorite: "favourite", customize: "customise", organize: "organise",
+    license: "licence", gray: "grey", urbanization: "urbanisation", behavior: "behaviour", favorite: "favourite", customize: "customise", organize: "organise",
 };
 const swap = (text, table) => text.replace(/[A-Za-z]+/g, (word) => {
     const swapped = table[word.toLowerCase()];

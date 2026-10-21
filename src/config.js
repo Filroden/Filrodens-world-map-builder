@@ -665,6 +665,7 @@ export const FILRODENSWMB = {
             terrain: { icon: "landscape", label: "FILRODENSWMB.UI.ToolTerrain" },
             biomes: { icon: "forest", label: "FILRODENSWMB.UI.ToolBiomes" },
             features: { icon: "ssid-chart", label: "FILRODENSWMB.UI.ToolFeatures" },
+            generate: { icon: "generate", label: "FILRODENSWMB.UI.ToolGenerate" },
             regions: { icon: "pentagon", label: "FILRODENSWMB.UI.ToolRegions" },
             infrastructure: { icon: "location-city", label: "FILRODENSWMB.UI.ToolInfrastructure" },
             labels: { icon: "insert-text", label: "FILRODENSWMB.UI.ToolLabels" },
@@ -676,7 +677,7 @@ export const FILRODENSWMB = {
         },
         STAGES: [
             { id: "shape", label: "FILRODENSWMB.UI.StageShape", tools: ["scene", "terrain", "biomes", "features"] },
-            { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["regions", "infrastructure", "labels"] },
+            { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["generate", "regions", "infrastructure", "labels"] },
             { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
         ],
         // The Appearance menu (the reader's colour theme, see AppearanceMenu) sits among them, and on
@@ -698,7 +699,8 @@ export const FILRODENSWMB = {
             scene: { tool: "terrain", reason: "FILRODENSWMB.UI.NextReasonScene" },
             terrain: { tool: "biomes", reason: "FILRODENSWMB.UI.NextReasonTerrain" },
             biomes: { tool: "features", reason: "FILRODENSWMB.UI.NextReasonBiomes" },
-            features: { tool: "regions", reason: "FILRODENSWMB.UI.NextReasonFeatures" },
+            features: { tool: "generate", reason: "FILRODENSWMB.UI.NextReasonFeatures" },
+            generate: { tool: "regions", reason: "FILRODENSWMB.UI.NextReasonGenerate" },
             regions: { tool: "infrastructure", reason: "FILRODENSWMB.UI.NextReasonRegions" },
             infrastructure: { tool: "labels", reason: "FILRODENSWMB.UI.NextReasonInfrastructure" },
             labels: { tool: "cartography", reason: "FILRODENSWMB.UI.NextReasonLabels" },
@@ -718,6 +720,7 @@ export const FILRODENSWMB = {
             biomes: "painting",
             // Select starts editing in River (see PickTool.settleForEditing)
             features: { select: "drawing", spring: "placing", river: "drawing", fault: "drawing" },
+            generate: null,
             regions: "painting",
             infrastructure: { pin: "placing", route: "drawing" },
             labels: "placing",
@@ -1691,9 +1694,6 @@ export const FILRODENSWMB = {
         // Stored with every run so an old run stays explainable after the model changes. Any change
         // that alters the output for the same seed and settings must bump it.
         REVISION: 1,
-        // A temporary button at the top of the Regions panel that runs the generator with its
-        // defaults, until the Generate tool exists
-        PREVIEW_BUTTON: true,
         // The settings a new run starts from (see GeneratorSettings): one age, high medieval and
         // troubled, the world multipliers at 1, Human Generic names.
         DEFAULT_NAME_BASE: "Human Generic",
@@ -1709,6 +1709,58 @@ export const FILRODENSWMB = {
         STRIFES: Object.freeze({ peaceful: 0.2, troubled: 0.5, warTorn: 0.8 }),
         DEFAULT_STRIFE: "troubled",
         MAX_AGES: 8,
+        // What a run writes onto the map, as the Generate panel's Output section starts: the levels
+        // below Realms, the settlement tiers given pins (capitals always are), the kinds of route,
+        // and whether realm, capital and city names are shown
+        OUTPUT: Object.freeze({
+            duchies: true,
+            counties: true,
+            places: Object.freeze({ city: true, largeTown: true, town: true, castle: true }),
+            routes: Object.freeze({ road: true, river: true, sea: true }),
+            labels: true,
+        }),
+        // The Generate panel's estimate of a run's time, in seconds: the per-pixel first stage
+        // (PER_PIXEL), the searches, which grow faster than the model cells (CELL_FACTOR x cells ^
+        // CELL_POWER), and writing the result onto the display mesh (PER_DISPLAY_CELL). Measured on
+        // P0JBVA (14,293 model cells, 2.9 s) and a 3200 x 2400 regional map (2,661 cells, 1.1 s).
+        // Above WARN_SECONDS the panel says the run will take a while.
+        ESTIMATE: Object.freeze({ PER_PIXEL: 1.2e-7, CELL_FACTOR: 1.5e-6, CELL_POWER: 1.5, PER_DISPLAY_CELL: 3e-6, WARN_SECONDS: 60 }),
+        // The settlement pin scales of the module's older default sets (in today's units), which
+        // suit an earlier scale: a map whose tier styles still match one of them (at least MIN of
+        // its tiers found) starts its runs with Use the default styles on
+        OLDER_PIN_SCALES: Object.freeze([
+            Object.freeze({ capital: 4, city: 3.4, largeTown: 2.8, town: 2.4, village: 2, castle: 2.8, fortifiedTown: 2.8, port: 2.4 }),
+            Object.freeze({ capital: 1.6, city: 1.2, largeTown: 0.8, town: 2.4, village: 2, castle: 0.8, fortifiedTown: 0.8, port: 0.8 }),
+        ]),
+        OLDER_PIN_SCALES_MIN: 3,
+        // A map with fewer land model cells than this covers too small an area for more than a few
+        // realms and the larger settlements, which the panel says
+        SMALL_WORLD_LAND_CELLS: 2000,
+        // The light-hearted lines shown under the progress while a run works, each for QUIP_MS
+        // before the next (see Generation)
+        QUIP_MS: 2500,
+        QUIPS: Object.freeze([
+            "FILRODENSWMB.UI.GenerateQuipTools",
+            "FILRODENSWMB.UI.GenerateQuipSeaLanes",
+            "FILRODENSWMB.UI.GenerateQuipBorders",
+            "FILRODENSWMB.UI.GenerateQuipSheep",
+            "FILRODENSWMB.UI.GenerateQuipForests",
+            "FILRODENSWMB.UI.GenerateQuipMarket",
+            "FILRODENSWMB.UI.GenerateQuipHighRoad",
+            "FILRODENSWMB.UI.GenerateQuipKings",
+            "FILRODENSWMB.UI.GenerateQuipWalls",
+            "FILRODENSWMB.UI.GenerateQuipHamlets",
+            "FILRODENSWMB.UI.GenerateQuipTaxes",
+            "FILRODENSWMB.UI.GenerateQuipAle",
+            "FILRODENSWMB.UI.GenerateQuipAlliances",
+            "FILRODENSWMB.UI.GenerateQuipInheritance",
+            "FILRODENSWMB.UI.GenerateQuipBridge",
+            "FILRODENSWMB.UI.GenerateQuipMercenaries",
+            "FILRODENSWMB.UI.GenerateQuipOldRoads",
+            "FILRODENSWMB.UI.GenerateQuipCathedral",
+            "FILRODENSWMB.UI.GenerateQuipRaiders",
+            "FILRODENSWMB.UI.GenerateQuipLighthouse",
+        ]),
         // The world settings: multipliers of the model's own figures, 1 leaving them as they are.
         // density scales how many people the land feeds; urbanisation the share of them living in
         // towns; realmSpacing how far apart royal seats must be (more spacing, fewer realms);

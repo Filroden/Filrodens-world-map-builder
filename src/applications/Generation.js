@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { generateInBackground } from "../generator/Generate.js";
 import { buildGeneratorPayload } from "../generator/GeneratorInput.js";
 import { materialise } from "../generator/Materialise.js";
+import { panelSettings } from "../generator/GeneratorSettings.js";
 import { encodeModelRun } from "../generator/ModelRun.js";
 import { platform } from "../platform/index.js";
 import { FieldSpecs } from "./FieldSpecs.js";
@@ -23,38 +24,80 @@ import { VectorHistory } from "./VectorHistory.js";
  */
 export class Generation {
     /**
-     * Runs the generator with the given settings (the defaults when none) and adds its output to
-     * the map. Does nothing while the map's mesh or terrain is not ready, or when other cancellable
-     * work is under way.
+     * Runs the generator with the map's Generate settings (see GeneratePanel) and adds its output
+     * to the map. When the map already holds generated content, the user is asked first (the new
+     * run is added beside it). Does nothing while the map's mesh or terrain is not ready, or when
+     * other cancellable work is under way.
      * @param {object} app - The studio.
-     * @param {object} [settings] - See GeneratorSettings.
      * @returns {Promise<boolean>} Whether content was added.
      */
-    static async run(app, settings = {}) {
+    static async run(app) {
         if (!app.meshSession?.aggregates || !app.currentElevationData) {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.GenerateNotReady"));
             return false;
         }
+        const settings = panelSettings(app.uiState.generatorSettings);
+        // Use the default styles, when the reader has not chosen, follows whether the map's styles are an older set
+        settings.output.defaultStyles ??= this.stylesLookOlder(app);
+        if (!(await this.#confirmAgain(app))) return false;
         let result;
         try {
-            result = await app.runCancellable(this.#progressText(0), (signal, overlay) =>
-                generateInBackground(() => this.payload(app, settings), { signal, onProgress: ({ pct }) => overlay?.text(this.#progressText(pct)) }).catch((error) => {
-                    if (error?.name === "AbortError") return null;
-                    throw error;
-                }),
-            );
+            result = await app.runCancellable(this.#stageText(STAGES[0].id, 0), (signal, overlay) => this.#runWork(app, settings, signal, overlay));
         } catch (error) {
             console.error("FWMB | Generation failed:", error);
             platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.GenerateFailed"));
             return false;
         }
-        if (!result) return false;
-        this.apply(app, result);
-        return true;
+        return !!result;
     }
 
-    static #progressText(pct) {
-        return platform.i18n.format("FILRODENSWMB.UI.GeneratingWorld", { pct });
+    /** The run under the overlay: the generator in the background, then the result written onto the map. */
+    static async #runWork(app, settings, signal, overlay) {
+        const progress = new RunProgress(overlay, (stage, pct) => this.#stageText(stage, pct));
+        try {
+            const result = await generateInBackground(() => this.payload(app, settings), { signal, onProgress: ({ stage, pct }) => progress.update(stage, pct) }).catch((error) => {
+                if (error?.name === "AbortError") return null;
+                throw error;
+            });
+            if (!result) return null;
+            progress.update(MATERIALISE_STAGE, FULL);
+            await nextPaint();
+            this.apply(app, result, settings.output);
+            return result;
+        } finally {
+            progress.stop();
+        }
+    }
+
+    /** The progress line: the stage's name and how far the run has come. */
+    static #stageText(stage, pct) {
+        return platform.i18n.format("FILRODENSWMB.UI.GenerateProgress", { stage: platform.i18n.localize(`FILRODENSWMB.UI.GenerateStage${stage.charAt(0).toUpperCase()}${stage.slice(1)}`), pct: Math.round(pct) });
+    }
+
+    /**
+     * Before a run on a map that already holds generated content: a confirmation giving what is
+     * there, since the new run is added beside it. True to go ahead (or when there is nothing).
+     */
+    static async #confirmAgain(app) {
+        const counts = this.counts(app);
+        if (!counts.realms && !counts.places && !counts.routes) return true;
+        const shown = Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, value.toLocaleString(platform.i18n.lang)]));
+        return MapDialogManager._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.GenerateAgainTitle"), platform.i18n.format("FILRODENSWMB.UI.GenerateAgainMessage", shown));
+    }
+
+    /**
+     * How much generated content the map holds, from any run: realms, places (pins) and routes.
+     * @param {object} app
+     * @returns {{realms: number, places: number, routes: number}}
+     */
+    static counts(app) {
+        const generated = (item) => !!item?.generated;
+        const regions = (app.layerSets ?? []).flatMap((set) => set.levels ?? []).flatMap((level) => level.regions ?? []);
+        return {
+            realms: regions.filter((region) => region.generated?.kind === "realm").length,
+            places: (app.mapPins ?? []).filter(generated).length,
+            routes: (app.mapRoutes ?? []).filter(generated).length,
+        };
     }
 
     /**
@@ -63,7 +106,7 @@ export class Generation {
      * @param {object} app
      * @param {object} [settings]
      */
-    static payload(app, settings = {}) {
+    static payload(app, settings = panelSettings(app.uiState.generatorSettings)) {
         const mesh = app.meshSession.mesh;
         const { params } = MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors);
         return buildGeneratorPayload({
@@ -75,7 +118,7 @@ export class Generation {
             biomeParams: { customBiomeRules: params.customBiomeRules, biomePalette: params.biomePalette, biomeSides: params.biomeSides },
             customBiomes: app.uiState.customBiomes ?? [],
             mapSeed: app.uiState.mapSeed,
-            settings,
+            settings: { seed: settings.seed || undefined, nameBase: settings.nameBase, world: settings.world },
         });
     }
 
@@ -85,13 +128,15 @@ export class Generation {
      * model-cell outputs (app.modelRun).
      * @param {object} app
      * @param {object} result - A generator run.
+     * @param {object} [output] - What to write (see GeneratorSettings.resolveOutput); all of it when left out.
      */
-    static apply(app, result) {
+    static apply(app, result, output = {}) {
         const before = VectorHistory.snapshot(app);
+        if (output.defaultStyles) this.resetStyles(app);
         this.#ensureLabelStyles(app);
         const session = app.meshSession;
         const runId = platform.utils.randomID();
-        const output = materialise(session, result, {
+        const made = materialise(session, result, {
             runId,
             idFactory: () => platform.utils.randomID(),
             layerSets: app.layerSets ?? [],
@@ -102,18 +147,19 @@ export class Generation {
             pinStyleFor: this.#pinStyleFinder(app),
             applyPinStyle: (pin, style) => PinStyles.apply(app, pin, style),
             regionLabel: this.#regionLabels(app),
+            output,
         });
-        app.layerSets = [...(app.layerSets ?? []), output.set];
+        app.layerSets = [...(app.layerSets ?? []), made.set];
         session.setLayerSets(app.layerSets);
-        app.mapRoutes.push(...output.routes);
-        app.mapPins.push(...output.pins);
+        app.mapRoutes.push(...made.routes);
+        app.mapPins.push(...made.pins);
         const modelRunBefore = app.modelRun ?? null;
         app.modelRun = encodeModelRun(result, runId);
         app.uiState.generatorStale = false;
-        app.activeLayerSetId = output.set.id;
-        app.activeLevelId = output.set.levels[0].id;
+        app.activeLayerSetId = made.set.id;
+        app.activeLevelId = made.set.levels[0].id;
 
-        const levels = output.set.levels.map((level) => VectorHistory.levelOwners(level.id, null, output.owners[level.id]));
+        const levels = made.set.levels.map((level) => VectorHistory.levelOwners(level.id, null, made.owners[level.id]));
         VectorHistory.push(app, VectorHistory.composite([before, ...levels, VectorHistory.modelRun(modelRunBefore, app.modelRun)]));
         app._repaintVectors();
         app.view?.render(["context"]);
@@ -190,17 +236,127 @@ export class Generation {
         const styles = app.uiState.customPinStyles;
         const defaults = PinStyles.defaults();
         return (tier) => {
-            const marked = styles.find((style) => style.tier === tier);
-            if (marked) return marked;
+            const found = this.#tierStyle(styles, tier);
+            if (found) return found;
             const seed = defaults.find((style) => style.tier === tier);
             if (!seed) return null;
-            const unmarked = styles.find((style) => !style.tier && style.icon === seed.icon);
-            if (unmarked) {
-                unmarked.tier = tier;
-                return unmarked;
-            }
             styles.push(seed);
             return seed;
         };
+    }
+
+    /**
+     * The map's pin style of a tier: the one marked with it, or failing that one of a map made
+     * before styles were marked, recognised by the tier's default icon (and marked now); null when
+     * there is neither.
+     */
+    static #tierStyle(styles, tier) {
+        const marked = styles.find((style) => style.tier === tier);
+        if (marked) return marked;
+        const icon = FILRODENSWMB.PINS.DEFAULT_STYLES.find((seed) => seed.tier === tier)?.icon;
+        const unmarked = icon ? styles.find((style) => !style.tier && style.icon === icon) : null;
+        if (unmarked) unmarked.tier = tier;
+        return unmarked ?? null;
+    }
+
+    /**
+     * Whether the map's settlement pin styles are still one of the module's older default sets
+     * (GENERATOR.OLDER_PIN_SCALES), which suit an earlier scale: the Generate panel then starts
+     * with Use the default styles on.
+     * @param {object} app
+     * @returns {boolean}
+     */
+    static stylesLookOlder(app) {
+        const styles = app.uiState.customPinStyles ?? [];
+        const MATCH = 1e-6;
+        return FILRODENSWMB.GENERATOR.OLDER_PIN_SCALES.some((set) => {
+            const compared = Object.entries(set).map(([tier, scale]) => {
+                const style = styles.find((candidate) => candidate.tier === tier) ?? styles.find((candidate) => !candidate.tier && candidate.icon === FILRODENSWMB.PINS.DEFAULT_STYLES.find((seed) => seed.tier === tier)?.icon);
+                return style ? Math.abs(style.scale - scale) < MATCH : null;
+            });
+            const found = compared.filter((match) => match !== null);
+            return found.length >= FILRODENSWMB.GENERATOR.OLDER_PIN_SCALES_MIN && found.every(Boolean);
+        });
+    }
+
+    /**
+     * Use the default styles: the styles generated content takes (the settlement tiers' pin
+     * styles, the political levels' and settlements' label styles, and the generated route styles)
+     * are set back to the module's defaults, keeping their names, and everything that follows them
+     * takes their new look. Part of the run's undo step.
+     * @param {object} app
+     */
+    static resetStyles(app) {
+        const config = MapDialogManager.QUICK_STYLE_CONFIG;
+        const reset = (style, fields, type) => {
+            Object.assign(style, fields);
+            config[type].onCascade(app, style.id, style);
+        };
+        const labelIds = new Set([...Object.values(FILRODENSWMB.GENERATOR.REGION_LABEL_STYLES), ...FILRODENSWMB.PINS.DEFAULT_STYLES.map((tier) => tier.labelStyle).filter(Boolean)]);
+        for (const { id, nameKey: _name, ...fields } of FILRODENSWMB.LABELS.DEFAULT_STYLES) {
+            const style = labelIds.has(id) ? (app.uiState.customLabelStyles ?? []).find((candidate) => candidate.id === id) : null;
+            if (style) reset(style, fields, "Label");
+        }
+        const routeIds = new Set(Object.values(FILRODENSWMB.GENERATOR.ROUTE_STYLES).flatMap((byClass) => Object.values(byClass)));
+        for (const { id, nameKey: _name, ...fields } of FILRODENSWMB.ROUTES.DEFAULT_STYLES) {
+            const style = routeIds.has(id) ? (app.uiState.customRouteStyles ?? []).find((candidate) => candidate.id === id) : null;
+            if (style) reset(style, fields, "Route");
+        }
+        const styles = app.uiState.customPinStyles ?? [];
+        const generatedTiers = new Set(Object.values(FILRODENSWMB.GENERATOR.PIN_TIERS));
+        for (const { id: _id, name: _name, ...fields } of PinStyles.defaults()) {
+            const style = generatedTiers.has(fields.tier) ? this.#tierStyle(styles, fields.tier) : null;
+            if (style) reset(style, fields, "Pin");
+        }
+    }
+}
+
+/** The run's stages, in order; writing onto the map follows them under its own name. */
+const STAGES = FILRODENSWMB.GENERATOR.STAGES;
+const MATERIALISE_STAGE = "materialise";
+const FULL = 100;
+
+/** Resolves once the window has painted (so the overlay shows a new line before blocking work). */
+function nextPaint() {
+    const frame = globalThis.requestAnimationFrame;
+    if (!frame) return Promise.resolve();
+    return new Promise((resolve) => frame(() => setTimeout(resolve, 0)));
+}
+
+/**
+ * The overlay while a run works: the stage and percentage as its title, a bar showing how far it
+ * has come, and a light-hearted line under it that changes every QUIP_MS (see GENERATOR.QUIPS).
+ */
+class RunProgress {
+    #overlay;
+    #format;
+    #timer = null;
+    #quip;
+
+    constructor(overlay, format) {
+        this.#overlay = overlay;
+        this.#format = format;
+        const { QUIPS, QUIP_MS } = FILRODENSWMB.GENERATOR;
+        this.#quip = 0;
+        this.#showQuip();
+        this.#timer = setInterval(() => {
+            this.#quip = (this.#quip + 1) % QUIPS.length;
+            this.#showQuip();
+        }, QUIP_MS);
+    }
+
+    update(stage, pct) {
+        this.#overlay?.text(this.#format(stage, pct));
+        this.#overlay?.progress?.(pct / FULL);
+    }
+
+    stop() {
+        clearInterval(this.#timer);
+        this.#overlay?.detail?.(null);
+        this.#overlay?.progress?.(null);
+    }
+
+    #showQuip() {
+        this.#overlay?.detail?.(platform.i18n.localize(FILRODENSWMB.GENERATOR.QUIPS[this.#quip]));
     }
 }

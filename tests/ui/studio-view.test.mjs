@@ -135,6 +135,32 @@ test("a region drawn once is never redrawn, and ignored elements are left alone"
     assert.ok(!calls.after.at(-1).includes("map"));
 });
 
+test("a versioned list gets its rows when it first appears and when its version changes, and is left alone otherwise", async () => {
+    const rowsHtml = { places: "" };
+    const list = (version) => `<div class="list" data-list-version="${version}" data-list-rows="places"></div>`;
+    const rowsOf = (names) => names.map((name) => `<div class="row" data-id="${name}" tabindex="0">${name}</div>`).join("");
+    rowsHtml.places = rowsOf(["Ashford", "Brill"]);
+    state.extra = list("v1");
+    const view = makeView({ listRows: (name) => rowsHtml[name] });
+    await view.render();
+    const rows = [...root.querySelectorAll(".row")];
+    assert.deepEqual(rows.map((row) => row.textContent), ["Ashford", "Brill"]);
+    rows[0].classList.add("marked");
+
+    state.title = "Port Arthur";
+    await view.render(["panel"]);
+    assert.deepEqual([...root.querySelectorAll(".row")], rows, "the same rows");
+    assert.ok(rows[0].classList.contains("marked"), "not compared against the template");
+
+    root.querySelector('.row[data-id="Brill"]').focus();
+    rowsHtml.places = rowsOf(["Ashford", "Brill", "Crewe"]);
+    state.extra = list("v2");
+    await view.render(["panel"]);
+    assert.deepEqual([...root.querySelectorAll(".row")].map((row) => row.textContent), ["Ashford", "Brill", "Crewe"]);
+    assert.equal(root.querySelector(".list").dataset.listVersion, "v2");
+    assert.equal(document.activeElement?.dataset.id, "Brill", "focus stays on the same row");
+});
+
 test("a custom element keeps the children it built, and takes a new value through its property", async () => {
     class FakePicker extends window.HTMLElement {
         connectedCallback() {
