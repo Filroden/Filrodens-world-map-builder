@@ -7,6 +7,7 @@ import { resampleOwners, retraceLine, routeMarkedLine } from "../mesh/Resample.j
 import { VECTOR_SCHEMA_VERSION, createMeshBlock, createRoute, validateOwners } from "../mesh/Schema.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { RegionPanel } from "./RegionPanel.js";
+import { DetailLevel } from "./DetailLevel.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { platform } from "../platform/index.js";
 
@@ -335,11 +336,12 @@ export class MeshIntegration {
     /**
      * The region under the pointer: on the level being edited when there is one (so a level
      * below others can still be picked), otherwise on the topmost visible level that has a
-     * region there.
+     * region there. A level the map's detail level hides is not picked.
      */
     static #regionHit(app, x, y) {
         const active = app.activeLevelId ? app.meshSession.level(app.activeLevelId) : null;
-        const visible = [...app.meshSession.levels()].filter((level) => this.#shown(app, level.visibility)).reverse();
+        const detailed = app.meshSession.layerSets.flatMap((set) => set.levels.filter((level) => DetailLevel.shows(app, "region", { set, level })));
+        const visible = detailed.filter((level) => this.#shown(app, level.visibility)).reverse();
         const levels = active ? [active] : visible;
         for (const level of levels) {
             const region = app.meshSession.regionAt(level.id, x, y);

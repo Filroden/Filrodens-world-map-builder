@@ -49,9 +49,11 @@ export function layersShown(state) {
  * @param {{id: string, items: {key: string, on: boolean}[]}[]} state.terrainGroups - The terrain
  *   layer groups (Terrain, Biomes) and their layers.
  * @param {boolean} state.threeD - Whether the 3D view is showing.
+ * @param {number} state.detailLevel - The map's detail level (see DetailLevel).
  * @param {(shown: number, total: number) => string} layersLabel - The Layers button's name for a count.
+ * @param {(level: number) => string} detailLabel - The Detail button's name for a level.
  */
-export function syncMapControls(root, state, layersLabel) {
+export function syncMapControls(root, state, layersLabel, detailLabel) {
     if (!root) return;
     const each = (selector, apply) => root.querySelectorAll(selector).forEach(apply);
 
@@ -59,6 +61,14 @@ export function syncMapControls(root, state, layersLabel) {
     each('[data-action="toggleLayer"]', (element) => setOn(element, state.layers[element.dataset.layer]));
     each('[data-action="toggleGrid"]', (element) => setOn(element, state.grid));
     each('[data-action="threeDView"]', (element) => setOn(element, state.threeD));
+
+    // The Detail menu: one level chosen, named on its button
+    each('[data-action="setDetailLevel"]', (row) => row.setAttribute("aria-checked", String(Number(row.dataset.detailLevel) === state.detailLevel)));
+    each('.fwmb-layer-group[data-layer-group="detail"] > [data-action="toggleLayerMenu"]', (button) => {
+        const label = detailLabel(state.detailLevel);
+        button.setAttribute("aria-label", label);
+        button.dataset.tooltip = label;
+    });
 
     for (const group of state.terrainGroups) {
         const status = groupState(group.items.map((item) => item.on));

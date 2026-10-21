@@ -121,6 +121,7 @@ export class MapStateManager {
             gridType: "square",
             gridSize: 50,
             gridVisible: false,
+            detailLevel: FILRODENSWMB.DETAIL.EVERYTHING,
 
             terrainBrushTool: "raise",
             biomesBrushTool: "paint",

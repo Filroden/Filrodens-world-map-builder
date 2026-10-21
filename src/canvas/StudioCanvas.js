@@ -50,6 +50,9 @@ export class StudioCanvas {
     /** Whether destroy() has run (see destroy). */
     #destroyed = false;
 
+    /** Whether the map's detail level shows a set's level (see setDetailFilter). */
+    #showsLevel = () => true;
+
     constructor(htmlContainer) {
         this.container = htmlContainer;
 
@@ -1510,6 +1513,7 @@ export class StudioCanvas {
         const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
         this.regionLevels.render(meshSession, {
             isVisible: (visibility, parentVisibility, isContainer) => this.#isVisibleInCurrentPass(visibility, parentVisibility, isContainer),
+            showsLevel: this.#showsLevel,
             resScale,
             focusLevelId,
         });
@@ -1702,12 +1706,12 @@ export class StudioCanvas {
         // Custom Labels
         mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all", label.id, "custom"));
 
-        // Pins' labels: beside the pin, starting one pin width to its right and centred on it
-        // vertically, so the gap grows only with the pin
+        // Pins' labels: beside the pin, starting at its right edge (PINS.LABEL_OFFSET) and centred
+        // on it vertically, so the gap grows only with the pin
         const pinWidth = (pin) => FILRODENSWMB.SYMBOLS.PIN_PX * FILRODENSWMB.SYMBOLS.UNIT * resScale * (pin.scale || FILRODENSWMB.PINS.DEFAULT_SCALE);
         mapPins.forEach((pin) => {
             if (!pin.icon) return;
-            drawLabel(pin.name, ensureLabelData(pin), pin.x + pinWidth(pin), pin.y, pin.visibility, pin.id, "pin", null, { startsAtDefault: true });
+            drawLabel(pin.name, ensureLabelData(pin), pin.x + pinWidth(pin) * FILRODENSWMB.PINS.LABEL_OFFSET, pin.y, pin.visibility, pin.id, "pin", null, { startsAtDefault: true });
         });
 
         this.#drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession);
@@ -1745,6 +1749,7 @@ export class StudioCanvas {
     }
 
     #drawLevelLabels(drawLabel, ensureLabelData, meshSession, set, level) {
+        if (!this.#showsLevel(set, level)) return;
         const levelVisibility = level.visibility !== "none" && set.visibility === "gm" ? "gm" : level.visibility || "all";
         if (!this.#isVisibleInCurrentPass(levelVisibility, "all", true)) return;
 
@@ -2002,6 +2007,15 @@ export class StudioCanvas {
 
     setViewFilters(filters) {
         this.viewFilters = { ...this.viewFilters, ...filters };
+    }
+
+    /**
+     * Whether the map's detail level shows a set's level (see DetailLevel), for the region levels
+     * and their labels; the pins and routes are given already filtered.
+     * @param {function(object, object): boolean} showsLevel
+     */
+    setDetailFilter(showsLevel) {
+        this.#showsLevel = showsLevel;
     }
 
     /**

@@ -5,6 +5,7 @@ import { materialise } from "../generator/Materialise.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { encodeModelRun } from "../generator/ModelRun.js";
 import { platform } from "../platform/index.js";
+import { DetailLevel } from "./DetailLevel.js";
 import { FieldSpecs } from "./FieldSpecs.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { MapStateManager } from "./MapStateManager.js";
@@ -161,6 +162,8 @@ export class Generation {
 
         const levels = made.set.levels.map((level) => VectorHistory.levelOwners(level.id, null, made.owners[level.id]));
         VectorHistory.push(app, VectorHistory.composite([before, ...levels, VectorHistory.modelRun(modelRunBefore, app.modelRun)]));
+        // The map is shown at the detail its scale leaves room for (a view setting, so not undone with the run)
+        app.setDetailLevel?.(DetailLevel.forScale(session.mesh.kmPerPx), { repaint: false });
         app._repaintVectors();
         app.view?.render(["context"]);
         app.markDirty();

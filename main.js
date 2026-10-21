@@ -70,6 +70,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/parts/inspector-level.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-pin-style.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-pin.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/inspector-generated.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-region-style.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-region.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-river.hbs",

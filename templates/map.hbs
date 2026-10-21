@@ -52,6 +52,22 @@
                 </button>
             </div>
 
+            {{!-- Detail: how much of the generated content is shown (see DetailLevel); one choice --}}
+            <div class="fwmb-map-control-group">
+                <div class="fwmb-layer-group" data-layer-group="detail">
+                    <button type="button" class="fwmb-map-btn" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize 'FILRODENSWMB.UI.DetailMenu'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DetailMenu'}}">
+                        <span class="fwmb-icon fwmb-icon--detail" aria-hidden="true"></span>
+                    </button>
+                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.DetailMenu'}}">
+                        {{#each detailLevels}}
+                        <button type="button" role="menuitemradio" aria-checked="false" data-action="setDetailLevel" data-detail-level="{{this.value}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+                        </button>
+                        {{/each}}
+                    </div>
+                </div>
+            </div>
+
             {{!-- Layer toggles. Terrain and Biomes each open the list of their layers (see
                  MapStudio.#TERRAIN_LAYER_GROUPS). Hidden while the controls are folded. --}}
             <div class="fwmb-map-control-group fwmb-map-controls-wide">

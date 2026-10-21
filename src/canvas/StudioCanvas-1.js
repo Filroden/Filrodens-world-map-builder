@@ -1,0 +1,2595 @@
+import { FILRODENSWMB } from "../config.js";
+import { resolvePinIconPath } from "../data/pinIcons.js";
+import { ColorMath } from "../tools/ColorMath.js";
+import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
+import { getRegionUploadResource } from "./RegionUploadResource.js";
+import { TerrainCompositor } from "./TerrainCompositor.js";
+import { CanvasTransforms } from "../tools/CanvasTransforms.js";
+import { LabelFonts } from "../tools/LabelFonts.js";
+import { LabelWidth } from "../tools/LabelWidth.js";
+import { RegionLevelLayers } from "./RegionLevelLayers.js";
+import { RegionOverlays } from "./RegionOverlays.js";
+import { RouteOverlays } from "./RouteOverlays.js";
+import { platform } from "../platform/index.js";
+
+/** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
+const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br: "nwse-resize", tr: "nesw-resize", bl: "nesw-resize" });
+
+/**
+ * Entities whose nodes may be dragged into the buffer around the map, so lines and outlines can
+ * span well outside the visible map. Single-point markers (pins, labels, decorations) and manual
+ * river nodes stay confined to the map itself, the same rule applied when these nodes are first
+ * created (see MapStudio's click handlers).
+ */
+const BUFFERED_NODE_TYPES = Object.freeze(["landMask", "fault"]);
+
+// Shortest time between two brush stamps sent to the app while the pointer moves with the button
+// held, however often the browser reports pointer moves
+const BRUSH_MOVE_INTERVAL_MS = 100;
+
+// Furthest (in screen pixels) the pointer may travel between pressing and releasing the right
+// button for it to count as a right-click rather than the end of a pan
+const RIGHT_CLICK_MAX_TRAVEL_PX = 5;
+
+const POINTER_BUTTON = Object.freeze({ PRIMARY: 0, MIDDLE: 1, SECONDARY: 2 });
+// The texture side every WebGL implementation must support, assumed when the real limit cannot be read
+const MIN_GUARANTEED_TEXTURE_SIZE = 4096;
+
+// Hex grid geometry: a hexagon's six corners lie 60 degrees apart, and a row grid's hexes are
+// turned a further 30 degrees so they stand pointy-topped. Staggered rows (or columns) of hexes
+// sit one and a half radii apart.
+const HEX_CORNERS = 6;
+const HEX_CORNER_ANGLE_DEG = 60;
+const POINTY_TOP_TURN_DEG = 30;
+const HEX_STAGGERED_SPACING = 1.5;
+
+/** The smallest distance (map pixels) from a decoration's centre that still picks it up, however small its image. */
+const DECORATION_MIN_HIT_RADIUS = 16;
+
+export class StudioCanvas {
+    /** Whether destroy() has run (see destroy). */
+    #destroyed = false;
+
+    /** Whether the map's detail level shows a set's level (see setDetailFilter). */
+    #showsLevel = () => true;
+
+    constructor(htmlContainer) {
+        this.container = htmlContainer;
+
+        this.app = new PIXI.Application({
+            autoDensity: true,
+            // Transparent, so the space around the map is the studio's own canvas surround colour
+            // (the map preview's background in the stylesheet), which follows the colour theme.
+            // Exports render into their own textures, which start transparent either way.
+            backgroundAlpha: 0,
+            antialias: true,
+            resolution: window.devicePixelRatio || 1,
+            sharedTicker: false,
+            autoStart: false,
+        });
+
+        const canvasElement = this.app.canvas ?? this.app.view;
+        canvasElement.style.display = "block";
+
+        this.container.appendChild(canvasElement);
+
+        this.stage = new PIXI.Container();
+        this.app.stage.addChild(this.stage);
+
+        // Initialise a strict z-index hierarchy of layers
+        this.layers = {
+            // Elevation, relief shading, water and biomes, drawn together by one shader (see
+            // TerrainCompositor); which of them show is a shader setting, not layer visibility
+            terrain: new PIXI.Container(),
+            // Companion highlight layer for the "Preview Rule Coverage" hover button - painted
+            // alongside `biomes` on every repaint, but hidden until hovered.
+            biomeFallback: new PIXI.Container(),
+            contours: new PIXI.Container(),
+            landMasks: new PIXI.Container(),
+            features: new PIXI.Container(),
+            infrastructure: new PIXI.Container(),
+            regions: new PIXI.Container(),
+            labels: new PIXI.Container(),
+            reference: new PIXI.Container(),
+            cartography: new PIXI.Container(),
+        };
+
+        this.terrainCompositor = new TerrainCompositor(PIXI);
+        this.layers.biomeFallback.visible = false;
+
+        // Region levels drawn from the display mesh (see renderRegionLevels): fills read their land
+        // mask from the terrain's packed texture
+        this.regionLevels = new RegionLevelLayers(PIXI, this.layers.regions, {
+            auxProvider: () => this.terrainCompositor.auxTexture,
+            maxTextureSize: () => {
+                const gl = this.app.renderer.gl;
+                return gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : MIN_GUARANTEED_TEXTURE_SIZE;
+            },
+        });
+        // Optional (x, y, radius) => hit lookup for things picked without edit nodes (regions and
+        // routes drawn from the mesh), consulted when no node or marker is under the pointer
+        this.meshHitTest = null;
+
+        // Vector Graphics Engine for non-pixel entities (custom river and fault guides, spring pins).
+        // Rivers themselves are drawn by the terrain shader (see TerrainCompositor).
+        this.haloGraphics = new PIXI.Graphics();
+        this.haloGraphics.filters = [new PIXI.AlphaFilter(0.15)];
+        this.layers.features.addChild(this.haloGraphics);
+
+        this.manualRiverGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.manualRiverGraphics);
+
+        this.faultGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.faultGraphics);
+
+        this.featurePinGraphics = new PIXI.Graphics();
+        this.layers.features.addChild(this.featurePinGraphics);
+
+        // Setup Infrastructure Sub-containers
+        this.routeGraphics = new PIXI.Graphics();
+        this.nodeContainer = new PIXI.Container();
+        this.pinContainer = new PIXI.Container();
+
+        this.layers.infrastructure.addChild(this.routeGraphics);
+        this.layers.infrastructure.addChild(this.nodeContainer); // Render nodes above lines
+        this.layers.infrastructure.addChild(this.pinContainer); // Render pins above nodes
+
+        // Reference Image Sprite Setup
+        this.referenceSprite = new PIXI.Sprite();
+        this.referenceSprite.anchor.set(0.5); // Centered anchor ensures scaling expands outward equally
+        this.layers.reference.addChild(this.referenceSprite);
+
+        // --- Global Drag Handling ---
+        this.activeDrag = null;
+        // What the pointer holds, for the canvas hint: null, "label", "decoration", "pin" or
+        // "mask" (see #heldItemKind)
+        this.heldItem = null;
+        // The highlight box around a shape being dragged with Shift (see #drawShapeDragBox)
+        this.shapeDragBox = null;
+        this.interactiveTargets = [];
+
+        // Instantiate the grid layer
+        this.gridLayer = new PIXI.Graphics();
+
+        // Cache for persistent GPU textures to prevent memory churn
+        this.layerSprites = {};
+
+        // Setup the Brush Cursor overlay
+        this.brushCursor = new PIXI.Graphics();
+        this.brushCursor.visible = false;
+
+        // The Regions tool's outline of the region being edited, and its Fill preview
+        this.regionOverlays = new RegionOverlays(PIXI);
+        // The Routes tool's route being placed, trace stroke and waypoint handles
+        this.routeOverlays = new RouteOverlays(PIXI);
+
+        // A tool that takes the primary button's presses, moves and releases itself while editing
+        // (see #pointerTool), or null; read on every event, so it follows the tool in use
+        this.pointerToolProvider = null;
+        this.pointerToolPressed = false;
+
+        // Setup the Crop Tool overlay
+        this.cropGraphics = new PIXI.Graphics();
+        this.cropBox = null;
+        this.activeCropAction = null;
+        this.cropStart = { x: 0, y: 0 };
+        this.cropOriginalBox = null;
+        this.onCropUpdate = null;
+        // Called with the crop when a drag of it ends, so the app can snap it (see setCropBox)
+        this.onCropRelease = null;
+
+        // Add them to the zooming stage in ascending order
+        this.stage.addChild(
+            this.layers.terrain,
+            this.layers.biomeFallback,
+            this.layers.contours,
+            this.layers.landMasks,
+            this.layers.features,
+            this.layers.regions,
+            this.layers.infrastructure,
+            this.layers.reference,
+            this.gridLayer,
+            this.layers.labels,
+            this.layers.cartography,
+            this.cropGraphics,
+            ...this.regionOverlays.displayObjects,
+            ...this.routeOverlays.displayObjects,
+            this.brushCursor,
+        );
+
+        this.isDragging = false;
+        this.dragStart = { x: 0, y: 0 };
+        this.stageStart = { x: 0, y: 0 };
+
+        this.isReferenceMode = false;
+        this.isDraggingReference = false;
+
+        // Frame State
+        this.isInitialized = false;
+        this.hasGeneratedMap = false;
+        this.mapWidth = FILRODENSWMB.DEFAULTS.MAP_WIDTH;
+        this.mapHeight = FILRODENSWMB.DEFAULTS.MAP_HEIGHT;
+
+        this.#updateGlobalMask();
+
+        this.#setupInteractions(canvasElement);
+
+        let lastW = 0;
+        let lastH = 0;
+        this.resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const w = Math.floor(entry.contentRect.width);
+                const h = Math.floor(entry.contentRect.height);
+
+                if (w > 0 && h > 0 && (w !== lastW || h !== lastH)) {
+                    lastW = w;
+                    lastH = h;
+
+                    // Always update the WebGL renderer resolution to prevent pixel stretching
+                    this.app.renderer.resize(w, h);
+
+                    // Only reset the camera on the very first DOM render
+                    if (!this.isInitialized) {
+                        this.resetCamera();
+                        this.isInitialized = true;
+                    }
+                }
+            }
+        });
+        this.resizeObserver.observe(this.container);
+        const renderLoop = (time) => {
+            const activeWindow = this.container.ownerDocument.defaultView || window;
+            this.app.ticker.update(time);
+            this.app.renderer.render(this.stage);
+            this.animationFrameId = activeWindow.requestAnimationFrame(renderLoop);
+        };
+        renderLoop();
+
+        // Callbacks for brush tools
+        this.onBrushStart = null;
+        this.onBrushMove = null;
+        this.onBrushEnd = null;
+
+        // Mode flag
+        this.isEditMode = false;
+        this.renderPassMode = "normal"; // "normal" | "player" | "gm"
+        this.viewFilters = { all: true, gm: true, none: false };
+        this.lastBrushTime = 0;
+    }
+
+    /**
+     * Mathematically checks if the mouse coordinates are hovering over an interactive target.
+     * Returns the full target data packet (including entityType and entityId).
+     */
+    #getHitTarget(x, y) {
+        let closest = null;
+        let minDist = Infinity;
+
+        for (const item of this.interactiveTargets) {
+            const dist = Math.hypot(item.x - x, item.y - y);
+            if (dist <= item.radius && dist < minDist) {
+                minDist = dist;
+                closest = item;
+            }
+        }
+        // Regions and routes drawn from the mesh have no nodes; they are found by what lies under
+        // the pointer instead (see meshHitTest). Such a hit can be picked (double-clicked) but not
+        // dragged: it carries selectOnly.
+        if (!closest && this.isEditMode && this.meshHitTest) {
+            closest = this.meshHitTest(x, y, FILRODENSWMB.MESH.ROUTE_HIT_PX / (this.stage.scale.x || 1));
+        }
+        return closest;
+    }
+
+    /**
+     * The nearest of the interactive items of one type (a pin, a label) whose reach covers a map
+     * point, or null: what a Select mode picks (see PickTool).
+     *
+     * @param {number} x
+     * @param {number} y
+     * @param {string} entityType
+     * @returns {object|null} The item's hit data (entityType, entityId, and for a label its parentType and layerId).
+     */
+    hitTest(x, y, entityType) {
+        let closest = null;
+        let minDist = Infinity;
+        for (const item of this.interactiveTargets) {
+            if (item.entityType !== entityType) continue;
+            const dist = Math.hypot(item.x - x, item.y - y);
+            if (dist <= item.radius && dist < minDist) {
+                minDist = dist;
+                closest = item;
+            }
+        }
+        return closest;
+    }
+
+    #setupInteractions(canvasElement) {
+        // Focusable from script only (not by Tab), and focused by a press, so the keys a tool
+        // listens for (Escape, Enter, undo) reach the studio after working on the map
+        canvasElement.tabIndex = -1;
+        canvasElement.addEventListener("wheel", (e) => this.#handleWheel(e, canvasElement));
+        canvasElement.addEventListener("contextmenu", (e) => e.preventDefault());
+        canvasElement.addEventListener("pointerdown", (e) => this.#handlePointerDown(e, canvasElement));
+        canvasElement.addEventListener("pointermove", (e) => this.#handlePointerMove(e, canvasElement));
+        canvasElement.addEventListener("dblclick", (e) => this.#handleDoubleClick(e, canvasElement));
+
+        // Unified completion events prevent duplicate listener binds
+        const endInteraction = (e) => this.#handlePointerUp(e, canvasElement);
+        canvasElement.addEventListener("pointerup", endInteraction);
+        canvasElement.addEventListener("pointercancel", endInteraction);
+        canvasElement.addEventListener("pointerleave", (e) => this.#handlePointerLeave(e, canvasElement));
+    }
+
+    #handleWheel(e, canvasElement) {
+        const isZoomIn = e.deltaY < 0;
+        const config = FILRODENSWMB.UI.WHEEL;
+
+        // --- Reference Image Scaling Intercept ---
+        if (this.isReferenceMode && e.shiftKey) {
+            const scale = isZoomIn ? FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_FACTOR : 1 / FILRODENSWMB.UI.REFERENCE_IMAGE.SCALE_FACTOR;
+            if (this.onReferenceScale) this.onReferenceScale(scale);
+            return;
+        }
+
+        // --- Held Item Transformation Intercept ---
+        // While a label, decoration or pin is held with the left button, the wheel changes that
+        // item instead of the camera, so a slip of the wheel mid-drag never moves the view.
+        const dragWrapper = this.activeDrag ? this.interactiveTargets.find((t) => t.target === this.activeDrag.target) : null;
+
+        if (StudioCanvas.#isWheelTransformable(dragWrapper)) {
+            e.preventDefault();
+            this.#transformHeldItem(dragWrapper, e.shiftKey, isZoomIn);
+            return;
+        }
+
+        // --- Standard Camera Zoom ---
+        e.preventDefault();
+
+        const scaleDirection = isZoomIn ? config.CAMERA_FACTOR : 1 / config.CAMERA_FACTOR;
+        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+
+        const rect = canvasElement.getBoundingClientRect();
+        const localX = (e.clientX - rect.left - this.stage.x) / this.stage.scale.x;
+        const localY = (e.clientY - rect.top - this.stage.y) / this.stage.scale.y;
+
+        this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * scaleDirection, maxZoom));
+        this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * scaleDirection, maxZoom));
+
+        this.stage.position.x = e.clientX - rect.left - localX * this.stage.scale.x;
+        this.stage.position.y = e.clientY - rect.top - localY * this.stage.scale.y;
+
+        this.#updateNodeScales();
+        if (this.isCropMode) this.#drawCropOverlay();
+    }
+
+    /** Whether the wheel changes a held item rather than the camera (see #transformHeldItem). */
+    static #isWheelTransformable(wrapper) {
+        return !!(wrapper?.isLabel || wrapper?.isDecoration || wrapper?.isIconPin);
+    }
+
+    /**
+     * Applies one wheel notch to the held item: Shift resizes it, a plain notch rotates it.
+     * Labels and decorations rotate; pins have no rotation, so a plain notch does nothing to them.
+     * Rotation is kept between -180 and 180 degrees, the range of the edit dialogues' Rotation
+     * slider (see CanvasTransforms.normalizeAngle). Every item resizes in the same steps as its
+     * edit dialogue slider (see CanvasTransforms.stepValue).
+     *
+     * The first change counts as the start of a drag even if the item has not moved, so the
+     * state before it is recorded for undo, exactly as for a move.
+     */
+    #transformHeldItem(wrapper, isResize, isGrow) {
+        if (!isResize && wrapper.isIconPin) return;
+
+        this.#beginDragOnce();
+
+        if (isResize) {
+            this.#resizeHeldItem(wrapper, isGrow);
+        } else {
+            const rotation = isGrow ? -FILRODENSWMB.UI.WHEEL.ROTATION_STEP : FILRODENSWMB.UI.WHEEL.ROTATION_STEP;
+            wrapper.target.rotation = CanvasTransforms.normalizeAngle((wrapper.target.rotation || 0) + rotation);
+        }
+
+        if (this.onInfraDrag) this.onInfraDrag();
+    }
+
+    /**
+     * Resizes the held item by one wheel notch. A label's size is its font size (in rem, the value
+     * its edit dialogue shows); a pin's and a decoration's is their scale.
+     */
+    #resizeHeldItem(wrapper, isGrow) {
+        const target = wrapper.target;
+        const steps = isGrow ? 1 : -1;
+        const { LABEL_FONT_SIZE, PIN_SCALE, DECORATION_SCALE } = FILRODENSWMB.UI.WHEEL_RESIZE;
+
+        if (wrapper.isLabel) {
+            target.fontSize = CanvasTransforms.stepValue(target.fontSize || FILRODENSWMB.LABELS.UNSET_SIZE, steps, LABEL_FONT_SIZE);
+        } else if (wrapper.isIconPin) {
+            target.scale = CanvasTransforms.stepValue(target.scale || FILRODENSWMB.PINS.DEFAULT_SCALE, steps, PIN_SCALE);
+        } else {
+            target.scale = CanvasTransforms.stepValue(target.scale || 1, steps, DECORATION_SCALE);
+        }
+    }
+
+    /**
+     * The tool taking the primary button while editing, or null: an object with down, move, up,
+     * hover, doubleClick and leave, each given the map point and the event (see pointerToolProvider).
+     */
+    #pointerTool() {
+        return this.isEditMode ? (this.pointerToolProvider?.() ?? null) : null;
+    }
+
+    #handlePointerDown(e, canvasElement) {
+        canvasElement.setPointerCapture(e.pointerId);
+        canvasElement.focus({ preventScroll: true });
+
+        // Right/Middle Click Drag Pan
+        if (e.button === 2 || e.button === 1) {
+            this.isDragging = true;
+            this.dragStart = { x: e.clientX, y: e.clientY };
+            this.stageStart = { x: this.stage.position.x, y: this.stage.position.y };
+            canvasElement.style.cursor = "grabbing";
+            return;
+        }
+
+        if (e.button !== 0) return;
+
+        const coords = this.#getMapCoordinates(e, canvasElement);
+
+        if (this.isCropMode) return this.#handleCropPointerDown(e, coords, canvasElement);
+
+        if (this.isReferenceMode) {
+            this.isDraggingReference = true;
+            this.dragStart = { x: coords.x, y: coords.y };
+            canvasElement.style.cursor = "grabbing";
+            return;
+        }
+
+        const tool = this.#pointerTool();
+        if (tool) {
+            e.preventDefault();
+            this.pointerToolPressed = true;
+            tool.down(coords.x, coords.y, e);
+            return;
+        }
+
+        const hit = this.#getHitTarget(coords.x, coords.y);
+        const grabbedTarget = hit && !hit.selectOnly ? hit.target : null;
+
+        // Shift pressed on a node of a land mask picks up the whole shape (see
+        // #beginShapeDrag); Shift pressed anywhere else inserts a node on the nearest line or
+        // outline. Inserting a node on top of an existing node is never useful, so giving that
+        // press to the shape drag takes nothing away.
+        const isShapeGrab = e.shiftKey && !!hit?.shape;
+
+        if (this.isEditMode && e.shiftKey && !isShapeGrab && this.onInfraInsertNode) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.activeDrag = null;
+            this.onInfraInsertNode(coords.x, coords.y);
+            return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && grabbedTarget && this.onInfraDeleteNode) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.activeDrag = null;
+            this.onInfraDeleteNode(grabbedTarget);
+            return;
+        }
+
+        if (grabbedTarget) {
+            e.preventDefault();
+            e.stopPropagation();
+            // The drag is only "armed" here. It becomes a real drag - recording its undo snapshot
+            // and moving the item - once the pointer has travelled past the drag threshold (see
+            // #beginDragOnce), so a plain click or double-click on an item changes nothing.
+            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType, originX: e.clientX, originY: e.clientY, started: false };
+            if (isShapeGrab) this.#beginShapeDrag(hit.shape, coords);
+            canvasElement.style.cursor = "grabbing";
+            this.#setHeldItem(StudioCanvas.#heldItemKind(hit, this.activeDrag));
+            return;
+        }
+
+        if (this.isEditMode && this.onBrushStart) {
+            this.onBrushStart(coords.x, coords.y);
+        }
+    }
+
+    #handleCropPointerDown(e, coords, canvasElement) {
+        const zone = this.#getCropHitZone(coords.x, coords.y);
+        this.cropStart = { x: coords.x, y: coords.y };
+
+        if (zone) {
+            this.activeCropAction = zone;
+            this.cropOriginalBox = { ...this.cropBox };
+        } else {
+            this.activeCropAction = "draw";
+            this.cropBox = { x: coords.x, y: coords.y, width: 0, height: 0 };
+        }
+
+        canvasElement.style.cursor = "grabbing";
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    /**
+     * Routes a pointer move to whichever interaction is under way, in priority order: a crop box
+     * being drawn or moved, the crop tool's hover cursor, panning the reference image, panning the
+     * map, dragging a node or shape, painting with the brush, and finally plain hovering.
+     */
+    #handlePointerMove(e, canvasElement) {
+        const coords = this.#getMapCoordinates(e, canvasElement);
+
+        if (this.activeCropAction) {
+            this.#processCropDrag(coords);
+            return;
+        }
+        if (this.isCropMode) {
+            this.#showCropCursor(coords, canvasElement);
+            return;
+        }
+        if (this.isDraggingReference) {
+            this.#panReference(coords);
+            return;
+        }
+        if (this.isDragging) {
+            this.#panMap(e);
+            return;
+        }
+        const tool = this.#pointerTool();
+        if (tool) {
+            if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+            if (this.pointerToolPressed) tool.move(coords.x, coords.y, e);
+            else tool.hover(coords.x, coords.y, e);
+            return;
+        }
+        if (this.activeDrag) {
+            this.#dragHeldItem(e, coords);
+            return;
+        }
+        if (this.isEditMode && e.buttons === 1 && this.onBrushMove) {
+            this.#paintBrushMove(coords);
+            return;
+        }
+
+        this.#hover(e, coords, canvasElement);
+    }
+
+    /** Shows which part of the crop box (a corner, the middle, or outside) the pointer is over. */
+    #showCropCursor(coords, canvasElement) {
+        const zone = this.#getCropHitZone(coords.x, coords.y);
+        canvasElement.style.cursor = CROP_ZONE_CURSORS[zone] ?? "crosshair";
+    }
+
+    /** Moves the reference image by how far the pointer has moved since the last move. */
+    #panReference(coords) {
+        const dx = coords.x - this.dragStart.x;
+        const dy = coords.y - this.dragStart.y;
+        this.dragStart = { x: coords.x, y: coords.y };
+        if (this.onReferencePan) this.onReferencePan(dx, dy);
+    }
+
+    /** Moves the map with the pointer, measured in screen pixels from where the pan started. */
+    #panMap(e) {
+        const dx = e.clientX - this.dragStart.x;
+        const dy = e.clientY - this.dragStart.y;
+        this.stage.position.x = this.stageStart.x + dx;
+        this.stage.position.y = this.stageStart.y + dy;
+    }
+
+    /**
+     * Moves the node or shape the pointer holds. Nothing moves until the pointer has travelled
+     * past the drag threshold, so a click on an item does not nudge it.
+     */
+    #dragHeldItem(e, coords) {
+        if (!this.activeDrag.started && !this.#hasExceededDragThreshold(e)) return;
+        this.#beginDragOnce();
+
+        if (this.activeDrag.shapeDrag) {
+            this.#moveDraggedShape(coords);
+            return;
+        }
+
+        const buffer = BUFFERED_NODE_TYPES.includes(this.activeDrag.entityType) ? FILRODENSWMB.UI.CANVAS_BUFFER : 0;
+        this.activeDrag.target.x = Math.max(-buffer, Math.min(coords.x, this.mapWidth + buffer));
+        this.activeDrag.target.y = Math.max(-buffer, Math.min(coords.y, this.mapHeight + buffer));
+        if (this.onInfraDrag) this.onInfraDrag();
+    }
+
+    /** Paints a brush stamp at the pointer, at most once every BRUSH_MOVE_INTERVAL_MS. */
+    #paintBrushMove(coords) {
+        const now = performance.now();
+        if (now - this.lastBrushTime <= BRUSH_MOVE_INTERVAL_MS) return;
+
+        this.onBrushMove(coords.x, coords.y);
+        this.lastBrushTime = now;
+    }
+
+    /** Reports the pointer's position and, while editing, shows whether anything under it can be picked up. */
+    #hover(e, coords, canvasElement) {
+        if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+        if (!this.isEditMode) return;
+
+        const hit = this.#getHitTarget(coords.x, coords.y);
+        canvasElement.style.cursor = StudioCanvas.#hoverCursor(hit, e.shiftKey);
+    }
+
+    /**
+     * True once the pointer has moved far enough from where it pressed on an item to count as a drag.
+     */
+    #hasExceededDragThreshold(e) {
+        const { originX, originY } = this.activeDrag;
+        return Math.hypot(e.clientX - originX, e.clientY - originY) >= FILRODENSWMB.UI.NODE_DRAG_THRESHOLD_PX;
+    }
+
+    /**
+     * Marks the active drag as genuinely started, notifying the app the first time only so it can
+     * snapshot the state before anything has changed. Called before the item is first modified,
+     * whether by moving it or by rotating/scaling it with the mouse wheel while it is held.
+     */
+    #beginDragOnce() {
+        if (this.activeDrag.started) return;
+
+        this.activeDrag.started = true;
+        if (this.onInfraDragStart) this.onInfraDragStart();
+    }
+
+    /**
+     * The cursor over the canvas while editing and not dragging: "move" over a node that would
+     * drag its whole shape with Shift held (see #beginShapeDrag), "grab" over anything else that
+     * can be picked up, and the crosshair elsewhere.
+     */
+    static #hoverCursor(hit, isShiftHeld) {
+        if (!hit) return "crosshair";
+        if (hit.selectOnly) return "pointer";
+        return isShiftHeld && hit.shape ? "move" : "grab";
+    }
+
+    /**
+     * What the pointer is holding, for the canvas hint (see CanvasHints): a land mask
+     * ("mask") dragged whole with Shift, or a label, decoration or pin, whose wheel gestures
+     * differ from the tool's own. Nodes and anything else give null, since the tool's hint
+     * already covers them.
+     */
+    static #heldItemKind(hit, activeDrag) {
+        if (activeDrag?.shapeDrag) return "mask";
+        if (hit.isLabel) return "label";
+        if (hit.isDecoration) return "decoration";
+        if (hit.isIconPin) return "pin";
+        return null;
+    }
+
+    /** Tells the app what the pointer now holds, when that changes (see #heldItemKind). */
+    #setHeldItem(kind) {
+        if (this.heldItem === kind) return;
+        this.heldItem = kind;
+        if (this.onHeldItemChange) this.onHeldItemChange(kind);
+    }
+
+    /**
+     * Starts moving a whole land mask: records where its points start (see
+     * CanvasTransforms.beginShapeDrag) and shows the highlight box around it straight away, so
+     * pressing with Shift shows what will move before anything does.
+     */
+    #beginShapeDrag(shape, coords) {
+        this.activeDrag.shapeDrag = CanvasTransforms.beginShapeDrag(shape, coords);
+        this.#drawShapeDragBox(this.activeDrag.shapeDrag.bounds);
+    }
+
+    /**
+     * Moves the shape being dragged with Shift so it follows the pointer. Shapes may reach into the
+     * buffer around the map, as their nodes can when dragged one at a time.
+     */
+    #moveDraggedShape(coords) {
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER;
+        const limits = { minX: -buffer, minY: -buffer, maxX: this.mapWidth + buffer, maxY: this.mapHeight + buffer };
+        const drag = this.activeDrag.shapeDrag;
+        const offset = CanvasTransforms.moveShape(drag, coords, limits);
+
+        const { minX, minY, maxX, maxY } = drag.bounds;
+        this.#drawShapeDragBox({ minX: minX + offset.dx, minY: minY + offset.dy, maxX: maxX + offset.dx, maxY: maxY + offset.dy });
+
+        if (this.onInfraDrag) this.onInfraDrag();
+    }
+
+    /**
+     * Draws (or redraws) the highlight box around the shape being dragged with Shift. It is a
+     * direct child of the stage, above every layer, so redrawing the vector layers while the
+     * shape moves leaves it in place.
+     */
+    #drawShapeDragBox(bounds) {
+        if (!this.shapeDragBox || this.shapeDragBox.destroyed) {
+            this.shapeDragBox = new PIXI.Graphics();
+            this.shapeDragBox.alpha = FILRODENSWMB.UI.HIGHLIGHT.HELD_ALPHA;
+        }
+
+        const width = bounds.maxX - bounds.minX;
+        const height = bounds.maxY - bounds.minY;
+        this.shapeDragBox.clear();
+        this.#drawHighlightBox(this.shapeDragBox, width, height);
+        this.shapeDragBox.x = bounds.minX + width / 2;
+        this.shapeDragBox.y = bounds.minY + height / 2;
+
+        // Re-adding keeps it on top of anything added to the stage since it was first drawn
+        this.stage.addChild(this.shapeDragBox);
+    }
+
+    /** Lets go of the shape-drag box: it fades out the same way as the zoom-to-feature box. */
+    #releaseShapeDragBox() {
+        if (!this.shapeDragBox) return;
+        this.#fadeOutHighlight(this.shapeDragBox);
+        this.shapeDragBox = null;
+    }
+
+    /**
+     * Draws the shared highlight box (see FILRODENSWMB.UI.HIGHLIGHT) centred on the graphics
+     * object's origin, around a feature `width` by `height` map pixels. Line width, padding and
+     * corner radius are divided by the current zoom so the box looks the same at any zoom.
+     */
+    #drawHighlightBox(graphics, width, height) {
+        const { COLOR, LINE_WIDTH, FILL_ALPHA, CORNER_RADIUS } = FILRODENSWMB.UI.HIGHLIGHT;
+        const invScale = 1 / (this.stage.scale.x || 1);
+        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale;
+
+        graphics.lineStyle(LINE_WIDTH * invScale, COLOR, 1);
+        graphics.beginFill(COLOR, FILL_ALPHA);
+        graphics.drawRoundedRect(-width / 2 - pad, -height / 2 - pad, width + pad * 2, height + pad * 2, CORNER_RADIUS * invScale);
+        graphics.endFill();
+    }
+
+    /**
+     * Fades a highlight out while growing it slightly, then destroys it. Runs on the PIXI ticker
+     * and stops by itself if the canvas is torn down first.
+     */
+    #fadeOutHighlight(displayObject) {
+        const { FADE_FRAMES, FADE_GROWTH } = FILRODENSWMB.UI.HIGHLIGHT;
+        const startAlpha = displayObject.alpha;
+        let elapsed = 0;
+
+        const tick = () => {
+            // Safety escape if the user closes the app mid-animation
+            if (displayObject.destroyed) {
+                this.app.ticker.remove(tick);
+                return;
+            }
+
+            elapsed++;
+            const progress = elapsed / FADE_FRAMES;
+
+            // Ease-out fade combined with a gentle outward expansion
+            displayObject.alpha = startAlpha * (1 - Math.pow(progress, 2));
+            displayObject.scale.set(1 + progress * FADE_GROWTH);
+
+            if (elapsed >= FADE_FRAMES) {
+                displayObject.destroy();
+                this.app.ticker.remove(tick);
+            }
+        };
+
+        this.app.ticker.add(tick);
+    }
+
+    #processCropDrag(coords) {
+        const dx = coords.x - this.cropStart.x;
+        const dy = coords.y - this.cropStart.y;
+
+        if (this.activeCropAction === "draw") {
+            this.cropBox.x = Math.min(this.cropStart.x, coords.x);
+            this.cropBox.y = Math.min(this.cropStart.y, coords.y);
+            this.cropBox.width = Math.abs(coords.x - this.cropStart.x);
+            this.cropBox.height = Math.abs(coords.y - this.cropStart.y);
+        } else if (this.activeCropAction === "center") {
+            this.cropBox.x = this.cropOriginalBox.x + dx;
+            this.cropBox.y = this.cropOriginalBox.y + dy;
+        } else {
+            const MIN_SIZE = 10;
+            if (this.activeCropAction.includes("l")) {
+                this.cropBox.x = Math.min(this.cropOriginalBox.x + dx, this.cropOriginalBox.x + this.cropOriginalBox.width - MIN_SIZE);
+                this.cropBox.width = this.cropOriginalBox.x + this.cropOriginalBox.width - this.cropBox.x;
+            }
+            if (this.activeCropAction.includes("r")) {
+                this.cropBox.width = Math.max(MIN_SIZE, this.cropOriginalBox.width + dx);
+            }
+            if (this.activeCropAction.includes("t")) {
+                this.cropBox.y = Math.min(this.cropOriginalBox.y + dy, this.cropOriginalBox.y + this.cropOriginalBox.height - MIN_SIZE);
+                this.cropBox.height = this.cropOriginalBox.y + this.cropOriginalBox.height - this.cropBox.y;
+            }
+            if (this.activeCropAction.includes("b")) {
+                this.cropBox.height = Math.max(MIN_SIZE, this.cropOriginalBox.height + dy);
+            }
+        }
+
+        this.cropBox.x = Math.max(0, Math.min(this.cropBox.x, this.mapWidth - this.cropBox.width));
+        this.cropBox.y = Math.max(0, Math.min(this.cropBox.y, this.mapHeight - this.cropBox.height));
+
+        this.#drawCropOverlay();
+        if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+    }
+
+    #handleDoubleClick(e, canvasElement) {
+        if (!this.isEditMode) return;
+
+        const coords = this.#getMapCoordinates(e, canvasElement);
+        const tool = this.#pointerTool();
+        if (tool) {
+            e.preventDefault();
+            tool.doubleClick(coords.x, coords.y, e);
+            return;
+        }
+
+        const hit = this.#getHitTarget(coords.x, coords.y);
+
+        if (hit && this.onDoubleClick) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.onDoubleClick(hit);
+        }
+    }
+
+    /**
+     * Ends whatever the released button was doing: the right or middle button ends a pan (a
+     * right-button release that barely moved counts as a right-click), and the primary button ends
+     * a crop, a reference pan, a node or shape drag, or a brush stroke.
+     */
+    #handlePointerUp(e, canvasElement) {
+        if (canvasElement.hasPointerCapture(e.pointerId)) {
+            canvasElement.releasePointerCapture(e.pointerId);
+        }
+
+        if (e.button === POINTER_BUTTON.SECONDARY || e.button === POINTER_BUTTON.MIDDLE) {
+            this.#endPan(e, canvasElement);
+            return;
+        }
+        if (e.button !== POINTER_BUTTON.PRIMARY) return;
+        if (this.pointerToolPressed) {
+            this.pointerToolPressed = false;
+            const coords = this.#getMapCoordinates(e, canvasElement);
+            this.#pointerTool()?.up(coords.x, coords.y, e);
+            return;
+        }
+        this.#endPrimaryAction(canvasElement);
+    }
+
+    /** Ends a map pan, treating a right-button release close to where it was pressed as a right-click. */
+    #endPan(e, canvasElement) {
+        this.isDragging = false;
+        if (e.button === POINTER_BUTTON.SECONDARY && this.dragStart) {
+            const travel = Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y);
+            if (travel < RIGHT_CLICK_MAX_TRAVEL_PX && this.onRightClick) this.onRightClick();
+        }
+        canvasElement.style.cursor = this.isEditMode ? "crosshair" : "default";
+    }
+
+    /** Ends the primary-button interaction under way, the first of those listed on #handlePointerUp that applies. */
+    #endPrimaryAction(canvasElement) {
+        if (this.activeCropAction) {
+            this.activeCropAction = null;
+            canvasElement.style.cursor = "crosshair";
+            if (this.cropBox && this.onCropRelease) this.onCropRelease({ ...this.cropBox });
+            return;
+        }
+        if (this.isDraggingReference) {
+            this.isDraggingReference = false;
+            canvasElement.style.cursor = "crosshair";
+            return;
+        }
+        if (this.activeDrag) {
+            this.#endDrag(canvasElement);
+            return;
+        }
+        if (this.isEditMode && this.onBrushEnd) this.onBrushEnd();
+    }
+
+    /** Lets go of the node or shape being dragged, telling the app only if it actually moved. */
+    #endDrag(canvasElement) {
+        const wasDragged = this.activeDrag.started;
+        this.activeDrag = null;
+        this.#releaseShapeDragBox();
+        this.#setHeldItem(null);
+        canvasElement.style.cursor = "crosshair";
+        if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
+    }
+
+    #handlePointerLeave(_e, _canvasElement) {
+        if (!this.pointerToolPressed) this.#pointerTool()?.leave();
+        if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
+            this.onCanvasHover(null, null);
+        }
+    }
+
+    // --- Public API for the UI Buttons ---
+
+    zoomCamera(factor) {
+        const center = { x: this.container.clientWidth / 2, y: this.container.clientHeight / 2 };
+        const localX = (center.x - this.stage.x) / this.stage.scale.x;
+        const localY = (center.y - this.stage.y) / this.stage.scale.y;
+
+        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+
+        this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * factor, maxZoom));
+        this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * factor, maxZoom));
+
+        this.stage.position.x = center.x - localX * this.stage.scale.x;
+        this.stage.position.y = center.y - localY * this.stage.scale.y;
+
+        this.#updateNodeScales(); // Trigger inverse scaling
+    }
+
+    resetCamera() {
+        const paddedWidth = this.mapWidth * 1.1;
+        const paddedHeight = this.mapHeight * 1.1;
+
+        const scaleX = this.app.screen.width / paddedWidth;
+        const scaleY = this.app.screen.height / paddedHeight;
+        const optimalScale = Math.min(scaleX, scaleY);
+
+        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+        const finalScale = Math.max(0.1, Math.min(optimalScale, maxZoom));
+
+        this.stage.scale.set(finalScale);
+        this.stage.position.set((this.app.screen.width - this.mapWidth * finalScale) / 2, (this.app.screen.height - this.mapHeight * finalScale) / 2);
+
+        this.#updateNodeScales(); // Trigger inverse scaling
+    }
+
+    destroy() {
+        if (this.animationFrameId) {
+            const activeWindow = this.container?.ownerDocument?.defaultView || window;
+            activeWindow.cancelAnimationFrame(this.animationFrameId);
+        }
+        if (this.resizeObserver) this.resizeObserver.disconnect();
+
+        // Destroying a PIXI application twice fails part-way (its resize plugin has already been
+        // torn down), so it is only ever destroyed once
+        if (this.app && !this.#destroyed) {
+            // The terrain's and the regions' meshes and textures go first: destroying them again
+            // after the stage has already destroyed its children would fail on the meshes'
+            // released geometry
+            this.terrainCompositor.destroy();
+            this.regionLevels.clear();
+            this.app.destroy(true, { children: true, texture: true, baseTexture: true });
+        }
+        this.#destroyed = true;
+    }
+
+    /**
+     * Takes a raw RGBA pixel buffer and paints it directly to a specific layer in the stack.
+     * Utilises persistent sprite caching to eliminate VRAM reallocation spikes during live editing.
+     *
+     * When the caller knows which pixels changed since it last sent this layer, it passes them as
+     * bounds, and only those rows are copied into the texture and uploaded to the GPU (see
+     * RegionUploadResource). The bounds must cover every pixel that differs, including any margin
+     * the painters add around a repaint area (ProceduralEngine.getRepaintBounds). Without bounds
+     * the whole buffer is sent.
+     *
+     * @param {string} layerId - The layer to paint to.
+     * @param {Uint8Array} pixelBuffer - RGBA pixels of the whole map.
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @param {object|null} bounds - The pixels that changed since the last call for this layer.
+     */
+    renderPixelBuffer(layerId, pixelBuffer, width, height, bounds = null) {
+        const targetLayer = this.layers[layerId];
+        if (!targetLayer || this.#destroyed) return;
+
+        this.mapWidth = width;
+        this.mapHeight = height;
+
+        this.#updateGlobalMask();
+
+        let sprite = this.layerSprites[layerId];
+
+        // Setup the persistent sprite if it does not exist or resolution has changed
+        if (sprite?.width !== width || sprite.height !== height) {
+            if (sprite) sprite.destroy(true);
+
+            // The texture keeps its own copy of the pixels, decoupled from the engine's buffer
+            const RegionUploadResource = getRegionUploadResource(PIXI);
+            const resource = new RegionUploadResource(new Uint8Array(pixelBuffer.length), { width, height });
+            resource.write(pixelBuffer);
+            const baseTexture = new PIXI.BaseTexture(resource);
+            const texture = new PIXI.Texture(baseTexture);
+
+            sprite = new PIXI.Sprite(texture);
+            this.layerSprites[layerId] = sprite;
+
+            targetLayer.removeChildren();
+            targetLayer.addChild(sprite);
+        } else {
+            // Strictly mutate the underlying buffer and notify the GPU
+            const baseTexture = sprite.texture.baseTexture;
+            baseTexture.resource.write(pixelBuffer, bounds);
+            baseTexture.update();
+        }
+
+        if (!this.hasGeneratedMap) {
+            this.resetCamera();
+            this.hasGeneratedMap = true;
+        }
+    }
+
+    /**
+     * Sends the terrain's images (see TerrainShading) to the GPU and draws them on the terrain
+     * layer. As with renderPixelBuffer, `bounds` limits the upload to the rows that changed.
+     *
+     * @param {{surface: Uint8Array, underwater: Uint8Array, aux: Uint8Array, rivers: Uint8Array}} buffers - RGBA images of the whole map.
+     * @param {number} width - Map width in pixels.
+     * @param {number} height - Map height in pixels.
+     * @param {object|null} bounds - The pixels that changed since the last call.
+     */
+    renderTerrain(buffers, width, height, bounds = null) {
+        if (this.#destroyed) return;
+
+        this.mapWidth = width;
+        this.mapHeight = height;
+        this.#updateGlobalMask();
+
+        if (this.terrainCompositor.update(buffers, width, height, bounds)) {
+            this.layers.terrain.removeChildren();
+            this.layers.terrain.addChild(this.terrainCompositor.displayObject);
+        }
+
+        if (!this.hasGeneratedMap) {
+            this.resetCamera();
+            this.hasGeneratedMap = true;
+        }
+    }
+
+    /**
+     * Changes how the terrain is drawn (see TerrainCompositor.setSettings): the layer switches,
+     * biome opacity, relief strength and water settings. Nothing is repainted.
+     * @param {object} changes
+     */
+    setTerrainSettings(changes) {
+        this.terrainCompositor.setSettings(changes);
+    }
+
+    /**
+     * Renders interactive feature pins (like Springs and Blockers), and, while editing, the
+     * procedural springs placed on the current terrain (see RiverSources) as rings, so they can
+     * be moved or removed like the user's own.
+     */
+    renderFeaturePins(mapPins, isFeatureEdit, proceduralSprings = []) {
+        if (!this.featurePinGraphics) return;
+
+        this.featurePinGraphics.clear();
+        this.featurePinGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
+
+        if (mapPins && mapPins.length > 0) {
+            this.#drawMapPins(mapPins, isFeatureEdit);
+        }
+        if (isFeatureEdit) this.#drawProceduralSprings(proceduralSprings);
+    }
+
+    /** Draws the procedural springs as rings, each a target that can be dragged or removed. */
+    #drawProceduralSprings(springs) {
+        const style = FILRODENSWMB.DISPLAY.PROCEDURAL_SPRING;
+        const radius = FILRODENSWMB.DISPLAY.PIN_RADIUS;
+        const scale = this.stage.scale.x || 1;
+        for (const spring of springs) {
+            const x = spring.x + 0.5;
+            const y = spring.y + 0.5;
+            this.featurePinGraphics.lineStyle({ width: style.LINE_WIDTH / scale, color: style.COLOUR, alpha: style.ALPHA });
+            this.featurePinGraphics.drawCircle(x, y, radius);
+            this.interactiveTargets.push({ target: spring, x, y, radius: Math.max(radius, style.HIT_RADIUS), entityType: "proceduralSpring", entityId: spring.id });
+        }
+        this.featurePinGraphics.lineStyle(0);
+    }
+
+    /**
+     * Renders Vector Pins directly from the POI array using a flattened colour map.
+     */
+    #drawMapPins(mapPins, isFeatureEdit) {
+        this.featurePinGraphics.lineStyle(0);
+
+        // Dictionary to completely eliminate if/else cognitive complexity
+        const pinColors = {
+            spring: 0xff0000, // Semi-transparent Red
+            block_spring: 0x000000, // Semi-transparent Black
+        };
+
+        for (const pin of mapPins) {
+            // Rule: Springs and Blockers only render when editing Hydrology
+            if (!isFeatureEdit && (pin.type === "spring" || pin.type === "block_spring")) {
+                continue;
+            }
+
+            const hexColor = pinColors[pin.type];
+
+            if (hexColor !== undefined) {
+                const radius = pin.radius || FILRODENSWMB.DISPLAY.PIN_RADIUS;
+                this.featurePinGraphics.beginFill(hexColor, FILRODENSWMB.DISPLAY.PIN_ALPHA);
+                this.featurePinGraphics.drawCircle(pin.x, pin.y, radius);
+                this.featurePinGraphics.endFill();
+
+                if (isFeatureEdit) {
+                    this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: Math.max(radius, 10), entityType: "pin", entityId: pin.id });
+                }
+            }
+        }
+    }
+
+    /**
+     * Toggles the visibility of a specific layer in the WebGL scene graph.
+     */
+    toggleLayer(layerId, isVisible) {
+        const targetLayer = this.layers[layerId];
+        if (targetLayer) {
+            targetLayer.visible = isVisible;
+        }
+    }
+
+    /**
+     * Extracts precise X/Y integer array coordinates from a screen click.
+     */
+    #getMapCoordinates(event, canvasElement) {
+        const rect = canvasElement.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        // Reverse the WebGL scale and translation offsets
+        const localX = (mouseX - this.stage.x) / this.stage.scale.x;
+        const localY = (mouseY - this.stage.y) / this.stage.scale.y;
+
+        return {
+            x: Math.floor(localX),
+            y: Math.floor(localY),
+        };
+    }
+
+    setEditMode(isActive) {
+        this.isEditMode = isActive;
+        const canvasElement = this.app.canvas ?? this.app.view;
+        canvasElement.style.cursor = isActive ? "crosshair" : "default";
+
+        // Reveal/hide the buffer area immediately on toggle, rather than waiting for the next
+        // render pass to catch up with the new mode.
+        this.#updateGlobalMask();
+    }
+
+    /**
+     * Sets the opacity of the biomes over the ground (a terrain shader setting).
+     */
+    setBiomeOpacity(alphaValue) {
+        this.setTerrainSettings({ biomeAlpha: alphaValue });
+    }
+
+    /**
+     * Draws a crisp, low-opacity PIXI overlay of standard VTT grid patterns.
+     * Utilises a geometric boundary mask to allow edge-hex completion without bleed.
+     */
+    drawGrid(type, size, isVisible) {
+        this.gridLayer.clear();
+
+        // Clean up the mask layout if the grid is hidden or disabled
+        if (this.gridMask) {
+            this.gridMask.clear();
+            this.gridLayer.mask = null;
+        }
+
+        if (!isVisible || type === "none") return;
+
+        this.#maskGridToMap();
+
+        // Configure the drawing line styles
+        this.gridLayer.lineStyle(1, 0xffffff, FILRODENSWMB.DISPLAY.GRID_ALPHA);
+
+        const cellSize = Math.max(FILRODENSWMB.LIMITS.MIN_GRID_SIZE, Number(size));
+        if (type === "square") this.#drawSquareGrid(cellSize);
+        else if (type === "hexR" || type === "hexC") this.#drawHexGrid(cellSize, type === "hexR");
+    }
+
+    /**
+     * Clips the grid layer to the map, so hexes drawn past the edges (see #drawHexGrid) are cut
+     * off cleanly at the map's border. The mask is created the first time and reused after.
+     */
+    #maskGridToMap() {
+        if (!this.gridMask) {
+            this.gridMask = new PIXI.Graphics();
+            this.stage.addChild(this.gridMask);
+        }
+
+        this.gridMask.beginFill(0xffffff);
+        this.gridMask.drawRect(0, 0, this.mapWidth, this.mapHeight);
+        this.gridMask.endFill();
+        this.gridLayer.mask = this.gridMask;
+    }
+
+    /** Draws square grid lines every `cellSize` map pixels, starting at the map's top-left corner. */
+    #drawSquareGrid(cellSize) {
+        for (let x = 0; x <= this.mapWidth; x += cellSize) {
+            this.gridLayer.moveTo(x, 0).lineTo(x, this.mapHeight);
+        }
+        for (let y = 0; y <= this.mapHeight; y += cellSize) {
+            this.gridLayer.moveTo(0, y).lineTo(this.mapWidth, y);
+        }
+    }
+
+    /**
+     * Draws a hex grid whose hexes are `cellSize` map pixels across their flat sides. Row grids
+     * (`isRow`) have pointy-topped hexes in rows, every other row shifted by half a hex; column
+     * grids have flat-topped hexes in columns, every other column shifted.
+     *
+     * Hexes start one column and one row before the map and run one hex past its far edges, so
+     * the partial hexes along every edge are drawn complete and then clipped by the grid mask
+     * (see #maskGridToMap), rather than left open.
+     */
+    #drawHexGrid(cellSize, isRow) {
+        const radius = cellSize / Math.sqrt(3);
+        const spacing = {
+            x: isRow ? cellSize : radius * HEX_STAGGERED_SPACING,
+            y: isRow ? radius * HEX_STAGGERED_SPACING : cellSize,
+        };
+
+        for (let col = -1; col * spacing.x < this.mapWidth + cellSize; col++) {
+            for (let row = -1; row * spacing.y < this.mapHeight + cellSize; row++) {
+                const centre = StudioCanvas.#hexCentre(col, row, spacing, cellSize, isRow);
+                this.#drawHexagon(centre, radius, isRow);
+            }
+        }
+    }
+
+    /** The centre of the hex at `col`, `row`: every odd row (row grids) or odd column (column grids) is shifted by half a hex. */
+    static #hexCentre(col, row, spacing, cellSize, isRow) {
+        if (isRow) {
+            const offset = row % 2 === 0 ? 0 : cellSize / 2;
+            return { x: col * spacing.x + offset, y: row * spacing.y };
+        }
+
+        const offset = col % 2 === 0 ? 0 : cellSize / 2;
+        return { x: col * spacing.x, y: row * spacing.y + offset };
+    }
+
+    /** Draws one hexagon's outline through its six corners, turned so row grids' hexes are pointy-topped. */
+    #drawHexagon(centre, radius, isRow) {
+        for (let i = 0; i < HEX_CORNERS; i++) {
+            const angleDeg = HEX_CORNER_ANGLE_DEG * i - (isRow ? POINTY_TOP_TURN_DEG : 0);
+            const angleRad = (Math.PI / 180) * angleDeg;
+            const px = centre.x + radius * Math.cos(angleRad);
+            const py = centre.y + radius * Math.sin(angleRad);
+
+            if (i === 0) this.gridLayer.moveTo(px, py);
+            else this.gridLayer.lineTo(px, py);
+        }
+        this.gridLayer.closePath();
+    }
+
+    /**
+     * Extracts the current PIXI stage and converts it synchronously to a binary Blob.
+     * Triggers a detached link click to bypass Electron's DOM navigation interceptors.
+     */
+    exportToPNG(filename = "world-map") {
+        // The reference image and the land masks' outlines are working aids, never exported (as
+        // scene export leaves them out too); each is shown again afterwards only if it was showing
+        const referenceVisible = this.layers.reference.visible;
+        const landMasksVisible = this.layers.landMasks.visible;
+        try {
+            this.layers.reference.visible = false;
+            this.layers.landMasks.visible = false;
+
+            const optimalRes = 2000 / this.mapWidth;
+            const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
+
+            const renderTexture = PIXI.RenderTexture.create({
+                width: Math.round(this.mapWidth * dynamicRes),
+                height: Math.round(this.mapHeight * dynamicRes),
+                resolution: 1,
+            });
+
+            // Temporarily strip the camera transform for a clean, 0-offset export
+            const origX = this.stage.position.x;
+            const origY = this.stage.position.y;
+            const origScaleX = this.stage.scale.x;
+            const origScaleY = this.stage.scale.y;
+
+            this.stage.position.set(0, 0);
+            this.stage.scale.set(dynamicRes);
+
+            // Render to texture (instead of relying on the live monitor output)
+            this.app.renderer.render(this.stage, { renderTexture: renderTexture });
+            const canvas = this.app.renderer.extract.canvas(renderTexture);
+
+            // Restore camera
+            this.stage.position.set(origX, origY);
+            this.stage.scale.set(origScaleX, origScaleY);
+
+            this.layers.reference.visible = referenceVisible;
+            this.layers.landMasks.visible = landMasksVisible;
+
+            const dataUrl = canvas.toDataURL("image/png");
+            const byteString = atob(dataUrl.split(",")[1]);
+            const arrayBuffer = new ArrayBuffer(byteString.length);
+            const uintArray = new Uint8Array(arrayBuffer);
+
+            for (let i = 0; i < byteString.length; i++) {
+                uintArray[i] = byteString.codePointAt(i);
+            }
+
+            const blob = new Blob([arrayBuffer], { type: "image/png" });
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = blobUrl;
+
+            const safeName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+            a.download = `fwmb_${safeName}.png`;
+
+            a.click();
+
+            URL.revokeObjectURL(blobUrl);
+
+            // Clean up the temporary texture from VRAM
+            renderTexture.destroy(true);
+        } catch (err) {
+            this.layers.reference.visible = referenceVisible;
+            this.layers.landMasks.visible = landMasksVisible;
+            console.error("FWMB | Failed to export PNG:", err);
+            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ExportPngFailed"));
+        }
+    }
+
+    /**
+     * Generates a smooth array of coordinates through the provided points using a Catmull-Rom spline.
+     */
+    #getSplinePoints(points, resolution = 20) {
+        if (!points || points.length < 2) return points;
+        if (points.length === 2) return points;
+
+        const curve = [];
+
+        // To make the spline pass exactly through the first and last points without snapping,
+        // we duplicate the start and end nodes to act as invisible control anchors.
+        const p = [points[0], ...points, points[points.length - 1]];
+
+        for (let i = 1; i < p.length - 2; i++) {
+            const p0 = p[i - 1];
+            const p1 = p[i];
+            const p2 = p[i + 1];
+            const p3 = p[i + 2];
+
+            for (let t = 0; t <= 1; t += 1 / resolution) {
+                const t2 = t * t;
+                const t3 = t2 * t;
+
+                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
+
+                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
+
+                // Prevent pushing microscopic overlapping coordinates
+                if (curve.length > 0) {
+                    const last = curve.at(-1);
+                    if (Math.abs(last.x - x) < 0.1 && Math.abs(last.y - y) < 0.1) continue;
+                }
+
+                curve.push({ x, y });
+            }
+        }
+        return curve;
+    }
+
+    /**
+     * Safety router to clear the spatial node cache before a render pass.
+     */
+    clearInteractiveTargets() {
+        this.interactiveTargets = [];
+    }
+
+    /**
+     * Renders vector routes and POI pins to the infrastructure layer.
+     */
+    renderInfrastructure(pins = [], routes = [], isEditMode = false, meshSession = null) {
+        // Clone and sort the routes by thickness so major highways always draw on top
+        const sortedRoutes = [...routes].sort((a, b) => a.thickness - b.thickness);
+
+        this.routeGraphics.clear();
+        // Pin icons come from PIXI's shared texture cache (Texture.from), so the sprites are
+        // destroyed without their textures. Destroying the texture as well would force the next
+        // redraw to load and rasterise every icon again, creating fresh GPU textures each time.
+        this.pinContainer.removeChildren().forEach((c) => c.destroy());
+        this.nodeContainer.removeChildren().forEach((c) => c.destroy(true));
+
+        // 1. Render Routes (Bottom Layer), from their legs on the display mesh (see #drawMeshRoute),
+        // with the stretches several visible routes share drawn once (see MeshSession.routeDrawLines)
+        if (meshSession) {
+            const visible = sortedRoutes.filter((route) => this.#isVisibleInCurrentPass(route.visibility, "all", false));
+            const lines = meshSession.routeDrawLines(visible);
+            for (const route of visible) for (const flat of lines.get(route.id) ?? []) this.#drawMeshRoute(route, flat);
+        }
+
+        // 2. Render Pins (Top Layer)
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+
+        pins.forEach((pin) => {
+            if (!this.#isVisibleInCurrentPass(pin.visibility, "all", false)) return;
+
+            // Icon paths are stored as the host names them (a built-in icon by its module path);
+            // the host turns them into a URL the page can load (see platform.assets)
+            const texturePath = platform.assets.url(resolvePinIconPath(pin.icon));
+            const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
+
+            // Apply multiplicative tinting (defaults to white if missing)
+            if (pin.color) {
+                sprite.tint = ColorMath.hexToPackedInt(pin.color);
+            }
+
+            // Apply resolution scaling * user override scale
+            const { PIN_PX, UNIT } = FILRODENSWMB.SYMBOLS;
+            const size = PIN_PX * UNIT * resScale * (pin.scale || FILRODENSWMB.PINS.DEFAULT_SCALE);
+            sprite.width = size;
+            sprite.height = size;
+
+            sprite.anchor.set(0.5);
+            sprite.x = pin.x;
+            sprite.y = pin.y;
+
+            if (isEditMode) {
+                // The hit radius must expand to match the new size
+                // isIconPin: a map pin with an icon, which can be resized with the wheel while held
+                // (see #transformHeldItem), unlike the Terrain Features tool's river source pins
+                this.interactiveTargets.push({ target: pin, x: pin.x, y: pin.y, radius: sprite.width / 2, entityType: "pin", entityId: pin.id, isIconPin: true });
+            }
+
+            this.pinContainer.addChild(sprite);
+        });
+    }
+
+    /**
+     * Draws one line of a route (the whole route, or a stretch no higher route draws): through its
+     * cells' sites, corner cut when the route is smoothed, with a black outline one pixel wider
+     * underneath unless the route turns its outline off.
+     * @param {object} route
+     * @param {Float64Array} flat - The line, flat [x0, y0, ...].
+     */
+    #drawMeshRoute(route, flat) {
+        if (flat.length < 4) return;
+
+        const points = [];
+        for (let i = 0; i < flat.length; i += 2) points.push({ x: flat[i], y: flat[i + 1] });
+        const lineStyle = (width, color) => ({ width, color, alpha: 1, cap: PIXI.LINE_CAP.ROUND, join: PIXI.LINE_JOIN.ROUND });
+
+        if (route.outline !== false) {
+            this.routeGraphics.lineStyle(lineStyle(route.thickness + 1, 0x000000));
+            this.#drawVectorPath(this.routeGraphics, points, route.style, route.thickness);
+        }
+        this.routeGraphics.lineStyle(lineStyle(route.thickness, ColorMath.hexToPackedInt(route.color)));
+        this.#drawVectorPath(this.routeGraphics, points, route.style, route.thickness);
+    }
+
+    renderLandMasks(masks = [], isEditMode = false, activeMaskId = null, isVisible = true) {
+        if (!this.landMaskGraphics) {
+            this.landMaskGraphics = new PIXI.Graphics();
+            this.layers.landMasks.addChild(this.landMaskGraphics);
+        }
+
+        const g = this.landMaskGraphics;
+        g.clear();
+        g.removeChildren().forEach((c) => c.destroy({ children: true }));
+
+        this.interactiveTargets = this.interactiveTargets.filter((t) => t.entityType !== "landMask");
+
+        if (!isVisible || !masks || masks.length === 0) return;
+
+        for (const mask of masks) {
+            if (!mask.points || mask.points.length === 0) continue;
+
+            const isActive = mask.id === activeMaskId;
+            const isSubtract = mask.operation === "subtract";
+
+            // Green for Add Land, Red for Subtract Land (Add Ocean). The same hex values drive the
+            // swatch on the Land Masks list, so the two stay in step.
+            const { ADD, SUBTRACT } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
+            const baseColor = ColorMath.hexToPackedInt(isSubtract ? SUBTRACT : ADD);
+
+            g.lineStyle(2, baseColor, isActive ? 0.9 : 0.4);
+            g.beginFill(baseColor, isActive ? 0.3 : 0.1);
+
+            g.moveTo(mask.points[0].x, mask.points[0].y);
+            for (let i = 1; i < mask.points.length; i++) {
+                g.lineTo(mask.points[i].x, mask.points[i].y);
+            }
+
+            // Close the visual outline when the polygon has finished drawing
+            const isClosed = mask.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && !isActive;
+            if (isClosed) {
+                g.closePath();
+            }
+            g.endFill();
+
+            // Render edit nodes and hit targets for ALL masks whenever edit mode is active
+            if (isEditMode) {
+                this.#renderEditNodes(mask.points, g, isActive, mask, "landMask");
+            }
+        }
+    }
+
+    /**
+     * Draws the map's region levels from its mesh session (see RegionLevelLayers), with the
+     * visibility rules of the current render pass. Without a session (while a map is still being
+     * opened) nothing is drawn.
+     *
+     * @param {import("../mesh/MeshSession.js").MeshSession|null} meshSession
+     */
+    renderRegionLevels(meshSession, { focusLevelId = null } = {}) {
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        this.regionLevels.render(meshSession, {
+            isVisible: (visibility, parentVisibility, isContainer) => this.#isVisibleInCurrentPass(visibility, parentVisibility, isContainer),
+            showsLevel: this.#showsLevel,
+            resScale,
+            focusLevelId,
+        });
+    }
+
+    /**
+     * Frames the viewport to encompass a specific array of coordinates
+     * and fires a temporary animated highlight box around the true bounds.
+     */
+    zoomToFeature(points) {
+        if (!points || points.length === 0 || !this.stage) return;
+
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+
+        for (const pt of points) {
+            if (pt.x < minX) minX = pt.x;
+            if (pt.x > maxX) maxX = pt.x;
+            if (pt.y < minY) minY = pt.y;
+            if (pt.y > maxY) maxY = pt.y;
+        }
+
+        // Separate the true visual dimensions from the padded camera bounding box
+        const trueWidth = maxX - minX;
+        const trueHeight = maxY - minY;
+        const centerX = minX + trueWidth / 2;
+        const centerY = minY + trueHeight / 2;
+
+        const zoomWidth = Math.max(trueWidth, FILRODENSWMB.UI.ZOOM.MIN_BOUNDS_SIZE);
+        const zoomHeight = Math.max(trueHeight, FILRODENSWMB.UI.ZOOM.MIN_BOUNDS_SIZE);
+
+        // Calculate scale to fit with padding, constrained by maximum zoom limits
+        const scaleX = this.app.screen.width / (zoomWidth * FILRODENSWMB.UI.ZOOM.PADDING_FACTOR);
+        const scaleY = this.app.screen.height / (zoomHeight * FILRODENSWMB.UI.ZOOM.PADDING_FACTOR);
+        const targetScale = Math.min(scaleX, scaleY, FILRODENSWMB.UI.ZOOM.MAX_ZOOM_SCALE);
+
+        // Apply transforms directly to the PIXI stage
+        this.stage.scale.set(targetScale);
+        this.stage.position.x = this.app.screen.width / 2 - centerX * targetScale;
+        this.stage.position.y = this.app.screen.height / 2 - centerY * targetScale;
+
+        // Ensure interactive edit nodes shrink to match the new zoom level
+        this.#updateNodeScales();
+
+        // --- Animated Target Highlight ---
+        const highlight = new PIXI.Graphics();
+        this.#drawHighlightBox(highlight, trueWidth, trueHeight);
+        highlight.x = centerX;
+        highlight.y = centerY;
+        this.stage.addChild(highlight);
+        this.#fadeOutHighlight(highlight);
+    }
+
+    async updateReferenceImage(path, x, y, scale, alpha) {
+        if (!path) {
+            this.referenceSprite.texture = PIXI.Texture.EMPTY;
+            return;
+        }
+        const url = platform.assets.url(path);
+
+        try {
+            if (!this.referenceSprite.texture.textureCacheIds.includes(url)) {
+                const texture = await PIXI.Assets.load(url);
+                this.referenceSprite.texture = texture;
+            }
+        } catch (err) {
+            console.error("FWMB | Failed to load reference image:", err);
+        }
+
+        this.referenceSprite.x = x;
+        this.referenceSprite.y = y;
+        this.referenceSprite.scale.set(scale);
+        this.referenceSprite.alpha = alpha;
+    }
+
+    setReferenceMode(isActive) {
+        this.isReferenceMode = isActive;
+        const canvasElement = this.app.canvas ?? this.app.view;
+        if (isActive) canvasElement.style.cursor = "crosshair";
+    }
+
+    updateBrushCursor(x, y, radius, isVisible) {
+        if (!isVisible || x === null || y === null) {
+            this.brushCursor.visible = false;
+            return;
+        }
+
+        this.brushCursor.visible = true;
+        this.brushCursor.clear();
+
+        // Ensure the line stays exactly 1 screen-pixel thick regardless of map zoom
+        const thickness = 1 / this.stage.scale.x;
+
+        // Draw a white circle with a slight drop-shadow effect for visibility on light terrain
+        this.brushCursor.lineStyle({ width: thickness * 3, color: 0x000000, alpha: 0.3 });
+        this.brushCursor.drawCircle(x, y, radius);
+
+        this.brushCursor.lineStyle({ width: thickness, color: 0xffffff, alpha: 0.9 });
+        this.brushCursor.drawCircle(x, y, radius);
+    }
+
+    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], isEditMode = false, meshSession = null) {
+        this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
+        const args = [mapLabels, mapPins, mapRoutes, isEditMode, meshSession];
+        this.#labelArgs = args;
+        // The faces the labels are drawn in, so any still loading are drawn again once they arrive
+        const drawn = [];
+
+        // Extract native OS root font size to mimic CSS 'rem' behaviour
+        const rootFontSize = LabelWidth.rootFontSize();
+
+        // Dynamically scale vectors based on the canvas dimensions
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+
+        const ensureLabelData = (obj) => {
+            if (!obj.label) obj.label = {};
+            return obj.label;
+        };
+
+        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all", parentId = null, parentType = "custom", layerId = null, { startsAtDefault = false } = {}) => {
+            if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name) return;
+
+            let x = labelData.x ?? defaultX;
+            const y = labelData.y ?? defaultY;
+            const rotation = labelData.rotation ?? 0;
+
+            drawn.push(labelData);
+            const size = (labelData.fontSize || FILRODENSWMB.LABELS.UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontSize * resScale;
+            const fill = labelData.fillColor || "#ffffff";
+            const stroke = ColorMath.getContrastColor(fill);
+
+            // 1. Setup Base Style
+            const styleConfig = {
+                fontFamily: LabelFonts.family(labelData),
+                fontSize: size,
+                fill: fill,
+                fontWeight: LabelFonts.weight(labelData),
+                fontStyle: LabelFonts.style(labelData),
+                stroke: stroke,
+                strokeThickness: 3,
+                dropShadow: true,
+                dropShadowColor: stroke,
+                dropShadowBlur: 2,
+                dropShadowDistance: 2,
+            };
+
+            // 2. Apply Word Wrapping & Justification. The maximum width is a number of characters
+            // of this label's own font and size (see LabelWidth), so resizing the label or changing
+            // its font keeps its line breaks.
+            const wrapWidth = LabelWidth.wrapWidth(labelData, size, resScale);
+            if (wrapWidth > 0) {
+                styleConfig.wordWrap = true;
+                styleConfig.wordWrapWidth = wrapWidth;
+                styleConfig.align = labelData.justify || "left";
+            }
+
+            const style = new PIXI.TextStyle(styleConfig);
+
+            const text = new PIXI.Text(name, style);
+            // A label not yet placed that starts at its default point (a pin's) is centred half its
+            // own width further on, so its first letter is where the point is
+            if (startsAtDefault && labelData.x === undefined) x += text.width / 2;
+            text.anchor.set(0.5);
+            text.x = x;
+            text.y = y;
+            text.rotation = rotation * (Math.PI / 180);
+
+            this.layers.labels.addChild(text);
+
+            if (isEditMode) {
+                // The label's own position is written only when it is dragged (see #dragHeldItem):
+                // until then it follows its pin, route or region
+                const hitRadius = Math.max(text.width, text.height) / 2;
+                this.interactiveTargets.push({
+                    target: labelData,
+                    x: x,
+                    y: y,
+                    radius: hitRadius,
+                    isLabel: true,
+                    entityType: "label",
+                    entityId: parentId || labelData.id,
+                    parentType: parentType,
+                    layerId: layerId,
+                });
+            }
+        };
+
+        // Custom Labels
+        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all", label.id, "custom"));
+
+        // Pins' labels: beside the pin, starting at its right edge (PINS.LABEL_OFFSET) and centred
+        // on it vertically, so the gap grows only with the pin
+        const pinWidth = (pin) => FILRODENSWMB.SYMBOLS.PIN_PX * FILRODENSWMB.SYMBOLS.UNIT * resScale * (pin.scale || FILRODENSWMB.PINS.DEFAULT_SCALE);
+        mapPins.forEach((pin) => {
+            if (!pin.icon) return;
+            drawLabel(pin.name, ensureLabelData(pin), pin.x + pinWidth(pin) * FILRODENSWMB.PINS.LABEL_OFFSET, pin.y, pin.visibility, pin.id, "pin", null, { startsAtDefault: true });
+        });
+
+        this.#drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession);
+
+        // A face still loading was drawn in the fallback: once it arrives the labels are drawn
+        // again, unless they have been drawn since (see LabelFonts)
+        LabelFonts.load(drawn).then((asked) => {
+            if (asked && this.#labelArgs === args && !this.#destroyed) this.renderLabels(...args);
+        });
+    }
+
+    /** What the labels were last drawn from, so they can be drawn again when a face loads. */
+    #labelArgs = null;
+
+    /**
+     * Route and region labels on the display mesh. A route's label sits above the middle point of
+     * its line; a region's at its label anchor (the deepest point of its largest part; see
+     * MeshSession.labelAnchor). A label the user has moved keeps its own position either way.
+     */
+    #drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession) {
+        if (!meshSession) return;
+        const ROUTE_LABEL_RISE = 15;
+
+        for (const route of mapRoutes) {
+            if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) continue;
+            const point = meshSession.routeMidpoint(route);
+            if (!point) continue;
+            drawLabel(route.name, ensureLabelData(route), point.x, point.y - ROUTE_LABEL_RISE, route.visibility, route.id, "route");
+        }
+
+        for (const set of meshSession.layerSets) {
+            if (!this.#isVisibleInCurrentPass(set.visibility, "all", true)) continue;
+            for (const level of set.levels) this.#drawLevelLabels(drawLabel, ensureLabelData, meshSession, set, level);
+        }
+    }
+
+    #drawLevelLabels(drawLabel, ensureLabelData, meshSession, set, level) {
+        if (!this.#showsLevel(set, level)) return;
+        const levelVisibility = level.visibility !== "none" && set.visibility === "gm" ? "gm" : level.visibility || "all";
+        if (!this.#isVisibleInCurrentPass(levelVisibility, "all", true)) return;
+
+        for (const region of level.regions) {
+            let regionVisibility = region.visibility || "all";
+            if (regionVisibility !== "none" && levelVisibility === "gm") regionVisibility = "gm";
+            if (!this.#isVisibleInCurrentPass(regionVisibility, levelVisibility, true)) continue;
+
+            const anchor = meshSession.labelAnchor(level.id, region.key);
+            if (!anchor) continue;
+            drawLabel(region.name, ensureLabelData(region), anchor.x, anchor.y, regionVisibility, region.id, "region", level.id);
+        }
+    }
+
+    renderCartography(uiState, mapWidth, mapHeight, isEditMode = false, decorations = []) {
+        if (!this.layers.cartography) return;
+        this.layers.cartography.removeChildren().forEach((c) => c.destroy({ children: true }));
+
+        // Delegate to isolated drawing pipelines
+        this.#drawCartographyBorder(uiState, mapWidth, mapHeight);
+        this.#drawScaleBar(uiState, mapHeight, isEditMode);
+        this.#drawCartographyDecorations(decorations, isEditMode);
+    }
+
+    #drawCartographyBorder(uiState, mapWidth, mapHeight) {
+        if (!uiState.cartographyBorderEnable) return;
+
+        const vectorLayer = new PIXI.Graphics();
+        this.layers.cartography.addChild(vectorLayer);
+
+        const borderColorHex = ColorMath.hexToPackedInt(uiState.cartographyBorderColor || "#000000");
+        const style = uiState.cartographyBorderStyle;
+        const margin = 20;
+
+        if (style === "solid") {
+            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+        } else if (style === "double") {
+            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
+            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+            vectorLayer.lineStyle(3, borderColorHex, 1, 0);
+            vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
+        } else if (style === "ornate") {
+            vectorLayer.lineStyle(12, borderColorHex, 1, 0);
+            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+            vectorLayer.lineStyle(4, borderColorHex, 1, 0);
+            vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
+
+            const boxSize = 40;
+            vectorLayer.beginFill(borderColorHex);
+            vectorLayer.drawRect(0, 0, boxSize, boxSize);
+            vectorLayer.drawRect(mapWidth - boxSize, 0, boxSize, boxSize);
+            vectorLayer.drawRect(0, mapHeight - boxSize, boxSize, boxSize);
+            vectorLayer.drawRect(mapWidth - boxSize, mapHeight - boxSize, boxSize, boxSize);
+            vectorLayer.endFill();
+        }
+    }
+
+    #drawScaleBar(uiState, mapHeight, isEditMode) {
+        if (!uiState.cartographyScaleEnable) return;
+
+        const scaleContainer = new PIXI.Container();
+
+        // Set position based on UI State
+        scaleContainer.x = uiState.cartographyScaleX ?? 50;
+        scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
+
+        const interval = uiState.cartographyScaleInterval || 100;
+        // 0 minor subdivisions is a choice (no minor ticks), so only a missing value takes the default
+        const majorTicks = uiState.cartographyScaleMajorTicks || 4;
+        const minorTicks = uiState.cartographyScaleMinorTicks ?? 4;
+        const scaleValue = uiState.cartographyScaleValue || 1;
+        const units = uiState.cartographyScaleUnits || "Miles";
+
+        const height = 10;
+        const totalWidth = interval * majorTicks;
+
+        const scaleGraphics = new PIXI.Graphics();
+
+        // Base graphics are drawn relative to 0,0 inside the container
+        scaleGraphics.lineStyle(2, 0x000000, 1);
+        scaleGraphics.beginFill(0xffffff, 0.9);
+        scaleGraphics.drawRect(0, 0, totalWidth, height);
+        scaleGraphics.endFill();
+
+        scaleGraphics.beginFill(0x000000, 0.9);
+        for (let i = 0; i < majorTicks; i++) {
+            if (i % 2 !== 0) scaleGraphics.drawRect(i * interval, 0, interval, height);
+        }
+        scaleGraphics.endFill();
+
+        if (minorTicks > 0) {
+            const minorInterval = interval / minorTicks;
+            scaleGraphics.beginFill(0x000000, 0.9);
+            for (let i = 0; i < minorTicks; i++) {
+                if (i % 2 === 0) {
+                    scaleGraphics.drawRect(i * minorInterval, height / 2, minorInterval, height / 2);
+                } else {
+                    scaleGraphics.drawRect(i * minorInterval, 0, minorInterval, height / 2);
+                }
+            }
+            scaleGraphics.endFill();
+        }
+        scaleContainer.addChild(scaleGraphics);
+
+        const textStyle = new PIXI.TextStyle({ fontFamily: "Signika", fontSize: 16, fill: "#000000", stroke: "#ffffff", strokeThickness: 4, fontWeight: "bold" });
+        const text0 = new PIXI.Text("0", textStyle);
+        text0.anchor.set(0.5, 1);
+        text0.x = 0;
+        text0.y = -5;
+        scaleContainer.addChild(text0);
+
+        // Apply the multiplier mathematically
+        const textMax = new PIXI.Text(`${majorTicks * scaleValue} ${units}`, textStyle);
+        textMax.anchor.set(0.5, 1);
+        textMax.x = totalWidth;
+        textMax.y = -5;
+        scaleContainer.addChild(textMax);
+
+        this.layers.cartography.addChild(scaleContainer);
+
+        if (isEditMode) {
+            const scaleDataObj = {
+                get x() {
+                    return uiState.cartographyScaleX;
+                },
+                set x(val) {
+                    uiState.cartographyScaleX = val;
+                },
+                get y() {
+                    return uiState.cartographyScaleY;
+                },
+                set y(val) {
+                    uiState.cartographyScaleY = val;
+                },
+            };
+
+            this.interactiveTargets.push({
+                target: scaleDataObj,
+                x: scaleContainer.x + totalWidth / 2,
+                y: scaleContainer.y,
+                radius: totalWidth / 2,
+                isDecoration: false,
+            });
+        }
+    }
+
+    #drawCartographyDecorations(decorations, isEditMode) {
+        decorations.forEach((dec) => {
+            if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false) || !dec.src) return;
+
+            const sprite = new PIXI.Sprite(PIXI.Texture.from(platform.assets.url(dec.src)));
+            sprite.anchor.set(0.5);
+            sprite.x = dec.x;
+            sprite.y = dec.y;
+            sprite.rotation = dec.rotation * (Math.PI / 180);
+            sprite.scale.set(dec.scale || 1);
+            sprite.alpha = dec.opacity ?? 1; // Allow opacity fading
+
+            this.layers.cartography.addChild(sprite);
+
+            if (isEditMode) {
+                this.interactiveTargets.push({
+                    target: dec,
+                    x: dec.x,
+                    y: dec.y,
+                    // Read when the pointer is tested rather than now: an image still loading has no
+                    // size yet, so the whole decoration only becomes a handle once it has loaded
+                    get radius() {
+                        return sprite.destroyed ? 0 : Math.max(sprite.width / 2, sprite.height / 2, DECORATION_MIN_HIT_RADIUS);
+                    },
+                    isDecoration: true,
+                    entityType: "decoration",
+                    entityId: dec.id,
+                });
+                // A marker on its centre, the point it is held by and turns around; where two
+                // decorations overlap, a press picks the one whose centre is nearer
+                this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
+            }
+        });
+    }
+
+    /**
+     * Extracts the canvas to a binary Blob, manipulating heavy background layers based on the pass type.
+     */
+    async extractCanvasBlob(passType = "player") {
+        const originalVisibility = {
+            grid: this.gridLayer.visible,
+            reference: this.layers.reference.visible,
+            cartography: this.layers.cartography.visible,
+            landMasks: this.layers.landMasks.visible,
+            terrain: this.layers.terrain.visible,
+            contours: this.layers.contours.visible,
+            features: this.layers.features.visible,
+        };
+
+        this.layers.reference.visible = false;
+        // Guided mode's land mask editing polygons are an in-Studio authoring aid only, never
+        // part of the finished map, so they're kept out of every export pass regardless of
+        // whether they happened to be left visible from the Scene tool.
+        this.layers.landMasks.visible = false;
+
+        if (passType === "player") {
+            this.gridLayer.visible = false;
+        } else if (passType === "gm") {
+            this.layers.terrain.visible = false;
+            this.layers.contours.visible = false;
+            this.layers.features.visible = false;
+            this.gridLayer.visible = false;
+            this.layers.cartography.visible = false;
+        }
+
+        // Dynamically oversample small maps for vector crispness, capped at 2x.
+        const optimalRes = 2000 / this.mapWidth;
+        const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
+
+        // Physically multiply the pixel bounds rather than relying on PIXI's resolution flag
+        const renderTexture = PIXI.RenderTexture.create({
+            width: Math.round(this.mapWidth * dynamicRes),
+            height: Math.round(this.mapHeight * dynamicRes),
+            resolution: 1,
+        });
+
+        // Temporarily scale the stage up to draw into the larger texture
+        const origScaleX = this.stage.scale.x;
+        const origScaleY = this.stage.scale.y;
+        this.stage.scale.set(dynamicRes);
+
+        this.app.renderer.render(this.stage, { renderTexture: renderTexture });
+        const canvas = this.app.renderer.extract.canvas(renderTexture);
+
+        // Restore the original scale
+        this.stage.scale.set(origScaleX, origScaleY);
+
+        this.gridLayer.visible = originalVisibility.grid;
+        this.layers.reference.visible = originalVisibility.reference;
+        this.layers.cartography.visible = originalVisibility.cartography;
+        this.layers.landMasks.visible = originalVisibility.landMasks;
+        // Each layer goes back to how the person had it, rather than always to visible
+        this.layers.terrain.visible = originalVisibility.terrain;
+        this.layers.contours.visible = originalVisibility.contours;
+        this.layers.features.visible = originalVisibility.features;
+
+        return new Promise((resolve) => {
+            canvas.toBlob((blob) => {
+                renderTexture.destroy(true);
+                resolve(blob);
+            }, "image/png");
+        });
+    }
+
+    setRenderPass(mode) {
+        this.renderPassMode = mode;
+    }
+
+    setViewFilters(filters) {
+        this.viewFilters = { ...this.viewFilters, ...filters };
+    }
+
+    /**
+     * Whether the map's detail level shows a set's level (see DetailLevel), for the region levels
+     * and their labels; the pins and routes are given already filtered.
+     * @param {function(object, object): boolean} showsLevel
+     */
+    setDetailFilter(showsLevel) {
+        this.#showsLevel = showsLevel;
+    }
+
+    /**
+     * Evaluates whether a JSON element should be drawn during the current pass.
+     * @param {string} visibility - The visibility of the current element ("all", "gm", "none")
+     * @param {string} parentVisibility - The visibility of the parent container ("all", "gm", "none")
+     * @param {boolean} isContainer - Whether this element contains children that need evaluation
+     */
+    #isVisibleInCurrentPass(visibility, parentVisibility = "all", isContainer = false) {
+        let vis = visibility || "all";
+
+        // Hierarchical override: If a parent is strictly GM only, children cannot be Player visible.
+        if (vis !== "none" && parentVisibility === "gm") {
+            vis = "gm";
+        }
+
+        // A hidden item is drawn only on the map being worked on, and only while the Hidden view
+        // filter is on; an export never includes it
+        if (vis === "none") return this.renderPassMode === "normal" && this.viewFilters.none === true;
+
+        // Strict Export Overrides
+        if (this.renderPassMode === "player") {
+            return vis === "all";
+        } else if (this.renderPassMode === "gm") {
+            if (isContainer && vis === "all") return true; // Enter generic layers to check for GM secrets
+            return vis === "gm";
+        }
+
+        // Standard Interactive Mode Filters
+        if (isContainer && vis === "all") return true; // Always enter generic layers in interactive mode
+
+        if (vis === "gm") return this.viewFilters.gm;
+        return this.viewFilters.all;
+    }
+
+    #getCropHitZone(x, y) {
+        if (!this.cropBox) return null;
+
+        // Maintain a constant grab radius regardless of zoom level
+        const handleR = 10 / this.stage.scale.x;
+        const { x: cx, y: cy, width: cw, height: ch } = this.cropBox;
+
+        if (Math.hypot(x - cx, y - cy) < handleR) return "tl";
+        if (Math.hypot(x - (cx + cw), y - cy) < handleR) return "tr";
+        if (Math.hypot(x - cx, y - (cy + ch)) < handleR) return "bl";
+        if (Math.hypot(x - (cx + cw), y - (cy + ch)) < handleR) return "br";
+
+        if (x > cx && x < cx + cw && y > cy && y < cy + ch) return "center";
+
+        return null;
+    }
+
+    setCropMode(isActive) {
+        this.isCropMode = isActive;
+        if (!isActive) {
+            this.cropGraphics.clear();
+            this.cropBox = null;
+        } else if (!this.cropBox) {
+            // Initialise default bounding box to 50% of the screen centre
+            const w = this.mapWidth * 0.5;
+            const h = this.mapHeight * 0.5;
+            this.cropBox = { x: (this.mapWidth - w) / 2, y: (this.mapHeight - h) / 2, width: w, height: h };
+
+            this.#drawCropOverlay();
+            if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+            if (this.onCropRelease) this.onCropRelease({ ...this.cropBox });
+        }
+    }
+
+    getCropData() {
+        return this.cropBox;
+    }
+
+    /**
+     * Replaces the crop (while the crop tool is showing) and redraws it, as when the app snaps a
+     * crop the user has drawn to the one a regional map will actually use.
+     *
+     * @param {{x: number, y: number, width: number, height: number}} box - The crop, in map pixels.
+     */
+    setCropBox(box) {
+        if (!this.isCropMode || !box) return;
+        this.cropBox = { x: box.x, y: box.y, width: box.width, height: box.height };
+        this.#drawCropOverlay();
+        if (this.onCropUpdate) this.onCropUpdate(this.cropBox);
+    }
+
+    #drawCropOverlay() {
+        this.cropGraphics.clear();
+        if (!this.cropBox || this.cropBox.width <= 0) return;
+
+        // 1. Darkened negative space mask
+        this.cropGraphics.beginFill(0x000000, 0.6);
+        this.cropGraphics.drawRect(0, 0, this.mapWidth, this.mapHeight);
+        this.cropGraphics.beginHole();
+        this.cropGraphics.drawRect(this.cropBox.x, this.cropBox.y, this.cropBox.width, this.cropBox.height);
+        this.cropGraphics.endHole();
+        this.cropGraphics.endFill();
+
+        // 2. Scale-invariant outline
+        const lineW = 2 / this.stage.scale.x;
+        this.cropGraphics.lineStyle(lineW, 0xffffff, 1);
+        this.cropGraphics.drawRect(this.cropBox.x, this.cropBox.y, this.cropBox.width, this.cropBox.height);
+
+        // 3. Corner handles
+        const handleR = 6 / this.stage.scale.x;
+        this.cropGraphics.beginFill(0xffffff, 1);
+        this.cropGraphics.lineStyle(lineW / 2, 0x000000, 1);
+
+        const corners = [
+            { x: this.cropBox.x, y: this.cropBox.y },
+            { x: this.cropBox.x + this.cropBox.width, y: this.cropBox.y },
+            { x: this.cropBox.x, y: this.cropBox.y + this.cropBox.height },
+            { x: this.cropBox.x + this.cropBox.width, y: this.cropBox.y + this.cropBox.height },
+        ];
+
+        corners.forEach((c) => this.cropGraphics.drawCircle(c.x, c.y, handleR));
+        this.cropGraphics.endFill();
+    }
+
+    #updateGlobalMask() {
+        if (!this.mapMask) {
+            this.mapMask = new PIXI.Graphics();
+            this.stage.addChild(this.mapMask);
+            this.stage.mask = this.mapMask;
+        }
+
+        const buffer = FILRODENSWMB.UI.CANVAS_BUFFER; // Sensible off-canvas boundary
+
+        // Cosmetic only: the buffer is visible while editing (so nodes dragged/placed out there
+        // stay visible) and hidden outside edit mode, when it's just simulation headroom the
+        // viewer shouldn't see. Interaction (hitArea below) is unaffected by this either way.
+        const visualPad = this.isEditMode ? buffer : 0;
+
+        this.mapMask.clear();
+        this.mapMask.beginFill(0xffffff);
+        this.mapMask.drawRect(-visualPad, -visualPad, this.mapWidth + visualPad * 2, this.mapHeight + visualPad * 2);
+        this.mapMask.endFill();
+
+        this.stage.hitArea = new PIXI.Rectangle(-buffer, -buffer, this.mapWidth + buffer * 2, this.mapHeight + buffer * 2);
+    }
+
+    /**
+     * Draws the fault lines and tectonic features while Rivers and faults is in use (`isEditMode`:
+     * the map takes its clicks), with their points as handles only while they are being edited
+     * (`showNodes`; not in its Select mode, which picks whole lines).
+     */
+    renderFaultLines(faults = [], isEditMode = false, activeFaultId = null, showNodes = isEditMode) {
+        if (this.haloGraphics) this.haloGraphics.clear();
+
+        if (this.faultGraphics) {
+            this.faultGraphics.clear();
+            this.faultGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
+        }
+
+        if (!this.layers.features || !isEditMode) return;
+
+        faults.forEach((fault) => {
+            if (!this.#isVisibleInCurrentPass(fault.visibility, "all", false) || !fault.points || fault.points.length === 0) return;
+
+            // 1. Draw Halo and Line ONLY if there are enough points to form a path
+            if (fault.points.length >= 2) {
+                const rawSpline = this.#getSplinePoints(fault.points);
+
+                const spline = [rawSpline[0]];
+                for (let i = 1; i < rawSpline.length; i++) {
+                    const pt = rawSpline[i];
+                    const lastPt = spline.at(-1);
+                    if (Math.hypot(pt.x - lastPt.x, pt.y - lastPt.y) > 2 || i === rawSpline.length - 1) {
+                        spline.push(pt);
+                    }
+                }
+
+                const colorHex = typeof fault.color === "string" ? ColorMath.hexToPackedInt(fault.color) : fault.color || 0xffffff;
+                const thickness = fault.thickness || FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS;
+
+                // Draw the Area of Effect Halo via circle stamping
+                this.haloGraphics.beginFill(colorHex, 1);
+                this.haloGraphics.lineStyle(0);
+
+                let lastX = -9999;
+                let lastY = -9999;
+                const stepThreshold = Math.max(2, thickness * 0.25);
+
+                for (let i = 0; i < spline.length; i++) {
+                    const pt = spline[i];
+                    if (Math.hypot(pt.x - lastX, pt.y - lastY) > stepThreshold || i === spline.length - 1) {
+                        this.haloGraphics.drawCircle(pt.x, pt.y, thickness);
+                        lastX = pt.x;
+                        lastY = pt.y;
+                    }
+                }
+                this.haloGraphics.endFill();
+
+                // Draw the Core Vector Line
+                this.faultGraphics.lineStyle({
+                    width: 3,
+                    color: colorHex,
+                    alpha: 0.85,
+                    alignment: 0.5,
+                    join: PIXI.LINE_JOIN.ROUND,
+                    cap: PIXI.LINE_CAP.ROUND,
+                });
+                this.#drawVectorPath(this.faultGraphics, spline, "solid", 3);
+                // A reversed feature is laid out from its last point to its first, and its markers follow suit
+                if (TectonicFeatureEngine.isFeature(fault)) this.#drawFeatureMarkers(fault.type, fault.reversed ? [...spline].reverse() : spline, colorHex);
+            }
+
+            // 2. Draw Edit Nodes LAST so they always render on top of the geometry
+            if (showNodes) {
+                const isActive = fault.id === activeFaultId;
+                this.#renderEditNodes(fault.points, this.faultGraphics, isActive, fault, "fault");
+            }
+        });
+    }
+
+    /**
+     * Marks a tectonic feature's line with the symbol geological maps use for it, so its type and
+     * the direction it was drawn in (which decides which plate a subduction zone's volcanoes stand
+     * on, and which end of a hotspot chain is youngest) can be read on the map:
+     *   - subduction: triangles on the overriding plate's side (anticlockwise from the drawing
+     *     direction, the left-hand side on screen), pointing towards it;
+     *   - mountain range: triangles on both sides, as for a thrust belt;
+     *   - rift: short ticks on both sides, as for normal faults;
+     *   - hotspot chain: arrowheads pointing along the line towards its youngest end.
+     *
+     * Markers are drawn at a fixed spacing along the spline, sized for the screen at the current
+     * zoom, and skip the line's ends so they never sit on an edit node.
+     *
+     * @param {string} type - The feature type.
+     * @param {{x: number, y: number}[]} spline - The drawn line.
+     * @param {number} color - The line's colour.
+     */
+    #drawFeatureMarkers(type, spline, color) {
+        const scale = this.stage.scale.x || 1;
+        const size = FEATURE_MARKER.SIZE / scale;
+        const spacing = FEATURE_MARKER.SPACING / scale;
+        const graphics = this.faultGraphics;
+        const types = FILRODENSWMB.TECTONICS.FEATURES.TYPES;
+
+        this.#forEachAlongSpline(spline, spacing, (x, y, dx, dy) => {
+            // Left of (dx, dy) on screen (y pointing down) is (dy, -dx)
+            const nx = dy;
+            const ny = -dx;
+            if (type === types.SUBDUCTION) this.#drawMarkerTriangle(graphics, x, y, nx, ny, dx, dy, size, color);
+            else if (type === types.RANGE) {
+                this.#drawMarkerTriangle(graphics, x, y, nx, ny, dx, dy, size, color);
+                this.#drawMarkerTriangle(graphics, x, y, -nx, -ny, dx, dy, size, color);
+            } else if (type === types.RIFT) this.#drawMarkerTicks(graphics, x, y, nx, ny, size, color);
+            else if (type === types.HOTSPOT) this.#drawMarkerArrow(graphics, x, y, dx, dy, size, color);
+        });
+    }
+
+    /** Calls fn(x, y, dx, dy) every `spacing` pixels along the spline, leaving its ends clear. */
+    #forEachAlongSpline(spline, spacing, fn) {
+        let travelled = 0;
+        let next = spacing / 2;
+        for (let i = 0; i < spline.length - 1; i++) {
+            const a = spline[i];
+            const b = spline[i + 1];
+            const length = Math.hypot(b.x - a.x, b.y - a.y);
+            if (length === 0) continue;
+            const dx = (b.x - a.x) / length;
+            const dy = (b.y - a.y) / length;
+            while (next <= travelled + length) {
+                const along = next - travelled;
+                fn(a.x + dx * along, a.y + dy * along, dx, dy);
+                next += spacing;
+            }
+            travelled += length;
+        }
+    }
+
+    /** A filled triangle standing on the line at (x, y), pointing towards (nx, ny). */
+    #drawMarkerTriangle(graphics, x, y, nx, ny, dx, dy, size, color) {
+        const half = size * FEATURE_MARKER.TRIANGLE_BASE;
+        graphics.lineStyle(0);
+        graphics.beginFill(color, FEATURE_MARKER.ALPHA);
+        graphics.drawPolygon([x - dx * half, y - dy * half, x + dx * half, y + dy * half, x + nx * size, y + ny * size]);
+        graphics.endFill();
+    }
+
+    /** A short tick either side of the line at (x, y). */
+    #drawMarkerTicks(graphics, x, y, nx, ny, size, color) {
+        graphics.lineStyle({ width: FEATURE_MARKER.TICK_WIDTH / (this.stage.scale.x || 1), color, alpha: FEATURE_MARKER.ALPHA });
+        graphics.moveTo(x + nx * size * FEATURE_MARKER.TICK_GAP, y + ny * size * FEATURE_MARKER.TICK_GAP);
+        graphics.lineTo(x + nx * size, y + ny * size);
+        graphics.moveTo(x - nx * size * FEATURE_MARKER.TICK_GAP, y - ny * size * FEATURE_MARKER.TICK_GAP);
+        graphics.lineTo(x - nx * size, y - ny * size);
+    }
+
+    /** An arrowhead on the line at (x, y), pointing along (dx, dy). */
+    #drawMarkerArrow(graphics, x, y, dx, dy, size, color) {
+        const back = size * FEATURE_MARKER.ARROW_LENGTH;
+        const half = size * FEATURE_MARKER.TRIANGLE_BASE;
+        graphics.lineStyle(0);
+        graphics.beginFill(color, FEATURE_MARKER.ALPHA);
+        graphics.drawPolygon([x + dx * size, y + dy * size, x - dx * back + dy * half, y - dy * back - dx * half, x - dx * back - dy * half, y - dy * back + dx * half]);
+        graphics.endFill();
+    }
+
+    /** Draws the river guides, as renderFaultLines draws the faults. */
+    renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null, showNodes = isEditMode) {
+        if (!this.manualRiverGraphics) return;
+
+        // Aggressively purge memory and nested nodes to prevent WebGL leaks
+        this.manualRiverGraphics.clear();
+        this.manualRiverGraphics.removeChildren().forEach((c) => c.destroy({ children: true }));
+
+        if (!this.layers.features || !isEditMode) return;
+
+        for (const river of rivers) {
+            if (!this.#isVisibleInCurrentPass(river.visibility, "all", false) || !river.points || river.points.length === 0) continue;
+
+            const isActive = river.id === activeRiverId;
+            const lineColor = isActive ? 0x00e5ff : 0x78aad2;
+
+            this.manualRiverGraphics.lineStyle(FILRODENSWMB.DISPLAY.RIVER_WIDTH, lineColor, 0.8);
+
+            // Draw Catmull-Rom spline
+            const points = river.points;
+            if (points.length === 1) {
+                this.manualRiverGraphics.drawCircle(points[0].x, points[0].y, 2);
+            } else {
+                this.#drawVectorPath(this.manualRiverGraphics, points, "solid", 2);
+            }
+
+            // Draw edit nodes
+            if (showNodes) {
+                const isActive = river.id === activeRiverId;
+                this.#renderEditNodes(points, this.manualRiverGraphics, isActive, river, "river");
+            }
+        }
+    }
+
+    /**
+     * Centralised factory to spawn interactive vector nodes, automatically applying inverse scale.
+     */
+    #createEditNode(parentContainer, x, y, isLast, isActive) {
+        const nodeColor = isActive ? 0x00e5ff : 0xffffff;
+        const node = new PIXI.Graphics();
+
+        node.beginFill(nodeColor, 0.6);
+        node.lineStyle(2, 0x000000, 0.6);
+        node.drawCircle(0, 0, isLast ? 8 : 5);
+        node.endFill();
+
+        node.x = x;
+        node.y = y;
+        node.isEditNode = true; // Tag for the scale sweeper
+
+        // Immediately apply inverse scaling so it spawns at the correct visual size
+        node.scale.set(1 / (this.stage.scale.x || 1));
+        parentContainer.addChild(node);
+    }
+
+    /**
+     * Centralised helper to generate edit nodes and interactive hit targets for any vector array.
+     */
+    #renderEditNodes(points, parentContainer, isActive, parentEntity, entityType, layerId = null) {
+        if (!points || points.length === 0) return;
+
+        const hitRadius = 10 / (this.stage.scale.x || 1);
+        // Nodes of shapes that can be moved whole (Shift + drag) carry the shape itself, so the
+        // drag can reach every point and the label (see #beginShapeDrag). A shape still being
+        // drawn is not offered: its outline is not finished, and right-click would end it anyway.
+        const shape = FILRODENSWMB.UI.SHAPE_DRAG_TYPES.includes(entityType) && !isActive ? parentEntity : null;
+
+        points.forEach((pt, index) => {
+            const isLast = isActive && index === points.length - 1;
+            this.#createEditNode(parentContainer, pt.x, pt.y, isLast, isActive);
+            this.interactiveTargets.push({
+                target: pt,
+                x: pt.x,
+                y: pt.y,
+                radius: hitRadius,
+                entityType: entityType,
+                entityId: parentEntity.id,
+                layerId: layerId,
+                shape,
+            });
+        });
+    }
+
+    /**
+     * Acts as a dictionary for dash geometries.
+     */
+    #getLinePattern(style, thickness) {
+        if (style === "dotted") return [thickness, thickness * 2];
+        if (style === "dashdot") return [thickness * 4, thickness * 2, thickness, thickness * 2];
+        return [thickness * 4, thickness * 3]; // Default to dashed
+    }
+
+    /**
+     * Dedicated inner loop processor. Mutates the 'state' object reference
+     * to persist pattern progress across multiple line segments.
+     */
+    #drawDashSegment(graphics, p1, p2, pattern, state) {
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        if (dist === 0) return;
+
+        let remainingDist = dist;
+        let currentX = p1.x;
+        let currentY = p1.y;
+
+        while (remainingDist > 0) {
+            const step = Math.min(remainingDist, pattern[state.dashIdx] - state.dashLen);
+            const ratio = step / remainingDist;
+
+            currentX += (p2.x - currentX) * ratio;
+            currentY += (p2.y - currentY) * ratio;
+
+            if (state.isDrawing) graphics.lineTo(currentX, currentY);
+            else graphics.moveTo(currentX, currentY);
+
+            state.dashLen += step;
+            remainingDist -= step;
+
+            if (state.dashLen >= pattern[state.dashIdx]) {
+                state.dashLen = 0;
+                state.dashIdx = (state.dashIdx + 1) % pattern.length;
+                state.isDrawing = !state.isDrawing;
+            }
+        }
+    }
+
+    /**
+     * Unified vector path generator.
+     */
+    #drawVectorPath(graphics, points, style, thickness, isClosed = false) {
+        if (!points || points.length < 2) return;
+
+        graphics.moveTo(points[0].x, points[0].y);
+
+        if (style === "solid") {
+            for (let i = 1; i < points.length; i++) {
+                graphics.lineTo(points[i].x, points[i].y);
+            }
+            if (isClosed) graphics.closePath();
+            return;
+        }
+
+        const pattern = this.#getLinePattern(style, thickness);
+
+        // Pass this state object by reference into the segment helper so the dash sequence remains continuous across sharp corners.
+        const state = { dashIdx: 0, dashLen: 0, isDrawing: true };
+        const limit = isClosed ? points.length + 1 : points.length;
+
+        for (let i = 1; i < limit; i++) {
+            const p1 = points[(i - 1) % points.length];
+            const p2 = points[i % points.length];
+            this.#drawDashSegment(graphics, p1, p2, pattern, state);
+        }
+    }
+
+    /**
+     * Sweeps the stage and forcefully inverts the scale of all edit nodes.
+     */
+    #updateNodeScales() {
+        const invScale = 1 / (this.stage.scale.x || 1);
+
+        const scaleNodes = (container) => {
+            if (!container?.children) return;
+            for (const child of container.children) {
+                if (child.isEditNode) {
+                    child.scale.set(invScale);
+                } else if (child instanceof PIXI.Container) {
+                    scaleNodes(child);
+                }
+            }
+        };
+
+        scaleNodes(this.stage);
+        this.regionOverlays.redraw(this.stage.scale.x);
+        this.routeOverlays.redraw(this.stage.scale.x);
+    }
+
+    /**
+     * Draws a persistently pulsing cyan bounding box and text label to preview an upcoming action.
+     */
+    showActionPreview(bounds, actionLabel = "") {
+        this.clearActionPreview();
+        if (!bounds || !this.stage) return;
+
+        const trueWidth = bounds.maxX - bounds.minX;
+        const trueHeight = bounds.maxY - bounds.minY;
+        const centerX = bounds.minX + trueWidth / 2;
+        const centerY = bounds.minY + trueHeight / 2;
+
+        this.actionPreview = new PIXI.Container();
+
+        const invScale = 1 / (this.stage.scale.x || 1);
+        const pad = FILRODENSWMB.UI.ZOOM.VISUAL_PADDING * invScale;
+        const boxX = -trueWidth / 2 - pad;
+        const boxY = -trueHeight / 2 - pad;
+
+        // 1. Draw the bounding box
+        const graphics = new PIXI.Graphics();
+        this.#drawHighlightBox(graphics, trueWidth, trueHeight);
+        this.actionPreview.addChild(graphics);
+
+        // 2. Add the dynamic text label
+        if (actionLabel) {
+            const textStyle = new PIXI.TextStyle({
+                fontFamily: "Signika",
+                fontSize: 16 * invScale,
+                fill: "#00e5ff",
+                fontWeight: "bold",
+                stroke: "#000000",
+                strokeThickness: 4 * invScale,
+                dropShadow: true,
+                dropShadowColor: "#000000",
+                dropShadowBlur: 2,
+                dropShadowDistance: 2 * invScale,
+            });
+
+            const text = new PIXI.Text(actionLabel, textStyle);
+            // Position slightly inside the top-left corner
+            text.x = boxX + 8 * invScale;
+            text.y = boxY - text.height - 4 * invScale;
+
+            // Safety fallback: if the box is hard against the top of the map, push the text inside the box
+            if (centerY + text.y < 0) {
+                text.y = boxY + 8 * invScale;
+            }
+
+            this.actionPreview.addChild(text);
+        }
+
+        this.actionPreview.x = centerX;
+        this.actionPreview.y = centerY;
+        this.stage.addChild(this.actionPreview);
+
+        // --- ACCESSIBILITY CHECK ---
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+        if (!prefersReducedMotion) {
+            // Standard smooth pulse for users who haven't opted out of motion
+            let elapsed = 0;
+            this.previewTick = () => {
+                if (this.actionPreview.destroyed) return;
+                elapsed += 0.05;
+                this.actionPreview.alpha = 0.55 + Math.sin(elapsed) * 0.25;
+            };
+            this.app.ticker.add(this.previewTick);
+        } else {
+            // Static, fixed state for users with accessibility preferences
+            this.actionPreview.alpha = 0.75;
+        }
+    }
+
+    /**
+     * Clears the action preview and halts its animation ticker.
+     */
+    clearActionPreview() {
+        if (this.previewTick) {
+            this.app.ticker.remove(this.previewTick);
+            this.previewTick = null;
+        }
+        if (this.actionPreview) {
+            // Must pass { children: true } so the text and graphics nodes are purged from VRAM
+            this.actionPreview.destroy({ children: true });
+            this.actionPreview = null;
+        }
+    }
+}
+
+// Tectonic feature line markers (see StudioCanvas#drawFeatureMarkers): sizes and spacing in screen
+// pixels at the zoom they are drawn at, shapes as shares of the marker size
+const FEATURE_MARKER = {
+    SIZE: 9,
+    SPACING: 48,
+    TRIANGLE_BASE: 0.6,
+    ARROW_LENGTH: 0.6,
+    TICK_GAP: 0.2,
+    TICK_WIDTH: 2,
+    ALPHA: 0.9,
+};

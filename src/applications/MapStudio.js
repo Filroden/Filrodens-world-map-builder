@@ -60,6 +60,7 @@ import { StudioLayout } from "../ui/StudioLayout.js";
 import { moveAlongModes } from "../ui/BarFold.js";
 import { AppearanceMenu } from "../ui/AppearanceMenu.js";
 import { HelpPanel } from "./HelpPanel.js";
+import { DetailLevel } from "./DetailLevel.js";
 import { rebaseMap } from "../data/SymbolSizes.js";
 
 // Turns a fraction into a percentage for the timing summary
@@ -244,6 +245,7 @@ export class MapStudio {
         toggleHelp()                    { HelpPanel.toggle(this); },
         toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
         toggleGrid(e, t)                { this._onToggleGrid(e, t); },
+        setDetailLevel(_e, t)           { this.setDetailLevel(Number(t.dataset.detailLevel)); },
         toggleLayer(e, t)               { this._onToggleLayer(e, t); },
         toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
         toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
@@ -956,7 +958,7 @@ export class MapStudio {
 
     /** The map controls' single toggles, for map.hbs (the terrain groups come from #layerGroupsContext). */
     static #mapControlsContext() {
-        return { viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS };
+        return { viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS, detailLevels: FILRODENSWMB.DETAIL.LEVELS };
     }
 
     /**
@@ -2474,9 +2476,10 @@ export class MapStudio {
 
         // Only the layer being worked on is drawn again while something is dragged: a map with
         // thousands of generated pins and routes would otherwise redraw them at every move
+        const shown = DetailLevel.shown(this);
         if (this.activeTool === "infrastructure") {
-            const infraPins = this.mapPins.filter((p) => !!p.icon);
-            this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isEdit, this.meshSession);
+            const infraPins = shown.pins.filter((p) => !!p.icon);
+            this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isEdit, this.meshSession);
         }
         if (this.activeTool === "regions") MeshIntegration.renderRegions(this);
 
@@ -2493,7 +2496,7 @@ export class MapStudio {
         }
 
         if (this.activeTool === "labels") {
-            this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, isEdit, this.meshSession);
+            this.canvasEngine.renderLabels(this.mapLabels, shown.pins, shown.routes, isEdit, this.meshSession);
         }
 
         if (this.activeTool === "scene" && this.canvasEngine.renderLandMasks) {
@@ -3056,10 +3059,12 @@ export class MapStudio {
             viewFilters: this.viewFilters,
             layers: this.#layerVisibility,
             grid: !!this.uiState.gridVisible,
+            detailLevel: DetailLevel.current(this),
             terrainGroups,
             threeD: !!this.scene3D,
         };
-        syncMapControls(this.root, state, (shown, total) => platform.i18n.format("FILRODENSWMB.UI.LayersMenuCount", { shown, total }));
+        const detailName = (level) => platform.i18n.localize(FILRODENSWMB.DETAIL.LEVELS.find((choice) => choice.value === level).label);
+        syncMapControls(this.root, state, (shown, total) => platform.i18n.format("FILRODENSWMB.UI.LayersMenuCount", { shown, total }), (level) => platform.i18n.format("FILRODENSWMB.UI.DetailMenuLevel", { level: detailName(level) }));
         // The Layers button's name grows and shrinks with the count; the controls may fold differently
         this.#layout?.update();
     }
@@ -3091,8 +3096,12 @@ export class MapStudio {
         const doc = this.root.ownerDocument;
         doc.addEventListener("pointerdown", this.#onPointerDownOutsideMenu, true);
         doc.addEventListener("keydown", this.#onMenuKeyDown, true);
-        container.querySelector('[role="menuitemcheckbox"]')?.focus();
+        // A list of choices opens on the one chosen; a list of switches on its first
+        (container.querySelector('[role="menuitemradio"][aria-checked="true"]') ?? container.querySelector(MapStudio.#MENU_ROWS))?.focus();
     }
+
+    /** The rows of the map controls' menus the arrow keys move between. */
+    static #MENU_ROWS = '[role="menuitemcheckbox"], [role="menuitemradio"]';
 
     /** Closes the open terrain layer list, if any. */
     #closeLayerMenu() {
@@ -3118,7 +3127,7 @@ export class MapStudio {
         if (!this.#openLayerMenu) return;
         // The arrow keys move between the list's rows, wrapping round at either end
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            const rows = [...this.#openLayerMenu.querySelectorAll('[role="menuitemcheckbox"]')];
+            const rows = [...this.#openLayerMenu.querySelectorAll(MapStudio.#MENU_ROWS)];
             const index = rows.indexOf(event.target);
             if (index === -1) return;
             event.preventDefault();
@@ -3332,17 +3341,19 @@ export class MapStudio {
             this.canvasEngine.renderManualRivers(this.manualRivers, isRiverEdit, this.activeRiverId, isRiverEdit && !picking);
         }
 
-        // 2. Render Infrastructure
+        // 2. Render Infrastructure, at the map's detail level (as are the regions and labels)
+        const shown = DetailLevel.shown(this);
+        this.canvasEngine.setDetailFilter(shown.showsLevel);
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
-        const infraPins = this.mapPins.filter((p) => !!p.icon);
-        this.canvasEngine.renderInfrastructure(infraPins, this.mapRoutes, isInfraEdit, this.meshSession);
+        const infraPins = shown.pins.filter((p) => !!p.icon);
+        this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isInfraEdit, this.meshSession);
 
         // 3. Render Regions, from the display mesh
         MeshIntegration.renderRegions(this);
 
         // 4. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
-        this.canvasEngine.renderLabels(this.mapLabels, this.mapPins, this.mapRoutes, isLabelEdit, this.meshSession);
+        this.canvasEngine.renderLabels(this.mapLabels, shown.pins, shown.routes, isLabelEdit, this.meshSession);
 
         // 5. Render Land Masks
         if (this.canvasEngine.renderLandMasks) {
@@ -3667,6 +3678,7 @@ export class MapStudio {
         // its grid data describes the smaller cells
         this.uiState.gridSize = MapStateManager.gridSizeOf(payload.gridSize || 100);
         this.uiState.gridVisible = payload.gridVisible ?? false;
+        this.uiState.detailLevel = DetailLevel.valid(payload.detailLevel);
 
         MapStateManager.allocateBuffers(this);
         // Every terrain layer is on when a map opens (see #terrainLayers)
@@ -4147,6 +4159,7 @@ export class MapStudio {
             gridType: this.uiState.gridType,
             gridSize: this.uiState.gridSize,
             gridVisible: this.uiState.gridVisible,
+            detailLevel: DetailLevel.current(this),
             params: params,
             customBiomes: this.uiState.customBiomes,
             nextCustomBiomeId: this.uiState.nextCustomBiomeId,
@@ -6013,6 +6026,22 @@ export class MapStudio {
             this.generateTerrain();
         }
         this.view?.render(["editToolbar"]);
+    }
+
+    /**
+     * Sets the map's detail level (the Detail menu, and a run's starting level): what it hides is
+     * neither drawn, picked nor exported. Saved with the map.
+     * @param {number} level - One of FILRODENSWMB.DETAIL.LEVELS' values.
+     * @param {{repaint?: boolean}} [options] - repaint false when the caller redraws the map itself.
+     */
+    setDetailLevel(level, { repaint = true } = {}) {
+        const valid = DetailLevel.valid(level);
+        this.#closeLayerMenu();
+        if (valid === DetailLevel.current(this)) return;
+        this.uiState.detailLevel = valid;
+        this.#syncMapControls();
+        if (repaint) this._repaintVectors();
+        this.markDirty();
     }
 
     /**

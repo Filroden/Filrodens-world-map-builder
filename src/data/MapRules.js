@@ -535,6 +535,7 @@ const MAP = obj({
     gridType: enumOf(Object.keys(FILRODENSWMB.GRID_TYPES)),
     gridSize: num(RANGE.SIZE),
     gridVisible: bool,
+    detailLevel: int(0, FILRODENSWMB.DETAIL.EVERYTHING),
     params: PARAMS,
     customBiomes: list(CUSTOM_BIOME),
     nextCustomBiomeId: int(0, MAX_BIOME_ID + 1),

@@ -50,13 +50,13 @@ export class RegionLevelLayers {
      * @param {string|null} [options.focusLevelId] - A level being painted: it and its ancestors are
      *     drawn for the task, and nothing else (see describeLevels).
      */
-    render(session, { isVisible, resScale = 1, focusLevelId = null }) {
+    render(session, { isVisible, showsLevel = () => true, resScale = 1, focusLevelId = null }) {
         if (!session) {
             this.clear();
             return;
         }
         this.#adoptMesh(session.mesh);
-        const drawn = describeLevels(session, isVisible, focusLevelId);
+        const drawn = describeLevels(session, isVisible, focusLevelId, showsLevel);
         const keep = new Set(drawn.map((entry) => entry.level.id));
         for (const id of [...this.#levels.keys()]) if (!keep.has(id)) this.#dropLevel(id);
 
@@ -168,8 +168,10 @@ export class RegionLevelLayers {
  * @param {import("../mesh/MeshSession.js").MeshSession} session
  * @param {function(string, string, boolean): boolean} isVisible
  * @param {string|null} [focusLevelId]
+ * @param {function(object, object): boolean} [showsLevel] - Whether the map's detail level shows a
+ *     set's level (see DetailLevel). A level being painted is shown whatever the detail level.
  */
-export function describeLevels(session, isVisible, focusLevelId = null) {
+export function describeLevels(session, isVisible, focusLevelId = null, showsLevel = () => true) {
     // A level the session no longer holds (deleted a moment ago) focuses nothing: the map is drawn as viewed
     const focus = focusLevelId && session.level(focusLevelId) ? focusLineage(session, focusLevelId) : null;
     const drawn = [];
@@ -178,6 +180,7 @@ export function describeLevels(session, isVisible, focusLevelId = null) {
         if (!isVisible(set.visibility, "all", true)) continue;
         for (const level of set.levels) {
             if (focus && !focus.has(level.id)) continue;
+            if (!focus && !showsLevel(set, level)) continue;
             const levelVisibility = combinedVisibility(level.visibility, set.visibility);
             if (!isVisible(levelVisibility, "all", true)) continue;
             shown.add(level.id);

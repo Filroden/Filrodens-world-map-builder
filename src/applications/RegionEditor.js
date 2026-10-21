@@ -7,6 +7,7 @@ import { RegionPanel } from "./RegionPanel.js";
 import { regionFillColor } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
+import { GeneratedDetails } from "./GeneratedDetails.js";
 
 /** The fill patterns a region can have, with their names. */
 const PATTERNS = Object.freeze({ solid: "FILRODENSWMB.UI.StyleSolid", diagonal: "FILRODENSWMB.UI.StyleDiagonalHatch", crosshatch: "FILRODENSWMB.UI.StyleCrossHatch" });
@@ -79,6 +80,7 @@ export class RegionEditor {
             labelStyleName: InspectorFields.styleName(app.uiState.customLabelStyles, label.quickStyle),
             labelVisibilities: RegionPanel.visibilityChoices(label.visibility),
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
+            generated: GeneratedDetails.forRegion(app, region),
         };
     }
 

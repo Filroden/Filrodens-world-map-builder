@@ -41,6 +41,9 @@
 .fwmb-icon--layers {
     --fwmb-mask: url("../assets/icons/layers.svg");
 }
+.fwmb-icon--detail {
+    --fwmb-mask: url("../assets/icons/filter_list.svg");
+}
 .fwmb-icon--pentagon {
     --fwmb-mask: url("../assets/icons/pentagon.svg");
 }
@@ -2917,6 +2920,19 @@
     border: solid var(--fwmb-text-inverse, #000);
     border-width: 0 0.125rem 0.125rem 0;
     transform: translateY(-0.06rem) rotate(45deg);
+}
+
+/* A choice of one (the Detail menu): a round mark, filled with a dot */
+.fwmb-layer-menu [role="menuitemradio"] .fwmb-layer-check {
+    border-radius: 50%;
+}
+.fwmb-layer-menu [role="menuitemradio"][aria-checked="true"] .fwmb-layer-check::after {
+    inline-size: 0.375rem;
+    block-size: 0.375rem;
+    border: none;
+    border-radius: 50%;
+    background: var(--fwmb-text-inverse, #000);
+    transform: none;
 }
 
 .fwmb-layer-menu [aria-checked="mixed"] .fwmb-layer-check {

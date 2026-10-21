@@ -8,6 +8,7 @@ import { PinStyles } from "./PinStyles.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
+import { GeneratedDetails } from "./GeneratedDetails.js";
 
 /** The pin's own fields a pin style sets, by their names in the form (the label's size is set by it too). */
 const LOOK_FIELDS = Object.freeze({ pinColor: true, pinScale: true });
@@ -68,6 +69,7 @@ export class PinEditor {
             labelStyleName: InspectorFields.styleName(app.uiState.customLabelStyles, label.quickStyle),
             labelVisibilities: RegionPanel.visibilityChoices(label.visibility),
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
+            generated: GeneratedDetails.forPin(app, pin),
         };
     }
 

@@ -3,6 +3,7 @@ import { resolvePinIconPath } from "../../data/pinIcons.js";
 import { Sanitize } from "../../data/Sanitize.js";
 import { GridDataExporter } from "../../applications/GridDataExporter.js";
 import { MapStateManager } from "../../applications/MapStateManager.js";
+import { GeneratedDetails } from "../../applications/GeneratedDetails.js";
 
 /**
  * A description as a journal page's HTML. Descriptions are plain text (typed into a textarea, or
@@ -114,14 +115,12 @@ export class SceneExporter {
             parentJournal = await JournalEntry.create({ name: sceneName, folder: folder.id });
         }
 
-        const syncJournalPage = async (mapElement, defaultName) => {
-            if (!mapElement.name && !mapElement.description) return;
-
+        const syncJournalPage = async (mapElement, defaultName, text) => {
             const pageData = {
                 name: mapElement.name || defaultName,
                 type: "text",
                 text: {
-                    content: journalHtml(mapElement.description),
+                    content: journalHtml(text),
                     format: 1,
                 },
             };
@@ -155,22 +154,14 @@ export class SceneExporter {
             }
         };
 
-        // Execute loops using the helper
-        for (const pin of app.mapPins) {
-            if (pin.type === "spring" || pin.type === "block_spring") continue;
-
-            await syncJournalPage(pin, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedLocation"));
+        // The items that get a page: generated ones only at the map's detail level (see GeneratedDetails)
+        const pages = GeneratedDetails.journalPages(app);
+        for (const { item, text } of pages.pins) {
+            if (item.type === "spring" || item.type === "block_spring") continue;
+            await syncJournalPage(item, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedLocation"), text);
         }
-
-        for (const level of app.regionLevels) {
-            for (const region of level.regions) {
-                await syncJournalPage(region, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedRegion"));
-            }
-        }
-
-        for (const route of app.mapRoutes ?? []) {
-            await syncJournalPage(route, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedRoute"));
-        }
+        for (const { item, text } of pages.regions) await syncJournalPage(item, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedRegion"), text);
+        for (const { item, text } of pages.routes) await syncJournalPage(item, game.i18n.localize("FILRODENSWMB.JOURNAL.UnnamedRoute"), text);
 
         return parentJournal;
     }
@@ -332,9 +323,12 @@ export class SceneExporter {
             // Scale note icons with the map's width, within fixed limits
             const iconSize = Math.max(NOTE_ICON_MIN_PX, Math.min(Math.round(app.mapWidth / NOTE_ICON_WIDTH_RATIO), NOTE_ICON_MAX_PX));
 
-            const pinNotes = app.mapPins.filter((pin) => pin.icon && pin.journalPageId).map((pin) => this.#pinNote(pin, journalObj, iconSize));
-            const regionNotes = this.regionNoteAnchors(app).map(({ region, x, y }) => ({ entryId: journalObj.id, pageId: region.journalPageId, x, y, iconSize }));
-            const routeNotes = this.routeNoteAnchors(app).map(({ route, x, y }) => ({ entryId: journalObj.id, pageId: route.journalPageId, x, y, iconSize }));
+            // Only items given a page in this export: a generated one the detail level hides keeps
+            // the page an earlier export made, but gets no note
+            const paged = new Set(Object.values(GeneratedDetails.journalPages(app)).flatMap((pages) => pages.map((page) => page.item)));
+            const pinNotes = app.mapPins.filter((pin) => pin.icon && pin.journalPageId && paged.has(pin)).map((pin) => this.#pinNote(pin, journalObj, iconSize));
+            const regionNotes = this.regionNoteAnchors(app).filter(({ region }) => paged.has(region)).map(({ region, x, y }) => ({ entryId: journalObj.id, pageId: region.journalPageId, x, y, iconSize }));
+            const routeNotes = this.routeNoteAnchors(app).filter(({ route }) => paged.has(route)).map(({ route, x, y }) => ({ entryId: journalObj.id, pageId: route.journalPageId, x, y, iconSize }));
             const noteData = [...pinNotes, ...regionNotes, ...routeNotes];
 
             if (noteData.length > 0) {

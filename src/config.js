@@ -763,6 +763,21 @@ export const FILRODENSWMB = {
             { id: "reference", action: "toggleLayer", icon: "image", label: "FILRODENSWMB.UI.LayerReference" },
         ],
     },
+    // The map controls' Detail menu (see DetailLevel): a level shows every pin and region level at
+    // or below it. Pins take theirs from their style (PINS.DEFAULT_STYLES) and a Political set's
+    // levels from their place in it (Realms, Duchies, Counties). Routes are shown at every level
+    DETAIL: Object.freeze({
+        LEVELS: Object.freeze([
+            Object.freeze({ value: 3, label: "FILRODENSWMB.UI.DetailEverything" }),
+            Object.freeze({ value: 2, label: "FILRODENSWMB.UI.DetailRegional" }),
+            Object.freeze({ value: 1, label: "FILRODENSWMB.UI.DetailProvince" }),
+            Object.freeze({ value: 0, label: "FILRODENSWMB.UI.DetailWorld" }),
+        ]),
+        EVERYTHING: 3,
+        // A run starts the map at the most detailed level whose places are still this many map
+        // pixels apart, from each tier's typical spacing (GENERATOR.TOWNS.TIERS)
+        MIN_SPACING_PX: 60,
+    }),
     // Help's links (see HelpPanel). The tutorial's link is null until the tutorial exists, which
     // hides it.
     HELP: {
@@ -1343,6 +1358,9 @@ export const FILRODENSWMB = {
         // The colour the default styles use, and the detail levels a style may have
         DEFAULT_STYLE_COLOR: "#ffffff",
         DETAIL_LEVELS: [0, 1, 2, 3],
+        // Where a pin's name starts, from the pin's centre, in pin widths: half a width is the
+        // pin's edge (the icons' own padding leaves a small gap)
+        LABEL_OFFSET: 0.5,
     },
     TECTONICS: {
         DEFAULT_THICKNESS: 40,

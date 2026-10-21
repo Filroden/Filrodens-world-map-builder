@@ -34,7 +34,7 @@ function drawMap() {
     handlebars.registerHelper("eq", (a, b) => a === b);
     handlebars.registerPartial("modules/filrodens-world-map-builder/templates/parts/shared-range.hbs", readFileSync(join(ROOT, "templates/parts/shared-range.hbs"), "utf8"));
     const template = handlebars.compile(readFileSync(join(ROOT, "templates/map.hbs"), "utf8"));
-    document.body.innerHTML = template({ uiState: { reliefEmphasis: 20 }, layerGroups: TERRAIN_GROUPS, viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS });
+    document.body.innerHTML = template({ uiState: { reliefEmphasis: 20 }, layerGroups: TERRAIN_GROUPS, viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS, detailLevels: FILRODENSWMB.DETAIL.LEVELS });
     return document.body;
 }
 
@@ -46,15 +46,17 @@ function viewState({ layers = {}, items = {}, ...changes } = {}) {
         grid: true,
         terrainGroups: TERRAIN_GROUPS.map((group) => ({ id: group.id, items: group.items.map((item) => ({ key: item.key, on: items[item.key] ?? true })) })),
         threeD: false,
+        detailLevel: 3,
         ...changes,
     };
 }
 
 const label = (shown, total) => `Layers: ${shown} of ${total} shown`;
+const detailLabel = (level) => `Detail: ${level}`;
 
 test("every control in both forms reads the state it switches", () => {
     const root = drawMap();
-    syncMapControls(root, viewState({ grid: false, layers: { labels: false }, items: { relief: false } }), label);
+    syncMapControls(root, viewState({ grid: false, layers: { labels: false }, items: { relief: false } }), label, detailLabel);
 
     const wide = root.querySelector(".fwmb-map-controls-wide");
     const menu = root.querySelector('.fwmb-layer-group[data-layer-group="layers"] .fwmb-layer-menu');
@@ -84,12 +86,24 @@ test("every control in both forms reads the state it switches", () => {
 
 test("a state with everything on reads pressed throughout, with no dot", () => {
     const root = drawMap();
-    syncMapControls(root, viewState(), label);
-    for (const button of root.querySelectorAll('.fwmb-map-btn[data-action="toggleLayerMenu"]')) {
+    syncMapControls(root, viewState(), label, detailLabel);
+    for (const button of root.querySelectorAll('.fwmb-layer-group:not([data-layer-group="detail"]) > .fwmb-map-btn[data-action="toggleLayerMenu"]')) {
         assert.equal(button.getAttribute("aria-pressed"), "true");
         assert.equal(button.classList.contains("fwmb-is-partial"), false);
     }
     assert.deepEqual(layersShown(viewState()), { shown: 12, total: 12 });
+});
+
+test("the Detail menu marks the map's one detail level and names it on its button", () => {
+    const root = drawMap();
+    syncMapControls(root, viewState({ detailLevel: 1 }), label, detailLabel);
+    const rows = [...root.querySelectorAll('[data-action="setDetailLevel"]')];
+    assert.deepEqual(rows.map((row) => row.dataset.detailLevel), ["3", "2", "1", "0"], "most detailed first");
+    assert.deepEqual(rows.map((row) => row.getAttribute("aria-checked")), ["false", "false", "true", "false"]);
+    assert.ok(rows.every((row) => row.getAttribute("role") === "menuitemradio"));
+    const button = root.querySelector('.fwmb-layer-group[data-layer-group="detail"] > [data-action="toggleLayerMenu"]');
+    assert.equal(button.getAttribute("aria-label"), "Detail: 1");
+    assert.equal(root.querySelector(".fwmb-map-controls-wide [data-action=\"setDetailLevel\"]"), null, "not folded into the Layers menu");
 });
 
 test("the Layers menu lists every wide toggle, in the same order", () => {
@@ -116,7 +130,7 @@ function methodBodies(source) {
 }
 
 /** What changes a view: the state the map controls show, written. */
-const VIEW_CHANGES = [/this\.uiState\s*=(?!=)/, /this\.#layerVisibility\[[^\]]+\]\s*=(?!=)/, /this\.viewFilters\[[^\]]+\]\s*=(?!=)/, /this\.uiState\.gridVisible\s*=(?!=)/, /this\.#terrainLayers\s*=(?!=)/, /this\.scene3D\s*=(?!=)/];
+const VIEW_CHANGES = [/this\.uiState\s*=(?!=)/, /this\.#layerVisibility\[[^\]]+\]\s*=(?!=)/, /this\.viewFilters\[[^\]]+\]\s*=(?!=)/, /this\.uiState\.gridVisible\s*=(?!=)/, /this\.#terrainLayers\s*=(?!=)/, /this\.scene3D\s*=(?!=)/, /this\.uiState\.detailLevel\s*=(?!=)/];
 
 test("every method that changes a view calls #syncMapControls", () => {
     const bodies = methodBodies(SOURCE);
@@ -138,7 +152,7 @@ test("a grid type or size change turns the grid on, and the map controls follow"
 test("loading or starting a map, and switching tool, bring the map controls up to date", () => {
     const bodies = methodBodies(SOURCE);
     // A loaded map's grid setting and every terrain layer, through #setTerrainLayers
-    assert.match(bodies.get("#ingestMapPayload"), /gridVisible[\s\S]*#setTerrainLayers\(/);
+    assert.match(bodies.get("#ingestMapPayload"), /gridVisible[\s\S]*detailLevel[\s\S]*#setTerrainLayers\(/);
     assert.match(bodies.get("#setTerrainLayers"), /this\.#syncMapControls\(\)/);
     // A tool that shows its own layer when picked
     assert.match(bodies.get("#ensureToolLayerVisible"), /this\.#syncMapControls\(\)/);
