@@ -214,10 +214,12 @@ test("a route style's field cascades to its routes, one undo step that puts back
     assert.equal(app.mapRoutes[0].color, "#abcdef");
 });
 
-test("a route style's transport is Road, Sea or Any; changing it moves no route off the style", async () => {
+test("a route style's transport is Road, Sea, River or Any; changing it moves no route off the style", async () => {
     const app = studio();
     await StyleEditors.open(app, "Route", "trade");
-    assert.deepEqual([...field(app, "styleTransport").options].map((option) => option.value), ["", "road", "sea"]);
+    assert.deepEqual([...field(app, "styleTransport").options].map((option) => option.value), ["", "road", "sea", "river"]);
+    await commit(app, "styleTransport", "river");
+    assert.equal(app.uiState.customRouteStyles[0].transport, "river");
     await commit(app, "styleTransport", "sea");
     assert.equal(app.uiState.customRouteStyles[0].transport, "sea");
     assert.equal(app.mapRoutes[0].quickStyle, "trade", "the road keeps its style");
@@ -370,7 +372,7 @@ test("Save as… is one undo step with its style: undo takes the style away", as
     assert.equal(app.mapRoutes[1].quickStyle, "custom");
 });
 
-test("a new map starts with the road and sea lane route styles and their two label styles", async () => {
+test("a new map starts with the road, sea lane and river trade route styles and their two label styles", async () => {
     const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
     const state = MapStateManager.buildDefaultUiState(400, 300);
     assert.deepEqual(state.customRouteStyles.map((style) => [style.name, style.transport, style.thickness, style.style, style.outline]), [
@@ -380,10 +382,12 @@ test("a new map starts with the road and sea lane route styles and their two lab
         ["FILRODENSWMB.UI.RouteStyleTrack", "road", 1, "dotted", false],
         ["FILRODENSWMB.UI.RouteStyleSeaLane", "sea", 1.5, "dashed", false],
         ["FILRODENSWMB.UI.RouteStyleMinorSeaLane", "sea", 1, "dashed", false],
+        ["FILRODENSWMB.UI.RouteStyleRiverTrade", "river", 1.5, "solid", false],
+        ["FILRODENSWMB.UI.RouteStyleMinorRiverTrade", "river", 1, "solid", false],
     ]);
     assert.ok(state.customRouteStyles.every((style) => style.smoothing === false && !("nameKey" in style)));
     const road = state.customLabelStyles.find((style) => style.id === "label-style-road");
     const lane = state.customLabelStyles.find((style) => style.id === "label-style-sea-lane");
-    assert.deepEqual([road.fontFamily, road.fontSize, road.fillColor, road.bold, road.italic], ["Barlow Semi Condensed", 0.8, "#5a3a1e", false, false]);
-    assert.deepEqual([lane.fontFamily, lane.fontSize, lane.fillColor, lane.bold, lane.italic], ["Noto Serif", 0.8, "#2e5f8a", false, true]);
+    assert.deepEqual([road.fontFamily, road.fontSize, road.fillColor, road.bold, road.italic], ["Barlow Semi Condensed", 1.4, "#5a3a1e", false, false]);
+    assert.deepEqual([lane.fontFamily, lane.fontSize, lane.fillColor, lane.bold, lane.italic], ["Noto Serif", 1.4, "#2e5f8a", false, true]);
 });

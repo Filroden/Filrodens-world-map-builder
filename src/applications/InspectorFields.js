@@ -120,7 +120,7 @@ export class InspectorFields {
         const label = {
             quickStyle: elements.labelQuickStyle.value,
             fontFamily: elements.labelFontFamily.value,
-            fontSize: Number(elements.labelFontSize.value) || 1,
+            fontSize: Number(elements.labelFontSize.value) || FILRODENSWMB.LABELS.DEFAULT_SIZE,
             fillColor: elements.labelFillColor.value,
             maxChars: Math.max(0, Math.round(Number(elements.labelMaxChars.value) || 0)),
             justify: elements.labelJustify.value,

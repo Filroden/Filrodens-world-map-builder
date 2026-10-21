@@ -43,6 +43,7 @@ export class MapPackage {
      * @param {object} options
      * @param {object} options.mapData - The map as saved.
      * @param {Object<string, string>} [options.owners] - Its encoded owner arrays.
+     * @param {object|null} [options.modelRun] - The generator's saved outputs (see ModelRun).
      * @param {string|null} [options.name] - Its saved name.
      * @param {{id: string, name: string, path: string}[]} [options.icons] - The host's custom pin icons.
      * @param {"embed"|"assets"|"keep"} options.mode
@@ -52,8 +53,8 @@ export class MapPackage {
      * @returns {Promise<{file: object, missing: number, hashes: string[]}>} The file's JSON, how
      *     many images could not be carried, and the hashes of the assets this map uses.
      */
-    static async prepare({ mapData, owners = {}, name = null, icons = [], mode, read = async () => null, assets = new Map() }) {
-        const file = MapJson.toExport(mapData, owners, name);
+    static async prepare({ mapData, owners = {}, modelRun = null, name = null, icons = [], mode, read = async () => null, assets = new Map() }) {
+        const file = MapJson.toExport(mapData, owners, name, modelRun);
         const state = { missing: 0, hashes: new Set() };
         const carry = (src) => carryOut(src, { mode, read, assets, state });
 

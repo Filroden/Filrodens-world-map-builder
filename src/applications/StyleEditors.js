@@ -19,11 +19,12 @@ const TEMPLATES = "modules/filrodens-world-map-builder/templates/parts/";
 const STROKE_LABELS = Object.freeze({ solid: "FILRODENSWMB.UI.StyleSolid", dashed: "FILRODENSWMB.UI.StyleDashed", dotted: "FILRODENSWMB.UI.StyleDotted" });
 const PATTERN_LABELS = Object.freeze({ solid: "FILRODENSWMB.UI.StyleSolid", diagonal: "FILRODENSWMB.UI.StyleDiagonalHatch", crosshatch: "FILRODENSWMB.UI.StyleCrossHatch" });
 
-/** The transports a route style can be for: any (none stored), road or sea. */
+/** The transports a route style can be for: any (none stored), road, sea or river. */
 const TRANSPORT_CHOICES = Object.freeze([
     Object.freeze({ value: "", label: "FILRODENSWMB.UI.TransportAny" }),
     Object.freeze({ value: "road", label: "FILRODENSWMB.UI.TransportRoad" }),
     Object.freeze({ value: "sea", label: "FILRODENSWMB.UI.TransportSea" }),
+    Object.freeze({ value: "river", label: "FILRODENSWMB.UI.TransportRiver" }),
 ]);
 
 /** The border fields region styles held before borders belonged to the level, dropped when such a style is next changed. */
@@ -185,7 +186,7 @@ export class StyleEditors {
         read: (_app, _style, elements) => ({
             name: elements.styleName.value,
             fontFamily: elements.styleFontFamily.value,
-            fontSize: Number(elements.styleFontSize.value) || 1,
+            fontSize: Number(elements.styleFontSize.value) || FILRODENSWMB.LABELS.DEFAULT_SIZE,
             fillColor: elements.styleFillColor.value,
             maxChars: Math.max(0, Math.round(Number(elements.styleMaxChars.value) || 0)),
             justify: elements.styleJustify.value,

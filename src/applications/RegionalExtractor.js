@@ -56,6 +56,7 @@ export class RegionalExtractor {
             seed: currentSeed,
             generationEngine: state.generationEngine,
             terrainVersion: state.terrainVersion,
+            sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             world: state.world,
             springsBaked: true,
             mapWidth: targetWidth,

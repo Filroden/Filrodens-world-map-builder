@@ -49,6 +49,7 @@ import { PickTool } from "./PickTool.js";
 import { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } from "./FeatureEditors.js";
 import { LayerSetEditor, LevelEditor } from "./LayerEditors.js";
 import { PinStyles } from "./PinStyles.js";
+import { Generation } from "./Generation.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
 import { StudioView } from "../ui/StudioView.js";
@@ -57,6 +58,7 @@ import { StudioLayout } from "../ui/StudioLayout.js";
 import { moveAlongModes } from "../ui/BarFold.js";
 import { AppearanceMenu } from "../ui/AppearanceMenu.js";
 import { HelpPanel } from "./HelpPanel.js";
+import { rebaseMap } from "../data/SymbolSizes.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -174,6 +176,8 @@ export class MapStudio {
         massEditLevel(_e, t)        { this.#massEditLevel(RegionPanel.levelIdOf(t)); },
         selectRegion(e, t)          { if (!MapStudio.#fromRowControl(e, t)) this.#selectRegionRow(t); },
         mergeRegion(_e, t)          { RegionPanel.mergeRegion(this, ...RegionPanel.regionIdsOf(t)); },
+        // The generator's preview button (GENERATOR.PREVIEW_BUTTON): runs it with its defaults
+        generateWorld()             { Generation.run(this); },
 
         // --- DIALOG MANAGER: Pin Icons ---
         addCustomPinIcon(e, t)     { MapDialogManager.onAddCustomPinIcon(this, e, t); },
@@ -440,6 +444,8 @@ export class MapStudio {
         this.activeLayerSetId = null;
         this.activeLevelId = null;
         this.activeRegionId = null;
+        // The generator's saved model-cell outputs (see ModelRun), or null for a map with no run
+        this.modelRun = null;
         this.landMasks = [];
         this.activeLandMaskId = null;
         this.mapLabels = [];
@@ -1222,7 +1228,10 @@ export class MapStudio {
             if (this.activeTool === "labels") Object.assign(context, this.#allLabelsContext(context));
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
-            if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
+            if (this.activeTool === "regions") {
+                context.regionPanel = RegionPanel.context(this, context.inspected);
+                context.generatorPreview = FILRODENSWMB.GENERATOR.PREVIEW_BUTTON === true;
+            }
 
             if (this.activeTool === "manage") {
                 context.savedMaps = MapStudio.#namedMaps(await platform.store.getSavedMaps());
@@ -3575,10 +3584,15 @@ export class MapStudio {
      *
      * @param {object} rawPayload - The map data.
      * @param {Object<string, string>} [rawOwners] - Its encoded owner arrays (see platform.store.loadMapOwners).
+     * @param {object|null} [modelRun] - The generator's saved outputs (see platform.store.loadMapModelRun).
      */
-    async #ingestMapPayload(rawPayload, rawOwners = {}) {
+    async #ingestMapPayload(rawPayload, rawOwners = {}, modelRun = null) {
         // Deep clone to sever the connection to Foundry's memory cache
         const payload = platform.utils.deepClone(rawPayload);
+        // Pin and label sizes saved before the current size unit are scaled to it (see SymbolSizes).
+        // The map is not marked as changed: until it is saved, the same scaling runs on every load.
+        rebaseMap(payload);
+        this.modelRun = modelRun ?? null;
         // Regions and routes come from the display mesh, whose session opens once the terrain
         // exists (see the end of this method)
         MeshIntegration.beginLoad(this, payload, rawOwners);
@@ -3863,7 +3877,8 @@ export class MapStudio {
      * than sharing a Cancel button that would stop both.
      *
      * @param {string} message - The overlay's text, already localised.
-     * @param {(signal: AbortSignal) => Promise<*>} work
+     * @param {(signal: AbortSignal, overlay: {text: function(string): void}) => Promise<*>} work - Also
+     *     handed the overlay, whose text it may change as it goes (to show its progress).
      * @returns {Promise<*>} What the work resolves with, or null when it could not start.
      */
     async runCancellable(message, work) {
@@ -3873,7 +3888,7 @@ export class MapStudio {
         this.#showCancelButton(true);
         await this.#startProcessing(message);
         try {
-            return await work(controller.signal);
+            return await work(controller.signal, { text: (text) => this.#processingOverlay().text(text) });
         } finally {
             this.#cancelRunning = null;
             this.#showCancelButton(false);
@@ -4046,10 +4061,11 @@ export class MapStudio {
 
     /**
      * The map as a save writes it: its data (the generation settings, every vector list, the
-     * styles and the display mesh's block and layer sets) and its encoded owner arrays by level id.
-     * Reads the panel's fields first, as every save does (see MapStateManager.getMapParameters).
-     * Shared by saving and by the check that a saved map passes the importer unchanged.
-     * @returns {{payload: object, owners: Object<string, string>}}
+     * styles and the display mesh's block and layer sets), its encoded owner arrays by level id, and
+     * the generator's saved outputs (null when the map has no run). Reads the panel's fields first,
+     * as every save does (see MapStateManager.getMapParameters). Shared by saving and by the check
+     * that a saved map passes the importer unchanged.
+     * @returns {{payload: object, owners: Object<string, string>, modelRun: object|null}}
      */
     _buildSavePayload() {
         const { currentSeed, params } = MapStateManager.getMapParameters(this);
@@ -4057,6 +4073,7 @@ export class MapStudio {
             seed: currentSeed,
             generationEngine: this.uiState.generationEngine,
             terrainVersion: this.uiState.terrainVersion,
+            sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             world: this.uiState.world,
             generatorStale: this.uiState.generatorStale === true,
             upwindMargin: this.upwindMargin ?? null,
@@ -4090,7 +4107,7 @@ export class MapStudio {
 
         // The display mesh's block, layer sets and owner arrays (see MeshIntegration)
         const owners = MeshIntegration.preparePayload(this, payload);
-        return { payload, owners };
+        return { payload, owners, modelRun: this.modelRun ?? null };
     }
 
     /**
@@ -4117,8 +4134,8 @@ export class MapStudio {
             await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.SavingMap"));
             this.currentSaveName = mapName;
 
-            const { payload, owners } = this._buildSavePayload();
-            const journal = await platform.store.saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId, { owners });
+            const { payload, owners, modelRun } = this._buildSavePayload();
+            const journal = await platform.store.saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId, { owners, modelRun });
 
             if (journal) {
                 this.currentSaveId = journal.id;
@@ -4717,6 +4734,7 @@ export class MapStudio {
         this.mapPins = [];
         this.mapRoutes = [];
         this.layerSets = [];
+        this.modelRun = null;
 
         // Apply the centre offset to keep masks perfectly framed
         this.landMasks =
@@ -5181,6 +5199,7 @@ export class MapStudio {
 
         const exportData = {
             schemaVersion: 1,
+            sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             fwmbVersion: platform.module.version,
             categories,
         };
@@ -5369,7 +5388,7 @@ export class MapStudio {
         if (payload) {
             this.currentSaveId = mapId;
             this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
-            await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId));
+            await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId), await platform.store.loadMapModelRun(mapId));
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
 
             this.view?.render(["toolbar", "context"]);
@@ -5489,7 +5508,7 @@ export class MapStudio {
             const originalName = card.querySelector(".fwmb-map-card-info").textContent.trim();
             const newName = platform.i18n.format("FILRODENSWMB.UI.StandaloneMapName", { name: originalName });
 
-            await platform.store.saveMapData(newName, exportData, null, { owners: await platform.store.loadMapOwners(mapId) });
+            await platform.store.saveMapData(newName, exportData, null, { owners: await platform.store.loadMapOwners(mapId), modelRun: await platform.store.loadMapModelRun(mapId) });
 
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.PromoteSuccess"));
             this.view?.render(["context"]);

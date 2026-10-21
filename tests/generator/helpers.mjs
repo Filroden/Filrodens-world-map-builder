@@ -4,6 +4,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { FILRODENSWMB } from "../../src/config.js";
 import { MeshBuilder } from "../../src/mesh/MeshBuilder.js";
 import { effectiveKmPerPx } from "../../src/mesh/Schema.js";
 import { buildGeneratorPayload } from "../../src/generator/GeneratorInput.js";
@@ -44,4 +45,24 @@ export function loadP0Generator() {
         buildGeneratorPayload({ mesh, buffers, seaLevel: mapData.params.seaLevel, kmPerPx: effectiveKmPerPx(mapData), riverData: rivers, mapSeed: mapData.seed, settings });
     p0 = { mapData, mesh, buffers, rivers, makePayload };
     return p0;
+}
+
+/** The words generated content is named with, as Generation passes them (English). */
+export const MATERIALISE_NAMES = Object.freeze({
+    set: "Political",
+    levels: ["Realms", "Duchies", "Counties"],
+    titles: { kingdom: "Kingdom of {name}", duchy: "Duchy of {name}", county: "County of {name}" },
+    castles: { castle: "{name} Castle", keep: "{name} Keep", hold: "{name} Hold", tower: "{name} Tower" },
+});
+
+/** Route and pin styles as the studio would find them, from the defaults. */
+export function materialiseStyles() {
+    const routeStyles = new Map(FILRODENSWMB.ROUTES.DEFAULT_STYLES.map((style) => [style.id, style]));
+    const pinStyles = new Map(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style]));
+    return {
+        routeStyleFor: (transport, routeClass) => routeStyles.get(FILRODENSWMB.GENERATOR.ROUTE_STYLES[transport]?.[routeClass]) ?? null,
+        routeStyleFields: (style) => ({ color: style.color, thickness: style.thickness, style: style.style, outline: style.outline, smoothing: style.smoothing }),
+        pinStyleFor: (tier) => pinStyles.get(tier) ?? null,
+        applyPinStyle: (pin, style) => Object.assign(pin, { icon: style.icon, scale: style.scale, color: style.color, pinStyle: style.id ?? null }),
+    };
 }

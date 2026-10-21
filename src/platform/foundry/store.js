@@ -223,9 +223,10 @@ function getJournalColors(payload) {
     return [...builtIn, ...custom];
 }
 
-/** The flag path of the map data, and of the owner arrays saved beside it. */
+/** The flag path of the map data, and of the owner arrays and the generator's outputs saved beside it. */
 const MAP_DATA_PATH = `flags.${FILRODENSWMB.ID}.mapData`;
 const OWNERS_PATH = `flags.${FILRODENSWMB.ID}.owners`;
+const MODEL_RUN_PATH = `flags.${FILRODENSWMB.ID}.modelRun`;
 
 /**
  * `next` with every key of `stored` that `next` no longer has marked for deletion.
@@ -259,8 +260,11 @@ function withStaleKeysDeleted(stored, next) {
  * @param {object} [options]
  * @param {Object<string, string>|null} [options.owners] - Encoded owner arrays by level id (see
  *     OwnerLayer.encodeOwners); null leaves any stored owners as they are.
+ * @param {object|null} [options.modelRun] - The generator's saved outputs (see ModelRun), under
+ *     their own flag key so the map list never reads them; left out keeps what is stored, null
+ *     removes it.
  */
-export async function saveMapData(mapName, mapDataPayload, existingId = null, { owners = null } = {}) {
+export async function saveMapData(mapName, mapDataPayload, existingId = null, { owners = null, modelRun = undefined } = {}) {
     if (!mapDataPayload) return null;
 
     const packName = `world.${FILRODENSWMB.COMPENDIUM.NAME}`;
@@ -297,6 +301,8 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null, { 
                 pages: pages,
             };
             if (owners) update[OWNERS_PATH] = withStaleKeysDeleted(stored.owners, owners);
+            if (modelRun) update[MODEL_RUN_PATH] = withStaleKeysDeleted(stored.modelRun, modelRun);
+            else if (modelRun === null && stored.modelRun) update[MODEL_RUN_PATH] = new foundry.data.operators.ForcedDeletion();
             await doc.update(update);
             return doc;
         }
@@ -308,6 +314,7 @@ export async function saveMapData(mapName, mapDataPayload, existingId = null, { 
         [MAP_DATA_PATH]: mapDataPayload,
     };
     if (owners) data[OWNERS_PATH] = owners;
+    if (modelRun) data[MODEL_RUN_PATH] = modelRun;
     return await JournalEntry.create(data, { pack: pack.collection });
 }
 
@@ -389,6 +396,21 @@ export async function loadMapOwners(documentId) {
 
     const document = await pack.getDocument(documentId);
     return foundry.utils.deepClone(document?.flags?.[FILRODENSWMB.ID]?.owners ?? {});
+}
+
+/**
+ * The generator's saved outputs of a map (see saveMapData and ModelRun), or null for a map that
+ * has none.
+ * @param {string} documentId
+ * @returns {Promise<object|null>}
+ */
+export async function loadMapModelRun(documentId) {
+    const pack = game.packs.get(`world.${FILRODENSWMB.COMPENDIUM.NAME}`);
+    if (!pack) return null;
+
+    const document = await pack.getDocument(documentId);
+    const modelRun = document?.flags?.[FILRODENSWMB.ID]?.modelRun;
+    return modelRun ? foundry.utils.deepClone(modelRun) : null;
 }
 
 /**

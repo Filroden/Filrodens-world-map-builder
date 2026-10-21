@@ -1,3 +1,4 @@
+import { FILRODENSWMB } from "../config.js";
 import { LabelFonts } from "./LabelFonts.js";
 
 /**
@@ -122,14 +123,14 @@ export class LabelWidth {
      * @param {number} legacyPx  The old width, in pixels on a 1000 pixel map.
      * @param {string} fontFamily
      * @param {number} fontSizeRem  The label's font size setting.
-     * @param {number} rootFontPx  The page's root font size, which labels' font sizes multiply.
+     * @param {number} rootFontPx  The page's root font size, which labels' font sizes (in SYMBOLS.UNIT steps) multiply.
      * @returns {number}
      */
     static pixelsToChars(legacyPx, fontFamily, fontSizeRem, rootFontPx) {
         // Both checks are written as !(value > 0) on purpose: a missing or NaN value also fails
         // them, whereas the equivalent-looking value <= 0 would let it through
         if (!(legacyPx > 0)) return 0; // NOSONAR
-        const charPx = LabelWidth.charRatio(fontFamily) * (fontSizeRem || 1) * rootFontPx;
+        const charPx = LabelWidth.charRatio(fontFamily) * (fontSizeRem || FILRODENSWMB.LABELS.UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontPx;
         if (!(charPx > 0)) return 0; // NOSONAR
         return Math.max(1, Math.ceil(legacyPx / charPx - LabelWidth.#ROUNDING_TOLERANCE));
     }
@@ -146,7 +147,7 @@ export class LabelWidth {
         if (!label || typeof label !== "object" || label.maxChars !== undefined) return false;
         if (label.maxWidth === undefined) return false;
 
-        label.maxChars = LabelWidth.pixelsToChars(Number(label.maxWidth) || 0, LabelFonts.family(label), Number(label.fontSize) || 1, rootFontPx);
+        label.maxChars = LabelWidth.pixelsToChars(Number(label.maxWidth) || 0, LabelFonts.family(label), Number(label.fontSize) || FILRODENSWMB.LABELS.UNSET_SIZE, rootFontPx);
         delete label.maxWidth;
         return true;
     }

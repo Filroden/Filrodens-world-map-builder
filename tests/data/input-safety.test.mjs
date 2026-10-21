@@ -18,6 +18,8 @@ const { MapNames } = await import("../../src/data/MapNames.js");
 const { MapJson } = await import("../../src/data/MapJson.js");
 const { createMeshBlock, createLayerSet, createLevel, addRegion, normaliseAreaFactor } = await import("../../src/mesh/Schema.js");
 const { decodeOwners, encodeOwners } = await import("../../src/mesh/OwnerLayer.js");
+const { encodeModelRun } = await import("../../src/generator/ModelRun.js");
+const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
 const webUtils = await import("../../src/platform/web/utils.js");
 const { registerHelpers } = await import("../../src/platform/web/templates.js");
 
@@ -49,6 +51,7 @@ function v4Map() {
     mapData.customRegionStyles = [{ id: "regionStyleAAAAA", name: "Fill", fillColor: "transparent", fillStyle: "solid" }];
     mapData.customLabelStyles = [{ id: "label-style-realm", name: "Realm", fontFamily: "Cinzel", fontSize: 1.8, fillColor: "#dedcd3", maxChars: 0, justify: "center", bold: true, italic: false }];
     mapData.customPinStyles = [{ id: "pinStyleAAAAAAAA", name: "Town", icon: "map_pin", scale: 1, color: "#ffffff", detailLevel: 1, label: { fontSize: 1, visibility: "all", quickStyle: "custom" } }];
+    mapData.sizeRevision = FILRODENSWMB.SYMBOLS.REVISION;
     mapData.customBiomes = [{ id: 14, name: "Moor", code: "MR", color: [90, 80, 70], placement: "land", rules: [{ elevation: [[0.2, 0.4, false, true]], moisture: [], temperature: [] }] }];
     return JSON.parse(JSON.stringify(MapJson.toExport(mapData, { levelAAAAAAAAAAA: encodeOwners(new Int32Array([0, 0, -1, 0])) })));
 }
@@ -224,6 +227,49 @@ test("owner arrays are kept only for the map's own layers, and the decoder refus
     // A run-length header claiming a billion cells, which would allocate gigabytes
     const header = Buffer.from([0x80, 0x94, 0xeb, 0xdc, 0x03, 0x01, 0x01]).toString("base64");
     assert.throws(() => decodeOwners(header), /Owner data is corrupt/);
+});
+
+/** A four-cell generator run as a map saves it (see ModelRun). */
+function savedModelRun() {
+    const cells = { capacity: [10, 20, 0, 5], population: [8, 15, 0, 4], security: [1, 0.5, 0, 0.25], cleared: [0.5, 0.5, 0, 0], water: [0, 0, 1, 0], realm: [0, 0, -1, 1], duchy: [0, 1, -1, 2], county: [0, 1, -1, 3], culture: [0, 0, -1, 0] };
+    const result = {
+        modelCells: { ...cells, shareStart: [0, 1, 2, 2, 3], shareCulture: [0, 0, 0], shareValue: [1, 1, 1] },
+        settings: resolveSettings({}, "SEED"),
+        cellCount: 4,
+        cultures: [{ name: "Northfolk", nameBase: "english", homeland: 0 }],
+        stats: { kingdoms: 2, independents: 0 },
+    };
+    return JSON.parse(JSON.stringify(encodeModelRun(result, "runAAAAAAAAAAAAA")));
+}
+
+test("a saved model run passes the importer whole, and a damaged or hostile one is dropped", () => {
+    const file = v4Map();
+    file.modelRun = savedModelRun();
+    const kept = MapImport.read(file);
+    assert.deepEqual(kept.modelRun, file.modelRun);
+    assert.equal(kept.corrected, 0);
+
+    const hostile = (change) => {
+        const damaged = v4Map();
+        damaged.modelRun = savedModelRun();
+        change(damaged.modelRun);
+        return MapImport.read(damaged);
+    };
+    const short = hostile((run) => (run.cells.population.data = run.cells.population.data.slice(0, 4)));
+    assert.equal(short.modelRun, null, "an array shorter than the run's cells");
+    assert.equal(short.corrected, 1);
+    assert.equal(hostile((run) => (run.cells.realm.data = "not base64!")).modelRun, null);
+    assert.equal(hostile((run) => (run.cellCount = 1e12)).modelRun, null, "a cell count past the mesh's limit");
+    assert.equal(hostile((run) => (run.cells.shareStart.data = btoa(String.fromCharCode(9, 0, 0, 0, 0)))).modelRun, null, "shares that run backwards");
+    const scripted = hostile((run) => {
+        run.cultures[0].name = SCRIPT;
+        run.__proto__ = { polluted: true };
+        run.extra = "dropped";
+    });
+    assert.equal(scripted.modelRun.cultures[0].name, SCRIPT, "a name is kept as text");
+    assert.equal(scripted.modelRun.extra, undefined);
+    assert.equal({}.polluted, undefined);
+    assert.equal(MapImport.read(v4Map()).modelRun, null, "a map without a run has none");
 });
 
 // ------------------------------------------------------------------ colours, enums, numbers, fonts, images

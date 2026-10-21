@@ -196,7 +196,7 @@ export class MapDialogManager {
         const defaults = {
             quickStyle: "custom",
             fontFamily: app.uiState.labelFontFamily || FILRODENSWMB.LABELS.DEFAULT_FONT,
-            fontSize: app.uiState.labelFontSize || 1,
+            fontSize: app.uiState.labelFontSize || FILRODENSWMB.LABELS.DEFAULT_SIZE,
             fillColor: app.uiState.labelFillColor || "#ffffff",
             maxChars: app.uiState.labelMaxChars || 0,
             justify: app.uiState.labelJustify || "left",
@@ -417,7 +417,7 @@ export class MapDialogManager {
                     if (style) return labelStyleFields(style);
                     return {
                         fontFamily: app.uiState.labelFontFamily || FILRODENSWMB.LABELS.DEFAULT_FONT,
-                        fontSize: app.uiState.labelFontSize || 1,
+                        fontSize: app.uiState.labelFontSize || FILRODENSWMB.LABELS.DEFAULT_SIZE,
                         fillColor: app.uiState.labelFillColor || "#000000",
                         maxChars: app.uiState.labelMaxChars || 0,
                         justify: app.uiState.labelJustify || "left",

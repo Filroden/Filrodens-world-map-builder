@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { LAYER_SET_KINDS, NESTING_MODES, ROUTE_CLASSES, ROUTE_TRANSPORTS, VISIBILITIES } from "../mesh/Schema.js";
+import { MODEL_RUN_ARRAYS } from "../generator/ModelRun.js";
 import { Sanitize } from "./Sanitize.js";
 
 /**
@@ -57,7 +58,6 @@ const enumOf = (values, options = {}) => ({ t: "enum", values, ...options });
 const key = { t: "key" };
 const id = { t: "id" };
 const ref = (options = {}) => ({ t: "ref", nullable: true, ...options });
-const nullOnly = { t: "null" };
 const points = { t: "points" };
 const obj = (fields, options = {}) => ({ t: "obj", fields, ...options });
 const list = (of, options = {}) => ({ t: "list", of, ...options });
@@ -70,6 +70,28 @@ const routeStroke = enumOf(["solid", "dashed", "dotted", "dashdot"]);
 const fillStyle = enumOf(["solid", "diagonal", "crosshatch", "hatch"], { nullable: true });
 const justify = enumOf(["left", "center", "right"]);
 const custom = ref({ also: ["custom"] });
+
+// ------------------------------------------------------------------ generated content
+
+/**
+ * What the generator records on everything it makes: its run, what it is (a realm, duchy or
+ * county; a town or castle; a route), its tier (kingdom or independent, a pin style tier, a route
+ * class), its index in the run, its people and dominant culture, and whether the user has edited or
+ * locked it (which a re-run reads).
+ */
+const GENERATED = obj(
+    {
+        run: { t: "key" },
+        kind: enumOf(["realm", "duchy", "county", "town", "castle", "route"]),
+        tier: { t: "key", nullable: true },
+        sourceId: int(0),
+        population: num(RANGE.COUNT, { nullable: true }),
+        culture: int(0, 1e6, { nullable: true }),
+        edited: bool,
+        locked: bool,
+    },
+    { nullable: true },
+);
 
 // ------------------------------------------------------------------ labels, pins, decorations
 
@@ -108,7 +130,7 @@ const PIN = obj({
     label: OWNED_LABEL,
     pinStyle: custom,
     cell: int(0, 1e9, { nullable: true }),
-    generated: nullOnly,
+    generated: GENERATED,
     type: enumOf(["spring", "block_spring"]),
     radius: num(RANGE.SIZE),
     inflow: num(RANGE.SIGNED),
@@ -156,7 +178,7 @@ const ROUTE = obj({
     class: enumOf(ROUTE_CLASSES, { nullable: true }),
     transport: enumOf(ROUTE_TRANSPORTS),
     journalPageId: ref(),
-    generated: nullOnly,
+    generated: GENERATED,
     legacy: obj({ points }),
     // An older (polygon) map's route, before it is moved onto the mesh
     points,
@@ -179,7 +201,7 @@ const REGION = obj({
     hidden,
     label: OWNED_LABEL,
     journalPageId: ref(),
-    generated: nullOnly,
+    generated: GENERATED,
     legacy: REGION_LEGACY,
 });
 
@@ -358,6 +380,8 @@ const LABEL_STYLE = obj({
 const PIN_STYLE = obj({
     id: { t: "id", strict: true },
     name: styleName,
+    // The settlement or site tier the style stands for, which the generator finds it by
+    tier: enumOf(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => style.tier), { nullable: true }),
     icon: key,
     scale: num(RANGE.SCALE),
     color,
@@ -445,6 +469,7 @@ const MAP = obj({
     seed: { t: "seed", kind: "name", where: "FILRODENSWMB.UI.LimitKindMap", field: "FILRODENSWMB.UI.LimitFieldSeed" },
     generationEngine: enumOf(["standard", "flat", "advanced", "guided"]),
     terrainVersion: int(0, 1000),
+    sizeRevision: int(0, 1000),
     world: obj(
         {
             zoom: num(RANGE.SIGNED),
@@ -513,6 +538,39 @@ const MAP = obj({
     regionLayers: list(LEGACY_REGION_LAYER),
 });
 
+// ------------------------------------------------------------------ the generator's outputs
+
+/** One packed array of a run's model-cell outputs (see ModelRun.packArray). */
+const PACKED_ARRAY = obj({ type: enumOf(["u8", "u16", "u32"]), scale: num({ min: 1e-9, max: 1e9 }), offset: num(RANGE.SIGNED), data: { t: "base64" } });
+
+const generatorText = (field) => text("name", "FILRODENSWMB.UI.LimitKindGenerator", field);
+
+/** The settings a run was made with (see GeneratorSettings.resolveSettings). */
+const GENERATOR_SETTINGS = obj({
+    seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
+    nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
+    world: obj({ density: num(RANGE.SCALE), urbanisation: num(RANGE.SCALE), realmSpacing: num(RANGE.SCALE), fragmentation: num(RANGE.SCALE) }),
+    ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strifeName: key, strife: num(RANGE.UNIT) })),
+    cultures: list(obj({ name: generatorText("FILRODENSWMB.UI.LimitFieldName"), nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), openness: num(RANGE.UNIT), density: num(RANGE.SCALE), homelandCell: int(0, 1e9, { nullable: true }), habitat: numTree })),
+});
+
+/**
+ * A run's saved model-cell outputs (see ModelRun), kept beside the map data. MapImport also checks
+ * that every array holds as many values as the run has cells.
+ */
+const MODEL_RUN = obj({
+    version: int(0, 1000),
+    run: key,
+    revision: int(0, 1000),
+    seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
+    settings: GENERATOR_SETTINGS,
+    cellCount: int(0, FILRODENSWMB.MESH.MAX_CELLS),
+    cultures: list(obj({ name: generatorText("FILRODENSWMB.UI.LimitFieldName"), nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), homeland: int(0, 1e9, { nullable: true }) })),
+    stats: numTree,
+    cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
+    history: list(numTree),
+});
+
 /** The rules, by kind. `map` is a whole saved map; the rest are the objects inside it. */
 export const RULES = Object.freeze({
     map: MAP,
@@ -534,6 +592,7 @@ export const RULES = Object.freeze({
     labelStyle: LABEL_STYLE,
     pinStyle: PIN_STYLE,
     params: PARAMS,
+    modelRun: MODEL_RUN,
 });
 
 /** The style lists of a map, each with the rule of its entries. */

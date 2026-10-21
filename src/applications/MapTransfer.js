@@ -39,7 +39,7 @@ export class MapTransfer {
             await MapDialogManager.showOverLimit(tooLong);
             return;
         }
-        const { file, missing } = await MapPackage.prepare({ mapData, owners: await platform.store.loadMapOwners(mapId), name, icons: getCustomPinIconEntries(), mode: "embed", read: (src) => platform.assets.read(src) });
+        const { file, missing } = await MapPackage.prepare({ mapData, owners: await platform.store.loadMapOwners(mapId), modelRun: await platform.store.loadMapModelRun(mapId), name, icons: getCustomPinIconEntries(), mode: "embed", read: (src) => platform.assets.read(src) });
         if (missing > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.BackupImagesLeftOut", { count: missing }));
         const safeName = name.replaceAll(/[^a-z0-9]/gi, "_").toLowerCase();
         MapTransfer.download(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }), `fwmb_${safeName}.json`);
@@ -146,11 +146,11 @@ export class MapTransfer {
      * @returns {Promise<{id: string, name: string, corrected: number, missing: number, unresolvedIcons: number}>}
      */
     static async #bringIn(parsed, { fallback, taken, parentId, assetBytes = () => null }) {
-        const { mapData, owners, name: savedName, pinIcons, corrected } = MapImport.read(parsed, { newId: () => platform.utils.randomID() });
+        const { mapData, owners, modelRun, name: savedName, pinIcons, corrected } = MapImport.read(parsed, { newId: () => platform.utils.randomID() });
         const { missing } = await MapPackage.resolve({ mapData, pinIcons, assetBytes, keep: (bytes, type, hash) => platform.assets.keep(bytes, type, hash), icons: ICONS });
         mapData.parentId = parentId(mapData.parentId ?? null) ?? null;
         const name = MapNames.unique(savedName ?? fallback, taken, numberedName);
-        const saved = await platform.store.saveMapData(name, mapData, null, { owners });
+        const saved = await platform.store.saveMapData(name, mapData, null, { owners, modelRun });
         if (!saved) throw new Error("The map could not be saved.");
         return { id: saved.id, name, corrected, missing, unresolvedIcons: findUnresolvedPinIcons(mapData.mapPins).affectedPinCount };
     }
@@ -178,7 +178,8 @@ export class MapTransfer {
             if (!mapData) continue;
             for (const problem of overLimit(mapData, { "FILRODENSWMB.UI.LimitFieldName": entry.name })) tooLong.push({ ...problem, map: entry.name });
             const owners = await platform.store.loadMapOwners(entry.id);
-            const prepared = await MapPackage.prepare({ mapData, owners, name: entry.name, icons, mode, read: (src) => platform.assets.read(src), assets });
+            const modelRun = await platform.store.loadMapModelRun(entry.id);
+            const prepared = await MapPackage.prepare({ mapData, owners, modelRun, name: entry.name, icons, mode, read: (src) => platform.assets.read(src), assets });
             missing += prepared.missing;
             maps.push({ id: entry.id, name: entry.name, parentId: entry.parentId, file: prepared.file });
         }

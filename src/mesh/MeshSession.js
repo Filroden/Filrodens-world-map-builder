@@ -4,6 +4,7 @@ import { Mesh, MeshBuilder, accumulateRows, finishAggregates } from "./MeshBuild
 import { migrateMapData, pinsToCells, regionsToOwners } from "./Migration.js";
 import { OwnerLayer, decodeOwners, encodeOwners, mergePatchList } from "./OwnerLayer.js";
 import { nodesMarkedLine, resampleOwners, retraceLine, routeMarkedLine } from "./Resample.js";
+import { routeRuns } from "./RouteMerge.js";
 import { routePolyline } from "./RoutePath.js";
 import { UNCLAIMED, VECTOR_SCHEMA_VERSION, createMeshBlock, normaliseAreaFactor, normaliseVectorData, randomId, validateOwners, validateVectorData } from "./Schema.js";
 
@@ -46,6 +47,8 @@ export class MeshSession {
     #anchors = new Map();
     #bounds = new Map();
     #routeLines = new Map();
+    /** The drawn lines of the routes last asked for (see routeDrawLines), with what they were made from. */
+    #drawnRoutes = { inputs: [], lines: new Map() };
     #ownerChanges = new Map();
     /** Each water cell's distance from land in cells (see shoreDistance), or null until asked for. */
     #shoreDistance = null;
@@ -308,6 +311,28 @@ export class MeshSession {
         if (line.length < 4) return null;
         const mid = Math.floor(line.length / 4) * 2;
         return { x: line[mid], y: line[mid + 1] };
+    }
+
+    /**
+     * The lines to draw for the routes of a render pass, with the stretches several routes share
+     * drawn once (see RouteMerge): by route id, the route's own line when it draws whole, or the
+     * lines of the runs it still draws. Cached until any route in the pass, its legs, transport,
+     * class, thickness or smoothing changes.
+     * @param {object[]} routes - The routes visible in the pass.
+     * @returns {Map<string, Float64Array[]>}
+     */
+    routeDrawLines(routes) {
+        const inputs = routes.map((route) => [route, route.legs, route.transport, route.class, route.thickness, route.smoothing === true]);
+        const cached = this.#drawnRoutes;
+        if (sameInputs(cached.inputs, inputs)) return cached.lines;
+        const runs = routeRuns(routes, this.mesh.cellCount);
+        const lines = new Map();
+        for (const route of routes) {
+            const own = runs.get(route.id);
+            lines.set(route.id, own ? own.map((run) => routePolyline(this.mesh, [run], route.smoothing === true)) : [this.routeLine(route)]);
+        }
+        this.#drawnRoutes = { inputs, lines };
+        return lines;
     }
 
     /** Drops a route's cached line (a route deleted, or changed in place). */
@@ -711,6 +736,17 @@ function cellStates(aggregates, cells) {
 }
 
 /** A route with a single waypoint draws as a point. */
+/** Whether two lists of route draw inputs hold the same values, compared by identity. */
+function sameInputs(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        const x = a[i];
+        const y = b[i];
+        for (let k = 0; k < x.length; k++) if (x[k] !== y[k]) return false;
+    }
+    return true;
+}
+
 function singleWaypointLine(mesh, route) {
     const cell = route.waypoints?.[0];
     return cell === undefined ? new Float64Array(0) : Float64Array.of(mesh.siteX(cell), mesh.siteY(cell));

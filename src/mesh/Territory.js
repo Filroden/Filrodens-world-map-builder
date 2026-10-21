@@ -149,21 +149,61 @@ export function reliefRiverCost(mesh, aggregates, settings = {}) {
  * @param {import("./MeshBuilder.js").Mesh} mesh
  * @param {import("./OwnerLayer.js").OwnerLayer} layer
  * @param {import("./MeshBuilder.js").CellAggregates} aggregates
+ * A level nested in another relaxes inside it: `allow` (as for floodOwners) keeps each owner to the
+ * cells of its parent region, so a border between two children moves only within their parent.
+ * A band cell no owner may reach keeps its owner.
+ *
+ * No region is lost: one too small to have cells beyond the band keeps its deepest cells (those
+ * furthest from its border) as its sources, and `anchors` keep their owners whatever the flood
+ * does (a generated county's seat, so its town stays inside it).
+ *
  * @param {object} [settings] - Overrides of config MESH.RELAX.
+ * @param {object} [options]
+ * @param {function(number, number): boolean} [options.allow] - Whether an owner may take a cell (cell, owner).
+ * @param {Iterable<number>} [options.anchors] - Cells that keep their owner.
  * @returns {import("./OwnerLayer.js").OwnerPatch}
  */
-export function relaxBorders(mesh, layer, aggregates, settings = {}) {
+export function relaxBorders(mesh, layer, aggregates, settings = {}, { allow = null, anchors = [] } = {}) {
     const { RINGS } = { ...FILRODENSWMB.MESH.RELAX, ...settings };
     const owners = layer.owners;
     const { land } = aggregates;
     const ring = borderRings(mesh, owners, land, RINGS);
-    const sources = ownedCells(owners, (cell) => land[cell] === 1 && ring[cell] < 0);
+    const sources = relaxSources(owners, land, ring, anchors);
     const flood = floodOwners(mesh, sources.cells, sources.values, {
         passable: (cell) => land[cell] === 1 && ring[cell] >= 0,
         cost: reliefRiverCost(mesh, aggregates, settings),
+        allow,
     });
     const moved = ownedCells(flood.owner, (cell) => ring[cell] >= 0);
     return layer.assign(moved.cells, moved.values);
+}
+
+/**
+ * The cells relaxation floods from: owned land beyond the border band; for an owner with none,
+ * its land cells deepest in the band; and the anchors.
+ */
+function relaxSources(owners, land, ring, anchors) {
+    const sources = ownedCells(owners, (cell) => land[cell] === 1 && ring[cell] < 0);
+    const inland = new Set(sources.values);
+    const deepest = new Map();
+    owners.forEach((owner, cell) => {
+        if (owner === UNCLAIMED || land[cell] !== 1 || inland.has(owner)) return;
+        const best = deepest.get(owner);
+        if (!best || ring[cell] > best.ring) deepest.set(owner, { ring: ring[cell], cells: [cell] });
+        else if (ring[cell] === best.ring) best.cells.push(cell);
+    });
+    for (const [owner, { cells }] of deepest) {
+        for (const cell of cells) {
+            sources.cells.push(cell);
+            sources.values.push(owner);
+        }
+    }
+    for (const cell of anchors) {
+        if (owners[cell] === UNCLAIMED) continue;
+        sources.cells.push(cell);
+        sources.values.push(owners[cell]);
+    }
+    return sources;
 }
 
 /**

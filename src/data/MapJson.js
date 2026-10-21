@@ -7,6 +7,7 @@ import { normaliseAreaFactor } from "../mesh/Schema.js";
  * a file has to carry them inside, or a re-imported map would lose its regions. The map's name
  * travels as a top-level `name` too: the saved map keeps its name beside its data, and the file's
  * own name is made safe for a file system (lower case, underscores), so it cannot give it back.
+ * The generator's saved outputs travel the same way, under a top-level `modelRun` (see ModelRun).
  *
  * Kept free of Foundry calls so the round trip can be tested on its own.
  */
@@ -16,14 +17,17 @@ export class MapJson {
      * @param {object} mapData
      * @param {Object<string, string>} [owners]
      * @param {string|null} [name] - The saved map's name.
+     * @param {object|null} [modelRun] - The generator's saved outputs.
      * @returns {object}
      */
-    static toExport(mapData, owners = {}, name = null) {
+    static toExport(mapData, owners = {}, name = null, modelRun = null) {
         const data = structuredClone(mapData);
         delete data.owners;
         delete data.name;
+        delete data.modelRun;
         const named = name ? { name, ...data } : data;
-        return Object.keys(owners).length ? { ...named, owners: { ...owners } } : named;
+        const withOwners = Object.keys(owners).length ? { ...named, owners: { ...owners } } : named;
+        return modelRun ? { ...withOwners, modelRun: structuredClone(modelRun) } : withOwners;
     }
 
     /**
@@ -31,14 +35,16 @@ export class MapJson {
      * whole number or out of range is corrected here, so a hand-edited file cannot store one the
      * map could not use.
      * @param {object} parsed - The file's JSON.
-     * @returns {{mapData: object, owners: Object<string, string>}}
+     * @returns {{mapData: object, owners: Object<string, string>, modelRun: object|null}}
      */
     static fromImport(parsed) {
         const mapData = structuredClone(parsed);
         const owners = isOwnerMap(mapData.owners) ? mapData.owners : {};
+        const modelRun = mapData.modelRun && typeof mapData.modelRun === "object" && !Array.isArray(mapData.modelRun) ? mapData.modelRun : null;
         delete mapData.owners;
+        delete mapData.modelRun;
         normaliseAreaFactor(mapData);
-        return { mapData, owners };
+        return { mapData, owners, modelRun };
     }
 }
 

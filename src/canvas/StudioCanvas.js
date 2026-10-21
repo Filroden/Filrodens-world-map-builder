@@ -400,7 +400,7 @@ export class StudioCanvas {
         const { LABEL_FONT_SIZE, PIN_SCALE, DECORATION_SCALE } = FILRODENSWMB.UI.WHEEL_RESIZE;
 
         if (wrapper.isLabel) {
-            target.fontSize = CanvasTransforms.stepValue(target.fontSize || 1, steps, LABEL_FONT_SIZE);
+            target.fontSize = CanvasTransforms.stepValue(target.fontSize || FILRODENSWMB.LABELS.UNSET_SIZE, steps, LABEL_FONT_SIZE);
         } else if (wrapper.isIconPin) {
             target.scale = CanvasTransforms.stepValue(target.scale || FILRODENSWMB.PINS.DEFAULT_SCALE, steps, PIN_SCALE);
         } else {
@@ -1385,8 +1385,13 @@ export class StudioCanvas {
         this.pinContainer.removeChildren().forEach((c) => c.destroy());
         this.nodeContainer.removeChildren().forEach((c) => c.destroy(true));
 
-        // 1. Render Routes (Bottom Layer), from their legs on the display mesh (see #drawMeshRoute)
-        for (const route of sortedRoutes) this.#drawMeshRoute(route, meshSession);
+        // 1. Render Routes (Bottom Layer), from their legs on the display mesh (see #drawMeshRoute),
+        // with the stretches several visible routes share drawn once (see MeshSession.routeDrawLines)
+        if (meshSession) {
+            const visible = sortedRoutes.filter((route) => this.#isVisibleInCurrentPass(route.visibility, "all", false));
+            const lines = meshSession.routeDrawLines(visible);
+            for (const route of visible) for (const flat of lines.get(route.id) ?? []) this.#drawMeshRoute(route, flat);
+        }
 
         // 2. Render Pins (Top Layer)
         const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
@@ -1405,9 +1410,10 @@ export class StudioCanvas {
             }
 
             // Apply resolution scaling * user override scale
-            const baseSize = 24 * resScale;
-            sprite.width = baseSize * (pin.scale || 1);
-            sprite.height = baseSize * (pin.scale || 1);
+            const { PIN_PX, UNIT } = FILRODENSWMB.SYMBOLS;
+            const size = PIN_PX * UNIT * resScale * (pin.scale || FILRODENSWMB.PINS.DEFAULT_SCALE);
+            sprite.width = size;
+            sprite.height = size;
 
             sprite.anchor.set(0.5);
             sprite.x = pin.x;
@@ -1425,14 +1431,13 @@ export class StudioCanvas {
     }
 
     /**
-     * Draws a route from its legs on the display mesh: the line through its cells' sites (corner
-     * cut when the route is smoothed; see MeshSession.routeLine), with a black outline one pixel
-     * wider underneath unless the route turns its outline off. Nothing is drawn before the map's
-     * mesh session exists.
+     * Draws one line of a route (the whole route, or a stretch no higher route draws): through its
+     * cells' sites, corner cut when the route is smoothed, with a black outline one pixel wider
+     * underneath unless the route turns its outline off.
+     * @param {object} route
+     * @param {Float64Array} flat - The line, flat [x0, y0, ...].
      */
-    #drawMeshRoute(route, meshSession) {
-        if (!meshSession || !this.#isVisibleInCurrentPass(route.visibility, "all", false)) return;
-        const flat = meshSession.routeLine(route);
+    #drawMeshRoute(route, flat) {
         if (flat.length < 4) return;
 
         const points = [];
@@ -1634,7 +1639,7 @@ export class StudioCanvas {
             const rotation = labelData.rotation ?? 0;
 
             drawn.push(labelData);
-            const size = (labelData.fontSize || 1) * rootFontSize * resScale;
+            const size = (labelData.fontSize || FILRODENSWMB.LABELS.UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontSize * resScale;
             const fill = labelData.fillColor || "#ffffff";
             const stroke = ColorMath.getContrastColor(fill);
 

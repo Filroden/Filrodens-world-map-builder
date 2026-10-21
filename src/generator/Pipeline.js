@@ -160,6 +160,7 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
         revision: FILRODENSWMB.GENERATOR.REVISION,
         settings,
         modelCells: modelCellOutput(run, feedback, finalRealms),
+        modelGraph: { neighbourStart: Int32Array.from(cells.neighbourStart), neighbourList: Int32Array.from(cells.neighbourList) },
         cultures: cultures.cultures.map((culture, index) => ({ name: culture.name, nameBase: culture.nameBase, homeland: cultures.homelands[index] })),
         places,
         realms: finalRealms.realms.map((realm, index) => ({
@@ -245,6 +246,7 @@ function modelCellOutput(run, feedback, realms) {
         realm: Int32Array.from(realms.realmOfCell),
         duchy: Int32Array.from(realms.duchyOfCell),
         county: Int32Array.from(realms.countyOfCell),
+        water: Uint8Array.from(cells.water),
         culture: Int32Array.from(cultures.dominant),
         shareStart: Int32Array.from(cultures.shareStart),
         shareCulture: Int32Array.from(cultures.shareCulture),

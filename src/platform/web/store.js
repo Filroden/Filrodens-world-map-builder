@@ -138,13 +138,16 @@ export function createWebStore(records, { newId = randomID } = {}) {
          * @param {string} mapName
          * @param {object} mapData
          * @param {string|null} [existingId]
-         * @param {{owners?: object|null}} [options] - Owner arrays by level id; null keeps those already saved.
+         * @param {{owners?: object|null, modelRun?: object|null}} [options] - Owner arrays by level
+         *     id (null keeps those already saved), and the generator's saved outputs (left out keeps
+         *     those already saved; null removes them).
          * @returns {Promise<{id: string, name: string}|null>}
          */
-        async saveMapData(mapName, mapData, existingId = null, { owners = null } = {}) {
+        async saveMapData(mapName, mapData, existingId = null, { owners = null, modelRun = undefined } = {}) {
             if (!mapData) return null;
             const existing = existingId ? await records.get(existingId) : null;
-            const record = { id: existing?.id ?? newId(), name: mapName, mapData: deepClone(mapData), owners: deepClone(owners ?? existing?.owners ?? {}) };
+            const run = modelRun === undefined ? (existing?.modelRun ?? null) : modelRun;
+            const record = { id: existing?.id ?? newId(), name: mapName, mapData: deepClone(mapData), owners: deepClone(owners ?? existing?.owners ?? {}), modelRun: deepClone(run) };
             await records.put(record);
             return summary(record);
         },
@@ -183,6 +186,11 @@ export function createWebStore(records, { newId = randomID } = {}) {
 
         async loadMapOwners(id) {
             return (await records.get(id))?.owners ?? {};
+        },
+
+        /** The generator's saved outputs of a map (see ModelRun), or null. */
+        async loadMapModelRun(id) {
+            return deepClone((await records.get(id))?.modelRun ?? null);
         },
 
         async loadMapData(id) {

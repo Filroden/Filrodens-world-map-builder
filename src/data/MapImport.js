@@ -1,7 +1,9 @@
 import { FILRODENSWMB } from "../config.js";
 import { normaliseAreaFactor, ownersKeyFor, randomId, resolveSpacing } from "../mesh/Schema.js";
+import { decodeModelRun } from "../generator/ModelRun.js";
 import { clean, cleanContext, RULES, STYLE_LIST_RULES } from "./MapRules.js";
 import { ImportRefusal, Sanitize } from "./Sanitize.js";
+import { needsRebase, rebaseStyles } from "./SymbolSizes.js";
 
 /**
  * Reads a map (or a styles file) someone may have made elsewhere into data the studio can trust.
@@ -60,8 +62,9 @@ export class MapImport {
      *
      * @param {*} parsed - The file's JSON.
      * @param {{newId?: Function}} [options]
-     * @returns {{mapData: object, owners: Object<string, string>, name: string|null, pinIcons: object[], corrected: number}}
-     *     `name` is the map's name as the file carries it (see MapJson.toExport), or null for a
+     * @returns {{mapData: object, owners: Object<string, string>, modelRun: object|null, name: string|null, pinIcons: object[], corrected: number}}
+     *     `modelRun` is the generator's saved outputs (see ModelRun), or null when the file has
+     *     none or they do not hold together. `name` is the map's name as the file carries it (see MapJson.toExport), or null for a
      *     file from before exports carried one; it is kept apart from the map data, as a save keeps
      *     it. `pinIcons` are the custom pin icons the file carries for the map (see MapPackage),
      *     which belong to the host's settings rather than the map.
@@ -80,13 +83,14 @@ export class MapImport {
         checkUniqueIds(mapData, newId);
         settleLevels(mapData);
         const owners = cleanOwners(tree.owners, mapData, context);
+        const modelRun = cleanModelRun(tree.modelRun, context);
         refuseOverLimit(context);
         normaliseAreaFactor(mapData);
         const name = typeof mapData.name === "string" && mapData.name.trim() ? mapData.name.trim() : null;
         const pinIcons = mapData.pinIcons ?? [];
         delete mapData.name;
         delete mapData.pinIcons;
-        return { mapData, owners, name, pinIcons, corrected: context.corrected };
+        return { mapData, owners, modelRun, name, pinIcons, corrected: context.corrected };
     }
 
     /**
@@ -111,6 +115,8 @@ export class MapImport {
             categories[category] = clean(entries, { t: "list", of: { ...rule, fields } }, context) ?? [];
         }
         refuseOverLimit(context);
+        // A file exported before the current size unit holds older pin and label sizes
+        if (needsRebase(tree.sizeRevision)) rebaseStyles(categories.customPinStyles, categories.customLabelStyles);
         return { categories, corrected: context.corrected };
     }
 }
@@ -227,6 +233,36 @@ function cleanOwners(raw, mapData, context) {
         owners[levelId] = encoded;
     }
     return owners;
+}
+
+/**
+ * The generator's saved outputs kept only when they hold together: every array decodes, and each
+ * holds one value per model cell (the shares' start one more, and their cultures and values as many
+ * as each other), so nothing reading them can run past an end. Anything else is dropped whole (the
+ * map's content is untouched; only the thematic layers lose their data until the next run).
+ */
+function cleanModelRun(raw, context) {
+    if (raw == null) return null;
+    const modelRun = clean(raw, RULES.modelRun, context);
+    if (modelRun && modelRunHoldsTogether(modelRun)) return modelRun;
+    context.corrected += 1;
+    return null;
+}
+
+function modelRunHoldsTogether(modelRun) {
+    const count = modelRun.cellCount;
+    if (!Number.isInteger(count) || count <= 0) return false;
+    let arrays;
+    try {
+        arrays = decodeModelRun(modelRun);
+    } catch {
+        return false;
+    }
+    const perCell = ["capacity", "population", "security", "cleared", "water", "realm", "duchy", "county", "culture"];
+    if (!perCell.every((name) => arrays[name]?.length === count)) return false;
+    const { shareStart, shareCulture, shareValue } = arrays;
+    if (!shareStart || shareStart.length !== count + 1 || shareCulture?.length !== shareValue?.length) return false;
+    return shareStart.every((start, index) => start >= 0 && start <= shareCulture.length && (index === 0 || start >= shareStart[index - 1]));
 }
 
 /** Refuses a file holding free text past its limit, naming the first place and counting the rest. */

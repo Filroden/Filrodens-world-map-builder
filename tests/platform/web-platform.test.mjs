@@ -144,6 +144,21 @@ test("saving creates a map, saving with its id overwrites it, and owners are kep
     assert.equal(await store.saveMapData("Empty", null), null);
 });
 
+test("a map's model run is saved beside it, kept unless given, cleared by null and copied with the map", async () => {
+    let next = 0;
+    const store = createWebStore(new MemoryRecords(), { newId: () => `id${++next}` });
+    const modelRun = { version: 1, run: "run", cells: {} };
+    await store.saveMapData("World", { seed: 1 }, null, { modelRun });
+    assert.deepEqual(await store.loadMapModelRun("id1"), modelRun);
+    await store.saveMapData("World", { seed: 2 }, "id1");
+    assert.deepEqual(await store.loadMapModelRun("id1"), modelRun, "a save without one keeps it");
+    await store.duplicateSavedMap("id1", "Copy");
+    assert.deepEqual(await store.loadMapModelRun("id2"), modelRun);
+    await store.saveMapData("World", { seed: 3 }, "id1", { modelRun: null });
+    assert.equal(await store.loadMapModelRun("id1"), null);
+    assert.equal(await store.loadMapModelRun("missing"), null);
+});
+
 test("saved maps are listed as a tree: regional maps under the map they were cut from, by name", async () => {
     let next = 0;
     const store = createWebStore(new MemoryRecords(), { newId: () => `id${++next}` });

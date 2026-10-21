@@ -131,7 +131,8 @@ test("keep (Maps only) carries no images: paths stay, embedded images go", async
 test("a backup round-trips its maps, regional maps after their parents, with each image once", async () => {
     const from = host();
     const assets = new Map();
-    const parent = await MapPackage.prepare({ mapData: savedMap(), name: "World", icons: from.icons, mode: "assets", read: from.read, assets });
+    const modelRun = { version: 1, run: "runAAAAAAAAAAAAA", cellCount: 1, cells: {} };
+    const parent = await MapPackage.prepare({ mapData: savedMap(), modelRun, name: "World", icons: from.icons, mode: "assets", read: from.read, assets });
     const child = await MapPackage.prepare({ mapData: { ...savedMap(), parentId: "worldAAAAAAAAAAA" }, name: "Region", icons: from.icons, mode: "assets", read: from.read, assets });
     assert.equal(assets.size, 3, "the decoration, the reference and the icon, each once although both maps use them");
     assert.ok(parent.file.mapDecorations[0].src.startsWith("fwmb-asset:"));
@@ -154,6 +155,9 @@ test("a backup round-trips its maps, regional maps after their parents, with eac
             ["worldAAAAAAAAAAA", "World", null],
         ],
     );
+
+    assert.deepEqual(backup.mapFile("worldAAAAAAAAAAA").modelRun, modelRun, "a map's model run travels in its file");
+    assert.equal(backup.mapFile("regionAAAAAAAAAA").modelRun, undefined);
 
     const to = host();
     const restored = MapImport.read(backup.mapFile("regionAAAAAAAAAA"));

@@ -16,7 +16,7 @@ import {
 } from "../../src/mesh/OwnerLayer.js";
 import { UNCLAIMED } from "../../src/mesh/Schema.js";
 import { claimWaters, fillUnclaimedLand, relaxBorders } from "../../src/mesh/Territory.js";
-import { P0_SKIP, flatAggregates, loadP0, seededRandom, smallMesh } from "./helpers.mjs";
+import { P0_SKIP, cellsInRect, flatAggregates, loadP0, seededRandom, smallMesh } from "./helpers.mjs";
 
 const MAX_LEVEL_BYTES = 50 * 1024;
 
@@ -212,6 +212,21 @@ test("unowned land joins the nearest region; relaxation moves only the border ba
     }
     assert.ok(patch.cells.length > 0, "a straight border across flat ground still settles somewhere");
     for (const cell of patch.cells) assert.ok(ring[cell] >= 0, `cell ${cell} moved but was not in the border band`);
+});
+
+test("relaxation loses no region: a small one keeps its core, and an anchor keeps its owner", () => {
+    const mesh = smallMesh();
+    const aggregates = flatAggregates(mesh, { isWater: () => false });
+    const layer = new OwnerLayer(mesh.cellCount);
+    layer.paint(cellsInRect(mesh, 0, 0, mesh.width, mesh.height), 0);
+    // A region only a few cells across, inside the border band all over
+    const small = cellsInRect(mesh, 140, 140, 152, 152);
+    layer.paint(small, 1);
+    const anchor = mesh.cellAt(60, 60);
+    layer.paint([anchor], 2);
+    relaxBorders(mesh, layer, aggregates, { RINGS: 3 }, { anchors: [anchor] });
+    assert.ok(layer.owners.some((owner) => owner === 1), "the small region keeps ground");
+    assert.equal(layer.ownerOf(anchor), 2, "the anchor keeps its owner");
 });
 
 test("territorial waters stop at the claim distance", () => {

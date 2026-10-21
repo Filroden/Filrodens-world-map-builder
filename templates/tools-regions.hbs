@@ -8,6 +8,9 @@
         data-id and data-layer-id (its level), a level's section data-level-id, and every row its
         data-list-key.
     --}}
+    {{#if generatorPreview}}
+    <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-action="generateWorld" data-tooltip="{{localize 'FILRODENSWMB.UI.GeneratePreviewHint'}}">{{localize "FILRODENSWMB.UI.GeneratePreview"}}</button>
+    {{/if}}
     <details class="fwmb-section fwmb-section--list" data-section="regionSets" {{#unless collapsedSections.regionSets}}open{{/unless}}>
         <summary>
             <span class="fwmb-chev" aria-hidden="true"></span>

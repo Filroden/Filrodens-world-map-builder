@@ -456,8 +456,8 @@ export const FILRODENSWMB = {
         // value always sits on a slider position and opening the dialogue never rounds it to
         // something else.
         WHEEL_RESIZE: {
-            LABEL_FONT_SIZE: { MIN: 0.2, MAX: 5, STEP: 0.1 },
-            PIN_SCALE: { MIN: 0.2, MAX: 4, STEP: 0.1 },
+            LABEL_FONT_SIZE: { MIN: 0.2, MAX: 20, STEP: 0.1 },
+            PIN_SCALE: { MIN: 0.2, MAX: 16, STEP: 0.1 },
             DECORATION_SCALE: { MIN: 0.05, MAX: 5, STEP: 0.05 },
         },
         // The rotation of labels and decorations, in degrees, as their edit dialogues' Rotation
@@ -1267,19 +1267,28 @@ export const FILRODENSWMB = {
     },
     LABELS: {
         DEFAULT_FONT: DEFAULT_LABEL_FONT,
-        DEFAULT_SIZE: 1,
+        // The size new labels start with, and the size a label with none set is drawn at (what size 1
+        // was before SYMBOLS.REVISION, so older maps look as they did)
+        DEFAULT_SIZE: 2,
+        UNSET_SIZE: 4,
         DEFAULT_COLOR: "#DEDCD3",
         DEFAULT_TEXT: "FILRODENSWMB.LABELS.DefaultLabel",
         // The label styles a new map starts with (Ken, 2026-10-16): realm names in engraved
         // capitals, places in a book serif, water in its italic, and notes in handwriting
         DEFAULT_STYLES: Object.freeze([
-            Object.freeze({ id: "label-style-realm", nameKey: "FILRODENSWMB.LABELS.StyleRealm", fontFamily: "Cinzel", fontSize: 1.8, fillColor: "#DEDCD3", maxChars: 0, justify: "center", bold: true, italic: false }),
-            Object.freeze({ id: "label-style-place", nameKey: "FILRODENSWMB.LABELS.StylePlace", fontFamily: "EB Garamond", fontSize: 1, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: true, italic: false }),
-            Object.freeze({ id: "label-style-water", nameKey: "FILRODENSWMB.LABELS.StyleWater", fontFamily: "EB Garamond", fontSize: 1.2, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
-            Object.freeze({ id: "label-style-note", nameKey: "FILRODENSWMB.LABELS.StyleNote", fontFamily: "Kalam", fontSize: 0.8, fillColor: "#DEDCD3", maxChars: 24, justify: "left", bold: false, italic: false }),
+            Object.freeze({ id: "label-style-realm", nameKey: "FILRODENSWMB.LABELS.StyleRealm", fontFamily: "Cinzel", fontSize: 3, fillColor: "#DEDCD3", maxChars: 0, justify: "center", bold: true, italic: false }),
+            Object.freeze({ id: "label-style-place", nameKey: "FILRODENSWMB.LABELS.StylePlace", fontFamily: "EB Garamond", fontSize: 2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: true, italic: false }),
+            Object.freeze({ id: "label-style-water", nameKey: "FILRODENSWMB.LABELS.StyleWater", fontFamily: "EB Garamond", fontSize: 2.4, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
+            Object.freeze({ id: "label-style-note", nameKey: "FILRODENSWMB.LABELS.StyleNote", fontFamily: "Kalam", fontSize: 1.6, fillColor: "#DEDCD3", maxChars: 24, justify: "left", bold: false, italic: false }),
             // For the routes' labels (see ROUTES.DEFAULT_STYLES)
-            Object.freeze({ id: "label-style-road", nameKey: "FILRODENSWMB.LABELS.StyleRoad", fontFamily: "Barlow Semi Condensed", fontSize: 0.8, fillColor: "#5a3a1e", maxChars: 0, justify: "center", bold: false, italic: false }),
-            Object.freeze({ id: "label-style-sea-lane", nameKey: "FILRODENSWMB.LABELS.StyleSeaLane", fontFamily: "Noto Serif", fontSize: 0.8, fillColor: "#2e5f8a", maxChars: 0, justify: "center", bold: false, italic: true }),
+            Object.freeze({ id: "label-style-road", nameKey: "FILRODENSWMB.LABELS.StyleRoad", fontFamily: "Barlow Semi Condensed", fontSize: 1.4, fillColor: "#5a3a1e", maxChars: 0, justify: "center", bold: false, italic: false }),
+            Object.freeze({ id: "label-style-sea-lane", nameKey: "FILRODENSWMB.LABELS.StyleSeaLane", fontFamily: "Noto Serif", fontSize: 1.4, fillColor: "#2e5f8a", maxChars: 0, justify: "center", bold: false, italic: true }),
+            // For generated content: the political levels' region labels (see GENERATOR.REGION_LABEL_STYLES)
+            // and the settlements' pin labels (see PINS.DEFAULT_STYLES' labelStyle)
+            Object.freeze({ id: "label-style-duchy", nameKey: "FILRODENSWMB.LABELS.StyleDuchy", fontFamily: "Cinzel", fontSize: 2.2, fillColor: "#DEDCD3", maxChars: 0, justify: "center", bold: false, italic: false }),
+            Object.freeze({ id: "label-style-county", nameKey: "FILRODENSWMB.LABELS.StyleCounty", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#DEDCD3", maxChars: 0, justify: "center", bold: false, italic: true }),
+            Object.freeze({ id: "label-style-capital", nameKey: "FILRODENSWMB.LABELS.StyleCapital", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#FFFFFF", maxChars: 0, justify: "left", bold: true, italic: false }),
+            Object.freeze({ id: "label-style-settlement", nameKey: "FILRODENSWMB.LABELS.StyleSettlement", fontFamily: "EB Garamond", fontSize: 1.2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: false, italic: false }),
         ]),
         PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
     },
@@ -1295,30 +1304,38 @@ export const FILRODENSWMB = {
             Object.freeze({ id: "route-style-track", nameKey: "FILRODENSWMB.UI.RouteStyleTrack", transport: "road", color: "#7a6a55", thickness: 1, style: "dotted", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleSeaLane", transport: "sea", color: "#2e5f8a", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-minor-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleMinorSeaLane", transport: "sea", color: "#5f89ad", thickness: 1, style: "dashed", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleRiverTrade", transport: "river", color: "#3d7fb8", thickness: 1.5, style: "solid", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-minor-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleMinorRiverTrade", transport: "river", color: "#6a9fcc", thickness: 1, style: "solid", outline: false, smoothing: false }),
         ]),
     },
+    // Pins and labels are sized in UNIT steps of what size 1 meant before size revision REVISION:
+    // a pin of size 1 is PIN_PX x UNIT pixels across on a LIMITS.BASELINE_DIMENSION map, and a
+    // label of size 1 the page's root font size x UNIT, both growing with the map. Older maps and
+    // styles files are scaled up as they are read (see SymbolSizes), so they look as they did.
+    SYMBOLS: Object.freeze({ REVISION: 2, UNIT: 0.25, PIN_PX: 24 }),
     PINS: {
         // The size new pins (and their labels) start with: small, so a map of many places stays readable
-        DEFAULT_SCALE: 0.6,
+        DEFAULT_SCALE: 1.2,
         // The look of a pin placed with no style (its icon and colour are changed in the inspector)
         DEFAULT_ICON: "map_pin",
         DEFAULT_COLOR: "#ffffff",
-        // The pin styles every map starts with (see PinStyles): one per settlement or site tier,
-        // each a built-in icon, a scale, the label's size, and a detail level (0 is always shown;
+        // The pin styles every map starts with (see PinStyles): one per settlement or site tier
+        // (`tier`, which the generator finds a place's style by), each a built-in icon, a scale,
+        // the label's size and label style (see LABELS.DEFAULT_STYLES), and a detail level (0 is always shown;
         // higher levels are the first hidden when a map is viewed at world scale, which the
         // generator's tier filter reads). Their names come from the NAME localisation keys, so
         // a map made in one language keeps the names it was made with.
         DEFAULT_STYLES: [
-            { icon: "circle_outline_with_star", scale: 1, labelSize: 1, detailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCapital" },
-            { icon: "star", scale: 0.85, labelSize: 0.85, detailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCity" },
-            { icon: "circle_outline_with_dot", scale: 0.7, labelSize: 0.7, detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleLargeTown" },
-            { icon: "dot", scale: 0.6, labelSize: 0.6, detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleTown" },
-            { icon: "dot_outline", scale: 0.5, labelSize: 0.5, detailLevel: 3, name: "FILRODENSWMB.UI.PinStyleVillage" },
-            { icon: "castle", scale: 0.7, labelSize: 0.6, detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleCastle" },
-            { icon: "fortress", scale: 0.7, labelSize: 0.65, detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleFortifiedTown" },
-            { icon: "anchor", scale: 0.6, labelSize: 0.6, detailLevel: 1, name: "FILRODENSWMB.UI.PinStylePort" },
-            { icon: "classical_building", scale: 0.55, labelSize: 0.55, detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleRuin" },
-            { icon: "jp_landmark", scale: 0.6, labelSize: 0.6, detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLandmark" },
+            { tier: "capital", icon: "circle_outline_with_star", scale: 1.6, labelSize: 1.6, labelStyle: "label-style-capital", detailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCapital" },
+            { tier: "city", icon: "star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCity" },
+            { tier: "largeTown", icon: "circle_outline_with_dot", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleLargeTown" },
+            { tier: "town", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleTown" },
+            { tier: "village", icon: "dot_outline", scale: 0.5, labelSize: 0.5, labelStyle: "label-style-settlement", detailLevel: 3, name: "FILRODENSWMB.UI.PinStyleVillage" },
+            { tier: "castle", icon: "castle", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleCastle" },
+            { tier: "fortifiedTown", icon: "fortress", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleFortifiedTown" },
+            { tier: "port", icon: "anchor", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStylePort" },
+            { tier: "ruin", icon: "classical_building", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleRuin" },
+            { tier: "landmark", icon: "jp_landmark", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLandmark" },
         ],
         // The colour the default styles use, and the detail levels a style may have
         DEFAULT_STYLE_COLOR: "#ffffff",
@@ -1674,6 +1691,9 @@ export const FILRODENSWMB = {
         // Stored with every run so an old run stays explainable after the model changes. Any change
         // that alters the output for the same seed and settings must bump it.
         REVISION: 1,
+        // A temporary button at the top of the Regions panel that runs the generator with its
+        // defaults, until the Generate tool exists
+        PREVIEW_BUTTON: true,
         // The settings a new run starts from (see GeneratorSettings): one age, high medieval and
         // troubled, the world multipliers at 1, Human Generic names.
         DEFAULT_NAME_BASE: "Human Generic",
@@ -1898,6 +1918,26 @@ export const FILRODENSWMB = {
         // Names: a name is retried this many times to avoid a duplicate before one is accepted
         NAME_RETRIES: 12,
         CASTLE_WORDS: Object.freeze(["castle", "keep", "hold", "tower"]),
+        // Writing a run onto the map (see Materialise). COLOUR_RINGS: realms within this many model
+        // cell steps of each other take different fill colours, so realms parted by a thin strip of
+        // unclaimed land still differ. SNAP_CELLS: how far (in display cells) a route waypoint may
+        // move to reach ground its transport can stand on (a road's cell on the shore, a sea lane's
+        // last cell beside its port). LEG_STRETCH: a leg's search stops beyond this many times the
+        // straight distance's least cost, and the leg is drawn straight (an unreachable leg would
+        // otherwise search the whole landmass).
+        MATERIALISE: Object.freeze({ COLOUR_RINGS: 2, SNAP_CELLS: 40, LEG_STRETCH: 40 }),
+        // The pin style tier each kind of generated place takes (see PINS.DEFAULT_STYLES' tier keys)
+        // and the route style each transport and class takes (see ROUTES.DEFAULT_STYLES' ids).
+        // Pins below LABELLED_TIERS keep a label that is hidden until the user shows it.
+        PIN_TIERS: Object.freeze({ capital: "capital", city: "city", largeTown: "largeTown", town: "town", castle: "castle", fortifiedTown: "fortifiedTown", port: "port" }),
+        LABELLED_TIERS: Object.freeze(["capital", "city"]),
+        // The label style each political level's generated regions take (see LABELS.DEFAULT_STYLES)
+        REGION_LABEL_STYLES: Object.freeze({ realm: "label-style-realm", duchy: "label-style-duchy", county: "label-style-county" }),
+        ROUTE_STYLES: Object.freeze({
+            road: Object.freeze({ trunk: "route-style-trunk-road", main: "route-style-main-road", minor: "route-style-minor-road" }),
+            sea: Object.freeze({ trunk: "route-style-sea-lane", main: "route-style-sea-lane", minor: "route-style-minor-sea-lane" }),
+            river: Object.freeze({ trunk: "route-style-river-trade", main: "route-style-river-trade", minor: "route-style-minor-river-trade" }),
+        }),
         // The run's stages in order, each with its share of the run's time (for the progress bar)
         STAGES: Object.freeze([
             Object.freeze({ id: "values", weight: 4 }),

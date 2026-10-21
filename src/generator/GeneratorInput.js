@@ -101,5 +101,6 @@ export function payloadTransfer(payload) {
 
 /** The buffers of a result, to transfer rather than copy. */
 export function resultTransfer(result) {
-    return [...new Set(Object.values(result.modelCells).map((array) => array.buffer))];
+    const arrays = [...Object.values(result.modelCells), ...Object.values(result.modelGraph)];
+    return [...new Set(arrays.map((array) => array.buffer))];
 }

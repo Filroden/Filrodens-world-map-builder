@@ -149,12 +149,15 @@ export class StyleLists {
         return id;
     }
 
-    /** Duplicate: "<name> copy" (or "<name> copy 2"…), with the style's fields, opened in the inspector. */
+    /**
+     * Duplicate: "<name> copy" (or "<name> copy 2"…), with the style's fields, opened in the
+     * inspector. A pin style's tier stays with the original, so generated pins keep finding it.
+     */
     static async duplicate(app, type, id) {
         const style = StyleEditors.find(app, type, id);
         if (!style) return null;
         const spec = InspectorFields.STYLE_TYPES[type];
-        const { id: _id, ...fields } = structuredClone(style);
+        const { id: _id, tier: _tier, ...fields } = structuredClone(style);
         const name = uniqueName(platform.i18n.format("FILRODENSWMB.UI.StyleCopyName", { name: style.name }), app.uiState[spec.registryKey] ?? []);
         const copy = this.#add(app, type, { ...fields, name });
         await StyleEditors.open(app, type, copy, { keepFocus: true });

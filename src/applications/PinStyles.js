@@ -34,11 +34,12 @@ export class PinStyles {
         const { DEFAULT_STYLES, DEFAULT_STYLE_COLOR } = FILRODENSWMB.PINS;
         return DEFAULT_STYLES.map((tier) => ({
             id: platform.utils.randomID(),
+            tier: tier.tier,
             name: platform.i18n.localize(tier.name),
             icon: tier.icon,
             scale: tier.scale,
             color: DEFAULT_STYLE_COLOR,
-            label: { fontSize: tier.labelSize, visibility: "all", quickStyle: this.NONE },
+            label: { fontSize: tier.labelSize, visibility: "all", quickStyle: tier.labelStyle ?? this.NONE },
             detailLevel: tier.detailLevel,
         }));
     }

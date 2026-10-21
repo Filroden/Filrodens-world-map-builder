@@ -4,7 +4,7 @@ import { NoiseTransform } from "./NoiseTransform.js";
 
 /**
  * The vector side of the studio's undo and redo: everything except brush strokes on the terrain
- * and biomes (which the brush engine keeps itself). Each step is an entry of one of five kinds:
+ * and biomes (which the brush engine keeps itself). Each step is an entry of one of six kinds:
  *
  * - `{ kind: "vector", snapshot }`: the vector state as it was (see
  *   MapStateManager.getVectorStateSnapshot). Stepping through it restores the snapshot and keeps
@@ -23,6 +23,9 @@ import { NoiseTransform } from "./NoiseTransform.js";
  *   by the studio once the step is applied, since the frame is one of its inputs. Panning or
  *   rescaling records this beside a vector snapshot and the levels' owner arrays, so one Undo
  *   steps the terrain and everything on it back together.
+ * - `{ kind: "modelRun", before, after }`: the generator's saved model-cell outputs (see
+ *   ModelRun) before and after a run. Undo puts `before` back, redo `after`; both are kept as they
+ *   are (a run's outputs are never changed in place), so the entry costs no copy.
  * - `{ kind: "composite", entries }`: several of the above made by one action (deleting a region
  *   changes the layer sets and its cells). Undo steps its entries backwards, redo forwards.
  *
@@ -31,7 +34,7 @@ import { NoiseTransform } from "./NoiseTransform.js";
  * many entries it holds. HISTORY_MAX counts entries, as it always has.
  */
 export class VectorHistory {
-    static KIND = Object.freeze({ VECTOR: "vector", OWNERS: "owners", LEVEL_OWNERS: "levelOwners", NOISE: "noise", COMPOSITE: "composite" });
+    static KIND = Object.freeze({ VECTOR: "vector", OWNERS: "owners", LEVEL_OWNERS: "levelOwners", NOISE: "noise", MODEL_RUN: "modelRun", COMPOSITE: "composite" });
 
     /** An entry restoring the vector state as it is now. Take it before changing anything. */
     static snapshot(app) {
@@ -51,6 +54,11 @@ export class VectorHistory {
     /** An entry moving the map between two noise frames (see NoiseTransform.current). */
     static noise(before, after) {
         return { kind: this.KIND.NOISE, before, after };
+    }
+
+    /** An entry replacing the generator's saved outputs (app.modelRun; null for none). */
+    static modelRun(before, after) {
+        return { kind: this.KIND.MODEL_RUN, before, after };
     }
 
     /** One entry for several, leaving out empty ones; a single entry stands on its own. */
@@ -105,6 +113,9 @@ export class VectorHistory {
                 return entry;
             case this.KIND.NOISE:
                 NoiseTransform.apply(app, isUndo ? entry.before : entry.after);
+                return entry;
+            case this.KIND.MODEL_RUN:
+                app.modelRun = isUndo ? entry.before : entry.after;
                 return entry;
             case this.KIND.COMPOSITE: {
                 const order = isUndo ? [...entry.entries].reverse() : entry.entries;
