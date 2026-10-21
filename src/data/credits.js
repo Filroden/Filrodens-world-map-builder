@@ -22,6 +22,7 @@ export const LIBRARY_CREDITS = Object.freeze([
     Object.freeze({ id: "fflate", name: "fflate", version: "0.8.3", url: "https://github.com/101arrowz/fflate", what: "FILRODENSWMB.Credits.Fflate", folder: "vendor/fflate", licenceFile: "licence-fflate.md", licence: "MIT" }),
     Object.freeze({ id: "dompurify", name: "DOMPurify", version: "3.4.16", url: "https://github.com/cure53/DOMPurify", what: "FILRODENSWMB.Credits.DOMPurify", folder: "vendor/dompurify", licenceFile: "licence-dompurify.md", licence: "Apache 2.0" }),
     Object.freeze({ id: "three", name: "three.js", version: "r185", url: "https://threejs.org/", what: "FILRODENSWMB.Credits.Three", folder: "vendor/three", licenceFile: "licence-three.md", licence: "MIT" }),
+    Object.freeze({ id: "azgaar-names", name: "Azgaar's Fantasy Map Generator (name generator and name bases)", version: "619d37c7", url: "https://github.com/Azgaar/Fantasy-Map-Generator", what: "FILRODENSWMB.Credits.AzgaarNames", folder: "vendor/azgaar-names", licenceFile: "licence-azgaar-fmg.md", licence: "MIT" }),
     Object.freeze({ id: "material-icons", name: "Google Material Design icons", url: "https://fonts.google.com/icons", what: "FILRODENSWMB.Credits.MaterialIcons", folder: "assets/icons", licenceFile: "icons-licence.md", licence: "Apache 2.0" }),
     Object.freeze({ id: "pinhead-icons", name: "Pinhead icons", url: "https://pinhead.ink/", what: "FILRODENSWMB.Credits.PinheadIcons", folder: "assets/pinhead-icons", licenceFile: "licence-pinhead-icons.md", licence: "CC0 1.0 (public domain dedication)" }),
 ]);

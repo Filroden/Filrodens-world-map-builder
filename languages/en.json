@@ -11,6 +11,7 @@
     "FILRODENSWMB.Credits.Three": "development build, with its OrbitControls add-on, used by the 3D view",
     "FILRODENSWMB.Credits.MaterialIcons": "the interface icons",
     "FILRODENSWMB.Credits.PinheadIcons": "the pin icons",
+    "FILRODENSWMB.Credits.AzgaarNames": "names the generated places and realms, ported to JavaScript with its own seeded randomness",
     "FILRODENSWMB.UI.ControlTitle": "Filroden's World Map Builder",
     "FILRODENSWMB.UI.WindowTitleMap": "{title}: {name} ({id})",
     "FILRODENSWMB.UI.WindowTitleUnsaved": "{title} (unsaved)",

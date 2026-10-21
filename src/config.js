@@ -1666,6 +1666,251 @@ export const FILRODENSWMB = {
             EDIT_FILL_OPACITY: 0.5,
         },
     },
+    // The settlement, route and realm generator (see src/generator/). It runs on the model mesh
+    // (the display mesh's coarse sites, MESH.MODEL_SPACING_KM apart) in "flat-km": the time it
+    // takes to walk one effective km over flat open ground, so every cost below is a travel time.
+    // The figures are tuned to give believable medieval places at world scale, not to be realistic.
+    GENERATOR: {
+        // Stored with every run so an old run stays explainable after the model changes. Any change
+        // that alters the output for the same seed and settings must bump it.
+        REVISION: 1,
+        // The settings a new run starts from (see GeneratorSettings): one age, high medieval and
+        // troubled, the world multipliers at 1, Human Generic names.
+        DEFAULT_NAME_BASE: "Human Generic",
+        // Era: development is the share of the land's food capacity actually farmed; plague the share
+        // of people lost to a recent great pandemic (the Black Death took 30 to 50%).
+        ERAS: Object.freeze({
+            earlyMedieval: Object.freeze({ development: 0.45, plague: 0 }),
+            highMedieval: Object.freeze({ development: 0.7, plague: 0 }),
+            afterPlague: Object.freeze({ development: 0.75, plague: 0.35 }),
+        }),
+        DEFAULT_ERA: "highMedieval",
+        // Strife: how hard insecurity bites (the least secure ground keeps 1 - strife of its people)
+        STRIFES: Object.freeze({ peaceful: 0.2, troubled: 0.5, warTorn: 0.8 }),
+        DEFAULT_STRIFE: "troubled",
+        MAX_AGES: 8,
+        // The world settings: multipliers of the model's own figures, 1 leaving them as they are.
+        // density scales how many people the land feeds; urbanisation the share of them living in
+        // towns; realmSpacing how far apart royal seats must be (more spacing, fewer realms);
+        // fragmentation divides the power exponents, so above 1 a lord's wealth carries him less
+        // far and the map breaks into more, smaller duchies and kingdoms.
+        WORLD: Object.freeze({
+            density: Object.freeze({ min: 0.25, max: 4, default: 1 }),
+            urbanisation: Object.freeze({ min: 0.25, max: 4, default: 1 }),
+            realmSpacing: Object.freeze({ min: 0.4, max: 2.5, default: 1 }),
+            fragmentation: Object.freeze({ min: 0.5, max: 2, default: 1 }),
+        }),
+        // What each built-in land biome means to the model. farming multiplies the climate's yield;
+        // cover is the share of farmland left after clearing effort (forest below 1, so land near
+        // towns and roads gains when it is cleared); travel the cost of crossing it off-road; and
+        // raiders how well it feeds raiders when no realm holds it. A custom biome behaves as one of
+        // these (its "behaves like" choice, or the built-in biome the climate would give there).
+        BIOMES: Object.freeze({
+            SNOW: Object.freeze({ farming: 1, cover: 1, travel: 4, raiders: 1 }),
+            TUNDRA: Object.freeze({ farming: 1, cover: 1, travel: 1.5, raiders: 1 }),
+            TAIGA: Object.freeze({ farming: 1, cover: 0.8, travel: 1.8, raiders: 1 }),
+            GRASSLAND: Object.freeze({ farming: 1, cover: 1, travel: 1, raiders: 1 }),
+            DECIDUOUS_FOREST: Object.freeze({ farming: 1, cover: 0.95, travel: 1.4, raiders: 1 }),
+            TEMPERATE_RAINFOREST: Object.freeze({ farming: 1, cover: 0.8, travel: 2, raiders: 1 }),
+            TEMPERATE_DESERT: Object.freeze({ farming: 1, cover: 1, travel: 1.5, raiders: 1 }),
+            TROPICAL_RAINFOREST: Object.freeze({ farming: 1, cover: 0.6, travel: 3, raiders: 1 }),
+            SAVANNA: Object.freeze({ farming: 1, cover: 1, travel: 1, raiders: 1 }),
+            SUBTROPICAL_DESERT: Object.freeze({ farming: 1, cover: 1, travel: 2, raiders: 1 }),
+        }),
+        // Stage 1, the base layer: what each model cell holds.
+        VALUES: Object.freeze({
+            // Rural people per km² on the best farmland; pasture feeds this share of it; fishing adds
+            // this many per km² of a coastal cell's land
+            PEAK_DENSITY: 60,
+            PASTURE_SHARE: 0.2,
+            FISHING_DENSITY: 8,
+            // Crops: no harvest below the first temperature, full by the second, losing HOT_LOSS
+            // towards the hottest (leached soils); moisture likewise, losing WET_LOSS when waterlogged
+            CROP_TEMPERATURE: Object.freeze([0.25, 0.5]),
+            CROP_HOT: Object.freeze([0.8, 1]),
+            HOT_LOSS: 0.2,
+            CROP_MOISTURE: Object.freeze([0.12, 0.42]),
+            CROP_WET: Object.freeze([0.8, 1]),
+            WET_LOSS: 0.3,
+            PASTURE_TEMPERATURE: Object.freeze([0.12, 0.35]),
+            PASTURE_MOISTURE: Object.freeze([0.04, 0.2]),
+            // Land this close to a river or lake is watered at least to IRRIGATED_MOISTURE
+            IRRIGATION_KM: 6,
+            IRRIGATED_MOISTURE: 0.5,
+            // Local relief (highest minus lowest land in a cell) at which farmland halves, and at
+            // which overland travel costs twice as much
+            RELIEF_HALF_M: 600,
+            RELIEF_COST_M: 500,
+            // Upstream river length at which a river carries boats
+            NAVIGABLE_KM: 250,
+            // Radius over which a coast's shelter (the share of land around it) is measured
+            SHELTER_KM: 25,
+            // A cell is land when at least this share of its pixels are; it is coastal when a
+            // neighbour is more than COASTAL_SEA_SHARE sea
+            LAND_SHARE: 0.5,
+            COASTAL_SEA_SHARE: 0.5,
+        }),
+        // Travel over the cell graph: per km by sea or lake, and along a navigable river; the cost of
+        // loading and unloading between land and water on an open coast, at a sheltered harbour or
+        // river mouth (shelter at least SHELTERED), and at a town that already has quays; built
+        // roads (relief only, no land cover) and established sea lanes cost these shares.
+        TRAVEL: Object.freeze({
+            SEA_COST: 0.2,
+            RIVER_COST: 0.35,
+            PORT_KM: 20,
+            SHELTERED_PORT_KM: 8,
+            SHELTERED: 0.6,
+            TOWN_PORT_KM: 4,
+            ROAD_FACTOR: 0.5,
+            LANE_FACTOR: 0.6,
+        }),
+        // Cultures. With the single default culture every culture effect is neutral.
+        CULTURES: Object.freeze({
+            DEFAULT: Object.freeze({ name: "", color: "#8a8a8a", nameBase: "Human Generic", openness: 0.5, density: 1, habitat: Object.freeze({}) }),
+            // The least a culture fits anywhere; a culture farming land that does not suit it
+            // still reaches POP_FLOOR of its capacity
+            FIT_FLOOR: 0.05,
+            POP_FLOOR: 0.4,
+            // Political cost x (1 + BARRIER x closedness) into another culture's land; trade
+            // between different cultures keeps at least AFFINITY_FLOOR; border threat x (1 +
+            // HOSTILITY x closedness); towns draw open cultures from further (URBAN_PULL)
+            BARRIER: 3,
+            AFFINITY_FLOOR: 0.1,
+            HOSTILITY: 1,
+            URBAN_PULL: 1.5,
+            // Soft habitat bands ease to nothing over these widths outside their range
+            SOFT: Object.freeze({ temperature: 0.12, moisture: 0.12, heightM: 500, reliefM: 250 }),
+            // Coast and river affinity: seeking raises the fit by up to RAISE, avoiding lowers it
+            // by up to LOWER where the feature is missing
+            AFFINITY_RAISE: 0.5,
+            AFFINITY_LOWER: 0.3,
+            // Spreading through land of fit f costs x (1 + FIT_COST x (1 - f)); a culture fitting
+            // little of the world spreads up to SPECIALIST_BONUS cheaper through what it does fit
+            FIT_COST: 3,
+            SPECIALIST_BONUS: 0.4,
+            // Blend width between two fully open cultures (flat-km of extra travel); shares below
+            // MIN_SHARE are dropped; auto-placed homelands are at least HOMELAND_SPACING_KM apart
+            BLEND_KM: 250,
+            MIN_SHARE: 0.02,
+            HOMELAND_SPACING_KM: 500,
+            // A town's culture mix drops cultures below this share
+            MIX_MIN_SHARE: 0.01,
+        }),
+        // Stage 2: population and central places. Tiers largest first: spacing and reach in flat-km,
+        // the urban share of the catchment, and the least a town of the tier may hold.
+        TOWNS: Object.freeze({
+            MARSH_PENALTY: 0.45,
+            // Malaria country: hot, wet, flat and low, worse beside rivers and lakes
+            MARSH_TEMPERATURE: Object.freeze([0.7, 0.9]),
+            MARSH_MOISTURE: Object.freeze([0.6, 0.85]),
+            MARSH_RELIEF_M: Object.freeze([150, 400]),
+            MARSH_HEIGHT_M: Object.freeze([200, 600]),
+            MARSH_DRY_SHARE: 0.7,
+            TIERS: Object.freeze([
+                Object.freeze({ spacingKm: 320, reachKm: 320, urbanShare: 0.025, minPop: 15000 }),
+                Object.freeze({ spacingKm: 130, reachKm: 130, urbanShare: 0.02, minPop: 4000 }),
+                Object.freeze({ spacingKm: 55, reachKm: 55, urbanShare: 0.045, minPop: 1500 }),
+            ]),
+            // Weak towns are dropped half at a time, for at most this many passes
+            PRUNE_PASSES: 6,
+            // A town keeps its place if it reaches this share of its tier's minimum
+            KEEP_SHARE: 0.8,
+        }),
+        // Stage 3: trade rounds. Gravity is popA x popB / max(cost, GRAVITY_FLOOR_KM)², each city
+        // trading with its CITY_PARTNERS strongest partners (plus a spanning tree), each large town
+        // with LARGE_PARTNERS within PARTNER_REACH_KM, each town with its nearest bigger place within
+        // MARKET_REACH_KM. Trade supports townspeople equal to URBAN_SHARE of the population, spread
+        // by score^EXPONENT, transfers at ports weighing PORT_WEIGHT; through trade feeds only towns
+        // and junctions of JUNCTION_DEGREE or more routes; a trade town needs no town within
+        // NEW_TOWN_GAP steps. In the final round a step through ground of security s costs
+        // x (1 + DANGER x (1 - s)).
+        TRADE: Object.freeze({
+            ROUNDS: 2,
+            CITY_PARTNERS: 4,
+            LARGE_PARTNERS: 2,
+            PARTNER_REACH_KM: 1200,
+            MARKET_REACH_KM: 400,
+            GRAVITY_FLOOR_KM: 60,
+            URBAN_SHARE: 0.015,
+            EXPONENT: 1.1,
+            PORT_WEIGHT: 2,
+            JUNCTION_DEGREE: 3,
+            NEW_TOWN_GAP: 1,
+            DANGER: 1,
+        }),
+        // Stage 4: counties (city and large-town seats, reach COUNTY_REACH_KM), duchies (city seats,
+        // reach x tax^DUCHY_POWER) and kingdoms (the richest duchies at least KINGDOM_SPACING_KM
+        // apart, reach KINGDOM_REACH_KM x tax^KINGDOM_POWER). Holding water costs SEA_HOLD x sailing
+        // it plus CROSSING_KM per landing. A kingdom of fewer than MIN_KINGDOM_DUCHIES duchies is an
+        // independent duchy; unclaimed pockets of up to ENCLAVE_MAX_CELLS join the county around them.
+        REALMS: Object.freeze({
+            TAX_SHARE: 0.1,
+            SEA_HOLD: 4,
+            CROSSING_KM: 40,
+            COUNTY_REACH_KM: 220,
+            DUCHY_POWER: 0.35,
+            KINGDOM_POWER: 0.5,
+            KINGDOM_SPACING_KM: 650,
+            KINGDOM_REACH_KM: 900,
+            MIN_KINGDOM_DUCHIES: 2,
+            ENCLAVE_MAX_CELLS: 40,
+        }),
+        // Border danger felt on each side of a realm border: power x permeability x culture.
+        BORDERS: Object.freeze({
+            POWER_EXP: 0.6,
+            POWER_FLOOR: 0.35,
+            PERMEABILITY_FLOOR: 0.35,
+            PERMEABILITY_MAX: 1.3,
+            HOSTILITY_MAX: 2.5,
+        }),
+        // Stage 5, the feedback pass: security (threats fading over BORDER_KM from a realm border,
+        // WILD_KM from unclaimed land that feeds at least WILD_HOSTS_PER_KM2, and SEA_RAID on an
+        // exposed coast until shelter reaches RAID_SHELTER; protection fading over SEAT_KM from
+        // royal and ducal seats), clearing (a town clears out to CLEAR_KM_PER_SQRT_POP x √pop, a
+        // road at least ROAD_CLEAR), concentration into walled seats, fortified towns and castles.
+        FEEDBACK: Object.freeze({
+            BORDER_KM: 90,
+            WILD_KM: 70,
+            WILD_HOSTS_PER_KM2: 4,
+            SEA_RAID: 0.35,
+            RAID_SHELTER: 0.8,
+            SEAT_KM: 160,
+            ROYAL_PROTECTION: 1,
+            DUCAL_PROTECTION: 0.6,
+            // Searches stop at these multiples of the fading distances, where the effect is gone
+            THREAT_REACH: 6,
+            SEAT_REACH: 4,
+            CLEAR_KM_PER_SQRT_POP: 0.25,
+            CLEAR_REACH: 2,
+            ROAD_CLEAR: 0.5,
+            CONCENTRATION: 0.6,
+            FORTIFIED_BELOW: 0.75,
+            CASTLE_SPACING_KM: 120,
+            CASTLE_SECURITY: 0.85,
+            CASTLE_TRAFFIC_RANK: 0.5,
+            CASTLE_PASS_RELIEF_M: 400,
+            CASTLE_BORDER_KM: 30,
+            CASTLE_SCORE: 1.5,
+        }),
+        // Generated routes are classed by traffic: the busiest TRUNK_SHARE of their steps trunk,
+        // up to MAIN_SHARE main, the rest minor.
+        ROUTES: Object.freeze({ TRUNK_SHARE: 0.08, MAIN_SHARE: 0.33 }),
+        // Names: a name is retried this many times to avoid a duplicate before one is accepted
+        NAME_RETRIES: 12,
+        CASTLE_WORDS: Object.freeze(["castle", "keep", "hold", "tower"]),
+        // The run's stages in order, each with its share of the run's time (for the progress bar)
+        STAGES: Object.freeze([
+            Object.freeze({ id: "values", weight: 4 }),
+            Object.freeze({ id: "cultures", weight: 1 }),
+            Object.freeze({ id: "towns", weight: 6 }),
+            Object.freeze({ id: "trade", weight: 40 }),
+            Object.freeze({ id: "realms", weight: 2 }),
+            Object.freeze({ id: "feedback", weight: 2 }),
+            Object.freeze({ id: "finalTrade", weight: 20 }),
+            Object.freeze({ id: "finalRealms", weight: 2 }),
+            Object.freeze({ id: "names", weight: 1 }),
+        ]),
+    },
     ENTITY_CONFIG: {
         decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },
         // `smoothed: true` marks entities StudioCanvas always renders as a Catmull-Rom curve

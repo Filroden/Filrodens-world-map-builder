@@ -153,9 +153,11 @@ class JobWorker {
      * @param {object} options
      * @param {function(object): void} [options.onProgress]
      * @param {AbortSignal} [options.signal]
+     * @param {Transferable[]} [options.transfer] - Buffers of the payload to move to the worker
+     *     rather than copy (they are unusable here afterwards).
      * @returns {Promise<*>}
      */
-    run(task, payload, { onProgress = null, signal = null } = {}) {
+    run(task, payload, { onProgress = null, signal = null, transfer = [] } = {}) {
         if (this.#failure) return Promise.reject(this.#failure);
 
         const id = this.#nextId++;
@@ -166,7 +168,7 @@ class JobWorker {
                 signal.addEventListener("abort", job.onAbort, { once: true });
             }
             this.#pending.set(id, job);
-            this.#worker.postMessage({ id, task, payload });
+            this.#worker.postMessage({ id, task, payload }, transfer);
         });
     }
 
@@ -310,15 +312,18 @@ export class GenerationWorkers {
      * @param {function({stage: string, pct: number, text?: string}): void} [options.onProgress]
      * @param {AbortSignal} [options.signal]
      * @param {function({onProgress: Function, isCancelled: function(): boolean}): Promise<*>} [options.alone]
+     * @param {Transferable[]} [options.transfer] - Buffers of the payload to move to the worker
+     *     rather than copy. The payload is unusable afterwards, so `alone` must not rely on it: a
+     *     job that transfers builds its own inputs again if it falls back to the main thread.
      * @returns {Promise<*>} The task's result.
      */
-    static async runOne(task, payload, { onProgress = null, signal = null, alone = null } = {}) {
+    static async runOne(task, payload, { onProgress = null, signal = null, alone = null, transfer = [] } = {}) {
         if (signal?.aborted) throw abortError(signal);
         const worker = this.#ensureJobWorker();
         if (!worker) return this.#runAlone(alone, { onProgress, signal });
 
         try {
-            return await worker.run(task, payload, { onProgress, signal });
+            return await worker.run(task, payload, { onProgress, signal, transfer });
         } catch (error) {
             if (signal?.aborted || !worker.failed) throw error;
             this.#disableJobs(error);

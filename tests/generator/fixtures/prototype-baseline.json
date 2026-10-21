@@ -1,0 +1,26 @@
+{
+  "description": "The settlement prototype's figures on P0JBVA (default culture, high medieval, troubled), on the prototype's own model mesh. The generator runs on the module's mesh, whose model cells are placed differently, so the comparison is statistical.",
+  "modelCells": 14977,
+  "landCells": 8892,
+  "population": 146634196,
+  "kingdoms": 16,
+  "independents": 4,
+  "duchies": 172,
+  "counties": 838,
+  "cities": 172,
+  "largeTowns": 666,
+  "towns": 1104,
+  "castles": 37,
+  "fortified": 220,
+  "roadKm": 108933,
+  "riverKm": 12262,
+  "seaKm": 34145,
+  "hiddenRealm": {
+    "description": "A small realm of its own in the high mountain basin of the north-centre, cut off from the lowland kingdoms around it",
+    "x": 1151.2,
+    "y": 198.8,
+    "heightM": 3223,
+    "population": 1153222
+  },
+  "seconds": 45
+}

@@ -22,8 +22,8 @@ class ShimWorker {
         this.#listeners[type]?.push(listener);
     }
 
-    postMessage(message) {
-        this.#thread.postMessage(message);
+    postMessage(message, transfer = []) {
+        this.#thread.postMessage(message, transfer);
     }
 
     terminate() {

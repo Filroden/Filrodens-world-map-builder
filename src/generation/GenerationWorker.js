@@ -16,6 +16,8 @@
 import { ProceduralEngine } from "./ProceduralEngine.js";
 import { LayerPainting } from "../canvas/LayerPainting.js";
 import { buildMeshData } from "../mesh/MeshBuilder.js";
+import { runGenerator } from "../generator/Pipeline.js";
+import { resultTransfer } from "../generator/GeneratorInput.js";
 
 /** One band's rows, newly allocated: `width` values per row. */
 const bandBuffer = (width, rowStart, rowEnd) => new Float32Array((rowEnd - rowStart) * width);
@@ -71,7 +73,16 @@ async function buildMesh(params, job) {
     return { value: data, transfer: [...new Set(transfer)] };
 }
 
-const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh };
+/**
+ * A generator run (settlements, routes and realms; see src/generator/Pipeline.js), with progress
+ * reports and the chance to cancel between and within its stages.
+ */
+async function generate(payload, job) {
+    const result = await runGenerator(payload, { onProgress: job.progress, isCancelled: job.isCancelled, pause });
+    return { value: result, transfer: resultTransfer(result) };
+}
+
+const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh, generate };
 
 /** Ids of jobs asked to stop. */
 const cancelled = new Set();
