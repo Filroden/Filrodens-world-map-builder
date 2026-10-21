@@ -1,3 +1,5 @@
+import { registerModuleHelpers } from "../../ui/templateHelpers.js";
+
 /**
  * The module's Handlebars templates on the web (the platform's `templates` service), with the
  * helpers Foundry provides that they use.
@@ -12,7 +14,8 @@
  */
 
 /**
- * The helpers Foundry registers that the module's templates use: localize, eq, or, numberFormat.
+ * The helpers Foundry registers that the module's templates use (localize, eq, or, numberFormat),
+ * and the module's own (see ui/templateHelpers.js).
  *
  * @param {object} handlebars - The Handlebars instance.
  * @param {{localize: Function, format: Function}} i18n
@@ -32,6 +35,7 @@ export function registerHelpers(handlebars, i18n) {
         const text = safe.toFixed(decimals);
         return sign && safe >= 0 ? `+${text}` : text;
     });
+    registerModuleHelpers(handlebars);
 }
 
 /**

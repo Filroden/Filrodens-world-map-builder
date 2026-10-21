@@ -7,6 +7,7 @@ import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { platform } from "../platform/index.js";
+import { typed } from "../data/MapRules.js";
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/parts/";
 
@@ -71,7 +72,7 @@ export class RiverEditor {
         header: (_app, river) => ({ title: river.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitleRiver") }),
         context: (_app, river) => ({ river, widths: RIVER_WIDTHS.map(([value, label]) => ({ value, label, selected: value === Number(river.width) })) }),
         apply: (app, river, _ref, form) => {
-            const values = { name: form.elements.riverName.value.trim() || river.name, width: Number(form.elements.riverWidth.value) };
+            const values = typed("river", { name: form.elements.riverName.value.trim() || river.name, width: Number(form.elements.riverWidth.value) }, river);
             const applied = applyValues(app, river, values, ["width"]);
             if (applied && app.activeRiverId === river.id) app.uiState.riverWidth = river.width;
             return applied;
@@ -174,7 +175,7 @@ export class FaultEditor {
     }
 
     static #apply(app, fault, form) {
-        const values = this.read(fault, form);
+        const values = typed("fault", this.read(fault, form), fault);
         const current = { ...fault, reversed: fault.reversed === true };
         const changed = Object.keys(values).filter((name) => current[name] !== values[name]);
         if (!changed.length) return false;
@@ -243,7 +244,7 @@ export class DecorationEditor {
             if (field === "decorationOpacity") values.opacity = Number(elements.decorationOpacity.value);
             if (field === "decorationScale") values.scale = Number(elements.decorationScale.value) || 1;
             if (field === "decorationRotation") values.rotation = CanvasTransforms.normalizeAngle(elements.decorationRotation.value);
-            return applyValues(app, decoration, values, [], { ...decoration, visibility: decoration.visibility ?? "all" });
+            return applyValues(app, decoration, typed("decoration", values, decoration), [], { ...decoration, visibility: decoration.visibility ?? "all" });
         },
         actions: {
             zoom: (app, decoration) => zoomTo(app, [decoration]),
@@ -280,7 +281,7 @@ export class LandMaskEditor {
         }),
         context: (_app, mask) => ({ mask, ocean: mask.operation === "subtract" }),
         apply: (app, mask, _ref, form) => {
-            const values = { name: form.elements.maskName.value.trim() || mask.name, operation: form.elements.maskOperation.value === "subtract" ? "subtract" : "add" };
+            const values = typed("landMask", { name: form.elements.maskName.value.trim() || mask.name, operation: form.elements.maskOperation.value === "subtract" ? "subtract" : "add" }, mask);
             return applyValues(app, mask, values, ["operation"], { ...mask, operation: mask.operation === "subtract" ? "subtract" : "add" });
         },
         actions: {

@@ -7,6 +7,7 @@ import { ListNav } from "../ui/ListNav.js";
 import { getPinIconPickerList } from "../data/pinIcons.js";
 import { uniqueName } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
+import { Sanitize } from "../data/Sanitize.js";
 
 /** The style types in Styles and icons' order, each with its section and its strings. */
 const LISTS = Object.freeze([
@@ -173,10 +174,11 @@ export class StyleLists {
         if (!style || !config) return false;
         const count = StyleEditors.usageCount(app, type, id);
         const users = LISTS.find((list) => list.type === type).users;
-        const name = platform.utils.escapeHtml(style.name);
+        const name = style.name;
         const key = count === 0 ? "FILRODENSWMB.UI.StyleDeleteUnused" : count === 1 ? "FILRODENSWMB.UI.StyleDeleteUsedOne" : "FILRODENSWMB.UI.StyleDeleteUsed";
         const message = platform.i18n.format(key, { count, name, one: platform.i18n.localize(`${users}One`), many: platform.i18n.localize(users) });
-        const confirmed = await platform.dialogs.confirm({ title: platform.i18n.format("FILRODENSWMB.UI.StyleDeleteTitle", { name }), content: `<p>${message}</p>` });
+        // The title is set as text; the message is escaped as a whole, the style's name with it
+        const confirmed = await platform.dialogs.confirm({ title: platform.i18n.format("FILRODENSWMB.UI.StyleDeleteTitle", { name }), content: `<p>${Sanitize.escapeHtml(message)}</p>` });
         if (!confirmed) return false;
         MapStateManager.pushVectorState(app);
         app.uiState[config.registryKey] = (app.uiState[config.registryKey] ?? []).filter((candidate) => candidate.id !== id);

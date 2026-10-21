@@ -101,7 +101,13 @@ async function start() {
         }),
     );
     describeFailure = (detail) => platform.i18n.format("FILRODENSWMB.Web.StartFailed", { detail });
-    FilePickerElement.define(customElements, { browseLabel: platform.i18n.localize("FILRODENSWMB.UI.BrowseFiles") });
+    // A picked image is known by its bytes and an SVG is cleaned before the studio keeps it (see ImageCheck)
+    const [{ ImageCheck }, { ImportRefusal, Sanitize }] = await Promise.all([import("../src/data/ImageCheck.js"), import("../src/data/Sanitize.js")]);
+    FilePickerElement.define(customElements, {
+        browseLabel: platform.i18n.localize("FILRODENSWMB.UI.BrowseFiles"),
+        check: (file) => ImageCheck.checkFile(file),
+        onRefused: (error) => platform.notify.error(Sanitize.refusalMessage(error instanceof ImportRefusal ? error : new ImportRefusal("image"), platform.i18n)),
+    });
 
     const [{ registerPinIconSettings }, { MapStudio }, { attachTheme, registerThemeSettings }] = await Promise.all([
         import("../src/data/pinIcons.js"),

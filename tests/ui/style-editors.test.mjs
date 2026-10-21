@@ -273,7 +273,7 @@ test("a label style in a family without an italic shows Italic disabled, its set
     await Inspector.refresh(app);
     assert.equal(field(app, "styleItalic").disabled, true);
     assert.equal(field(app, "styleItalic").checked, true);
-    assert.match(field(app, "styleItalic").closest("label").dataset.tooltip, /FontNoItalic/);
+    assert.match(field(app, "styleItalic").closest("label").dataset.tooltipText, /FontNoItalic/);
 });
 
 test("the add row names a new style with the bar's next-object fields, then opens it, focus on its row", async () => {

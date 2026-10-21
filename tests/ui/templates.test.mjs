@@ -22,7 +22,8 @@ const FOUNDRY_PREFIX = "modules/filrodens-world-map-builder/templates/";
  * register itself (see the thin-frame plan). Add a helper here when the module starts registering
  * it on both hosts.
  */
-const KNOWN_HELPERS = new Set(["if", "unless", "each", "with", "lookup", "log", "localize", "eq", "or", "numberFormat"]);
+// fwmbTextLimit is the module's own, registered on both hosts (ui/templateHelpers.js)
+const KNOWN_HELPERS = new Set(["if", "unless", "each", "with", "lookup", "log", "localize", "eq", "or", "numberFormat", "fwmbTextLimit"]);
 
 /**
  * The names of every helper a template calls: any mustache, block or subexpression with

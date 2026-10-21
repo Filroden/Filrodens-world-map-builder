@@ -8,14 +8,14 @@
     <div class="fwmb-form-group fwmb-dialog-content">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" name="biomeName" value="{{biome.name}}" autofocus />
+            <input type="text" name="biomeName" maxlength="{{fwmbTextLimit 'name'}}" value="{{biome.name}}" autofocus />
         </div>
     </div>
 
     <div class="fwmb-form-group fwmb-dialog-content fwmb-space-before">
         <label>{{localize "FILRODENSWMB.UI.BiomeCode"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" name="biomeCode" value="{{biome.code}}" placeholder="{{localize 'FILRODENSWMB.UI.BiomeCodeHint'}}" />
+            <input type="text" name="biomeCode" maxlength="{{fwmbTextLimit 'name'}}" value="{{biome.code}}" placeholder="{{localize 'FILRODENSWMB.UI.BiomeCodeHint'}}" />
         </div>
     </div>
 
@@ -39,4 +39,4 @@
             </select>
         </div>
     </div>
-</div>
+</div>

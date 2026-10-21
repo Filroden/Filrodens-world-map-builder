@@ -18,30 +18,65 @@ import {
 import { PinStyles } from "./PinStyles.js";
 import { positionPopoverMenu } from "../ui/dropdowns.js";
 import { platform } from "../platform/index.js";
+import { Sanitize } from "../data/Sanitize.js";
+import { typed } from "../data/MapRules.js";
+
+/** How many over-limit texts the export's refusal lists before counting the rest. */
+const OVER_LIMIT_SHOWN = 20;
 
 export class MapDialogManager {
     /**
-     * Shows a standard Yes/No confirmation dialogue.
+     * Shows a standard Yes/No confirmation dialogue. The message is plain text: it often names
+     * something the user typed or a file brought in (a layer, a set, a custom icon), so it is
+     * escaped before it becomes the dialogue's markup, and no message carries markup of its own.
      */
     static async _confirmDialog(title, content) {
+        const message = Sanitize.escapeHtml(content || platform.i18n.localize("FILRODENSWMB.UI.DeleteConfirm"));
         return platform.dialogs.confirm({
             title: title || platform.i18n.localize("FILRODENSWMB.UI.Warning"),
-            content: `<p>${content || platform.i18n.localize("FILRODENSWMB.UI.DeleteConfirm")}</p>`,
+            content: `<p>${message}</p>`,
         });
     }
 
     /**
-     * Prompts for a single line of text via a minimal form.
+     * Says why an export was refused: the texts longer than an export allows, one per line, so
+     * the user knows exactly what to shorten (see MapRules.overLimit). The list stops after
+     * OVER_LIMIT_SHOWN lines, with a count of the rest.
+     * @param {{where?: string, item?: string, field?: string, length: number, limit: number}[]} entries
      */
-    static async _promptTextValue(title, label, defaultValue) {
+    static async showOverLimit(entries) {
+        const { i18n } = platform;
+        const escape = Sanitize.escapeHtml;
+        const shown = entries.slice(0, OVER_LIMIT_SHOWN).map((entry) => `<li>${escape(Sanitize.limitLine(entry, i18n))}</li>`);
+        const rest = entries.length - shown.length;
+        const more = rest > 0 ? `<p>${escape(i18n.format("FILRODENSWMB.UI.ImportRefusedMore", { count: rest }))}</p>` : "";
+        await platform.dialogs.choose({
+            classes: ["fwmb"],
+            title: i18n.localize("FILRODENSWMB.UI.ExportRefusedTitle"),
+            content: `<p>${escape(i18n.localize("FILRODENSWMB.UI.ExportRefusedIntro"))}</p><ul class="fwmb-limit-list">${shown.join("")}</ul>${more}`,
+            buttons: [{ action: "close", label: i18n.localize("FILRODENSWMB.UI.Close"), default: true }],
+        });
+    }
+
+    /**
+     * Prompts for a single line of text via a minimal form. The field stops at the limit of its
+     * kind of text (FILRODENSWMB.LIMITS.TEXT), and the answer is cut to it as well.
+     * @param {string} title
+     * @param {string} label - Plain text.
+     * @param {string} defaultValue
+     * @param {"name"|"description"|"label"} [kind]
+     */
+    static async _promptTextValue(title, label, defaultValue, kind = "name") {
         // The value is escaped because it is often an existing name (a map or layer name) that
         // may contain quotes, which would otherwise end the attribute early and cut the name short
         const safeValue = platform.utils.escapeHtml(defaultValue ?? "");
-        return platform.dialogs.prompt({
+        const limit = Sanitize.textLimit(kind);
+        const answer = await platform.dialogs.prompt({
             title,
-            content: `<label>${label}</label><input type="text" id="fwmb-prompt-input" value="${safeValue}">`,
+            content: `<label>${Sanitize.escapeHtml(label)}</label><input type="text" id="fwmb-prompt-input" value="${safeValue}" maxlength="${limit}">`,
             onSubmit: (form) => form.elements["fwmb-prompt-input"].value,
         });
+        return typeof answer === "string" ? answer.slice(0, limit) : answer;
     }
 
     /**
@@ -299,9 +334,10 @@ export class MapDialogManager {
                 const previewImg = html.querySelector("#fwmb-pin-icon-preview-img");
                 if (!pathInput || !previewImg) return;
 
+                // Only a source the studio would accept is previewed (see Sanitize.imageSource)
                 const updatePreview = () => {
-                    const path = pathInput.value.trim();
-                    previewImg.src = path;
+                    const path = Sanitize.imageSource(pathInput.value.trim(), { remote: true });
+                    if (path) previewImg.src = path;
                     previewImg.hidden = !path;
                 };
 
@@ -309,8 +345,10 @@ export class MapDialogManager {
                 pathInput.addEventListener("change", updatePreview);
             },
             onSubmit: (form) => {
-                const name = form.elements["iconName"].value.trim();
-                const path = form.elements["iconPath"].value.trim();
+                const name = Sanitize.typedText(form.elements["iconName"].value.trim(), "name");
+                const typedPath = form.elements["iconPath"].value.trim();
+                const path = Sanitize.imageSource(typedPath, { remote: true });
+                if (typedPath && !path) platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ImageSourceInvalid"));
                 return name && path ? { name, path } : null;
             },
         });
@@ -493,11 +531,14 @@ export class MapDialogManager {
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
                     placements: this.#biomePlacementChoices(BiomePlacement.placementOfCustom(biome)),
                 }),
+                // Checked as an import is (see MapRules.typed)
                 onExtract: (form, fallbackName) => ({
-                    name: form.elements["biomeName"].value.trim() || fallbackName,
-                    code: form.elements["biomeCode"].value.trim() || null,
-                    color: ColorMath.hexToRgb(form.elements["biomeColor"].value),
-                    placement: form.elements["biomePlacement"].value,
+                    ...typed("customBiome", {
+                        name: form.elements["biomeName"].value.trim() || fallbackName,
+                        code: form.elements["biomeCode"].value.trim() || null,
+                        color: ColorMath.hexToRgb(form.elements["biomeColor"].value),
+                        placement: form.elements["biomePlacement"].value,
+                    }),
                     // Superseded by `placement`, which takes priority over it anyway (see
                     // BiomePlacement.placementOfCustom); cleared so an older map's flag is not
                     // carried forward once the biome has been edited
@@ -605,12 +646,18 @@ export class MapDialogManager {
             title: platform.i18n.localize("FILRODENSWMB.UI.AddDecoration"),
             content: content,
             onSubmit: (form) => ({
-                name: form.elements["fwmb-dec-name"].value.trim() || defaultName,
-                src: form.elements["fwmb-dec-src"].value,
+                name: Sanitize.typedText(form.elements["fwmb-dec-name"].value.trim() || defaultName, "name"),
+                src: form.elements["fwmb-dec-src"].value.trim(),
             }),
         });
 
         if (!result) return;
+        // A path into the host's data, an image picked on the web (already checked as it was read),
+        // or a typed address; anything else is refused before it reaches the canvas
+        if (result.src && !Sanitize.imageSource(result.src, { remote: true })) {
+            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ImageSourceInvalid"));
+            return;
+        }
 
         if (result?.src) {
             MapStateManager.pushVectorState(app);

@@ -12,7 +12,7 @@
     <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.ScaleUnits"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" name="cartographyScaleUnits" value="{{uiState.cartographyScaleUnits}}" placeholder="{{localize 'FILRODENSWMB.UI.ScaleUnitsPlaceholder'}}">
+            <input type="text" name="cartographyScaleUnits" maxlength="{{fwmbTextLimit 'name'}}" value="{{uiState.cartographyScaleUnits}}" placeholder="{{localize 'FILRODENSWMB.UI.ScaleUnitsPlaceholder'}}">
         </div>
     </div>
         

@@ -2,7 +2,7 @@
     <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" name="fwmb-dec-name" id="fwmb-dec-name" value="{{defaultName}}" required />
+            <input type="text" name="fwmb-dec-name" maxlength="{{fwmbTextLimit 'name'}}" id="fwmb-dec-name" value="{{defaultName}}" required />
         </div>
     </div>
 

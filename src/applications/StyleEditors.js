@@ -8,6 +8,10 @@ import { MapStateManager } from "./MapStateManager.js";
 import { PinStyles } from "./PinStyles.js";
 import { ROUTE_THICKNESS_STEP, roundRouteThickness } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
+import { typed } from "../data/MapRules.js";
+
+/** The MapRules kind (see MapRules.typed) of each style type. */
+const STYLE_KINDS = Object.freeze({ Route: "routeStyle", Region: "regionStyle", Label: "labelStyle", Pin: "pinStyle" });
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/parts/";
 
@@ -87,8 +91,12 @@ export class StyleEditors {
      * Applies a style's fields as read from the form, as one undo step, when anything changed:
      * the style changes, and every object that follows it (the cascade).
      */
-    static #apply(app, type, style, values) {
-        const name = values.name.trim();
+    static #apply(app, type, style, read) {
+        // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the style's
+        // own. A route style's empty transport means "any" and is kept as it is (it is deleted below).
+        const values = typed(STYLE_KINDS[type], read, style);
+        if (type === "Route" && read.transport === "") values.transport = "";
+        const name = String(values.name ?? "").trim();
         values.name = name || style.name;
         if (!InspectorFields.differs(this.#current(type, style), values)) return false;
         MapStateManager.pushVectorState(app);

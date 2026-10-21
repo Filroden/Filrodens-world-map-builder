@@ -2,7 +2,7 @@
     <div class="fwmb-form-group fwmb-form-group--stacked">
         <label>{{localize "FILRODENSWMB.UI.SceneName"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" name="sceneName" value="{{defaultName}}" />
+            <input type="text" name="sceneName" maxlength="{{fwmbTextLimit 'name'}}" value="{{defaultName}}" />
         </div>
         <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.SceneNameHint"}}</p>
     </div>

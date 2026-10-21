@@ -7,6 +7,7 @@ import { MapStateManager } from "./MapStateManager.js";
 import { PinStyles } from "./PinStyles.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { platform } from "../platform/index.js";
+import { typed } from "../data/MapRules.js";
 
 /** The pin's own fields a pin style sets, by their names in the form (the label's size is set by it too). */
 const LOOK_FIELDS = Object.freeze({ pinColor: true, pinScale: true });
@@ -73,14 +74,19 @@ export class PinEditor {
     /** Applies the form to the pin as one undo step, when anything changed. */
     static #apply(app, pin, form, field) {
         const elements = form.elements;
-        const values = {
-            name: elements.pinName.value.trim() || pin.name,
-            description: elements.pinDesc.value,
-            visibility: elements.pinVisibility.value,
-            color: elements.pinColor.value,
-            scale: Number(elements.pinScale.value) || FILRODENSWMB.PINS.DEFAULT_SCALE,
-            label: InspectorFields.readLabel(form, field, app),
-        };
+        // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the pin's own
+        const values = typed(
+            "pin",
+            {
+                name: elements.pinName.value.trim() || pin.name,
+                description: elements.pinDesc.value,
+                visibility: elements.pinVisibility.value,
+                color: elements.pinColor.value,
+                scale: Number(elements.pinScale.value) || FILRODENSWMB.PINS.DEFAULT_SCALE,
+                label: InspectorFields.readLabel(form, field, app),
+            },
+            pin,
+        );
         const current = { ...pin, visibility: pin.visibility ?? "all", label: InspectorFields.label(app, pin) };
 
         if (field === "pinStyle") {

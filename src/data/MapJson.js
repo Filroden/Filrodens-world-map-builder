@@ -4,7 +4,9 @@ import { normaliseAreaFactor } from "../mesh/Schema.js";
  * The JSON file a map is exported to and imported from: the map data as saved, plus (for a map on
  * the display mesh) its encoded owner arrays under a top-level `owners` key, by level id. In the
  * compendium the owners live in their own flag beside the map data (see platform.store.saveMapData);
- * a file has to carry them inside, or a re-imported map would lose its regions.
+ * a file has to carry them inside, or a re-imported map would lose its regions. The map's name
+ * travels as a top-level `name` too: the saved map keeps its name beside its data, and the file's
+ * own name is made safe for a file system (lower case, underscores), so it cannot give it back.
  *
  * Kept free of Foundry calls so the round trip can be tested on its own.
  */
@@ -13,12 +15,15 @@ export class MapJson {
      * The object to write to a file.
      * @param {object} mapData
      * @param {Object<string, string>} [owners]
+     * @param {string|null} [name] - The saved map's name.
      * @returns {object}
      */
-    static toExport(mapData, owners = {}) {
+    static toExport(mapData, owners = {}, name = null) {
         const data = structuredClone(mapData);
         delete data.owners;
-        return Object.keys(owners).length ? { ...data, owners: { ...owners } } : data;
+        delete data.name;
+        const named = name ? { name, ...data } : data;
+        return Object.keys(owners).length ? { ...named, owners: { ...owners } } : named;
     }
 
     /**

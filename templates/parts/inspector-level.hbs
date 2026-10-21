@@ -7,13 +7,13 @@
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" id="fwmb-inspector-name" name="levelName" value="{{level.name}}" />
+            <input type="text" id="fwmb-inspector-name" name="levelName" maxlength="{{fwmbTextLimit 'name'}}" value="{{level.name}}" />
         </div>
     </div>
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-level-title">{{localize "FILRODENSWMB.UI.LevelTitleTemplate"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" id="fwmb-inspector-level-title" name="levelTitleTemplate" value="{{level.titleTemplate}}" />
+            <input type="text" id="fwmb-inspector-level-title" name="levelTitleTemplate" maxlength="{{fwmbTextLimit 'name'}}" value="{{level.titleTemplate}}" />
             <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LevelTitleTemplateHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.LevelTitleTemplateHint'}}"></i>
         </div>
     </div>

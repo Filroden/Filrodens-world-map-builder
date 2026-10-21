@@ -7,7 +7,7 @@
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" id="fwmb-inspector-name" name="decorationName" value="{{decoration.name}}" />
+            <input type="text" id="fwmb-inspector-name" name="decorationName" maxlength="{{fwmbTextLimit 'name'}}" value="{{decoration.name}}" />
         </div>
     </div>
     <div class="fwmb-form-group">

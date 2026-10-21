@@ -27,7 +27,7 @@
         <div class="fwmb-form-group">
             <label for="fwmb-map-seed">{{localize "FILRODENSWMB.UI.MapSeed"}}</label>
             <div class="fwmb-form-fields">
-                <input type="text" id="fwmb-map-seed" name="mapSeed" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.SeedHint'}}" />
+                <input type="text" id="fwmb-map-seed" name="mapSeed" maxlength="{{fwmbTextLimit 'name'}}" value="{{uiState.mapSeed}}" placeholder="{{localize 'FILRODENSWMB.UI.RandomSeed'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.SeedHint'}}" />
                 <button type="button" class="fwmb-btn fwmb-btn--square" data-action="randomizeSeed" aria-label="{{localize 'FILRODENSWMB.UI.Randomize'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Randomize'}}">
                     <i class="fwmb-icon fwmb-icon--shuffle"></i>
                 </button>

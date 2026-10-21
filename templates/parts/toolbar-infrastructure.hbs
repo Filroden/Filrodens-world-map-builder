@@ -28,7 +28,7 @@
             </div>
             <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable" popover="manual">
                 {{#each infrastructureIcons}}
-                    <button type="button" class="fwmb-btn" aria-pressed="{{#if (eq ../uiState.activeIcon this.key)}}true{{else}}false{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.key}}" aria-label="{{this.label}}" data-tooltip="{{this.label}}">
+                    <button type="button" class="fwmb-btn" aria-pressed="{{#if (eq ../uiState.activeIcon this.key)}}true{{else}}false{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.key}}" aria-label="{{this.label}}" data-tooltip-text="{{this.label}}">
                         <i class="fwmb-icon {{#unless this.isCustom}}fwmb-icon--{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}}></i>
                     </button>
                 {{/each}}

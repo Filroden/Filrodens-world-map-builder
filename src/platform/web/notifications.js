@@ -22,6 +22,9 @@ export function createNotifications(frame, { closeLabel = "Close" } = {}) {
     frame.append(list);
 
     function show(kind, text, { permanent = false } = {}) {
+        // The page draws the studio into the frame after the platform (and this list) is made,
+        // replacing the frame's contents, so the list is put back whenever it has been taken out
+        if (!list.isConnected) frame.append(list);
         const item = doc.createElement("li");
         item.className = `fwmb-notification fwmb-notification--${kind}`;
         item.setAttribute("role", kind === "error" ? "alert" : "status");

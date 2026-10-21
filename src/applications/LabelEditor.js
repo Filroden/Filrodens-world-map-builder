@@ -9,6 +9,7 @@ import { RegionEditor } from "./RegionEditor.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { RouteEditor } from "./RouteEditor.js";
 import { platform } from "../platform/index.js";
+import { typed } from "../data/MapRules.js";
 
 /** What a label can belong to: its localisation key, its icon, and the tool its own inspector is opened in. */
 const OWNERS = Object.freeze({
@@ -96,9 +97,10 @@ export class LabelEditor {
 
     /** Applies the form to the label as one undo step, when anything changed. */
     static #apply(app, object, ref, form, field) {
-        const fields = InspectorFields.readLabel(form, field, app);
         const current = this.#label(app, object, ref);
-        const name = ref.type === "custom" ? form.elements.labelName.value.trim() || object.name : object.name;
+        // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the label's own
+        const fields = typed("ownedLabel", InspectorFields.readLabel(form, field, app), current);
+        const name = ref.type === "custom" ? typed("label", { name: form.elements.labelName.value.trim() || object.name }, object).name : object.name;
         if (!InspectorFields.differs(current, fields) && name === object.name) return false;
         MapStateManager.pushVectorState(app);
         if (ref.type === "custom") Object.assign(object, fields, { name });

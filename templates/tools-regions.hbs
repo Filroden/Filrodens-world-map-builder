@@ -50,7 +50,7 @@
         <summary>
             <span class="fwmb-chev" aria-hidden="true"></span>
             {{#if this.renaming}}
-            <input type="text" id="fwmb-list-naming-input" class="fwmb-input fwmb-heading-naming" value="{{this.renaming.value}}" aria-label="{{localize this.renaming.label}}" data-list-naming data-panel-ui autocomplete="off" spellcheck="false" />
+            <input type="text" id="fwmb-list-naming-input" class="fwmb-input fwmb-heading-naming" maxlength="{{fwmbTextLimit 'name'}}" value="{{this.renaming.value}}" aria-label="{{localize this.renaming.label}}" data-list-naming data-panel-ui autocomplete="off" spellcheck="false" />
             {{else}}
             <span class="fwmb-section-title" title="{{this.name}}">{{this.name}}</span>
             {{#if this.parentName}}<span class="fwmb-meta" title="{{localize 'FILRODENSWMB.UI.LevelInParent' name=this.parentName}}">{{localize "FILRODENSWMB.UI.LevelInParent" name=this.parentName}}</span>{{/if}}
@@ -152,7 +152,7 @@
 {{#*inline "regionNamingRow"}}
 <div id="fwmb-list-naming" class="fwmb-list-item fwmb-list-item--naming" role="option" aria-selected="true" data-list-key="naming">
     {{#if this.swatch}}<span class="fwmb-chip-swatch" style="--swatch: {{this.swatch}}"></span>{{/if}}
-    <input type="text" id="fwmb-list-naming-input" class="fwmb-input" value="{{this.value}}" aria-label="{{localize this.label}}" data-list-naming data-panel-ui autocomplete="off" spellcheck="false" />
+    <input type="text" id="fwmb-list-naming-input" class="fwmb-input" value="{{this.value}}" maxlength="{{fwmbTextLimit 'name'}}" aria-label="{{localize this.label}}" data-list-naming data-panel-ui autocomplete="off" spellcheck="false" />
 </div>
 {{/inline}}
 

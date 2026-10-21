@@ -1,3 +1,4 @@
+import { FILRODENSWMB } from "../config.js";
 import { UNCLAIMED } from "./Schema.js";
 
 /**
@@ -443,6 +444,11 @@ export function encodeOwners(owners) {
 export function decodeOwners(text) {
     const reader = new VarintReader(base64ToBytes(text));
     const length = reader.readUnsigned();
+    // The length comes from the data itself, so it is checked before anything is allocated. A
+    // mesh is sized to about MESH.MAX_CELLS cells from an estimate of its density, so twice that is
+    // far beyond any real mesh, and a larger figure means damaged or hostile data.
+    const ceiling = FILRODENSWMB.MESH.MAX_CELLS * OWNER_LENGTH_HEADROOM;
+    if (length > ceiling) throw new Error(`Owner data is corrupt (it claims ${length} cells; a mesh has at most about ${FILRODENSWMB.MESH.MAX_CELLS}).`);
     const owners = new Int32Array(length);
     let index = 0;
     while (index < length) {
@@ -454,6 +460,9 @@ export function decodeOwners(text) {
     }
     return owners;
 }
+
+/** How far past MESH.MAX_CELLS a decoded owner array may claim to reach (see decodeOwners). */
+const OWNER_LENGTH_HEADROOM = 2;
 
 const zigzag = (value) => (value >= 0 ? value * 2 : -value * 2 - 1);
 const unzigzag = (value) => (value % 2 === 0 ? value / 2 : -(value + 1) / 2);

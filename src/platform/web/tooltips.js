@@ -8,8 +8,9 @@
  * gives it there. It is appended to <body> and fixed-positioned, so it shows above the studio and
  * above any dialogue inside it.
  *
- * The attribute is read as plain text (templates already localise it), as Foundry treats
- * data-tooltip; nothing is parsed as HTML.
+ * The attribute is read as plain text (templates already localise it); nothing is parsed as HTML.
+ * Text that holds a name the user gave (a custom icon's, a font's) is written as data-tooltip-text,
+ * which Foundry's tooltip manager also shows as plain text: Foundry reads data-tooltip as HTML.
  */
 
 /** How long the pointer rests on an element before its tooltip shows (about what Foundry waits). */
@@ -48,7 +49,7 @@ export class WebTooltips {
     }
 
     #onPointerOver = (event) => {
-        const target = event.target.closest?.("[data-tooltip]");
+        const target = event.target.closest?.("[data-tooltip], [data-tooltip-text]");
         if (!target || target === this.#target || !this.#root.contains(target)) return;
         this.#hide();
         this.#target = target;
@@ -64,7 +65,7 @@ export class WebTooltips {
 
     #show(target) {
         if (!target.isConnected) return;
-        const text = target.dataset.tooltip;
+        const text = target.dataset.tooltipText ?? target.dataset.tooltip;
         if (!text) return;
         this.#element.textContent = text;
         this.#element.hidden = false;

@@ -10,6 +10,10 @@ import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
 import { RenderTimer } from "../tools/RenderTimer.js";
 import { MapJson } from "../data/MapJson.js";
+import { MapImport } from "../data/MapImport.js";
+import { MapNames } from "../data/MapNames.js";
+import { overLimit } from "../data/MapRules.js";
+import { ImportRefusal, Sanitize } from "../data/Sanitize.js";
 import { Scene3D } from "../canvas/Scene3D.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { RefreshQueue } from "../tools/RefreshQueue.js";
@@ -1545,7 +1549,8 @@ export class MapStudio {
         if (target.closest("[data-panel-ui]")) return;
 
         if (event.type === "change" && target.matches('file-picker[name="referenceImage"]')) {
-            this.uiState.referenceImage = target.value;
+            // Only a source the studio accepts reaches the canvas (see Sanitize.imageSource)
+            this.uiState.referenceImage = Sanitize.imageSource(target.value, { remote: true }) ?? "";
             this.#updateReferenceLayer();
             return;
         }
@@ -4008,6 +4013,52 @@ export class MapStudio {
     }
 
     /**
+     * The map as a save writes it: its data (the generation settings, every vector list, the
+     * styles and the display mesh's block and layer sets) and its encoded owner arrays by level id.
+     * Reads the panel's fields first, as every save does (see MapStateManager.getMapParameters).
+     * Shared by saving and by the check that a saved map passes the importer unchanged.
+     * @returns {{payload: object, owners: Object<string, string>}}
+     */
+    _buildSavePayload() {
+        const { currentSeed, params } = MapStateManager.getMapParameters(this);
+        const payload = {
+            seed: currentSeed,
+            generationEngine: this.uiState.generationEngine,
+            terrainVersion: this.uiState.terrainVersion,
+            world: this.uiState.world,
+            generatorStale: this.uiState.generatorStale === true,
+            upwindMargin: this.upwindMargin ?? null,
+            terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
+            springsBaked: this.uiState.springsBaked,
+            mapWidth: this.mapWidth,
+            mapHeight: this.mapHeight,
+            gridType: this.uiState.gridType,
+            gridSize: this.uiState.gridSize,
+            gridVisible: this.uiState.gridVisible,
+            params: params,
+            customBiomes: this.uiState.customBiomes,
+            nextCustomBiomeId: this.uiState.nextCustomBiomeId,
+            customRouteStyles: this.uiState.customRouteStyles,
+            customLabelStyles: this.uiState.customLabelStyles,
+            customRegionStyles: this.uiState.customRegionStyles,
+            customPinStyles: this.uiState.customPinStyles,
+            history: this.brushEngine?.history || [],
+            tectonicFaults: this.tectonicFaults,
+            manualRivers: this.manualRivers,
+            mapPins: this.mapPins,
+            mapRoutes: this.mapRoutes,
+            landMasks: this.landMasks,
+            mapLabels: this.mapLabels,
+            mapDecorations: this.mapDecorations,
+            parentId: this.currentParentId,
+        };
+
+        // The display mesh's block, layer sets and owner arrays (see MeshIntegration)
+        const owners = MeshIntegration.preparePayload(this, payload);
+        return { payload, owners };
+    }
+
+    /**
      * Saves the map (see saveCurrentMap).
      *
      * @param {boolean} asNew - Create a new saved map rather than overwrite the open one.
@@ -4031,41 +4082,7 @@ export class MapStudio {
             await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.SavingMap"));
             this.currentSaveName = mapName;
 
-            const { currentSeed, params } = MapStateManager.getMapParameters(this);
-            const payload = {
-                seed: currentSeed,
-                generationEngine: this.uiState.generationEngine,
-                terrainVersion: this.uiState.terrainVersion,
-                world: this.uiState.world,
-                generatorStale: this.uiState.generatorStale === true,
-                upwindMargin: this.upwindMargin ?? null,
-                terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
-                springsBaked: this.uiState.springsBaked,
-                mapWidth: this.mapWidth,
-                mapHeight: this.mapHeight,
-                gridType: this.uiState.gridType,
-                gridSize: this.uiState.gridSize,
-                gridVisible: this.uiState.gridVisible,
-                params: params,
-                customBiomes: this.uiState.customBiomes,
-                nextCustomBiomeId: this.uiState.nextCustomBiomeId,
-                customRouteStyles: this.uiState.customRouteStyles,
-                customLabelStyles: this.uiState.customLabelStyles,
-                customRegionStyles: this.uiState.customRegionStyles,
-                customPinStyles: this.uiState.customPinStyles,
-                history: this.brushEngine?.history || [],
-                tectonicFaults: this.tectonicFaults,
-                manualRivers: this.manualRivers,
-                mapPins: this.mapPins,
-                mapRoutes: this.mapRoutes,
-                landMasks: this.landMasks,
-                mapLabels: this.mapLabels,
-                mapDecorations: this.mapDecorations,
-                parentId: this.currentParentId,
-            };
-
-            // The display mesh's block, layer sets and owner arrays (see MeshIntegration)
-            const owners = MeshIntegration.preparePayload(this, payload);
+            const { payload, owners } = this._buildSavePayload();
             const journal = await platform.store.saveMapData(this.currentSaveName, payload, createsNewMap ? null : this.currentSaveId, { owners });
 
             if (journal) {
@@ -5015,7 +5032,11 @@ export class MapStudio {
     }
 
     /**
-     * Opens a system file dialogue, validates the JSON payload, and imports it to the database.
+     * Opens a system file dialogue and imports the chosen map file as a new saved map. The file
+     * goes through MapImport (size, structure, the allow-list of fields, consistency, text limits
+     * and embedded images) before anything is saved, and a file it refuses is reported with the
+     * reason, localised. The map keeps the name it was saved under (or, from a file exported before
+     * files carried it, the file's name), numbered when a saved map already has it.
      */
     async _onImportMapJson(_event, _target) {
         const input = document.createElement("input");
@@ -5029,24 +5050,23 @@ export class MapStudio {
             await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ImportingMap"));
 
             try {
-                const text = await file.text();
-                const parsedData = JSON.parse(text);
-
-                if (!parsedData.seed || !parsedData.params) {
-                    throw new Error("Invalid FWMB Data Schema");
-                }
-
-                const cleanName = file.name.replace(".json", "").replace("fwmb_", "");
+                const parsed = MapImport.parse(await MapImport.readText(file));
                 // A file carries the owner arrays inside it (see MapJson); the compendium keeps them apart
-                const { mapData, owners } = MapJson.fromImport(parsedData);
-                await platform.store.saveMapData(platform.i18n.format("FILRODENSWMB.UI.ImportedMapName", { name: cleanName }), mapData, null, { owners });
+                const { mapData, owners, name: savedName, corrected } = MapImport.read(parsed, { newId: () => platform.utils.randomID() });
+                await MapImport.checkImages(mapData);
+                // The name the map was saved under, which the file carries; an older file has none,
+                // and the map is named after the file instead
+                const baseName = savedName ?? MapNames.fromFileName(file.name, platform.i18n.localize("FILRODENSWMB.UI.UnnamedMap"));
+                const name = MapNames.unique(baseName, MapNames.namesIn(await platform.store.getSavedMaps()), this.#numberedMapName);
+                await platform.store.saveMapData(name, mapData, null, { owners });
 
-                platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.ImportSuccess"));
+                platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ImportSuccess", { name }));
+                if (corrected > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.ImportCorrected", { count: corrected }));
 
                 // Flag now, at import time, rather than waiting for the GM to load the map -
                 // custom pin icons are world-local (see pinIcons.js), so a JSON export from a
                 // different world commonly won't resolve here.
-                const { affectedPinCount } = findUnresolvedPinIcons(parsedData.mapPins);
+                const { affectedPinCount } = findUnresolvedPinIcons(mapData.mapPins);
                 if (affectedPinCount > 0) {
                     platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.UnresolvedPinIconsWarning", { count: affectedPinCount }));
                 }
@@ -5054,7 +5074,7 @@ export class MapStudio {
                 this.view?.render(["toolbar", "context"]);
             } catch (err) {
                 console.error("FWMB | Import Failed:", err);
-                platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ImportError"));
+                platform.notify.error(err instanceof ImportRefusal ? Sanitize.refusalMessage(err, platform.i18n) : platform.i18n.localize("FILRODENSWMB.UI.ImportError"));
             } finally {
                 this.#endProcessing();
             }
@@ -5062,6 +5082,9 @@ export class MapStudio {
 
         input.click();
     }
+
+    /** A map name with a number after it, for an import whose name is already taken (see MapNames). */
+    #numberedMapName = (name, number) => platform.i18n.format("FILRODENSWMB.UI.NumberedMapName", { name, number });
 
     /**
      * Prompts the GM to choose which Style Library registries to bundle into a shareable JSON
@@ -5149,14 +5172,11 @@ export class MapStudio {
             if (!file) return;
 
             try {
-                const text = await file.text();
-                const parsedData = JSON.parse(text);
+                // The file goes through the same rules as a map's own styles and biomes (see MapImport)
+                const { categories, corrected } = MapImport.readStyles(MapImport.parse(await MapImport.readText(file), "notStyles"));
+                if (corrected > 0) platform.notify.warn(platform.i18n.format("FILRODENSWMB.UI.ImportCorrected", { count: corrected }));
 
-                if (!parsedData.categories || typeof parsedData.categories !== "object") {
-                    throw new Error("Invalid FWMB Style Library Schema");
-                }
-
-                const { importedCount, duplicateCount, customBiomesImported } = this.#importStyleLibraryCategories(parsedData.categories);
+                const { importedCount, duplicateCount, customBiomesImported } = this.#importStyleLibraryCategories(categories);
 
                 if (importedCount === 0) {
                     const emptyKey = duplicateCount > 0 ? "FILRODENSWMB.UI.ImportSettingsAllDuplicates" : "FILRODENSWMB.UI.ImportSettingsEmpty";
@@ -5182,7 +5202,7 @@ export class MapStudio {
                 platform.notify.info(successMessage);
             } catch (err) {
                 console.error("FWMB | Style Library Import Failed:", err);
-                platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ImportSettingsError"));
+                platform.notify.error(err instanceof ImportRefusal ? Sanitize.refusalMessage(err, platform.i18n) : platform.i18n.localize("FILRODENSWMB.UI.ImportSettingsError"));
             }
         };
 
@@ -5442,8 +5462,16 @@ export class MapStudio {
         const rawName = card.querySelector(".fwmb-map-card-info").textContent.trim();
         const mapName = rawName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
 
-        // The owner arrays travel inside the file (see MapJson)
-        const blob = new Blob([JSON.stringify(MapJson.toExport(exportData, await platform.store.loadMapOwners(mapId)), null, 2)], { type: "application/json" });
+        // An export never writes text an import would refuse: it is refused here instead, naming
+        // what to shorten (the limits are FILRODENSWMB.LIMITS.TEXT)
+        const tooLong = overLimit(exportData, { "FILRODENSWMB.UI.LimitFieldName": rawName });
+        if (tooLong.length) {
+            await MapDialogManager.showOverLimit(tooLong);
+            return;
+        }
+
+        // The owner arrays and the map's name travel inside the file (see MapJson)
+        const blob = new Blob([JSON.stringify(MapJson.toExport(exportData, await platform.store.loadMapOwners(mapId), rawName), null, 2)], { type: "application/json" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = `fwmb_${mapName}.json`;

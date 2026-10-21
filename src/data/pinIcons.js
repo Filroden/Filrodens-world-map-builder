@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { platform } from "../platform/index.js";
+import { Sanitize } from "./Sanitize.js";
 
 /**
  * Data layer for the pin icon registry: built-in icons (curated, shipped with the module,
@@ -66,10 +67,14 @@ function getDisabledPinIcons() {
 }
 
 /**
- * The GM's registered custom icons, each `{ id, name, path }`.
+ * The GM's registered custom icons, each `{ id, name, path }`. An entry whose id or path the
+ * studio would not accept (see Sanitize) is left out: its path is written into CSS url()s and
+ * texture loads, so only a data path, an https address or a checked embedded image may reach them.
  */
 function getCustomPinIcons() {
-    return platform.settings.get(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM) || [];
+    const stored = platform.settings.get(FILRODENSWMB.PIN_ICONS.SETTINGS.CUSTOM);
+    if (!Array.isArray(stored)) return [];
+    return stored.filter((entry) => Sanitize.isId(entry?.id) && typeof entry.name === "string" && Sanitize.imageSource(entry.path, { remote: true }) !== null);
 }
 
 /**

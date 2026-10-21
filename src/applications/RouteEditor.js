@@ -9,6 +9,7 @@ import { RouteTool } from "./RouteTool.js";
 import { repathRoute, simplifyRoute } from "../mesh/RouteEdits.js";
 import { ROUTE_CLASSES, ROUTE_MODES, ROUTE_THICKNESS_STEP, roundRouteThickness } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
+import { typed } from "../data/MapRules.js";
 
 /** The localisation key of each leg mode, transport, class and stroke. */
 const LEG_MODE_LABELS = Object.freeze({ terrain: "FILRODENSWMB.UI.RouteLegTerrain", direct: "FILRODENSWMB.UI.RouteLegDirect" });
@@ -133,7 +134,8 @@ export class RouteEditor {
             app.view?.render(["editToolbar"]);
             return true;
         }
-        const values = this.read(app, route, form, field);
+        // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the route's own
+        const values = typed("route", this.read(app, route, form, field), route);
         const current = { ...route, class: route.class ?? null, spanWater: route.spanWater === true, outline: route.outline !== false, smoothing: route.smoothing === true, label: InspectorFields.label(app, route) };
         if (!InspectorFields.differs(current, values)) return false;
         MapStateManager.pushVectorState(app);

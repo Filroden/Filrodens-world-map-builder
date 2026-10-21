@@ -9,11 +9,11 @@
       boldName, italicName: the fields' names
 --}}
 <div class="fwmb-row fwmb-inspector-face">
-    <label class="fwmb-checkbox-label" {{#if face.boldHint}}data-tooltip="{{face.boldHint}}"{{/if}}>
+    <label class="fwmb-checkbox-label" {{#if face.boldHint}}data-tooltip-text="{{face.boldHint}}"{{/if}}>
         <input type="checkbox" class="fwmb-checkbox" name="{{boldName}}" {{#if bold}}checked{{/if}} {{#unless face.bold}}disabled aria-description="{{face.boldHint}}"{{/unless}} />
         {{localize "FILRODENSWMB.UI.LabelBold"}}
     </label>
-    <label class="fwmb-checkbox-label" {{#if face.italicHint}}data-tooltip="{{face.italicHint}}"{{/if}}>
+    <label class="fwmb-checkbox-label" {{#if face.italicHint}}data-tooltip-text="{{face.italicHint}}"{{/if}}>
         <input type="checkbox" class="fwmb-checkbox" name="{{italicName}}" {{#if italic}}checked{{/if}} {{#unless face.italic}}disabled aria-description="{{face.italicHint}}"{{/unless}} />
         {{localize "FILRODENSWMB.UI.LabelItalic"}}
     </label>

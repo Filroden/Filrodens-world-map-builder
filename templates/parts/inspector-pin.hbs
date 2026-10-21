@@ -13,13 +13,13 @@
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" id="fwmb-inspector-name" name="pinName" value="{{pin.name}}" />
+            <input type="text" id="fwmb-inspector-name" name="pinName" maxlength="{{fwmbTextLimit 'name'}}" value="{{pin.name}}" />
         </div>
     </div>
     <div class="fwmb-form-group fwmb-form-group--stacked">
         <label class="fwmb-label" for="fwmb-inspector-description">{{localize "FILRODENSWMB.UI.Description"}}</label>
         <div class="fwmb-form-fields">
-            <textarea id="fwmb-inspector-description" class="fwmb-scrollable" name="pinDesc" rows="3">{{pin.description}}</textarea>
+            <textarea id="fwmb-inspector-description" class="fwmb-scrollable" name="pinDesc" maxlength="{{fwmbTextLimit 'description'}}" rows="3">{{pin.description}}</textarea>
         </div>
     </div>
     <div class="fwmb-form-group">
@@ -41,14 +41,14 @@
         <span class="fwmb-label">{{localize "FILRODENSWMB.UI.InspectorIcon"}}</span>
         <div class="fwmb-form-fields">
             <details class="fwmb-icon-picker">
-                <summary class="fwmb-btn" aria-label="{{localize 'FILRODENSWMB.UI.InspectorChooseIcon'}}" data-tooltip="{{icon.label}}">
+                <summary class="fwmb-btn" aria-label="{{localize 'FILRODENSWMB.UI.InspectorChooseIcon'}}" data-tooltip-text="{{icon.label}}">
                     <i class="fwmb-icon {{#unless icon.isCustom}}fwmb-icon--{{icon.key}}{{/unless}}" {{#if icon.isCustom}}style="--fwmb-mask: url('{{icon.path}}');"{{/if}} aria-hidden="true"></i>
                     <span>{{icon.label}}</span>
                     <i class="fwmb-icon fwmb-icon--arrow-drop-down" aria-hidden="true"></i>
                 </summary>
                 <div class="fwmb-icon-grid fwmb-scrollable" role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.InspectorIcon'}}">
                     {{#each icons}}
-                    <button type="button" class="fwmb-btn fwmb-btn--square" role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" data-inspector-action="pickIcon" data-icon="{{this.key}}" aria-label="{{this.label}}" data-tooltip="{{this.label}}">
+                    <button type="button" class="fwmb-btn fwmb-btn--square" role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" data-inspector-action="pickIcon" data-icon="{{this.key}}" aria-label="{{this.label}}" data-tooltip-text="{{this.label}}">
                         <i class="fwmb-icon {{#unless this.isCustom}}fwmb-icon--{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} aria-hidden="true"></i>
                     </button>
                     {{/each}}

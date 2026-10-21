@@ -1,7 +1,21 @@
 import { FILRODENSWMB } from "../../config.js";
 import { resolvePinIconPath } from "../../data/pinIcons.js";
+import { Sanitize } from "../../data/Sanitize.js";
 import { GridDataExporter } from "../../applications/GridDataExporter.js";
 import { MapStateManager } from "../../applications/MapStateManager.js";
+
+/**
+ * A description as a journal page's HTML. Descriptions are plain text (typed into a textarea, or
+ * brought in by an import), so every character is escaped and only line breaks become markup
+ * (see Sanitize.textToHtml); markup typed into a description shows as the characters typed. The
+ * result then goes through Foundry's own HTML cleaner as well, so the page holds nothing Foundry
+ * would not allow even if a description reached here by some other route.
+ * @param {string} [description]
+ * @returns {string}
+ */
+function journalHtml(description) {
+    return foundry.utils.cleanHTML(Sanitize.textToHtml(description ?? ""));
+}
 
 // Map note icons are one fiftieth of the map's width, kept between 32 and 96 pixels
 const NOTE_ICON_WIDTH_RATIO = 50;
@@ -10,52 +24,51 @@ const NOTE_ICON_MAX_PX = 96;
 
 export class SceneExporter {
     /**
-     * Executes the full asynchronous export pipeline.
+     * Executes the full asynchronous export pipeline. A failure is not reported here: it reaches
+     * the caller (MapStudio's scene export), which logs it and shows its own localised message,
+     * so no error text (which can carry a file or scene name) is ever put into a notification.
      */
     static async run(app, config, playerBlob, gmBlob) {
         const { sceneName, exportFolder, generateJournals, overwriteJournals, createGmOverlay } = config;
         const FilePickerV2 = foundry.applications.apps.FilePicker.implementation;
 
-        try {
-            // 1. Validate and Create Server Directory
-            const targetPath = await this.#ensureDirectoryExists(exportFolder);
+        // 1. Validate and Create Server Directory
+        const targetPath = await this.#ensureDirectoryExists(exportFolder);
 
-            // 2. Extract and Upload Player Background
-            ui.notifications.info(`FWMB | Extracting Player View...`);
-            const playerFilename = `${sceneName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_player.png`;
-            const playerFile = new File([playerBlob], playerFilename, { type: "image/png" });
+        // 2. Extract and Upload Player Background
+        ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepPlayer"));
+        const playerFilename = `${sceneName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_player.png`;
+        const playerFile = new File([playerBlob], playerFilename, { type: "image/png" });
 
-            await FilePickerV2.upload("data", targetPath, playerFile);
-            const playerImgPath = `${targetPath}/${playerFilename}`;
+        await FilePickerV2.upload("data", targetPath, playerFile);
+        const playerImgPath = `${targetPath}/${playerFilename}`;
 
-            let gmImgPath = null;
+        let gmImgPath = null;
 
-            // 3. Extract and Upload GM Overlay (If requested)
-            if (createGmOverlay && gmBlob) {
-                ui.notifications.info(`FWMB | Extracting GM Overlay...`);
-                const gmFilename = `${sceneName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_gm.png`;
-                const gmFile = new File([gmBlob], gmFilename, { type: "image/png" });
+        // 3. Extract and Upload GM Overlay (If requested)
+        if (createGmOverlay && gmBlob) {
+            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepGm"));
+            const gmFilename = `${sceneName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_gm.png`;
+            const gmFile = new File([gmBlob], gmFilename, { type: "image/png" });
 
-                await FilePickerV2.upload("data", targetPath, gmFile);
-                gmImgPath = `${targetPath}/${gmFilename}`;
-            }
-
-            // 4. Generate Journals & Notes
-            let journalObj = null;
-            if (generateJournals) {
-                ui.notifications.info(`FWMB | Generating Journals...`);
-                journalObj = await this.#createJournals(app, sceneName, overwriteJournals);
-            }
-
-            // 5. Construct the Scene
-            ui.notifications.info(`FWMB | Constructing Scene...`);
-            await this.#createScene(app, sceneName, playerImgPath, gmImgPath, journalObj);
-
-            ui.notifications.info(`FWMB | Export Complete!`);
-        } catch (error) {
-            console.error("FWMB | Export Failed:", error);
-            ui.notifications.error(`Scene export failed: ${error.message}`);
+            await FilePickerV2.upload("data", targetPath, gmFile);
+            gmImgPath = `${targetPath}/${gmFilename}`;
         }
+
+        // 4. Generate Journals & Notes
+        let journalObj = null;
+        if (generateJournals) {
+            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepJournals"));
+            journalObj = await this.#createJournals(app, sceneName, overwriteJournals);
+        }
+
+        // 5. Construct the Scene
+        ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepScene"));
+        await this.#createScene(app, sceneName, playerImgPath, gmImgPath, journalObj);
+
+        // The scene's name is the GM's own text: it goes in as a format value, which Foundry's
+        // notifications escape
+        ui.notifications.info("FILRODENSWMB.UI.ExportSceneDone", { format: { name: sceneName } });
     }
 
     /**
@@ -71,7 +84,7 @@ export class SceneExporter {
             console.debug(`FWMB | Expected missing directory. Creating new at: ${basePath}`, err);
 
             await FilePickerV2.createDirectory("data", basePath);
-            ui.notifications.info(game.i18n.format("FILRODENSWMB.UI.DirectoryCreated", { path: basePath }));
+            ui.notifications.info("FILRODENSWMB.UI.DirectoryCreated", { format: { path: basePath } });
         }
         return basePath;
     }
@@ -108,7 +121,7 @@ export class SceneExporter {
                 name: mapElement.name || defaultName,
                 type: "text",
                 text: {
-                    content: mapElement.description || "",
+                    content: journalHtml(mapElement.description),
                     format: 1,
                 },
             };
@@ -195,7 +208,7 @@ export class SceneExporter {
      */
     static #buildGridData(app) {
         try {
-            ui.notifications.info(`FWMB | Calculating Grid Cell Data...`);
+            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepGridData"));
             return GridDataExporter.build(app);
         } catch (err) {
             console.error("FWMB | Grid data export failed.", err);
@@ -252,7 +265,7 @@ export class SceneExporter {
         let scene = game.scenes.getName(sceneName);
         try {
             if (scene) {
-                ui.notifications.info(`FWMB | Updating existing Scene data...`);
+                ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepSceneUpdate"));
                 await scene.update(sceneData);
                 await this.#clearPreviousExport(scene, gridData, journalObj);
             } else {
@@ -387,7 +400,7 @@ export class SceneExporter {
     /** Generates the Scene's thumbnail. It is only a convenience, so a failure is skipped quietly. */
     static async #updateThumbnail(scene) {
         try {
-            ui.notifications.info(`FWMB | Generating Thumbnail...`);
+            ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepThumbnail"));
             const thumbData = await scene.createThumbnail();
             if (thumbData?.thumb) {
                 await scene.update({ thumb: thumbData.thumb });

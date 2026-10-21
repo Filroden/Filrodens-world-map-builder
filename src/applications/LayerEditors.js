@@ -4,6 +4,7 @@ import { RegionPanel } from "./RegionPanel.js";
 import { defaultLevelStyle, NESTING_MODES } from "../mesh/Schema.js";
 import { parentCandidates, setOfLevel } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
+import { typed } from "../data/MapRules.js";
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/parts/";
 
@@ -43,12 +44,17 @@ export class LayerSetEditor {
         context: (_app, set) => ({ set: { ...set, opacity: set.opacity ?? 1, waterTint: set.waterTint !== false }, visibilities: RegionPanel.visibilityChoices(set.visibility) }),
         apply: (app, set, _ref, form) => {
             const elements = form.elements;
-            const values = {
-                name: elements.setName.value.trim() || set.name,
-                visibility: elements.setVisibility.value,
-                opacity: Number(elements.setOpacity.value),
-                waterTint: elements.setWaterTint.checked,
-            };
+            // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the set's own
+            const values = typed(
+                "layerSet",
+                {
+                    name: elements.setName.value.trim() || set.name,
+                    visibility: elements.setVisibility.value,
+                    opacity: Number(elements.setOpacity.value),
+                    waterTint: elements.setWaterTint.checked,
+                },
+                set,
+            );
             const current = { ...set, visibility: set.visibility ?? "all", opacity: set.opacity ?? 1, waterTint: set.waterTint !== false };
             if (!Object.keys(values).some((name) => current[name] !== values[name])) return false;
             RegionPanel.applySetEdit(app, set, values);
@@ -155,7 +161,8 @@ export class LevelEditor {
     }
 
     static #apply(app, level, set, form, field) {
-        const values = this.read(app, level, set, form, field);
+        // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the layer's own
+        const values = typed("level", this.read(app, level, set, form, field), level);
         const current = {
             ...level,
             titleTemplate: level.titleTemplate || "{name}",

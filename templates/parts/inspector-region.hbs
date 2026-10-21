@@ -12,13 +12,13 @@
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" id="fwmb-inspector-name" name="regionName" value="{{region.name}}" />
+            <input type="text" id="fwmb-inspector-name" name="regionName" maxlength="{{fwmbTextLimit 'name'}}" value="{{region.name}}" />
         </div>
     </div>
     <div class="fwmb-form-group fwmb-form-group--stacked">
         <label class="fwmb-label" for="fwmb-inspector-description">{{localize "FILRODENSWMB.UI.Description"}}</label>
         <div class="fwmb-form-fields">
-            <textarea id="fwmb-inspector-description" class="fwmb-scrollable" name="regionDesc" rows="3">{{region.description}}</textarea>
+            <textarea id="fwmb-inspector-description" class="fwmb-scrollable" name="regionDesc" maxlength="{{fwmbTextLimit 'description'}}" rows="3">{{region.description}}</textarea>
         </div>
     </div>
     <div class="fwmb-form-group">

@@ -5,6 +5,7 @@ import { MapStateManager } from "./MapStateManager.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
 import { roundRouteThickness } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
+import { typed } from "../data/MapRules.js";
 
 const TEMPLATE = "modules/filrodens-world-map-builder/templates/dialogs/mass-edit.hbs";
 const TITLES = Object.freeze({
@@ -303,14 +304,14 @@ export class MassEdit {
         MapStateManager.pushVectorState(app);
         for (const item of items) {
             if (kind.hasLabel) {
-                this.#applyStore(app, item, kind.style, changes.filter((change) => change.store === "item"), fields, "item");
+                this.#applyStore(app, item, kind.style, changes.filter((change) => change.store === "item"), fields, "item", type);
                 const label = { ...(item.label ?? {}) };
                 if (changes.some((change) => change.store === "label")) {
-                    this.#applyStore(app, label, FieldSpecs.labelStyle, changes.filter((change) => change.store === "label"), fields, "label");
+                    this.#applyStore(app, label, FieldSpecs.labelStyle, changes.filter((change) => change.store === "label"), fields, "label", "ownedLabel");
                     item.label = { ...(item.label ?? {}), ...label };
                 }
             } else {
-                this.#applyStore(app, item, kind.style, changes, fields, "item");
+                this.#applyStore(app, item, kind.style, changes, fields, "item", type);
             }
         }
         app._repaintVectors();
@@ -318,7 +319,12 @@ export class MassEdit {
         return true;
     }
 
-    static #applyStore(app, target, styleSpec, changes, fields, store) {
+    /**
+     * @param {string} ruleKind - The MapRules kind of `target` ("pin", "route", "region", "label",
+     *     or "ownedLabel" for an item's label): each value is checked as an import is (see
+     *     MapRules.typed), and one that fails its rule leaves the field as it was.
+     */
+    static #applyStore(app, target, styleSpec, changes, fields, store, ruleKind) {
         if (!changes.length) return;
         const styleChange = changes.find((change) => change.key === styleSpec.key);
         let toStyle = null;
@@ -337,7 +343,8 @@ export class MassEdit {
             if (change === styleChange) continue;
             const field = fields.get(`${store}.${change.key}`);
             if (!field) continue;
-            target[change.key] = this.#parse(field, change.value);
+            const value = this.#parse(field, change.value);
+            target[change.key] = typed(ruleKind, { [change.key]: value }, target)[change.key];
             if (field.styled) styledByHand = true;
         }
         if (styledByHand && !toStyle) target[styleSpec.key] = styleSpec.none;

@@ -317,6 +317,45 @@ export const FILRODENSWMB = {
         // A shape still below this when the user finishes drawing it is discarded, since it could
         // never be selected or edited as a shape, and terrain generation ignores land masks below it.
         MIN_POLYGON_VERTICES: 3,
+        // The longest free text, in characters: what a field accepts (its maxlength), what an
+        // export writes and what an import accepts. An export or import holding longer text is
+        // refused rather than cut short, so nothing a user wrote is lost without them knowing.
+        // Raise these to test with longer text; every check reads them from here.
+        TEXT: {
+            // Names of maps, pins, routes, regions, layers, sets, styles, biomes and the like,
+            // and other one-line text (a seed, a title template, the scale bar's units)
+            NAME: 200,
+            // Descriptions of pins, routes, regions and faults (written into journal pages)
+            DESCRIPTION: 20000,
+            // The text of a standalone label
+            LABEL: 500,
+        },
+        // What a file opened for import may hold. Anything past these is refused before it reaches
+        // the map, so a damaged or hostile file cannot exhaust memory or stall the studio.
+        IMPORT: {
+            // The largest file read, in bytes
+            FILE_BYTES: 268435456,
+            // How deeply objects and arrays may nest
+            DEPTH: 32,
+            // How many values (objects, arrays, strings, numbers…) the file may hold in all
+            VALUES: 10000000,
+            // The longest array
+            ARRAY_LENGTH: 2000000,
+            // The longest string that is not free text (an embedded image, an encoded owner array)
+            STRING_LENGTH: 67108864,
+            // The smallest and largest map width or height, in pixels
+            MAP_DIMENSION_MIN: 16,
+            MAP_DIMENSION_MAX: 16384,
+            // The longest id or key
+            ID_LENGTH: 64,
+        },
+        // Images a user picks or a file brings in (reference images, decorations, custom pin icons)
+        IMAGE: {
+            // The largest image file, in bytes
+            BYTES: 33554432,
+            // The widest or tallest image, in pixels
+            DIMENSION: 8192,
+        },
     },
     // The random land mask button in Guided mode (see LandMaskGenerator). Sizes are fractions of
     // the map's shorter side, so a shape covers the same share of any map.

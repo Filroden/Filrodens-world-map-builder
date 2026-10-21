@@ -3,6 +3,7 @@ import { registerSidebarInjection } from "./src/hooks/sidebar-injection.js";
 import { initializeCompendium } from "./src/platform/foundry/store.js";
 import { registerPinIconSettings } from "./src/data/pinIcons.js";
 import { attachTheme, registerThemeSettings } from "./src/ui/Theme.js";
+import { registerModuleHelpers } from "./src/ui/templateHelpers.js";
 
 Hooks.once("init", async () => {
     game.filrodenswmb = {
@@ -15,6 +16,9 @@ Hooks.once("init", async () => {
     attachTheme(document.body);
 
     registerPinIconSettings();
+
+    // The module's own template helpers (a free-text field's maxlength), beside Foundry's
+    registerModuleHelpers(Handlebars);
 
     // Pre-load Handlebars partials so the UI can construct itself dynamically
     await foundry.applications.handlebars.loadTemplates([

@@ -8,13 +8,13 @@
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" id="fwmb-inspector-name" name="faultName" value="{{fault.name}}" />
+            <input type="text" id="fwmb-inspector-name" name="faultName" maxlength="{{fwmbTextLimit 'name'}}" value="{{fault.name}}" />
         </div>
     </div>
     <div class="fwmb-form-group fwmb-form-group--stacked">
         <label class="fwmb-label" for="fwmb-inspector-description">{{localize "FILRODENSWMB.UI.Description"}}</label>
         <div class="fwmb-form-fields">
-            <textarea id="fwmb-inspector-description" class="fwmb-scrollable" name="faultDesc" rows="3">{{fault.description}}</textarea>
+            <textarea id="fwmb-inspector-description" class="fwmb-scrollable" name="faultDesc" maxlength="{{fwmbTextLimit 'description'}}" rows="3">{{fault.description}}</textarea>
         </div>
     </div>
 </div>

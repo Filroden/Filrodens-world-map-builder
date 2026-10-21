@@ -6,6 +6,7 @@ import { MeshIntegration } from "./MeshIntegration.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { regionFillColor } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
+import { typed } from "../data/MapRules.js";
 
 /** The fill patterns a region can have, with their names. */
 const PATTERNS = Object.freeze({ solid: "FILRODENSWMB.UI.StyleSolid", diagonal: "FILRODENSWMB.UI.StyleDiagonalHatch", crosshatch: "FILRODENSWMB.UI.StyleCrossHatch" });
@@ -105,7 +106,8 @@ export class RegionEditor {
 
     /** Applies the form to the region as one undo step, when anything changed. */
     static #apply(app, region, form, field) {
-        const values = this.read(app, region, form, field);
+        // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the region's own
+        const values = typed("region", this.read(app, region, form, field), region);
         // A region drawn in its preset colour holds no fill of its own until one is given
         const current = { ...region, fillColor: region.fillColor ?? regionFillColor(region), fillStyle: region.fillStyle ?? "solid", label: InspectorFields.label(app, region) };
         if (!InspectorFields.differs(current, values)) return false;

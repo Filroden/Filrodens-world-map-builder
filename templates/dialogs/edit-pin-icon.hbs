@@ -2,7 +2,7 @@
     <div class="fwmb-form-group fwmb-form-group--stacked">
         <label>{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
-            <input type="text" name="iconName" value="{{icon.name}}" required />
+            <input type="text" name="iconName" maxlength="{{fwmbTextLimit 'name'}}" value="{{icon.name}}" required />
         </div>
     </div>
 

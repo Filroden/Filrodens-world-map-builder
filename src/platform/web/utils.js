@@ -45,11 +45,19 @@ export function debounce(fn, delay) {
     };
 }
 
-/** Turns dotted keys ("label.color") into nested objects. */
+/** Path parts never followed or written: they would reach an object's prototype rather than its own data. */
+const UNSAFE_PARTS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Turns dotted keys ("label.color") into nested objects. A key with a `__proto__`, `constructor`
+ * or `prototype` part is skipped: followed, it would walk onto Object.prototype and write there
+ * for every object in the page.
+ */
 function expandDottedKeys(source) {
     const expanded = {};
     for (const [key, value] of Object.entries(source)) {
         const path = key.split(".");
+        if (path.some((part) => UNSAFE_PARTS.has(part))) continue;
         const last = path.pop();
         let target = expanded;
         for (const part of path) target = target[part] = isPlainObject(target[part]) ? target[part] : {};
@@ -61,10 +69,12 @@ function expandDottedKeys(source) {
 /**
  * Merges `source` into `target` (which is changed and returned): plain objects are merged key by
  * key all the way down, anything else replaces what was there, and dotted keys in `source` are
- * expanded first. This is what Foundry's mergeObject does with its default options.
+ * expanded first. This is what Foundry's mergeObject does with its default options, except that
+ * keys reaching a prototype are never merged (see expandDottedKeys).
  */
 export function mergeObject(target, source = {}) {
     for (const [key, value] of Object.entries(expandDottedKeys(source))) {
+        if (UNSAFE_PARTS.has(key)) continue;
         if (isPlainObject(value) && isPlainObject(target[key])) mergeObject(target[key], value);
         else target[key] = value;
     }

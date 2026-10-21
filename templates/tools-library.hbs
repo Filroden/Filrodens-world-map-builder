@@ -24,7 +24,7 @@
         {{#each this.rows}}
             {{#if this.naming}}
             <div class="fwmb-list-item fwmb-list-item--naming" role="option" aria-selected="true">
-                <input type="text" class="fwmb-input" value="{{this.value}}" aria-label="{{localize this.label}}" data-style-naming data-panel-ui autocomplete="off" spellcheck="false" />
+                <input type="text" class="fwmb-input" value="{{this.value}}" maxlength="{{fwmbTextLimit 'name'}}" aria-label="{{localize this.label}}" data-style-naming data-panel-ui autocomplete="off" spellcheck="false" />
             </div>
             {{else}}
             <div role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-style-type="{{../type}}" data-action="openStyle">

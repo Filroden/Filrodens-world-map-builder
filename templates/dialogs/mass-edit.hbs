@@ -72,7 +72,7 @@
             </button>
             <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
                 {{#each icons}}
-                <button type="button" class="fwmb-btn" aria-pressed="{{#if this.selected}}true{{else}}false{{/if}}" data-icon="{{this.key}}" data-path="{{this.path}}" data-custom="{{this.isCustom}}" data-tooltip="{{this.localized}}" aria-label="{{this.localized}}">
+                <button type="button" class="fwmb-btn" aria-pressed="{{#if this.selected}}true{{else}}false{{/if}}" data-icon="{{this.key}}" data-path="{{this.path}}" data-custom="{{this.isCustom}}" data-tooltip-text="{{this.localized}}" aria-label="{{this.localized}}">
                     <i class="fwmb-icon {{#unless this.isCustom}}fwmb-icon--{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} aria-hidden="true"></i>
                 </button>
                 {{/each}}

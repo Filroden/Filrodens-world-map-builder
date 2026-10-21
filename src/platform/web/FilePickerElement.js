@@ -24,13 +24,28 @@ export class FilePickerElement extends HTMLElement {
     static browseLabel = "Choose a file";
 
     /**
+     * Checks a chosen file and returns the data URL to keep, or throws to refuse it (see define).
+     * Without a check, the file is read as it is.
+     * @type {((file: File) => Promise<string>)|null}
+     */
+    static check = null;
+
+    /** Told why a chosen file was refused (see define). @type {((error: Error) => void)|null} */
+    static onRefused = null;
+
+    /**
      * Defines the element under its Foundry name, once.
      *
      * @param {CustomElementRegistry} registry
-     * @param {{browseLabel?: string}} [options]
+     * @param {{browseLabel?: string, check?: Function, onRefused?: Function}} [options] - `check`
+     *     reads a chosen file into the data URL kept (the page passes ImageCheck.checkFile, so an
+     *     image is known by its bytes and an SVG is cleaned), throwing to refuse it; `onRefused`
+     *     reports a refusal.
      */
-    static define(registry, { browseLabel } = {}) {
+    static define(registry, { browseLabel, check, onRefused } = {}) {
         if (browseLabel) FilePickerElement.browseLabel = browseLabel;
+        if (check) FilePickerElement.check = check;
+        if (onRefused) FilePickerElement.onRefused = onRefused;
         if (!registry.get("file-picker")) registry.define("file-picker", FilePickerElement);
     }
 
@@ -82,15 +97,24 @@ export class FilePickerElement extends HTMLElement {
         this.#internals?.setFormValue(this.#value);
     }
 
-    /** Opens the browser's file chooser for an image, and takes the chosen file as a data URL. */
+    /**
+     * Opens the browser's file chooser for an image, and takes the chosen file as a data URL once
+     * it has passed the check (see define). A refused file leaves the field as it was.
+     */
     #browse() {
         const chooser = this.ownerDocument.createElement("input");
         chooser.type = "file";
-        chooser.accept = "image/*";
+        chooser.accept = "image/png,image/jpeg,image/webp,image/svg+xml";
         chooser.addEventListener("change", async () => {
             const file = chooser.files?.[0];
             if (!file) return;
-            this.value = await FilePickerElement.readAsDataUrl(file);
+            try {
+                this.value = FilePickerElement.check ? await FilePickerElement.check(file) : await FilePickerElement.readAsDataUrl(file);
+            } catch (error) {
+                console.warn("FWMB | Image refused:", error);
+                FilePickerElement.onRefused?.(error);
+                return;
+            }
             for (const type of FORWARDED_EVENTS) this.#emit(type);
         });
         chooser.click();

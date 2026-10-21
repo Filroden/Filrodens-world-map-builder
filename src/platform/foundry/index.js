@@ -23,10 +23,16 @@ const i18n = {
 /** The studio's dialogues are drawn inside the studio, the same in Foundry as on any other host. */
 const dialogs = createOverlayDialogs({ localize: (key) => i18n.localize(key) });
 
+/**
+ * Notifications. The studio's messages are plain text, already localised and often holding a name
+ * the user typed or a file brought in, so each is escaped and shown as text. Foundry would
+ * otherwise treat the message as HTML (cleaned, but still markup), as the web host never does.
+ */
+const asText = (options) => ({ ...options, clean: false });
 const notify = {
-    info: (text, options) => ui.notifications.info(text, options),
-    warn: (text, options) => ui.notifications.warn(text, options),
-    error: (text, options) => ui.notifications.error(text, options),
+    info: (text, options) => ui.notifications.info(foundry.utils.escapeHTML(String(text)), asText(options)),
+    warn: (text, options) => ui.notifications.warn(foundry.utils.escapeHTML(String(text)), asText(options)),
+    error: (text, options) => ui.notifications.error(foundry.utils.escapeHTML(String(text)), asText(options)),
 };
 
 const utils = {
