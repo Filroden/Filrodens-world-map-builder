@@ -501,6 +501,8 @@ export const FILRODENSWMB = {
                 view3d: ["Rotate3D"],
                 reference: ["ReferenceMove", "ReferenceResize"],
                 crop: ["CropDraw", "CropMove", "CropResize"],
+                // A culture's homeland being picked on the map (see CultureMarkers)
+                homeland: ["PlaceHomeland", "StopHomeland"],
                 terrain: ["PaintTerrain"],
                 biomes: ["PaintBiomes"],
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
@@ -570,6 +572,7 @@ export const FILRODENSWMB = {
                         { caption: "FILRODENSWMB.UI.ShortcutsLines", context: "line" },
                     ],
                 },
+                { title: "FILRODENSWMB.UI.ToolGenerate", tables: [{ caption: "FILRODENSWMB.UI.ShortcutsHomeland", context: "homeland" }] },
                 {
                     title: "FILRODENSWMB.UI.ToolRegions",
                     tables: [

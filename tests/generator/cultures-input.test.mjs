@@ -57,3 +57,21 @@ test("a map culture set as the default gives the same run as no cultures, with i
     assert.equal(named.cultures[0].id, "people");
     assert.equal(named.cultures[0].homelands.length, 1, "Auto placed one homeland");
 });
+
+test("a run reports each culture's homelands: placed for it or given, and how many points were left out; duchies and counties name their largest culture", async () => {
+    const { makePayload, mesh } = syntheticMap();
+    const quiet = { pause: () => Promise.resolve() };
+    // One point in the sea (the island's corner) and one off the map: both left out, so one is placed
+    const sea = { id: "sea", name: "Sea", homelands: [{ x: 2, y: 2 }, { x: -50, y: 10 }] };
+    const land = { id: "land", name: "Land", homelands: [{ x: 240, y: 180 }, { x: 2, y: 3 }] };
+    const result = await runGenerator(makePayload({ cultures: [sea, land] }), quiet);
+    const [first, second] = result.cultures;
+    assert.equal(first.homelandsAuto, true);
+    assert.equal(first.homelandsLeftOut, 2);
+    assert.equal(second.homelandsAuto, false);
+    assert.equal(second.homelandsLeftOut, 1);
+    assert.equal(second.homelands.length, 1);
+    assert.ok(mesh.cellCount > second.homelands[0]);
+    assert.ok(result.duchies.every((duchy) => duchy.culture === 0 || duchy.culture === 1));
+    assert.ok(result.counties.every((county) => county.culture === 0 || county.culture === 1));
+});

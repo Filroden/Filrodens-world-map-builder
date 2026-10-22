@@ -20,6 +20,9 @@ const COUNTIES = 2;
 const TRANSPORTS = Object.freeze({ road: "FILRODENSWMB.UI.TransportRoad", river: "FILRODENSWMB.UI.TransportRiver", sea: "FILRODENSWMB.UI.TransportSea" });
 const CLASSES = Object.freeze({ trunk: "FILRODENSWMB.UI.RouteClassTrunk", main: "FILRODENSWMB.UI.RouteClassMain", minor: "FILRODENSWMB.UI.RouteClassMinor" });
 
+/** The least share of a culture mix shown (smaller shares are left out of the line). */
+const MIX_MIN_SHARE = 0.05;
+
 /** Each settlement tier's name, from its default pin style. */
 const TIER_NAMES = new Map(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style.name]));
 
@@ -37,6 +40,7 @@ export class GeneratedDetails {
         return this.#rows([
             ["FILRODENSWMB.UI.GeneratedPlace", tierName ? platform.i18n.localize(tierName) : null],
             ["FILRODENSWMB.UI.GeneratedPopulation", this.#count(generated.population)],
+            ["FILRODENSWMB.UI.GeneratedCultures", this.#cultures(app, generated)],
             ["FILRODENSWMB.UI.GeneratedShownFrom", this.#levelName(DetailLevel.ofPin(app, pin))],
             ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(pin)],
         ]);
@@ -58,6 +62,7 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedTitle", place ? this.#titleOf(region, place) : null],
             ["FILRODENSWMB.UI.GeneratedRank", RANKS[generated.tier] ? platform.i18n.localize(RANKS[generated.tier]) : null],
             ["FILRODENSWMB.UI.GeneratedPopulation", this.#count(generated.population)],
+            [generated.mix ? "FILRODENSWMB.UI.GeneratedCultures" : "FILRODENSWMB.UI.GeneratedCulture", this.#cultures(app, generated)],
             ["FILRODENSWMB.UI.GeneratedDuchies", place?.depth === REALMS ? this.#count(below[0]) : null],
             ["FILRODENSWMB.UI.GeneratedCounties", place ? this.#count(below[COUNTIES - place.depth - 1]) : null],
             ["FILRODENSWMB.UI.GeneratedShownFrom", place ? this.#levelName(DetailLevel.ofLevel(place.set, place.level)) : null],
@@ -126,6 +131,37 @@ export class GeneratedDetails {
         const independent = place.depth === REALMS && region.generated?.tier === "independent";
         const template = (independent ? place.set.levels[REALMS + 1]?.titleTemplate : null) ?? place.level.titleTemplate;
         return template?.includes("{name}") ? template.replaceAll("{name}", region.name) : null;
+    }
+
+    /**
+     * A culture's name as generated details name it: by the map culture's id (its name now, or as
+     * the run that made the item knew it, if it has since been deleted), or by an older run's index
+     * into its own cultures. Null for the default culture of a run with no cultures.
+     * @param {object} app
+     * @param {string|number|null} ref
+     * @returns {string|null}
+     */
+    static cultureName(app, ref) {
+        const known = app.modelRun?.cultures ?? [];
+        if (typeof ref === "string") return (app.uiState?.cultures ?? []).find((culture) => culture.id === ref)?.name || known.find((culture) => culture.id === ref)?.name || null;
+        if (Number.isInteger(ref)) return known[ref]?.name || null;
+        return null;
+    }
+
+    /**
+     * An item's cultures as one line: its mix ("Hillfolk 70%, Lowlanders 30%", shares under
+     * MIX_MIN_SHARE left out), or its one culture's name; null with no cultures.
+     */
+    static #cultures(app, generated) {
+        if (Array.isArray(generated.mix) && generated.mix.length) {
+            const parts = generated.mix
+                .filter((entry) => entry.share >= MIX_MIN_SHARE)
+                .map((entry) => ({ name: this.cultureName(app, entry.culture), share: Math.round(entry.share * 100) }))
+                .filter((entry) => entry.name)
+                .map((entry) => platform.i18n.format("FILRODENSWMB.UI.GeneratedCultureShare", { name: entry.name, share: entry.share }));
+            if (parts.length) return parts.join(", ");
+        }
+        return this.cultureName(app, generated.culture);
     }
 
     /** The rows whose value is known, localised. */

@@ -39,6 +39,7 @@ import { StyleEditors } from "./StyleEditors.js";
 import { StyleLists } from "./StyleLists.js";
 import { CultureEditor } from "./CultureEditor.js";
 import { CultureLists } from "./CultureLists.js";
+import { CultureMarkers } from "./CultureMarkers.js";
 import { RegionPainter } from "./RegionPainter.js";
 import { Inspector } from "./Inspector.js";
 import { RegionEditor } from "./RegionEditor.js";
@@ -1309,6 +1310,7 @@ export class MapStudio {
         this.#updateCanvasHint();
         MeshIntegration.updateOutline(this);
         RouteTool.updateOverlays(this);
+        CultureMarkers.update(this);
         // The inspector shows the object as it is now: a change made in the panel, the bar or by
         // an undo redraws the panel, and the inspector with it (or closes it, if the object went)
         if (regions.includes("context")) Inspector.refresh(this);
@@ -1557,8 +1559,9 @@ export class MapStudio {
             event.preventDefault();
             return;
         }
-        // Pins' and labels' Select mode takes Escape, closing the inspector on what it picked
-        if (PickTool.handleKey(this, event)) {
+        // A homeland pick takes Escape, ending it; pins' and labels' Select mode takes it, closing the
+        // inspector on what it picked
+        if (CultureMarkers.handleKey(this, event) || PickTool.handleKey(this, event)) {
             event.preventDefault();
             return;
         }
@@ -2313,9 +2316,15 @@ export class MapStudio {
             selecting: PickTool.selecting(this),
             isMaskDrawing: this.#isMaskDrawingMode(),
             heldItem: this.canvasEngine?.heldItem ?? null,
+            pickingHomeland: CultureMarkers.picking(this),
         });
 
         CanvasHints.render(element, CanvasHints.getItems(context), (key) => platform.i18n.localize(key));
+    }
+
+    /** The list of canvas actions brought up to date outside a redraw (a culture's homeland pick starting or ending). */
+    refreshCanvasHint() {
+        this.#updateCanvasHint();
     }
 
     /** The id of the list row an action's button sits in. */

@@ -5156,6 +5156,18 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     margin-block: var(--fwmb-size-4) var(--fwmb-size-2);
     cursor: default;
 }
+/* A culture's homelands in its inspector, each with its remove button */
+.fwmb-homeland-list {
+    list-style: none;
+    margin: 0 0 var(--fwmb-size-8);
+    padding: 0;
+}
+.fwmb-homeland-row {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-size-4);
+    font-variant-numeric: tabular-nums;
+}
 .fwmb-range-band-ends {
     display: flex;
     justify-content: space-between;

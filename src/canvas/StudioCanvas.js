@@ -11,6 +11,7 @@ import { LabelLayout } from "./LabelLayout.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
 import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
+import { HomelandMarkers } from "./HomelandMarkers.js";
 import { platform } from "../platform/index.js";
 
 /** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
@@ -171,11 +172,15 @@ export class StudioCanvas {
         this.regionOverlays = new RegionOverlays(PIXI);
         // The Routes tool's route being placed, trace stroke and waypoint handles
         this.routeOverlays = new RouteOverlays(PIXI);
+        this.homelandMarkers = new HomelandMarkers(PIXI);
 
         // A tool that takes the primary button's presses, moves and releases itself while editing
         // (see #pointerTool), or null; read on every event, so it follows the tool in use
         this.pointerToolProvider = null;
         this.pointerToolPressed = false;
+        // A tool that takes the primary button whether or not the map is being edited, for a
+        // moment's task (a culture's homeland picked on the map; see CultureMarkers), or null
+        this.pickPointerTool = null;
 
         // Setup the Crop Tool overlay
         this.cropGraphics = new PIXI.Graphics();
@@ -203,6 +208,7 @@ export class StudioCanvas {
             this.cropGraphics,
             ...this.regionOverlays.displayObjects,
             ...this.routeOverlays.displayObjects,
+            ...this.homelandMarkers.displayObjects,
             this.brushCursor,
         );
 
@@ -425,6 +431,7 @@ export class StudioCanvas {
      * hover, doubleClick and leave, each given the map point and the event (see pointerToolProvider).
      */
     #pointerTool() {
+        if (this.pickPointerTool) return this.pickPointerTool;
         return this.isEditMode ? (this.pointerToolProvider?.() ?? null) : null;
     }
 
@@ -2561,6 +2568,7 @@ export class StudioCanvas {
         scaleNodes(this.stage);
         this.regionOverlays.redraw(this.stage.scale.x);
         this.routeOverlays.redraw(this.stage.scale.x);
+        this.homelandMarkers.redraw(this.stage.scale.x);
     }
 
     /**

@@ -615,7 +615,7 @@ const MODEL_RUN = obj({
     settings: GENERATOR_SETTINGS,
     cellCount: int(0, FILRODENSWMB.MESH.MAX_CELLS),
     // Each culture as the run used it (see ModelRun); `homeland`, a single cell, is an older run's
-    cultures: list(obj({ id: { ...key, nullable: true }, name: generatorText("FILRODENSWMB.UI.LimitFieldName"), color: { ...color, nullable: true }, nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), homelands: { t: "cells" }, homeland: int(0, 1e9, { nullable: true }) })),
+    cultures: list(obj({ id: { ...key, nullable: true }, name: generatorText("FILRODENSWMB.UI.LimitFieldName"), color: { ...color, nullable: true }, nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), homelands: { t: "cells" }, homelandsAuto: bool, homelandsLeftOut: int(0, 1e6), homeland: int(0, 1e9, { nullable: true }) })),
     stats: numTree,
     cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
     history: list(numTree),

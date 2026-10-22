@@ -113,7 +113,7 @@ export function encodeModelRun(result, runId) {
         // The run's cultures in the order the cells' shares count them: each map culture's id (null
         // for the default culture), so a culture renamed or deleted since is still found, its name
         // and colour as they were, and its homeland cells
-        cultures: result.cultures.map(({ id = null, name, color = null, nameBase, homelands = [] }) => ({ id, name, color, nameBase, homelands })),
+        cultures: result.cultures.map(({ id = null, name, color = null, nameBase, homelands = [], homelandsAuto = false, homelandsLeftOut = 0 }) => ({ id, name, color, nameBase, homelands, homelandsAuto, homelandsLeftOut })),
         stats: { ...result.stats },
         cells,
         history: [],

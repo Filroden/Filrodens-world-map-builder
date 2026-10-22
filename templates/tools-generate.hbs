@@ -48,7 +48,7 @@
     {{/if}}
 
     {{#if generate.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOutOfDateHint"}}</p>{{/if}}
-    {{#each generate.notices}}<p class="fwmb-hint fwmb-generate-notice">{{localize this}}</p>{{/each}}
+    {{#each generate.notices}}<p class="fwmb-hint fwmb-generate-notice">{{#if this.text}}{{this.text}}{{else}}{{localize this}}{{/if}}</p>{{/each}}
 
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
@@ -148,6 +148,10 @@
         {{/each}}
         <dt>{{localize "FILRODENSWMB.UI.GenerateResultPopulation"}}</dt>
         <dd class="fwmb-readout">{{generate.results.population}}</dd>
+        {{#each generate.results.cultures}}
+        <dt><span class="fwmb-chip-swatch" aria-hidden="true" {{#if this.color}}style="--swatch: {{this.color}}"{{/if}}></span> {{this.name}}</dt>
+        <dd class="fwmb-readout">{{this.share}}</dd>
+        {{/each}}
     </dl>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 {{/if}}

@@ -31,6 +31,7 @@ export class CanvasHints {
      * @param {boolean} [state.selecting]  Whether a Select mode of PickTool's is on (rivers and
      *   faults, land masks, decorations).
      * @param {boolean} [state.isMaskDrawing]  Whether the Scene tool is drawing land masks.
+     * @param {boolean} [state.pickingHomeland]  Whether the next click adds a culture's homeland (see CultureMarkers).
      * @param {string|null} [state.heldItem]  What the pointer holds: label, decoration, pin or
      *   mask (a land mask).
      * @returns {string}  A key of CANVAS_HINTS.CONTEXTS.
@@ -40,6 +41,7 @@ export class CanvasHints {
         if (state.is3DView) return "view3d";
         const held = CanvasHints.#heldContext(state.heldItem);
         if (held) return held;
+        if (state.pickingHomeland) return "homeland";
         if (state.isReferenceMode) return "reference";
         if (state.isCropMode) return "crop";
         if (!state.isEditMode) return "view";

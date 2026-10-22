@@ -57,8 +57,25 @@
 
 <div class="fwmb-group">
     <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.CultureHomelands"}}</div>
-    <p class="fwmb-hint">{{#if homelands}}{{localize "FILRODENSWMB.UI.CultureHomelandsGiven" count=homelands}}{{else}}{{localize "FILRODENSWMB.UI.CultureHomelandsAuto"}}{{/if}}</p>
-    {{#if homelands}}
-    <button type="button" class="fwmb-btn fwmb-btn--secondary" data-inspector-action="autoHomelands">{{localize "FILRODENSWMB.UI.CultureHomelandsUseAuto"}}</button>
+    <p class="fwmb-hint">{{#if homelands.length}}{{localize "FILRODENSWMB.UI.CultureHomelandsGivenHint"}}{{else}}{{localize "FILRODENSWMB.UI.CultureHomelandsAuto"}}{{/if}}</p>
+    {{#if homelands.length}}
+    <ul class="fwmb-homeland-list">
+        {{#each homelands}}
+        <li class="fwmb-homeland-row">
+            <span class="fwmb-flex-1">{{this.label}}</span>
+            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-inspector-action="removeHomeland" data-index="{{this.index}}" aria-label="{{localize 'FILRODENSWMB.UI.CultureHomelandRemove'}} {{this.label}}" data-tooltip="{{localize 'FILRODENSWMB.UI.CultureHomelandRemove'}}">
+                <i class="fwmb-icon fwmb-icon--delete"></i>
+            </button>
+        </li>
+        {{/each}}
+    </ul>
     {{/if}}
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn" data-inspector-action="addHomeland" aria-pressed="{{#if picking}}true{{else}}false{{/if}}" {{#unless canAddHomeland}}disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.CultureHomelandAddHint'}}">
+            <i class="fwmb-icon fwmb-icon--place" aria-hidden="true"></i>{{#if picking}}{{localize "FILRODENSWMB.UI.CultureHomelandPicking"}}{{else}}{{localize "FILRODENSWMB.UI.CultureHomelandAdd"}}{{/if}}
+        </button>
+        {{#if homelands.length}}
+        <button type="button" class="fwmb-btn" data-inspector-action="autoHomelands">{{localize "FILRODENSWMB.UI.CultureHomelandsUseAuto"}}</button>
+        {{/if}}
+    </div>
 </div>

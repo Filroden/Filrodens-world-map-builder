@@ -157,6 +157,9 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
     ];
     const routes = routeChains(graph, finalTrade.traffic, finalTrade.towns.map((town) => town.cell));
     const people = peopleByUnit(feedback.cellPop, finalRealms);
+    const realmMix = unitCultures(cultures, finalRealms.realmOfCell, feedback.cellPop, finalRealms.realms.length);
+    const duchyMix = unitCultures(cultures, finalRealms.duchyOfCell, feedback.cellPop, finalRealms.duchies.length);
+    const countyMix = unitCultures(cultures, finalRealms.countyOfCell, feedback.cellPop, finalRealms.counties.length);
     return {
         revision: FILRODENSWMB.GENERATOR.REVISION,
         settings,
@@ -164,7 +167,16 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
         modelGraph: { neighbourStart: Int32Array.from(cells.neighbourStart), neighbourList: Int32Array.from(cells.neighbourList) },
         // Each culture as the run used it: the map's id (none for the default culture), its name and
         // colour then, and its homeland cells (given, or placed) with how many points it was given
-        cultures: cultures.cultures.map((culture, index) => ({ id: culture.id ?? null, name: culture.name, color: culture.color ?? null, nameBase: culture.nameBase, homelands: Array.from(cultures.homelands[index]), homelandsGiven: culture.homelandsGiven ?? 0 })),
+        // and how many of the points it was given were left out (off the map, or not on land)
+        cultures: cultures.cultures.map((culture, index) => ({
+            id: culture.id ?? null,
+            name: culture.name,
+            color: culture.color ?? null,
+            nameBase: culture.nameBase,
+            homelands: Array.from(cultures.homelands[index]),
+            homelandsAuto: cultures.homelandNotes[index].auto,
+            homelandsLeftOut: Math.max(0, (culture.homelandsGiven ?? 0) - (culture.homelandCells?.length ?? 0)) + cultures.homelandNotes[index].offLand,
+        })),
         places,
         realms: finalRealms.realms.map((realm, index) => ({
             kind: realm.kind,
@@ -174,10 +186,11 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
             duchies: realm.duchies,
             population: Math.round(people.realm[index]),
             landKm2: Math.round(realm.landKm2),
-            cultures: realmCultures(cultures, finalRealms.realmOfCell, feedback.cellPop, index),
+            cultures: realmMix[index],
         })),
-        duchies: finalRealms.duchies.map((duchy, index) => ({ seat: duchy.seat, name: names.duchies[index], realm: finalRealms.realmOfDuchy[index], counties: duchy.counties, population: Math.round(people.duchy[index]) })),
-        counties: finalRealms.counties.map((county, index) => ({ seat: county.seat, name: names.counties[index], duchy: finalRealms.duchyOfCounty[index], population: Math.round(people.county[index]) })),
+        // Duchies and counties name their largest culture (-1 for none)
+        duchies: finalRealms.duchies.map((duchy, index) => ({ seat: duchy.seat, name: names.duchies[index], realm: finalRealms.realmOfDuchy[index], counties: duchy.counties, population: Math.round(people.duchy[index]), culture: duchyMix[index][0]?.[0] ?? -1 })),
+        counties: finalRealms.counties.map((county, index) => ({ seat: county.seat, name: names.counties[index], duchy: finalRealms.duchyOfCounty[index], population: Math.round(people.county[index]), culture: countyMix[index][0]?.[0] ?? -1 })),
         routes,
         stats: statistics(run, { feedback, finalTrade, finalRealms, routes, places }),
         timings: run.timings,
@@ -228,15 +241,26 @@ function castlePlace(castle, name) {
     return { kind: "castle", cell: castle.cell, name: name.name, keep: name.keep, reason: castle.reason, security: round(castle.security, 3) };
 }
 
-/** A realm's people by culture, largest first. */
-function realmCultures(cultures, realmOfCell, cellPop, realm) {
-    const totals = new Map();
-    for (let cell = 0; cell < realmOfCell.length; cell++) {
-        if (realmOfCell[cell] !== realm) continue;
-        for (const [culture, share] of sharesOf(cultures, cell)) totals.set(culture, (totals.get(culture) ?? 0) + share * cellPop[cell]);
+/**
+ * Each unit's people by culture (a realm's, duchy's or county's), largest first: the shares of its
+ * cells weighted by their people.
+ * @param {import("./Cultures.js").CultureData} cultures
+ * @param {Int32Array} unitOfCell - Each cell's unit, or -1.
+ * @param {Float64Array} cellPop
+ * @param {number} count - How many units there are.
+ * @returns {[number, number][][]}
+ */
+function unitCultures(cultures, unitOfCell, cellPop, count) {
+    const totals = Array.from({ length: count }, () => new Map());
+    for (let cell = 0; cell < unitOfCell.length; cell++) {
+        const unit = unitOfCell[cell];
+        if (unit < 0 || unit >= count) continue;
+        for (const [culture, share] of sharesOf(cultures, cell)) totals[unit].set(culture, (totals[unit].get(culture) ?? 0) + share * cellPop[cell]);
     }
-    const sum = [...totals.values()].reduce((total, value) => total + value, 0) || 1;
-    return [...totals.entries()].map(([culture, value]) => [culture, round(value / sum, 3)]).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+    return totals.map((byCulture) => {
+        const sum = [...byCulture.values()].reduce((total, value) => total + value, 0) || 1;
+        return [...byCulture.entries()].map(([culture, value]) => [culture, round(value / sum, 3)]).sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+    });
 }
 
 function modelCellOutput(run, feedback, realms) {

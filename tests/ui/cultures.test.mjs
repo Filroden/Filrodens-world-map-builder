@@ -31,11 +31,12 @@ const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-wo
 await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/range-band.hbs", "parts/inspector-culture.hbs", "tools-generate.hbs"]);
 
 const answers = { confirm: true };
+const warnings = [];
 let host = null;
 let nextId = 0;
 installPlatform({
     i18n,
-    notify: { info: () => {}, warn: () => {}, error: () => {} },
+    notify: { info: () => {}, warn: (message) => warnings.push(message), error: () => {} },
     utils: { ...platform.utils, randomID: () => `culture${++nextId}`, deepClone: (value) => structuredClone(value), mergeObject: (target, source) => Object.assign(target, source), escapeHtml: (text) => handlebars.escapeExpression(text) },
     templates,
     settings: { get: () => [] },
@@ -52,6 +53,10 @@ const { CultureEditor } = await import("../../src/applications/CultureEditor.js"
 const { CultureLists } = await import("../../src/applications/CultureLists.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
 const { RangeTrack } = await import("../../src/ui/RangeTrack.js");
+const { CultureMarkers } = await import("../../src/applications/CultureMarkers.js");
+const { Inspector } = await import("../../src/applications/Inspector.js");
+const { GeneratedDetails } = await import("../../src/applications/GeneratedDetails.js");
+const { GeneratePanel } = await import("../../src/applications/GeneratePanel.js");
 
 beforeEach(() => {
     answers.confirm = true;
@@ -74,6 +79,11 @@ function studio() {
         _expandedSections: new Set(),
         _collapsedSections: new Set(),
         uiState: { seaLevel: 0.4, generatorSettings: { nameBase: "Nordic" }, cultures: [], customBiomes: [] },
+        // A 10 x 10 map: sea on its left half, land on its right
+        mapWidth: 10,
+        mapHeight: 10,
+        currentElevationData: Float32Array.from({ length: 100 }, (_, index) => (index % 10 < 5 ? 0.2 : 0.6)),
+        canvasEngine: { pickPointerTool: null, markers: null, homelandMarkers: { set(markers) { app.canvasEngine.markers = markers; } } },
         modelRun: { run: "earlier" },
         pinHistory: [],
         pinRedoStack: [],
@@ -230,4 +240,81 @@ test("a handle's keys: a step, ten steps, the ends; never past the other end", (
     const lowEnd = holder.querySelector('[data-band-edge="0"]');
     lowEnd.dispatchEvent(new window.KeyboardEvent("keydown", { key: "End", bubbles: true }));
     assert.equal(holder.querySelector("input").value, "0.4,0.4", "the low end stops at the high one");
+});
+
+test("Add homeland: the next click on land adds one as an undo step; water is refused; Escape and closing end it", async () => {
+    const app = studio();
+    const id = await addCulture(app, "Hillfolk");
+    const button = () => form(app).querySelector('[data-inspector-action="addHomeland"]');
+    button().click();
+    await settle();
+    assert.ok(app.canvasEngine.pickPointerTool, "the click goes to the pick, editing or not");
+    assert.equal(button().getAttribute("aria-pressed"), "true");
+    warnings.length = 0;
+    app.canvasEngine.pickPointerTool.down(2, 3);
+    assert.equal(warnings.length, 1, "water is refused");
+    assert.deepEqual(culture(app).homelands, []);
+    app.canvasEngine.pickPointerTool.down(7.4, 3.6);
+    await settle();
+    assert.deepEqual(culture(app).homelands, [{ x: 7, y: 4 }]);
+    assert.equal(app.canvasEngine.pickPointerTool, null, "one click, one homeland");
+    // The studio redraws the inspector after the panel (see MapStudio's afterRegionsDrawn)
+    await Inspector.refresh(app);
+    assert.match(form(app).querySelector(".fwmb-homeland-row").textContent, /CultureHomelandAt/);
+    undo(app);
+    assert.deepEqual(culture(app).homelands, []);
+    // Escape ends a pick; so does the inspector closing
+    CultureMarkers.togglePick(app, id);
+    assert.equal(CultureMarkers.handleKey(app, { key: "Escape" }), true);
+    assert.equal(app.canvasEngine.pickPointerTool, null);
+    CultureMarkers.togglePick(app, id);
+    Inspector.close(app);
+    await settle();
+    assert.equal(app.canvasEngine.pickPointerTool, null);
+});
+
+test("Remove takes one homeland away, as one undo step", async () => {
+    const app = studio();
+    await addCulture(app, "Hillfolk");
+    culture(app).homelands = [{ x: 6, y: 1 }, { x: 8, y: 8 }];
+    await CultureEditor.open(app, culture(app).id);
+    form(app).querySelector('[data-inspector-action="removeHomeland"][data-index="0"]').click();
+    await settle();
+    assert.deepEqual(culture(app).homelands, [{ x: 8, y: 8 }]);
+    undo(app);
+    assert.equal(culture(app).homelands.length, 2);
+});
+
+test("the markers: given homelands filled, a run's placed homeland hollow, only in the Generate tool", async () => {
+    const app = studio();
+    await addCulture(app, "Hillfolk");
+    await addCulture(app, "Lowlanders");
+    culture(app).homelands = [{ x: 6, y: 1 }];
+    app.meshSession = { mesh: { cellCount: 50, siteX: (cell) => cell, siteY: (cell) => cell + 1 } };
+    app.modelRun = { run: "r", cultures: [{ id: culture(app).id, homelands: [3], homelandsAuto: false }, { id: culture(app, 1).id, homelands: [9], homelandsAuto: true }] };
+    CultureMarkers.update(app);
+    assert.deepEqual(app.canvasEngine.markers, [{ x: 6, y: 1, color: culture(app).color, filled: true }, { x: 9, y: 10, color: culture(app, 1).color, filled: false }]);
+    app.activeTool = "regions";
+    CultureMarkers.update(app);
+    assert.deepEqual(app.canvasEngine.markers, []);
+});
+
+test("generated details name cultures by id (a deleted one as the run knew it), with the mix; Results give each culture's share", () => {
+    const app = studio();
+    app.uiState.cultures = [{ id: "hill", name: "Hillfolk", color: "#aa0000" }];
+    app.modelRun = { run: "r", cultures: [{ id: "hill", name: "Hill people" }, { id: "gone", name: "Old folk", color: "#00aa00" }], stats: { population: 1000 } };
+    const pin = { generated: { run: "r", kind: "town", tier: "town", population: 500, culture: "hill", mix: [{ culture: "hill", share: 0.7 }, { culture: "gone", share: 0.27 }, { culture: "hill", share: 0.03 }] } };
+    const rows = GeneratedDetails.forPin(app, pin);
+    const cultures = rows.find((row) => row.label === "FILRODENSWMB.UI.GeneratedCultures");
+    assert.match(cultures.value, /Hillfolk.*70.*Old folk.*27/);
+    assert.ok(!cultures.value.includes("3"), "under 5% left out");
+    assert.equal(GeneratedDetails.cultureName(app, 0), "Hill people", "an older run's index");
+    assert.equal(GeneratedDetails.cultureName(app, null), null);
+    app.layerSets = [{ kind: "political", levels: [{ regions: [
+        { key: 0, name: "A", generated: { run: "r", kind: "realm", population: 300, culture: "hill", mix: [{ culture: "hill", share: 1 }] } },
+        { key: 1, name: "B", generated: { run: "r", kind: "realm", population: 100, culture: "gone", mix: [{ culture: "gone", share: 1 }] } },
+    ] }] }];
+    const shares = GeneratePanel.results(app).cultures;
+    assert.deepEqual(shares.map((entry) => [entry.name, entry.color]), [["Hillfolk", "#aa0000"], ["Old folk", "#00aa00"]]);
+    assert.match(shares[0].share, /75/);
 });

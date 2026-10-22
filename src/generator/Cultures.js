@@ -38,6 +38,8 @@ import { SearchSpace, searchAll } from "./Search.js";
  * @property {Int32Array} dominant - The culture holding each land cell, or -1.
  * @property {Float64Array} popMult
  * @property {Int32Array[]} homelands - The homeland cells of each culture.
+ * @property {{auto: boolean, offLand: number}[]} homelandNotes - Each culture's homelands: whether
+ *     one was placed for it, and how many of those it was given lay off the land.
  */
 
 /** The cultures a run uses: the given ones, or the single default culture. */
@@ -158,9 +160,11 @@ export function spreadCultures(graph, cultures) {
     const land = landCells(cells);
     const fits = cultures.map((culture) => fitTable(culture, cells, land));
     const meanFits = fits.map((fit) => meanFit(fit, cells, land));
-    const homelands = placeHomelands(graph, cultures, fits, land, base);
+    const placed = placeHomelands(graph, cultures, fits, land, base);
+    const homelands = placed.map((entry) => entry.cells);
+    const homelandNotes = placed.map(({ auto, offLand }) => ({ auto, offLand }));
     const distances = cultures.map((_, index) => spreadCost(graph, base, fits[index], meanFits[index], homelands[index]));
-    return { cultures, homelands, ...shareCells(cells, cultures, fits, distances, land) };
+    return { cultures, homelands, homelandNotes, ...shareCells(cells, cultures, fits, distances, land) };
 }
 
 function landCells(cells) {
@@ -197,10 +201,12 @@ function placeHomelands(graph, cultures, fits, land, base) {
     const isLand = new Uint8Array(graph.count);
     for (const cell of land) isLand[cell] = 1;
     return cultures.map((culture, index) => {
-        const given = [...new Set(givenHomelands(culture))].filter((cell) => Number.isInteger(cell) && cell >= 0 && cell < graph.count && isLand[cell]);
+        const asked = givenHomelands(culture);
+        const onLand = (cell) => Number.isInteger(cell) && cell >= 0 && cell < graph.count && isLand[cell] === 1;
+        const given = [...new Set(asked.filter(onLand))];
         const cells = given.length ? given : [bestHomeland(graph.cells, fits[index], land, taken)];
         space.run(cells, base, { limit: spacing, visit: (reached) => (taken[reached] = 1) });
-        return Int32Array.from(cells);
+        return { cells: Int32Array.from(cells), auto: given.length === 0, offLand: asked.filter((cell) => !onLand(cell)).length };
     });
 }
 

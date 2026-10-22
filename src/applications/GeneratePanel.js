@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { nameBaseNames } from "../generator/Names.js";
+import { GeneratedDetails } from "./GeneratedDetails.js";
 import { platform } from "../platform/index.js";
 import { Generation } from "./Generation.js";
 
@@ -115,8 +116,9 @@ export class GeneratePanel {
     /**
      * The notices the panel shows: on a regional map holding content generated on the map it was
      * cut from, that in-fill is the way to refine it; on a map covering a small area, that it will
-     * get few realms and only the larger settlements.
-     * @returns {string[]} Localisation keys.
+     * get few realms and only the larger settlements; and, after a run, each culture whose
+     * homelands were not all on land (some left out, and one placed for it when none was left).
+     * @returns {(string|{text: string})[]} Localisation keys, or text already put together.
      */
     static #notices(app) {
         const notices = [];
@@ -126,6 +128,11 @@ export class GeneratePanel {
         if (app.currentParentId && [...(app.mapPins ?? []), ...(app.mapRoutes ?? []), ...regions].some(inherited)) notices.push("FILRODENSWMB.UI.GenerateInheritedNotice");
         const land = this.landModelCells(app.meshSession);
         if (land !== null && land < FILRODENSWMB.GENERATOR.SMALL_WORLD_LAND_CELLS) notices.push("FILRODENSWMB.UI.GenerateSmallWorldNotice");
+        for (const culture of app.modelRun?.cultures ?? []) {
+            if (!(culture.homelandsLeftOut > 0)) continue;
+            const key = culture.homelandsAuto ? "FILRODENSWMB.UI.GenerateHomelandsPlacedNotice" : "FILRODENSWMB.UI.GenerateHomelandsLeftOutNotice";
+            notices.push({ text: platform.i18n.format(key, { name: culture.name, count: culture.homelandsLeftOut }) });
+        }
         return notices;
     }
 
@@ -172,7 +179,32 @@ export class GeneratePanel {
         return {
             rows: rows.map(([label, value]) => ({ label, value: value.toLocaleString(platform.i18n.lang) })),
             population: population.toLocaleString(platform.i18n.lang),
+            cultures: this.#cultureShares(app, regions),
         };
+    }
+
+    /**
+     * Each culture's share of the people of the run's realms still on the map, largest first (its
+     * realms' people by culture), with its name and colour; none for a run with no cultures.
+     * @returns {{name: string, color: string|null, share: string}[]}
+     */
+    static #cultureShares(app, regions) {
+        const totals = new Map();
+        let sum = 0;
+        for (const region of regions) {
+            const { kind, mix, population } = region.generated;
+            if (kind !== "realm" || !Array.isArray(mix) || !Number.isFinite(population)) continue;
+            for (const { culture, share } of mix) {
+                totals.set(culture, (totals.get(culture) ?? 0) + share * population);
+                sum += share * population;
+            }
+        }
+        if (!sum) return [];
+        const known = app.modelRun?.cultures ?? [];
+        const colorOf = (id) => (app.uiState.cultures ?? []).find((culture) => culture.id === id)?.color ?? known.find((culture) => culture.id === id)?.color ?? null;
+        return [...totals.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([id, value]) => ({ name: GeneratedDetails.cultureName(app, id) ?? "", color: colorOf(id), share: platform.i18n.format("FILRODENSWMB.UI.GeneratePercent", { value: Math.round((value / sum) * 100) }) }));
     }
 
     /**

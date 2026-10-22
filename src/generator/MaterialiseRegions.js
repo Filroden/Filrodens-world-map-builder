@@ -58,8 +58,8 @@ export function buildPolitical(session, result, { runId, idFactory, names, water
 
     const realmVisibility = output.labels === false ? "none" : "all";
     addRealms(levels[0], result, { runId, idFactory, label: { ...regionLabel("realm"), visibility: realmVisibility }, duchyLabel: { ...regionLabel("duchy"), visibility: realmVisibility } });
-    if (withDuchies) addChildren(levels[1], units.duchies, units.duchyParent, { kind: "duchy", units: result.duchies }, { runId, idFactory, label: regionLabel("duchy") });
-    if (withCounties) addChildren(levels[2], units.counties, units.countyParent, { kind: "county", units: result.counties }, { runId, idFactory, label: regionLabel("county") });
+    if (withDuchies) addChildren(levels[1], units.duchies, units.duchyParent, { kind: "duchy", units: result.duchies }, { runId, idFactory, label: regionLabel("duchy"), result });
+    if (withCounties) addChildren(levels[2], units.counties, units.countyParent, { kind: "county", units: result.counties }, { runId, idFactory, label: regionLabel("county"), result });
 
     const counties = carry(session, result, "county", units.countyKey);
     joinCoast(session, result, counties);
@@ -137,14 +137,14 @@ function addRealms(level, result, { runId, idFactory, label, duchyLabel }) {
  * A child level's regions: one per unit in `list` (indices into `units`), keyed in list order,
  * each with the key of its parent region and a hidden label in the level's look.
  */
-function addChildren(level, list, parentKeys, { kind, units }, { runId, idFactory, label }) {
+function addChildren(level, list, parentKeys, { kind, units }, { runId, idFactory, label, result }) {
     list.forEach((sourceIndex, key) => {
         const unit = units[sourceIndex];
         addRegion(level, {
             name: unit.name,
             parentKey: parentKeys[key],
             label: { ...label, visibility: "none" },
-            generated: generatedFor(runId, kind, sourceIndex, { population: unit.population }),
+            generated: generatedFor(runId, kind, sourceIndex, { population: unit.population, culture: cultureId(result, unit.culture) }),
         }, idFactory);
     });
 }
