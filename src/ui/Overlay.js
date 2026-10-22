@@ -187,8 +187,11 @@ export class Overlay {
                 line.className = "fwmb-kind";
                 heading.after(line);
             }
-            if (subtitle) line.textContent = subtitle;
-            else line?.remove();
+            if (subtitle) {
+                line.textContent = subtitle;
+                // The line is cut short with an ellipsis in a narrow inspector, so it carries itself in full
+                line.title = subtitle;
+            } else line?.remove();
         }
     }
 

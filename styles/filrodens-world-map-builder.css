@@ -1002,7 +1002,7 @@
     color: var(--fwmb-text-muted);
     font-size: 0.75rem;
 }
-/* A row's actions and its trailing meta and counts are always shown (Ken, 2026-10-16), so nothing
+/* A row's actions and its trailing meta and counts are always shown, so nothing
    moves under the pointer; in a compact panel the counts give way so names keep their room */
 .fwmb-list-item .fwmb-actions {
     display: inline-flex;
@@ -1608,7 +1608,7 @@
     background: var(--fwmb-range-fill);
 }
 
-/* Legend forms (phase 5 thematic layers): a graded scale (.fwmb-ramp), a key + label list whose key is
+/* Legend forms (the thematic layers'): a graded scale (.fwmb-ramp), a key + label list whose key is
    a colour swatch or a symbol (.fwmb-classes), or a plain text list (.fwmb-terms). */
 .fwmb-canvas-readout .fwmb-classes .fwmb-sym {
     width: 0.875rem;
@@ -2718,7 +2718,7 @@
     z-index: 20;
 }
 
-/* The four overlays sit where they did before v4 (Ken, 2026-10-16): the information bar top start,
+/* The four overlays sit where they did before v4: the information bar top start,
    undo and redo top end, the hint bottom start and the map controls bottom end. */
 
 /* Top start: the information bar, growing downward and stopping clear of the hint below it
@@ -3117,7 +3117,10 @@
 
 /* A slider's name wraps rather than being cut short: a longer translation must still be read in
    full, and the value beside it keeps its place at the end of the first line */
+/* A flex item does not shrink below its longest word unless told it may, so a long name would
+   push past its card; with min-width 0 it wraps, breaking a long word where it must */
 .fwmb .fwmb-range-name {
+    min-width: 0;
     overflow-wrap: anywhere;
 }
 .fwmb .fwmb-range-header {
@@ -4350,7 +4353,8 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 /* Docked: the inspector, at the studio's end edge (see Inspector). It is the studio's last
    column at every width, the full height of the studio, and pushes the canvas narrower, so nothing
    of the map is hidden under it; below 1,400px it takes its compact width and stacks its fields
-   (Ken, 2026-10-16: one placement rather than lying over the canvas below 1,200px) */
+   (one placement at every width, rather than lying over the canvas on narrow windows, so it never
+   hides the object being inspected) */
 .fwmb .fwmb-overlay-docked {
     position: relative;
     inset: auto;
@@ -5029,9 +5033,9 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     }
 }
 
-/* --- Custom-row interactive controls (4b-ii: priority stepper, add/remove row,
+/* --- Custom-row interactive controls (priority stepper, add/remove row,
    add/remove range, elevation zone quick-picks). The defaults section above never
-   uses any of these - it stays fully static. --- */
+   uses any of these: it stays fully static. --- */
 
 .fwmb-rule-stepper {
     display: flex;

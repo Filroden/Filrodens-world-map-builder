@@ -37,8 +37,8 @@ export const FONT_SUBSETS = Object.freeze({
 });
 
 /**
- * The label fonts' categories, in the picker's order, each with its localisation key (see the
- * scoping in v4-label-fonts.md): the studio's own faces first (the only ones that match the
+ * The label fonts' categories, in the picker's order, each with its localisation key: the
+ * studio's own faces first (the only ones that match the
  * interface), then book serifs for towns and regions (their italics for water), old
  * print for an antique atlas, engraved capitals for realms and oceans, calligraphic and blackletter
  * faces for fantasy and gothic realms, handwriting for notes, clean sans for modern maps, and the

@@ -223,7 +223,7 @@ function formerResult(run, result, former, names, history) {
 }
 
 /**
- * An earlier age in brief, for the run's history (phase 5's history layer): its era and strife,
+ * An earlier age in brief, kept in the run's history so the map's past can be shown: its era and strife,
  * its places (cell, tier and whether a realm's seat, three numbers each), castles, realm seats and
  * each cell's realm.
  */

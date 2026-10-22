@@ -1,5 +1,6 @@
 /**
- * Placing the map's names so they do not cover each other (see label-overlap-research.md). Pure
+ * Placing the map's names so they do not cover each other (greedy placement in priority order
+ * over a grid index, then annealing among the labels that compete). Pure
  * geometry: no PIXI and no DOM, so it runs and is tested in Node.
  *
  * Each label is a box (centred on its point) with candidate positions in order of preference,

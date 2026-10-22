@@ -545,7 +545,7 @@ export class RuleEditorDialog {
     }
 
     // =========================================================================================
-    // DEFAULT (read-only) section - unchanged since 4b-i: no listeners, never re-rendered.
+    // DEFAULT (read-only) section: no listeners, never re-rendered.
     // =========================================================================================
 
     /** Builds one default biome's card: its label plus one row per (always ≥1) reference row. */

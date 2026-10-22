@@ -1343,7 +1343,7 @@ export const FILRODENSWMB = {
             DROPPED_ALPHA: 0.35,
             SEED: 1,
         }),
-        // The label styles a new map starts with (Ken, 2026-10-16): realm names in engraved
+        // The label styles a new map starts with: realm names in engraved
         // capitals, places in a book serif, water in its italic, and notes in handwriting
         DEFAULT_STYLES: Object.freeze([
             Object.freeze({ id: "label-style-realm", nameKey: "FILRODENSWMB.LABELS.StyleRealm", fontFamily: "Cinzel", fontSize: 3, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: true, italic: false }),
@@ -1366,7 +1366,7 @@ export const FILRODENSWMB = {
     ROUTES: {
         // The route styles a new map starts with (a saved map keeps its own), each for one
         // transport, so the bar and the inspector offer a road's styles to roads and a sea lane's
-        // to sea routes. The generator (phase 4) uses the same names and looks. Their names come
+        // to sea routes. The generator uses the same names and looks. Their names come
         // from the localisation keys, so a map keeps the names it was made with.
         DEFAULT_STYLES: Object.freeze([
             Object.freeze({ id: "route-style-trunk-road", nameKey: "FILRODENSWMB.UI.RouteStyleTrunkRoad", transport: "road", color: "#6b3a1f", thickness: 3, style: "solid", outline: true, smoothing: false }),
