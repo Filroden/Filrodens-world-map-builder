@@ -1,3 +1,5 @@
+import { formatDistance } from "../data/MapUnit.js";
+
 /**
  * Keeps a range slider's value display and its filled portion in step with the slider.
  *
@@ -32,7 +34,7 @@ export class RangeDisplay {
      */
     static sync(input) {
         const output = input.closest(RangeDisplay.#WRAPPER_SELECTOR)?.querySelector("output");
-        if (output) output.value = input.value;
+        if (output) output.value = RangeDisplay.#shown(input);
 
         input.style.setProperty(RangeDisplay.#FILL_PROPERTY, `${RangeDisplay.#fillPercent(input)}%`);
     }
@@ -47,6 +49,17 @@ export class RangeDisplay {
         for (const input of root.querySelectorAll('input[type="range"]')) {
             input.style.setProperty(RangeDisplay.#FILL_PROPERTY, `${RangeDisplay.#fillPercent(input)}%`);
         }
+    }
+
+    /**
+     * The value a slider shows: its own, or, for a setting stored in one measure and shown in
+     * another (data-display-scale, see the shared-range partial), its value times that factor,
+     * formatted as a distance.
+     */
+    static #shown(input) {
+        const scale = Number.parseFloat(input.dataset?.displayScale);
+        if (!Number.isFinite(scale)) return input.value;
+        return formatDistance(Number.parseFloat(input.value) * scale);
     }
 
     /**

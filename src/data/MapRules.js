@@ -508,7 +508,9 @@ const PARAMS = obj({
     }),
     cartography: obj({
         scaleEnable: bool,
+        // The bar's units before the map had a unit of its own: read once, as such a map opens (see MapUnit)
         scaleUnits: text("name", "FILRODENSWMB.UI.LimitKindMap", "FILRODENSWMB.UI.LimitFieldScaleUnits"),
+        scaleMatchWorld: bool,
         scaleInterval: num(RANGE.SIZE),
         scaleValue: num(RANGE.SIGNED),
         scaleMajorTicks: int(0, 1000),
@@ -551,6 +553,8 @@ const MAP = obj({
         },
         { nullable: true },
     ),
+    // The name every distance shown is labelled with (see MapUnit)
+    mapUnit: text("name", "FILRODENSWMB.UI.LimitKindMap", "FILRODENSWMB.UI.LimitFieldMapUnit"),
     generatorStale: bool,
     generatorSettings: GENERATOR_PANEL,
     cultures: list(CULTURE),

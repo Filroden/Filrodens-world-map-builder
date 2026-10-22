@@ -108,6 +108,7 @@ const US_GB = {
     initialization: "initialisation", randomize: "randomise", randomized: "randomised", recognized: "recognised",
     neighbor: "neighbour", neighbors: "neighbours", neighboring: "neighbouring", dialog: "dialogue", dialogs: "dialogues",
     license: "licence", gray: "grey", urbanization: "urbanisation", behavior: "behaviour", favorite: "favourite", customize: "customise", organize: "organise",
+    kilometer: "kilometre", kilometers: "kilometres",
 };
 const swap = (text, table) => text.replace(/[A-Za-z]+/g, (word) => {
     const swapped = table[word.toLowerCase()];

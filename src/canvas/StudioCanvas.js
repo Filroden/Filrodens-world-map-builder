@@ -15,6 +15,7 @@ import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
 import { HomelandMarkers } from "./HomelandMarkers.js";
 import { platform } from "../platform/index.js";
+import { cleanUnit, formatDistance, scaleBarTick } from "../data/MapUnit.js";
 
 /** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
 const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br: "nwse-resize", tr: "nesw-resize", bl: "nesw-resize" });
@@ -1950,12 +1951,13 @@ export class StudioCanvas {
         scaleContainer.x = uiState.cartographyScaleX ?? 50;
         scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
 
-        const interval = uiState.cartographyScaleInterval || 100;
+        // The tick's length and the distance it stands for: the bar's own, or worked out from the
+        // world's scale when it matches it (see MapUnit.scaleBarTick); labelled with the map's unit
+        const { value: scaleValue, intervalPx: interval } = scaleBarTick(uiState, mapHeight);
         // 0 minor subdivisions is a choice (no minor ticks), so only a missing value takes the default
         const majorTicks = uiState.cartographyScaleMajorTicks || 4;
         const minorTicks = uiState.cartographyScaleMinorTicks ?? 4;
-        const scaleValue = uiState.cartographyScaleValue || 1;
-        const units = uiState.cartographyScaleUnits || "Miles";
+        const units = cleanUnit(uiState.mapUnit);
 
         const height = 10;
         const totalWidth = interval * majorTicks;
@@ -1996,7 +1998,7 @@ export class StudioCanvas {
         scaleContainer.addChild(text0);
 
         // Apply the multiplier mathematically
-        const textMax = new PIXI.Text(`${majorTicks * scaleValue} ${units}`, textStyle);
+        const textMax = new PIXI.Text(`${formatDistance(majorTicks * scaleValue)} ${units}`, textStyle);
         textMax.anchor.set(0.5, 1);
         textMax.x = totalWidth;
         textMax.y = -5;

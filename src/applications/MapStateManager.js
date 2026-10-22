@@ -256,8 +256,11 @@ export class MapStateManager {
             // atlas without choosing any; a saved map keeps its own (see MapStudio's load)
             customLabelStyles: FILRODENSWMB.LABELS.DEFAULT_STYLES.map(({ nameKey, ...style }) => ({ ...style, name: platform.i18n.localize(nameKey) })),
 
+            // The map's unit (see MapUnit): the name every distance shown is labelled with
+            mapUnit: FILRODENSWMB.MAP_UNIT.DEFAULT,
             cartographyScaleEnable: false,
-            cartographyScaleUnits: "Miles",
+            // A new map's scale bar measures the world as it is (see MapUnit.scaleBarTick)
+            cartographyScaleMatchWorld: true,
             cartographyScaleValue: 1,
             cartographyScaleInterval: 100,
             cartographyScaleMajorTicks: 4,
@@ -476,7 +479,7 @@ export class MapStateManager {
             },
             cartography: {
                 scaleEnable: state.cartographyScaleEnable,
-                scaleUnits: state.cartographyScaleUnits,
+                scaleMatchWorld: state.cartographyScaleMatchWorld === true,
                 scaleInterval: state.cartographyScaleInterval,
                 scaleValue: state.cartographyScaleValue,
                 scaleMajorTicks: state.cartographyScaleMajorTicks,

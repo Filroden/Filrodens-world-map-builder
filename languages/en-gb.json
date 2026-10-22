@@ -4,7 +4,7 @@
     "FILRODENSWMB.UI.InspectorColor": "Colour",
     "FILRODENSWMB.UI.ImportSettingsEmpty": "That file didn't contain any recognised custom biomes or styles.",
     "FILRODENSWMB.UI.PresetColors": "Preset colours",
-    "FILRODENSWMB.UI.LevelWatersHint": "How far this layer's regions claim the sea from their coasts, in map pixels (the scale bar in the Cartography tool can show what a pixel is in your map's units). Water goes to the nearest region, so neighbours meet halfway; a lake with one region on all its shores is wholly that region's. At 0 regions own land only. The waters follow every stroke.",
+    "FILRODENSWMB.UI.LevelWatersHint": "How far this layer's regions claim the sea from their coasts, in the map unit. Water goes to the nearest region, so neighbours meet halfway; a lake with one region on all its shores is wholly that region's. At 0 regions own land only. The waters follow every stroke.",
     "FILRODENSWMB.UI.LineColor": "Colour",
     "FILRODENSWMB.UI.PinStyleHint": "A named look for a kind of place: its icon, colour and size, and its label's size and visibility. A pin made with a style follows the style when it is edited. Pin styles are managed in Styles and icons.",
     "FILRODENSWMB.UI.PinStyleLabelHint": "What the label of a pin made with this style starts with. A label style sets its font, colour, width and alignment; the size here is used over the label style's own.",
@@ -18,5 +18,7 @@
     "FILRODENSWMB.UI.FaultSpacingHint": "The typical distance between volcanoes, in island sizes. Low values merge neighbouring volcanoes into larger islands.",
     "FILRODENSWMB.UI.JustifyCenter": "Centre",
     "FILRODENSWMB.UI.EngineStandardHint": "Uses standard noise generation to create quick, randomised terrain.",
-    "FILRODENSWMB.UI.GenerateUrbanization": "Urbanisation"
+    "FILRODENSWMB.UI.GenerateUrbanization": "Urbanisation",
+    "FILRODENSWMB.UI.MapUnitHint": "The name of the unit every distance on this map is shown in: the scale bar, territorial waters and the scale below. The module measures distances in kilometres and shows the number with this name, so the figures are true kilometres whatever the unit is called. Change it to give the unit your world's own name.",
+    "FILRODENSWMB.UI.MapUnitConverted": "This map's scale bar used the old default unit, Miles, for distances the module measures in kilometres. Its map unit is now km (in New map, under Generation). Save the map to keep the change."
 }

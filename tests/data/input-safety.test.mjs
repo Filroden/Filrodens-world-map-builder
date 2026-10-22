@@ -52,6 +52,8 @@ function v4Map() {
     mapData.customLabelStyles = [{ id: "label-style-realm", name: "Realm", fontFamily: "Cinzel", fontSize: 1.8, fillColor: "#dedcd3", maxChars: 0, justify: "center", bold: true, italic: false }];
     mapData.customPinStyles = [{ id: "pinStyleAAAAAAAA", name: "Town", icon: "map_pin", scale: 1, color: "#ffffff", detailLevel: 1, label: { fontSize: 1, visibility: "all", quickStyle: "custom" } }];
     mapData.sizeRevision = FILRODENSWMB.SYMBOLS.REVISION;
+    mapData.mapUnit = "leagues";
+    mapData.params = { ...mapData.params, cartography: { ...mapData.params.cartography, scaleMatchWorld: true } };
     mapData.generatorSettings = { seed: "Avalon", nameBase: "Nordic", world: { density: 1.5, urbanisation: 1, realmSpacing: 0.8, fragmentation: 1 }, output: { duchies: true, counties: false, places: { city: true, largeTown: true, town: false, castle: true }, routes: { road: true, river: false, sea: true }, labels: true } };
     mapData.cultures = [{ id: "cultureAAAAAAAAA", name: "Hillfolk", color: "#8a6a4a", nameBase: "Nordic", openness: 0.3, density: 1.5, habitat: { temperature: [0, 0.4], moisture: null, height: [0.6, 1], relief: [0.05, 0.25], coast: -0.5, river: 0.5 }, homelands: [{ x: 12, y: 30 }, { x: 80, y: 44.5 }] }];
     mapData.customBiomes = [{ id: 14, name: "Moor", code: "MR", color: [90, 80, 70], placement: "land", behavesLike: "TAIGA", rules: [{ elevation: [[0.2, 0.4, false, true]], moisture: [], temperature: [] }] }];
@@ -96,6 +98,7 @@ test("a complete v4 map, and the older sample maps, pass the importer with nothi
 test("script and markup in every text field are kept as text, never as markup", () => {
     const file = v4Map();
     file.seed = SCRIPT;
+    file.mapUnit = SCRIPT;
     file.params.cartography = { ...file.params.cartography, scaleUnits: SCRIPT };
     file.mapPins[0].name = SCRIPT;
     file.mapPins[0].description = SCRIPT;
@@ -115,6 +118,7 @@ test("script and markup in every text field are kept as text, never as markup", 
 
     const { mapData } = MapImport.read(file);
     assert.equal(mapData.mapPins[0].name, SCRIPT, "stored as the text it is");
+    assert.equal(mapData.mapUnit, SCRIPT, "the map's unit is plain text too");
 
     // The journal page: escaped, so the description reads as the characters typed
     const html = Sanitize.textToHtml(mapData.mapPins[0].description);
@@ -359,6 +363,7 @@ test("text past its limit refuses an import, naming where, and an export lists e
     const file = v4Map();
     file.mapPins[0].description = "d".repeat(FILRODENSWMB.LIMITS.TEXT.DESCRIPTION + 1);
     file.mapLabels[0].name = "l".repeat(FILRODENSWMB.LIMITS.TEXT.LABEL + 1);
+    file.mapUnit = "u".repeat(FILRODENSWMB.LIMITS.TEXT.NAME + 1);
     let refusal;
     assert.throws(
         () => MapImport.read(file),
@@ -368,7 +373,7 @@ test("text past its limit refuses an import, naming where, and an export lists e
         },
     );
     const message = Sanitize.refusalMessage(refusal, i18n);
-    assert.equal(message, `This file can't be imported: the description of the pin “Harbour” is ${FILRODENSWMB.LIMITS.TEXT.DESCRIPTION + 1} characters long, and the limit is ${FILRODENSWMB.LIMITS.TEXT.DESCRIPTION}. 1 more texts are over their limits too.`);
+    assert.equal(message, `This file can't be imported: the map unit of the map is ${FILRODENSWMB.LIMITS.TEXT.NAME + 1} characters long, and the limit is ${FILRODENSWMB.LIMITS.TEXT.NAME}. 2 more texts are over their limits too.`);
 
     // Raising the limit (as for testing) lets the same file in
     withLimit("TEXT", "DESCRIPTION", 1e6, () => withLimit("TEXT", "LABEL", 1e6, () => assert.ok(MapImport.read(v4Map()))));
@@ -378,6 +383,7 @@ test("text past its limit refuses an import, naming where, and an export lists e
         entries.map((entry) => Sanitize.limitLine(entry, i18n)),
         [
             `the map: name, ${FILRODENSWMB.LIMITS.TEXT.NAME + 1} characters (the limit is ${FILRODENSWMB.LIMITS.TEXT.NAME})`,
+            `the map: map unit, ${FILRODENSWMB.LIMITS.TEXT.NAME + 1} characters (the limit is ${FILRODENSWMB.LIMITS.TEXT.NAME})`,
             `the pin “Harbour”: description, ${FILRODENSWMB.LIMITS.TEXT.DESCRIPTION + 1} characters (the limit is ${FILRODENSWMB.LIMITS.TEXT.DESCRIPTION})`,
             `the label “${"l".repeat(40)}…”: text, ${FILRODENSWMB.LIMITS.TEXT.LABEL + 1} characters (the limit is ${FILRODENSWMB.LIMITS.TEXT.LABEL})`,
         ],

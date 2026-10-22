@@ -9,13 +9,13 @@
         {{localize "FILRODENSWMB.UI.CartographyScale"}}
     </label>
         
-    <div class="fwmb-form-group">
-        <label>{{localize "FILRODENSWMB.UI.ScaleUnits"}}</label>
-        <div class="fwmb-form-fields">
-            <input type="text" name="cartographyScaleUnits" maxlength="{{fwmbTextLimit 'name'}}" value="{{uiState.cartographyScaleUnits}}" placeholder="{{localize 'FILRODENSWMB.UI.ScaleUnitsPlaceholder'}}">
-        </div>
-    </div>
-        
+    {{!-- The bar's unit is the map's (New map, Generation). Matching the world works out the value
+         per tick, so the value field then shows it and cannot be typed in (see MapUnit.scaleBarTick) --}}
+    <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.ScaleMatchWorldHint'}}">
+        <input type="checkbox" name="cartographyScaleMatchWorld" class="fwmb-checkbox" {{#if uiState.cartographyScaleMatchWorld}}checked{{/if}}>
+        {{localize "FILRODENSWMB.UI.ScaleMatchWorld"}}
+    </label>
+
     <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.ScaleInterval"}}</label>
         <div class="fwmb-form-fields">
@@ -30,8 +30,8 @@
         <label>{{localize "FILRODENSWMB.UI.ScaleValue"}}</label>
         <div class="fwmb-form-fields">
             <div class="fwmb-setting-row">
-                <input type="number" name="cartographyScaleValue" value="{{uiState.cartographyScaleValue}}" min="1" class="fwmb-input-short">
-                <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.ScaleValueHint"}}</span>
+                <input type="number" name="cartographyScaleValue" value="{{#if uiState.cartographyScaleMatchWorld}}{{scaleBarValue}}{{else}}{{uiState.cartographyScaleValue}}{{/if}}" min="0" step="any" class="fwmb-input-short" {{#if uiState.cartographyScaleMatchWorld}}disabled{{/if}}>
+                <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.ScaleValueHint" unit=mapUnit}}</span>
             </div>
         </div>
     </div>

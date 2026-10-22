@@ -22,7 +22,8 @@ import { bindDropdownMenus, positionPopoverMenu } from "../ui/dropdowns.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
-import { clampAreaFactor, effectiveKmPerPx } from "../mesh/Schema.js";
+import { clampAreaFactor } from "../mesh/Schema.js";
+import { cleanUnit, formatDistance, kmPerPxOf, scaleBarTick, unitFromSaved } from "../data/MapUnit.js";
 import { TerrainUpgrade } from "./TerrainUpgrade.js";
 import { RiverSources } from "../generation/RiverSources.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
@@ -474,6 +475,8 @@ export class MapStudio {
         this.activeRegionId = null;
         // The generator's saved model-cell outputs (see ModelRun), or null for a map with no run
         this.modelRun = null;
+        // Whether the map last opened had its unit changed as it loaded (see MapUnit.unitFromSaved)
+        this.unitConvertedOnLoad = false;
         this.landMasks = [];
         this.activeLandMaskId = null;
         this.mapLabels = [];
@@ -1178,6 +1181,10 @@ export class MapStudio {
         context.uiState = this.uiState;
         context.worldAreaFactor = clampAreaFactor(this.uiState.world?.areaFactor);
         context.areaFactorRange = { min: FILRODENSWMB.MESH.AREA_FACTOR_RANGE[0], max: FILRODENSWMB.MESH.AREA_FACTOR_RANGE[1] };
+        context.mapUnit = cleanUnit(this.uiState.mapUnit);
+        context.pixelScale = this.#pixelScaleText();
+        // The value per tick a bar matching the world draws (a number field, so unformatted)
+        context.scaleBarValue = scaleBarTick(this.uiState, this.mapHeight).value;
         context.currentSaveName = this.currentSaveName;
         context.terrainUpgradeAvailable = this.terrainUpgrade !== null;
         context.canCreateRegionalMap = TerrainVersion.canCreateRegionalMap(this.uiState);
@@ -1967,6 +1974,7 @@ export class MapStudio {
         }
 
         // 1. Route specific single-action updates
+        if (name === "mapUnitName") return this.#updateMapUnit(target);
         if (name.startsWith("cartography")) return this.#updateCartography(target, name);
         if (name === "referenceAlpha") return this.#updateReferenceAlpha(target);
         if (name === "gridType" || name === "gridSize") return this.#updateGridSettings();
@@ -1976,6 +1984,9 @@ export class MapStudio {
         // Relief strength and the water settings are terrain shader settings, so moving them
         // redraws without repainting
         if (MapStudio.#TERRAIN_SHADER_INPUTS.has(name)) return this.#updateTerrainShaderInputs();
+
+        // The latitudes set the map's height in km, so they change its scale as the area factor does
+        if (name === "latTop" || name === "latBottom") this.#updateLatitudeScale(target, name);
 
         // 2. Custom biome colour handler (uses dataset instead of name)
         if (target.type === "color" && target.dataset.biome) return this.#updateBiomeColor(target);
@@ -1990,7 +2001,70 @@ export class MapStudio {
         else if (target.type === "number") value = Number(target.value);
 
         this.uiState[name] = value;
+        this.#syncScaleBarFields();
         this._repaintVectors();
+    }
+
+    /**
+     * The map's unit (see MapUnit): only a name, so nothing is worked out again; the scale bar's
+     * label and the scale shown beside the area factor take it. An emptied field goes back to the
+     * default, since every distance needs a name.
+     */
+    #updateMapUnit(target) {
+        const unit = cleanUnit(target.value);
+        target.value = unit;
+        this.uiState.mapUnit = unit;
+        this.#syncPixelScale();
+        this._repaintVectors();
+    }
+
+    /**
+     * A latitude changed: it is taken into the state at once (as a save would read it), so that
+     * the open mesh, the scale beside the area factor and a scale bar that matches the world all
+     * follow the map's new scale before the climate is generated again.
+     */
+    #updateLatitudeScale(target, name) {
+        const value = Number.parseFloat(target.value);
+        if (!Number.isFinite(value)) return;
+        this.uiState[name] = value;
+        this.#applyWorldScale();
+        if (this.uiState.cartographyScaleMatchWorld) {
+            this.#syncScaleBarFields();
+            this._repaintVectors();
+        }
+    }
+
+    /**
+     * Gives the open mesh the map's km scale (it was built with the scale the map had then, and
+     * would keep it until the map is next loaded) and shows the new scale beside the area factor.
+     */
+    #applyWorldScale() {
+        if (this.meshSession) this.meshSession.mesh.kmPerPx = kmPerPxOf(this.uiState, this.mapHeight);
+        this.#syncPixelScale();
+    }
+
+    /** "1 pixel is about 3.2 km": what one map pixel measures, in the map's unit. */
+    #pixelScaleText() {
+        return platform.i18n.format("FILRODENSWMB.UI.PixelScale", { distance: formatDistance(kmPerPxOf(this.uiState, this.mapHeight)), unit: cleanUnit(this.uiState.mapUnit) });
+    }
+
+    /** Writes the scale beside the area factor in place (the panel is not drawn again while typing). */
+    #syncPixelScale() {
+        const element = this.root?.querySelector("[data-pixel-scale]");
+        if (element) element.textContent = this.#pixelScaleText();
+    }
+
+    /**
+     * Keeps the scale bar's fields in step with Match world scale: while the bar matches the world
+     * its value per tick is worked out (see MapUnit.scaleBarTick), so the field shows that value
+     * and cannot be typed in. Written in place, so a field being typed in keeps its focus.
+     */
+    #syncScaleBarFields() {
+        const valueInput = this.root?.querySelector('input[name="cartographyScaleValue"]');
+        if (!valueInput) return;
+        const matching = this.uiState.cartographyScaleMatchWorld === true;
+        valueInput.disabled = matching;
+        if (matching) valueInput.value = String(scaleBarTick(this.uiState, this.mapHeight).value);
     }
 
     #updateReferenceAlpha(target) {
@@ -2011,26 +2085,31 @@ export class MapStudio {
 
     /**
      * The map's area factor (see Schema.effectiveKmPerPx): it changes what a pixel measures in km
-     * and nothing that is drawn, so no repaint follows. It is written into a full description of
-     * the map's world (a top map's own, or the regional one it already has), the open mesh takes
-     * the new km scale at once (it was built with the old one, and keeps it otherwise until the
-     * map is next loaded), and the generator's outputs are marked stale, since every km-based
-     * figure they were made with has changed.
+     * and nothing that is drawn, except a scale bar that matches the world, which is drawn again.
+     * It is written into a full description of the map's world (a top map's own, or the regional
+     * one it already has), the open mesh takes the new km scale at once (see #applyWorldScale),
+     * and the generator's outputs are marked stale, since every km-based figure they were made
+     * with has changed.
      */
     #updateAreaFactor(target) {
         const areaFactor = clampAreaFactor(target.value);
         target.value = areaFactor;
         this.uiState.world = { ...TerrainVersion.resolveWorld(this.uiState), areaFactor };
         this.#markGeneratorStale();
-        if (this.meshSession) this.meshSession.mesh.kmPerPx = effectiveKmPerPx({ mapHeight: this.mapHeight, params: { latTop: this.uiState.latTop, latBottom: this.uiState.latBottom }, world: this.uiState.world });
+        this.#applyWorldScale();
+        if (this.uiState.cartographyScaleMatchWorld) {
+            this.#syncScaleBarFields();
+            this._repaintVectors();
+        }
     }
 
     /**
-     * Carries the panel's latitude and area factor into a new map's state, which was rebuilt from
-     * the defaults. A top map's world is taken afresh (a regional map's zoom and origin are not
-     * the new map's), with the area factor that was set.
+     * Carries the panel's latitude, area factor and unit into a new map's state, which was rebuilt
+     * from the defaults. A top map's world is taken afresh (a regional map's zoom and origin are
+     * not the new map's), with the area factor that was set.
      */
-    #keepNewMapPlace({ latTop, latBottom, areaFactor }) {
+    #keepNewMapPlace({ latTop, latBottom, areaFactor, unit }) {
+        this.uiState.mapUnit = cleanUnit(unit);
         if (Number.isFinite(latTop) && Number.isFinite(latBottom)) {
             this.uiState.latTop = latTop;
             this.uiState.latBottom = latBottom;
@@ -3858,7 +3937,12 @@ export class MapStudio {
         this.uiState.biomeAlphaInactive = p.display?.biomeAlphaInactive ?? FILRODENSWMB.DISPLAY.BIOME_ALPHA_INACTIVE;
         this.uiState.regionOpacity = p.display?.regionOpacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY;
         this.uiState.cartographyScaleEnable = c.scaleEnable ?? this.defaultUiState.cartographyScaleEnable;
-        this.uiState.cartographyScaleUnits = c.scaleUnits ?? this.defaultUiState.cartographyScaleUnits;
+        // A map saved before it had a unit takes it from its scale bar's text, and keeps its
+        // hand-set bar (see MapUnit.unitFromSaved); the load reports a unit it had to change
+        const { unit, converted } = unitFromSaved(payload);
+        this.uiState.mapUnit = unit;
+        this.unitConvertedOnLoad = converted;
+        this.uiState.cartographyScaleMatchWorld = c.scaleMatchWorld === true;
         this.uiState.cartographyScaleInterval = c.scaleInterval ?? this.defaultUiState.cartographyScaleInterval;
         this.uiState.cartographyScaleValue = c.scaleValue ?? this.defaultUiState.cartographyScaleValue;
         this.uiState.cartographyScaleMajorTicks = c.scaleMajorTicks ?? this.defaultUiState.cartographyScaleMajorTicks;
@@ -4261,6 +4345,7 @@ export class MapStudio {
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             nameLevels: true,
             world: this.uiState.world,
+            mapUnit: cleanUnit(this.uiState.mapUnit),
             generatorStale: this.uiState.generatorStale === true,
             generatorSettings: panelSettings(this.uiState.generatorSettings),
             cultures: platform.utils.deepClone(this.uiState.cultures ?? []),
@@ -4897,9 +4982,9 @@ export class MapStudio {
             return false;
         }
 
-        // The latitude and area factor in the panel are the new map's too: they apply to the open
-        // map as they are typed, so they are read before the state is rebuilt from the defaults
-        const kept = { latTop: this.uiState.latTop, latBottom: this.uiState.latBottom, areaFactor: this.uiState.world?.areaFactor };
+        // The latitude, area factor and unit in the panel are the new map's too: they apply to the
+        // open map as they are typed, so they are read before the state is rebuilt from the defaults
+        const kept = { latTop: this.uiState.latTop, latBottom: this.uiState.latBottom, areaFactor: this.uiState.world?.areaFactor, unit: this.uiState.mapUnit };
 
         // Calculate the centre-anchor offset
         const dx = (newWidth - this.mapWidth) / 2;
@@ -5650,10 +5735,13 @@ export class MapStudio {
             this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
             await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId), await platform.store.loadMapModelRun(mapId));
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
+            // Said as the map opens; the map is marked as changed, and once saved it holds its new
+            // unit, so a map that has been saved is not told again
+            if (this.unitConvertedOnLoad) platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.MapUnitConverted"));
 
             this.view?.render(["toolbar", "context"]);
-            // A map migrated or given a new mesh as it opened has changes to save
-            this.isDirty = MeshIntegration.changedOnLoad(this);
+            // A map migrated, given a new mesh or a new unit as it opened has changes to save
+            this.isDirty = MeshIntegration.changedOnLoad(this) || this.unitConvertedOnLoad;
 
             // Offered only once the map is fully generated and marked clean: the check reads the
             // generated climate, and an update applied here must leave the map marked unsaved.

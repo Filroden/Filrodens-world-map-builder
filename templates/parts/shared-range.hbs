@@ -14,6 +14,12 @@
       unit, unitShort: optional localisation keys for the value's unit, shown after the value
                 rather than in the label (the short form where the row is stacked); the unit sits
                 outside the output so RangeDisplay's updates leave it alone
+      unitText: optional unit shown as it is, not localised (the map's own unit name), in place
+                of unit and unitShort
+      displayScale: optional factor the shown value is the slider's value times, for a setting
+                stored in one measure and shown in another (map pixels shown in the map unit);
+                RangeDisplay shows the product, formatted as a distance (see MapUnit), as the
+                slider moves, so pass display with the first value formatted the same way
       class: optional extra classes for the wrapper
       resetTo: optional value (as a string, so 0 counts) a double-click returns the slider to, for
                 a setting that is not one of the map's (see StudioView's data-default); the
@@ -30,8 +36,8 @@
         </label>
         <span class="fwmb-range-reading">
             <output class="fwmb-range-value">{{#if display}}{{display}}{{else}}{{value}}{{/if}}</output>
-            {{#if unit}}<span class="fwmb-unit"><span class="fwmb-unit-long">{{localize unit}}</span><span class="fwmb-unit-short">{{#if unitShort}}{{localize unitShort}}{{else}}{{localize unit}}{{/if}}</span></span>{{/if}}
+            {{#if unitText}}<span class="fwmb-unit">{{unitText}}</span>{{else if unit}}<span class="fwmb-unit"><span class="fwmb-unit-long">{{localize unit}}</span><span class="fwmb-unit-short">{{#if unitShort}}{{localize unitShort}}{{else}}{{localize unit}}{{/if}}</span></span>{{/if}}
         </span>
     </div>
-    <input type="range" class="fwmb-range-input" name="{{name}}" value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}"{{#if resetTo}} data-default="{{resetTo}}"{{/if}} aria-label="{{localize label}}" />
+    <input type="range" class="fwmb-range-input" name="{{name}}" value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}"{{#if resetTo}} data-default="{{resetTo}}"{{/if}}{{#if displayScale}} data-display-scale="{{displayScale}}"{{/if}} aria-label="{{localize label}}" />
 </div>

@@ -73,6 +73,18 @@
         </div>
     </div>
 
+    {{!-- The map's unit: the name every distance shown is labelled with (see MapUnit). Its input is
+         not named after the state key, so a save's read of the panel never parses it as a number --}}
+    <div class="fwmb-form-group">
+        <label for="fwmb-map-unit">{{localize "FILRODENSWMB.UI.MapUnit"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-map-unit" name="mapUnitName" value="{{mapUnit}}" maxlength="{{fwmbTextLimit 'name'}}" aria-describedby="fwmb-pixel-scale" />
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.MapUnitHint'}}"></i>
+        </div>
+    </div>
+    {{!-- What one pixel measures, written in place as the latitudes, area factor or unit change --}}
+    <p class="fwmb-hint" id="fwmb-pixel-scale" data-pixel-scale>{{pixelScale}}</p>
+
     <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="applyResolution">
         {{localize "FILRODENSWMB.UI.ApplyResolution"}}
     </button>

@@ -5,6 +5,7 @@ import { defaultLevelStyle, NESTING_MODES } from "../mesh/Schema.js";
 import { parentCandidates, setOfLevel } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
+import { cleanUnit, formatDistance, kmPerPxOf } from "../data/MapUnit.js";
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/parts/";
 
@@ -114,6 +115,15 @@ export class LevelEditor {
         return (app.layerSets ?? []).flatMap((candidate) => candidate.levels.filter((other) => other.id !== level.id).map((other) => ({ id: other.id, name: candidate === set ? other.name : `${candidate.name}: ${other.name}`, style: other.style })));
     }
 
+    /**
+     * What the territorial waters slider needs to show its pixels in the map unit: the km a pixel
+     * measures, the current distance formatted as the slider will format it, and the unit's name.
+     */
+    static #watersInUnit(app, watersPx) {
+        const kmPerPx = kmPerPxOf(app.uiState, app.mapHeight);
+        return { kmPerPx, display: formatDistance(watersPx * kmPerPx), unit: cleanUnit(app.uiState?.mapUnit) };
+    }
+
     static #context(app, level, set) {
         const style = { ...defaultLevelStyle(), ...level.style };
         return {
@@ -125,7 +135,8 @@ export class LevelEditor {
             seaLineStyles: RegionPanel.lineStyleChoices(style.seaLineStyle ?? "dashed"),
             copySources: this.#copySources(app, set, level),
             thicknessStep: FILRODENSWMB.MESH.ARCS.THICKNESS_STEP,
-            waters: FILRODENSWMB.MESH.WATERS,
+            // Stored in map pixels and shown in the map unit (see MapUnit)
+            waters: { ...FILRODENSWMB.MESH.WATERS, ...LevelEditor.#watersInUnit(app, level.watersPx ?? 0) },
         };
     }
 

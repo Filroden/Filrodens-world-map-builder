@@ -60,6 +60,8 @@ export class RegionalExtractor {
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             nameLevels: true,
             world: state.world,
+            // The regional map shows the same world, so keeps its parent's unit
+            mapUnit: state.mapUnit,
             springsBaked: true,
             mapWidth: targetWidth,
             mapHeight: targetHeight,
