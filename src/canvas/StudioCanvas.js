@@ -7,6 +7,8 @@ import { TerrainCompositor } from "./TerrainCompositor.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
+import { SymbolScale } from "../tools/SymbolScale.js";
+import { ExportScale } from "../tools/ExportScale.js";
 import { LabelLayout } from "./LabelLayout.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
 import { RegionOverlays } from "./RegionOverlays.js";
@@ -65,6 +67,9 @@ export class StudioCanvas {
 
     /** Whether the map's detail level shows a pin's name (see setNameFilter). */
     #showsName = () => true;
+
+    /** The map's symbol size, which multiplies every pin and label (see setSymbolScale). */
+    #symbolScale = 1;
 
     constructor(htmlContainer) {
         this.container = htmlContainer;
@@ -1276,75 +1281,102 @@ export class StudioCanvas {
     }
 
     /**
-     * Extracts the current PIXI stage and converts it synchronously to a binary Blob.
-     * Triggers a detached link click to bypass Electron's DOM navigation interceptors.
+     * The height of the smallest name drawn now, in map pixels (null when none is): what the PNG
+     * export's recommended scale is worked out from (see ExportScale). A name with no room, drawn
+     * faintly while labels are edited, does not count.
+     * @returns {number|null}
      */
-    exportToPNG(filename = "world-map") {
-        // The reference image and the land masks' outlines are working aids, never exported (as
-        // scene export leaves them out too); each is shown again afterwards only if it was showing
+    smallestLabelPx() {
+        let smallest = null;
+        for (const child of this.layers.labels.children) {
+            if (!(child instanceof PIXI.Text) || !child.visible || child.alpha < 1) continue;
+            const size = Number(child.style?.fontSize);
+            if (size > 0 && (smallest === null || size < smallest)) smallest = size;
+        }
+        return smallest;
+    }
+
+    /**
+     * Exports the map as a PNG at a scale (see ExportScale): drawn in tiles of at most
+     * EXPORT_PNG.TILE_PX (and the graphics card's texture limit), joined onto one canvas, with
+     * every name and other text redrawn at the scale so it is sharp rather than enlarged. The
+     * terrain is enlarged from the map's own resolution. The reference image and the land masks'
+     * outlines are working aids, never exported. The file is downloaded through a detached link,
+     * which Electron's navigation interceptors leave alone.
+     * @param {string} [filename]
+     * @param {number} [scale] - 1 draws the map at its own size.
+     * @returns {Promise<boolean>} Whether the image was made.
+     */
+    async exportToPNG(filename = "world-map", scale = 1) {
         const referenceVisible = this.layers.reference.visible;
         const landMasksVisible = this.layers.landMasks.visible;
+        const origX = this.stage.position.x;
+        const origY = this.stage.position.y;
+        const origScaleX = this.stage.scale.x;
+        const origScaleY = this.stage.scale.y;
+        const texts = [];
+        const restore = () => {
+            this.stage.position.set(origX, origY);
+            this.stage.scale.set(origScaleX, origScaleY);
+            this.layers.reference.visible = referenceVisible;
+            this.layers.landMasks.visible = landMasksVisible;
+            for (const { text, resolution, auto } of texts) {
+                if (text.destroyed) continue;
+                text.resolution = resolution;
+                // PIXI's own flag: the text follows the screen's pixel ratio again
+                text._autoResolution = auto;
+            }
+        };
         try {
             this.layers.reference.visible = false;
             this.layers.landMasks.visible = false;
 
-            const optimalRes = 2000 / this.mapWidth;
-            const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
+            const factor = Number(scale) > 0 ? scale : 1;
+            const width = Math.round(this.mapWidth * factor);
+            const height = Math.round(this.mapHeight * factor);
 
-            const renderTexture = PIXI.RenderTexture.create({
-                width: Math.round(this.mapWidth * dynamicRes),
-                height: Math.round(this.mapHeight * dynamicRes),
-                resolution: 1,
+            // Text is drawn into its own texture at its resolution: raised to the scale, so names
+            // are drawn afresh at the size they take in the image
+            this.stage.children.forEach(function collect(child) {
+                if (child instanceof PIXI.Text) {
+                    texts.push({ text: child, resolution: child.resolution, auto: child._autoResolution });
+                    child.resolution = Math.max(child.resolution, factor);
+                }
+                child.children?.forEach(collect);
             });
 
-            // Temporarily strip the camera transform for a clean, 0-offset export
-            const origX = this.stage.position.x;
-            const origY = this.stage.position.y;
-            const origScaleX = this.stage.scale.x;
-            const origScaleY = this.stage.scale.y;
-
-            this.stage.position.set(0, 0);
-            this.stage.scale.set(dynamicRes);
-
-            // Render to texture (instead of relying on the live monitor output)
-            this.app.renderer.render(this.stage, { renderTexture: renderTexture });
-            const canvas = this.app.renderer.extract.canvas(renderTexture);
-
-            // Restore camera
-            this.stage.position.set(origX, origY);
-            this.stage.scale.set(origScaleX, origScaleY);
-
-            this.layers.reference.visible = referenceVisible;
-            this.layers.landMasks.visible = landMasksVisible;
-
-            const dataUrl = canvas.toDataURL("image/png");
-            const byteString = atob(dataUrl.split(",")[1]);
-            const arrayBuffer = new ArrayBuffer(byteString.length);
-            const uintArray = new Uint8Array(arrayBuffer);
-
-            for (let i = 0; i < byteString.length; i++) {
-                uintArray[i] = byteString.codePointAt(i);
+            const output = document.createElement("canvas");
+            output.width = width;
+            output.height = height;
+            const context = output.getContext("2d");
+            const gl = this.app.renderer.gl;
+            const tileLimit = Math.min(FILRODENSWMB.EXPORT_PNG.TILE_PX, gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : FILRODENSWMB.EXPORT_PNG.TILE_PX);
+            this.stage.scale.set(factor);
+            for (const tile of ExportScale.tiles(width, height, tileLimit)) {
+                const renderTexture = PIXI.RenderTexture.create({ width: tile.width, height: tile.height, resolution: 1 });
+                this.stage.position.set(-tile.x, -tile.y);
+                this.app.renderer.render(this.stage, { renderTexture });
+                context.drawImage(this.app.renderer.extract.canvas(renderTexture), tile.x, tile.y);
+                renderTexture.destroy(true);
             }
+            restore();
 
-            const blob = new Blob([arrayBuffer], { type: "image/png" });
+            const blob = await new Promise((resolve) => output.toBlob(resolve, "image/png"));
+            if (!blob) throw new Error("The image could not be encoded");
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = blobUrl;
-
             const safeName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
             a.download = `fwmb_${safeName}.png`;
-
             a.click();
-
-            URL.revokeObjectURL(blobUrl);
-
-            // Clean up the temporary texture from VRAM
-            renderTexture.destroy(true);
+            // Revoked once the download has had time to start
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            return true;
         } catch (err) {
-            this.layers.reference.visible = referenceVisible;
-            this.layers.landMasks.visible = landMasksVisible;
+            restore();
             console.error("FWMB | Failed to export PNG:", err);
             platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ExportPngFailed"));
+            return false;
         }
     }
 
@@ -1417,7 +1449,7 @@ export class StudioCanvas {
         }
 
         // 2. Render Pins (Top Layer)
-        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        const resScale = this.#symbolSizeScale();
 
         pins.forEach((pin) => {
             if (!this.#isVisibleInCurrentPass(pin.visibility, "all", false)) return;
@@ -1656,8 +1688,8 @@ export class StudioCanvas {
         // Extract native OS root font size to mimic CSS 'rem' behaviour
         const rootFontSize = LabelWidth.rootFontSize();
 
-        // Dynamically scale vectors based on the canvas dimensions
-        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        // Names grow with the map's pixel size and its symbol size, as pins do
+        const resScale = this.#symbolSizeScale();
 
         const ensureLabelData = (obj) => {
             if (!obj.label) obj.label = {};
@@ -1743,6 +1775,19 @@ export class StudioCanvas {
         this.#labelShown = shown ?? (() => true);
     }
 
+    /** The map's symbol size (see SymbolScale): every pin and label is drawn this much bigger. */
+    setSymbolScale(scale) {
+        this.#symbolScale = Number(scale) > 0 ? scale : 1;
+    }
+
+    /**
+     * How big a pin or label of size 1 is drawn, beyond its own size: it grows with the map's
+     * pixel size (SYMBOLS) and with the map's symbol size.
+     */
+    #symbolSizeScale() {
+        return (Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION) * this.#symbolScale;
+    }
+
     /** Which pins' names the map's detail level shows (see DetailLevel.ofName). */
     setNameFilter(showsName) {
         this.#showsName = showsName ?? (() => true);
@@ -1758,6 +1803,8 @@ export class StudioCanvas {
         const size = (labelData.fontSize || FILRODENSWMB.LABELS.UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontSize * resScale;
         const fill = labelData.fillColor || "#ffffff";
         const stroke = ColorMath.getContrastColor(fill);
+        // The outline and shadow in proportion to the name, so a small one keeps its letters
+        const halo = SymbolScale.labelHalo(size);
 
         // 1. Setup Base Style
         const styleConfig = {
@@ -1767,11 +1814,11 @@ export class StudioCanvas {
             fontWeight: LabelFonts.weight(labelData),
             fontStyle: LabelFonts.style(labelData),
             stroke: stroke,
-            strokeThickness: 3,
+            strokeThickness: halo.stroke,
             dropShadow: true,
             dropShadowColor: stroke,
-            dropShadowBlur: 2,
-            dropShadowDistance: 2,
+            dropShadowBlur: halo.shadow,
+            dropShadowDistance: halo.shadow,
         };
 
         // 2. Apply Word Wrapping & Justification. The maximum width is a number of characters

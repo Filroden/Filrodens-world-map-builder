@@ -2925,6 +2925,13 @@
     margin: 0.25rem 0;
     background: var(--fwmb-overlay-border);
 }
+/* A heading over a menu's group of choices (the Detail menu's Symbol size) */
+.fwmb-layer-menu-label {
+    flex: none;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    color: var(--fwmb-overlay-muted);
+}
 
 /* The tick box drawn in each list row, from the row's aria-checked */
 .fwmb-layer-check {

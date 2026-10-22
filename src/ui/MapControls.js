@@ -53,10 +53,13 @@ export function layersShown(state) {
  *   Regions menus' rows (see ContentRows).
  * @param {number} state.detailLevel - The map's detail level (see DetailLevel).
  * @param {boolean} state.avoidOverlaps - Whether names avoid each other (see LabelLayout).
+ * @param {{value: string, percent: number, auto: boolean, selected: boolean}[]} [state.symbolSizes] - The
+ *   symbol size rows (see SymbolScale.choices), Auto first.
+ * @param {(percent: number) => string} [autoLabel] - The Auto row's name for its value.
  * @param {(shown: number, total: number) => string} layersLabel - The Layers button's name for a count.
  * @param {(level: number) => string} detailLabel - The Detail button's name for a level.
  */
-export function syncMapControls(root, state, layersLabel, detailLabel) {
+export function syncMapControls(root, state, layersLabel, detailLabel, autoLabel = (percent) => `${percent}%`) {
     if (!root) return;
     const each = (selector, apply) => root.querySelectorAll(selector).forEach(apply);
 
@@ -70,6 +73,13 @@ export function syncMapControls(root, state, layersLabel, detailLabel) {
     // The Detail menu: one level chosen, named on its button
     each('[data-action="setDetailLevel"]', (row) => row.setAttribute("aria-checked", String(Number(row.dataset.detailLevel) === state.detailLevel)));
     each('[data-action="toggleLabelOverlaps"]', (row) => setOn(row, state.avoidOverlaps));
+    for (const choice of state.symbolSizes ?? []) {
+        each(`[data-action="setSymbolSize"][data-symbol-size="${choice.value}"]`, (row) => {
+            row.setAttribute("aria-checked", String(choice.selected));
+            const name = choice.auto ? row.querySelector("[data-symbol-auto]") : null;
+            if (name) name.textContent = autoLabel(choice.percent);
+        });
+    }
     each('.fwmb-layer-group[data-layer-group="detail"] > [data-action="toggleLayerMenu"]', (button) => {
         const label = detailLabel(state.detailLevel);
         button.setAttribute("aria-label", label);

@@ -124,6 +124,8 @@ export class MapStateManager {
             gridVisible: false,
             detailLevel: FILRODENSWMB.DETAIL.EVERYTHING,
             avoidLabelOverlaps: true,
+            // The symbol size (see SymbolScale): null for Auto
+            symbolSize: null,
             hiddenLabelStyles: [],
             hiddenLevels: [],
             hideRegionFills: false,

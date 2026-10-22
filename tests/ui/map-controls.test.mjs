@@ -34,7 +34,7 @@ function drawMap() {
     handlebars.registerHelper("eq", (a, b) => a === b);
     handlebars.registerPartial("modules/filrodens-world-map-builder/templates/parts/shared-range.hbs", readFileSync(join(ROOT, "templates/parts/shared-range.hbs"), "utf8"));
     const template = handlebars.compile(readFileSync(join(ROOT, "templates/map.hbs"), "utf8"));
-    document.body.innerHTML = template({ uiState: { reliefEmphasis: 20 }, layerGroups: TERRAIN_GROUPS, viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS, detailLevels: FILRODENSWMB.DETAIL.LEVELS });
+    document.body.innerHTML = template({ uiState: { reliefEmphasis: 20 }, layerGroups: TERRAIN_GROUPS, viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS, detailLevels: FILRODENSWMB.DETAIL.LEVELS, symbolSizes: FILRODENSWMB.SYMBOLS.SIZES.map((size) => ({ value: String(size), percent: Math.round(size * 100) })) });
     return document.body;
 }
 
@@ -147,6 +147,21 @@ test("the Detail menu marks the map's one detail level and names it on its butto
     assert.equal(root.querySelector(".fwmb-map-controls-wide [data-action=\"setDetailLevel\"]"), null, "not folded into the Layers menu");
 });
 
+test("the Detail menu marks the map's symbol size, naming Auto with its value", () => {
+    const root = drawMap();
+    const choices = [{ value: "auto", percent: 163, auto: true, selected: true }, ...FILRODENSWMB.SYMBOLS.SIZES.map((size) => ({ value: String(size), percent: Math.round(size * 100), auto: false, selected: false }))];
+    syncMapControls(root, viewState({ symbolSizes: choices }), label, detailLabel, (percent) => `Auto (${percent}%)`);
+    const rows = [...root.querySelectorAll('[data-action="setSymbolSize"]')];
+    assert.deepEqual(rows.map((row) => row.dataset.symbolSize), ["auto", ...FILRODENSWMB.SYMBOLS.SIZES.map(String)]);
+    assert.deepEqual(rows.map((row) => row.getAttribute("aria-checked")), ["true", ...FILRODENSWMB.SYMBOLS.SIZES.map(() => "false")]);
+    assert.equal(rows[0].querySelector("[data-symbol-auto]").textContent, "Auto (163%)");
+    choices[0].selected = false;
+    choices[2].selected = true;
+    syncMapControls(root, viewState({ symbolSizes: choices }), label, detailLabel);
+    assert.equal(rows[2].getAttribute("aria-checked"), "true");
+    assert.equal(rows[0].getAttribute("aria-checked"), "false");
+});
+
 test("the Layers menu lists every wide toggle, in the same order", () => {
     const root = drawMap();
     const key = (element) => [element.dataset.action, element.dataset.layer ?? "", element.dataset.layerGroup ?? "", element.dataset.terrainLayer ?? ""].join(":");
@@ -171,7 +186,7 @@ function methodBodies(source) {
 }
 
 /** What changes a view: the state the map controls show, written. */
-const VIEW_CHANGES = [/this\.uiState\s*=(?!=)/, /this\.#layerVisibility\[[^\]]+\]\s*=(?!=)/, /this\.viewFilters\[[^\]]+\]\s*=(?!=)/, /this\.uiState\.gridVisible\s*=(?!=)/, /this\.#terrainLayers\s*=(?!=)/, /this\.scene3D\s*=(?!=)/, /this\.uiState\.detailLevel\s*=(?!=)/, /this\.uiState\.avoidLabelOverlaps\s*=(?!=)/];
+const VIEW_CHANGES = [/this\.uiState\s*=(?!=)/, /this\.#layerVisibility\[[^\]]+\]\s*=(?!=)/, /this\.viewFilters\[[^\]]+\]\s*=(?!=)/, /this\.uiState\.gridVisible\s*=(?!=)/, /this\.#terrainLayers\s*=(?!=)/, /this\.scene3D\s*=(?!=)/, /this\.uiState\.detailLevel\s*=(?!=)/, /this\.uiState\.avoidLabelOverlaps\s*=(?!=)/, /this\.uiState\.symbolSize\s*=(?!=)/];
 
 test("every method that changes a view calls #syncMapControls", () => {
     const bodies = methodBodies(SOURCE);

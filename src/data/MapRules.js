@@ -577,6 +577,8 @@ const MAP = obj({
     gridVisible: bool,
     detailLevel: int(0, FILRODENSWMB.DETAIL.EVERYTHING),
     avoidLabelOverlaps: bool,
+    // The map's symbol size (see SymbolScale), or null for Auto
+    symbolSize: num({ min: FILRODENSWMB.SYMBOLS.RANGE[0], max: FILRODENSWMB.SYMBOLS.RANGE[1] }, { nullable: true }),
     hiddenLabelStyles: list(key),
     hiddenLevels: list(key),
     hideRegionFills: bool,

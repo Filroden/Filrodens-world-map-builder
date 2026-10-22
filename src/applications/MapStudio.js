@@ -68,6 +68,8 @@ import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { rebaseMap } from "../data/SymbolSizes.js";
 import { showNamesOnce } from "../data/NameLevels.js";
+import { SymbolScale } from "../tools/SymbolScale.js";
+import { ExportScale } from "../tools/ExportScale.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -264,6 +266,7 @@ export class MapStudio {
         toggleGrid(e, t)                { this._onToggleGrid(e, t); },
         setDetailLevel(_e, t)           { this.setDetailLevel(Number(t.dataset.detailLevel)); },
         toggleLabelOverlaps()           { this.#toggleLabelOverlaps(); },
+        setSymbolSize(_e, t)            { this.#setSymbolSize(t.dataset.symbolSize); },
         toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
         toggleLayer(e, t)               { this._onToggleLayer(e, t); },
         toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
@@ -980,7 +983,7 @@ export class MapStudio {
 
     /** The map controls' single toggles, for map.hbs (the terrain groups come from #layerGroupsContext). */
     static #mapControlsContext() {
-        return { viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS, detailLevels: FILRODENSWMB.DETAIL.LEVELS };
+        return { viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS, detailLevels: FILRODENSWMB.DETAIL.LEVELS, symbolSizes: FILRODENSWMB.SYMBOLS.SIZES.map((size) => ({ value: String(size), percent: Math.round(size * 100) })) };
     }
 
     /**
@@ -2536,6 +2539,7 @@ export class MapStudio {
         const shown = DetailLevel.shown(this);
         this.canvasEngine.setLabelFilter(ContentRows.labelShown(this));
         this.canvasEngine.setNameFilter(shown.showsName);
+        this.canvasEngine.setSymbolScale(SymbolScale.of(this.uiState));
         if (this.activeTool === "infrastructure") {
             const infraPins = shown.pins.filter((p) => !!p.icon);
             this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isEdit, this.meshSession);
@@ -3135,12 +3139,13 @@ export class MapStudio {
             grid: !!this.uiState.gridVisible,
             detailLevel: DetailLevel.current(this),
             avoidOverlaps: this.uiState.avoidLabelOverlaps !== false,
+            symbolSizes: SymbolScale.choices(this.uiState),
             contentGroups,
             terrainGroups,
             threeD: !!this.scene3D,
         };
         const detailName = (level) => platform.i18n.localize(FILRODENSWMB.DETAIL.LEVELS.find((choice) => choice.value === level).label);
-        syncMapControls(this.root, state, (shown, total) => platform.i18n.format("FILRODENSWMB.UI.LayersMenuCount", { shown, total }), (level) => platform.i18n.format("FILRODENSWMB.UI.DetailMenuLevel", { level: detailName(level) }));
+        syncMapControls(this.root, state, (shown, total) => platform.i18n.format("FILRODENSWMB.UI.LayersMenuCount", { shown, total }), (level) => platform.i18n.format("FILRODENSWMB.UI.DetailMenuLevel", { level: detailName(level) }), (percent) => platform.i18n.format("FILRODENSWMB.UI.SymbolSizeAutoValue", { percent }));
         // The Layers button's name grows and shrinks with the count; the controls may fold differently
         this.#layout?.update();
     }
@@ -3422,6 +3427,7 @@ export class MapStudio {
         this.canvasEngine.setDetailFilter(shown.showsLevel);
         this.canvasEngine.setLabelFilter(ContentRows.labelShown(this));
         this.canvasEngine.setNameFilter(shown.showsName);
+        this.canvasEngine.setSymbolScale(SymbolScale.of(this.uiState));
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
         const infraPins = shown.pins.filter((p) => !!p.icon);
         this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isInfraEdit, this.meshSession);
@@ -3764,6 +3770,7 @@ export class MapStudio {
         this.uiState.gridVisible = payload.gridVisible ?? false;
         this.uiState.detailLevel = DetailLevel.valid(payload.detailLevel);
         this.uiState.avoidLabelOverlaps = payload.avoidLabelOverlaps !== false;
+        this.uiState.symbolSize = SymbolScale.valid(payload.symbolSize);
         this.uiState.hiddenLabelStyles = Array.isArray(payload.hiddenLabelStyles) ? [...payload.hiddenLabelStyles] : [];
         this.uiState.hiddenLevels = Array.isArray(payload.hiddenLevels) ? [...payload.hiddenLevels] : [];
         this.uiState.hideRegionFills = payload.hideRegionFills === true;
@@ -4267,6 +4274,7 @@ export class MapStudio {
             gridVisible: this.uiState.gridVisible,
             detailLevel: DetailLevel.current(this),
             avoidLabelOverlaps: this.uiState.avoidLabelOverlaps !== false,
+            symbolSize: SymbolScale.valid(this.uiState.symbolSize),
             hiddenLabelStyles: [...(this.uiState.hiddenLabelStyles ?? [])],
             hiddenLevels: [...(this.uiState.hiddenLevels ?? [])],
             hideRegionFills: this.uiState.hideRegionFills === true,
@@ -5144,12 +5152,49 @@ export class MapStudio {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.ExportNoMap"));
             return;
         }
+        const scale = await this.#chooseExportScale();
+        if (!scale) return;
 
         const mapName = this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.UnsavedMapName");
-
         platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ExportPngStarted", { name: mapName }));
-        await this.#labelFacesReady();
-        this.canvasEngine.exportToPNG(mapName);
+        await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingPng"));
+        try {
+            await this.#labelFacesReady();
+            await this.canvasEngine.exportToPNG(mapName, scale);
+        } finally {
+            this.#endProcessing();
+        }
+    }
+
+    /**
+     * Asks for the PNG's scale (see ExportScale): each with the image's size, the recommended one
+     * chosen, from the smallest name drawn now, with the reason. Resolves with the scale, or null
+     * when cancelled.
+     * @returns {Promise<number|null>}
+     */
+    async #chooseExportScale() {
+        const plan = ExportScale.plan({ width: this.mapWidth, height: this.mapHeight, smallestLabelPx: this.canvasEngine.smallestLabelPx() });
+        const number = (value) => value.toLocaleString();
+        const options = plan.options.map((option) => {
+            const key = option.recommended ? "FILRODENSWMB.UI.ExportPngScaleRecommended" : option.allowed ? "FILRODENSWMB.UI.ExportPngScaleOption" : "FILRODENSWMB.UI.ExportPngScaleTooLarge";
+            return { ...option, label: platform.i18n.format(key, { scale: option.scale, width: number(option.width), height: number(option.height) }) };
+        });
+        const { reason } = plan;
+        const px = (value) => Math.round(value);
+        const reasons = {
+            none: () => platform.i18n.localize("FILRODENSWMB.UI.ExportPngReasonNone"),
+            enough: () => platform.i18n.format("FILRODENSWMB.UI.ExportPngReasonEnough", { px: px(reason.px) }),
+            reaches: () => platform.i18n.format("FILRODENSWMB.UI.ExportPngReasonReaches", { px: px(reason.px), scale: reason.scale, scaledPx: px(reason.scaledPx) }),
+            short: () => platform.i18n.format("FILRODENSWMB.UI.ExportPngReasonShort", { px: px(reason.px), scale: reason.scale, scaledPx: px(reason.scaledPx) }),
+        };
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-png.hbs", { options, reason: reasons[reason.kind]() });
+        const chosen = await platform.dialogs.prompt({
+            classes: ["fwmb"],
+            title: platform.i18n.localize("FILRODENSWMB.UI.ExportPNG"),
+            content,
+            onSubmit: (form) => Number(form.elements.exportScale.value),
+        });
+        return plan.options.some((option) => option.allowed && option.scale === chosen) ? chosen : null;
     }
 
     /**
@@ -6185,6 +6230,20 @@ export class MapStudio {
     #toggleLabelOverlaps() {
         this.uiState.avoidLabelOverlaps = this.uiState.avoidLabelOverlaps === false;
         this.canvasEngine?.setLabelOverlapAvoidance(this.uiState.avoidLabelOverlaps);
+        this.#syncMapControls();
+        this._repaintVectors();
+        this.markDirty();
+    }
+
+    /**
+     * The Detail menu's symbol size: "auto", or one of SYMBOLS.SIZES (see SymbolScale). Every pin
+     * and label is drawn again at it. Saved with the map, as the detail level is.
+     */
+    #setSymbolSize(value) {
+        const size = value === "auto" ? null : SymbolScale.valid(value);
+        this.#closeLayerMenu();
+        if (size === SymbolScale.valid(this.uiState.symbolSize)) return;
+        this.uiState.symbolSize = size;
         this.#syncMapControls();
         this._repaintVectors();
         this.markDirty();

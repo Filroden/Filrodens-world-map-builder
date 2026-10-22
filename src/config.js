@@ -1293,6 +1293,9 @@ export const FILRODENSWMB = {
         // was before SYMBOLS.REVISION, so older maps look as they did)
         DEFAULT_SIZE: 2,
         UNSET_SIZE: 4,
+        // A name's outline and shadow, in proportion to its height (pixels), within their limits,
+        // so a small name keeps its letters and a large one looks as it did (see SymbolScale.labelHalo)
+        HALO: Object.freeze({ STROKE: 0.125, STROKE_MIN: 1, STROKE_MAX: 3, SHADOW: 1 / 12, SHADOW_MIN: 0.5, SHADOW_MAX: 2 }),
         DEFAULT_COLOR: "#DEDCD3",
         DEFAULT_TEXT: "FILRODENSWMB.LABELS.DefaultLabel",
         // Placing names so they do not cover each other (see LabelLayout). Each kind of label has
@@ -1381,7 +1384,15 @@ export const FILRODENSWMB = {
     // a pin of size 1 is PIN_PX x UNIT pixels across on a LIMITS.BASELINE_DIMENSION map, and a
     // label of size 1 the page's root font size x UNIT, both growing with the map. Older maps and
     // styles files are scaled up as they are read (see SymbolSizes), so they look as they did.
-    SYMBOLS: Object.freeze({ REVISION: 2, UNIT: 0.25, PIN_PX: 24 }),
+    //
+    // Symbol size (see SymbolScale) multiplies every pin and label on a map: Auto grows them with
+    // the square root of how much the map is magnified against its whole world, from 1 (a top map)
+    // up to AUTO_MAX; or one of SIZES, chosen in the Detail menu.
+    SYMBOLS: Object.freeze({ REVISION: 2, UNIT: 0.25, PIN_PX: 24, AUTO_MAX: 2.5, SIZES: Object.freeze([0.75, 1, 1.25, 1.5, 2, 2.5]), RANGE: Object.freeze([0.5, 3]) }),
+    // The PNG export (see ExportScale): the scales offered, the height the smallest name shown
+    // should reach for a scale to be recommended, the largest image (a side, and in all) a scale
+    // may make, and the largest tile drawn at once
+    EXPORT_PNG: Object.freeze({ SCALES: Object.freeze([1, 2, 3, 4]), MIN_LABEL_PX: 12, MAX_SIDE: 16384, MAX_PIXELS: 150_000_000, TILE_PX: 4096 }),
     PINS: {
         // The size new pins (and their labels) start with: small, so a map of many places stays readable
         DEFAULT_SCALE: 1.2,

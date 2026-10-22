@@ -52,7 +52,7 @@
                 </button>
             </div>
 
-            {{!-- Detail: how much of the generated content is shown (see DetailLevel), one choice; and whether names avoid each other (see LabelLayout) --}}
+            {{!-- Detail: how much of the generated content is shown (see DetailLevel), one choice; whether names avoid each other (see LabelLayout); and the symbol size (see SymbolScale) --}}
             <div class="fwmb-map-control-group">
                 <div class="fwmb-layer-group" data-layer-group="detail">
                     <button type="button" class="fwmb-map-btn" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize 'FILRODENSWMB.UI.DetailMenu'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DetailMenu'}}">
@@ -68,6 +68,17 @@
                         <button type="button" role="menuitemcheckbox" aria-checked="true" data-action="toggleLabelOverlaps">
                             <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.DetailAvoidOverlaps"}}
                         </button>
+                        <div class="fwmb-layer-menu-sep" role="separator"></div>
+                        {{!-- Symbol size (see SymbolScale): Auto, named with its value by MapControls, or a size --}}
+                        <div class="fwmb-layer-menu-label" role="presentation">{{localize "FILRODENSWMB.UI.SymbolSize"}}</div>
+                        <button type="button" role="menuitemradio" aria-checked="false" data-action="setSymbolSize" data-symbol-size="auto" data-tooltip="{{localize 'FILRODENSWMB.UI.SymbolSizeAutoHint'}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span><span data-symbol-auto>{{localize "FILRODENSWMB.UI.SymbolSizeAuto"}}</span>
+                        </button>
+                        {{#each symbolSizes}}
+                        <button type="button" role="menuitemradio" aria-checked="false" data-action="setSymbolSize" data-symbol-size="{{this.value}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.SymbolSizePercent" percent=this.percent}}
+                        </button>
+                        {{/each}}
                     </div>
                 </div>
             </div>
