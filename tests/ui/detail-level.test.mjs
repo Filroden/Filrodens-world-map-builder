@@ -86,6 +86,22 @@ test("a level the detail level hides is not drawn, unless it is being painted", 
     assert.deepEqual(describeLevels(session, all, "counties", showsLevel).map((entry) => entry.level.id), ["counties"]);
 });
 
+test("with the Regions menu's Fills off, levels are drawn as borders alone at full strength, except while painting", () => {
+    const app = studio(3);
+    const session = { layerSets: app.layerSets, level: (id) => app.layerSets.flatMap((set) => set.levels).find((level) => level.id === id) };
+    for (const set of app.layerSets) for (const level of set.levels) Object.assign(level, { visibility: "all", regions: [], parentLevelId: null, opacity: 1 });
+    app.layerSets[0].opacity = 0.5;
+    app.layerSets[1].opacity = 0;
+    const all = () => true;
+    const filled = describeLevels(session, all, null, () => true);
+    assert.deepEqual(filled[0].opacity, { fill: 0.5, arcs: 0.5 }, "fills on: the level's opacity for both");
+    const bare = describeLevels(session, all, null, () => true, { fills: false });
+    assert.deepEqual(bare[0].opacity, { fill: 0, arcs: 1 });
+    assert.deepEqual(bare.at(-1).opacity, { fill: 0, arcs: 0 }, "a set faded to nothing stays hidden");
+    const painting = describeLevels(session, all, "realms", () => true, { fills: false });
+    assert.ok(painting[0].opacity.fill > 0, "the painted level keeps its working fill");
+});
+
 // ------------------------------------------------------------------ generated details
 
 const { installPlatform, platform } = await import("../../src/platform/index.js");
@@ -124,6 +140,7 @@ test("a generated place's section gives its place, population and the level it i
         { label: "FILRODENSWMB.UI.GeneratedPlace", value: "FILRODENSWMB.UI.PinStyleCity" },
         { label: "FILRODENSWMB.UI.GeneratedPopulation", value: "15,234" },
         { label: "FILRODENSWMB.UI.GeneratedShownFrom", value: "FILRODENSWMB.UI.DetailWorld" },
+        { label: "FILRODENSWMB.UI.GeneratedNextRun", value: "FILRODENSWMB.UI.GeneratedReplaced" },
     ]);
     assert.equal(GeneratedDetails.forPin(app, app.mapPins[2]), null, "a hand-made pin has none");
 });
@@ -132,10 +149,10 @@ test("a generated region's section counts the duchies and counties beneath it", 
     const app = generatedMap(3);
     const [realms, duchies, counties] = app.layerSets[0].levels;
     const values = (rows) => Object.fromEntries(rows.map((row) => [row.label.replace("FILRODENSWMB.UI.Generated", ""), row.value]));
-    assert.deepEqual(values(GeneratedDetails.forRegion(app, realms.regions[0])), { Title: "Kingdom of Ashford", Rank: "FILRODENSWMB.UI.GeneratedRankKingdom", Population: "120,000", Duchies: "2", Counties: "3", ShownFrom: "FILRODENSWMB.UI.DetailWorld" });
+    assert.deepEqual(values(GeneratedDetails.forRegion(app, realms.regions[0])), { Title: "Kingdom of Ashford", Rank: "FILRODENSWMB.UI.GeneratedRankKingdom", Population: "120,000", Duchies: "2", Counties: "3", ShownFrom: "FILRODENSWMB.UI.DetailWorld", NextRun: "FILRODENSWMB.UI.GeneratedReplaced" });
     assert.equal(values(GeneratedDetails.forRegion(app, realms.regions[1])).Title, "Duchy of Grange", "an independent duchy takes the duchy title");
-    assert.deepEqual(values(GeneratedDetails.forRegion(app, duchies.regions[0])), { Title: "Duchy of Brill", Population: "70,000", Counties: "2", ShownFrom: "FILRODENSWMB.UI.DetailProvince" });
-    assert.deepEqual(values(GeneratedDetails.forRegion(app, counties.regions[2])), { Title: "County of Ford", Population: "50,000", ShownFrom: "FILRODENSWMB.UI.DetailRegional" });
+    assert.deepEqual(values(GeneratedDetails.forRegion(app, duchies.regions[0])), { Title: "Duchy of Brill", Population: "70,000", Counties: "2", ShownFrom: "FILRODENSWMB.UI.DetailProvince", NextRun: "FILRODENSWMB.UI.GeneratedReplaced" });
+    assert.deepEqual(values(GeneratedDetails.forRegion(app, counties.regions[2])), { Title: "County of Ford", Population: "50,000", ShownFrom: "FILRODENSWMB.UI.DetailRegional", NextRun: "FILRODENSWMB.UI.GeneratedReplaced" });
     assert.equal(GeneratedDetails.forRegion(app, app.layerSets[1].levels[0].regions[0]), null);
 });
 
@@ -144,7 +161,7 @@ test("a scene export gives generated items pages only at the map's detail level,
     assert.deepEqual(world.pins.map((page) => page.item.id), ["city", "inn"], "the town is below the detail level; the hand-made pin keeps its page");
     assert.deepEqual(world.regions.map((page) => page.item.name), ["Ashford", "Grange"]);
     assert.deepEqual(world.routes, [], "an unnamed route has no page");
-    assert.equal(world.pins[0].text, "On the river.\n\nFILRODENSWMB.UI.GeneratedPlace: FILRODENSWMB.UI.PinStyleCity\nFILRODENSWMB.UI.GeneratedPopulation: 15,234\nFILRODENSWMB.UI.GeneratedShownFrom: FILRODENSWMB.UI.DetailWorld");
+    assert.equal(world.pins[0].text, "On the river.\n\nFILRODENSWMB.UI.GeneratedPlace: FILRODENSWMB.UI.PinStyleCity\nFILRODENSWMB.UI.GeneratedPopulation: 15,234\nFILRODENSWMB.UI.GeneratedShownFrom: FILRODENSWMB.UI.DetailWorld\nFILRODENSWMB.UI.GeneratedNextRun: FILRODENSWMB.UI.GeneratedReplaced");
     const everything = GeneratedDetails.journalPages(generatedMap(3));
     assert.equal(everything.pins.length, 3);
     assert.equal(everything.regions.length, 7);

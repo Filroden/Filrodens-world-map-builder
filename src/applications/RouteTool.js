@@ -9,6 +9,7 @@ import { routePolyline } from "../mesh/RoutePath.js";
 import { ROUTE_MODES, ROUTE_THICKNESS_STEP } from "../mesh/Schema.js";
 import { uniqueName } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
+import { GeneratedEdits } from "./GeneratedEdits.js";
 
 /** The Routes tool's modes, in toolbar order. */
 export const ROUTE_TOOL_MODES = Object.freeze(["select", "draw", "edit"]);
@@ -401,7 +402,7 @@ export class RouteTool {
         }
         const index = this.#waypointUnder(app, route, x, y);
         if (index >= 0 && (event.ctrlKey || event.metaKey)) {
-            this.#change(app, () => removeWaypoint(app.meshSession, app.mapRoutes, route, index));
+            this.#change(app, route, () => removeWaypoint(app.meshSession, app.mapRoutes, route, index));
             return;
         }
         if (index >= 0 && event.altKey) {
@@ -435,7 +436,7 @@ export class RouteTool {
     /** Alt+click on an inner waypoint: the route splits there into two. */
     static #splitAt(app, route, index) {
         const name = uniqueName(route.name || platform.i18n.localize("FILRODENSWMB.UI.NewRouteName"), app.mapRoutes);
-        this.#change(app, () => {
+        this.#change(app, route, () => {
             const second = splitRoute(route, index, () => platform.utils.randomID(), name);
             if (second) app.mapRoutes.push(second);
             return !!second;
@@ -489,7 +490,10 @@ export class RouteTool {
         if (drag.target !== undefined && moveWaypoint(app.meshSession, app.mapRoutes, drag.route, drag.index, drag.target)) drag.moved = true;
         const joined = join && x !== null && this.#tryJoin(app, drag.route, drag.index, x, y);
         const changed = drag.moved || joined || drag.inserted;
-        if (changed) VectorHistory.push(app, drag.before);
+        if (changed) {
+            GeneratedEdits.mark(drag.route);
+            VectorHistory.push(app, drag.before);
+        }
         this.#redrawRoutes(app);
         this.#drawHandles(app, state);
         if (changed) {
@@ -520,10 +524,11 @@ export class RouteTool {
         return false;
     }
 
-    /** Applies an edit to the picked route as one undo step, when it changed anything. */
-    static #change(app, edit) {
+    /** Applies an edit to the picked route as one undo step, when it changed anything (the route is then the reader's own; see GeneratedEdits). */
+    static #change(app, route, edit) {
         const before = VectorHistory.snapshot(app);
         if (!edit()) return;
+        GeneratedEdits.mark(route);
         VectorHistory.push(app, before);
         this.#redrawRoutes(app);
         this.#drawHandles(app, this.#state(app));

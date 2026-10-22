@@ -110,6 +110,11 @@
                 {{#if (or this.count (eq this.count 0))}}<span class="fwmb-meta fwmb-row-count" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionsInsideCount' count=this.count}}">{{this.count}}</span>{{/if}}
                 {{#if this.stateWord}}<span class="fwmb-state">{{localize this.stateWord}}</span>{{else if (eq this.visibility 'gm')}}<span class="fwmb-meta">{{localize "FILRODENSWMB.UI.TreeMetaGM"}}</span>{{else if (eq this.visibility 'none')}}<span class="fwmb-meta">{{localize "FILRODENSWMB.UI.TreeMetaHidden"}}</span>{{/if}}
                 <span class="fwmb-actions">
+                    {{#if this.generated}}
+                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-lock-toggle" data-action="toggleLock" aria-pressed="{{#if this.locked}}true{{else}}false{{/if}}" aria-label="{{localize 'FILRODENSWMB.UI.GeneratedLock'}}" data-tooltip="{{#if this.locked}}{{localize 'FILRODENSWMB.UI.ListLockedHint'}}{{else if this.edited}}{{localize 'FILRODENSWMB.UI.ListEditedHint'}}{{else}}{{localize 'FILRODENSWMB.UI.ListUnlockedHint'}}{{/if}}">
+                        <i class="fwmb-icon {{#if this.locked}}fwmb-icon--lock{{else}}fwmb-icon--lock-open{{/if}}"></i>
+                    </button>
+                    {{/if}}
                     <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                         <i class="fwmb-icon fwmb-icon--center-focus"></i>
                     </button>

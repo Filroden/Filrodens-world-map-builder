@@ -41,9 +41,30 @@ test("the Labels menu lists the styles the map's names use, in the styles' order
     assert.equal(labels.state, "on");
 });
 
-test("the Regions menu lists each set, its levels indented below it", () => {
+test("the Regions menu lists each set, its levels indented below it, then Fills", () => {
     const regions = rowsOf(studio(), "regions");
-    assert.deepEqual(regions.rows.map((row) => [row.kind, row.key, !!row.sub]), [["set", "political", false], ["level", "realms", true], ["level", "duchies", true], ["set", "own", false], ["level", "lands", true]]);
+    assert.deepEqual(regions.rows.map((row) => [row.kind, row.key, !!row.sub]), [["set", "political", false], ["level", "realms", true], ["level", "duchies", true], ["set", "own", false], ["level", "lands", true], ["fills", "fills", false]]);
+    assert.equal(regions.rows.at(-1).separator, true);
+    const empty = studio();
+    empty.layerSets = [];
+    assert.deepEqual(rowsOf(empty, "regions").rows, [], "no sets: no Fills either");
+});
+
+test("Fills turns the levels' fills off and on, apart from All and the menu's state, and is saved", () => {
+    const app = studio();
+    assert.equal(ContentRows.fillsShown(app), true);
+    ContentRows.toggle(app, "regions", "fills", "fills");
+    assert.equal(app.uiState.hideRegionFills, true);
+    assert.equal(ContentRows.fillsShown(app), false);
+    assert.equal(rowsOf(app, "regions").rows.at(-1).on, false);
+    assert.equal(rowsOf(app, "regions").state, "on", "every level is still shown");
+    ContentRows.toggle(app, "regions", "all");
+    assert.deepEqual(app.uiState.hiddenLevels.sort(), ["duchies", "lands", "realms"], "All is the levels alone");
+    assert.equal(ContentRows.fillsShown(app), false, "All leaves Fills as it was");
+    ContentRows.toggle(app, "regions", "fills", "fills");
+    assert.equal(ContentRows.fillsShown(app), true);
+    const saved = clean({ hideRegionFills: true }, RULES.map, cleanContext(() => "x"));
+    assert.equal(saved.hideRegionFills, true);
 });
 
 test("a row turns its style or level off and on; a set's row all its levels; All every row", () => {

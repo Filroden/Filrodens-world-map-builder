@@ -8,6 +8,7 @@ import { regionFillColor } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
+import { GeneratedEdits } from "./GeneratedEdits.js";
 
 /** The fill patterns a region can have, with their names. */
 const PATTERNS = Object.freeze({ solid: "FILRODENSWMB.UI.StyleSolid", diagonal: "FILRODENSWMB.UI.StyleDiagonalHatch", crosshatch: "FILRODENSWMB.UI.StyleCrossHatch" });
@@ -53,6 +54,7 @@ export class RegionEditor {
         context: (app, region) => RegionEditor.#context(app, region),
         apply: (app, region, ref, form, field) => RegionEditor.#apply(app, region, form, field),
         actions: {
+            lock: (app, region) => GeneratedEdits.toggleLock(app, region),
             zoom: (app, region) => {
                 const points = MeshIntegration.outlinePoints(app, region);
                 if (points.length) app.canvasEngine?.zoomToFeature(points);
@@ -81,6 +83,7 @@ export class RegionEditor {
             labelVisibilities: RegionPanel.visibilityChoices(label.visibility),
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
             generated: GeneratedDetails.forRegion(app, region),
+            generatedLocked: region.generated?.locked === true,
         };
     }
 
@@ -114,6 +117,7 @@ export class RegionEditor {
         const current = { ...region, fillColor: region.fillColor ?? regionFillColor(region), fillStyle: region.fillStyle ?? "solid", label: InspectorFields.label(app, region) };
         if (!InspectorFields.differs(current, values)) return false;
         MapStateManager.pushVectorState(app);
+        GeneratedEdits.markIfSubstantive(region, field);
         const { label, ...fields } = values;
         Object.assign(region, fields);
         region.label = { ...region.label, ...label };

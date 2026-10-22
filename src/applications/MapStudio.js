@@ -62,6 +62,7 @@ import { AppearanceMenu } from "../ui/AppearanceMenu.js";
 import { HelpPanel } from "./HelpPanel.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
+import { GeneratedEdits } from "./GeneratedEdits.js";
 import { rebaseMap } from "../data/SymbolSizes.js";
 
 // Turns a fraction into a percentage for the timing summary
@@ -183,6 +184,7 @@ export class MapStudio {
         mergeRegion(_e, t)          { RegionPanel.mergeRegion(this, ...RegionPanel.regionIdsOf(t)); },
         // --- GENERATE ---
         generateWorld()             { GeneratePanel.generate(this); },
+        removeGenerated()           { GeneratePanel.removeGenerated(this); },
         randomizeGeneratorSeed()    { GeneratePanel.randomizeSeed(this); },
 
         // --- DIALOG MANAGER: Pin Icons ---
@@ -254,6 +256,7 @@ export class MapStudio {
         toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
         toggleTerrainLayer(e, t)        { this._onToggleTerrainLayer(e, t); },
         toggleViewFilter(e, t)          { this._onToggleViewFilter(e, t); },
+        toggleLock(e, t)                { this._onToggleLock(e, t); },
         toggleVisibility(e, t)          { this._onToggleVisibility(e, t); },
         undoBrush(e, t)                 { this._onUndoBrush(e, t); },
         updateMapTerrain(e, t)          { this._onUpdateMapTerrain(e, t); },
@@ -1323,8 +1326,8 @@ export class MapStudio {
      * tick is marked after each draw, so it is not among them; see ListQuery.settle).
      */
     static #LISTS = Object.freeze({
-        pin: { kinds: MapStudio.#PIN_KINDS, template: "parts/list-rows-pin.hbs", shown: (row) => [row.id, row.name, row.icon, row.color, row.visibility] },
-        route: { kinds: MapStudio.#ROUTE_KINDS, template: "parts/list-rows-route.hbs", shown: (row) => [row.id, row.name, row.color, row.thickness, row.style, row.visibility] },
+        pin: { kinds: MapStudio.#PIN_KINDS, template: "parts/list-rows-pin.hbs", shown: (row) => [row.id, row.name, row.icon, row.color, row.visibility, row.generated, row.locked, row.edited] },
+        route: { kinds: MapStudio.#ROUTE_KINDS, template: "parts/list-rows-route.hbs", shown: (row) => [row.id, row.name, row.color, row.thickness, row.style, row.visibility, row.generated, row.locked, row.edited] },
         label: { kinds: MapStudio.#LABEL_KINDS, template: "parts/list-rows-label.hbs", shown: (row) => [row.id, row.name, row.type, row.layerId, row.meta, row.visibility, row.noRoom] },
     });
 
@@ -1351,11 +1354,13 @@ export class MapStudio {
         const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
         const byName = (a, b) => collator.compare(a.name || "", b.name || "");
         const selected = this.massEditSelection[type];
+        // Whether a run made it, and its Lock (see GeneratedEdits.toggleLock)
+        const lockOf = (item) => ({ generated: !!item.generated, locked: item.generated?.locked === true, edited: item.generated?.edited === true });
         if (type === "pin") {
             const tierOf = (pin) => pin.generated?.tier ?? PinStyles.find(this, pin.pinStyle)?.tier ?? "other";
-            return (this.mapPins || []).filter((pin) => !!pin.icon).map((pin) => ({ ...pin, generated: !!pin.generated, kind: tierOf(pin), massEditSelected: selected.has(pin.id) })).sort(byName);
+            return (this.mapPins || []).filter((pin) => !!pin.icon).map((pin) => ({ ...pin, ...lockOf(pin), kind: tierOf(pin), massEditSelected: selected.has(pin.id) })).sort(byName);
         }
-        if (type === "route") return (this.mapRoutes || []).map((route) => ({ ...route, generated: !!route.generated, kind: route.transport ?? "road", massEditSelected: selected.has(route.id) })).sort(byName);
+        if (type === "route") return (this.mapRoutes || []).map((route) => ({ ...route, ...lockOf(route), kind: route.transport ?? "road", massEditSelected: selected.has(route.id) })).sort(byName);
         return this.#labelRows(selected).sort(byName);
     }
 
@@ -2256,7 +2261,11 @@ export class MapStudio {
 
         this.canvasEngine.onInfraDragStart = () => MapStateManager.pushVectorState(this);
         this.canvasEngine.onInfraDrag = () => this.#handleInfraDrag();
-        this.canvasEngine.onInfraDragEnd = () => this.#handleInfraDragEnd();
+        // A generated pin moved or resized by hand is the reader's own (its label dragged is not; see GeneratedEdits)
+        this.canvasEngine.onInfraDragEnd = (drag) => {
+            if (drag?.entityType === "pin") GeneratedEdits.mark(drag.target);
+            this.#handleInfraDragEnd();
+        };
 
         this.canvasEngine.onInfraInsertNode = (x, y) => this.#handleInfraInsertNode(x, y);
         this.canvasEngine.onInfraDeleteNode = (target) => this.#handleInfraDeleteNode(target);
@@ -3723,6 +3732,7 @@ export class MapStudio {
         this.uiState.avoidLabelOverlaps = payload.avoidLabelOverlaps !== false;
         this.uiState.hiddenLabelStyles = Array.isArray(payload.hiddenLabelStyles) ? [...payload.hiddenLabelStyles] : [];
         this.uiState.hiddenLevels = Array.isArray(payload.hiddenLevels) ? [...payload.hiddenLevels] : [];
+        this.uiState.hideRegionFills = payload.hideRegionFills === true;
         this.canvasEngine?.setLabelOverlapAvoidance(this.uiState.avoidLabelOverlaps);
 
         MapStateManager.allocateBuffers(this);
@@ -4208,6 +4218,7 @@ export class MapStudio {
             avoidLabelOverlaps: this.uiState.avoidLabelOverlaps !== false,
             hiddenLabelStyles: [...(this.uiState.hiddenLabelStyles ?? [])],
             hiddenLevels: [...(this.uiState.hiddenLevels ?? [])],
+            hideRegionFills: this.uiState.hideRegionFills === true,
             params: params,
             customBiomes: this.uiState.customBiomes,
             nextCustomBiomeId: this.uiState.nextCustomBiomeId,
@@ -6225,6 +6236,17 @@ export class MapStudio {
             this.view?.render(["context"]);
             this.markDirty();
         }
+    }
+
+    /** A generated item's Lock in its list row (see GeneratedEdits.toggleLock): one undo step. */
+    _onToggleLock(_event, target) {
+        const row = target.closest(".fwmb-list-item");
+        if (!row) return;
+        const { id, type, layerId } = row.dataset;
+        const item = this.#findEntityByType(type, id, layerId);
+        if (!item?.generated) return;
+        GeneratedEdits.toggleLock(this, item);
+        this.view?.render(["context"]);
     }
 
     #toggleEntityVisibility(target, targetType) {

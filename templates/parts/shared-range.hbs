@@ -15,6 +15,9 @@
                 rather than in the label (the short form where the row is stacked); the unit sits
                 outside the output so RangeDisplay's updates leave it alone
       class: optional extra classes for the wrapper
+      resetTo: optional value (as a string, so 0 counts) a double-click returns the slider to, for
+                a setting that is not one of the map's (see StudioView's data-default); the
+                map's own settings are reset from their map defaults by the studio
 
     The value display and the slider's filled portion are kept in step with the slider by
     RangeDisplay (see src/tools/RangeDisplay.js), which finds the value through .fwmb-range.
@@ -30,5 +33,5 @@
             {{#if unit}}<span class="fwmb-unit"><span class="fwmb-unit-long">{{localize unit}}</span><span class="fwmb-unit-short">{{#if unitShort}}{{localize unitShort}}{{else}}{{localize unit}}{{/if}}</span></span>{{/if}}
         </span>
     </div>
-    <input type="range" class="fwmb-range-input" name="{{name}}" value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}" aria-label="{{localize label}}" />
+    <input type="range" class="fwmb-range-input" name="{{name}}" value="{{value}}" min="{{min}}" max="{{max}}" step="{{step}}"{{#if resetTo}} data-default="{{resetTo}}"{{/if}} aria-label="{{localize label}}" />
 </div>

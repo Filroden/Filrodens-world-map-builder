@@ -8,6 +8,7 @@ import { VECTOR_SCHEMA_VERSION, createMeshBlock, createRoute, validateOwners } f
 import { allLevels } from "../mesh/LayerTree.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { DetailLevel } from "./DetailLevel.js";
+import { ContentRows } from "./ContentRows.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { platform } from "../platform/index.js";
 
@@ -292,11 +293,13 @@ export class MeshIntegration {
      * Draws the region levels (see StudioCanvas.renderRegionLevels): each level at its own opacity
      * multiplied by its layer set's, or, while the Regions tool is painting a level, that level and
      * its ancestors alone, drawn for painting (see RegionLevelLayers.describeLevels), unless the
-     * toolbar's Show Everything is on. The outline of the region being edited follows (see updateOutline).
+     * toolbar's Show Everything is on. With the Regions menu's Fills off, levels are drawn as
+     * borders alone (see ContentRows.fillsShown), except the level being painted. The outline of
+     * the region being edited follows (see updateOutline).
      */
     static renderRegions(app) {
         const painting = app.activeTool === "regions" && app.uiState.isEditMode && !app.uiState.regionShowAll;
-        app.canvasEngine.renderRegionLevels(app.meshSession, { focusLevelId: painting ? app.activeLevelId : null });
+        app.canvasEngine.renderRegionLevels(app.meshSession, { focusLevelId: painting ? app.activeLevelId : null, fills: ContentRows.fillsShown(app) });
         this.updateOutline(app);
     }
 

@@ -10,6 +10,8 @@ import { repathRoute, simplifyRoute } from "../mesh/RouteEdits.js";
 import { ROUTE_CLASSES, ROUTE_MODES, ROUTE_THICKNESS_STEP, roundRouteThickness } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
+import { GeneratedEdits } from "./GeneratedEdits.js";
+import { GeneratedDetails } from "./GeneratedDetails.js";
 
 /** The localisation key of each leg mode, transport, class and stroke. */
 const LEG_MODE_LABELS = Object.freeze({ terrain: "FILRODENSWMB.UI.RouteLegTerrain", direct: "FILRODENSWMB.UI.RouteLegDirect" });
@@ -61,6 +63,7 @@ export class RouteEditor {
         context: (app, route) => RouteEditor.#context(app, route),
         apply: (app, route, _ref, form, field) => RouteEditor.#apply(app, route, form, field),
         actions: {
+            lock: (app, route) => GeneratedEdits.toggleLock(app, route),
             zoom: (app, route) => {
                 const points = MeshIntegration.outlinePoints(app, route);
                 if (points.length) app.canvasEngine?.zoomToFeature(points);
@@ -81,6 +84,8 @@ export class RouteEditor {
             visibilities: RegionPanel.visibilityChoices(route.visibility),
             legModes: choices(ROUTE_MODES, LEG_MODE_LABELS, route.mode),
             transportLabel: TRANSPORT_LABELS[route.transport] ?? TRANSPORT_LABELS.road,
+            generated: GeneratedDetails.forRoute(app, route),
+            generatedLocked: route.generated?.locked === true,
             classes: choices(ROUTE_CLASSES, CLASS_LABELS, route.class),
             strokes: choices(Object.keys(STROKE_LABELS), STROKE_LABELS, route.style ?? "solid"),
             thicknessStep: ROUTE_THICKNESS_STEP,
@@ -139,6 +144,7 @@ export class RouteEditor {
         const current = { ...route, class: route.class ?? null, spanWater: route.spanWater === true, outline: route.outline !== false, smoothing: route.smoothing === true, label: InspectorFields.label(app, route) };
         if (!InspectorFields.differs(current, values)) return false;
         MapStateManager.pushVectorState(app);
+        GeneratedEdits.markIfSubstantive(route, field);
         const { label, ...fields } = values;
         Object.assign(route, fields);
         route.label = { ...route.label, ...label };
@@ -151,6 +157,7 @@ export class RouteEditor {
         if (!app.meshSession) return;
         MapStateManager.pushVectorState(app);
         change(app.meshSession);
+        GeneratedEdits.mark(route);
         this.#redraw(app);
     }
 

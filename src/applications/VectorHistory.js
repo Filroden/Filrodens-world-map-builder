@@ -34,7 +34,7 @@ import { NoiseTransform } from "./NoiseTransform.js";
  * many entries it holds. HISTORY_MAX counts entries, as it always has.
  */
 export class VectorHistory {
-    static KIND = Object.freeze({ VECTOR: "vector", OWNERS: "owners", LEVEL_OWNERS: "levelOwners", NOISE: "noise", MODEL_RUN: "modelRun", COMPOSITE: "composite" });
+    static KIND = Object.freeze({ VECTOR: "vector", OWNERS: "owners", LEVEL_OWNERS: "levelOwners", NOISE: "noise", MODEL_RUN: "modelRun", EDITED: "edited", COMPOSITE: "composite" });
 
     /** An entry restoring the vector state as it is now. Take it before changing anything. */
     static snapshot(app) {
@@ -59,6 +59,11 @@ export class VectorHistory {
     /** An entry replacing the generator's saved outputs (app.modelRun; null for none). */
     static modelRun(before, after) {
         return { kind: this.KIND.MODEL_RUN, before, after };
+    }
+
+    /** Generated regions a change marked edited (see GeneratedEdits.markPatched), by id; null when none. */
+    static edited(regionIds) {
+        return regionIds?.length ? { kind: this.KIND.EDITED, regionIds } : null;
     }
 
     /** One entry for several, leaving out empty ones; a single entry stands on its own. */
@@ -117,6 +122,9 @@ export class VectorHistory {
             case this.KIND.MODEL_RUN:
                 app.modelRun = isUndo ? entry.before : entry.after;
                 return entry;
+            case this.KIND.EDITED:
+                this.#applyEdited(app, entry, isUndo);
+                return entry;
             case this.KIND.COMPOSITE: {
                 const order = isUndo ? [...entry.entries].reverse() : entry.entries;
                 const reversed = order.map((inner) => this.#apply(app, inner, isUndo));
@@ -126,6 +134,16 @@ export class VectorHistory {
                 const current = this.snapshot(app);
                 MapStateManager.restoreVectorStateSnapshot(app, entry.snapshot);
                 return current;
+            }
+        }
+    }
+
+    /** Undo unmarks the regions a change marked edited; redo marks them again. */
+    static #applyEdited(app, entry, isUndo) {
+        const ids = new Set(entry.regionIds);
+        for (const set of app.layerSets ?? []) {
+            for (const level of set.levels) {
+                for (const region of level.regions) if (ids.has(region.id) && region.generated) region.generated.edited = !isUndo;
             }
         }
     }

@@ -217,6 +217,19 @@ test("sliders get their value display and fill after a redraw and as they move",
     assert.equal(slider.style.getPropertyValue("--fwmb-range-percent"), "70%");
 });
 
+test("a double-click returns a slider carrying data-default to it, as a drag that was let go", async () => {
+    state.extra = '<input type="range" name="world" min="0" max="4" step="0.05" value="2.5" data-default="1">';
+    const view = makeView();
+    await view.render();
+    const slider = root.querySelector('input[name="world"]');
+    const events = [];
+    for (const type of ["input", "change"]) root.addEventListener(type, (event) => event.target === slider && events.push(`${type} ${slider.value}`));
+    slider.dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true }));
+    assert.deepEqual(events, ["input 1", "change 1"], "moved, then committed");
+    slider.dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true }));
+    assert.equal(events.length, 2, "already at its default: nothing sent");
+});
+
 test("after destroy, clicks are ignored and render does nothing", async () => {
     const view = makeView();
     await view.render();

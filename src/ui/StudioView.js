@@ -307,15 +307,20 @@ export class StudioView {
 
     /**
      * Returns a slider carrying data-default to that value. The input event it sends updates the
-     * display and track (above) and reaches whatever listens for changes, as a drag would. Sliders
-     * without data-default are left to the studio.
+     * display and track (above) and reaches whatever listens for changes, as a drag would; the
+     * change event that follows commits it, as letting go of a drag would (fields that save only
+     * when let go, such as the Generate panel's). Sliders without data-default are left to the
+     * studio.
      */
     #onSliderDoubleClick = (event) => {
         const target = event.target;
         if (!StudioView.#isRange(target)) return;
         if (target.dataset.default === undefined || target.value === target.dataset.default) return;
         target.value = target.dataset.default;
-        target.dispatchEvent(new Event("input", { bubbles: true }));
+        // The slider's own page's events (a popped-out window has its own)
+        const PageEvent = target.ownerDocument.defaultView?.Event ?? Event;
+        target.dispatchEvent(new PageEvent("input", { bubbles: true }));
+        target.dispatchEvent(new PageEvent("change", { bubbles: true }));
     };
 
     static #isRange(element) {

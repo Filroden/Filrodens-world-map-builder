@@ -125,6 +125,7 @@ export class MapStateManager {
             avoidLabelOverlaps: true,
             hiddenLabelStyles: [],
             hiddenLevels: [],
+            hideRegionFills: false,
 
             terrainBrushTool: "raise",
             biomesBrushTool: "paint",

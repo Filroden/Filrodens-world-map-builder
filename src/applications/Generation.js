@@ -10,6 +10,7 @@ import { FieldSpecs } from "./FieldSpecs.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { PinStyles } from "./PinStyles.js";
+import { Regeneration } from "./Regeneration.js";
 import { VectorHistory } from "./VectorHistory.js";
 
 /**
@@ -76,14 +77,49 @@ export class Generation {
     }
 
     /**
-     * Before a run on a map that already holds generated content: a confirmation giving what is
-     * there, since the new run is added beside it. True to go ahead (or when there is nothing).
+     * Before a run on a map that already holds generated content: a confirmation giving what the
+     * run replaces and how much is kept (see Regeneration). True to go ahead (or when nothing would
+     * be replaced).
      */
     static async #confirmAgain(app) {
-        const counts = this.counts(app);
-        if (!counts.realms && !counts.places && !counts.routes) return true;
-        const shown = Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, value.toLocaleString(platform.i18n.lang)]));
-        return MapDialogManager._confirmDialog(platform.i18n.localize("FILRODENSWMB.UI.GenerateAgainTitle"), platform.i18n.format("FILRODENSWMB.UI.GenerateAgainMessage", shown));
+        return this.#confirmReplacing(app, "FILRODENSWMB.UI.GenerateAgainTitle", "FILRODENSWMB.UI.GenerateAgainMessage");
+    }
+
+    static async #confirmReplacing(app, titleKey, messageKey) {
+        const { removed, kept } = Regeneration.plan(app);
+        if (!removed.realms && !removed.places && !removed.routes) return true;
+        const format = (value) => value.toLocaleString(platform.i18n.lang);
+        const shown = { ...Object.fromEntries(Object.entries(removed).map(([key, value]) => [key, format(value)])), kept: format(kept) };
+        return MapDialogManager._confirmDialog(platform.i18n.localize(titleKey), platform.i18n.format(messageKey, shown));
+    }
+
+    /**
+     * Remove generated content (the Results section): every generated realm, place and route not
+     * kept goes, after a confirmation, as one undo step (see Regeneration). Returns whether anything went.
+     * @param {object} app
+     * @returns {Promise<boolean>}
+     */
+    static async removeGenerated(app) {
+        const { removed } = Regeneration.plan(app);
+        if (!removed.realms && !removed.places && !removed.routes) {
+            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.RemoveGeneratedNothing"));
+            return false;
+        }
+        if (!(await this.#confirmReplacing(app, "FILRODENSWMB.UI.RemoveGeneratedTitle", "FILRODENSWMB.UI.RemoveGeneratedMessage"))) return false;
+        const before = VectorHistory.snapshot(app);
+        const removal = Regeneration.remove(app);
+        const modelRunBefore = app.modelRun ?? null;
+        app.modelRun = null;
+        const owners = removal.owners.map((entry) => VectorHistory.levelOwners(entry.levelId, entry.before, entry.after));
+        VectorHistory.push(app, VectorHistory.composite([before, ...owners, VectorHistory.modelRun(modelRunBefore, null)]));
+        this.#afterChange(app);
+        return true;
+    }
+
+    static #afterChange(app) {
+        app._repaintVectors();
+        app.view?.render(["context"]);
+        app.markDirty();
     }
 
     /**
@@ -124,9 +160,10 @@ export class Generation {
     }
 
     /**
-     * Adds a run's output to the map as one undo step: the Political set and its levels' owner
-     * arrays, the routes, the pins, any style the run needed that the map lacked, and the run's
-     * model-cell outputs (app.modelRun).
+     * Writes a run's output onto the map as one undo step: what earlier runs made and the reader
+     * has not kept is replaced (see Regeneration), and the run's regions go into the Political set
+     * that remains (a new one when none does), with its routes, its pins (none on a kept pin's
+     * cell), any style the run needed that the map lacked, and its model-cell outputs (app.modelRun).
      * @param {object} app
      * @param {object} result - A generator run.
      * @param {object} [output] - What to write (see GeneratorSettings.resolveOutput); all of it when left out.
@@ -135,6 +172,7 @@ export class Generation {
         const before = VectorHistory.snapshot(app);
         if (output.defaultStyles) this.resetStyles(app);
         this.#ensureLabelStyles(app);
+        const removal = Regeneration.remove(app, { keepLatest: true });
         const session = app.meshSession;
         const runId = platform.utils.randomID();
         const made = materialise(session, result, {
@@ -150,23 +188,42 @@ export class Generation {
             regionLabel: this.#regionLabels(app),
             output,
         });
-        app.layerSets = [...(app.layerSets ?? []), made.set];
-        session.setLayerSets(app.layerSets);
+        const owners = removal.owners.map((entry) => VectorHistory.levelOwners(entry.levelId, entry.before, entry.after));
+        const merged = removal.target ? Regeneration.merge(app, removal.target, made.set) : null;
+        let set = made.set;
+        if (merged) {
+            set = removal.target;
+            owners.push(...merged.map((entry) => VectorHistory.levelOwners(entry.levelId, entry.before, entry.after)));
+        } else {
+            // A kept set the run could not write into (its levels differ) goes if it was left empty
+            if (removal.target?.levels.every((level) => level.regions.length === 0)) owners.push(...this.#dropSet(app, removal.target));
+            app.layerSets = [...(app.layerSets ?? []), made.set];
+            session.setLayerSets(app.layerSets);
+            owners.push(...made.set.levels.map((level) => VectorHistory.levelOwners(level.id, null, made.owners[level.id])));
+        }
         app.mapRoutes.push(...made.routes);
-        app.mapPins.push(...made.pins);
+        app.mapPins.push(...Regeneration.placesBeside(app, made.pins));
         const modelRunBefore = app.modelRun ?? null;
         app.modelRun = encodeModelRun(result, runId);
         app.uiState.generatorStale = false;
-        app.activeLayerSetId = made.set.id;
-        app.activeLevelId = made.set.levels[0].id;
+        app.activeLayerSetId = set.id;
+        app.activeLevelId = set.levels[0].id;
 
-        const levels = made.set.levels.map((level) => VectorHistory.levelOwners(level.id, null, made.owners[level.id]));
-        VectorHistory.push(app, VectorHistory.composite([before, ...levels, VectorHistory.modelRun(modelRunBefore, app.modelRun)]));
+        VectorHistory.push(app, VectorHistory.composite([before, ...owners, VectorHistory.modelRun(modelRunBefore, app.modelRun)]));
         // The map is shown at the detail its scale leaves room for (a view setting, so not undone with the run)
         app.setDetailLevel?.(DetailLevel.forScale(session.mesh.kmPerPx), { repaint: false });
         app._repaintVectors();
         app.view?.render(["context"]);
         app.markDirty();
+    }
+
+    /** Removes a set and its levels' owner arrays; returns the undo entries that bring them back. */
+    static #dropSet(app, set) {
+        const session = app.meshSession;
+        const entries = set.levels.map((level) => VectorHistory.levelOwners(level.id, session.removeLevelOwners(level.id), null));
+        app.layerSets = app.layerSets.filter((each) => each !== set);
+        session.setLayerSets(app.layerSets);
+        return entries;
     }
 
     /** The localised words generated content is named with (title and castle name templates hold "{name}"). */

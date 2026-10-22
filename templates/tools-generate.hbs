@@ -1,6 +1,7 @@
 {{!--
     Generate (tool id "generate"; see GeneratePanel): the run itself at the top, then the settings
-    the settlements, routes and realms are made with, and what the last run made. Fields are named
+    the settlements, routes and realms are made with, what the last run made, and Remove generated
+    content. Fields are named
     "generator.<path>" and kept with the map. The estimate and the notices come from GeneratePanel.
 --}}
 <div class="fwmb-generate-action">
@@ -51,7 +52,7 @@
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateWorld" title="FILRODENSWMB.UI.SectionGenerateWorld" badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
     {{#each generate.world}}
-    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name=this.name label=this.label hint=this.hint value=this.value min=this.min max=this.max step=this.step}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name=this.name label=this.label hint=this.hint value=this.value min=this.min max=this.max step=this.step resetTo=this.resetTo}}
     {{/each}}
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
@@ -108,4 +109,12 @@
         <dd class="fwmb-readout">{{generate.results.population}}</dd>
     </dl>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}
+
+{{#if generate.canRemove}}
+<div class="fwmb-generate-action">
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-btn--wide" data-action="removeGenerated" data-tooltip="{{localize 'FILRODENSWMB.UI.RemoveGeneratedHint'}}">
+        {{localize "FILRODENSWMB.UI.RemoveGenerated"}}
+    </button>
+</div>
 {{/if}}

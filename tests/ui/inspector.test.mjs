@@ -606,3 +606,65 @@ test("the lists learn which object the inspector shows, a label by its owner's t
     await settle();
     assert.deepEqual(Inspector.inspected(app), {});
 });
+
+// ------------------------------------------------------------------ generated items made the reader's own (4e)
+
+/** One step back, and the open inspector drawn again from the restored state. */
+async function undo(app) {
+    VectorHistory.step(app, true);
+    Inspector.refresh(app);
+    await settle();
+}
+
+const made = () => ({ run: "run", kind: "town", tier: "town", sourceId: 0, population: 100, culture: null, edited: false, locked: false });
+
+test("a generated item is marked edited by its name, look or shape, never by its label or visibility; undo unmarks it", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    pin.generated = made();
+    await PinEditor.open(app, "keep");
+    await commit(app, "pinVisibility", "gm");
+    await commit(app, "labelFontSize", "2.5");
+    assert.equal(pin.generated.edited, false, "visibility and label are not edits");
+    await commit(app, "pinName", "New Keep");
+    assert.equal(pin.generated.edited, true);
+    await undo(app);
+    const restored = app.mapPins.find((each) => each.id === pin.id);
+    assert.equal(restored.generated.edited, false, "undo takes the mark with the name");
+
+    await commit(app, "pinScale", "1.5");
+    assert.equal(app.mapPins.find((each) => each.id === pin.id).generated.edited, true, "a look change");
+
+    const region = app.regionLevels[0].regions[0];
+    region.generated = { ...made(), kind: "realm" };
+    await RegionEditor.open(app, "realms", region.id);
+    await commit(app, "regionVisibility", "gm");
+    assert.equal(region.generated.edited, false);
+    await commit(app, "regionDesc", "Old lands");
+    assert.equal(region.generated.edited, true);
+
+    const route = placeRoad(app);
+    route.generated = { ...made(), kind: "route" };
+    await RouteEditor.open(app, route.id);
+    form(app).querySelector('[data-inspector-action="repath"]').click();
+    await settle();
+    assert.equal(route.generated.edited, true, "a re-path is a shape change");
+});
+
+test("Lock, in the Generated section, keeps an item on Generate again; one undo step", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    pin.generated = made();
+    await PinEditor.open(app, "keep");
+    const lock = form(app).querySelector('[data-inspector-action="lock"]');
+    assert.ok(lock, "a generated pin has Lock");
+    const before = steps(app);
+    lock.click();
+    await settle();
+    assert.equal(pin.generated.locked, true);
+    assert.equal(steps(app), before + 1);
+    assert.equal(form(app).querySelector('[data-inspector-action="lock"]').checked, true);
+    assert.match(form(app).textContent, /GeneratedKeptLocked/);
+    await undo(app);
+    assert.equal(app.mapPins.find((each) => each.id === pin.id).generated.locked, false);
+});

@@ -60,7 +60,7 @@ export class GeneratePanel {
             hasRun,
             world: WORLD_FIELDS.map(({ key, label, hint }) => {
                 const range = FILRODENSWMB.GENERATOR.WORLD[key];
-                return { name: `${FIELD_PREFIX}world.${key}`, label, hint, value: settings.world[key], min: range.min, max: range.max, step: SLIDER_STEP };
+                return { name: `${FIELD_PREFIX}world.${key}`, label, hint, value: settings.world[key], min: range.min, max: range.max, step: SLIDER_STEP, resetTo: String(range.default) };
             }),
             output: {
                 duchies: settings.output.duchies,
@@ -71,6 +71,8 @@ export class GeneratePanel {
                 routes: Object.entries(ROUTE_FIELDS).map(([field, label]) => ({ name: `${FIELD_PREFIX}output.routes.${field}`, label, checked: settings.output.routes[field] })),
             },
             results: hasRun ? this.results(app) : null,
+            // Remove generated content, while anything a run made is on the map
+            canRemove: Object.values(Generation.counts(app)).some((count) => count > 0),
         };
     }
 
@@ -205,6 +207,13 @@ export class GeneratePanel {
         this.settings(app).seed = platform.utils.randomID();
         app.markDirty();
         app.view?.render(["context"]);
+    }
+
+    /** Remove generated content: what runs made and the reader has not kept goes (see Regeneration). */
+    static async removeGenerated(app) {
+        const done = await Generation.removeGenerated(app);
+        if (done) app.view?.render(["context"]);
+        return done;
     }
 
     /** Generate (or Generate again): the run, then the panel redrawn with its results. */

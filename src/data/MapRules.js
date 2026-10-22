@@ -539,6 +539,7 @@ const MAP = obj({
     avoidLabelOverlaps: bool,
     hiddenLabelStyles: list(key),
     hiddenLevels: list(key),
+    hideRegionFills: bool,
     params: PARAMS,
     customBiomes: list(CUSTOM_BIOME),
     nextCustomBiomeId: int(0, MAX_BIOME_ID + 1),

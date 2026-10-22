@@ -6,6 +6,7 @@ import { RangeDisplay } from "../tools/RangeDisplay.js";
 import { roundRouteThickness } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
+import { GeneratedEdits } from "./GeneratedEdits.js";
 
 const TEMPLATE = "modules/filrodens-world-map-builder/templates/dialogs/mass-edit.hbs";
 const TITLES = Object.freeze({
@@ -302,7 +303,10 @@ export class MassEdit {
         const kind = FieldSpecs.KINDS[type];
         const fields = new Map(kind.fields.map((field) => [`${field.store}.${field.key}`, field]));
         MapStateManager.pushVectorState(app);
+        // A change to anything but visibility and the label is the reader's own (see GeneratedEdits)
+        const substantive = changes.some((change) => change.store === "item" && change.key !== "visibility");
         for (const item of items) {
+            if (substantive) GeneratedEdits.mark(item);
             if (kind.hasLabel) {
                 this.#applyStore(app, item, kind.style, changes.filter((change) => change.store === "item"), fields, "item", type);
                 const label = { ...(item.label ?? {}) };

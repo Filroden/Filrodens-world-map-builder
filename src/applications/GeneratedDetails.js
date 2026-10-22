@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { platform } from "../platform/index.js";
 import { DetailLevel } from "./DetailLevel.js";
+import { Regeneration } from "./Regeneration.js";
 
 /**
  * What a run of Generate recorded about a place or region (its `generated` details), as the rows
@@ -14,6 +15,10 @@ const RANKS = Object.freeze({ kingdom: "FILRODENSWMB.UI.GeneratedRankKingdom", i
 /** The depth of the realms and counties in a generated Political set. */
 const REALMS = 0;
 const COUNTIES = 2;
+
+/** A route's transport and class, by name. */
+const TRANSPORTS = Object.freeze({ road: "FILRODENSWMB.UI.TransportRoad", river: "FILRODENSWMB.UI.TransportRiver", sea: "FILRODENSWMB.UI.TransportSea" });
+const CLASSES = Object.freeze({ trunk: "FILRODENSWMB.UI.RouteClassTrunk", main: "FILRODENSWMB.UI.RouteClassMain", minor: "FILRODENSWMB.UI.RouteClassMinor" });
 
 /** Each settlement tier's name, from its default pin style. */
 const TIER_NAMES = new Map(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style.name]));
@@ -33,6 +38,7 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedPlace", tierName ? platform.i18n.localize(tierName) : null],
             ["FILRODENSWMB.UI.GeneratedPopulation", this.#count(generated.population)],
             ["FILRODENSWMB.UI.GeneratedShownFrom", this.#levelName(DetailLevel.ofPin(app, pin))],
+            ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(pin)],
         ]);
     }
 
@@ -55,6 +61,7 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedDuchies", place?.depth === REALMS ? this.#count(below[0]) : null],
             ["FILRODENSWMB.UI.GeneratedCounties", place ? this.#count(below[COUNTIES - place.depth - 1]) : null],
             ["FILRODENSWMB.UI.GeneratedShownFrom", place ? this.#levelName(DetailLevel.ofLevel(place.set, place.level)) : null],
+            ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(region, place)],
         ]);
     }
 
@@ -85,6 +92,30 @@ export class GeneratedDetails {
     static #pageText(description, rows) {
         const figures = (rows ?? []).map((row) => `${row.label}: ${row.value}`).join("\n");
         return [description?.trim(), figures].filter(Boolean).join("\n\n");
+    }
+
+    /**
+     * A generated route's rows, or null for a route no run made: its kind and class, and what
+     * Generate again does with it.
+     * @param {object} app
+     * @param {object} route
+     * @returns {{label: string, value: string}[]|null}
+     */
+    static forRoute(app, route) {
+        if (!route.generated) return null;
+        return this.#rows([
+            ["FILRODENSWMB.UI.GeneratedRouteKind", TRANSPORTS[route.transport] ? platform.i18n.localize(TRANSPORTS[route.transport]) : null],
+            ["FILRODENSWMB.UI.GeneratedRouteClass", CLASSES[route.class] ? platform.i18n.localize(CLASSES[route.class]) : null],
+            ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(route)],
+        ]);
+    }
+
+    /** What Generate again does with an item: keeps it (edited, locked, or with its realm) or replaces it. */
+    static #fate(item, place = null) {
+        if (item.generated.locked) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptLocked");
+        if (item.generated.edited) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptEdited");
+        if (place && Regeneration.keptKeys(place.set)[place.depth].has(item.key)) return platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptRealm");
+        return platform.i18n.localize("FILRODENSWMB.UI.GeneratedReplaced");
     }
 
     /**

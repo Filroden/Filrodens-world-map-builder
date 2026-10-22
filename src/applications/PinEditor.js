@@ -9,6 +9,7 @@ import { RegionPanel } from "./RegionPanel.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
+import { GeneratedEdits } from "./GeneratedEdits.js";
 
 /** The pin's own fields a pin style sets, by their names in the form (the label's size is set by it too). */
 const LOOK_FIELDS = Object.freeze({ pinColor: true, pinScale: true });
@@ -49,6 +50,7 @@ export class PinEditor {
             zoom: (app, pin) => app.canvasEngine?.zoomToFeature([pin]),
             pickIcon: (app, pin, _ref, button) => PinEditor.#pickIcon(app, pin, button.dataset.icon),
             delete: (app, pin) => MapDialogManager.deleteEntityById(app, "pin", pin.id),
+            lock: (app, pin) => GeneratedEdits.toggleLock(app, pin),
             saveStyle: (app, pin, _ref, button) => PinEditor.#saveStyle(app, pin, button.dataset.styleType),
         },
     });
@@ -70,6 +72,7 @@ export class PinEditor {
             labelVisibilities: RegionPanel.visibilityChoices(label.visibility),
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
             generated: GeneratedDetails.forPin(app, pin),
+            generatedLocked: pin.generated?.locked === true,
         };
     }
 
@@ -97,11 +100,13 @@ export class PinEditor {
             MapStateManager.pushVectorState(app);
             if (style) PinStyles.apply(app, pin, style);
             else pin.pinStyle = null;
+            GeneratedEdits.mark(pin);
             this.#redraw(app);
             return true;
         }
         if (!InspectorFields.differs(current, values)) return false;
         MapStateManager.pushVectorState(app);
+        GeneratedEdits.markIfSubstantive(pin, field);
         const { label, ...fields } = values;
         Object.assign(pin, fields);
         pin.label = { ...pin.label, ...label };
@@ -116,6 +121,7 @@ export class PinEditor {
         MapStateManager.pushVectorState(app);
         pin.icon = icon;
         pin.pinStyle = null;
+        GeneratedEdits.mark(pin);
         this.#redraw(app);
     }
 

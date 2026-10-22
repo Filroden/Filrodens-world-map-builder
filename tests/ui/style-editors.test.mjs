@@ -32,7 +32,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/face-fields.hbs", "parts/label-fields.hbs", "parts/inspector-route.hbs", "parts/inspector-route-style.hbs", "parts/inspector-region-style.hbs", "parts/inspector-label-style.hbs", "parts/inspector-pin-style.hbs", "tools-library.hbs"]);
+await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/face-fields.hbs", "parts/label-fields.hbs", "parts/inspector-generated.hbs", "parts/inspector-route.hbs", "parts/inspector-route-style.hbs", "parts/inspector-region-style.hbs", "parts/inspector-label-style.hbs", "parts/inspector-pin-style.hbs", "tools-library.hbs"]);
 
 const answers = { prompt: null, confirm: true, confirmed: [] };
 let host = null;

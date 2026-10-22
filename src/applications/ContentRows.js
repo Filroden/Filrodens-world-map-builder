@@ -11,6 +11,9 @@ import { platform } from "../platform/index.js";
  * - Regions: each layer set, its levels indented below it. Turning a level off hides its fill,
  *   borders and names in the view, without changing what players or the GM are shown (its saved
  *   visibility); a set's row turns all its levels on or off.
+ * - Regions also ends with Fills (uiState.hideRegionFills): off draws every level's borders alone,
+ *   at full strength, so a map can show where its regions lie without their colour. It is not a
+ *   level, so All and the menu's state leave it out.
  *
  * Each menu's All row turns every row off when all are on, and every row on otherwise. A style
  * or level new to the map starts shown.
@@ -40,6 +43,11 @@ export class ContentRows {
         return (labelData) => !hidden.has(this.labelKey(app, labelData));
     }
 
+    /** Whether the Regions menu's Fills row is on (the levels' fills are drawn). */
+    static fillsShown(app) {
+        return app.uiState?.hideRegionFills !== true;
+    }
+
     /** Whether a region level's row is on. */
     static levelShown(app) {
         const hidden = this.hidden(app, "regions");
@@ -49,7 +57,7 @@ export class ContentRows {
     /**
      * Each menu's rows, with whether each is on, and the menu's own state (all on, some, none).
      * @param {object} app
-     * @returns {{id: string, state: string, rows: {kind: string, key: string, label: string, on: boolean, sub?: boolean}[]}[]}
+     * @returns {{id: string, state: string, rows: {kind: string, key: string, label: string, on: boolean, sub?: boolean, separator?: boolean}[]}[]}
      */
     static groups(app) {
         return [this.#labelGroup(app), this.#regionGroup(app)];
@@ -83,22 +91,28 @@ export class ContentRows {
             const levels = set.levels.map((level) => ({ kind: "level", key: level.id, label: level.name, on: !hidden.has(level.id), sub: true }));
             rows.push({ kind: "set", key: set.id, label: set.name, on: levels.every((row) => row.on), mixed: levels.some((row) => row.on) && !levels.every((row) => row.on) }, ...levels);
         }
-        return { id: "regions", state: stateOf(rows.filter((row) => row.kind !== "set")), rows };
+        const levels = rows.filter((row) => row.kind === "level");
+        if (rows.length) rows.push({ kind: "fills", key: "fills", label: platform.i18n.localize("FILRODENSWMB.UI.RegionFills"), on: this.fillsShown(app), separator: true });
+        return { id: "regions", state: stateOf(levels), rows };
     }
 
     /**
      * A row clicked: All, a style, a set or a level. Returns whether anything changed.
      * @param {object} app
      * @param {string} group - "labels" or "regions".
-     * @param {string} kind - "all", "style", "set" or "level".
+     * @param {string} kind - "all", "style", "set", "level" or "fills".
      * @param {string} [key]
      */
     static toggle(app, group, kind, key) {
         const field = GROUPS[group];
         if (!field) return false;
+        if (kind === "fills") {
+            app.uiState.hideRegionFills = this.fillsShown(app);
+            return true;
+        }
         const hidden = this.hidden(app, group);
         const { rows } = this.groups(app).find((entry) => entry.id === group);
-        const keys = rows.filter((row) => row.kind !== "set").map((row) => row.key);
+        const keys = rows.filter((row) => row.kind === "style" || row.kind === "level").map((row) => row.key);
         if (kind === "all") {
             const allOn = keys.every((each) => !hidden.has(each));
             app.uiState[field] = allOn ? keys : [];

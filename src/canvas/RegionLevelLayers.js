@@ -49,14 +49,15 @@ export class RegionLevelLayers {
      * @param {number} [options.resScale] - The map's resolution scale (for levels whose borders scale with it).
      * @param {string|null} [options.focusLevelId] - A level being painted: it and its ancestors are
      *     drawn for the task, and nothing else (see describeLevels).
+     * @param {boolean} [options.fills] - false: the levels as borders alone (see describeLevels).
      */
-    render(session, { isVisible, showsLevel = () => true, resScale = 1, focusLevelId = null }) {
+    render(session, { isVisible, showsLevel = () => true, resScale = 1, focusLevelId = null, fills = true }) {
         if (!session) {
             this.clear();
             return;
         }
         this.#adoptMesh(session.mesh);
-        const drawn = describeLevels(session, isVisible, focusLevelId, showsLevel);
+        const drawn = describeLevels(session, isVisible, focusLevelId, showsLevel, { fills });
         const keep = new Set(drawn.map((entry) => entry.level.id));
         for (const id of [...this.#levels.keys()]) if (!keep.has(id)) this.#dropLevel(id);
 
@@ -170,8 +171,12 @@ export class RegionLevelLayers {
  * @param {string|null} [focusLevelId]
  * @param {function(object, object): boolean} [showsLevel] - Whether the map's detail level shows a
  *     set's level (see DetailLevel). A level being painted is shown whatever the detail level.
+ * @param {{fills?: boolean}} [options] - fills: false (the Regions menu's Fills off) draws every
+ *     level's borders alone, at full strength (a level faded to nothing stays hidden), so the
+ *     level and set opacity, which are mostly for the fills, do not wash the borders out. Painting
+ *     draws as it always does: the painted level's fill is what a stroke shows.
  */
-export function describeLevels(session, isVisible, focusLevelId = null, showsLevel = () => true) {
+export function describeLevels(session, isVisible, focusLevelId = null, showsLevel = () => true, { fills = true } = {}) {
     // A level the session no longer holds (deleted a moment ago) focuses nothing: the map is drawn as viewed
     const focus = focusLevelId && session.level(focusLevelId) ? focusLineage(session, focusLevelId) : null;
     const drawn = [];
@@ -185,7 +190,7 @@ export function describeLevels(session, isVisible, focusLevelId = null, showsLev
             if (!isVisible(levelVisibility, "all", true)) continue;
             shown.add(level.id);
             const { palette, visibleKeys } = regionPalette(level, levelVisibility, isVisible);
-            const opacity = focus ? focusOpacity(level, set, level.id === focusLevelId) : viewOpacity(level, set);
+            const opacity = focus ? focusOpacity(level, set, level.id === focusLevelId) : viewOpacity(level, set, fills);
             drawn.push({ level, set, palette, visibleKeys, exclude: visibleAncestors(session, level, shown), opacity });
         }
     }
@@ -199,9 +204,13 @@ function focusLineage(session, levelId) {
     return lineage;
 }
 
-/** How a level is drawn when the map is viewed: fill and borders at its own opacity times its set's. */
-function viewOpacity(level, set) {
+/**
+ * How a level is drawn when the map is viewed: fill and borders at its own opacity times its
+ * set's; with fills off, borders alone at full strength (none for a level faded to nothing).
+ */
+function viewOpacity(level, set, fills = true) {
     const opacity = drawnOpacity(level, set);
+    if (!fills) return { fill: 0, arcs: opacity > 0 ? 1 : 0 };
     return { fill: opacity, arcs: opacity };
 }
 

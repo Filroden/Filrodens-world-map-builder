@@ -6,6 +6,7 @@ import { addRegion, childLevelFields, createLayerSet, createLevel, regionFillCol
 import { childLevels, descendantLevels, insertLevel, levelDepth, parentLevel, setOfLevel, setParent, uniqueName } from "../mesh/LayerTree.js";
 import { assignToParents, autoAssign, claimWaters, deleteLevel, deleteRegion, deleteSet, levelCounts, mergeRegion, nestingProblems, regionParents, unassignedCount } from "../mesh/RegionEdits.js";
 import { platform } from "../platform/index.js";
+import { GeneratedEdits } from "./GeneratedEdits.js";
 
 /** Where the dialogue templates live (Merge Into's). */
 const DIALOG_ROOT = "modules/filrodens-world-map-builder/templates/dialogs/";
@@ -128,6 +129,10 @@ export class RegionPanel {
                 name: region.name,
                 visibility: region.visibility ?? "all",
                 swatch: regionFillColor(region),
+                // A generated region's Lock (see GeneratedEdits.toggleLock)
+                generated: !!region.generated,
+                locked: region.generated?.locked === true,
+                edited: region.generated?.edited === true,
                 // The regions inside it, in the layers below (none shown when there are none below)
                 count: below.length ? below.reduce((sum, child) => sum + child.regions.filter((inner) => inner.parentKey === region.key).length, 0) : null,
                 working,
@@ -390,6 +395,7 @@ export class RegionPanel {
         if (!object || !name || object.name === name) return false;
         MapStateManager.pushVectorState(app);
         object.name = name;
+        GeneratedEdits.mark(object);
         this.#refresh(app);
         return true;
     }
@@ -661,6 +667,7 @@ export class RegionPanel {
         const before = VectorHistory.snapshot(app);
         const merged = mergeRegion(app.meshSession, levelId, regionId, intoId);
         if (!merged) return false;
+        GeneratedEdits.mark(level.regions.find((candidate) => candidate.id === intoId));
         VectorHistory.push(app, VectorHistory.composite([before, VectorHistory.owners(levelId, merged.patch), this.watersEntry(app, levelId)]));
         app.activeRegionId = intoId;
         this.#refresh(app);

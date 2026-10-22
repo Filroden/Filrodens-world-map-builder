@@ -248,6 +248,12 @@
 .fwmb-icon--security {
     --fwmb-mask: url("../assets/icons/security.svg");
 }
+.fwmb-icon--lock {
+    --fwmb-mask: url("../assets/icons/lock.svg");
+}
+.fwmb-icon--lock-open {
+    --fwmb-mask: url("../assets/icons/lock_open.svg");
+}
 .fwmb-icon--crop {
     --fwmb-mask: url("../assets/icons/crop.svg");
 }
@@ -1001,6 +1007,22 @@
     display: inline-flex;
     flex: none;
     gap: 0.125rem;
+}
+/* A generated item's Lock in its row: an icon, not a fill, so a row of locks stays quiet; open
+   locks are dimmed, so the locked ones stand out */
+.fwmb .fwmb-list-item .fwmb-lock-toggle[aria-pressed] {
+    background: transparent;
+    border-color: transparent;
+    color: var(--fwmb-accent-main);
+}
+.fwmb .fwmb-list-item .fwmb-lock-toggle[aria-pressed="false"] {
+    color: var(--fwmb-text-muted);
+    opacity: 0.6;
+}
+.fwmb .fwmb-list-item .fwmb-lock-toggle[aria-pressed]:hover {
+    background: var(--fwmb-bg-hover);
+    color: var(--fwmb-accent-hover);
+    opacity: 1;
 }
 .fwmb-list-item > :is(.fwmb-meta, .fwmb-state, .fwmb-badge) {
     flex: none;

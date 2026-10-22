@@ -8,6 +8,7 @@ import { arcsForLevel } from "../mesh/BorderArcs.js";
 import { BRUSH_MODES, PAINT_MODES, RegionStroke, STROKE_REFUSALS, fillExtent } from "../mesh/RegionPaint.js";
 import { UNCLAIMED, regionFillColor } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
+import { GeneratedEdits } from "./GeneratedEdits.js";
 
 /** What each refusal to start a stroke tells the user (see RegionStroke.begin). */
 const REFUSAL_MESSAGES = Object.freeze({
@@ -256,10 +257,12 @@ export class RegionPainter {
         const result = state.stroke.end();
         state.stroke = null;
         state.last = null;
-        const entries = [...result.patches].map(([levelId, patch]) => VectorHistory.owners(levelId, patch));
+        const entries = [...result.patches].map(([levelId, patch]) => VectorHistory.owners(levelId, patch)).filter(Boolean);
         if (result.parentKeyChanged) entries.unshift(state.before);
         state.before = null;
         if (!entries.length) return;
+        // Generated regions the stroke gave or took cells from are the reader's own now (see GeneratedEdits)
+        entries.push(VectorHistory.edited(GeneratedEdits.markPatched(app, result.patches)));
         for (const levelId of result.patches.keys()) entries.push(RegionPanel.watersEntry(app, levelId));
 
         VectorHistory.push(app, VectorHistory.composite(entries));

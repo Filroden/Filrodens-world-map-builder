@@ -119,7 +119,7 @@ export function mustFoldMapControls(wideWidth, room) {
  * each marked, the All row and the group's button with them.
  *
  * @param {ParentNode} root
- * @param {{id: string, state: string, rows: {kind: string, key: string, label: string, on: boolean, mixed?: boolean, sub?: boolean}[]}} group
+ * @param {{id: string, state: string, rows: {kind: string, key: string, label: string, on: boolean, mixed?: boolean, sub?: boolean, separator?: boolean}[]}} group
  */
 function syncContentGroup(root, group) {
     const signature = group.rows.map((row) => `${row.kind}:${row.key}:${row.label}`).join("|");
@@ -139,7 +139,10 @@ function syncContentGroup(root, group) {
     });
 }
 
-/** A menu's rows as buttons, indented one step further in the folded Layers menu (data-content-indent). */
+/**
+ * A menu's rows as buttons, indented one step further in the folded Layers menu
+ * (data-content-indent); a row marked separator (Regions' Fills) has a rule above it.
+ */
 function writeContentRows(container, group) {
     const indent = Number(container.dataset.contentIndent ?? 0);
     const doc = container.ownerDocument;
@@ -155,7 +158,11 @@ function writeContentRows(container, group) {
         check.className = "fwmb-layer-check";
         check.setAttribute("aria-hidden", "true");
         button.append(check, doc.createTextNode(row.label));
-        return button;
+        if (!row.separator) return [button];
+        const rule = doc.createElement("div");
+        rule.className = "fwmb-layer-menu-sep";
+        rule.setAttribute("role", "separator");
+        return [rule, button];
     });
-    container.replaceChildren(...rows);
+    container.replaceChildren(...rows.flat());
 }

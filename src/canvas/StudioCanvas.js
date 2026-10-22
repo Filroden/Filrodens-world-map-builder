@@ -890,14 +890,15 @@ export class StudioCanvas {
         if (this.isEditMode && this.onBrushEnd) this.onBrushEnd();
     }
 
-    /** Lets go of the node or shape being dragged, telling the app only if it actually moved. */
+    /** Lets go of the node or shape being dragged, telling the app (and what moved) only if it actually moved. */
     #endDrag(canvasElement) {
-        const wasDragged = this.activeDrag.started;
+        const drag = this.activeDrag;
         this.activeDrag = null;
         this.#releaseShapeDragBox();
         this.#setHeldItem(null);
         canvasElement.style.cursor = "crosshair";
-        if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
+        // The app is told what moved (its target and entity type), so it can mark it the reader's own
+        if (drag.started && this.onInfraDragEnd) this.onInfraDragEnd({ target: drag.target, entityType: drag.entityType });
     }
 
     #handlePointerLeave(_e, _canvasElement) {
@@ -1517,14 +1518,17 @@ export class StudioCanvas {
      * opened) nothing is drawn.
      *
      * @param {import("../mesh/MeshSession.js").MeshSession|null} meshSession
+     * @param {{focusLevelId?: string|null, fills?: boolean}} [options] - fills: false draws the
+     *     levels as borders alone (the Regions menu's Fills).
      */
-    renderRegionLevels(meshSession, { focusLevelId = null } = {}) {
+    renderRegionLevels(meshSession, { focusLevelId = null, fills = true } = {}) {
         const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
         this.regionLevels.render(meshSession, {
             isVisible: (visibility, parentVisibility, isContainer) => this.#isVisibleInCurrentPass(visibility, parentVisibility, isContainer),
             showsLevel: this.#showsLevel,
             resScale,
             focusLevelId,
+            fills,
         });
     }
 

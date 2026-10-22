@@ -83,6 +83,12 @@ test("a slider writes when let go, a text field when left, a tick at once; other
 
 // ------------------------------------------------------------------ estimate, staleness, notices, results
 
+test("each World slider double-clicks back to its default", () => {
+    const { world } = GeneratePanel.context(studio());
+    assert.equal(world.length, 4);
+    for (const field of world) assert.equal(field.resetTo, String(FILRODENSWMB.GENERATOR.WORLD[field.name.split(".").at(-1)].default), field.name);
+});
+
 test("the estimate grows with the map and warns past a minute", () => {
     const small = GeneratePanel.estimateSeconds({ width: 1000, height: 1000, modelCount: 2000, cellCount: 60000 });
     const large = GeneratePanel.estimateSeconds({ width: 2000, height: 1600, modelCount: 14293, cellCount: 200000 });
