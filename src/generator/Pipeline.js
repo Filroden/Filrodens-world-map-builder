@@ -4,6 +4,7 @@ import { CellGraph, EDGE } from "./CellGraph.js";
 import { engineCultures } from "./CultureInput.js";
 import { resolveCultures, sharesOf, spreadCultures, townMix } from "./Cultures.js";
 import { feedbackPass } from "./Feedback.js";
+import { formerAge } from "./FormerAge.js";
 import { resolveSettings } from "./GeneratorSettings.js";
 import { modelBiomeRaster } from "./ModelBiomes.js";
 import { nameEverything } from "./Names.js";
@@ -31,6 +32,9 @@ import { tradeRounds } from "./Trade.js";
 /** Longest stretch of work between pauses, in ms. */
 const BREATH_MS = 40;
 
+/** Thrown inside a run when it is asked to stop with the ages finished (see runGenerator). */
+class AgeStopped extends Error {}
+
 /** Thrown (rejected) when a run is cancelled. */
 export class GenerationCancelled extends Error {
     constructor() {
@@ -41,42 +45,199 @@ export class GenerationCancelled extends Error {
 
 /**
  * Runs the generator.
+ *
+ * A run is one or more ages (settings.ages, oldest first; see GeneratorSettings). The model cells
+ * are built once. Each age then runs the stages in turn; an age after the first starts from the
+ * age before: its land cleared, its towns favoured where the new age places its own (inertia), its
+ * roads and lanes already built, and its realm seats kept where a duchy still sits on one. A one-age
+ * run is exactly the run of before ages were added.
+ *
+ * An age may hold a culture event naming one of the map's cultures: it arrives in that age (it is
+ * absent from the ages before), or invades (arrives, spreads at an advantage taking land, and the
+ * age's strife rises where it takes land from another people).
+ *
+ * The last age finished is the run's result; the ages before it are kept, in brief, in its history.
+ * Asked to stop (isStopping) once an age has finished, the run lets go of the age under way and
+ * ends with the ages finished.
+ *
  * @param {import("./GeneratorInput.js").GeneratorPayload} payload
  * @param {object} [options]
- * @param {function({stage: string, pct: number}): void} [options.onProgress]
+ * @param {function({stage: string, pct: number, age?: number, ages?: number}): void} [options.onProgress]
  * @param {function(): boolean} [options.isCancelled]
+ * @param {function(): boolean} [options.isStopping] - Whether to end with the ages finished.
  * @param {function(): Promise<void>} [options.pause]
  * @param {number} [options.breathMs] - Longest stretch of work between pauses (BREATH_MS).
  * @returns {Promise<object>} The run's result (see assembleResult).
  */
-export async function runGenerator(payload, { onProgress = null, isCancelled = () => false, pause = defaultPause, breathMs = BREATH_MS } = {}) {
+export async function runGenerator(payload, { onProgress = null, isCancelled = () => false, isStopping = () => false, pause = defaultPause, breathMs = BREATH_MS } = {}) {
     const settings = resolveSettings(payload.settings, payload.mapSeed);
-    const age = settings.ages.at(-1);
-    const driver = new StageDriver({ onProgress, isCancelled, pause, breathMs });
-    const run = { settings, age, timings: {} };
+    const ages = settings.ages;
+    const driver = new StageDriver({ onProgress, isCancelled, isStopping, pause, breathMs, ages: ages.length });
+    const run = { settings, age: ages.at(-1), timings: {} };
 
     run.cells = await driver.step("values", () => buildModelCells({ ...payload, biome: modelBiomeRaster(payload) }, settings.world), run);
     run.graph = new CellGraph(run.cells);
-    run.cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(cultureList(settings, payload))), run);
-    const common = { cultures: run.cultures, world: settings.world };
+    const people = cultureList(settings, payload);
 
-    const towns = await driver.stage("towns", () => placeTowns(run.graph, { ...common, era: age }), run);
-    const trade = await driver.stage("trade", () => tradeRounds(run.graph, { ...common, towns: towns.towns, cellPop: towns.cellPop, totalPop: towns.totalPop }), run);
-    const realms = await driver.step("realms", () => buildRealms(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic }), run);
-    const feedback = await driver.step("feedback", () => feedbackPass(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, realms, strife: age.strife }), run);
+    let previous = null;
+    const history = [];
+    let last = null;
+    let before = null;
+    for (let index = 0; index < ages.length; index++) {
+        if (index > 0 && isStopping()) break;
+        driver.setAge(index);
+        const finished = await runAge(run, driver, { settings, people, ages, index, previous }).catch((error) => {
+            if (error instanceof AgeStopped) return null;
+            throw error;
+        });
+        if (!finished) break;
+        if (last) history.push(ageHistory(last, ages[index - 1]));
+        before = last;
+        last = finished.age;
+        previous = finished.next(previous);
+    }
+    // Naming the places is the run's last step, whatever was asked: it is never let go
+    driver.endAges();
+    run.cultures = last.cultures;
+    run.agesRun = history.length + 1;
+    const { feedback, finalTrade, finalRealms } = last;
+    const former = before ? formerAge(run.graph, before, last, settings.nameBase) : null;
+    const formerNames = former ? { towns: former.ruins, castles: former.castles } : null;
+    const names = await driver.step("names", () => nameEverything({ seed: settings.seed, nameBase: settings.nameBase, cultures: run.cultures, towns: finalTrade.towns, castles: feedback.castles, realms: finalRealms, former: formerNames }), run);
+    driver.report("names", 1);
+    const result = assembleResult(run, { feedback, finalTrade, finalRealms, names });
+    result.history = history;
+    result.ages = { asked: ages.length, run: run.agesRun };
+    if (former) Object.assign(result, formerResult(run, result, former, names, history));
+    return result;
+}
+
+/**
+ * One age's stages, from the age before (`previous`; none for the first). Returns the age, and how
+ * the next age starts from it.
+ */
+async function runAge(run, driver, { settings, people, ages, index, previous }) {
+    const age = ages[index];
+    const { list, invader } = agePeople(settings, people, ages, index);
+    const cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(list), { invader }), run);
+    const common = { cultures, world: settings.world };
+    const towns = await driver.stage("towns", () => placeTowns(run.graph, { ...common, era: age, previous }), run);
+    const trade = await driver.stage("trade", () => tradeRounds(run.graph, { ...common, towns: towns.towns, cellPop: towns.cellPop, totalPop: towns.totalPop, built: previous?.built ?? null }), run);
+    const realms = await driver.step("realms", () => buildRealms(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, keptSeats: previous?.seats ?? null }), run);
+    const strifeAt = invader >= 0 && previous ? invasionStrife(run.cells, cultures, invader, previous, age.strife) : null;
+    const feedback = await driver.step("feedback", () => feedbackPass(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, realms, strife: age.strife, strifeAt }), run);
 
     const final = { traffic: trade.traffic, security: feedback.security, royalSeats: feedback.royalSeats };
     const finalTrade = await driver.stage("finalTrade", () => tradeRounds(run.graph, { ...common, towns: feedback.towns, cellPop: feedback.cellPop, totalPop: feedback.totalPop, final }), run);
     const finalRealms = await driver.step("finalRealms", () => buildRealms(run.graph, { ...common, towns: finalTrade.towns, cellPop: feedback.cellPop, traffic: finalTrade.traffic, fixedSeats: feedback.royalSeats }), run);
-    const names = await driver.step("names", () => nameEverything({ seed: settings.seed, nameBase: settings.nameBase, cultures: run.cultures, towns: finalTrade.towns, castles: feedback.castles, realms: finalRealms }), run);
-    driver.report("names", 1);
-    return assembleResult(run, { feedback, finalTrade, finalRealms, names });
+
+    return {
+        age: { cultures, feedback, finalTrade, finalRealms },
+        next: (before) => ({
+            towns: finalTrade.towns,
+            cleared: feedback.cleared,
+            // Roads and lanes stay built from age to age, used or not
+            built: builtEdges(run.graph, finalTrade.traffic, before?.built ?? null),
+            seats: new Set(finalRealms.realms.map((realm) => realm.seat)),
+            dominantId: Array.from(cultures.dominant, (culture) => (culture >= 0 ? (cultures.cultures[culture].id ?? null) : null)),
+        }),
+    };
 }
 
 /** The cultures of a run (the map's, in the engine's form); with none, the default culture speaking the run's name style. */
 function cultureList(settings, payload) {
     if (settings.cultures.length) return engineCultures(settings.cultures, payload);
     return [{ ...FILRODENSWMB.GENERATOR.CULTURES.DEFAULT, nameBase: settings.nameBase }];
+}
+
+/**
+ * The cultures living in an age: every map culture but those an event brings in a later age (with
+ * none left, the default culture), and the index among them of the one invading in this age (-1).
+ */
+function agePeople(settings, people, ages, index) {
+    if (!settings.cultures.length) return { list: people, invader: -1 };
+    const arrives = new Map();
+    ages.forEach((age, at) => {
+        if (age.event && !arrives.has(age.event.culture)) arrives.set(age.event.culture, at);
+    });
+    const list = people.filter((culture) => !(arrives.get(culture.id) > index));
+    if (!list.length) return { list: [{ ...FILRODENSWMB.GENERATOR.CULTURES.DEFAULT, nameBase: settings.nameBase }], invader: -1 };
+    const event = ages[index].event;
+    return { list, invader: event?.kind === "invasion" ? list.findIndex((culture) => culture.id === event.culture) : -1 };
+}
+
+/**
+ * The age's strife at each cell under an invasion: higher (AGES.INVASION.STRIFE) on land the invader
+ * now holds that another people held in the age before.
+ */
+function invasionStrife(cells, cultures, invader, previous, strife) {
+    const raised = Math.min(1, strife + FILRODENSWMB.GENERATOR.AGES.INVASION.STRIFE);
+    const invaderId = cultures.cultures[invader].id ?? null;
+    const strifeAt = new Float64Array(cells.count).fill(strife);
+    for (let cell = 0; cell < cells.count; cell++) {
+        if (cultures.dominant[cell] === invader && previous.dominantId[cell] !== null && previous.dominantId[cell] !== invaderId) strifeAt[cell] = raised;
+    }
+    return strifeAt;
+}
+
+/** The edges built as roads and lanes: those carrying trade now, and those built before. */
+function builtEdges(graph, traffic, before) {
+    const built = new Uint8Array(graph.edgeCount);
+    for (let edge = 0; edge < graph.edgeCount; edge++) built[edge] = before?.[edge] || (traffic[edge] > 0 && graph.edgeKind[edge] !== EDGE.RIVER) ? 1 : 0;
+    return built;
+}
+
+/**
+ * What the age before the present left (see FormerAge), as the result carries it: its ruins and
+ * abandoned castles named, its old roads chained as routes are (roads only), and on every place
+ * of the present and every ruin its tier in each age (-1 where it was none; 0 city, 1 large town,
+ * 2 town), with the age it was last a realm's seat for a former capital (ages counted from 1).
+ */
+function formerResult(run, result, former, names, history) {
+    const formerAgeNumber = history.length;
+    const tiersAt = history.map((age) => {
+        const tiers = new Map();
+        for (let index = 0; index < age.places.length; index += 3) tiers.set(age.places[index], age.places[index + 1]);
+        return tiers;
+    });
+    const agesOf = (cell, now) => [...tiersAt.map((tiers) => tiers.get(cell) ?? -1), now];
+    for (const place of result.places) {
+        if (place.kind !== "town") continue;
+        place.ages = agesOf(place.cell, place.tier);
+        if (former.formerSeats.has(place.cell)) place.formerCapital = formerAgeNumber;
+    }
+    const ruins = former.ruins.map((ruin) => ({
+        kind: "ruin",
+        cell: ruin.cell,
+        name: names.former.towns.get(ruin.cell),
+        formerTier: ruin.formerTier,
+        formerAge: formerAgeNumber,
+        formerCapital: ruin.formerCapital ? formerAgeNumber : null,
+        population: Math.round(ruin.population),
+        ages: agesOf(ruin.cell, -1),
+    }));
+    const abandonedCastles = former.castles.map((castle, index) => ({ kind: "abandonedCastle", cell: castle.cell, name: names.former.castles[index].name, keep: names.former.castles[index].keep, formerAge: formerAgeNumber }));
+    const nodes = [...result.places.map((place) => place.cell), ...ruins.map((ruin) => ruin.cell)];
+    const oldRoads = routeChains(run.graph, former.oldTraffic, nodes).filter((chain) => chain.transport === "road");
+    return { ruins, abandonedCastles, oldRoads };
+}
+
+/**
+ * An earlier age in brief, for the run's history (phase 5's history layer): its era and strife,
+ * its places (cell, tier and whether a realm's seat, three numbers each), castles, realm seats and
+ * each cell's realm.
+ */
+function ageHistory(age, settingsOfAge) {
+    const seats = new Set(age.finalRealms.realms.map((realm) => realm.seat));
+    return {
+        development: settingsOfAge.development,
+        plague: settingsOfAge.plague,
+        strife: settingsOfAge.strife,
+        places: age.finalTrade.towns.flatMap((town) => [town.cell, town.tier, seats.has(town.cell) ? 1 : 0]),
+        castles: age.feedback.castles.map((castle) => castle.cell),
+        seats: [...seats],
+        realm: Int32Array.from(age.finalRealms.realmOfCell),
+    };
 }
 
 function defaultPause() {
@@ -86,9 +247,13 @@ function defaultPause() {
 /** Runs stages, turning their yielded fractions into overall progress, pausing and cancelling. */
 class StageDriver {
     #last = performance.now();
+    #age = 0;
+    #agesDone = false;
 
-    constructor({ onProgress, isCancelled, pause, breathMs }) {
+    constructor({ onProgress, isCancelled, isStopping = () => false, pause, breathMs, ages = 1 }) {
         this.breathMs = breathMs;
+        this.ages = ages;
+        this.isStopping = isStopping;
         this.onProgress = onProgress;
         this.isCancelled = isCancelled;
         this.pause = pause;
@@ -126,10 +291,25 @@ class StageDriver {
         }
     }
 
+    /** The age under way (0 first): progress runs through the ages in turn. */
+    setAge(index) {
+        this.#age = index;
+    }
+
+    /** The ages are done: a stop asked for now changes nothing. */
+    endAges() {
+        this.#agesDone = true;
+    }
+
     report(id, fraction) {
         const span = this.span.get(id);
-        const pct = Math.min(100, Math.round(100 * (span.start + span.width * Math.min(1, Math.max(0, fraction)))));
-        this.onProgress?.({ stage: id, pct });
+        const withinAge = span.start + span.width * Math.min(1, Math.max(0, fraction));
+        if (this.ages <= 1) {
+            this.onProgress?.({ stage: id, pct: Math.min(100, Math.round(100 * withinAge)) });
+            return;
+        }
+        const pct = Math.min(100, Math.round((100 * (this.#age + withinAge)) / this.ages));
+        this.onProgress?.({ stage: id, pct, age: this.#age + 1, ages: this.ages });
     }
 
     async #breathe(id, fraction, always) {
@@ -138,6 +318,8 @@ class StageDriver {
         await this.pause();
         this.#last = performance.now();
         if (this.isCancelled()) throw new GenerationCancelled();
+        // An age after the first lets go when asked to stop: the ages finished are the run
+        if (this.#age > 0 && !this.#agesDone && this.isStopping()) throw new AgeStopped();
     }
 }
 

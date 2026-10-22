@@ -14,15 +14,18 @@ import { runGenerator } from "./Pipeline.js";
  * @param {object} [options]
  * @param {function({stage: string, pct: number}): void} [options.onProgress]
  * @param {AbortSignal} [options.signal] - Aborting rejects at once with an AbortError.
+ * @param {AbortSignal} [options.stopSignal] - Aborting ends the run after the age under way, with
+ *     the ages finished (see Pipeline.runGenerator).
  * @returns {Promise<object>} The run's result (see Pipeline.runGenerator).
  */
-export function generateInBackground(makePayload, { onProgress = null, signal = null } = {}) {
+export function generateInBackground(makePayload, { onProgress = null, signal = null, stopSignal = null } = {}) {
     const payload = makePayload();
     return GenerationWorkers.runOne("generate", payload, {
         onProgress,
         signal,
+        stopSignal,
         transfer: payloadTransfer(payload),
-        alone: ({ onProgress: report, isCancelled }) => runGenerator(isDetached(payload) ? makePayload() : payload, { onProgress: report, isCancelled }),
+        alone: ({ onProgress: report, isCancelled, isStopping }) => runGenerator(isDetached(payload) ? makePayload() : payload, { onProgress: report, isCancelled, isStopping }),
     });
 }
 

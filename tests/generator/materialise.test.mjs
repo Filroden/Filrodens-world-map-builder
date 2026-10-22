@@ -195,3 +195,44 @@ test("a run's model cells survive the codec within their quantisation", async ()
     }
     for (let cell = 0; cell < result.cellCount; cell++) assert.ok(Math.abs(arrays.security[cell] - result.modelCells.security[cell]) <= 0.5 / 255 + 1e-9);
 });
+
+// ------------------------------------------------------------------ what the age before leaves
+
+test("the age before the present leaves ruins and abandoned castles on their ruined tiers' styles, and old roads; a living former capital keeps its style and says what it was", async () => {
+    const { session } = await islandRun();
+    const result = await runGenerator(syntheticMap().makePayload({ ages: [{ strife: "warTorn" }, { era: "afterPlague", strife: "warTorn" }] }), { pause: () => Promise.resolve() });
+    assert.ok(result.ruins.length > 5, `ruins (${result.ruins.length})`);
+    assert.ok(result.oldRoads.length > 0, "old roads");
+    assert.ok(result.ruins.every((ruin) => ruin.name && ruin.formerAge === 1 && ruin.ages.at(-1) === -1));
+    // A former capital, as one would show on a map of several realms
+    const town = result.places.find((place) => place.kind === "town" && !place.capital);
+    town.formerCapital = 1;
+    result.ruins[0].formerCapital = 1;
+    const seed = (tier) => FILRODENSWMB.PINS.DEFAULT_STYLES.find((style) => style.tier === tier);
+    const options = { runId: "run", idFactory: nextId, layerSets: [], names: MATERIALISE_NAMES, watersPx: 24, ...materialiseStyles() };
+    const made = materialise(session, result, options);
+    const ruins = made.pins.filter((pin) => pin.generated.kind === "ruin");
+    assert.equal(ruins.length, result.ruins.length);
+    assert.equal(ruins[0].generated.tier, "ruinedCapital", "a ruined former capital");
+    assert.equal(ruins[0].icon, seed("capital").icon, "on the capital's icon");
+    const bySize = ["city", "largeTown", "town"];
+    const ruinedBySize = ["ruinedCity", "ruinedLargeTown", "ruinedTown"];
+    for (const [index, pin] of ruins.entries()) {
+        if (index > 0) assert.equal(pin.generated.tier, ruinedBySize[pin.generated.formerTier]);
+        assert.equal(pin.color, "#ff6464");
+        assert.equal(pin.label.visibility, "none");
+        if (index > 0) assert.equal(pin.icon, seed(bySize[pin.generated.formerTier]).icon, "the tier's own icon");
+    }
+    const castles = made.pins.filter((pin) => pin.generated.kind === "abandonedCastle");
+    assert.ok(castles.every((pin) => pin.icon === seed("castle").icon && pin.color === "#ff6464"));
+    const formerTown = made.pins.find((pin) => pin.cell === town.cell && pin.generated.kind === "town");
+    assert.equal(formerTown.icon, seed(placeTier(town)).icon, "a living former capital keeps its own style");
+    assert.equal(formerTown.name, `${town.name} (former capital)`);
+    assert.equal(formerTown.generated.formerCapital, 1);
+    assert.deepEqual(formerTown.generated.ages, town.ages);
+    const old = made.routes.filter((route) => route.generated.oldRoad);
+    assert.ok(old.length > 0 && old.every((route) => route.transport === "road" && route.quickStyle === "route-style-old-road"));
+    const without = materialise(session, result, { ...options, output: { history: false } });
+    assert.ok(!without.pins.some((pin) => pin.generated.kind === "ruin") && !without.routes.some((route) => route.generated.oldRoad), "the Output switch leaves them out");
+    assert.equal(without.pins.find((pin) => pin.cell === town.cell).name, town.name, "and former capitals their plain name");
+});

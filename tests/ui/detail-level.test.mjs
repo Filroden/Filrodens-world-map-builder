@@ -166,3 +166,24 @@ test("a scene export gives generated items pages only at the map's detail level,
     assert.equal(everything.pins.length, 3);
     assert.equal(everything.regions.length, 7);
 });
+
+test("with ages, a place's section gives its history and when it was a capital; a ruin what it was; an old road its kind", () => {
+    const app = generatedMap(3);
+    installPlatform({ i18n: { ...platform.i18n, localize: (key) => key.replace("FILRODENSWMB.UI.PinStyle", ""), format: (key, data) => `${key.replace("FILRODENSWMB.UI.Generated", "")}(${Object.values(data).join(",")})`, lang: "en" } });
+    const city = app.mapPins[0];
+    city.generated.ages = [2, 2, 1, 0];
+    city.generated.formerCapital = 3;
+    const values = (rows) => Object.fromEntries(rows.map((row) => [row.label.replace("FILRODENSWMB.UI.Generated", ""), row.value]));
+    const rows = values(GeneratedDetails.forPin(app, city));
+    assert.equal(rows.History, "InAgesOf(Town,1,1,2) · InAgeOf(LargeTown,3,3,3) · SinceAge(City,4,4,4)");
+    city.generated.ages = [0, 0];
+    assert.equal(values(GeneratedDetails.forPin(app, city)).History, "SinceAge(City,1,1,2)", "a city through every age");
+    assert.equal(rows.FormerCapital, "InAge(3)");
+    const ruin = { id: "ruin", name: "Old Brill", generated: { run: "run", kind: "ruin", tier: "ruin", formerTier: 1, formerAge: 2, formerPopulation: 6500, ages: [2, 1, -1], edited: false, locked: false } };
+    const ruinRows = values(GeneratedDetails.forPin(app, ruin));
+    assert.equal(ruinRows.Place, "Ruin");
+    assert.equal(ruinRows.Formerly, "FormerlyPeople(InAgeOf(LargeTown,2),6,500)");
+    assert.equal(ruinRows.History, "InAgeOf(Town,1,1,1) · InAgeOf(LargeTown,2,2,2) · SinceAge(Ruin,3,3,3)");
+    assert.equal(values(GeneratedDetails.forRoute(app, { transport: "road", class: "minor", generated: { run: "run", kind: "route", oldRoad: true } })).RouteKind, "FILRODENSWMB.UI.RouteStyleOldRoad");
+    installPlatform({ i18n: { ...platform.i18n, localize: (key) => key, lang: "en" } });
+});

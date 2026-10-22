@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { CELL_KIND, smooth } from "./CellValues.js";
 import { portCost, travelCost } from "./CellGraph.js";
 import { SearchSpace, searchAll } from "./Search.js";
+import { biomeProperties } from "./ModelBiomes.js";
 
 /**
  * Stage 2: population and central places.
@@ -40,19 +41,24 @@ const REPORT_EVERY = 64;
  * @param {import("./Cultures.js").CultureData} context.cultures
  * @param {{development: number, plague: number}} context.era
  * @param {{urbanisation: number}} context.world
+ * @param {{towns: Town[], cleared: Float64Array}} [context.previous] - The age before (see Pipeline):
+ *     its land cleared farms better, and its towns' cells are favoured (AGES.INERTIA).
  * @returns {Generator<number, {towns: Town[], cellPop: Float64Array, totalPop: number}>}
  */
-export function* placeTowns(graph, { cultures, era, world }) {
+export function* placeTowns(graph, { cultures, era, world, previous = null }) {
     const cells = graph.cells;
-    const { cellPop, totalPop } = population(cells, cultures, era);
+    const { cellPop, totalPop } = population(cells, cultures, era, previous?.cleared ?? null);
     const cost = graph.costs(travelCost(graph, { portKm: portCost(cells) }));
     const tiers = scaledTiers(world.urbanisation);
     const landIds = [];
     for (let cell = 0; cell < cells.count; cell++) if (cells.kind[cell] === CELL_KIND.LAND && cells.landKm2[cell] > 0) landIds.push(cell);
 
     const state = { graph, cost, cellPop, landIds, tiers, towns: [], townAt: new Int32Array(cells.count).fill(-1), space: new SearchSpace(graph) };
+    // The age before's towns, by cell: the smallest tier at which each is favoured
+    const earlier = new Map((previous?.towns ?? []).map((town) => [town.cell, town.tier]));
     for (let tier = 0; tier < tiers.length; tier++) {
         const potential = yield* potentials(state, tier, (done) => (tier + done) / tiers.length);
+        for (const [cell, earlierTier] of earlier) if (earlierTier <= tier) potential[cell] *= 1 + FILRODENSWMB.GENERATOR.AGES.INERTIA;
         placeTier(state, tier, potential);
         pruneTier(state, tier);
     }
@@ -65,13 +71,15 @@ function scaledTiers(urbanisation = 1) {
     return FILRODENSWMB.GENERATOR.TOWNS.TIERS.map((tier) => ({ ...tier, urbanShare: tier.urbanShare * urbanisation }));
 }
 
-/** People per cell and in all. */
-function population(cells, cultures, era) {
+/** People per cell and in all (land cleared in the age before farming as the feedback pass's does). */
+function population(cells, cultures, era, cleared) {
     const cellPop = new Float64Array(cells.count);
+    const cover = cleared ? biomeProperties().cover : null;
     let totalPop = 0;
     for (let cell = 0; cell < cells.count; cell++) {
         if (!cells.landKm2[cell]) continue;
-        cellPop[cell] = cells.food[cell] * era.development * health(cells, cell) * cultures.popMult[cell] * (1 - era.plague);
+        const boost = cleared ? 1 + (1 / cover[cells.biome[cell]] - 1) * cleared[cell] : 1;
+        cellPop[cell] = cells.food[cell] * era.development * health(cells, cell) * cultures.popMult[cell] * (1 - era.plague) * boost;
         totalPop += cellPop[cell];
     }
     return { cellPop, totalPop };

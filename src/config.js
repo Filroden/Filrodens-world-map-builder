@@ -1309,6 +1309,11 @@ export const FILRODENSWMB = {
                 landmark: Object.freeze({ order: 5, weight: 2 }),
                 town: Object.freeze({ order: 5, weight: 1.5 }),
                 ruin: Object.freeze({ order: 5, weight: 1 }),
+                ruinedCapital: Object.freeze({ order: 5, weight: 2 }),
+                ruinedCity: Object.freeze({ order: 5, weight: 1.5 }),
+                ruinedLargeTown: Object.freeze({ order: 5, weight: 1 }),
+                ruinedTown: Object.freeze({ order: 5, weight: 1 }),
+                abandonedCastle: Object.freeze({ order: 5, weight: 1 }),
                 village: Object.freeze({ order: 5, weight: 1 }),
             }),
             OTHER_PIN: Object.freeze({ order: 5, weight: 2 }),
@@ -1365,6 +1370,7 @@ export const FILRODENSWMB = {
             Object.freeze({ id: "route-style-main-road", nameKey: "FILRODENSWMB.UI.RouteStyleMainRoad", transport: "road", color: "#8a5a2b", thickness: 2, style: "solid", outline: true, smoothing: false }),
             Object.freeze({ id: "route-style-minor-road", nameKey: "FILRODENSWMB.UI.RouteStyleMinorRoad", transport: "road", color: "#8a6a45", thickness: 1.25, style: "solid", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-track", nameKey: "FILRODENSWMB.UI.RouteStyleTrack", transport: "road", color: "#7a6a55", thickness: 1, style: "dotted", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-old-road", nameKey: "FILRODENSWMB.UI.RouteStyleOldRoad", transport: "road", color: "#8c7f6c", thickness: 1, style: "dashed", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleSeaLane", transport: "sea", color: "#2e5f8a", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-minor-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleMinorSeaLane", transport: "sea", color: "#5f89ad", thickness: 1, style: "dashed", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleRiverTrade", transport: "river", color: "#3d7fb8", thickness: 1.5, style: "solid", outline: false, smoothing: false }),
@@ -1398,9 +1404,16 @@ export const FILRODENSWMB = {
             { tier: "fortifiedTown", icon: "fortress", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleFortifiedTown" },
             { tier: "port", icon: "anchor", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStylePort" },
             { tier: "ruin", icon: "classical_building", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleRuin" },
+            // What the age before the present left (see GENERATOR.PIN_TIERS): the tier's own icon in
+            // the ruins' colour, so a ruin reads as what it was
+            { tier: "ruinedCapital", icon: "circle_outline_with_star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 1, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCapital" },
+            { tier: "ruinedCity", icon: "star", scale: 1, labelSize: 1, labelStyle: "label-style-settlement", detailLevel: 1, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCity" },
+            { tier: "ruinedLargeTown", icon: "circle_outline_with_dot", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedLargeTown" },
+            { tier: "ruinedTown", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedTown" },
+            { tier: "abandonedCastle", icon: "castle", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleAbandonedCastle" },
             { tier: "landmark", icon: "jp_landmark", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLandmark" },
         ],
-        // The colour the default styles use, and the detail levels a style may have
+        // The colour the default styles use (unless one gives its own), and the detail levels a style may have
         DEFAULT_STYLE_COLOR: "#ffffff",
         DETAIL_LEVELS: [0, 1, 2, 3],
         // Where a pin's name starts, from the pin's centre, in pin widths: a little beyond the
@@ -1772,6 +1785,16 @@ export const FILRODENSWMB = {
         STRIFES: Object.freeze({ peaceful: 0.2, troubled: 0.5, warTorn: 0.8 }),
         DEFAULT_STRIFE: "troubled",
         MAX_AGES: 8,
+        // Ages after the first start from the age before (see Pipeline): a town's cell is favoured
+        // when the next age places its towns (its potential x 1 + INERTIA, at its own tier and
+        // smaller), so most places carry on. An invading culture spreads at INVASION.SPREAD of the
+        // cost, taking land, and where it takes land from another people the age's strife there
+        // rises by INVASION.STRIFE (to at most 1).
+        AGES: Object.freeze({
+            INERTIA: 0.6,
+            INVASION: Object.freeze({ SPREAD: 0.5, STRIFE: 0.35 }),
+            EVENTS: Object.freeze(["arrival", "invasion"]),
+        }),
         // What a run writes onto the map, as the Generate panel's Output section starts: the levels
         // below Realms, the settlement tiers given pins (capitals always are), the kinds of route,
         // and whether realm, capital and city names are shown
@@ -1781,6 +1804,9 @@ export const FILRODENSWMB = {
             places: Object.freeze({ city: true, largeTown: true, town: true, castle: true }),
             routes: Object.freeze({ road: true, river: true, sea: true }),
             labels: true,
+            // What the age before the present leaves (with more than one age): ruins, abandoned
+            // castles and old roads
+            history: true,
         }),
         // The Generate panel's estimate of a run's time, in seconds: the per-pixel first stage
         // (PER_PIXEL), the searches, which grow faster than the model cells (CELL_FACTOR x cells ^
@@ -2057,7 +2083,7 @@ export const FILRODENSWMB = {
         // The pin style tier each kind of generated place takes (see PINS.DEFAULT_STYLES' tier keys)
         // and the route style each transport and class takes (see ROUTES.DEFAULT_STYLES' ids).
         // Pins below LABELLED_TIERS keep a label that is hidden until the user shows it.
-        PIN_TIERS: Object.freeze({ capital: "capital", city: "city", largeTown: "largeTown", town: "town", castle: "castle", fortifiedTown: "fortifiedTown", port: "port" }),
+        PIN_TIERS: Object.freeze({ capital: "capital", city: "city", largeTown: "largeTown", town: "town", castle: "castle", fortifiedTown: "fortifiedTown", port: "port", ruinedCapital: "ruinedCapital", ruinedCity: "ruinedCity", ruinedLargeTown: "ruinedLargeTown", ruinedTown: "ruinedTown", abandonedCastle: "abandonedCastle" }),
         LABELLED_TIERS: Object.freeze(["capital", "city"]),
         // The label style each political level's generated regions take (see LABELS.DEFAULT_STYLES)
         REGION_LABEL_STYLES: Object.freeze({ realm: "label-style-realm", duchy: "label-style-duchy", county: "label-style-county" }),
@@ -2065,6 +2091,8 @@ export const FILRODENSWMB = {
             road: Object.freeze({ trunk: "route-style-trunk-road", main: "route-style-main-road", minor: "route-style-minor-road" }),
             sea: Object.freeze({ trunk: "route-style-sea-lane", main: "route-style-sea-lane", minor: "route-style-minor-sea-lane" }),
             river: Object.freeze({ trunk: "route-style-river-trade", main: "route-style-river-trade", minor: "route-style-minor-river-trade" }),
+            // The roads of the age before that carry nothing now
+            old: Object.freeze({ trunk: "route-style-old-road", main: "route-style-old-road", minor: "route-style-old-road" }),
         }),
         // The run's stages in order, each with its share of the run's time (for the progress bar)
         STAGES: Object.freeze([

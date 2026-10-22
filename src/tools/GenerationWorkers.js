@@ -153,11 +153,13 @@ class JobWorker {
      * @param {object} options
      * @param {function(object): void} [options.onProgress]
      * @param {AbortSignal} [options.signal]
+     * @param {AbortSignal} [options.stopSignal] - Aborting asks the job to end early with what it
+     *     has (a job that can, such as a generator run between its ages); it still resolves.
      * @param {Transferable[]} [options.transfer] - Buffers of the payload to move to the worker
      *     rather than copy (they are unusable here afterwards).
      * @returns {Promise<*>}
      */
-    run(task, payload, { onProgress = null, signal = null, transfer = [] } = {}) {
+    run(task, payload, { onProgress = null, signal = null, stopSignal = null, transfer = [] } = {}) {
         if (this.#failure) return Promise.reject(this.#failure);
 
         const id = this.#nextId++;
@@ -169,6 +171,9 @@ class JobWorker {
             }
             this.#pending.set(id, job);
             this.#worker.postMessage({ id, task, payload }, transfer);
+            const stop = () => this.#pending.has(id) && this.#worker.postMessage({ id, stop: true });
+            if (stopSignal?.aborted) stop();
+            else stopSignal?.addEventListener("abort", stop, { once: true });
         });
     }
 
@@ -317,17 +322,17 @@ export class GenerationWorkers {
      *     job that transfers builds its own inputs again if it falls back to the main thread.
      * @returns {Promise<*>} The task's result.
      */
-    static async runOne(task, payload, { onProgress = null, signal = null, alone = null, transfer = [] } = {}) {
+    static async runOne(task, payload, { onProgress = null, signal = null, stopSignal = null, alone = null, transfer = [] } = {}) {
         if (signal?.aborted) throw abortError(signal);
         const worker = this.#ensureJobWorker();
-        if (!worker) return this.#runAlone(alone, { onProgress, signal });
+        if (!worker) return this.#runAlone(alone, { onProgress, signal, stopSignal });
 
         try {
-            return await worker.run(task, payload, { onProgress, signal, transfer });
+            return await worker.run(task, payload, { onProgress, signal, stopSignal, transfer });
         } catch (error) {
             if (signal?.aborted || !worker.failed) throw error;
             this.#disableJobs(error);
-            return this.#runAlone(alone, { onProgress, signal });
+            return this.#runAlone(alone, { onProgress, signal, stopSignal });
         }
     }
 
@@ -337,9 +342,9 @@ export class GenerationWorkers {
         this.#jobWorker = null;
     }
 
-    static async #runAlone(alone, { onProgress, signal }) {
+    static async #runAlone(alone, { onProgress, signal, stopSignal = null }) {
         if (!alone) throw new Error("No worker is available and the job has no main-thread fallback.");
-        const result = await alone({ onProgress, isCancelled: () => !!signal?.aborted });
+        const result = await alone({ onProgress, isCancelled: () => !!signal?.aborted, isStopping: () => !!stopSignal?.aborted });
         if (signal?.aborted) throw abortError(signal);
         return result;
     }

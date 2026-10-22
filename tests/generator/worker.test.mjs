@@ -52,3 +52,24 @@ test("an already aborted signal never starts the run", async () => {
     controller.abort();
     await assert.rejects(generateInBackground(() => syntheticMap().makePayload(), { signal: controller.signal }), (error) => error.name === "AbortError");
 });
+
+test("asked to stop, the worker ends once an age has finished, with the ages finished; progress names the age", async () => {
+    const reports = [];
+    const full = await generateInBackground(() => syntheticMap().makePayload({ ages: [{}, {}] }), { onProgress: (report) => reports.push(report) });
+    assert.deepEqual(full.ages, { asked: 2, run: 2 });
+    assert.ok(reports.some((report) => report.ages === 2 && report.age === 2));
+    // Asked from the start: the first age always runs, then the run ends
+    const stop = new AbortController();
+    stop.abort();
+    const result = await generateInBackground(() => syntheticMap().makePayload({ ages: [{}, {}, {}] }), { stopSignal: stop.signal });
+    assert.deepEqual(result.ages, { asked: 3, run: 1 });
+    assert.equal(result.history.length, 0);
+    // Asked part-way through the second age: the worker reads it while it runs, lets that age go
+    const later = new AbortController();
+    const partway = await generateInBackground(() => syntheticMap().makePayload({ ages: [{}, {}, {}, {}, {}, {}] }), {
+        stopSignal: later.signal,
+        onProgress: ({ age }) => age === 2 && later.abort(),
+    });
+    assert.ok(partway.ages.run < 6, `stopped early (${partway.ages.run} of 6 ages)`);
+    assert.equal(partway.history.length, partway.ages.run - 1);
+});

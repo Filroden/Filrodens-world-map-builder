@@ -132,14 +132,16 @@ test("settings: defaults fill gaps, presets resolve, numbers are clamped", () =>
     const empty = resolveSettings({}, "MAPSEED");
     assert.equal(empty.seed, "MAPSEED");
     assert.equal(empty.nameBase, FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE);
-    assert.deepEqual(empty.ages, [{ era: "highMedieval", development: 0.7, plague: 0, strifeName: "troubled", strife: 0.5 }]);
+    assert.deepEqual(empty.ages, [{ era: "highMedieval", development: 0.7, plague: 0, strifeName: "troubled", strife: 0.5, event: null }]);
     assert.deepEqual(empty.world, { density: 1, urbanisation: 1, realmSpacing: 1, fragmentation: 1 });
 
     const odd = resolveSettings({ seed: " X ", world: { density: 99, fragmentation: "lots" }, ages: [{ era: "afterPlague", strife: 3 }, { era: { development: 2 } }] }, "M");
     assert.equal(odd.seed, "X");
     assert.equal(odd.world.density, FILRODENSWMB.GENERATOR.WORLD.density.max);
     assert.equal(odd.world.fragmentation, 1);
-    assert.deepEqual(odd.ages[0], { era: "afterPlague", development: 0.75, plague: 0.35, strifeName: "custom", strife: 1 });
+    assert.deepEqual(odd.ages[0], { era: "afterPlague", development: 0.75, plague: 0.35, strifeName: "custom", strife: 1, event: null });
+    const events = resolveSettings({ ages: [{ event: { kind: "invasion", culture: "elves" } }, { event: { kind: "conquest", culture: "x" } }, { event: { kind: "arrival", culture: 3 } }] }).ages;
+    assert.deepEqual(events.map((age) => age.event), [{ kind: "invasion", culture: "elves" }, null, null]);
     assert.equal(odd.ages[1].development, 1);
     assert.equal(resolveSettings({ ages: new Array(20).fill({}) }).ages.length, FILRODENSWMB.GENERATOR.MAX_AGES);
 });

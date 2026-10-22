@@ -29,7 +29,7 @@ const CLASS_ORDER = Object.freeze({ trunk: 0, main: 1, minor: 2 });
  *     sea); all when left out.
  * @returns {object[]} The routes, in the mesh shape (Schema.createRoute).
  */
-export function buildRoutes(session, result, { runId, idFactory, styleFor, styleFields, transports = {} }) {
+export function buildRoutes(session, result, { runId, idFactory, styleFor, styleFields, transports = {}, old = false }) {
     const finder = new LegFinder(session);
     const chains = result.routes
         .map((chain, index) => ({ ...chain, index }))
@@ -53,7 +53,7 @@ export function buildRoutes(session, result, { runId, idFactory, styleFor, style
             visibility: "all",
             quickStyle: style?.id ?? "custom",
             ...(style ? styleFields(style) : {}),
-            generated: { run: runId, kind: "route", tier: chain.class, sourceId: chain.index, edited: false, locked: false },
+            generated: { run: runId, kind: "route", tier: chain.class, sourceId: chain.index, ...(old ? { oldRoad: true } : {}), edited: false, locked: false },
         }, idFactory));
     }
     return routes;

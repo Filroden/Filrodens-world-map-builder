@@ -194,6 +194,10 @@ export class MapStudio {
         generateWorld()             { GeneratePanel.generate(this); },
         removeGenerated()           { GeneratePanel.removeGenerated(this); },
         randomizeGeneratorSeed()    { GeneratePanel.randomizeSeed(this); },
+        addAge()                    { GeneratePanel.editAges(this, "add"); },
+        removeAge(_e, t)            { GeneratePanel.editAges(this, "remove", Number(t.dataset.age)); },
+        moveAgeUp(_e, t)            { GeneratePanel.editAges(this, "up", Number(t.dataset.age)); },
+        moveAgeDown(_e, t)          { GeneratePanel.editAges(this, "down", Number(t.dataset.age)); },
 
         // --- DIALOG MANAGER: Pin Icons ---
         addCustomPinIcon(e, t)     { MapDialogManager.onAddCustomPinIcon(this, e, t); },
@@ -209,6 +213,7 @@ export class MapStudio {
         applyFeatureMath(e, t)          { this._onApplyFeatureMath(e, t); },
         applyResolution(e, t)           { this._onApplyResolution(e, t); },
         cancelProcessing()              { this.#cancelRunning?.abort(); },
+        keepProcessing()                { this.#keepRunning?.(); },
         changeTool(e, t)                { this._onChangeTool(e, t); },
         // The panel's Next footer: the following tool in the order of work (STUDIO.NEXT)
         nextTool(e, t)                  { this._onChangeTool(e, t); },
@@ -4001,6 +4006,9 @@ export class MapStudio {
     /** Stops the cancellable work under way (see runCancellable); null when there is none. */
     #cancelRunning = null;
 
+    /** Ends the work under way keeping what it has finished (the overlay's keep button; see runCancellable). */
+    #keepRunning = null;
+
     /**
      * Runs long work under the processing overlay with a Cancel button. The work is handed an
      * AbortSignal, which Cancel aborts; work that checks it between chunks can stop part-way and
@@ -4009,9 +4017,11 @@ export class MapStudio {
      * than sharing a Cancel button that would stop both.
      *
      * @param {string} message - The overlay's text, already localised.
-     * @param {(signal: AbortSignal, overlay: {text: function(string): void, detail: function(?string): void, progress: function(?number): void}) => Promise<*>} work - Also
+     * @param {(signal: AbortSignal, overlay: {text: function(string): void, detail: function(?string): void, progress: function(?number): void, keep: function(?string, function(): void=): void}) => Promise<*>} work - Also
      *     handed the overlay, whose text it may change as it goes (to show its progress), with a
-     *     line under it (detail; null hides it) and a bar (progress, 0 to 1; null hides it).
+     *     line under it (detail; null hides it), a bar (progress, 0 to 1; null hides it) and a
+     *     button beside Cancel for ending the work keeping what it has finished (keep: its label
+     *     and what it does; a null label hides it).
      * @returns {Promise<*>} What the work resolves with, or null when it could not start.
      */
     async runCancellable(message, work) {
@@ -4022,15 +4032,25 @@ export class MapStudio {
         await this.#startProcessing(message);
         try {
             const overlay = this.#processingOverlay();
-            return await work(controller.signal, { text: overlay.text, detail: overlay.detail, progress: overlay.progress });
+            return await work(controller.signal, { text: overlay.text, detail: overlay.detail, progress: overlay.progress, keep: (label, action) => this.#setKeepButton(label, action) });
         } finally {
             const overlay = this.#processingOverlay();
             overlay.detail(null);
             overlay.progress(null);
+            this.#setKeepButton(null);
             this.#cancelRunning = null;
             this.#showCancelButton(false);
             this.#endProcessing();
         }
+    }
+
+    /** The overlay's keep button: its label and what it does, or hidden (a null label). */
+    #setKeepButton(label, action = null) {
+        const button = this.root?.querySelector('[data-action="keepProcessing"]');
+        this.#keepRunning = label ? action : null;
+        if (!button) return;
+        button.textContent = label ?? "";
+        button.classList.toggle("fwmb-hidden", !label);
     }
 
     #showCancelButton(visible) {

@@ -83,12 +83,20 @@ const custom = ref({ also: ["custom"] });
 const GENERATED = obj(
     {
         run: { t: "key" },
-        kind: enumOf(["realm", "duchy", "county", "town", "castle", "route"]),
+        kind: enumOf(["realm", "duchy", "county", "town", "castle", "route", "ruin", "abandonedCastle"]),
         tier: { t: "key", nullable: true },
         sourceId: int(0),
         population: num(RANGE.COUNT, { nullable: true }),
         culture: { t: "cultureRef", nullable: true },
         mix: list(obj({ culture: key, share: num(RANGE.UNIT) })),
+        // With ages (see Pipeline): the tier in each age (-1 for none), the age last a realm's seat,
+        // and for what the age before left: the age, its tier and people then, and an old road
+        ages: list(int(-1, 10)),
+        formerCapital: int(1, 100, { nullable: true }),
+        formerAge: int(1, 100, { nullable: true }),
+        formerTier: int(0, 10, { nullable: true }),
+        formerPopulation: num(RANGE.COUNT, { nullable: true }),
+        oldRoad: bool,
         edited: bool,
         locked: bool,
     },
@@ -264,12 +272,15 @@ const CULTURE = obj({
     homelands: list({ t: "xy" }),
 });
 
+/** An age's culture event (see GeneratorSettings.resolveEvent): a culture arriving or invading, or none. */
+const AGE_EVENT = obj({ kind: enumOf(FILRODENSWMB.GENERATOR.AGES.EVENTS), culture: key }, { nullable: true });
+
 /** The settings a run was made with (see GeneratorSettings.resolveSettings). */
 const GENERATOR_SETTINGS = obj({
     seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
     nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
     world: obj({ density: num(RANGE.SCALE), urbanisation: num(RANGE.SCALE), realmSpacing: num(RANGE.SCALE), fragmentation: num(RANGE.SCALE) }),
-    ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strifeName: key, strife: num(RANGE.UNIT) })),
+    ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strifeName: key, strife: num(RANGE.UNIT), event: AGE_EVENT })),
     cultures: list(CULTURE),
 });
 
@@ -281,12 +292,15 @@ const GENERATOR_PANEL = obj({
     seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
     nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
     world: GENERATOR_SETTINGS.fields.world,
+    // The ages as the panel keeps them: each age's era and strife presets, and its event
+    ages: list(obj({ era: enumOf(Object.keys(FILRODENSWMB.GENERATOR.ERAS)), strife: enumOf(Object.keys(FILRODENSWMB.GENERATOR.STRIFES)), event: AGE_EVENT })),
     output: obj({
         duchies: bool,
         counties: bool,
         places: flags(Object.keys(FILRODENSWMB.GENERATOR.OUTPUT.places)),
         routes: flags(Object.keys(FILRODENSWMB.GENERATOR.OUTPUT.routes)),
         labels: bool,
+        history: bool,
         defaultStyles: bool,
     }),
 });
@@ -618,7 +632,9 @@ const MODEL_RUN = obj({
     cultures: list(obj({ id: { ...key, nullable: true }, name: generatorText("FILRODENSWMB.UI.LimitFieldName"), color: { ...color, nullable: true }, nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), homelands: { t: "cells" }, homelandsAuto: bool, homelandsLeftOut: int(0, 1e6), homeland: int(0, 1e9, { nullable: true }) })),
     stats: numTree,
     cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
-    history: list(numTree),
+    ages: obj({ asked: int(1, 100), run: int(1, 100) }),
+    // Each age before the last, in brief (see ModelRun)
+    history: list(obj({ development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strife: num(RANGE.UNIT), places: { t: "cells" }, castles: { t: "cells" }, seats: { t: "cells" }, realm: PACKED_ARRAY })),
 });
 
 /** The rules, by kind. `map` is a whole saved map; the rest are the objects inside it. */

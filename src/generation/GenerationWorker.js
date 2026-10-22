@@ -78,25 +78,36 @@ async function buildMesh(params, job) {
  * reports and the chance to cancel between and within its stages.
  */
 async function generate(payload, job) {
-    const result = await runGenerator(payload, { onProgress: job.progress, isCancelled: job.isCancelled, pause });
+    const result = await runGenerator(payload, { onProgress: job.progress, isCancelled: job.isCancelled, isStopping: job.isStopping, pause });
     return { value: result, transfer: resultTransfer(result) };
 }
 
 const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh, generate };
 
-/** Ids of jobs asked to stop. */
+/** Ids of jobs asked to stop (cancelled), and of jobs asked to end early with what they have. */
 const cancelled = new Set();
+const stopping = new Set();
 
 /**
  * Lets the worker handle waiting messages (a cancel, above all) before continuing. A message
- * channel resolves on the next turn without the minimum delay timers have in browsers.
+ * channel resolves on the next turn without the minimum delay timers have in browsers; but its
+ * own messages can be run ahead of the job messages waiting (a cancel or stop would then only be
+ * read once the run had ended), so at least every TIMER_YIELD_MS the pause is a timer, after
+ * which the waiting messages are always read.
  */
 const channel = typeof MessageChannel === "undefined" ? null : new MessageChannel();
+const TIMER_YIELD_MS = 100;
+let lastTimerYield = performance.now();
 /** Jobs waiting to continue, in the order they paused (two jobs may run interleaved). */
 const waiting = [];
 if (channel) channel.port1.onmessage = () => waiting.shift()?.();
 function pause() {
-    if (!channel) return new Promise((resolve) => setTimeout(resolve, 0));
+    if (!channel || performance.now() - lastTimerYield >= TIMER_YIELD_MS) {
+        return new Promise((resolve) => setTimeout(() => {
+            lastTimerYield = performance.now();
+            resolve();
+        }, 0));
+    }
     return new Promise((resolve) => {
         waiting.push(resolve);
         channel.port2.postMessage(0);
@@ -104,15 +115,20 @@ function pause() {
 }
 
 self.addEventListener("message", async (event) => {
-    const { id, task, payload, cancel } = event.data;
+    const { id, task, payload, cancel, stop } = event.data;
     if (cancel) {
         cancelled.add(id);
+        return;
+    }
+    if (stop) {
+        stopping.add(id);
         return;
     }
 
     const job = {
         progress: (progress) => self.postMessage({ id, progress }),
         isCancelled: () => cancelled.has(id),
+        isStopping: () => stopping.has(id),
     };
     try {
         const run = TASKS[task];
@@ -124,5 +140,6 @@ self.addEventListener("message", async (event) => {
         self.postMessage({ id, error: error?.message ?? String(error), cancelled: job.isCancelled() });
     } finally {
         cancelled.delete(id);
+        stopping.delete(id);
     }
 });

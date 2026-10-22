@@ -372,7 +372,7 @@ test("Save as… is one undo step with its style: undo takes the style away", as
     assert.equal(app.mapRoutes[1].quickStyle, "custom");
 });
 
-test("a new map starts with the road, sea lane and river trade route styles and their two label styles", async () => {
+test("a new map starts with the road (old road too), sea lane and river trade route styles and their two label styles", async () => {
     const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
     const state = MapStateManager.buildDefaultUiState(400, 300);
     assert.deepEqual(state.customRouteStyles.map((style) => [style.name, style.transport, style.thickness, style.style, style.outline]), [
@@ -380,6 +380,7 @@ test("a new map starts with the road, sea lane and river trade route styles and 
         ["FILRODENSWMB.UI.RouteStyleMainRoad", "road", 2, "solid", true],
         ["FILRODENSWMB.UI.RouteStyleMinorRoad", "road", 1.25, "solid", false],
         ["FILRODENSWMB.UI.RouteStyleTrack", "road", 1, "dotted", false],
+        ["FILRODENSWMB.UI.RouteStyleOldRoad", "road", 1, "dashed", false],
         ["FILRODENSWMB.UI.RouteStyleSeaLane", "sea", 1.5, "dashed", false],
         ["FILRODENSWMB.UI.RouteStyleMinorSeaLane", "sea", 1, "dashed", false],
         ["FILRODENSWMB.UI.RouteStyleRiverTrade", "river", 1.5, "solid", false],

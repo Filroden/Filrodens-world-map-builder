@@ -81,6 +81,32 @@ test("a slider writes when let go, a text field when left, a tick at once; other
     assert.equal({}.polluted, undefined);
 });
 
+test("the Ages section: add copies the present, remove, move earlier and later, an era, strife and event per age; a run made before is out of date", () => {
+    let stale = 0;
+    const app = studio({ uiState: { mapSeed: "M", generatorSettings: null, generatorStale: false, cultures: [{ id: "elves", name: "Elves" }] }, markGeneratorStale: () => stale++ });
+    GeneratePanel.handleInput(app, fieldEvent("change", { name: "generator.ages.0.era", type: "select-one", value: "afterPlague" }));
+    GeneratePanel.editAges(app, "add");
+    assert.deepEqual(GeneratePanel.settings(app).ages.map((age) => age.era), ["afterPlague", "afterPlague"], "a new age copies the present");
+    GeneratePanel.handleInput(app, fieldEvent("change", { name: "generator.ages.1.strife", type: "select-one", value: "warTorn" }));
+    GeneratePanel.handleInput(app, fieldEvent("change", { name: "generator.ages.1.event", type: "select-one", value: "invasion:elves" }));
+    assert.deepEqual(GeneratePanel.settings(app).ages[1], { era: "afterPlague", strife: "warTorn", event: { kind: "invasion", culture: "elves" } });
+    GeneratePanel.editAges(app, "up", 1);
+    assert.equal(GeneratePanel.settings(app).ages[0].strife, "warTorn");
+    GeneratePanel.editAges(app, "down", 0);
+    assert.equal(GeneratePanel.settings(app).ages[1].strife, "warTorn");
+    GeneratePanel.handleInput(app, fieldEvent("change", { name: "generator.ages.1.event", type: "select-one", value: "" }));
+    assert.equal(GeneratePanel.settings(app).ages[1].event, null);
+    const rows = GeneratePanel.context(app).ages.rows;
+    assert.match(rows[1].label, /GenerateAgePresent/);
+    assert.deepEqual(rows[0].events.map((event) => event.value), ["", "arrival:elves", "invasion:elves"]);
+    assert.deepEqual([rows[0].canUp, rows[0].canDown, rows[1].canDown], [false, true, false]);
+    GeneratePanel.editAges(app, "remove", 0);
+    GeneratePanel.editAges(app, "remove", 0);
+    assert.equal(GeneratePanel.settings(app).ages.length, 1, "at least one age");
+    assert.ok(stale >= 6);
+    assert.equal(GeneratePanel.context(studio()).ages.rows[0].events, null, "no events without cultures");
+});
+
 // ------------------------------------------------------------------ estimate, staleness, notices, results
 
 test("each World slider double-clicks back to its default", () => {
@@ -99,6 +125,9 @@ test("the estimate grows with the map and warns past a minute", () => {
     const estimate = GeneratePanel.context(huge).estimate;
     assert.equal(estimate.unit, "FILRODENSWMB.UI.UnitMinutes");
     assert.equal(estimate.long, true);
+    const mesh = { width: 2000, height: 1600, modelCount: 14293, cellCount: 200000 };
+    const three = studio({ meshSession: { mesh }, uiState: { mapSeed: "M", generatorSettings: { ages: [{}, {}, {}] }, generatorStale: false } });
+    assert.ok(Math.abs(GeneratePanel.context(three).estimate.seconds - 3 * large) < 1e-9, "each age adds a run's time");
 });
 
 test("Out of date shows only for a map with a run, and the notices follow the map", () => {
@@ -168,4 +197,23 @@ test("Output decides the levels, the places, the routes and the names a run writ
 
     const noCounties = (await materialiseWith({ counties: false })).made;
     assert.deepEqual(noCounties.set.levels.map((level) => level.name), ["Realms", "Duchies"]);
+});
+
+test("the results count ruins, abandoned castles and old roads apart from the present's places and roads; the history switch shows with more than one age", () => {
+    const gen = (kind, extra = {}) => ({ generated: { run: "r", kind, ...extra } });
+    const app = studio({
+        modelRun: { run: "r", stats: { population: 10 } },
+        mapPins: [gen("town", { tier: "town" }), gen("ruin", { tier: "ruin" }), gen("ruin", { tier: "ruin" }), gen("abandonedCastle", { tier: "abandonedCastle" })],
+        mapRoutes: [{ transport: "road", ...gen("route") }, { transport: "road", ...gen("route", { oldRoad: true }) }],
+    });
+    const rows = Object.fromEntries(GeneratePanel.results(app).rows.map((row) => [row.label.replace("FILRODENSWMB.UI.GenerateResult", ""), row.value]));
+    assert.equal(rows.Towns, "1");
+    assert.equal(rows.Ruins, "2");
+    assert.equal(rows.AbandonedCastles, "1");
+    assert.equal(rows.Roads, "1");
+    assert.equal(rows.OldRoads, "1");
+    assert.equal(GeneratePanel.context(app).output.showHistory, false);
+    GeneratePanel.editAges(app, "add");
+    assert.equal(GeneratePanel.context(app).output.showHistory, true);
+    assert.equal(GeneratePanel.context(app).output.history, true);
 });

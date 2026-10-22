@@ -58,6 +58,56 @@
     {{/each}}
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateAges" title="FILRODENSWMB.UI.SectionGenerateAges" count=generate.ages.count badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateAgesHint"}}</p>
+    <ol class="fwmb-age-list">
+        {{#each generate.ages.rows}}
+        <li class="fwmb-age-row">
+            <div class="fwmb-age-head">
+                <span class="fwmb-range-group-heading fwmb-flex-1">{{this.label}}</span>
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeUp" data-age="{{this.index}}" {{#unless this.canUp}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}"><i class="fwmb-icon fwmb-icon--arrow-upward"></i></button>
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeDown" data-age="{{this.index}}" {{#unless this.canDown}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}"><i class="fwmb-icon fwmb-icon--arrow-downward"></i></button>
+                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeAge" data-age="{{this.index}}" {{#unless this.canRemove}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}"><i class="fwmb-icon fwmb-icon--delete"></i></button>
+            </div>
+            <div class="fwmb-form-group">
+                <label for="fwmb-age-{{this.index}}-era">{{localize "FILRODENSWMB.UI.GenerateEra"}}</label>
+                <div class="fwmb-form-fields">
+                    <select id="fwmb-age-{{this.index}}-era" name="generator.ages.{{this.index}}.era">
+                        {{#each this.eras}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>{{/each}}
+                    </select>
+                    <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateEraHint'}}"></i>
+                </div>
+            </div>
+            <div class="fwmb-form-group">
+                <label for="fwmb-age-{{this.index}}-strife">{{localize "FILRODENSWMB.UI.GenerateStrife"}}</label>
+                <div class="fwmb-form-fields">
+                    <select id="fwmb-age-{{this.index}}-strife" name="generator.ages.{{this.index}}.strife">
+                        {{#each this.strifes}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>{{/each}}
+                    </select>
+                    <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateStrifeHint'}}"></i>
+                </div>
+            </div>
+            {{#if this.events}}
+            <div class="fwmb-form-group">
+                <label for="fwmb-age-{{this.index}}-event">{{localize "FILRODENSWMB.UI.GenerateEvent"}}</label>
+                <div class="fwmb-form-fields">
+                    <select id="fwmb-age-{{this.index}}-event" name="generator.ages.{{this.index}}.event">
+                        {{#each this.events}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}
+                    </select>
+                    <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateEventHint'}}"></i>
+                </div>
+            </div>
+            {{/if}}
+        </li>
+        {{/each}}
+    </ol>
+    {{#if generate.ages.canAdd}}
+    <div class="fwmb-list-add">
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="addAge"><i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.GenerateAgeAdd"}}</button>
+    </div>
+    {{/if}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateCultures" title="FILRODENSWMB.UI.SectionGenerateCultures" count=cultureList.count badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
     <p class="fwmb-hint">{{#if cultureList.count}}{{localize "FILRODENSWMB.UI.CulturesHint"}}{{else}}{{localize "FILRODENSWMB.UI.CulturesNoneHint"}}{{/if}}</p>
     <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionGenerateCultures'}}" data-list-nav data-culture-list class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
@@ -125,6 +175,14 @@
         {{localize this.label}}
     </label>
     {{/each}}
+
+    {{#if generate.output.showHistory}}
+    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.GenerateHistory"}}</div>
+    <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateHistoryHint'}}">
+        <input type="checkbox" name="generator.output.history" class="fwmb-checkbox" {{#if generate.output.history}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.GenerateHistoryRuins"}}
+    </label>
+    {{/if}}
 
     <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.GenerateNames"}}</div>
     <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateLabelsHint'}}">

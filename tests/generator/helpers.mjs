@@ -53,6 +53,7 @@ export const MATERIALISE_NAMES = Object.freeze({
     levels: ["Realms", "Duchies", "Counties"],
     titles: { kingdom: "Kingdom of {name}", duchy: "Duchy of {name}", county: "County of {name}" },
     castles: { castle: "{name} Castle", keep: "{name} Keep", hold: "{name} Hold", tower: "{name} Tower" },
+    formerCapital: "{name} (former capital)",
 });
 
 /** Route and pin styles as the studio would find them, from the defaults. */

@@ -4629,7 +4629,9 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 
 .fwmb-processing-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
+    gap: var(--fwmb-size-8);
 }
 
 .fwmb-spin {
@@ -5156,6 +5158,25 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     margin-block: var(--fwmb-size-4) var(--fwmb-size-2);
     cursor: default;
 }
+/* The Generate panel's ages, oldest first, each with its era, strife and event */
+.fwmb-age-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--fwmb-size-8);
+}
+.fwmb-age-row + .fwmb-age-row {
+    border-block-start: 1px solid var(--fwmb-border-subtle);
+    padding-block-start: var(--fwmb-size-8);
+}
+.fwmb-age-head {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-size-2);
+}
+
 /* A culture's homelands in its inspector, each with its remove button */
 .fwmb-homeland-list {
     list-style: none;

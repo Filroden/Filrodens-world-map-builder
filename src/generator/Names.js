@@ -29,9 +29,13 @@ export function nameBaseNames() {
  * @param {object[]} context.towns
  * @param {{cell: number}[]} context.castles
  * @param {object} context.realms - buildRealms's result.
- * @returns {{towns: Map<number, string>, castles: {name: string, keep: string}[], counties: string[], duchies: string[], realms: {name: string, capital: string}[]}}
+ * @param {{towns: {cell: number, population: number, nameBase: string}[], castles: {cell: number, nameBase: string}[]}} [context.former] -
+ *     The places the age before the present left (ruins and abandoned castles; see FormerAge), each
+ *     named in the name base of the people living there then. They are named after everything
+ *     else, so the present's names are the same with or without them.
+ * @returns {{towns: Map<number, string>, castles: {name: string, keep: string}[], counties: string[], duchies: string[], realms: {name: string, capital: string}[], former: {towns: Map<number, string>, castles: {name: string, keep: string}[]}}}
  */
-export function nameEverything({ seed, nameBase, cultures, towns, castles, realms }) {
+export function nameEverything({ seed, nameBase, cultures, towns, castles, realms, former = null }) {
     const generator = new NamesGenerator(stageRandom(seed, "names"));
     const baseAt = baseChooser(generator, nameBase, cultures, towns);
     const used = new Set();
@@ -61,7 +65,19 @@ export function nameEverything({ seed, nameBase, cultures, towns, castles, realm
         const name = realm.kind === "kingdom" ? unique(() => generator.getState(capital, baseAt(realm.seat)), realmNames) : capital;
         return { name, capital };
     });
-    return { towns: townNames, castles: castleNames, counties: countyNames, duchies: duchyNames, realms: realmList };
+    const baseOf = (name) => {
+        const index = generator.indexOf(name);
+        return index >= 0 ? index : Math.max(0, generator.indexOf(nameBase));
+    };
+    const formerTowns = new Map();
+    for (const town of [...(former?.towns ?? [])].sort((a, b) => b.population - a.population || a.cell - b.cell)) {
+        formerTowns.set(town.cell, unique(() => generator.getBase(baseOf(town.nameBase))));
+    }
+    const formerCastles = (former?.castles ?? []).map((castle) => ({
+        name: unique(() => generator.getBaseShort(baseOf(castle.nameBase))),
+        keep: words[Math.floor(generator.rng() * words.length)],
+    }));
+    return { towns: townNames, castles: castleNames, counties: countyNames, duchies: duchyNames, realms: realmList, former: { towns: formerTowns, castles: formerCastles } };
 }
 
 /** The name base index for a cell: its town's culture, else the cell's dominant culture, else `nameBase`. */

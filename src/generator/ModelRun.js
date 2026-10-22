@@ -12,7 +12,12 @@ import { FILRODENSWMB } from "../config.js";
  * is what makes the byte order fixed.
  *
  * Shape: { version, run, revision, seed, settings, cellCount, cultures, stats,
- *          cells: { <name>: { type, scale, offset, data } }, history }
+ *          cells: { <name>: { type, scale, offset, data } }, ages, history }
+ *
+ * `ages` is how many ages were asked for and run; `history` holds each age before the last in
+ * brief (its era's development and plague, its strife, its places as cell, tier and seat triples,
+ * its castles and realm seats, and each cell's realm, packed as the cells' arrays are), for the
+ * history layer to read.
  */
 
 export const MODEL_RUN_VERSION = 1;
@@ -116,7 +121,8 @@ export function encodeModelRun(result, runId) {
         cultures: result.cultures.map(({ id = null, name, color = null, nameBase, homelands = [], homelandsAuto = false, homelandsLeftOut = 0 }) => ({ id, name, color, nameBase, homelands, homelandsAuto, homelandsLeftOut })),
         stats: { ...result.stats },
         cells,
-        history: [],
+        ages: { asked: result.ages?.asked ?? 1, run: result.ages?.run ?? 1 },
+        history: (result.history ?? []).map((age) => ({ ...age, places: Array.from(age.places), castles: Array.from(age.castles), seats: Array.from(age.seats), realm: packArray(age.realm, FIELDS.realm) })),
     };
 }
 

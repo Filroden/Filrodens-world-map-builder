@@ -152,9 +152,11 @@ function byShare(a, b) {
  * Stage 1b: spreads the cultures and works out each cell's shares.
  * @param {import("./CellGraph.js").CellGraph} graph
  * @param {Culture[]} cultures
+ * @param {{invader?: number}} [options] - invader: the index of a culture invading in this age (see
+ *     Pipeline's ages), which spreads at AGES.INVASION.SPREAD of the cost, taking land.
  * @returns {CultureData}
  */
-export function spreadCultures(graph, cultures) {
+export function spreadCultures(graph, cultures, { invader = -1 } = {}) {
     const cells = graph.cells;
     const base = graph.costs(travelCost(graph, { portKm: portCost(cells) }));
     const land = landCells(cells);
@@ -163,7 +165,7 @@ export function spreadCultures(graph, cultures) {
     const placed = placeHomelands(graph, cultures, fits, land, base);
     const homelands = placed.map((entry) => entry.cells);
     const homelandNotes = placed.map(({ auto, offLand }) => ({ auto, offLand }));
-    const distances = cultures.map((_, index) => spreadCost(graph, base, fits[index], meanFits[index], homelands[index]));
+    const distances = cultures.map((_, index) => spreadCost(graph, base, fits[index], meanFits[index], homelands[index], index === invader ? FILRODENSWMB.GENERATOR.AGES.INVASION.SPREAD : 1));
     return { cultures, homelands, homelandNotes, ...shareCells(cells, cultures, fits, distances, land) };
 }
 
@@ -231,9 +233,9 @@ function bestHomeland(cells, fit, land, taken) {
 }
 
 /** A culture's arrival cost at every cell, spreading from all its homelands at once. */
-function spreadCost(graph, base, fit, mean, homelands) {
+function spreadCost(graph, base, fit, mean, homelands, advantage = 1) {
     const { FIT_COST, SPECIALIST_BONUS } = FILRODENSWMB.GENERATOR.CULTURES;
-    const bonus = 1 - SPECIALIST_BONUS * (1 - mean);
+    const bonus = (1 - SPECIALIST_BONUS * (1 - mean)) * advantage;
     const cost = graph.costs((edge) => base[edge] * (1 + FIT_COST * (1 - 0.5 * (fit[graph.edgeA[edge]] + fit[graph.edgeB[edge]]))) * bonus);
     return searchAll(graph, Array.from(homelands), cost).best;
 }

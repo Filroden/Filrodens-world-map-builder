@@ -38,6 +38,8 @@ const REPORT_EVERY = 32;
  * @param {import("./Cultures.js").CultureData} context.cultures
  * @param {{urbanisation: number}} context.world
  * @param {object} [context.final] - { traffic (the earlier rounds' traffic per edge), security, royalSeats: Set }
+ * @param {Uint8Array} [context.built] - Edges the age before built as roads and lanes (see Pipeline):
+ *     the first round starts from them.
  * @returns {Generator<number, {towns: object[], traffic: Float64Array, newRoadKm: number}>}
  */
 export function* tradeRounds(graph, context) {
@@ -68,6 +70,7 @@ function createState(graph, context) {
         newRoadKm: 0,
     };
     if (final) preloadRoads(state, final.traffic);
+    else if (context.built) for (let edge = 0; edge < graph.edgeCount; edge++) if (context.built[edge]) state.road[edge] = 1;
     indexTowns(state);
     return state;
 }

@@ -53,6 +53,11 @@ const FAMILIES = [
     "FILRODENSWMB.UI.RouteClass",
     "FILRODENSWMB.UI.RuleEditorZone",
     "FILRODENSWMB.UI.CultureRelief",
+    // An age's era, strife and event, by the preset's id (a key in GENERATOR.ERAS, GENERATOR.STRIFES)
+    // or the event's kind
+    { prefix: "FILRODENSWMB.UI.GenerateEra", values: CONFIG.replace(/(\w+):/g, '"$1":') },
+    { prefix: "FILRODENSWMB.UI.GenerateStrife", values: CONFIG.replace(/(\w+):/g, '"$1":') },
+    "FILRODENSWMB.UI.GenerateEvent",
     "FILRODENSWMB.BIOMES.",
     // The generator's stages, by their ids in GENERATOR.STAGES (and writing onto the map)
     { prefix: "FILRODENSWMB.UI.GenerateStage", values: CONFIG + '"materialise"' },

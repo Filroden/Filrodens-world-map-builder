@@ -33,6 +33,7 @@ import { SearchSpace, searchAll } from "./Search.js";
  * @param {object} context.realms - The first realms (buildRealms).
  * @param {import("./Cultures.js").CultureData} context.cultures
  * @param {number} context.strife
+ * @param {Float64Array} [context.strifeAt] - Each cell's strife, where an invasion raises it (see Pipeline).
  */
 export function feedbackPass(graph, context) {
     const road = roadsFrom(graph, context.traffic);
@@ -67,7 +68,7 @@ function securityField(state) {
         const raid = cells.coastal[cell] ? F.SEA_RAID * (1 - Math.min(1, cells.shelter[cell] / F.RAID_SHELTER)) : 0;
         const threat = Math.max(borderThreat, wildThreat, raid);
         const protection = Math.max(F.ROYAL_PROTECTION * Math.exp(-fromRoyal[cell] / F.SEAT_KM), F.DUCAL_PROTECTION * Math.exp(-fromDucal[cell] / F.SEAT_KM));
-        security[cell] = 1 - context.strife * threat * (1 - protection);
+        security[cell] = 1 - (context.strifeAt ? context.strifeAt[cell] : context.strife) * threat * (1 - protection);
     }
     return { security, fromBorder: fromBorder.best };
 }

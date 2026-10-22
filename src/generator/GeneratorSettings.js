@@ -7,7 +7,7 @@ import { FILRODENSWMB } from "../config.js";
  *
  * Saved shape (all optional):
  *   { seed, nameBase, world: { density, urbanisation, realmSpacing, fragmentation },
- *     ages: [{ era, strife }], cultures: [...] }
+ *     ages: [{ era, strife, event }], cultures: [...] }
  * `era` is a preset id (GENERATOR.ERAS) or { development, plague } (shares, 0 to 1); `strife` a
  * preset id (GENERATOR.STRIFES) or a number (0 to 1).
  */
@@ -42,9 +42,16 @@ export function resolveStrife(strife) {
     return { strifeName: G.DEFAULT_STRIFE, strife: G.STRIFES[G.DEFAULT_STRIFE] };
 }
 
+/** An age's culture event: { kind (arrival or invasion), culture (a map culture's id) }, or null. */
+export function resolveEvent(event) {
+    if (!event || typeof event !== "object") return null;
+    if (!FILRODENSWMB.GENERATOR.AGES.EVENTS.includes(event.kind) || typeof event.culture !== "string" || !event.culture) return null;
+    return { kind: event.kind, culture: event.culture };
+}
+
 function resolveAges(ages) {
     const list = Array.isArray(ages) && ages.length ? ages.slice(0, FILRODENSWMB.GENERATOR.MAX_AGES) : [{}];
-    return list.map((age) => ({ ...resolveEra(age?.era), ...resolveStrife(age?.strife) }));
+    return list.map((age) => ({ ...resolveEra(age?.era), ...resolveStrife(age?.strife), event: resolveEvent(age?.event) }));
 }
 
 /**
@@ -67,7 +74,7 @@ export function resolveSettings(settings = {}, mapSeed = "") {
 /**
  * What a run writes onto the map (see GENERATOR.OUTPUT): each switch as given, or its default.
  * @param {object} [output]
- * @returns {{duchies: boolean, counties: boolean, places: Object<string, boolean>, routes: Object<string, boolean>, labels: boolean, defaultStyles: boolean|null}}
+ * @returns {{duchies: boolean, counties: boolean, places: Object<string, boolean>, routes: Object<string, boolean>, labels: boolean, history: boolean, defaultStyles: boolean|null}}
  */
 export function resolveOutput(output = {}) {
     const defaults = FILRODENSWMB.GENERATOR.OUTPUT;
@@ -80,22 +87,40 @@ export function resolveOutput(output = {}) {
         places: flags(output?.places, defaults.places),
         routes: flags(output?.routes, defaults.routes),
         labels: flag(output?.labels, defaults.labels),
+        history: flag(output?.history, defaults.history),
         // Whether the run first sets the styles it uses back to the defaults; null until chosen
         defaultStyles: typeof output?.defaultStyles === "boolean" ? output.defaultStyles : null,
     };
 }
 
 /**
+ * The Ages section's ages as a map keeps them, oldest first: each with an era and a strife preset
+ * and its culture event (or none); at least one, at most MAX_AGES.
+ * @param {object[]} [ages]
+ * @returns {{era: string, strife: string, event: object|null}[]}
+ */
+export function panelAges(ages) {
+    const G = FILRODENSWMB.GENERATOR;
+    const list = Array.isArray(ages) && ages.length ? ages.slice(0, G.MAX_AGES) : [{}];
+    return list.map((age) => ({
+        era: Object.hasOwn(G.ERAS, age?.era) ? age.era : G.DEFAULT_ERA,
+        strife: Object.hasOwn(G.STRIFES, age?.strife) ? age.strife : G.DEFAULT_STRIFE,
+        event: resolveEvent(age?.event),
+    }));
+}
+
+/**
  * The Generate panel's settings as a map keeps them: the seed (empty for the map's own), the name
- * style, the world multipliers and the output switches, each valid.
+ * style, the world multipliers, the ages and the output switches, each valid.
  * @param {object} [settings]
- * @returns {{seed: string, nameBase: string, world: object, output: object}}
+ * @returns {{seed: string, nameBase: string, world: object, ages: object[], output: object}}
  */
 export function panelSettings(settings = {}) {
     return {
         seed: typeof settings?.seed === "string" ? settings.seed.trim() : "",
         nameBase: typeof settings?.nameBase === "string" && settings.nameBase ? settings.nameBase : FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE,
         world: resolveWorld(settings?.world),
+        ages: panelAges(settings?.ages),
         output: resolveOutput(settings?.output),
     };
 }

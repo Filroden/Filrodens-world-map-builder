@@ -38,7 +38,7 @@ export class PinStyles {
             name: platform.i18n.localize(tier.name),
             icon: tier.icon,
             scale: tier.scale,
-            color: DEFAULT_STYLE_COLOR,
+            color: tier.color ?? DEFAULT_STYLE_COLOR,
             label: { fontSize: tier.labelSize, visibility: "all", quickStyle: tier.labelStyle ?? this.NONE },
             detailLevel: tier.detailLevel,
         }));

@@ -67,14 +67,76 @@ export class GeneratePanel {
                 duchies: settings.output.duchies,
                 counties: settings.output.counties,
                 labels: settings.output.labels,
+                // What the age before the present leaves, offered with more than one age
+                history: settings.output.history,
+                showHistory: settings.ages.length > 1,
                 defaultStyles: settings.output.defaultStyles ?? Generation.stylesLookOlder(app),
                 places: Object.entries(PLACE_FIELDS).map(([field, label]) => ({ name: `${FIELD_PREFIX}output.places.${field}`, label, checked: settings.output.places[field] })),
                 routes: Object.entries(ROUTE_FIELDS).map(([field, label]) => ({ name: `${FIELD_PREFIX}output.routes.${field}`, label, checked: settings.output.routes[field] })),
             },
+            ages: this.#ages(app, settings.ages),
             results: hasRun ? this.results(app) : null,
             // Remove generated content, while anything a run made is on the map
             canRemove: Object.values(Generation.counts(app)).some((count) => count > 0),
         };
+    }
+
+    /**
+     * The Ages section's rows, oldest first (the last is the present): each age's era, strife and
+     * culture event (offered only while the map has cultures), and whether it can move or go.
+     */
+    static #ages(app, ages) {
+        const G = FILRODENSWMB.GENERATOR;
+        const cultures = app.uiState.cultures ?? [];
+        const choices = (presets, chosen, prefix) => Object.keys(presets).map((value) => ({ value, label: `${prefix}${value.charAt(0).toUpperCase()}${value.slice(1)}`, selected: value === chosen }));
+        const eventValue = (event) => (event ? `${event.kind}:${event.culture}` : "");
+        return {
+            rows: ages.map((age, index) => ({
+                index,
+                label: platform.i18n.format(index === ages.length - 1 && ages.length > 1 ? "FILRODENSWMB.UI.GenerateAgePresent" : "FILRODENSWMB.UI.GenerateAgeNumber", { number: index + 1 }),
+                eras: choices(G.ERAS, age.era, "FILRODENSWMB.UI.GenerateEra"),
+                strifes: choices(G.STRIFES, age.strife, "FILRODENSWMB.UI.GenerateStrife"),
+                events: cultures.length
+                    ? [
+                          { value: "", label: platform.i18n.localize("FILRODENSWMB.UI.GenerateEventNone"), selected: !age.event },
+                          ...cultures.flatMap((culture) => G.AGES.EVENTS.map((kind) => {
+                              const value = `${kind}:${culture.id}`;
+                              return { value, label: platform.i18n.format(`FILRODENSWMB.UI.GenerateEvent${kind.charAt(0).toUpperCase()}${kind.slice(1)}`, { name: culture.name }), selected: value === eventValue(age.event) };
+                          })),
+                      ]
+                    : null,
+                // An event naming a culture since deleted is shown as none, and ignored by the run
+                canUp: index > 0,
+                canDown: index < ages.length - 1,
+                canRemove: ages.length > 1,
+            })),
+            canAdd: ages.length < G.MAX_AGES,
+            count: ages.length,
+        };
+    }
+
+    /**
+     * The Ages section's commands: add an age (a copy of the present, which it becomes), remove
+     * one, or move one earlier or later. Saved with the map; a run made before is out of date.
+     * @param {object} app
+     * @param {"add"|"remove"|"up"|"down"} command
+     * @param {number} [index]
+     */
+    static editAges(app, command, index = -1) {
+        const settings = this.settings(app);
+        const ages = settings.ages.map((age) => ({ ...age }));
+        if (command === "add" && ages.length < FILRODENSWMB.GENERATOR.MAX_AGES) ages.push({ ...ages.at(-1), event: null });
+        else if (command === "remove" && ages.length > 1 && ages[index]) ages.splice(index, 1);
+        else if ((command === "up" || command === "down") && ages[index]) {
+            const other = command === "up" ? index - 1 : index + 1;
+            if (!ages[other]) return;
+            [ages[index], ages[other]] = [ages[other], ages[index]];
+        } else return;
+        settings.ages = ages;
+        app.uiState.generatorSettings = panelSettings(settings);
+        app.markGeneratorStale?.();
+        app.markDirty();
+        app.view?.render(["context"]);
     }
 
     /** The name styles, by their localised names, with the chosen one marked (also a culture's Name style). */
@@ -90,8 +152,10 @@ export class GeneratePanel {
      * @returns {{seconds: number, value: number, unit: string, long: boolean}|null}
      */
     static #estimate(app) {
-        const seconds = this.estimateSeconds(app.meshSession?.mesh);
-        if (seconds === null) return null;
+        const once = this.estimateSeconds(app.meshSession?.mesh);
+        if (once === null) return null;
+        // Each age runs the stages again (the model cells are built once, a small part of a run)
+        const seconds = once * this.settings(app).ages.length;
         const { WARN_SECONDS } = FILRODENSWMB.GENERATOR.ESTIMATE;
         const minutes = seconds >= SECONDS_PER_MINUTE;
         return {
@@ -128,6 +192,8 @@ export class GeneratePanel {
         if (app.currentParentId && [...(app.mapPins ?? []), ...(app.mapRoutes ?? []), ...regions].some(inherited)) notices.push("FILRODENSWMB.UI.GenerateInheritedNotice");
         const land = this.landModelCells(app.meshSession);
         if (land !== null && land < FILRODENSWMB.GENERATOR.SMALL_WORLD_LAND_CELLS) notices.push("FILRODENSWMB.UI.GenerateSmallWorldNotice");
+        const ages = app.modelRun?.ages;
+        if (ages && ages.run < ages.asked) notices.push({ text: platform.i18n.format("FILRODENSWMB.UI.GenerateAgesStoppedNotice", { run: ages.run, asked: ages.asked }) });
         for (const culture of app.modelRun?.cultures ?? []) {
             if (!(culture.homelandsLeftOut > 0)) continue;
             const key = culture.homelandsAuto ? "FILRODENSWMB.UI.GenerateHomelandsPlacedNotice" : "FILRODENSWMB.UI.GenerateHomelandsLeftOutNotice";
@@ -169,12 +235,19 @@ export class GeneratePanel {
             ["FILRODENSWMB.UI.GenerateResultCounties", count(regions, (region) => region.generated.kind === "county")],
             ["FILRODENSWMB.UI.GenerateResultCapitals", count(pins, (pin) => pin.generated.tier === T.capital)],
             ["FILRODENSWMB.UI.GenerateResultCities", count(pins, (pin) => pin.generated.tier === T.city)],
-            ["FILRODENSWMB.UI.GenerateResultTowns", count(pins, (pin) => pin.generated.kind !== "castle" && ![T.capital, T.city].includes(pin.generated.tier))],
+            ["FILRODENSWMB.UI.GenerateResultTowns", count(pins, (pin) => pin.generated.kind === "town" && ![T.capital, T.city].includes(pin.generated.tier))],
             ["FILRODENSWMB.UI.GenerateResultCastles", count(pins, (pin) => pin.generated.kind === "castle")],
-            ["FILRODENSWMB.UI.GenerateResultRoads", count(routes, (route) => route.transport === "road")],
+            ["FILRODENSWMB.UI.GenerateResultRoads", count(routes, (route) => route.transport === "road" && !route.generated.oldRoad)],
             ["FILRODENSWMB.UI.GenerateResultRiverTrade", count(routes, (route) => route.transport === "river")],
             ["FILRODENSWMB.UI.GenerateResultSeaLanes", count(routes, (route) => route.transport === "sea")],
         ];
+        // What the age before left, when it left anything
+        const former = [
+            ["FILRODENSWMB.UI.GenerateResultRuins", count(pins, (pin) => pin.generated.kind === "ruin")],
+            ["FILRODENSWMB.UI.GenerateResultAbandonedCastles", count(pins, (pin) => pin.generated.kind === "abandonedCastle")],
+            ["FILRODENSWMB.UI.GenerateResultOldRoads", count(routes, (route) => route.generated.oldRoad === true)],
+        ];
+        if (former.some(([, value]) => value > 0)) rows.push(...former);
         const population = Number(app.modelRun?.stats?.population) || 0;
         return {
             rows: rows.map(([label, value]) => ({ label, value: value.toLocaleString(platform.i18n.lang) })),
@@ -226,11 +299,18 @@ export class GeneratePanel {
         let value = target.value;
         if (target.type === "checkbox") value = target.checked;
         else if (target.type === "range" || target.type === "number") value = Number(target.value);
+        // An age's event: "kind:culture id", or none
+        if (path[0] === "ages" && path[2] === "event") {
+            const [kind, culture] = String(value).split(":");
+            value = kind && culture ? { kind, culture } : null;
+        }
         setPath(settings, path, value);
         app.uiState.generatorSettings = panelSettings(settings);
         app.markDirty();
-        // Turning duchies off takes counties with them, which the panel shows
+        // Turning duchies off takes counties with them, which the panel shows; an age's change
+        // changes what a run makes
         if (path[0] === "output") app.view?.render(["context"]);
+        if (path[0] === "ages" || path[0] === "world") app.markGeneratorStale?.();
         return true;
     }
 

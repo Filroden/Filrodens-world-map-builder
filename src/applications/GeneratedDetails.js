@@ -41,6 +41,9 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedPlace", tierName ? platform.i18n.localize(tierName) : null],
             ["FILRODENSWMB.UI.GeneratedPopulation", this.#count(generated.population)],
             ["FILRODENSWMB.UI.GeneratedCultures", this.#cultures(app, generated)],
+            ["FILRODENSWMB.UI.GeneratedFormerly", this.#formerly(generated)],
+            ["FILRODENSWMB.UI.GeneratedHistory", this.#history(generated)],
+            ["FILRODENSWMB.UI.GeneratedFormerCapital", Number.isInteger(generated.formerCapital) ? platform.i18n.format("FILRODENSWMB.UI.GeneratedInAge", { age: generated.formerCapital }) : null],
             ["FILRODENSWMB.UI.GeneratedShownFrom", this.#levelName(DetailLevel.ofPin(app, pin))],
             ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(pin)],
         ]);
@@ -109,7 +112,7 @@ export class GeneratedDetails {
     static forRoute(app, route) {
         if (!route.generated) return null;
         return this.#rows([
-            ["FILRODENSWMB.UI.GeneratedRouteKind", TRANSPORTS[route.transport] ? platform.i18n.localize(TRANSPORTS[route.transport]) : null],
+            ["FILRODENSWMB.UI.GeneratedRouteKind", route.generated.oldRoad ? platform.i18n.localize("FILRODENSWMB.UI.RouteStyleOldRoad") : TRANSPORTS[route.transport] ? platform.i18n.localize(TRANSPORTS[route.transport]) : null],
             ["FILRODENSWMB.UI.GeneratedRouteClass", CLASSES[route.class] ? platform.i18n.localize(CLASSES[route.class]) : null],
             ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(route)],
         ]);
@@ -162,6 +165,47 @@ export class GeneratedDetails {
             if (parts.length) return parts.join(", ");
         }
         return this.cultureName(app, generated.culture);
+    }
+
+    /** What a ruin was in the age before the present ("Large town in age 2, 6,500 people"); null for anything else. */
+    static #formerly(generated) {
+        if (generated.kind !== "ruin" || !Number.isInteger(generated.formerTier)) return null;
+        const what = platform.i18n.format("FILRODENSWMB.UI.GeneratedInAgeOf", { what: this.#sizeName(generated.formerTier), age: generated.formerAge });
+        const people = this.#count(generated.formerPopulation);
+        return people ? platform.i18n.format("FILRODENSWMB.UI.GeneratedFormerlyPeople", { what, people }) : what;
+    }
+
+    /**
+     * A place's ages as one line, from its tier in each age (-1 for none): runs of the same tier
+     * ("Town in ages 1–2", "City since age 3"), a ruin's end ("Ruin since age 3"), joined.
+     * Null with one age.
+     */
+    static #history(generated) {
+        const ages = generated.ages;
+        if (!Array.isArray(ages) || ages.length < 2) return null;
+        const last = ages.length - 1;
+        const parts = [];
+        for (let start = 0; start <= last;) {
+            let end = start;
+            while (end < last && ages[end + 1] === ages[start]) end++;
+            const tier = ages[start];
+            const reachesNow = end === last;
+            let what = null;
+            if (tier >= 0) what = this.#sizeName(tier);
+            else if (reachesNow && start > 0 && generated.kind === "ruin") what = platform.i18n.localize("FILRODENSWMB.UI.PinStyleRuin");
+            if (what) {
+                const since = reachesNow && (start > 0 || end > start);
+                const key = since ? "FILRODENSWMB.UI.GeneratedSinceAge" : start === end ? "FILRODENSWMB.UI.GeneratedInAgeOf" : "FILRODENSWMB.UI.GeneratedInAgesOf";
+                parts.push(platform.i18n.format(key, { what, age: start + 1, from: start + 1, to: end + 1 }));
+            }
+            start = end + 1;
+        }
+        return parts.length ? parts.join(" · ") : null;
+    }
+
+    /** A settlement size's name: 0 city, 1 large town, 2 town. */
+    static #sizeName(tier) {
+        return platform.i18n.localize(["FILRODENSWMB.UI.PinStyleCity", "FILRODENSWMB.UI.PinStyleLargeTown", "FILRODENSWMB.UI.PinStyleTown"][tier] ?? "FILRODENSWMB.UI.PinStyleTown");
     }
 
     /** The rows whose value is known, localised. */

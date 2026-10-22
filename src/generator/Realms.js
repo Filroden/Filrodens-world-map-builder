@@ -33,6 +33,8 @@ import { SearchSpace, searchAll } from "./Search.js";
  * @param {import("./Cultures.js").CultureData} context.cultures
  * @param {{realmSpacing: number, fragmentation: number}} context.world
  * @param {Set<number>|null} [context.fixedSeats] - Realm seat cells to keep.
+ * @param {Set<number>|null} [context.keptSeats] - The age before's realm seats (see Pipeline): a
+ *     duchy seated on one stays a kingdom's seat; more are chosen as usual, spaced from them.
  */
 export function buildRealms(graph, context) {
     const cells = graph.cells;
@@ -184,7 +186,8 @@ function buildKingdoms(state, counties, duchies) {
 function royalDuchies(state, duchies) {
     const fixed = state.context.fixedSeats;
     if (fixed) return duchies.filter((duchy) => fixed.has(duchy.seat)).map((duchy) => duchy.id);
-    const byPower = duchies.map((duchy) => duchy.id).sort((a, b) => duchies[b].tax - duchies[a].tax || a - b);
+    const kept = state.context.keptSeats;
+    const byPower = duchies.map((duchy) => duchy.id).sort((a, b) => (kept ? (kept.has(duchies[b].seat) ? 1 : 0) - (kept.has(duchies[a].seat) ? 1 : 0) : 0) || duchies[b].tax - duchies[a].tax || a - b);
     const blocked = new Uint8Array(state.graph.count);
     const space = new SearchSpace(state.graph);
     const royal = [];

@@ -55,9 +55,23 @@ export class Generation {
 
     /** The run under the overlay: the generator in the background, then the result written onto the map. */
     static async #runWork(app, settings, signal, overlay) {
-        const progress = new RunProgress(overlay, (stage, pct) => this.#stageText(stage, pct));
+        const progress = new RunProgress(overlay, (stage, pct, age, ages) => this.#stageText(stage, pct, age, ages));
+        // Once an age has finished, the run can end keeping the ages finished
+        const stop = new AbortController();
+        let offered = 0;
+        const onProgress = ({ stage, pct, age, ages }) => {
+            progress.update(stage, pct, age, ages);
+            const finished = (age ?? 1) - 1;
+            if (finished > offered && !stop.signal.aborted) {
+                offered = finished;
+                overlay.keep?.(platform.i18n.format("FILRODENSWMB.UI.GenerateKeepAges", { count: finished }), () => {
+                    stop.abort();
+                    overlay.keep?.(null);
+                });
+            }
+        };
         try {
-            const result = await generateInBackground(() => this.payload(app, settings), { signal, onProgress: ({ stage, pct }) => progress.update(stage, pct) }).catch((error) => {
+            const result = await generateInBackground(() => this.payload(app, settings), { signal, stopSignal: stop.signal, onProgress }).catch((error) => {
                 if (error?.name === "AbortError") return null;
                 throw error;
             });
@@ -71,9 +85,10 @@ export class Generation {
         }
     }
 
-    /** The progress line: the stage's name and how far the run has come. */
-    static #stageText(stage, pct) {
-        return platform.i18n.format("FILRODENSWMB.UI.GenerateProgress", { stage: platform.i18n.localize(`FILRODENSWMB.UI.GenerateStage${stage.charAt(0).toUpperCase()}${stage.slice(1)}`), pct: Math.round(pct) });
+    /** The progress line: the age (when there are several), the stage's name and how far the run has come. */
+    static #stageText(stage, pct, age = null, ages = null) {
+        const line = platform.i18n.format("FILRODENSWMB.UI.GenerateProgress", { stage: platform.i18n.localize(`FILRODENSWMB.UI.GenerateStage${stage.charAt(0).toUpperCase()}${stage.slice(1)}`), pct: Math.round(pct) });
+        return ages > 1 ? platform.i18n.format("FILRODENSWMB.UI.GenerateProgressAge", { age, ages, line }) : line;
     }
 
     /**
@@ -155,7 +170,7 @@ export class Generation {
             biomeParams: { customBiomeRules: params.customBiomeRules, biomePalette: params.biomePalette, biomeSides: params.biomeSides },
             customBiomes: app.uiState.customBiomes ?? [],
             mapSeed: app.uiState.mapSeed,
-            settings: { seed: settings.seed || undefined, nameBase: settings.nameBase, world: settings.world, cultures: app.uiState.cultures ?? [] },
+            settings: { seed: settings.seed || undefined, nameBase: settings.nameBase, world: settings.world, ages: settings.ages, cultures: app.uiState.cultures ?? [] },
         });
     }
 
@@ -234,6 +249,7 @@ export class Generation {
             levels: [word("FILRODENSWMB.UI.GeneratedRealms"), word("FILRODENSWMB.UI.GeneratedDuchies"), word("FILRODENSWMB.UI.GeneratedCounties")],
             titles: { kingdom: word("FILRODENSWMB.UI.GeneratedKingdomTitle"), duchy: word("FILRODENSWMB.UI.GeneratedDuchyTitle"), county: word("FILRODENSWMB.UI.GeneratedCountyTitle") },
             castles: { castle: word("FILRODENSWMB.UI.GeneratedCastleName"), keep: word("FILRODENSWMB.UI.GeneratedKeepName"), hold: word("FILRODENSWMB.UI.GeneratedHoldName"), tower: word("FILRODENSWMB.UI.GeneratedTowerName") },
+            formerCapital: word("FILRODENSWMB.UI.GeneratedFormerCapitalName"),
         };
     }
 
@@ -313,7 +329,9 @@ export class Generation {
     static #tierStyle(styles, tier) {
         const marked = styles.find((style) => style.tier === tier);
         if (marked) return marked;
-        const icon = FILRODENSWMB.PINS.DEFAULT_STYLES.find((seed) => seed.tier === tier)?.icon;
+        // Only the older tiers (on the plain default colour) can be on a map from before marking
+        const seed = FILRODENSWMB.PINS.DEFAULT_STYLES.find((candidate) => candidate.tier === tier);
+        const icon = seed && !seed.color ? seed.icon : null;
         const unmarked = icon ? styles.find((style) => !style.tier && style.icon === icon) : null;
         if (unmarked) unmarked.tier = tier;
         return unmarked ?? null;
@@ -405,8 +423,8 @@ class RunProgress {
         }, QUIP_MS);
     }
 
-    update(stage, pct) {
-        this.#overlay?.text(this.#format(stage, pct));
+    update(stage, pct, age = null, ages = null) {
+        this.#overlay?.text(this.#format(stage, pct, age, ages));
         this.#overlay?.progress?.(pct / FULL);
     }
 
