@@ -260,6 +260,8 @@ function modelRunHoldsTogether(modelRun) {
     }
     const perCell = ["capacity", "population", "security", "cleared", "water", "realm", "duchy", "county", "culture"];
     if (!perCell.every((name) => arrays[name]?.length === count)) return false;
+    // The land area came later: a run without it is whole, and its density layers have no data
+    if (arrays.landArea && arrays.landArea.length !== count) return false;
     // An earlier age's realms, one per cell like the run's own
     for (const age of modelRun.history ?? []) {
         try {

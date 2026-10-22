@@ -79,6 +79,19 @@ export class RegionLevelLayers {
         this.#mesh = null;
     }
 
+    /**
+     * The mesh's cell-id texture, shared with the thematic layer (see ThematicLayer), or null when
+     * the map is larger than the GPU's largest texture. Taking it adopts the mesh as a render
+     * does, so it can be asked for before the regions are first drawn. Another mesh (another map
+     * opened) replaces it, and destroys the old one, so a holder compares it with the one it has.
+     * @param {import("../mesh/MeshBuilder.js").Mesh} mesh
+     * @returns {object|null}
+     */
+    cellIdTextureFor(mesh) {
+        this.#adoptMesh(mesh);
+        return this.#cellIdTexture;
+    }
+
     /** The cell-id texture belongs to one mesh; a new mesh (another map) starts afresh. */
     #adoptMesh(mesh) {
         if (this.#mesh === mesh) return;

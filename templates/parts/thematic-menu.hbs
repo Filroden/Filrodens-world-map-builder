@@ -1,0 +1,25 @@
+{{!--
+    The thematic layers' rows (see ThematicView), shared by the wide Thematic layers menu and the
+    folded Layers menu: a note when the map's run cannot show them, the colour layers as one
+    choice with None first, and the colour layer's opacity. Their state is written by
+    MapControls.syncMapControls; the opacity slider has no name, so a save's read of the panel
+    never takes it for a map setting (the setting is uiState.thematic).
+
+    Parameters: thematic (ThematicView.menuContext), indent (true in the folded Layers menu).
+--}}
+<div class="fwmb-layer-menu-label fwmb-layer-menu-note fwmb-hidden" role="presentation" data-thematic-note></div>
+<button type="button" role="menuitemradio" aria-checked="true" data-action="setThematicFill" data-thematic-layer="{{thematic.none}}"{{#if indent}} class="fwmb-layer-menu-sub"{{/if}}>
+    <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.ThematicNone"}}
+</button>
+{{#each thematic.layers}}
+<button type="button" role="menuitemradio" aria-checked="false" data-action="setThematicFill" data-thematic-layer="{{this.id}}"{{#if ../indent}} class="fwmb-layer-menu-sub"{{/if}}>
+    <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+</button>
+{{/each}}
+<div class="fwmb-range fwmb-layer-menu-range{{#if indent}} fwmb-layer-menu-sub{{/if}}" role="none">
+    <div class="fwmb-range-header">
+        <label class="fwmb-range-label"><span class="fwmb-range-name">{{localize "FILRODENSWMB.UI.ThematicOpacity"}}</span></label>
+        <span class="fwmb-range-reading"><output class="fwmb-range-value">{{thematic.opacity.value}}</output></span>
+    </div>
+    <input type="range" class="fwmb-range-input" data-thematic-opacity value="{{thematic.opacity.value}}" min="{{thematic.opacity.min}}" max="{{thematic.opacity.max}}" step="{{thematic.opacity.step}}" aria-label="{{localize 'FILRODENSWMB.UI.ThematicOpacity'}}" />
+</div>

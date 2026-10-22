@@ -53,6 +53,7 @@ function v4Map() {
     mapData.customPinStyles = [{ id: "pinStyleAAAAAAAA", name: "Town", icon: "map_pin", scale: 1, color: "#ffffff", detailLevel: 1, label: { fontSize: 1, visibility: "all", quickStyle: "custom" } }];
     mapData.sizeRevision = FILRODENSWMB.SYMBOLS.REVISION;
     mapData.mapUnit = "leagues";
+    mapData.thematic = { fill: "population", opacity: 0.6 };
     mapData.params = { ...mapData.params, cartography: { ...mapData.params.cartography, scaleMatchWorld: true } };
     mapData.generatorSettings = { seed: "Avalon", nameBase: "Nordic", world: { density: 1.5, urbanisation: 1, realmSpacing: 0.8, fragmentation: 1 }, output: { duchies: true, counties: false, places: { city: true, largeTown: true, town: false, castle: true }, routes: { road: true, river: false, sea: true }, labels: true } };
     mapData.cultures = [{ id: "cultureAAAAAAAAA", name: "Hillfolk", color: "#8a6a4a", nameBase: "Nordic", openness: 0.3, density: 1.5, habitat: { temperature: [0, 0.4], moisture: null, height: [0.6, 1], relief: [0.05, 0.25], coast: -0.5, river: 0.5 }, homelands: [{ x: 12, y: 30 }, { x: 80, y: 44.5 }] }];
@@ -237,7 +238,7 @@ test("owner arrays are kept only for the map's own layers, and the decoder refus
 
 /** A four-cell generator run as a map saves it (see ModelRun). */
 function savedModelRun() {
-    const cells = { capacity: [10, 20, 0, 5], population: [8, 15, 0, 4], security: [1, 0.5, 0, 0.25], cleared: [0.5, 0.5, 0, 0], water: [0, 0, 1, 0], realm: [0, 0, -1, 1], duchy: [0, 1, -1, 2], county: [0, 1, -1, 3], culture: [0, 0, -1, 0] };
+    const cells = { capacity: [10, 20, 0, 5], population: [8, 15, 0, 4], landArea: [600, 512.5, 0, 80], security: [1, 0.5, 0, 0.25], cleared: [0.5, 0.5, 0, 0], water: [0, 0, 1, 0], realm: [0, 0, -1, 1], duchy: [0, 1, -1, 2], county: [0, 1, -1, 3], culture: [0, 0, -1, 0] };
     const result = {
         modelCells: { ...cells, shareStart: [0, 1, 2, 2, 3], shareCulture: [0, 0, 0], shareValue: [1, 1, 1] },
         settings: resolveSettings({}, "SEED"),
@@ -265,6 +266,10 @@ test("a saved model run passes the importer whole, and a damaged or hostile one 
     assert.equal(short.modelRun, null, "an array shorter than the run's cells");
     assert.equal(short.corrected, 1);
     assert.equal(hostile((run) => (run.cells.realm.data = "not base64!")).modelRun, null);
+    assert.equal(hostile((run) => (run.cells.landArea.data = run.cells.landArea.data.slice(0, 8))).modelRun, null, "a land area shorter than the run's cells");
+    // A run saved before land areas were kept is whole: only its density layers have no data
+    const older = hostile((run) => delete run.cells.landArea);
+    assert.ok(older.modelRun && !older.modelRun.cells.landArea);
     assert.equal(hostile((run) => (run.cellCount = 1e12)).modelRun, null, "a cell count past the mesh's limit");
     assert.equal(hostile((run) => (run.cells.shareStart.data = btoa(String.fromCharCode(9, 0, 0, 0, 0)))).modelRun, null, "shares that run backwards");
     const scripted = hostile((run) => {
@@ -320,7 +325,9 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     file.cultures[0].habitat.relief = ["low", 1];
     file.cultures[0].openness = 7;
     file.cultures[0].homelands.push({ x: "1", y: 2 }, [3, 4]);
+    file.thematic = { fill: "__proto__", opacity: 40 };
     const { mapData } = MapImport.read(file);
+    assert.deepEqual(mapData.thematic, { opacity: FILRODENSWMB.THEMATIC.OPACITY_RANGE.MAX }, "an unknown thematic layer is dropped and the opacity kept in range");
     assert.ok(!("temperature" in mapData.cultures[0].habitat) && !("relief" in mapData.cultures[0].habitat), "a band must be two numbers, low first");
     assert.equal(mapData.cultures[0].openness, 1);
     assert.deepEqual(mapData.cultures[0].homelands, [{ x: 12, y: 30 }, { x: 80, y: 44.5 }]);

@@ -11,6 +11,7 @@ import { SymbolScale } from "../tools/SymbolScale.js";
 import { ExportScale } from "../tools/ExportScale.js";
 import { LabelLayout } from "./LabelLayout.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
+import { ThematicLayer } from "./ThematicLayer.js";
 import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
 import { HomelandMarkers } from "./HomelandMarkers.js";
@@ -104,6 +105,8 @@ export class StudioCanvas {
             // alongside `biomes` on every repaint, but hidden until hovered.
             biomeFallback: new PIXI.Container(),
             contours: new PIXI.Container(),
+            // The thematic layer (see renderThematic): over the terrain, under everything drawn on it
+            thematic: new PIXI.Container(),
             landMasks: new PIXI.Container(),
             features: new PIXI.Container(),
             infrastructure: new PIXI.Container(),
@@ -206,6 +209,7 @@ export class StudioCanvas {
             this.layers.terrain,
             this.layers.biomeFallback,
             this.layers.contours,
+            this.layers.thematic,
             this.layers.landMasks,
             this.layers.features,
             this.layers.regions,
@@ -973,6 +977,7 @@ export class StudioCanvas {
             // after the stage has already destroyed its children would fail on the meshes'
             // released geometry
             this.terrainCompositor.destroy();
+            this.#dropThematic();
             this.regionLevels.clear();
             this.app.destroy(true, { children: true, texture: true, baseTexture: true });
         }
@@ -1576,6 +1581,43 @@ export class StudioCanvas {
     }
 
     /**
+     * Draws the shown thematic layer (see ThematicLayer), or nothing. The layer's GPU objects are
+     * kept while the map's mesh is the same and replaced with it, since they are sized to its
+     * cells and read its cell-id texture. A map larger than the GPU's largest texture has no
+     * cell-id texture, and no thematic layer either, as it has no region fills.
+     *
+     * @param {import("../mesh/MeshSession.js").MeshSession|null} meshSession
+     * @param {{values: Uint8Array, lookup: Uint8Array, opacity: number}|null} display - The layer
+     *     to show (see ThematicView), or null for none.
+     */
+    renderThematic(meshSession, display) {
+        const mesh = meshSession?.mesh ?? null;
+        const cellIdTexture = display && mesh ? this.regionLevels.cellIdTextureFor(mesh) : null;
+        if (!cellIdTexture) {
+            this.layers.thematic.visible = false;
+            return;
+        }
+        if (this.#thematic?.mesh !== mesh || this.#thematic.cellIdTexture !== cellIdTexture) {
+            this.#dropThematic();
+            const layer = new ThematicLayer(PIXI, { width: mesh.width, height: mesh.height, cellCount: mesh.cellCount, cellIdTexture, auxProvider: () => this.terrainCompositor.auxTexture });
+            this.layers.thematic.addChild(layer.displayObject);
+            this.#thematic = { mesh, cellIdTexture, layer };
+        }
+        this.#thematic.layer.show(display.values, display.lookup, display.opacity);
+        this.layers.thematic.visible = true;
+    }
+
+    /** The thematic layer's GPU objects, with the mesh they were made for (see renderThematic). */
+    #thematic = null;
+
+    #dropThematic() {
+        if (!this.#thematic) return;
+        this.layers.thematic.removeChildren();
+        this.#thematic.layer.destroy();
+        this.#thematic = null;
+    }
+
+    /**
      * Frames the viewport to encompass a specific array of coordinates
      * and fires a temporary animated highlight box around the true bounds.
      */
@@ -2079,6 +2121,7 @@ export class StudioCanvas {
             terrain: this.layers.terrain.visible,
             contours: this.layers.contours.visible,
             features: this.layers.features.visible,
+            thematic: this.layers.thematic.visible,
         };
 
         this.layers.reference.visible = false;
@@ -2092,6 +2135,9 @@ export class StudioCanvas {
         } else if (passType === "gm") {
             this.layers.terrain.visible = false;
             this.layers.contours.visible = false;
+            // The GM overlay holds only what players must not see; a thematic layer is in the
+            // player image already
+            this.layers.thematic.visible = false;
             this.layers.features.visible = false;
             this.gridLayer.visible = false;
             this.layers.cartography.visible = false;
@@ -2127,6 +2173,7 @@ export class StudioCanvas {
         this.layers.terrain.visible = originalVisibility.terrain;
         this.layers.contours.visible = originalVisibility.contours;
         this.layers.features.visible = originalVisibility.features;
+        this.layers.thematic.visible = originalVisibility.thematic;
 
         return new Promise((resolve) => {
             canvas.toBlob((blob) => {

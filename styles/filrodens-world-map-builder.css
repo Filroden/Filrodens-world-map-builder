@@ -41,6 +41,9 @@
 .fwmb-icon--layers {
     --fwmb-mask: url("../assets/icons/layers.svg");
 }
+.fwmb-icon--gradient {
+    --fwmb-mask: url("../assets/icons/gradient.svg");
+}
 .fwmb-icon--detail {
     --fwmb-mask: url("../assets/icons/filter_list.svg");
 }
@@ -1637,6 +1640,68 @@
 .fwmb-canvas-readout .fwmb-legend.fwmb-is-folded > :not(.fwmb-title) {
     display: none;
 }
+/* The information bar lets the pointer through to the map; a legend's fold button takes it */
+.fwmb-canvas-readout .fwmb-legend .fwmb-toggle {
+    pointer-events: auto;
+    display: grid;
+    place-items: center;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    padding: 0;
+    border: none;
+    border-radius: var(--fwmb-radius-small);
+    background: transparent;
+    cursor: pointer;
+}
+.fwmb-canvas-readout .fwmb-legend .fwmb-toggle:hover {
+    background: var(--fwmb-overlay-control-hover);
+}
+.fwmb-canvas-readout .fwmb-legend.fwmb-is-folded .fwmb-toggle .fwmb-icon {
+    transform: rotate(calc(90deg * var(--fwmb-dir-flip)));
+}
+/* A graded scale: the ramp as a bar with the pointer's marker on it, the ticks at their places
+   below (each centred on its place, mirrored in a right-to-left language), and the unit */
+.fwmb-canvas-readout .fwmb-ramp {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+.fwmb-canvas-readout .fwmb-ramp-bar {
+    position: relative;
+    block-size: 0.625rem;
+    border-radius: 0.125rem;
+}
+.fwmb-canvas-readout .fwmb-ramp-marker {
+    position: absolute;
+    inset-block: -0.1875rem;
+    inline-size: 0.1875rem;
+    margin-inline-start: -0.09375rem;
+    border-radius: 0.0625rem;
+    background: var(--fwmb-overlay-accent);
+    box-shadow: 0 0 0 1px var(--fwmb-overlay-bg);
+}
+.fwmb-canvas-readout .fwmb-ramp-marker.fwmb-hidden {
+    display: none;
+}
+.fwmb-canvas-readout .fwmb-ramp-ticks {
+    position: relative;
+    block-size: 1rem;
+    margin-inline: 0.5rem;
+    font: 500 0.6875rem/1rem var(--fwmb-font-readout);
+    font-variant-numeric: tabular-nums;
+    color: var(--fwmb-overlay-muted);
+}
+.fwmb-canvas-readout .fwmb-ramp-ticks span {
+    position: absolute;
+    transform: translateX(calc(-50% * var(--fwmb-dir-flip)));
+}
+.fwmb-canvas-readout .fwmb-ramp-unit,
+.fwmb-canvas-readout .fwmb-legend-note {
+    margin: 0;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    color: var(--fwmb-overlay-muted);
+}
 
 /* A docked panel lying over the canvas end edge: the end-edge overlays move clear */
 .fwmb-map-preview--covered-end {
@@ -2931,6 +2996,39 @@
     padding: 0.125rem 0.5rem;
     font-size: 0.75rem;
     color: var(--fwmb-overlay-muted);
+}
+.fwmb-layer-menu-label.fwmb-hidden {
+    display: none;
+}
+/* Why a menu's choices cannot be made (the thematic layers on a map with no run): wraps */
+.fwmb-layer-menu-note {
+    max-inline-size: 14rem;
+    white-space: normal;
+}
+.fwmb .fwmb-layer-menu button[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: default;
+}
+.fwmb .fwmb-layer-menu button[aria-disabled="true"]:hover {
+    background: transparent;
+}
+/* A slider inside a menu (the thematic layer's opacity), in the overlay's own colours */
+.fwmb-layer-menu-range {
+    flex: none;
+    padding: 0.25rem 0.5rem;
+    --fwmb-range-track: var(--fwmb-overlay-border);
+    --fwmb-range-fill: var(--fwmb-overlay-accent);
+    --fwmb-bg-panel: var(--fwmb-overlay-bg);
+}
+.fwmb-layer-menu-range.fwmb-layer-menu-sub {
+    padding-inline-start: 1.75rem;
+}
+.fwmb .fwmb-layer-menu-range .fwmb-range-label {
+    color: var(--fwmb-overlay-muted);
+    font-size: 0.75rem;
+}
+.fwmb .fwmb-layer-menu-range .fwmb-range-value {
+    color: var(--fwmb-overlay-accent);
 }
 
 /* The tick box drawn in each list row, from the row's aria-checked */

@@ -586,6 +586,11 @@ const MAP = obj({
     hiddenLabelStyles: list(key),
     hiddenLevels: list(key),
     hideRegionFills: bool,
+    // The thematic layer shown over the map and its opacity (see ThematicView)
+    thematic: obj({
+        fill: enumOf(FILRODENSWMB.THEMATIC.LAYERS.map((layer) => layer.id), { nullable: true }),
+        opacity: num({ min: FILRODENSWMB.THEMATIC.OPACITY_RANGE.MIN, max: FILRODENSWMB.THEMATIC.OPACITY_RANGE.MAX }),
+    }),
     params: PARAMS,
     customBiomes: list(CUSTOM_BIOME),
     nextCustomBiomeId: int(0, MAX_BIOME_ID + 1),

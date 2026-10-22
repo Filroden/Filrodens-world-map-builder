@@ -24,6 +24,7 @@ import { RegionalExtractor } from "./RegionalExtractor.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
 import { cleanUnit, formatDistance, kmPerPxOf, scaleBarTick, unitFromSaved } from "../data/MapUnit.js";
+import { ThematicView } from "./ThematicView.js";
 import { TerrainUpgrade } from "./TerrainUpgrade.js";
 import { RiverSources } from "../generation/RiverSources.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
@@ -266,6 +267,8 @@ export class MapStudio {
         toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
         toggleGrid(e, t)                { this._onToggleGrid(e, t); },
         setDetailLevel(_e, t)           { this.setDetailLevel(Number(t.dataset.detailLevel)); },
+        setThematicFill(_e, t)          { this.#setThematic(ThematicView.withFill(this, t.dataset.thematicLayer)); },
+        toggleThematicLegend()          { ThematicView.toggleLegend(this); },
         toggleLabelOverlaps()           { this.#toggleLabelOverlaps(); },
         setSymbolSize(_e, t)            { this.#setSymbolSize(t.dataset.symbolSize); },
         toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
@@ -1182,6 +1185,8 @@ export class MapStudio {
         context.worldAreaFactor = clampAreaFactor(this.uiState.world?.areaFactor);
         context.areaFactorRange = { min: FILRODENSWMB.MESH.AREA_FACTOR_RANGE[0], max: FILRODENSWMB.MESH.AREA_FACTOR_RANGE[1] };
         context.mapUnit = cleanUnit(this.uiState.mapUnit);
+        // The map controls' Thematic layers menu (the map region is drawn once; see ThematicView)
+        context.thematic = ThematicView.menuContext();
         context.pixelScale = this.#pixelScaleText();
         // The value per tick a bar matching the world draws (a number field, so unformatted)
         context.scaleBarValue = scaleBarTick(this.uiState, this.mapHeight).value;
@@ -1626,6 +1631,11 @@ export class MapStudio {
             this.uiState.reliefEmphasis = Number(target.value);
             if (event.type === "input") this.scene3D?.setReliefEmphasis(this.uiState.reliefEmphasis);
             else this.markDirty();
+            return;
+        }
+        // The thematic layer's opacity, in the map controls: live while it is dragged
+        if (target.matches("[data-thematic-opacity]")) {
+            this.#setThematic(ThematicView.withOpacity(this, target.value), { save: event.type === "change" });
             return;
         }
         if (!target.closest(".fwmb-context-panel")) return;
@@ -2205,8 +2215,10 @@ export class MapStudio {
             // The information bar stays on the canvas; off the map it shows a dash for every value
             if (x === null || y === null || x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight || !this.currentElevationData) {
                 for (const value of readout.querySelectorAll('[id^="fwmb-readout-"]')) value.textContent = "–";
+                ThematicView.readout(this, null, null);
                 return;
             }
+            ThematicView.readout(this, x, y);
 
             const index = y * this.mapWidth + x;
             const elev = this.currentElevationData[index];
@@ -3198,9 +3210,18 @@ export class MapStudio {
         return groups.map((group) => group.rows.map((row) => `${row.kind}:${row.key}:${row.label}:${row.on ? 1 : 0}`).join("|")).join("/");
     }
 
-    /** The Labels and Regions menus' rows brought up to date after the map changed (a new label style or level). */
+    /**
+     * The Labels and Regions menus' rows, and the thematic layers' menu, brought up to date after
+     * the map changed (a new label style or level; a run made, undone or opened, which makes the
+     * thematic layers available or not).
+     */
     #syncContentRows() {
-        if (MapStudio.#signatureOf(ContentRows.groups(this)) !== this.#contentSignature) this.#syncMapControls();
+        if (this.#menuSignature(ContentRows.groups(this), ThematicView.controlState(this)) !== this.#contentSignature) this.#syncMapControls();
+    }
+
+    /** What the map controls' changing menus hold, to tell when they must be marked again. */
+    #menuSignature(contentGroups, thematic) {
+        return `${MapStudio.#signatureOf(contentGroups)}#${JSON.stringify(thematic)}`;
     }
 
     #syncMapControls() {
@@ -3211,7 +3232,8 @@ export class MapStudio {
         }));
         // The Labels and Regions menus' rows (see ContentRows); each counts as shown unless all its rows are off
         const contentGroups = ContentRows.groups(this);
-        this.#contentSignature = MapStudio.#signatureOf(contentGroups);
+        const thematic = ThematicView.controlState(this);
+        this.#contentSignature = this.#menuSignature(contentGroups, thematic);
         const state = {
             viewFilters: this.viewFilters,
             layers: { ...this.#layerVisibility, ...Object.fromEntries(contentGroups.map((group) => [group.id, group.state !== "off"])) },
@@ -3222,6 +3244,7 @@ export class MapStudio {
             contentGroups,
             terrainGroups,
             threeD: !!this.scene3D,
+            thematic,
         };
         const detailName = (level) => platform.i18n.localize(FILRODENSWMB.DETAIL.LEVELS.find((choice) => choice.value === level).label);
         syncMapControls(this.root, state, (shown, total) => platform.i18n.format("FILRODENSWMB.UI.LayersMenuCount", { shown, total }), (level) => platform.i18n.format("FILRODENSWMB.UI.DetailMenuLevel", { level: detailName(level) }), (percent) => platform.i18n.format("FILRODENSWMB.UI.SymbolSizeAutoValue", { percent }));
@@ -3511,8 +3534,9 @@ export class MapStudio {
         const infraPins = shown.pins.filter((p) => !!p.icon);
         this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isInfraEdit, this.meshSession);
 
-        // 3. Render Regions, from the display mesh
+        // 3. Render Regions, from the display mesh, and the thematic layer under them
         MeshIntegration.renderRegions(this);
+        ThematicView.render(this);
 
         // 4. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
@@ -3853,6 +3877,7 @@ export class MapStudio {
         this.uiState.hiddenLabelStyles = Array.isArray(payload.hiddenLabelStyles) ? [...payload.hiddenLabelStyles] : [];
         this.uiState.hiddenLevels = Array.isArray(payload.hiddenLevels) ? [...payload.hiddenLevels] : [];
         this.uiState.hideRegionFills = payload.hideRegionFills === true;
+        this.uiState.thematic = ThematicView.valid(payload.thematic);
         this.canvasEngine?.setLabelOverlapAvoidance(this.uiState.avoidLabelOverlaps);
 
         MapStateManager.allocateBuffers(this);
@@ -4363,6 +4388,7 @@ export class MapStudio {
             hiddenLabelStyles: [...(this.uiState.hiddenLabelStyles ?? [])],
             hiddenLevels: [...(this.uiState.hiddenLevels ?? [])],
             hideRegionFills: this.uiState.hideRegionFills === true,
+            thematic: ThematicView.setting(this),
             params: params,
             customBiomes: this.uiState.customBiomes,
             nextCustomBiomeId: this.uiState.nextCustomBiomeId,
@@ -6297,6 +6323,23 @@ export class MapStudio {
         this.#syncMapControls();
         if (repaint) this._repaintVectors();
         this.markDirty();
+    }
+
+    /**
+     * The thematic layer shown and its opacity (see ThematicView), a view saved with the map. The
+     * menu stays open, so a layer can be chosen and its opacity set in one visit. Only the
+     * thematic layer is drawn again: nothing else on the canvas depends on it.
+     * @param {{fill: string|null, opacity: number}|null} next - The new setting, or null for no change.
+     * @param {{save?: boolean}} [options] - save: false while the opacity slider is being dragged,
+     *     so the map is marked changed once, when it is let go.
+     */
+    #setThematic(next, { save = true } = {}) {
+        if (next) {
+            this.uiState.thematic = next;
+            ThematicView.render(this);
+            this.#syncMapControls();
+        }
+        if (save && next) this.markDirty();
     }
 
     /**

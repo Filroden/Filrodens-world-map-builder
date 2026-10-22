@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { setOn, setPressed } from "./aria.js";
+import { RangeDisplay } from "../tools/RangeDisplay.js";
 
 /**
  * The map controls (bottom end of the canvas) show what the map is showing, and what an export
@@ -55,6 +56,8 @@ export function layersShown(state) {
  * @param {boolean} state.avoidOverlaps - Whether names avoid each other (see LabelLayout).
  * @param {{value: string, percent: number, auto: boolean, selected: boolean}[]} [state.symbolSizes] - The
  *   symbol size rows (see SymbolScale.choices), Auto first.
+ * @param {{fill: string|null, rows: {id: string, disabled: boolean, title: string}[], opacity: number, note: string}} [state.thematic] - The
+ *   thematic layers' menu (see ThematicView.controlState).
  * @param {(percent: number) => string} [autoLabel] - The Auto row's name for its value.
  * @param {(shown: number, total: number) => string} layersLabel - The Layers button's name for a count.
  * @param {(level: number) => string} detailLabel - The Detail button's name for a level.
@@ -69,6 +72,7 @@ export function syncMapControls(root, state, layersLabel, detailLabel, autoLabel
     each('[data-action="threeDView"]', (element) => setOn(element, state.threeD));
 
     for (const group of state.contentGroups ?? []) syncContentGroup(root, group);
+    if (state.thematic) syncThematic(root, state.thematic);
 
     // The Detail menu: one level chosen, named on its button
     each('[data-action="setDetailLevel"]', (row) => row.setAttribute("aria-checked", String(Number(row.dataset.detailLevel) === state.detailLevel)));
@@ -109,6 +113,37 @@ export function syncMapControls(root, state, layersLabel, detailLabel, autoLabel
         button.setAttribute("aria-label", label);
         button.dataset.tooltip = label;
     });
+}
+
+/**
+ * The thematic layers' menu (in its wide form and in the Layers menu): the colour layer chosen
+ * (None when none is drawn), the layers the map's run cannot show marked disabled with the reason
+ * as their tooltip, the note at its head, the opacity slider (idle while no layer is drawn), and
+ * the button pressed while a layer is drawn.
+ *
+ * @param {ParentNode} root
+ * @param {{fill: string|null, rows: {id: string, disabled: boolean, title: string}[], opacity: number, note: string}} thematic
+ */
+function syncThematic(root, thematic) {
+    const rows = new Map(thematic.rows.map((row) => [row.id, row]));
+    root.querySelectorAll('[data-action="setThematicFill"]').forEach((element) => {
+        const id = element.dataset.thematicLayer;
+        element.setAttribute("aria-checked", String(id === (thematic.fill ?? "none")));
+        const row = rows.get(id);
+        if (!row) return;
+        element.setAttribute("aria-disabled", String(row.disabled));
+        element.dataset.tooltip = row.title;
+    });
+    root.querySelectorAll("[data-thematic-note]").forEach((element) => {
+        element.textContent = thematic.note;
+        element.classList.toggle("fwmb-hidden", !thematic.note);
+    });
+    root.querySelectorAll("[data-thematic-opacity]").forEach((input) => {
+        input.value = String(thematic.opacity);
+        input.disabled = !thematic.fill;
+        RangeDisplay.sync(input);
+    });
+    root.querySelectorAll('.fwmb-layer-group[data-layer-group="thematic"] > [data-action="toggleLayerMenu"]').forEach((button) => setPressed(button, !!thematic.fill));
 }
 
 /**

@@ -3,11 +3,13 @@ import { FILRODENSWMB } from "../config.js";
 /**
  * A generator run's model-cell outputs as saved with a map (its `modelRun`, kept beside the map
  * data rather than in it, as the owner arrays are): what each model cell held (capacity,
- * population, security, clearing, realm, duchy, county, water, dominant culture and the culture
- * shares) for the thematic layers and later runs to read, with the run's settings and figures.
+ * population, land area, security, clearing, realm, duchy, county, water, dominant culture and the
+ * culture shares) for the thematic layers and later runs to read, with the run's settings and
+ * figures.
  *
  * Each array is quantised to the smallest type that keeps what matters (people as whole numbers,
- * shares and security to 1/255, unit indices offset by one so -1 fits an unsigned type) and stored
+ * land area to a tenth of a km², shares and security to 1/255, unit indices offset by one so -1
+ * fits an unsigned type) and stored
  * as base64 of its little-endian bytes. Every platform the module runs on is little-endian, which
  * is what makes the byte order fixed.
  *
@@ -35,6 +37,8 @@ const UNIT = 255;
 const FIELDS = Object.freeze({
     capacity: Object.freeze({ type: "u32", scale: 1, offset: 0 }),
     population: Object.freeze({ type: "u32", scale: 1, offset: 0 }),
+    // km² of land: a regional map's cells hold a few km², so tenths keep their density honest
+    landArea: Object.freeze({ type: "u32", scale: 10, offset: 0 }),
     security: Object.freeze({ type: "u8", scale: UNIT, offset: 0 }),
     cleared: Object.freeze({ type: "u8", scale: UNIT, offset: 0 }),
     water: Object.freeze({ type: "u8", scale: 1, offset: 0 }),
@@ -139,4 +143,82 @@ export function decodeModelRun(modelRun) {
         if (packed && TYPES[packed.type]) out[name] = unpackArray(packed);
     }
     return out;
+}
+
+// ------------------------------------------------------------------ moving a run with its map
+
+/** What a model cell that comes from beyond the map holds: open water, no one, in no unit. */
+const EMPTY = Object.freeze({ water: 1, realm: -1, duchy: -1, county: -1, culture: -1 });
+/** Values per history place: cell, tier, seat. */
+const PLACE_FIELDS = 3;
+
+/**
+ * A run moved with its map, when the terrain is panned or rescaled (see MapStudio's noise frame):
+ * the mesh's cells stay where they are and the land moves under them, so each model cell takes
+ * what the run held in the model cell its site came from (`sourceOf`), as the region owners do.
+ * A cell whose site came from beyond the map holds open water. The history's places, castles and
+ * seats, and the cultures' homelands, are cells that moved, so each goes to the model cell its
+ * old site lands on (`targetOf`), and is dropped when that is off the map.
+ *
+ * The run is otherwise kept as it was (its settings, figures and ages), and the original is not
+ * changed, so it can be put back by an undo.
+ *
+ * @param {object} modelRun - A saved run.
+ * @param {Int32Array} sourceOf - For each model cell, the cell it takes its values from, or -1.
+ * @param {function(number): number} targetOf - Where an old model cell's site lands, or -1.
+ * @returns {object} The moved run.
+ */
+export function resampleModelRun(modelRun, sourceOf, targetOf) {
+    const arrays = decodeModelRun(modelRun);
+    const count = sourceOf.length;
+    const take = (values, empty) => Float64Array.from({ length: count }, (_, cell) => (sourceOf[cell] < 0 ? empty : values[sourceOf[cell]]));
+
+    const cells = {};
+    for (const [name, field] of Object.entries(FIELDS)) {
+        if (arrays[name]) cells[name] = packArray(take(arrays[name], EMPTY[name] ?? 0), field);
+    }
+    Object.assign(cells, resampledShares(arrays, sourceOf));
+
+    const moveCells = (list) => Array.from(list ?? [], targetOf).filter((cell) => cell >= 0);
+    const history = (modelRun.history ?? []).map((age) => ({
+        ...age,
+        places: movedPlaces(age.places ?? [], targetOf),
+        castles: moveCells(age.castles),
+        seats: moveCells(age.seats),
+        realm: age.realm ? packArray(take(unpackArray(age.realm), EMPTY.realm), FIELDS.realm) : age.realm,
+    }));
+    const cultures = (modelRun.cultures ?? []).map((culture) => ({ ...culture, homelands: moveCells(culture.homelands) }));
+    return { ...modelRun, cultures, cells, history };
+}
+
+/** The culture shares, each cell's run taken from its source cell (none for a cell from beyond the map). */
+function resampledShares({ shareStart, shareCulture, shareValue }, sourceOf) {
+    if (!shareStart || !shareCulture || !shareValue) return {};
+    const start = [0];
+    const culture = [];
+    const value = [];
+    for (const source of sourceOf) {
+        if (source >= 0) {
+            for (let index = shareStart[source]; index < shareStart[source + 1]; index++) {
+                culture.push(shareCulture[index]);
+                value.push(shareValue[index]);
+            }
+        }
+        start.push(culture.length);
+    }
+    return {
+        shareStart: packArray(start, { type: "index" }),
+        shareCulture: packArray(culture, { type: "index", offset: 1 }),
+        shareValue: packArray(value, { type: "u8", scale: UNIT }),
+    };
+}
+
+/** A history's places (cell, tier, seat triples) with their cells moved, those moved off the map dropped. */
+function movedPlaces(places, targetOf) {
+    const moved = [];
+    for (let index = 0; index + PLACE_FIELDS <= places.length; index += PLACE_FIELDS) {
+        const cell = targetOf(places[index]);
+        if (cell >= 0) moved.push(cell, places[index + 1], places[index + 2]);
+    }
+    return moved;
 }

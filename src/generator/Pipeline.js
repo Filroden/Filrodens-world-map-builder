@@ -449,6 +449,8 @@ function modelCellOutput(run, feedback, realms) {
     const { cells, cultures } = run;
     return {
         capacity: Float32Array.from(cells.food),
+        // The land each cell holds, so a thematic layer can give its people and food per area
+        landArea: Float32Array.from(cells.landKm2),
         population: Float32Array.from(feedback.cellPop),
         security: Float32Array.from(feedback.security),
         cleared: Float32Array.from(feedback.cleared),

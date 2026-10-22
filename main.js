@@ -90,6 +90,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs",
         "modules/filrodens-world-map-builder/templates/parts/state-block.hbs",
         "modules/filrodens-world-map-builder/templates/parts/style-picker.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/thematic-menu.hbs",
         "modules/filrodens-world-map-builder/templates/parts/toolbar-biomes.hbs",
         "modules/filrodens-world-map-builder/templates/parts/toolbar-cartography.hbs",
         "modules/filrodens-world-map-builder/templates/parts/toolbar-empty.hbs",

@@ -12,6 +12,8 @@ import { MeshBuilder } from "../../src/mesh/MeshBuilder.js";
 import { RouteDraft } from "../../src/mesh/RouteEdits.js";
 import { addRegion, createLayerSet, createLevel, createMeshBlock, effectiveKmPerPx } from "../../src/mesh/Schema.js";
 import { TerrainVersion } from "../../src/tools/TerrainVersion.js";
+import { decodeModelRun, encodeModelRun } from "../../src/generator/ModelRun.js";
+import { resolveSettings } from "../../src/generator/GeneratorSettings.js";
 import { cellsInRect, isContiguous, smallSession } from "./helpers.mjs";
 
 const mapData = (world) => ({ mapWidth: 1000, mapHeight: 500, seed: "AREA", params: { latTop: 60, latBottom: -60 }, world });
@@ -81,6 +83,54 @@ test("a pan moves regions and routes with the terrain, and the undo entries put 
     assert.ok(near(app.mapRoutes[0].waypoints[0], 150, 150), "and the route");
     VectorHistory.step(app, false);
     assert.deepEqual(ownedX(session, west.key), after, "redo moves them again");
+});
+
+test("a pan moves the generator's saved run with the regions, in the same undo step", async () => {
+    const { app, session } = await studio();
+    const mesh = session.mesh;
+    const count = mesh.modelCount;
+    // People in proportion to each model site's x, so a move shows as a change of value under a site
+    const column = (value) => Float64Array.from({ length: count }, (_, cell) => value(cell));
+    const result = {
+        modelCells: {
+            capacity: column(() => 0),
+            population: column((cell) => Math.round(mesh.siteX(cell))),
+            landArea: column(() => 1),
+            security: column(() => 1),
+            cleared: column(() => 0),
+            water: column(() => 0),
+            realm: column(() => 0),
+            duchy: column(() => -1),
+            county: column(() => -1),
+            culture: column(() => -1),
+            shareStart: new Int32Array(count + 1),
+            shareCulture: new Int32Array(0),
+            shareValue: new Float32Array(0),
+        },
+        settings: resolveSettings({}, "SEED"),
+        cellCount: count,
+        cultures: [],
+        stats: {},
+    };
+    const run = JSON.parse(JSON.stringify(encodeModelRun(result, "runAAAAAAAAAAAAA")));
+    app.modelRun = run;
+    const snapshot = VectorHistory.snapshot(app);
+    const entries = MeshIntegration.transformContent(app, (x, y) => [x + 60, y], (x, y) => [x - 60, y]);
+    assert.equal(entries.length, 2, "the level's owners and the run");
+    assert.notEqual(app.modelRun, run);
+
+    const moved = decodeModelRun(app.modelRun);
+    for (let cell = 0; cell < count; cell++) {
+        const x = mesh.siteX(cell);
+        // A site well inside takes the people of the site 60 px to its left (within a model spacing)
+        if (x > 60 + mesh.modelSpacing * 2) assert.ok(Math.abs(moved.population[cell] - (x - 60)) <= mesh.modelSpacing * 1.5, `cell ${cell} at ${x}: ${moved.population[cell]}`);
+        // A site whose source lies beyond the map's edge is open water with no one
+        if (x < 60 - mesh.spacing * 2) assert.equal(moved.water[cell], 1);
+    }
+
+    VectorHistory.push(app, VectorHistory.composite([snapshot, ...entries]));
+    VectorHistory.step(app, true);
+    assert.equal(app.modelRun, run, "undo puts the run back as it was");
 });
 
 test("a rescale about the noise origin stretches the regions, and a route pushed off the map is cut to what remains", async () => {

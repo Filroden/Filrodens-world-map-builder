@@ -11,6 +11,7 @@ import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { platform } from "../platform/index.js";
+import { resampleModelRun } from "../generator/ModelRun.js";
 
 /**
  * Connects the Map Studio to the display mesh (src/mesh/): opening a map's mesh session when the
@@ -244,7 +245,28 @@ export class MeshIntegration {
             entries.push(VectorHistory.levelOwners(level.id, before, session.layer(level.id).encode()));
         }
         app.mapRoutes = (app.mapRoutes ?? []).flatMap((route) => this.#movedRoute(session, route, toTarget));
+        const runEntry = this.#movedModelRun(app, fromEdge, toTarget);
+        if (runEntry) entries.push(runEntry);
         return entries;
+    }
+
+    /**
+     * The generator's saved run moved with the regions (see ModelRun.resampleModelRun), so the
+     * thematic layers stay on the land they describe: each model cell reads the model cell under
+     * its source point (near the edge, the edge's, as the owners do), and the run's places go to
+     * where their sites land. One undo entry (null for a map with no run, or a run of another
+     * mesh, which the thematic layers do not read either).
+     */
+    static #movedModelRun(app, fromEdge, toTarget) {
+        const mesh = app.meshSession.mesh;
+        const before = app.modelRun ?? null;
+        if (!before || before.cellCount !== mesh.modelCount) return null;
+        const onMap = (x, y) => x >= 0 && y >= 0 && x <= mesh.width - 1 && y <= mesh.height - 1;
+        const modelCellAt = ([x, y]) => (onMap(x, y) ? mesh.modelDelaunay.find(x, y) : -1);
+        const sourceOf = Int32Array.from({ length: mesh.modelCount }, (_, cell) => modelCellAt(fromEdge(mesh.siteX(cell), mesh.siteY(cell))));
+        const targetOf = (cell) => (cell >= 0 && cell < mesh.modelCount ? modelCellAt(toTarget(mesh.siteX(cell), mesh.siteY(cell))) : -1);
+        app.modelRun = resampleModelRun(before, sourceOf, targetOf);
+        return VectorHistory.modelRun(before, app.modelRun);
     }
 
     /** A route traced again along its moved line: itself for the first piece on the map, a new route for each other piece. */

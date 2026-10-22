@@ -126,11 +126,12 @@ function getRegionMeshClass(pixi) {
 }
 
 /**
- * A texture whose texels come back exactly as written (see the module comment).
+ * A texture whose texels come back exactly as written (see the module comment). Shared with the
+ * thematic layer (see ThematicLayer), whose lookups have the same need.
  * @param {object} pixi
  * @param {object} resource - A BufferResource (or subclass).
  */
-function exactTexture(pixi, resource) {
+export function exactTexture(pixi, resource) {
     const base = new pixi.BaseTexture(resource, {
         format: pixi.FORMATS.RGBA,
         type: pixi.TYPES.UNSIGNED_BYTE,

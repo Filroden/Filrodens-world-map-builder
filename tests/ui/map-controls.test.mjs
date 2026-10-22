@@ -21,6 +21,7 @@ const document = window.document;
 
 const { FILRODENSWMB } = await import("../../src/config.js");
 const { layersShown, syncMapControls, VIEW_LAYERS } = await import("../../src/ui/MapControls.js");
+const { ThematicView } = await import("../../src/applications/ThematicView.js");
 
 const TERRAIN_GROUPS = [
     { id: "terrain", icon: "elevation", tooltip: "LayerTerrain", items: [{ key: "elevation", label: "LayerElevation" }, { key: "relief", label: "LayerRelief" }, { key: "water", label: "LayerWater" }] },
@@ -33,8 +34,9 @@ function drawMap() {
     handlebars.registerHelper("localize", (key) => key);
     handlebars.registerHelper("eq", (a, b) => a === b);
     handlebars.registerPartial("modules/filrodens-world-map-builder/templates/parts/shared-range.hbs", readFileSync(join(ROOT, "templates/parts/shared-range.hbs"), "utf8"));
+    handlebars.registerPartial("modules/filrodens-world-map-builder/templates/parts/thematic-menu.hbs", readFileSync(join(ROOT, "templates/parts/thematic-menu.hbs"), "utf8"));
     const template = handlebars.compile(readFileSync(join(ROOT, "templates/map.hbs"), "utf8"));
-    document.body.innerHTML = template({ uiState: { reliefEmphasis: 20 }, layerGroups: TERRAIN_GROUPS, viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS, detailLevels: FILRODENSWMB.DETAIL.LEVELS, symbolSizes: FILRODENSWMB.SYMBOLS.SIZES.map((size) => ({ value: String(size), percent: Math.round(size * 100) })) });
+    document.body.innerHTML = template({ uiState: { reliefEmphasis: 20 }, layerGroups: TERRAIN_GROUPS, viewLayers: FILRODENSWMB.STUDIO.VIEW_LAYERS, overlayLayers: FILRODENSWMB.STUDIO.OVERLAY_LAYERS, detailLevels: FILRODENSWMB.DETAIL.LEVELS, symbolSizes: FILRODENSWMB.SYMBOLS.SIZES.map((size) => ({ value: String(size), percent: Math.round(size * 100) })), thematic: ThematicView.menuContext() });
     return document.body;
 }
 
@@ -92,7 +94,8 @@ test("every control in both forms reads the state it switches", () => {
 test("a state with everything on reads pressed throughout, with no dot", () => {
     const root = drawMap();
     syncMapControls(root, viewState(), label, detailLabel);
-    for (const button of root.querySelectorAll('.fwmb-layer-group:not([data-layer-group="detail"]) > .fwmb-map-btn[data-action="toggleLayerMenu"]')) {
+    // Detail and the thematic layers are choices, not layers switched on and off
+    for (const button of root.querySelectorAll('.fwmb-layer-group:not([data-layer-group="detail"]):not([data-layer-group="thematic"]) > .fwmb-map-btn[data-action="toggleLayerMenu"]')) {
         assert.equal(button.getAttribute("aria-pressed"), "true");
         assert.equal(button.classList.contains("fwmb-is-partial"), false);
     }
@@ -162,6 +165,38 @@ test("the Detail menu marks the map's symbol size, naming Auto with its value", 
     assert.equal(rows[0].getAttribute("aria-checked"), "false");
 });
 
+test("the thematic layers' menu marks the layer drawn in both forms, the rows the run cannot show, its note and its opacity", () => {
+    const root = drawMap();
+    const rows = (id) => [...root.querySelectorAll(`[data-action="setThematicFill"][data-thematic-layer="${id}"]`)];
+    const button = root.querySelector('.fwmb-layer-group[data-layer-group="thematic"] > [data-action="toggleLayerMenu"]');
+    assert.equal(rows("population").length, 2, "in the wide menu and the Layers menu");
+
+    syncMapControls(root, viewState({ thematic: { fill: null, rows: [{ id: "population", disabled: true, title: "Generate again" }], opacity: 0.7, note: "Generate this map to see these layers." } }), label, detailLabel);
+    for (const row of rows("none")) assert.equal(row.getAttribute("aria-checked"), "true");
+    for (const row of rows("population")) {
+        assert.equal(row.getAttribute("aria-checked"), "false");
+        assert.equal(row.getAttribute("aria-disabled"), "true");
+        assert.equal(row.dataset.tooltip, "Generate again");
+    }
+    for (const note of root.querySelectorAll("[data-thematic-note]")) {
+        assert.equal(note.textContent, "Generate this map to see these layers.");
+        assert.equal(note.classList.contains("fwmb-hidden"), false);
+    }
+    for (const input of root.querySelectorAll("[data-thematic-opacity]")) assert.equal(input.disabled, true, "no layer drawn, nothing to fade");
+    assert.equal(button.getAttribute("aria-pressed"), "false");
+
+    syncMapControls(root, viewState({ thematic: { fill: "population", rows: [{ id: "population", disabled: false, title: "People" }], opacity: 0.4, note: "" } }), label, detailLabel);
+    for (const row of rows("population")) assert.equal(row.getAttribute("aria-checked"), "true");
+    for (const row of rows("none")) assert.equal(row.getAttribute("aria-checked"), "false");
+    for (const note of root.querySelectorAll("[data-thematic-note]")) assert.equal(note.classList.contains("fwmb-hidden"), true);
+    for (const input of root.querySelectorAll("[data-thematic-opacity]")) {
+        assert.equal(input.disabled, false);
+        assert.equal(input.value, "0.4");
+        assert.equal(input.closest(".fwmb-range").querySelector("output").value, "0.4");
+    }
+    assert.equal(button.getAttribute("aria-pressed"), "true");
+});
+
 test("the Layers menu lists every wide toggle, in the same order", () => {
     const root = drawMap();
     const key = (element) => [element.dataset.action, element.dataset.layer ?? "", element.dataset.layerGroup ?? "", element.dataset.terrainLayer ?? ""].join(":");
@@ -186,7 +221,7 @@ function methodBodies(source) {
 }
 
 /** What changes a view: the state the map controls show, written. */
-const VIEW_CHANGES = [/this\.uiState\s*=(?!=)/, /this\.#layerVisibility\[[^\]]+\]\s*=(?!=)/, /this\.viewFilters\[[^\]]+\]\s*=(?!=)/, /this\.uiState\.gridVisible\s*=(?!=)/, /this\.#terrainLayers\s*=(?!=)/, /this\.scene3D\s*=(?!=)/, /this\.uiState\.detailLevel\s*=(?!=)/, /this\.uiState\.avoidLabelOverlaps\s*=(?!=)/, /this\.uiState\.symbolSize\s*=(?!=)/];
+const VIEW_CHANGES = [/this\.uiState\s*=(?!=)/, /this\.#layerVisibility\[[^\]]+\]\s*=(?!=)/, /this\.viewFilters\[[^\]]+\]\s*=(?!=)/, /this\.uiState\.gridVisible\s*=(?!=)/, /this\.#terrainLayers\s*=(?!=)/, /this\.scene3D\s*=(?!=)/, /this\.uiState\.detailLevel\s*=(?!=)/, /this\.uiState\.avoidLabelOverlaps\s*=(?!=)/, /this\.uiState\.symbolSize\s*=(?!=)/, /this\.uiState\.thematic\s*=(?!=)/];
 
 test("every method that changes a view calls #syncMapControls", () => {
     const bodies = methodBodies(SOURCE);

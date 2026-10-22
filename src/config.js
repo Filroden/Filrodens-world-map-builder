@@ -779,6 +779,35 @@ export const FILRODENSWMB = {
         LEGACY_DEFAULT: "Miles",
         NICE_STEPS: Object.freeze([1, 2, 5]),
     }),
+    // The thematic layers (see ThematicData and ThematicView): what the generator's last run left in
+    // each model cell, drawn over the map as colour. One colour layer shows at a time, at OPACITY
+    // (its default) or the map's own setting. A graded layer's scale is fixed, the same on every
+    // map, so a colour always means the same value: SCALE is linear or logarithmic between min
+    // and max (values beyond them take the end colours), TICKS are the legend's labelled values,
+    // and RAMP its colours from min to max (ColorBrewer's sequential schemes, which stay readable
+    // with the common colour-vision deficiencies). READOUT names how a value is worded: "perArea"
+    // is a number per square map unit. NEEDS lists the run's arrays a layer is worked out from: a
+    // run saved before one existed cannot show the layer.
+    THEMATIC: Object.freeze({
+        OPACITY: 0.7,
+        OPACITY_RANGE: Object.freeze({ MIN: 0.1, MAX: 1, STEP: 0.05 }),
+        LAYERS: Object.freeze([
+            Object.freeze({
+                id: "population",
+                label: "FILRODENSWMB.UI.ThematicPopulation",
+                hint: "FILRODENSWMB.UI.ThematicPopulationHint",
+                // The legend's caption for the scale, with the map unit
+                unit: "FILRODENSWMB.UI.ThematicPopulationUnit",
+                legend: "ramp",
+                needs: Object.freeze(["population", "landArea"]),
+                scale: Object.freeze({ kind: "log", min: 0.5, max: 100 }),
+                ticks: Object.freeze([1, 10, 100]),
+                // YlOrRd
+                ramp: Object.freeze(["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#bd0026", "#800026"]),
+                readout: "perArea",
+            }),
+        ]),
+    }),
     // The map controls' Detail menu (see DetailLevel): a level shows every pin and region level at
     // or below it. Pins take theirs from their style (PINS.DEFAULT_STYLES) and a Political set's
     // levels from their place in it (Realms, Duchies, Counties). Routes are shown at every level
