@@ -7,7 +7,8 @@ import { BrushEngine } from "../tools/BrushEngine.js";
 import { UpwindMargin } from "../tools/UpwindMargin.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { extractRegionalVectors } from "../mesh/RegionalMesh.js";
-import { clampAreaFactor } from "../mesh/Schema.js";
+import { clampAreaFactor, effectiveKmPerPx } from "../mesh/Schema.js";
+import { DetailLevel } from "./DetailLevel.js";
 import { platform } from "../platform/index.js";
 
 export class RegionalExtractor {
@@ -57,6 +58,7 @@ export class RegionalExtractor {
             generationEngine: state.generationEngine,
             terrainVersion: state.terrainVersion,
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
+            nameLevels: true,
             world: state.world,
             springsBaked: true,
             mapWidth: targetWidth,
@@ -82,6 +84,10 @@ export class RegionalExtractor {
             upwindMargin: upwindMargin(cropBox, zoomScale),
             parentId: app.currentSaveId,
         };
+        // Closer in, more is shown: the parent's detail level, raised to what a run would start
+        // the regional map at for its scale (see DetailLevel.forScale), so its places and their
+        // names appear as the zoom gives them room
+        payload.detailLevel = Math.max(DetailLevel.current(app), DetailLevel.forScale(effectiveKmPerPx(payload)));
         return { payload, owners: this.#meshVectors(app, payload, cropBox, zoomScale) };
     }
 

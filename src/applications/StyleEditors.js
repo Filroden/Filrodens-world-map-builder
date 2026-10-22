@@ -206,6 +206,7 @@ export class StyleEditors {
                 icons,
                 icon: icons.find((entry) => entry.selected) ?? { key: style.icon, label: style.icon, isCustom: false },
                 detailLevels: PinStyles.detailLevelChoices(style.detailLevel),
+                nameLevels: PinStyles.detailLevelChoices(PinStyles.nameLevel(style) ?? style.detailLevel),
                 labelVisibilities: PinStyles.visibilityChoices(style.label?.visibility),
                 labelStyles: InspectorFields.styleChoices(app.uiState.customLabelStyles, style.label?.quickStyle),
             };
@@ -220,6 +221,7 @@ export class StyleEditors {
                 fontSize: Number(elements.styleLabelSize.value) || FILRODENSWMB.PINS.DEFAULT_SCALE,
                 visibility: elements.styleLabelVisibility.value,
                 quickStyle: elements.styleLabelQuickStyle.value,
+                detailLevel: Number(elements.styleLabelDetailLevel.value) || 0,
             },
         }),
         actions: {

@@ -45,8 +45,16 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedHistory", this.#history(generated)],
             ["FILRODENSWMB.UI.GeneratedFormerCapital", Number.isInteger(generated.formerCapital) ? platform.i18n.format("FILRODENSWMB.UI.GeneratedInAge", { age: generated.formerCapital }) : null],
             ["FILRODENSWMB.UI.GeneratedShownFrom", this.#levelName(DetailLevel.ofPin(app, pin))],
+            ["FILRODENSWMB.UI.GeneratedNameShownFrom", this.#nameLevel(app, pin)],
             ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(pin)],
         ]);
+    }
+
+    /** The level a pin's name shows from, when it is later than the pin's own (null when hidden or the same). */
+    static #nameLevel(app, pin) {
+        if (pin.label?.visibility === "none") return null;
+        const named = DetailLevel.ofName(app, pin);
+        return named > DetailLevel.ofPin(app, pin) ? this.#levelName(named) : null;
     }
 
     /**

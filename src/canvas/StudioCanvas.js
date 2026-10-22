@@ -63,6 +63,9 @@ export class StudioCanvas {
     /** Whether the map's detail level shows a set's level (see setDetailFilter). */
     #showsLevel = () => true;
 
+    /** Whether the map's detail level shows a pin's name (see setNameFilter). */
+    #showsName = () => true;
+
     constructor(htmlContainer) {
         this.container = htmlContainer;
 
@@ -1678,7 +1681,7 @@ export class StudioCanvas {
         // centred on it vertically, so the gap grows only with the pin
         const pinWidth = (pin) => FILRODENSWMB.SYMBOLS.PIN_PX * FILRODENSWMB.SYMBOLS.UNIT * resScale * (pin.scale || FILRODENSWMB.PINS.DEFAULT_SCALE);
         mapPins.forEach((pin) => {
-            if (!pin.icon) return;
+            if (!pin.icon || !this.#showsName(pin)) return;
             collect(pin.name, ensureLabelData(pin), pin.x + pinWidth(pin) * FILRODENSWMB.PINS.LABEL_OFFSET, pin.y, pin.visibility, pin.id, "pin", null, { pin, pinWidth: pinWidth(pin) });
         });
 
@@ -1738,6 +1741,11 @@ export class StudioCanvas {
     /** Which labels' styles are on in the Labels menu (see ContentRows). */
     setLabelFilter(shown) {
         this.#labelShown = shown ?? (() => true);
+    }
+
+    /** Which pins' names the map's detail level shows (see DetailLevel.ofName). */
+    setNameFilter(showsName) {
+        this.#showsName = showsName ?? (() => true);
     }
 
     /** Names avoid each other, or are drawn at their first place whatever they cover. */

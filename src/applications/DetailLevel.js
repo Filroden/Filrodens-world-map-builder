@@ -7,7 +7,8 @@ import { PinStyles } from "./PinStyles.js";
  * A level shows every pin and region level whose own detail level is at or below it, and what it
  * hides is neither drawn, picked nor exported. Routes are shown at every level: a road leading
  * beyond what is shown invites a closer look. Labels follow their pin or region; route and
- * standalone labels are always shown.
+ * standalone labels are always shown. A pin's name has a level of its own, never below the pin's
+ * (see ofName), so a tier's places can show before their names do.
  *
  * An item's detail level:
  * - a pin: its pin style's; a pin whose look was edited away from its style falls back to its
@@ -45,6 +46,19 @@ export class DetailLevel {
         return TIER_LEVELS.get(pin.generated?.tier) ?? ALWAYS;
     }
 
+    /**
+     * The detail level from which a pin's name is drawn: its style's name level (`label.detailLevel`;
+     * a style saved before it existed takes its tier's default, and one with no tier its own
+     * level); a pin off its style, its generated tier's default; any other pin's name shows with
+     * the pin. Never below the pin's own level.
+     */
+    static ofName(app, pin) {
+        const own = this.ofPin(app, pin);
+        const style = PinStyles.find(app, pin.pinStyle);
+        const named = style ? PinStyles.nameLevel(style) : PinStyles.tierNameLevel(pin.generated?.tier);
+        return Number.isFinite(named) ? Math.max(own, named) : own;
+    }
+
     /** A region level's detail level, from its place in its set. */
     static ofLevel(set, level) {
         if (set?.kind !== "political") return ALWAYS;
@@ -52,21 +66,22 @@ export class DetailLevel {
     }
 
     /**
-     * What the map's detail level shows: the pins, the routes (all of them) and a test for a set's
-     * level, which also leaves out the levels turned off in the Regions menu (see ContentRows).
-     * Everything returns the arrays it was given.
+     * What the map's detail level shows: the pins, the routes (all of them), a test for a pin's
+     * name, and a test for a set's level, which also leaves out the levels turned off in the
+     * Regions menu (see ContentRows). Everything returns the arrays it was given and names every pin.
      * @param {object} app
-     * @returns {{pins: object[], routes: object[], showsLevel: function(object, object): boolean}}
+     * @returns {{pins: object[], routes: object[], showsName: function(object): boolean, showsLevel: function(object, object): boolean}}
      */
     static shown(app) {
         const level = this.current(app);
         const pins = app.mapPins ?? [];
         const routes = app.mapRoutes ?? [];
         const levelOn = ContentRows.levelShown(app);
-        if (level === DETAIL.EVERYTHING) return { pins, routes, showsLevel: (_set, regionLevel) => levelOn(regionLevel) };
+        if (level === DETAIL.EVERYTHING) return { pins, routes, showsName: () => true, showsLevel: (_set, regionLevel) => levelOn(regionLevel) };
         return {
             pins: pins.filter((pin) => this.ofPin(app, pin) <= level),
             routes,
+            showsName: (pin) => this.ofName(app, pin) <= level,
             showsLevel: (set, regionLevel) => levelOn(regionLevel) && this.ofLevel(set, regionLevel) <= level,
         };
     }

@@ -67,6 +67,7 @@ import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { rebaseMap } from "../data/SymbolSizes.js";
+import { showNamesOnce } from "../data/NameLevels.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -2534,6 +2535,7 @@ export class MapStudio {
         // thousands of generated pins and routes would otherwise redraw them at every move
         const shown = DetailLevel.shown(this);
         this.canvasEngine.setLabelFilter(ContentRows.labelShown(this));
+        this.canvasEngine.setNameFilter(shown.showsName);
         if (this.activeTool === "infrastructure") {
             const infraPins = shown.pins.filter((p) => !!p.icon);
             this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isEdit, this.meshSession);
@@ -3419,6 +3421,7 @@ export class MapStudio {
         const shown = DetailLevel.shown(this);
         this.canvasEngine.setDetailFilter(shown.showsLevel);
         this.canvasEngine.setLabelFilter(ContentRows.labelShown(this));
+        this.canvasEngine.setNameFilter(shown.showsName);
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
         const infraPins = shown.pins.filter((p) => !!p.icon);
         this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isInfraEdit, this.meshSession);
@@ -3721,6 +3724,8 @@ export class MapStudio {
         // Pin and label sizes saved before the current size unit are scaled to it (see SymbolSizes).
         // The map is not marked as changed: until it is saved, the same scaling runs on every load.
         rebaseMap(payload);
+        // Generated names that older runs hid are given back to their styles, once (see NameLevels)
+        showNamesOnce(payload);
         this.modelRun = modelRun ?? null;
         // Regions and routes come from the display mesh, whose session opens once the terrain
         // exists (see the end of this method)
@@ -4247,6 +4252,7 @@ export class MapStudio {
             generationEngine: this.uiState.generationEngine,
             terrainVersion: this.uiState.terrainVersion,
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
+            nameLevels: true,
             world: this.uiState.world,
             generatorStale: this.uiState.generatorStale === true,
             generatorSettings: panelSettings(this.uiState.generatorSettings),

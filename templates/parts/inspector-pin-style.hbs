@@ -1,7 +1,7 @@
 {{!--
     The inspector's pin style (see StyleEditors): its name; its look (the icon, from the same grid
-    as a pin's, its colour and scale) and detail level; and its label's size, visibility and label
-    style. Every field applies when committed, to the style and every pin that follows it, one undo
+    as a pin's, its colour and scale) and detail level; and its label's size, visibility, the
+    detail level its names show from, and label style. Every field applies when committed, to the style and every pin that follows it, one undo
     step each.
 --}}
 <datalist id="fwmb-inspector-colors">
@@ -70,6 +70,17 @@
                 <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
                 {{/each}}
             </select>
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name-level">{{localize "FILRODENSWMB.UI.PinNameLevel"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-name-level" name="styleLabelDetailLevel">
+                {{#each nameLevels}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.PinNameLevelHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.PinNameLevelHint'}}"></i>
         </div>
     </div>
     <div class="fwmb-form-group">

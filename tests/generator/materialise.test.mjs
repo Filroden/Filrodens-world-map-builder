@@ -134,20 +134,21 @@ test("routes join their waypoints with contiguous legs, carry class and transpor
     assert.ok(straight <= made.routes.length * 0.05, `${straight} straight steps`);
 });
 
-test("every place has one pin on its tier's style, with only capitals' and cities' labels shown", async () => {
-    const { result, made } = await materialised();
+test("every place has one pin on its tier's style, its name left to its style's name level (hidden only with names switched off)", async () => {
+    const { session, result, made } = await materialised();
     assert.equal(made.pins.length, result.places.length);
-    const labelled = new Set(FILRODENSWMB.GENERATOR.LABELLED_TIERS);
     made.pins.forEach((pin, index) => {
         const place = result.places[index];
         assert.equal(pin.cell, place.cell);
         assert.equal(pin.generated.tier, placeTier(place));
         assert.equal(pin.generated.sourceId, index);
         assert.equal(pin.generated.edited, false);
-        assert.equal(pin.label.visibility === "none", !labelled.has(pin.generated.tier));
+        assert.notEqual(pin.label.visibility, "none");
     });
     const castle = made.pins.find((pin) => pin.generated.kind === "castle");
     if (castle) assert.match(castle.name, / (Castle|Keep|Hold|Tower)$/);
+    const unnamed = materialise(session, result, { runId: "run", idFactory: nextId, layerSets: [], names: MATERIALISE_NAMES, watersPx: 24, ...materialiseStyles(), output: { labels: false } });
+    assert.ok(unnamed.pins.every((pin) => pin.label.visibility === "none"), "names switched off");
 });
 
 // ------------------------------------------------------------------ coincident stretches
@@ -220,7 +221,7 @@ test("the age before the present leaves ruins and abandoned castles on their rui
     for (const [index, pin] of ruins.entries()) {
         if (index > 0) assert.equal(pin.generated.tier, ruinedBySize[pin.generated.formerTier]);
         assert.equal(pin.color, "#ff6464");
-        assert.equal(pin.label.visibility, "none");
+        assert.notEqual(pin.label.visibility, "none");
         if (index > 0) assert.equal(pin.icon, seed(bySize[pin.generated.formerTier]).icon, "the tier's own icon");
     }
     const castles = made.pins.filter((pin) => pin.generated.kind === "abandonedCastle");

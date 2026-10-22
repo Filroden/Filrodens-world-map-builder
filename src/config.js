@@ -1392,26 +1392,28 @@ export const FILRODENSWMB = {
         // (`tier`, which the generator finds a place's style by), each a built-in icon, a scale,
         // the label's size and label style (see LABELS.DEFAULT_STYLES), and a detail level (0 is always shown;
         // higher levels are the first hidden when a map is viewed at world scale, which the
-        // generator's tier filter reads). Their names come from the NAME localisation keys, so
-        // a map made in one language keeps the names it was made with.
+        // generator's tier filter reads). The label's detail level (labelDetailLevel) is the level
+        // from which the pin's name is drawn too, so stepping Detail up shows a tier's places one
+        // step before their names (see DetailLevel.ofName). Their names come from the NAME
+        // localisation keys, so a map made in one language keeps the names it was made with.
         DEFAULT_STYLES: [
-            { tier: "capital", icon: "circle_outline_with_star", scale: 1.6, labelSize: 1.6, labelStyle: "label-style-capital", detailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCapital" },
-            { tier: "city", icon: "star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCity" },
-            { tier: "largeTown", icon: "circle_outline_with_dot", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleLargeTown" },
-            { tier: "town", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleTown" },
-            { tier: "village", icon: "dot_outline", scale: 0.5, labelSize: 0.5, labelStyle: "label-style-settlement", detailLevel: 3, name: "FILRODENSWMB.UI.PinStyleVillage" },
-            { tier: "castle", icon: "castle", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleCastle" },
-            { tier: "fortifiedTown", icon: "fortress", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStyleFortifiedTown" },
-            { tier: "port", icon: "anchor", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, name: "FILRODENSWMB.UI.PinStylePort" },
-            { tier: "ruin", icon: "classical_building", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleRuin" },
+            { tier: "capital", icon: "circle_outline_with_star", scale: 1.6, labelSize: 1.6, labelStyle: "label-style-capital", detailLevel: 0, labelDetailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCapital" },
+            { tier: "city", icon: "star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 0, labelDetailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCity" },
+            { tier: "largeTown", icon: "circle_outline_with_dot", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLargeTown" },
+            { tier: "town", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleTown" },
+            { tier: "village", icon: "dot_outline", scale: 0.5, labelSize: 0.5, labelStyle: "label-style-settlement", detailLevel: 3, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleVillage" },
+            { tier: "castle", icon: "castle", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleCastle" },
+            { tier: "fortifiedTown", icon: "fortress", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleFortifiedTown" },
+            { tier: "port", icon: "anchor", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStylePort" },
+            { tier: "ruin", icon: "classical_building", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleRuin" },
             // What the age before the present left (see GENERATOR.PIN_TIERS): the tier's own icon in
             // the ruins' colour, so a ruin reads as what it was
-            { tier: "ruinedCapital", icon: "circle_outline_with_star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 1, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCapital" },
-            { tier: "ruinedCity", icon: "star", scale: 1, labelSize: 1, labelStyle: "label-style-settlement", detailLevel: 1, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCity" },
-            { tier: "ruinedLargeTown", icon: "circle_outline_with_dot", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedLargeTown" },
-            { tier: "ruinedTown", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedTown" },
-            { tier: "abandonedCastle", icon: "castle", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleAbandonedCastle" },
-            { tier: "landmark", icon: "jp_landmark", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLandmark" },
+            { tier: "ruinedCapital", icon: "circle_outline_with_star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCapital" },
+            { tier: "ruinedCity", icon: "star", scale: 1, labelSize: 1, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCity" },
+            { tier: "ruinedLargeTown", icon: "circle_outline_with_dot", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedLargeTown" },
+            { tier: "ruinedTown", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedTown" },
+            { tier: "abandonedCastle", icon: "castle", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleAbandonedCastle" },
+            { tier: "landmark", icon: "jp_landmark", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLandmark" },
         ],
         // The colour the default styles use (unless one gives its own), and the detail levels a style may have
         DEFAULT_STYLE_COLOR: "#ffffff",
@@ -2082,7 +2084,8 @@ export const FILRODENSWMB = {
         MATERIALISE: Object.freeze({ COLOUR_RINGS: 2, SNAP_CELLS: 40, LEG_STRETCH: 40 }),
         // The pin style tier each kind of generated place takes (see PINS.DEFAULT_STYLES' tier keys)
         // and the route style each transport and class takes (see ROUTES.DEFAULT_STYLES' ids).
-        // Pins below LABELLED_TIERS keep a label that is hidden until the user shows it.
+        // Pins below LABELLED_TIERS were given a hidden label by runs before names followed the
+        // detail level (see NameLevels, which shows them again once).
         PIN_TIERS: Object.freeze({ capital: "capital", city: "city", largeTown: "largeTown", town: "town", castle: "castle", fortifiedTown: "fortifiedTown", port: "port", ruinedCapital: "ruinedCapital", ruinedCity: "ruinedCity", ruinedLargeTown: "ruinedLargeTown", ruinedTown: "ruinedTown", abandonedCastle: "abandonedCastle" }),
         LABELLED_TIERS: Object.freeze(["capital", "city"]),
         // The label style each political level's generated regions take (see LABELS.DEFAULT_STYLES)

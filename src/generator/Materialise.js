@@ -60,7 +60,7 @@ export function materialise(session, result, options) {
     const pins = buildPins(session, result, { ...options, output });
     // What the age before the present left: its ruins, abandoned castles and old roads
     if (output.history) {
-        pins.push(...buildFormerPins(session, result, options));
+        pins.push(...buildFormerPins(session, result, { ...options, output }));
         if (output.routes.road !== false) routes.push(...buildRoutes(session, { routes: result.oldRoads ?? [] }, { runId, idFactory, styleFor: (_transport, routeClass) => options.routeStyleFor("old", routeClass), styleFields: options.routeStyleFields, old: true }));
     }
     return { set: political.set, owners, routes, pins };
@@ -80,12 +80,12 @@ function placeWanted(place, places) {
 }
 
 /**
- * A pin for every place wanted, on its tier's style; only capitals' and cities' labels are shown
- * (none when names are switched off). Each keeps its place's index in the run as its sourceId.
+ * A pin for every place wanted, on its tier's style. Its name shows from its style's name level
+ * (see DetailLevel.ofName), so only a run with names switched off hides labels. Each keeps its
+ * place's index in the run as its sourceId.
  */
 function buildPins(session, result, { runId, idFactory, names, pinStyleFor, applyPinStyle, output }) {
     const { mesh } = session;
-    const labelled = new Set(output.labels ? FILRODENSWMB.GENERATOR.LABELLED_TIERS : []);
     const pins = [];
     result.places.forEach((place, index) => {
         if (!placeWanted(place, output.places)) return;
@@ -109,7 +109,7 @@ function buildPins(session, result, { runId, idFactory, names, pinStyleFor, appl
         };
         const style = pinStyleFor(tier);
         if (style) applyPinStyle(pin, style);
-        if (!labelled.has(tier)) pin.label.visibility = "none";
+        if (!output.labels) pin.label.visibility = "none";
         pins.push(pin);
     });
     return pins;
@@ -141,10 +141,10 @@ export function ruinTier(ruin) {
 /**
  * A pin for each ruin and abandoned castle the age before the present left, named as its people
  * named it then, each on its ruined tier's style (the tier's own icon in the ruins' colour; see
- * ruinTier). Their labels are hidden, as lesser places' are. Each keeps its index among its kind
- * as its sourceId.
+ * ruinTier). Their names show as their styles say, unless names are switched off. Each keeps its
+ * index among its kind as its sourceId.
  */
-function buildFormerPins(session, result, { runId, idFactory, names, pinStyleFor, applyPinStyle }) {
+function buildFormerPins(session, result, { runId, idFactory, names, pinStyleFor, applyPinStyle, output }) {
     const { mesh } = session;
     const T = FILRODENSWMB.GENERATOR.PIN_TIERS;
     const pin = (place, index, kind, tier, name, extra) => {
@@ -165,7 +165,7 @@ function buildFormerPins(session, result, { runId, idFactory, names, pinStyleFor
         };
         const style = pinStyleFor(tier);
         if (style) applyPinStyle(made, style);
-        made.label.visibility = "none";
+        if (!output.labels) made.label.visibility = "none";
         return made;
     };
     const ruins = (result.ruins ?? []).map((ruin, index) => pin(ruin, index, "ruin", ruinTier(ruin), ruin.name, {

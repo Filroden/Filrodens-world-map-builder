@@ -266,6 +266,18 @@ test("a region fill, a label style and a pin style cascade to what follows them"
     assert.equal(steps(app), 4);
 });
 
+test("a pin style's name level starts at its own level, is saved on the style's label as one undo step, and is not written onto its pins", async () => {
+    const app = studio();
+    await StyleEditors.open(app, "Pin", "city");
+    assert.equal(field(app, "styleLabelDetailLevel").value, "1", "a style with no name level of its own shows its pins' level");
+    await commit(app, "styleLabelDetailLevel", "2");
+    assert.equal(app.uiState.customPinStyles[0].label.detailLevel, 2);
+    assert.equal(app.mapPins[0].label.detailLevel, undefined, "the pins keep only their look");
+    assert.equal(steps(app), 1);
+    VectorHistory.step(app, true);
+    assert.equal(app.uiState.customPinStyles[0].label.detailLevel, undefined);
+});
+
 test("a label style in a family without an italic shows Italic disabled, its setting kept", async () => {
     const app = studio();
     await StyleEditors.open(app, "Label", "realm");

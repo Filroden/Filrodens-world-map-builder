@@ -453,7 +453,8 @@ const PIN_STYLE = obj({
     scale: num(RANGE.SCALE),
     color,
     detailLevel: int(0, 100),
-    label: obj({ fontSize: num({ min: 0.01, max: 100 }), visibility, quickStyle: custom }),
+    // The label's detailLevel is the level from which the style's pins' names are drawn
+    label: obj({ fontSize: num({ min: 0.01, max: 100 }), visibility, quickStyle: custom, detailLevel: int(0, 100) }),
 });
 
 // ------------------------------------------------------------------ the map
@@ -537,6 +538,8 @@ const MAP = obj({
     generationEngine: enumOf(["standard", "flat", "advanced", "guided"]),
     terrainVersion: int(0, 1000),
     sizeRevision: int(0, 1000),
+    // Whether generated names hidden by older runs have been shown again (see NameLevels)
+    nameLevels: bool,
     world: obj(
         {
             zoom: num(RANGE.SIGNED),

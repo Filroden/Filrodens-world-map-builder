@@ -8,6 +8,9 @@ import { platform } from "../platform/index.js";
  * the place is. A pin that uses a style takes those fields from it, and follows the style when it
  * is edited (the cascade), exactly as a route follows its route quick style.
  *
+ * A style also says from which detail level its pins' names are drawn (`label.detailLevel`; see
+ * DetailLevel.ofName). That is the style's own: it is not written onto its pins.
+ *
  * Every map starts with a default set, one style per settlement or site tier (see
  * config PINS.DEFAULT_STYLES), made once when the map is created or when a map saved before pin
  * styles existed is loaded. The set is the map's own afterwards: styles can be renamed, changed,
@@ -39,7 +42,7 @@ export class PinStyles {
             icon: tier.icon,
             scale: tier.scale,
             color: tier.color ?? DEFAULT_STYLE_COLOR,
-            label: { fontSize: tier.labelSize, visibility: "all", quickStyle: tier.labelStyle ?? this.NONE },
+            label: { fontSize: tier.labelSize, visibility: "all", quickStyle: tier.labelStyle ?? this.NONE, detailLevel: tier.labelDetailLevel ?? tier.detailLevel },
             detailLevel: tier.detailLevel,
         }));
     }
@@ -114,6 +117,24 @@ export class PinStyles {
     static choices(app, selected) {
         const styles = [...this.list(app)].sort((a, b) => a.name.localeCompare(b.name));
         return styles.map((style) => ({ id: style.id, name: style.name, selected: style.id === selected }));
+    }
+
+    /**
+     * The detail level from which a style's pins' names are drawn: its own (`label.detailLevel`),
+     * else its tier's default (a style saved before it existed), else the style's own level.
+     * @param {object} style
+     * @returns {number|undefined}
+     */
+    static nameLevel(style) {
+        const own = style?.label?.detailLevel;
+        if (Number.isFinite(own)) return own;
+        return this.tierNameLevel(style?.tier) ?? style?.detailLevel;
+    }
+
+    /** A tier's default name level (see PINS.DEFAULT_STYLES), or undefined for none. */
+    static tierNameLevel(tier) {
+        const seed = tier ? FILRODENSWMB.PINS.DEFAULT_STYLES.find((candidate) => candidate.tier === tier) : null;
+        return seed ? (seed.labelDetailLevel ?? seed.detailLevel) : undefined;
     }
 
     /** The detail levels a style may have, for a select. */
