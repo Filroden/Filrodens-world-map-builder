@@ -32,7 +32,9 @@ import { floodOwners, relaxBorders } from "../mesh/Territory.js";
  * @param {string} options.runId
  * @param {Function} options.idFactory
  * @param {{set: string, levels: string[], titles: {kingdom: string, duchy: string, county: string}}} options.names
- *     Localised names: the set, the three levels, and the title templates ("Kingdom of {name}").
+ *     Localised names: the set, the three levels, and the title templates ("Kingdom of {name}"),
+ *     kept on the levels. Regions take their bare names: their level's label look shows their rank,
+ *     and a short name leaves room to place it (see GeneratedDetails for the full title).
  * @param {number} options.watersPx - The realms' territorial waters, in map pixels.
  * @param {function(string): object} [options.regionLabel] - The label look of a level's regions by kind
  *     (realm, duchy, county): a label style's fields and its id as quickStyle.
@@ -53,9 +55,10 @@ export function buildPolitical(session, result, { runId, idFactory, names, water
     if (withCounties) levels.push(createLevel({ name: names.levels[2], titleTemplate: names.titles.county, ...childLevelFields(levels[1].id) }, idFactory));
     set.levels.push(...levels);
 
-    addRealms(levels[0], result, { runId, idFactory, titles: names.titles, label: { ...regionLabel("realm"), visibility: output.labels === false ? "none" : "all" } });
-    if (withDuchies) addChildren(levels[1], units.duchies, units.duchyParent, { kind: "duchy", template: names.titles.duchy, units: result.duchies }, { runId, idFactory, label: regionLabel("duchy") });
-    if (withCounties) addChildren(levels[2], units.counties, units.countyParent, { kind: "county", template: names.titles.county, units: result.counties }, { runId, idFactory, label: regionLabel("county") });
+    const realmVisibility = output.labels === false ? "none" : "all";
+    addRealms(levels[0], result, { runId, idFactory, label: { ...regionLabel("realm"), visibility: realmVisibility }, duchyLabel: { ...regionLabel("duchy"), visibility: realmVisibility } });
+    if (withDuchies) addChildren(levels[1], units.duchies, units.duchyParent, { kind: "duchy", units: result.duchies }, { runId, idFactory, label: regionLabel("duchy") });
+    if (withCounties) addChildren(levels[2], units.counties, units.countyParent, { kind: "county", units: result.counties }, { runId, idFactory, label: regionLabel("county") });
 
     const counties = carry(session, result, "county", units.countyKey);
     joinCoast(session, result, counties);
@@ -117,18 +120,13 @@ function generatedFor(runId, kind, sourceId, extra = {}) {
     return { run: runId, kind, sourceId, edited: false, locked: false, ...extra };
 }
 
-function titled(template, name) {
-    return template.replaceAll("{name}", name);
-}
-
-function addRealms(level, result, { runId, idFactory, titles, label }) {
+function addRealms(level, result, { runId, idFactory, label, duchyLabel }) {
     result.realms.forEach((realm, index) => {
-        // An independent duchy is titled as the level below it
-        const template = realm.kind === "kingdom" ? titles.kingdom : titles.duchy;
         addRegion(level, {
-            name: titled(template, realm.name),
-            // Each region its own label (a moved label keeps its own position)
-            label: { ...label },
+            name: realm.name,
+            // Each region its own label (a moved label keeps its own position); an independent
+            // duchy's in the duchies' look, so a realm's look marks a kingdom
+            label: { ...(realm.kind === "kingdom" ? label : duchyLabel) },
             generated: generatedFor(runId, "realm", index, { tier: realm.kind, population: realm.population, culture: realm.cultures?.[0]?.[0] ?? null }),
         }, idFactory);
     });
@@ -138,11 +136,11 @@ function addRealms(level, result, { runId, idFactory, titles, label }) {
  * A child level's regions: one per unit in `list` (indices into `units`), keyed in list order,
  * each with the key of its parent region and a hidden label in the level's look.
  */
-function addChildren(level, list, parentKeys, { kind, template, units }, { runId, idFactory, label }) {
+function addChildren(level, list, parentKeys, { kind, units }, { runId, idFactory, label }) {
     list.forEach((sourceIndex, key) => {
         const unit = units[sourceIndex];
         addRegion(level, {
-            name: titled(template, unit.name),
+            name: unit.name,
             parentKey: parentKeys[key],
             label: { ...label, visibility: "none" },
             generated: generatedFor(runId, kind, sourceIndex, { population: unit.population }),

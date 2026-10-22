@@ -49,6 +49,7 @@ export class GeneratedDetails {
         const place = this.#placeOf(app, region);
         const below = place ? this.#beneath(place.set, place.depth, region.key) : [];
         return this.#rows([
+            ["FILRODENSWMB.UI.GeneratedTitle", place ? this.#titleOf(region, place) : null],
             ["FILRODENSWMB.UI.GeneratedRank", RANKS[generated.tier] ? platform.i18n.localize(RANKS[generated.tier]) : null],
             ["FILRODENSWMB.UI.GeneratedPopulation", this.#count(generated.population)],
             ["FILRODENSWMB.UI.GeneratedDuchies", place?.depth === REALMS ? this.#count(below[0]) : null],
@@ -84,6 +85,16 @@ export class GeneratedDetails {
     static #pageText(description, rows) {
         const figures = (rows ?? []).map((row) => `${row.label}: ${row.value}`).join("\n");
         return [description?.trim(), figures].filter(Boolean).join("\n\n");
+    }
+
+    /**
+     * A region's full title, from its level's title template ("Kingdom of {name}"): the name alone
+     * is drawn, its level's look showing its rank. An independent duchy takes the duchy title.
+     */
+    static #titleOf(region, place) {
+        const independent = place.depth === REALMS && region.generated?.tier === "independent";
+        const template = (independent ? place.set.levels[REALMS + 1]?.titleTemplate : null) ?? place.level.titleTemplate;
+        return template?.includes("{name}") ? template.replaceAll("{name}", region.name) : null;
     }
 
     /** The rows whose value is known, localised. */

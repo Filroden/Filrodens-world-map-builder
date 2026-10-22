@@ -16,7 +16,8 @@ import { platform } from "../platform/index.js";
  * changes most often, the row in the inspector and Mass Edit's ticks, is marked on the rows after
  * each draw (ListQuery.settle), so neither renders the rows again.
  *
- * A row is a plain object with `name`, `generated` (whether a run made it) and `kind`.
+ * A row is a plain object with `name`, `generated` (whether a run made it) and `kind`, and may
+ * list other kinds it also counts as in `also` (a label with no room is found by No room).
  */
 
 /** Who made the items a list shows. */
@@ -70,7 +71,7 @@ export class ListQuery {
         return rows.filter((row) => {
             if (query.origin === "generated" && !row.generated) return false;
             if (query.origin === "handmade" && row.generated) return false;
-            if (query.kind !== ALL && row.kind !== query.kind) return false;
+            if (query.kind !== ALL && row.kind !== query.kind && !row.also?.includes(query.kind)) return false;
             return !needle || String(row.name ?? "").toLocaleLowerCase().includes(needle);
         });
     }

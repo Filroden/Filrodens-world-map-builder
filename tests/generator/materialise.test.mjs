@@ -46,7 +46,7 @@ async function materialised() {
 
 // ------------------------------------------------------------------ the political set
 
-test("the political set has three nested levels with the run's units, titled by their templates", async () => {
+test("the political set has three nested levels with the run's units, named without their titles", async () => {
     const { result, made } = await materialised();
     const [realms, duchies, counties] = made.set.levels;
     assert.deepEqual(made.set.levels.map((level) => level.name), MATERIALISE_NAMES.levels);
@@ -56,8 +56,8 @@ test("the political set has three nested levels with the run's units, titled by 
     assert.equal(duchies.regions.length, result.duchies.length);
     assert.equal(counties.regions.length, result.counties.length);
     assert.ok(realms.regions.every((region) => region.generated?.run === "run" && region.generated.kind === "realm"));
-    const titled = duchies.regions.filter((region) => region.name.startsWith("Duchy of "));
-    assert.equal(titled.length, duchies.regions.length, "every duchy takes the duchy title");
+    assert.deepEqual(duchies.regions.map((region) => region.name), result.duchies.map((duchy) => duchy.name), "a duchy's bare name: its level's look shows its rank");
+    assert.equal(duchies.titleTemplate, MATERIALISE_NAMES.titles.duchy, "the title is kept on the level");
 });
 
 test("every child cell lies inside its region's parent, and the realms claim their waters", async () => {
@@ -78,6 +78,15 @@ test("every child cell lies inside its region's parent, and the realms claim the
     const waters = realmOwners.filter((owner, cell) => owner !== UNCLAIMED && !land[cell]).length;
     assert.ok(waters > 0, "some sea is claimed as territorial waters");
     assert.equal(Object.keys(made.owners).length, 3, "each level's owners come back encoded");
+});
+
+test("a kingdom's name takes the realm look, an independent duchy's the duchies' look", async () => {
+    const { result, made } = await materialised();
+    const [realms] = made.set.levels;
+    realms.regions.forEach((region, index) => {
+        const expected = result.realms[index].kind === "kingdom" ? FILRODENSWMB.GENERATOR.REGION_LABEL_STYLES.realm : FILRODENSWMB.GENERATOR.REGION_LABEL_STYLES.duchy;
+        assert.equal(region.label.quickStyle, expected, region.name);
+    });
 });
 
 test("each region has a label of its own, so moving one moves no other", async () => {

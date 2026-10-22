@@ -122,6 +122,9 @@ export class MapStateManager {
             gridSize: 50,
             gridVisible: false,
             detailLevel: FILRODENSWMB.DETAIL.EVERYTHING,
+            avoidLabelOverlaps: true,
+            hiddenLabelStyles: [],
+            hiddenLevels: [],
 
             terrainBrushTool: "raise",
             biomesBrushTool: "paint",

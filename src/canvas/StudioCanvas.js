@@ -7,6 +7,7 @@ import { TerrainCompositor } from "./TerrainCompositor.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
+import { LabelLayout } from "./LabelLayout.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
 import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
@@ -45,6 +46,14 @@ const HEX_STAGGERED_SPACING = 1.5;
 
 /** The smallest distance (map pixels) from a decoration's centre that still picks it up, however small its image. */
 const DECORATION_MIN_HIT_RADIUS = 16;
+
+/** The width and height of the box round a w by h box turned by an angle (radians). */
+function turnedBox(w, h, angle) {
+    if (!angle) return { w, h };
+    const cos = Math.abs(Math.cos(angle));
+    const sin = Math.abs(Math.sin(angle));
+    return { w: w * cos + h * sin, h: w * sin + h * cos };
+}
 
 export class StudioCanvas {
     /** Whether destroy() has run (see destroy). */
@@ -1617,6 +1626,12 @@ export class StudioCanvas {
         this.brushCursor.drawCircle(x, y, radius);
     }
 
+    /**
+     * Draws the map's names: standalone labels, and those of the pins, routes and regions. Every
+     * label is measured first, then LabelLayout decides where each goes so names do not cover
+     * each other or the pins (unless Avoid overlaps is off); a name with no room is not drawn,
+     * except faintly while labels are edited, so it can be dragged into place.
+     */
     renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], isEditMode = false, meshSession = null) {
         this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
         const args = [mapLabels, mapPins, mapRoutes, isEditMode, meshSession];
@@ -1635,86 +1650,54 @@ export class StudioCanvas {
             return obj.label;
         };
 
-        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all", parentId = null, parentType = "custom", layerId = null, { startsAtDefault = false } = {}) => {
-            if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name) return;
-
-            let x = labelData.x ?? defaultX;
-            const y = labelData.y ?? defaultY;
-            const rotation = labelData.rotation ?? 0;
-
+        // 1. Every label to draw, made and measured
+        const items = [];
+        const collect = (name, labelData, defaultX, defaultY, parentVis = "all", parentId = null, parentType = "custom", layerId = null, extra = {}) => {
+            if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name || !this.#labelShown(labelData)) return;
             drawn.push(labelData);
-            const size = (labelData.fontSize || FILRODENSWMB.LABELS.UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontSize * resScale;
-            const fill = labelData.fillColor || "#ffffff";
-            const stroke = ColorMath.getContrastColor(fill);
-
-            // 1. Setup Base Style
-            const styleConfig = {
-                fontFamily: LabelFonts.family(labelData),
-                fontSize: size,
-                fill: fill,
-                fontWeight: LabelFonts.weight(labelData),
-                fontStyle: LabelFonts.style(labelData),
-                stroke: stroke,
-                strokeThickness: 3,
-                dropShadow: true,
-                dropShadowColor: stroke,
-                dropShadowBlur: 2,
-                dropShadowDistance: 2,
-            };
-
-            // 2. Apply Word Wrapping & Justification. The maximum width is a number of characters
-            // of this label's own font and size (see LabelWidth), so resizing the label or changing
-            // its font keeps its line breaks.
-            const wrapWidth = LabelWidth.wrapWidth(labelData, size, resScale);
-            if (wrapWidth > 0) {
-                styleConfig.wordWrap = true;
-                styleConfig.wordWrapWidth = wrapWidth;
-                styleConfig.align = labelData.justify || "left";
-            }
-
-            const style = new PIXI.TextStyle(styleConfig);
-
-            const text = new PIXI.Text(name, style);
-            // A label not yet placed that starts at its default point (a pin's) is centred half its
-            // own width further on, so its first letter is where the point is
-            if (startsAtDefault && labelData.x === undefined) x += text.width / 2;
-            text.anchor.set(0.5);
-            text.x = x;
-            text.y = y;
-            text.rotation = rotation * (Math.PI / 180);
-
-            this.layers.labels.addChild(text);
-
-            if (isEditMode) {
-                // The label's own position is written only when it is dragged (see #dragHeldItem):
-                // until then it follows its pin, route or region
-                const hitRadius = Math.max(text.width, text.height) / 2;
-                this.interactiveTargets.push({
-                    target: labelData,
-                    x: x,
-                    y: y,
-                    radius: hitRadius,
-                    isLabel: true,
-                    entityType: "label",
-                    entityId: parentId || labelData.id,
-                    parentType: parentType,
-                    layerId: layerId,
-                });
-            }
+            const text = this.#labelText(name, labelData, rootFontSize, resScale);
+            const { w, h } = turnedBox(text.width, text.height, text.rotation);
+            items.push({ id: `${parentType}:${parentId ?? labelData.id}`, type: parentType, labelData, text, w, h, defaultX, defaultY, parentId, layerId, ...extra });
         };
 
         // Custom Labels
-        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all", label.id, "custom"));
+        mapLabels.forEach((label) => collect(label.name, label, label.x, label.y, "all", label.id, "custom"));
 
-        // Pins' labels: beside the pin, starting at its right edge (PINS.LABEL_OFFSET) and centred
-        // on it vertically, so the gap grows only with the pin
+        // Pins' labels: beside the pin, starting just past its right edge (PINS.LABEL_OFFSET) and
+        // centred on it vertically, so the gap grows only with the pin
         const pinWidth = (pin) => FILRODENSWMB.SYMBOLS.PIN_PX * FILRODENSWMB.SYMBOLS.UNIT * resScale * (pin.scale || FILRODENSWMB.PINS.DEFAULT_SCALE);
         mapPins.forEach((pin) => {
             if (!pin.icon) return;
-            drawLabel(pin.name, ensureLabelData(pin), pin.x + pinWidth(pin) * FILRODENSWMB.PINS.LABEL_OFFSET, pin.y, pin.visibility, pin.id, "pin", null, { startsAtDefault: true });
+            collect(pin.name, ensureLabelData(pin), pin.x + pinWidth(pin) * FILRODENSWMB.PINS.LABEL_OFFSET, pin.y, pin.visibility, pin.id, "pin", null, { pin, pinWidth: pinWidth(pin) });
         });
 
-        this.#drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession);
+        this.#collectMeshLabels(collect, ensureLabelData, mapRoutes, meshSession);
+
+        // 2. Where each goes
+        const shownPins = mapPins.filter((pin) => pin.icon && this.#isVisibleInCurrentPass(pin.visibility, "all", false));
+        const layout = this.#labelLayout.layout(items, { pins: shownPins, pinWidth, meshSession, pass: this.renderPassMode, avoid: this.#avoidLabelOverlaps, bounds: { width: this.mapWidth, height: this.mapHeight } });
+
+        // 3. Drawn there; a name with no room only while labels are edited, faintly
+        for (const item of items) {
+            let position = layout.position(item);
+            if (!position && isEditMode) {
+                position = { x: item.type === "pin" ? item.defaultX + item.w / 2 : item.defaultX, y: item.defaultY };
+                item.text.alpha = FILRODENSWMB.LABELS.PLACEMENT.DROPPED_ALPHA;
+            }
+            if (!position) {
+                item.text.destroy({ texture: true, baseTexture: true });
+                continue;
+            }
+            item.text.x = position.x;
+            item.text.y = position.y;
+            this.layers.labels.addChild(item.text);
+            if (isEditMode) this.#addLabelTarget(item, position);
+        }
+        this.labelPlacementStats = layout.stats;
+        if (this.renderPassMode === "normal") {
+            this.labelsWithoutRoom = layout.dropped;
+            this.onLabelsPlaced?.(layout.dropped);
+        }
 
         // A face still loading was drawn in the fallback: once it arrives the labels are drawn
         // again, unless they have been drawn since (see LabelFonts)
@@ -1723,15 +1706,98 @@ export class StudioCanvas {
         });
     }
 
+    /** Where the names go (see LabelLayout); kept between draws, so each starts from the last. */
+    #labelLayout = new LabelLayout();
+
+    /** Whether names avoid each other (the Detail menu's Avoid overlaps). */
+    #avoidLabelOverlaps = true;
+
+    /** The labels with no room at the last draw, by "<type>:<owner id>" (see LabelLayout). */
+    labelsWithoutRoom = new Set();
+
+    /** How the last placement went (labels, placed, moves, ms; see LabelPlacement), for checking its cost. */
+    labelPlacementStats = null;
+
+    /** Called after each studio draw of the labels with those that had no room. */
+    onLabelsPlaced = null;
+
+    /** Whether a label's style is on in the Labels menu (see ContentRows). */
+    #labelShown = () => true;
+
+    /** Which labels' styles are on in the Labels menu (see ContentRows). */
+    setLabelFilter(shown) {
+        this.#labelShown = shown ?? (() => true);
+    }
+
+    /** Names avoid each other, or are drawn at their first place whatever they cover. */
+    setLabelOverlapAvoidance(avoid) {
+        this.#avoidLabelOverlaps = avoid !== false;
+    }
+
+    /** A label's text, styled and rotated, not yet placed. */
+    #labelText(name, labelData, rootFontSize, resScale) {
+        const size = (labelData.fontSize || FILRODENSWMB.LABELS.UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontSize * resScale;
+        const fill = labelData.fillColor || "#ffffff";
+        const stroke = ColorMath.getContrastColor(fill);
+
+        // 1. Setup Base Style
+        const styleConfig = {
+            fontFamily: LabelFonts.family(labelData),
+            fontSize: size,
+            fill: fill,
+            fontWeight: LabelFonts.weight(labelData),
+            fontStyle: LabelFonts.style(labelData),
+            stroke: stroke,
+            strokeThickness: 3,
+            dropShadow: true,
+            dropShadowColor: stroke,
+            dropShadowBlur: 2,
+            dropShadowDistance: 2,
+        };
+
+        // 2. Apply Word Wrapping & Justification. The maximum width is a number of characters
+        // of this label's own font and size (see LabelWidth), so resizing the label or changing
+        // its font keeps its line breaks.
+        const wrapWidth = LabelWidth.wrapWidth(labelData, size, resScale);
+        if (wrapWidth > 0) {
+            styleConfig.wordWrap = true;
+            styleConfig.wordWrapWidth = wrapWidth;
+            styleConfig.align = labelData.justify || "left";
+        }
+
+        const text = new PIXI.Text(name, new PIXI.TextStyle(styleConfig));
+        text.anchor.set(0.5);
+        text.rotation = (labelData.rotation ?? 0) * (Math.PI / 180);
+        return text;
+    }
+
+    /**
+     * A drawn label can be picked and dragged while labels are edited. Its own position is written
+     * only when it is dragged (see #dragHeldItem): until then it follows its pin, route or region.
+     */
+    #addLabelTarget(item, position) {
+        this.interactiveTargets.push({
+            target: item.labelData,
+            x: position.x,
+            y: position.y,
+            radius: Math.max(item.text.width, item.text.height) / 2,
+            isLabel: true,
+            entityType: "label",
+            entityId: item.parentId || item.labelData.id,
+            parentType: item.type,
+            layerId: item.layerId,
+        });
+    }
+
     /** What the labels were last drawn from, so they can be drawn again when a face loads. */
     #labelArgs = null;
 
     /**
      * Route and region labels on the display mesh. A route's label sits above the middle point of
-     * its line; a region's at its label anchor (the deepest point of its largest part; see
-     * MeshSession.labelAnchor). A label the user has moved keeps its own position either way.
+     * its line; a region's at one of its deep places (see LabelLayout). A label the user has moved
+     * keeps its own position either way.
      */
-    #drawMeshLabels(drawLabel, ensureLabelData, mapRoutes, meshSession) {
+    #collectMeshLabels(collect, ensureLabelData, mapRoutes, meshSession) {
         if (!meshSession) return;
         const ROUTE_LABEL_RISE = 15;
 
@@ -1739,19 +1805,20 @@ export class StudioCanvas {
             if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) continue;
             const point = meshSession.routeMidpoint(route);
             if (!point) continue;
-            drawLabel(route.name, ensureLabelData(route), point.x, point.y - ROUTE_LABEL_RISE, route.visibility, route.id, "route");
+            collect(route.name, ensureLabelData(route), point.x, point.y - ROUTE_LABEL_RISE, route.visibility, route.id, "route");
         }
 
         for (const set of meshSession.layerSets) {
             if (!this.#isVisibleInCurrentPass(set.visibility, "all", true)) continue;
-            for (const level of set.levels) this.#drawLevelLabels(drawLabel, ensureLabelData, meshSession, set, level);
+            for (const level of set.levels) this.#collectLevelLabels(collect, ensureLabelData, meshSession, set, level);
         }
     }
 
-    #drawLevelLabels(drawLabel, ensureLabelData, meshSession, set, level) {
+    #collectLevelLabels(collect, ensureLabelData, meshSession, set, level) {
         if (!this.#showsLevel(set, level)) return;
         const levelVisibility = level.visibility !== "none" && set.visibility === "gm" ? "gm" : level.visibility || "all";
         if (!this.#isVisibleInCurrentPass(levelVisibility, "all", true)) return;
+        const depth = set.levels.indexOf(level);
 
         for (const region of level.regions) {
             let regionVisibility = region.visibility || "all";
@@ -1760,7 +1827,7 @@ export class StudioCanvas {
 
             const anchor = meshSession.labelAnchor(level.id, region.key);
             if (!anchor) continue;
-            drawLabel(region.name, ensureLabelData(region), anchor.x, anchor.y, regionVisibility, region.id, "region", level.id);
+            collect(region.name, ensureLabelData(region), anchor.x, anchor.y, regionVisibility, region.id, "region", level.id, { region: { levelId: level.id, key: region.key, depth } });
         }
     }
 

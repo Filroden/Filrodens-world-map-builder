@@ -49,7 +49,10 @@ export function layersShown(state) {
  * @param {{id: string, items: {key: string, on: boolean}[]}[]} state.terrainGroups - The terrain
  *   layer groups (Terrain, Biomes) and their layers.
  * @param {boolean} state.threeD - Whether the 3D view is showing.
+ * @param {{id: string, state: string, rows: object[]}[]} [state.contentGroups] - The Labels and
+ *   Regions menus' rows (see ContentRows).
  * @param {number} state.detailLevel - The map's detail level (see DetailLevel).
+ * @param {boolean} state.avoidOverlaps - Whether names avoid each other (see LabelLayout).
  * @param {(shown: number, total: number) => string} layersLabel - The Layers button's name for a count.
  * @param {(level: number) => string} detailLabel - The Detail button's name for a level.
  */
@@ -62,8 +65,11 @@ export function syncMapControls(root, state, layersLabel, detailLabel) {
     each('[data-action="toggleGrid"]', (element) => setOn(element, state.grid));
     each('[data-action="threeDView"]', (element) => setOn(element, state.threeD));
 
+    for (const group of state.contentGroups ?? []) syncContentGroup(root, group);
+
     // The Detail menu: one level chosen, named on its button
     each('[data-action="setDetailLevel"]', (row) => row.setAttribute("aria-checked", String(Number(row.dataset.detailLevel) === state.detailLevel)));
+    each('[data-action="toggleLabelOverlaps"]', (row) => setOn(row, state.avoidOverlaps));
     each('.fwmb-layer-group[data-layer-group="detail"] > [data-action="toggleLayerMenu"]', (button) => {
         const label = detailLabel(state.detailLevel);
         button.setAttribute("aria-label", label);
@@ -105,4 +111,51 @@ export function syncMapControls(root, state, layersLabel, detailLabel) {
  */
 export function mustFoldMapControls(wideWidth, room) {
     return wideWidth > room;
+}
+
+/**
+ * One of the Labels and Regions menus (see ContentRows): its rows written into the wide menu and
+ * the folded Layers menu when they change (styles and levels come and go with the map), then
+ * each marked, the All row and the group's button with them.
+ *
+ * @param {ParentNode} root
+ * @param {{id: string, state: string, rows: {kind: string, key: string, label: string, on: boolean, mixed?: boolean, sub?: boolean}[]}} group
+ */
+function syncContentGroup(root, group) {
+    const signature = group.rows.map((row) => `${row.kind}:${row.key}:${row.label}`).join("|");
+    for (const container of root.querySelectorAll(`[data-content-rows="${group.id}"]`)) {
+        if (container.dataset.signature !== signature) writeContentRows(container, group);
+        container.dataset.signature = signature;
+    }
+    for (const row of group.rows) {
+        root.querySelectorAll(`[data-action="toggleContentRow"][data-content-group="${group.id}"][data-content-kind="${row.kind}"]`).forEach((element) => {
+            if (element.dataset.contentRow === row.key) element.setAttribute("aria-checked", row.mixed ? "mixed" : String(row.on));
+        });
+    }
+    root.querySelectorAll(`[data-action="toggleContentRow"][data-content-group="${group.id}"][data-content-kind="all"]`).forEach((element) => element.setAttribute("aria-checked", ARIA_CHECKED[group.state]));
+    root.querySelectorAll(`.fwmb-layer-group[data-layer-group="${group.id}"] > [data-action="toggleLayerMenu"]`).forEach((button) => {
+        setPressed(button, group.state === "on");
+        button.classList.toggle("fwmb-is-partial", group.state === "partial");
+    });
+}
+
+/** A menu's rows as buttons, indented one step further in the folded Layers menu (data-content-indent). */
+function writeContentRows(container, group) {
+    const indent = Number(container.dataset.contentIndent ?? 0);
+    const doc = container.ownerDocument;
+    const rows = group.rows.map((row) => {
+        const button = doc.createElement("button");
+        button.type = "button";
+        button.setAttribute("role", "menuitemcheckbox");
+        button.setAttribute("aria-checked", "false");
+        Object.assign(button.dataset, { action: "toggleContentRow", contentGroup: group.id, contentKind: row.kind, contentRow: row.key });
+        const depth = indent + (row.sub ? 1 : 0);
+        if (depth) button.className = depth > 1 ? "fwmb-layer-menu-sub2" : "fwmb-layer-menu-sub";
+        const check = doc.createElement("span");
+        check.className = "fwmb-layer-check";
+        check.setAttribute("aria-hidden", "true");
+        button.append(check, doc.createTextNode(row.label));
+        return button;
+    });
+    container.replaceChildren(...rows);
 }

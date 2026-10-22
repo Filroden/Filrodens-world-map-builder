@@ -61,6 +61,7 @@ import { moveAlongModes } from "../ui/BarFold.js";
 import { AppearanceMenu } from "../ui/AppearanceMenu.js";
 import { HelpPanel } from "./HelpPanel.js";
 import { DetailLevel } from "./DetailLevel.js";
+import { ContentRows } from "./ContentRows.js";
 import { rebaseMap } from "../data/SymbolSizes.js";
 
 // Turns a fraction into a percentage for the timing summary
@@ -246,6 +247,8 @@ export class MapStudio {
         toggleEditMode(e, t)            { this._onToggleEditMode(e, t); },
         toggleGrid(e, t)                { this._onToggleGrid(e, t); },
         setDetailLevel(_e, t)           { this.setDetailLevel(Number(t.dataset.detailLevel)); },
+        toggleLabelOverlaps()           { this.#toggleLabelOverlaps(); },
+        toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
         toggleLayer(e, t)               { this._onToggleLayer(e, t); },
         toggleLayerMenu(e, t)           { this._onToggleLayerMenu(e, t); },
         toggleLiveFeatureUpdates(e, t)  { this._onToggleLiveFeatureUpdates(e, t); },
@@ -1313,7 +1316,7 @@ export class MapStudio {
     /** The kinds the pin, route and label lists can be narrowed to (value to localisation key). */
     static #PIN_KINDS = Object.freeze({ ...Object.fromEntries(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style.name])), other: "FILRODENSWMB.UI.ListKindOther" });
     static #ROUTE_KINDS = Object.freeze({ road: "FILRODENSWMB.UI.TransportRoad", river: "FILRODENSWMB.UI.TransportRiver", sea: "FILRODENSWMB.UI.TransportSea" });
-    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region" });
+    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region", noRoom: "FILRODENSWMB.UI.LabelFilter_noRoom" });
 
     /**
      * Each long list's kinds, rows template, and the fields of a row its template shows (a row's
@@ -1322,7 +1325,7 @@ export class MapStudio {
     static #LISTS = Object.freeze({
         pin: { kinds: MapStudio.#PIN_KINDS, template: "parts/list-rows-pin.hbs", shown: (row) => [row.id, row.name, row.icon, row.color, row.visibility] },
         route: { kinds: MapStudio.#ROUTE_KINDS, template: "parts/list-rows-route.hbs", shown: (row) => [row.id, row.name, row.color, row.thickness, row.style, row.visibility] },
-        label: { kinds: MapStudio.#LABEL_KINDS, template: "parts/list-rows-label.hbs", shown: (row) => [row.id, row.name, row.type, row.layerId, row.meta, row.visibility] },
+        label: { kinds: MapStudio.#LABEL_KINDS, template: "parts/list-rows-label.hbs", shown: (row) => [row.id, row.name, row.type, row.layerId, row.meta, row.visibility, row.noRoom] },
     });
 
     /**
@@ -1361,6 +1364,9 @@ export class MapStudio {
         const owner = (key) => platform.i18n.localize(key);
         const named = (item) => !!item.name;
         const ownerMeta = { pin: owner("FILRODENSWMB.UI.InspectorOwnerPin"), route: owner("FILRODENSWMB.UI.InspectorOwnerRoute") };
+        // A name the map had no room for at its last draw is marked, and found with the No room filter
+        const withoutRoom = this.canvasEngine?.labelsWithoutRoom ?? new Set();
+        const marked = (row) => (withoutRoom.has(`${row.type}:${row.id}`) ? { ...row, noRoom: true, also: ["noRoom"] } : row);
         return [
             ...(this.mapLabels || []).filter(named).map((label) => ({ id: label.id, name: label.name, type: "custom", kind: "custom", generated: false, labelKey: "labelcustom", standalone: true, visibility: label.visibility ?? "all", massEditSelected: selected.has(label.id) })),
             ...(this.mapPins || []).filter((pin) => !!pin.icon && named(pin)).map((pin) => ({ id: pin.id, name: pin.name, type: "pin", kind: "pin", generated: !!pin.generated, labelKey: "labelpin", meta: ownerMeta.pin, visibility: pin.label?.visibility ?? "all" })),
@@ -1368,7 +1374,7 @@ export class MapStudio {
             ...this.regionLevels.flatMap((level) =>
                 level.regions.filter(named).map((region) => ({ id: region.id, name: region.name, type: "region", kind: "region", generated: !!region.generated, labelKey: "labelregion", layerId: level.id, meta: platform.i18n.format("FILRODENSWMB.UI.LabelOwnerRegionMeta", { kind: owner("FILRODENSWMB.UI.InspectorOwnerRegion"), level: level.name }), visibility: region.label?.visibility ?? "all" })),
             ),
-        ];
+        ].map(marked);
     }
 
     /**
@@ -1623,6 +1629,19 @@ export class MapStudio {
 
         this.canvasEngine.onCropUpdate = (cropBox) => this.#showCropReadouts(cropBox);
         this.canvasEngine.onCropRelease = (cropBox) => this.#snapCrop(cropBox);
+        this.canvasEngine.onLabelsPlaced = (withoutRoom) => this.#labelsPlaced(withoutRoom);
+        this.canvasEngine.setLabelOverlapAvoidance(this.uiState.avoidLabelOverlaps);
+    }
+
+    /** The names with no room at the last draw (see LabelLayout), as a key that changes when they do. */
+    #withoutRoomKey = "";
+
+    /** After the labels are drawn: the Labels list marks those with no room, so it is drawn again when they change. */
+    #labelsPlaced(withoutRoom) {
+        const key = [...withoutRoom].sort().join("|");
+        if (key === this.#withoutRoomKey) return;
+        this.#withoutRoomKey = key;
+        if (this.activeTool === "labels") this.view?.render(["context"]);
     }
 
     /**
@@ -2477,6 +2496,7 @@ export class MapStudio {
         // Only the layer being worked on is drawn again while something is dragged: a map with
         // thousands of generated pins and routes would otherwise redraw them at every move
         const shown = DetailLevel.shown(this);
+        this.canvasEngine.setLabelFilter(ContentRows.labelShown(this));
         if (this.activeTool === "infrastructure") {
             const infraPins = shown.pins.filter((p) => !!p.icon);
             this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isEdit, this.meshSession);
@@ -3049,17 +3069,34 @@ export class MapStudio {
      * its controls change: every action that changes a view calls it (a test checks this), which
      * is what keeps a toggle from disagreeing with what the map shows.
      */
+    /** The Labels and Regions menus' rows as last written onto the map controls, to tell when they change. */
+    #contentSignature = "";
+
+    static #signatureOf(groups) {
+        return groups.map((group) => group.rows.map((row) => `${row.kind}:${row.key}:${row.label}:${row.on ? 1 : 0}`).join("|")).join("/");
+    }
+
+    /** The Labels and Regions menus' rows brought up to date after the map changed (a new label style or level). */
+    #syncContentRows() {
+        if (MapStudio.#signatureOf(ContentRows.groups(this)) !== this.#contentSignature) this.#syncMapControls();
+    }
+
     #syncMapControls() {
         if (!this.root) return;
         const terrainGroups = Object.entries(MapStudio.#TERRAIN_LAYER_GROUPS).map(([id, group]) => ({
             id,
             items: Object.keys(group.layers).map((key) => ({ key, on: !!this.#terrainLayers[key] })),
         }));
+        // The Labels and Regions menus' rows (see ContentRows); each counts as shown unless all its rows are off
+        const contentGroups = ContentRows.groups(this);
+        this.#contentSignature = MapStudio.#signatureOf(contentGroups);
         const state = {
             viewFilters: this.viewFilters,
-            layers: this.#layerVisibility,
+            layers: { ...this.#layerVisibility, ...Object.fromEntries(contentGroups.map((group) => [group.id, group.state !== "off"])) },
             grid: !!this.uiState.gridVisible,
             detailLevel: DetailLevel.current(this),
+            avoidOverlaps: this.uiState.avoidLabelOverlaps !== false,
+            contentGroups,
             terrainGroups,
             threeD: !!this.scene3D,
         };
@@ -3344,6 +3381,7 @@ export class MapStudio {
         // 2. Render Infrastructure, at the map's detail level (as are the regions and labels)
         const shown = DetailLevel.shown(this);
         this.canvasEngine.setDetailFilter(shown.showsLevel);
+        this.canvasEngine.setLabelFilter(ContentRows.labelShown(this));
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
         const infraPins = shown.pins.filter((p) => !!p.icon);
         this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isInfraEdit, this.meshSession);
@@ -3368,6 +3406,9 @@ export class MapStudio {
         if (this.canvasEngine.renderCartography) {
             this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit, this.mapDecorations);
         }
+
+        // 7. The Labels and Regions menus follow the map's styles and levels
+        this.#syncContentRows();
     }
 
     #applyBrushStroke(x, y) {
@@ -3679,6 +3720,10 @@ export class MapStudio {
         this.uiState.gridSize = MapStateManager.gridSizeOf(payload.gridSize || 100);
         this.uiState.gridVisible = payload.gridVisible ?? false;
         this.uiState.detailLevel = DetailLevel.valid(payload.detailLevel);
+        this.uiState.avoidLabelOverlaps = payload.avoidLabelOverlaps !== false;
+        this.uiState.hiddenLabelStyles = Array.isArray(payload.hiddenLabelStyles) ? [...payload.hiddenLabelStyles] : [];
+        this.uiState.hiddenLevels = Array.isArray(payload.hiddenLevels) ? [...payload.hiddenLevels] : [];
+        this.canvasEngine?.setLabelOverlapAvoidance(this.uiState.avoidLabelOverlaps);
 
         MapStateManager.allocateBuffers(this);
         // Every terrain layer is on when a map opens (see #terrainLayers)
@@ -4160,6 +4205,9 @@ export class MapStudio {
             gridSize: this.uiState.gridSize,
             gridVisible: this.uiState.gridVisible,
             detailLevel: DetailLevel.current(this),
+            avoidLabelOverlaps: this.uiState.avoidLabelOverlaps !== false,
+            hiddenLabelStyles: [...(this.uiState.hiddenLabelStyles ?? [])],
+            hiddenLevels: [...(this.uiState.hiddenLevels ?? [])],
             params: params,
             customBiomes: this.uiState.customBiomes,
             nextCustomBiomeId: this.uiState.nextCustomBiomeId,
@@ -4987,6 +5035,12 @@ export class MapStudio {
         };
 
         const layerId = toolLayerMap[newTool];
+        // The Labels and Regions menus: every row back on if all were off
+        if ((layerId === "labels" || layerId === "regions") && ContentRows.ensureShown(this, layerId)) {
+            this.#syncMapControls();
+            this._repaintVectors();
+            return;
+        }
         if (!layerId || this.#layerVisibility[layerId]) return;
 
         this.#layerVisibility[layerId] = true;
@@ -6041,6 +6095,30 @@ export class MapStudio {
         this.uiState.detailLevel = valid;
         this.#syncMapControls();
         if (repaint) this._repaintVectors();
+        this.markDirty();
+    }
+
+    /**
+     * A row of the Labels or Regions menu (see ContentRows): All, a label style, a set or a level.
+     * Saved with the map; what it hides is neither drawn nor exported.
+     */
+    #toggleContentRow(target) {
+        const { contentGroup, contentKind, contentRow } = target.dataset;
+        if (!ContentRows.toggle(this, contentGroup, contentKind, contentRow)) return;
+        this.#syncMapControls();
+        this._repaintVectors();
+        this.markDirty();
+    }
+
+    /**
+     * The Detail menu's Avoid overlaps: names are placed so they do not cover each other or the
+     * pins (see LabelLayout), or drawn at their first place whatever they cover. Saved with the map.
+     */
+    #toggleLabelOverlaps() {
+        this.uiState.avoidLabelOverlaps = this.uiState.avoidLabelOverlaps === false;
+        this.canvasEngine?.setLabelOverlapAvoidance(this.uiState.avoidLabelOverlaps);
+        this.#syncMapControls();
+        this._repaintVectors();
         this.markDirty();
     }
 

@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { ContentRows } from "./ContentRows.js";
 import { PinStyles } from "./PinStyles.js";
 
 /**
@@ -52,7 +53,8 @@ export class DetailLevel {
 
     /**
      * What the map's detail level shows: the pins, the routes (all of them) and a test for a set's
-     * level. Everything returns the arrays it was given.
+     * level, which also leaves out the levels turned off in the Regions menu (see ContentRows).
+     * Everything returns the arrays it was given.
      * @param {object} app
      * @returns {{pins: object[], routes: object[], showsLevel: function(object, object): boolean}}
      */
@@ -60,21 +62,24 @@ export class DetailLevel {
         const level = this.current(app);
         const pins = app.mapPins ?? [];
         const routes = app.mapRoutes ?? [];
-        if (level === DETAIL.EVERYTHING) return { pins, routes, showsLevel: () => true };
+        const levelOn = ContentRows.levelShown(app);
+        if (level === DETAIL.EVERYTHING) return { pins, routes, showsLevel: (_set, regionLevel) => levelOn(regionLevel) };
         return {
             pins: pins.filter((pin) => this.ofPin(app, pin) <= level),
             routes,
-            showsLevel: (set, regionLevel) => this.ofLevel(set, regionLevel) <= level,
+            showsLevel: (set, regionLevel) => levelOn(regionLevel) && this.ofLevel(set, regionLevel) <= level,
         };
     }
 
     /**
-     * Whether a pin, route or region is shown at the map's detail level (a route always is).
+     * Whether a pin, route or region is shown at the map's detail level (a route always is), and
+     * a region's level is on in the Regions menu.
      * @param {object} app
      * @param {string} type - "pin", "route" or "region".
      * @param {object} item - The pin or route; for a region, its level and set ({ set, level }).
      */
     static shows(app, type, item) {
+        if (type === "region" && !ContentRows.levelShown(app)(item.level)) return false;
         const level = this.current(app);
         if (level === DETAIL.EVERYTHING) return true;
         if (type === "pin") return this.ofPin(app, item) <= level;

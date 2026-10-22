@@ -47,6 +47,11 @@ function viewState({ layers = {}, items = {}, ...changes } = {}) {
         terrainGroups: TERRAIN_GROUPS.map((group) => ({ id: group.id, items: group.items.map((item) => ({ key: item.key, on: items[item.key] ?? true })) })),
         threeD: false,
         detailLevel: 3,
+        avoidOverlaps: true,
+        contentGroups: [
+            { id: "regions", state: "on", rows: [] },
+            { id: "labels", state: "on", rows: [] },
+        ],
         ...changes,
     };
 }
@@ -56,7 +61,7 @@ const detailLabel = (level) => `Detail: ${level}`;
 
 test("every control in both forms reads the state it switches", () => {
     const root = drawMap();
-    syncMapControls(root, viewState({ grid: false, layers: { labels: false }, items: { relief: false } }), label, detailLabel);
+    syncMapControls(root, viewState({ grid: false, layers: { cartography: false }, items: { relief: false } }), label, detailLabel);
 
     const wide = root.querySelector(".fwmb-map-controls-wide");
     const menu = root.querySelector('.fwmb-layer-group[data-layer-group="layers"] .fwmb-layer-menu');
@@ -64,9 +69,9 @@ test("every control in both forms reads the state it switches", () => {
     // Buttons read aria-pressed, menu rows aria-checked
     assert.equal(root.querySelector('.fwmb-map-btn[data-action="toggleGrid"]').getAttribute("aria-pressed"), "false");
     assert.equal(menu.querySelector('[data-action="toggleGrid"]').getAttribute("aria-checked"), "false");
-    assert.equal(wide.querySelector('[data-layer="labels"]').getAttribute("aria-pressed"), "false");
-    assert.equal(menu.querySelector('[data-layer="labels"]').getAttribute("aria-checked"), "false");
-    assert.equal(wide.querySelector('[data-layer="regions"]').getAttribute("aria-pressed"), "true");
+    assert.equal(wide.querySelector('[data-layer="cartography"]').getAttribute("aria-pressed"), "false");
+    assert.equal(menu.querySelector('[data-layer="cartography"]').getAttribute("aria-checked"), "false");
+    assert.equal(wide.querySelector('[data-layer="infrastructure"]').getAttribute("aria-pressed"), "true");
     assert.equal(root.querySelector('[data-action="toggleViewFilter"][data-filter="none"]').getAttribute("aria-pressed"), "false");
 
     // A group partly on: its wide button is not pressed and shows the dot; its rows read mixed
@@ -94,9 +99,45 @@ test("a state with everything on reads pressed throughout, with no dot", () => {
     assert.deepEqual(layersShown(viewState()), { shown: 12, total: 12 });
 });
 
+test("the Labels and Regions menus list their rows in both forms, marked, with the group's state on its button", () => {
+    const root = drawMap();
+    const regions = {
+        id: "regions",
+        state: "partial",
+        rows: [
+            { kind: "set", key: "political", label: "Political", on: false, mixed: true },
+            { kind: "level", key: "realms", label: "Realms", on: true, sub: true },
+            { kind: "level", key: "duchies", label: "Duchies", on: false, sub: true },
+        ],
+    };
+    const labels = { id: "labels", state: "on", rows: [{ kind: "style", key: "label-style-realm", label: "Realm <b>", on: true }] };
+    syncMapControls(root, viewState({ contentGroups: [regions, labels] }), label, detailLabel);
+    const wideMenu = root.querySelector('.fwmb-map-controls-wide .fwmb-layer-group[data-layer-group="regions"] .fwmb-layer-menu');
+    const rows = [...wideMenu.querySelectorAll('[data-action="toggleContentRow"]')];
+    assert.deepEqual(rows.map((row) => [row.dataset.contentKind, row.textContent.trim(), row.getAttribute("aria-checked")]), [
+        ["all", "FILRODENSWMB.UI.LayerAll", "mixed"],
+        ["set", "Political", "mixed"],
+        ["level", "Realms", "true"],
+        ["level", "Duchies", "false"],
+    ]);
+    assert.equal(rows[2].className, "fwmb-layer-menu-sub", "levels sit indented under their set");
+    const button = root.querySelector('.fwmb-map-controls-wide .fwmb-layer-group[data-layer-group="regions"] > [data-action="toggleLayerMenu"]');
+    assert.equal(button.getAttribute("aria-pressed"), "false");
+    assert.ok(button.classList.contains("fwmb-is-partial"));
+    const folded = root.querySelector('.fwmb-layer-group[data-layer-group="layers"] .fwmb-layer-menu');
+    assert.equal(folded.querySelector('[data-content-group="regions"][data-content-row="duchies"]').className, "fwmb-layer-menu-sub2", "one step further in the folded menu");
+    assert.equal(folded.querySelector('[data-content-group="labels"][data-content-row="label-style-realm"]').textContent.trim(), "Realm <b>", "a style's name is text, never markup");
+    // Written again only when the rows change
+    const first = wideMenu.querySelector('[data-content-row="realms"]');
+    syncMapControls(root, viewState({ contentGroups: [{ ...regions, rows: regions.rows.map((row) => ({ ...row, on: true, mixed: false })), state: "on" }, labels] }), label, detailLabel);
+    assert.equal(wideMenu.querySelector('[data-content-row="realms"]'), first);
+    assert.equal(first.getAttribute("aria-checked"), "true");
+});
+
 test("the Detail menu marks the map's one detail level and names it on its button", () => {
     const root = drawMap();
-    syncMapControls(root, viewState({ detailLevel: 1 }), label, detailLabel);
+    syncMapControls(root, viewState({ detailLevel: 1, avoidOverlaps: false }), label, detailLabel);
+    assert.equal(root.querySelector('[data-action="toggleLabelOverlaps"]').getAttribute("aria-checked"), "false", "Avoid overlaps is a switch in the same menu");
     const rows = [...root.querySelectorAll('[data-action="setDetailLevel"]')];
     assert.deepEqual(rows.map((row) => row.dataset.detailLevel), ["3", "2", "1", "0"], "most detailed first");
     assert.deepEqual(rows.map((row) => row.getAttribute("aria-checked")), ["false", "false", "true", "false"]);
@@ -130,7 +171,7 @@ function methodBodies(source) {
 }
 
 /** What changes a view: the state the map controls show, written. */
-const VIEW_CHANGES = [/this\.uiState\s*=(?!=)/, /this\.#layerVisibility\[[^\]]+\]\s*=(?!=)/, /this\.viewFilters\[[^\]]+\]\s*=(?!=)/, /this\.uiState\.gridVisible\s*=(?!=)/, /this\.#terrainLayers\s*=(?!=)/, /this\.scene3D\s*=(?!=)/, /this\.uiState\.detailLevel\s*=(?!=)/];
+const VIEW_CHANGES = [/this\.uiState\s*=(?!=)/, /this\.#layerVisibility\[[^\]]+\]\s*=(?!=)/, /this\.viewFilters\[[^\]]+\]\s*=(?!=)/, /this\.uiState\.gridVisible\s*=(?!=)/, /this\.#terrainLayers\s*=(?!=)/, /this\.scene3D\s*=(?!=)/, /this\.uiState\.detailLevel\s*=(?!=)/, /this\.uiState\.avoidLabelOverlaps\s*=(?!=)/];
 
 test("every method that changes a view calls #syncMapControls", () => {
     const bodies = methodBodies(SOURCE);

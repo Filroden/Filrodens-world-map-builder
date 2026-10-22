@@ -17,6 +17,7 @@
         <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
     </button>
     <span class="fwmb-name" title="{{this.name}}">{{this.name}}</span>
+    {{#if this.noRoom}}<span class="fwmb-badge fwmb-badge--instant" data-tooltip="{{localize 'FILRODENSWMB.UI.LabelNoRoomHint'}}">{{localize "FILRODENSWMB.UI.LabelNoRoom"}}</span>{{/if}}
     {{#if this.meta}}<span class="fwmb-meta">{{this.meta}}</span>{{/if}}
     <span class="fwmb-actions">
         <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">

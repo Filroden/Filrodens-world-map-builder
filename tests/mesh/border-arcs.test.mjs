@@ -1,7 +1,7 @@
 // Borders derived from owner arrays: completeness, junctions, smoothing, classes, nesting, labels.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { arcsForLevel, borderSegments, chaikin, coincidentEdges, coincidentWith, labelAnchor } from "../../src/mesh/BorderArcs.js";
+import { arcsForLevel, borderSegments, chaikin, coincidentEdges, coincidentWith, labelAnchor, labelCandidates } from "../../src/mesh/BorderArcs.js";
 import { UNCLAIMED } from "../../src/mesh/Schema.js";
 import { P0_SKIP, flatAggregates, loadP0, smallMesh } from "./helpers.mjs";
 
@@ -196,6 +196,23 @@ test("label anchor is the deepest cell of the largest part", () => {
     assert.ok(anchor.x > 90 && anchor.x < 210, `x ${anchor.x}`);
     assert.equal(owners[anchor.cell], 5);
     assert.equal(labelAnchor(mesh, owners, 9), null);
+});
+
+test("a region offers its anchor first, then other deep places spread across it", () => {
+    const mesh = smallMesh();
+    const owners = new Int32Array(mesh.cellCount).fill(UNCLAIMED);
+    for (let cell = 0; cell < mesh.cellCount; cell++) {
+        const [x, y] = [mesh.siteX(cell), mesh.siteY(cell)];
+        if (x > 20 && x < 330 && y > 100 && y < 200) owners[cell] = 5; // a long band, 310 x 100
+    }
+    const anchor = labelAnchor(mesh, owners, 5);
+    const places = labelCandidates(mesh, owners, 5);
+    assert.ok(places.length > 1 && places.length <= 6, `${places.length} places`);
+    assert.deepEqual([places[0].x, places[0].y], [anchor.x, anchor.y], "the anchor first");
+    assert.ok(places.every((place) => owners[place.cell] === 5 && place.depth * 3 >= anchor.depth), "deep cells of the region");
+    const spread = Math.max(...places.map((place) => place.x)) - Math.min(...places.map((place) => place.x));
+    assert.ok(spread > 100, `spread across the band (${spread})`);
+    assert.deepEqual(labelCandidates(mesh, owners, 9), []);
 });
 
 test("P0JBVA realm borders: counts, coverage and no crossings", { skip: P0_SKIP }, () => {

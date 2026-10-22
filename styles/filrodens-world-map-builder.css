@@ -2889,6 +2889,13 @@
 .fwmb .fwmb-layer-menu button.fwmb-layer-menu-sub {
     padding-inline-start: 1.75rem;
 }
+.fwmb .fwmb-layer-menu button.fwmb-layer-menu-sub2 {
+    padding-inline-start: 3rem;
+}
+/* The Labels and Regions menus' rows (see MapControls): laid out as the menu's own rows */
+.fwmb-content-rows {
+    display: contents;
+}
 .fwmb-layer-menu-sep {
     flex: none;
     height: 1px;

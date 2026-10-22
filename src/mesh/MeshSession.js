@@ -1,5 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
-import { arcsForLevel, coincidentEdges, labelAnchor } from "./BorderArcs.js";
+import { arcsForLevel, coincidentEdges, labelAnchor, labelCandidates } from "./BorderArcs.js";
 import { Mesh, MeshBuilder, accumulateRows, finishAggregates } from "./MeshBuilder.js";
 import { migrateMapData, pinsToCells, regionsToOwners } from "./Migration.js";
 import { OwnerLayer, decodeOwners, encodeOwners, mergePatchList } from "./OwnerLayer.js";
@@ -45,6 +45,7 @@ const BOUNDS_MARGIN_SPACINGS = 1.5;
 export class MeshSession {
     #arcs = new Map();
     #anchors = new Map();
+    #candidates = new Map();
     #bounds = new Map();
     #routeLines = new Map();
     /** The drawn lines of the routes last asked for (see routeDrawLines), with what they were made from. */
@@ -243,6 +244,18 @@ export class MeshSession {
         this.#anchors.set(levelId, anchors);
         if (!anchors.has(key)) anchors.set(key, labelAnchor(this.mesh, this.layer(levelId).owners, key));
         return anchors.get(key);
+    }
+
+    /**
+     * Places a region's label could go, best first (see BorderArcs.labelCandidates): the anchor,
+     * then other deep places spread across its largest part. Cached per region, with the anchor.
+     * @returns {{cell: number, x: number, y: number, depth: number}[]}
+     */
+    labelCandidates(levelId, key) {
+        const candidates = this.#candidates.get(levelId) ?? new Map();
+        this.#candidates.set(levelId, candidates);
+        if (!candidates.has(key)) candidates.set(key, labelCandidates(this.mesh, this.layer(levelId).owners, key));
+        return candidates.get(key);
     }
 
     /**
@@ -469,6 +482,7 @@ export class MeshSession {
     #forgetLevel(levelId) {
         this.#arcs.delete(levelId);
         this.#anchors.delete(levelId);
+        this.#candidates.delete(levelId);
         this.#bounds.delete(levelId);
     }
 

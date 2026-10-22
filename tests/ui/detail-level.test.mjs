@@ -100,9 +100,9 @@ function generatedMap(detailLevel) {
         id: "set",
         kind: "political",
         levels: [
-            { id: "realms", regions: [region(1, "Kingdom of Ashford", null, made("realm", 120000, { tier: "kingdom" }))] },
-            { id: "duchies", regions: [region(2, "Duchy of Brill", 1, made("duchy", 70000)), region(3, "Duchy of Crewe", 1, made("duchy", 50000))] },
-            { id: "counties", regions: [region(4, "County of Dent", 2, made("county", 30000)), region(5, "County of Eske", 2, made("county", 40000)), region(6, "County of Ford", 3, made("county", 50000))] },
+            { id: "realms", titleTemplate: "Kingdom of {name}", regions: [region(1, "Ashford", null, made("realm", 120000, { tier: "kingdom" })), region(8, "Grange", null, made("realm", 9000, { tier: "independent" }))] },
+            { id: "duchies", titleTemplate: "Duchy of {name}", regions: [region(2, "Brill", 1, made("duchy", 70000)), region(3, "Crewe", 1, made("duchy", 50000))] },
+            { id: "counties", titleTemplate: "County of {name}", regions: [region(4, "Dent", 2, made("county", 30000)), region(5, "Eske", 2, made("county", 40000)), region(6, "Ford", 3, made("county", 50000))] },
         ],
     };
     const own = { id: "own", kind: "custom", levels: [{ id: "lands", regions: [region(7, "", null, null)] }] };
@@ -132,19 +132,20 @@ test("a generated region's section counts the duchies and counties beneath it", 
     const app = generatedMap(3);
     const [realms, duchies, counties] = app.layerSets[0].levels;
     const values = (rows) => Object.fromEntries(rows.map((row) => [row.label.replace("FILRODENSWMB.UI.Generated", ""), row.value]));
-    assert.deepEqual(values(GeneratedDetails.forRegion(app, realms.regions[0])), { Rank: "FILRODENSWMB.UI.GeneratedRankKingdom", Population: "120,000", Duchies: "2", Counties: "3", ShownFrom: "FILRODENSWMB.UI.DetailWorld" });
-    assert.deepEqual(values(GeneratedDetails.forRegion(app, duchies.regions[0])), { Population: "70,000", Counties: "2", ShownFrom: "FILRODENSWMB.UI.DetailProvince" });
-    assert.deepEqual(values(GeneratedDetails.forRegion(app, counties.regions[2])), { Population: "50,000", ShownFrom: "FILRODENSWMB.UI.DetailRegional" });
+    assert.deepEqual(values(GeneratedDetails.forRegion(app, realms.regions[0])), { Title: "Kingdom of Ashford", Rank: "FILRODENSWMB.UI.GeneratedRankKingdom", Population: "120,000", Duchies: "2", Counties: "3", ShownFrom: "FILRODENSWMB.UI.DetailWorld" });
+    assert.equal(values(GeneratedDetails.forRegion(app, realms.regions[1])).Title, "Duchy of Grange", "an independent duchy takes the duchy title");
+    assert.deepEqual(values(GeneratedDetails.forRegion(app, duchies.regions[0])), { Title: "Duchy of Brill", Population: "70,000", Counties: "2", ShownFrom: "FILRODENSWMB.UI.DetailProvince" });
+    assert.deepEqual(values(GeneratedDetails.forRegion(app, counties.regions[2])), { Title: "County of Ford", Population: "50,000", ShownFrom: "FILRODENSWMB.UI.DetailRegional" });
     assert.equal(GeneratedDetails.forRegion(app, app.layerSets[1].levels[0].regions[0]), null);
 });
 
 test("a scene export gives generated items pages only at the map's detail level, with their figures", () => {
     const world = GeneratedDetails.journalPages(generatedMap(0));
     assert.deepEqual(world.pins.map((page) => page.item.id), ["city", "inn"], "the town is below the detail level; the hand-made pin keeps its page");
-    assert.deepEqual(world.regions.map((page) => page.item.name), ["Kingdom of Ashford"]);
+    assert.deepEqual(world.regions.map((page) => page.item.name), ["Ashford", "Grange"]);
     assert.deepEqual(world.routes, [], "an unnamed route has no page");
     assert.equal(world.pins[0].text, "On the river.\n\nFILRODENSWMB.UI.GeneratedPlace: FILRODENSWMB.UI.PinStyleCity\nFILRODENSWMB.UI.GeneratedPopulation: 15,234\nFILRODENSWMB.UI.GeneratedShownFrom: FILRODENSWMB.UI.DetailWorld");
     const everything = GeneratedDetails.journalPages(generatedMap(3));
     assert.equal(everything.pins.length, 3);
-    assert.equal(everything.regions.length, 6);
+    assert.equal(everything.regions.length, 7);
 });

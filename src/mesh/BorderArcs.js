@@ -344,6 +344,50 @@ export function labelAnchor(mesh, owners, key) {
     return { cell: best, x: mesh.siteX(best), y: mesh.siteY(best), depth: depth[best], partCells: part.length };
 }
 
+/**
+ * Several places a region's label could go, best first: the anchor (see labelAnchor), then other
+ * deep cells of the largest part spread across it, each at least a few cells from those already
+ * chosen, so a name pushed off its best place by a city's still has room inside the region. Only
+ * cells at least a third as deep as the anchor are offered.
+ *
+ * @param {import("./MeshBuilder.js").Mesh} mesh
+ * @param {Int32Array} owners
+ * @param {number} key
+ * @param {number} [count]
+ * @returns {{cell: number, x: number, y: number, depth: number}[]} Empty when the region owns no cells.
+ */
+export function labelCandidates(mesh, owners, key, count = LABEL_CANDIDATES) {
+    const anchor = labelAnchor(mesh, owners, key);
+    if (!anchor) return [];
+    const part = largestPart(mesh, owners, key);
+    const depth = depthFromEdge(mesh, owners, key, part);
+    const [cx, cy] = centroid(mesh, part);
+    const near = (cell) => (mesh.siteX(cell) - cx) ** 2 + (mesh.siteY(cell) - cy) ** 2;
+    const deepest = part.filter((cell) => depth[cell] * MIN_CANDIDATE_DEPTH_SHARE >= anchor.depth).sort((a, b) => depth[b] - depth[a] || near(a) - near(b) || a - b);
+    const step = cellStep(mesh, anchor.cell);
+    const apart = (Math.max(1, anchor.depth) * CANDIDATE_SPREAD * step) ** 2;
+    const chosen = [anchor.cell];
+    for (const cell of deepest) {
+        if (chosen.length >= count) break;
+        if (chosen.every((other) => (mesh.siteX(cell) - mesh.siteX(other)) ** 2 + (mesh.siteY(cell) - mesh.siteY(other)) ** 2 >= apart)) chosen.push(cell);
+    }
+    return chosen.map((cell) => ({ cell, x: mesh.siteX(cell), y: mesh.siteY(cell), depth: depth[cell] }));
+}
+
+/** How many places labelCandidates offers, how deep they must be (a share of the anchor's depth), and how far apart (in anchor depths). */
+const LABEL_CANDIDATES = 6;
+const MIN_CANDIDATE_DEPTH_SHARE = 3;
+const CANDIDATE_SPREAD = 0.75;
+
+/** The mean distance from a cell's site to its neighbours' sites: one step across the mesh there. */
+function cellStep(mesh, cell) {
+    const neighbours = mesh.neighbours(cell);
+    if (!neighbours.length) return 1;
+    let total = 0;
+    for (const next of neighbours) total += Math.hypot(mesh.siteX(next) - mesh.siteX(cell), mesh.siteY(next) - mesh.siteY(cell));
+    return total / neighbours.length;
+}
+
 /** The largest connected set of cells owned by `key` (ties to the part with the lowest cell). */
 function largestPart(mesh, owners, key) {
     const seen = new Uint8Array(mesh.cellCount);

@@ -753,8 +753,9 @@ export const FILRODENSWMB = {
         // has its own action)
         VIEW_LAYERS: [
             { id: "infrastructure", icon: "location-city", label: "FILRODENSWMB.UI.LayerInfrastructure" },
-            { id: "regions", icon: "pentagon", label: "FILRODENSWMB.UI.LayerRegions" },
-            { id: "labels", icon: "insert-text", label: "FILRODENSWMB.UI.LayerLabels" },
+            // Regions and Labels open a menu of their levels and label styles (see ContentRows)
+            { id: "regions", icon: "pentagon", label: "FILRODENSWMB.UI.LayerRegions", rows: true },
+            { id: "labels", icon: "insert-text", label: "FILRODENSWMB.UI.LayerLabels", rows: true },
             { id: "cartography", icon: "explore", label: "FILRODENSWMB.UI.LayerCartography" },
         ],
         OVERLAY_LAYERS: [
@@ -1291,20 +1292,61 @@ export const FILRODENSWMB = {
         UNSET_SIZE: 4,
         DEFAULT_COLOR: "#DEDCD3",
         DEFAULT_TEXT: "FILRODENSWMB.LABELS.DefaultLabel",
+        // Placing names so they do not cover each other (see LabelLayout). Each kind of label has
+        // its turn (lower first: capitals and cities are placed before the realm names fitted round
+        // them) and its weight (what dropping it costs). Realm names are always drawn.
+        PLACEMENT: Object.freeze({
+            PIN_TIERS: Object.freeze({
+                capital: Object.freeze({ order: 0, weight: 50 }),
+                city: Object.freeze({ order: 1, weight: 20 }),
+                largeTown: Object.freeze({ order: 5, weight: 3 }),
+                castle: Object.freeze({ order: 5, weight: 2 }),
+                fortifiedTown: Object.freeze({ order: 5, weight: 2 }),
+                port: Object.freeze({ order: 5, weight: 2 }),
+                landmark: Object.freeze({ order: 5, weight: 2 }),
+                town: Object.freeze({ order: 5, weight: 1.5 }),
+                ruin: Object.freeze({ order: 5, weight: 1 }),
+                village: Object.freeze({ order: 5, weight: 1 }),
+            }),
+            OTHER_PIN: Object.freeze({ order: 5, weight: 2 }),
+            // Region names by their level's depth in its set: realms, then duchies, then counties
+            REGION_DEPTHS: Object.freeze([Object.freeze({ order: 2, weight: 30, mustShow: true }), Object.freeze({ order: 3, weight: 8 }), Object.freeze({ order: 4, weight: 4 })]),
+            ROUTE: Object.freeze({ order: 6, weight: 1 }),
+            // A pin's name beside it, in order of preference: right (as drawn without placement),
+            // upper right, left, above, lower right, below, upper left, lower left. `side` is where
+            // the name sits horizontally (1 right, -1 left, 0 centred) and `rise` vertically (-1 above)
+            PIN_CANDIDATES: Object.freeze([
+                Object.freeze({ side: 1, rise: 0, cost: 0 }),
+                Object.freeze({ side: 1, rise: -1, cost: 0.3 }),
+                Object.freeze({ side: -1, rise: 0, cost: 0.4 }),
+                Object.freeze({ side: 0, rise: -1, cost: 0.5 }),
+                Object.freeze({ side: 1, rise: 1, cost: 0.55 }),
+                Object.freeze({ side: 0, rise: 1, cost: 0.6 }),
+                Object.freeze({ side: -1, rise: -1, cost: 0.7 }),
+                Object.freeze({ side: -1, rise: 1, cost: 0.8 }),
+            ]),
+            // A region name's place costs this much for each share of its box outside the region
+            // (a goal, not a rule: a small region's name may spill over its border)
+            SPILL_COST: 2,
+            // A name drawn faintly where it would go when there is no room, while labels are edited
+            DROPPED_ALPHA: 0.35,
+            SEED: 1,
+        }),
         // The label styles a new map starts with (Ken, 2026-10-16): realm names in engraved
         // capitals, places in a book serif, water in its italic, and notes in handwriting
         DEFAULT_STYLES: Object.freeze([
-            Object.freeze({ id: "label-style-realm", nameKey: "FILRODENSWMB.LABELS.StyleRealm", fontFamily: "Cinzel", fontSize: 3, fillColor: "#DEDCD3", maxChars: 0, justify: "center", bold: true, italic: false }),
+            Object.freeze({ id: "label-style-realm", nameKey: "FILRODENSWMB.LABELS.StyleRealm", fontFamily: "Cinzel", fontSize: 3, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: true, italic: false }),
             Object.freeze({ id: "label-style-place", nameKey: "FILRODENSWMB.LABELS.StylePlace", fontFamily: "EB Garamond", fontSize: 2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: true, italic: false }),
             Object.freeze({ id: "label-style-water", nameKey: "FILRODENSWMB.LABELS.StyleWater", fontFamily: "EB Garamond", fontSize: 2.4, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
             Object.freeze({ id: "label-style-note", nameKey: "FILRODENSWMB.LABELS.StyleNote", fontFamily: "Kalam", fontSize: 1.6, fillColor: "#DEDCD3", maxChars: 24, justify: "left", bold: false, italic: false }),
             // For the routes' labels (see ROUTES.DEFAULT_STYLES)
             Object.freeze({ id: "label-style-road", nameKey: "FILRODENSWMB.LABELS.StyleRoad", fontFamily: "Barlow Semi Condensed", fontSize: 1.4, fillColor: "#5a3a1e", maxChars: 0, justify: "center", bold: false, italic: false }),
             Object.freeze({ id: "label-style-sea-lane", nameKey: "FILRODENSWMB.LABELS.StyleSeaLane", fontFamily: "Noto Serif", fontSize: 1.4, fillColor: "#2e5f8a", maxChars: 0, justify: "center", bold: false, italic: true }),
-            // For generated content: the political levels' region labels (see GENERATOR.REGION_LABEL_STYLES)
-            // and the settlements' pin labels (see PINS.DEFAULT_STYLES' labelStyle)
-            Object.freeze({ id: "label-style-duchy", nameKey: "FILRODENSWMB.LABELS.StyleDuchy", fontFamily: "Cinzel", fontSize: 2.2, fillColor: "#DEDCD3", maxChars: 0, justify: "center", bold: false, italic: false }),
-            Object.freeze({ id: "label-style-county", nameKey: "FILRODENSWMB.LABELS.StyleCounty", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#DEDCD3", maxChars: 0, justify: "center", bold: false, italic: true }),
+            // For generated content: the political levels' region labels (see GENERATOR.REGION_LABEL_STYLES),
+            // in gold (the third preset, as Realm above) to set them apart from place names, and the
+            // settlements' pin labels (see PINS.DEFAULT_STYLES' labelStyle)
+            Object.freeze({ id: "label-style-duchy", nameKey: "FILRODENSWMB.LABELS.StyleDuchy", fontFamily: "Cinzel", fontSize: 2.2, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: false, italic: false }),
+            Object.freeze({ id: "label-style-county", nameKey: "FILRODENSWMB.LABELS.StyleCounty", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: false, italic: true }),
             Object.freeze({ id: "label-style-capital", nameKey: "FILRODENSWMB.LABELS.StyleCapital", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#FFFFFF", maxChars: 0, justify: "left", bold: true, italic: false }),
             Object.freeze({ id: "label-style-settlement", nameKey: "FILRODENSWMB.LABELS.StyleSettlement", fontFamily: "EB Garamond", fontSize: 1.2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: false, italic: false }),
         ]),
@@ -1358,9 +1400,9 @@ export const FILRODENSWMB = {
         // The colour the default styles use, and the detail levels a style may have
         DEFAULT_STYLE_COLOR: "#ffffff",
         DETAIL_LEVELS: [0, 1, 2, 3],
-        // Where a pin's name starts, from the pin's centre, in pin widths: half a width is the
-        // pin's edge (the icons' own padding leaves a small gap)
-        LABEL_OFFSET: 0.5,
+        // Where a pin's name starts, from the pin's centre, in pin widths: a little beyond the
+        // pin's edge (half a width)
+        LABEL_OFFSET: 0.6,
     },
     TECTONICS: {
         DEFAULT_THICKNESS: 40,

@@ -64,5 +64,6 @@ export function materialiseStyles() {
         routeStyleFields: (style) => ({ color: style.color, thickness: style.thickness, style: style.style, outline: style.outline, smoothing: style.smoothing }),
         pinStyleFor: (tier) => pinStyles.get(tier) ?? null,
         applyPinStyle: (pin, style) => Object.assign(pin, { icon: style.icon, scale: style.scale, color: style.color, pinStyle: style.id ?? null }),
+        regionLabel: (kind) => ({ quickStyle: FILRODENSWMB.GENERATOR.REGION_LABEL_STYLES[kind] }),
     };
 }
