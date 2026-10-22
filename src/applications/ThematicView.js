@@ -1,7 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { platform } from "../platform/index.js";
 import { cleanUnit, formatDistance } from "../data/MapUnit.js";
-import { LAYERS, ThematicSource, rampLookup, scalePosition } from "../thematic/ThematicData.js";
+import { LAYERS, ThematicSource, scalePosition } from "../thematic/ThematicData.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 
 /**
@@ -19,13 +19,16 @@ import { CultureMarkers } from "./CultureMarkers.js";
 
 const THEMATIC = FILRODENSWMB.THEMATIC;
 const NONE = "none";
+/** Why a row cannot be chosen, by ThematicSource.missing's answer (with no run, the menu's note says why). */
+const MISSING_REASON = Object.freeze({ run: "FILRODENSWMB.UI.ThematicNeedsRerun", cultures: "FILRODENSWMB.UI.ThematicNoCultures" });
+/** The studio's document, for making legend nodes. */
+const doc = (app) => app.root.ownerDocument;
 /** A dash for no value, as the information bar shows off the map. */
 const NO_VALUE = "–";
 const PERCENT = 100;
 
-/** Per studio: the source for its run and mesh, and the layers' colour lookups. */
+/** Per studio: the source for its run and mesh (which keeps the layers' values and colours). */
 const sources = new WeakMap();
-const lookups = new Map();
 /** Per studio: the legends folded by the user (by layer id), kept while the studio is open. */
 const folded = new WeakMap();
 
@@ -86,8 +89,8 @@ export class ThematicView {
         const rows = THEMATIC.LAYERS.map((layer) => ({
             id: layer.id,
             disabled: !source?.has(layer.id),
-            // A run made before the layer existed lacks what it is worked out from
-            title: source && !source.has(layer.id) ? platform.i18n.localize("FILRODENSWMB.UI.ThematicNeedsRerun") : platform.i18n.localize(layer.hint),
+            // A row the run cannot show says why; one it can, what it shows
+            title: platform.i18n.localize(MISSING_REASON[source?.missing(layer.id)] ?? layer.hint),
         }));
         // The chosen layer stays the map's setting when the run cannot show it (a map opened before
         // generating), but the menu marks what is drawn: None
@@ -99,14 +102,10 @@ export class ThematicView {
     /** Draws the shown layer on the canvas, or none, and brings the legend up to date. */
     static render(app) {
         const layer = this.shownLayer(app);
-        const display = layer ? { values: this.source(app).displayBytes(layer.id), lookup: this.#lookup(layer), opacity: this.setting(app).opacity } : null;
+        const source = this.source(app);
+        const display = layer ? { values: source.displayBytes(layer.id), lookup: source.lookup(layer.id), opacity: this.setting(app).opacity } : null;
         app.canvasEngine?.renderThematic(app.meshSession, display);
         this.renderLegend(app);
-    }
-
-    static #lookup(layer) {
-        if (!lookups.has(layer.id)) lookups.set(layer.id, rampLookup(layer.ramp));
-        return lookups.get(layer.id);
     }
 
     // ------------------------------------------------------------------ the information bar
@@ -124,16 +123,30 @@ export class ThematicView {
         const layer = this.shownLayer(app);
         element.classList.toggle("fwmb-hidden", !layer);
         if (!layer) return;
-        const value = x === null || y === null || !CultureMarkers.isLand(app, x, y) ? Number.NaN : this.source(app).valueAt(layer.id, app.meshSession.mesh.cellAt(x, y));
-        element.querySelector("[data-thematic-value]").textContent = Number.isFinite(value) ? this.formatValue(app, layer, value) : NO_VALUE;
+        const cell = x === null || y === null || !CultureMarkers.isLand(app, x, y) ? -1 : app.meshSession.mesh.cellAt(x, y);
+        const text = element.querySelector("[data-thematic-value]");
+        if (ThematicSource.isClassLayer(layer.id)) {
+            const culture = this.source(app).cultureAt(cell);
+            text.textContent = culture ? platform.i18n.format("FILRODENSWMB.UI.ThematicCultureValue", { name: culture.name, share: Math.round(culture.share * PERCENT) }) : NO_VALUE;
+            this.#markClass(app, layer, culture?.index ?? -1);
+            return;
+        }
+        const value = this.source(app).valueAt(layer.id, cell);
+        text.textContent = Number.isFinite(value) ? this.formatValue(app, layer, value) : NO_VALUE;
         this.#moveMarker(app, layer, value);
     }
 
-    /** A value as the information bar words it (see THEMATIC's READOUT). */
+    /** A value as the information bar and the legend's ticks word it (see THEMATIC's READOUT). */
     static formatValue(app, layer, value) {
+        if (layer.readout === "percent") return platform.i18n.format("FILRODENSWMB.UI.ThematicPercent", { value: Math.round(value * PERCENT) });
         const amount = formatDistance(value);
         if (layer.readout === "perArea") return platform.i18n.format("FILRODENSWMB.UI.ThematicPerArea", { value: amount, unit: cleanUnit(app.uiState?.mapUnit) });
         return amount;
+    }
+
+    /** A tick of a graded legend: a share as a percentage, anything else as the number. */
+    static #tickText(layer, value) {
+        return layer.readout === "percent" ? platform.i18n.format("FILRODENSWMB.UI.ThematicPercent", { value: Math.round(value * PERCENT) }) : formatDistance(value);
     }
 
     // ------------------------------------------------------------------ the legend
@@ -154,7 +167,8 @@ export class ThematicView {
         }
         const rtl = app.root.ownerDocument?.documentElement?.dir === "rtl" || app.root.closest?.('[dir="rtl"]') !== null;
         const isFolded = !!layer && (folded.get(app)?.has(layer.id) ?? false);
-        const signature = layer ? JSON.stringify([layer.id, cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, isFolded]) : "";
+        // The run's id stands for its cultures, which the culture legend lists
+        const signature = layer ? JSON.stringify([layer.id, app.modelRun?.run ?? null, cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, isFolded]) : "";
         if (container.dataset.signature === signature) return;
         container.dataset.signature = signature;
         container.replaceChildren(...(layer ? [this.#legend(app, layer, { rtl, isFolded })] : []));
@@ -196,7 +210,7 @@ export class ThematicView {
         arrow.setAttribute("aria-hidden", "true");
         toggle.append(arrow);
         title.append(name, toggle);
-        section.append(title, this.#ramp(app, layer, make, rtl));
+        section.append(title, ThematicSource.isClassLayer(layer.id) ? this.#classes(app, layer, make) : this.#ramp(app, layer, make, rtl));
 
         if (app.uiState?.generatorStale === true) section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicStale")));
         return section;
@@ -216,13 +230,39 @@ export class ThematicView {
         bar.append(marker);
         const ticks = make("div", "fwmb-ramp-ticks");
         for (const tick of layer.ticks) {
-            const label = make("span", "", formatDistance(tick));
+            const label = make("span", "", this.#tickText(layer, tick));
             label.style.insetInlineStart = `${scalePosition(layer.scale, tick) * PERCENT}%`;
             ticks.append(label);
         }
         const unit = make("div", "fwmb-ramp-unit", platform.i18n.format(layer.unit, { unit: cleanUnit(app.uiState?.mapUnit) }));
         ramp.append(bar, ticks, unit);
         return ramp;
+    }
+
+    /**
+     * A class legend: each culture dominant somewhere on the map, as a swatch of its colour and
+     * its name as the run recorded it, then the caption (paler where peoples mix). The culture
+     * under the pointer is marked (see #markClass).
+     */
+    static #classes(app, layer, make) {
+        const wrapper = make("div", "fwmb-legend-classes");
+        const list = make("div", "fwmb-classes");
+        for (const culture of this.source(app).cultureClasses()) {
+            const item = make("span");
+            item.dataset.thematicClass = String(culture.index);
+            const swatch = make("i");
+            swatch.style.setProperty("--swatch", culture.color);
+            item.append(swatch, doc(app).createTextNode(culture.name));
+            item.title = culture.name;
+            list.append(item);
+        }
+        wrapper.append(list, make("div", "fwmb-ramp-unit", platform.i18n.localize(layer.unit)));
+        return wrapper;
+    }
+
+    /** Marks the culture under the pointer in the class legend (-1 for none). */
+    static #markClass(app, layer, index) {
+        for (const item of app.root?.querySelectorAll(`[data-thematic-legend="${layer.id}"] [data-thematic-class]`) ?? []) item.classList.toggle("fwmb-is-current", Number(item.dataset.thematicClass) === index);
     }
 
     /** Puts the legend's marker at a value's place on the scale, or hides it for no value. */

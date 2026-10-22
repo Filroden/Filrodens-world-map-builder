@@ -1695,6 +1695,22 @@
     position: absolute;
     transform: translateX(calc(-50% * var(--fwmb-dir-flip)));
 }
+/* A class legend: the culture under the pointer stands out in the accent */
+.fwmb-canvas-readout .fwmb-legend-classes {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+.fwmb-canvas-readout .fwmb-classes span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb-canvas-readout .fwmb-classes span.fwmb-is-current {
+    color: var(--fwmb-overlay-accent);
+    font-weight: 700;
+}
 .fwmb-canvas-readout .fwmb-ramp-unit,
 .fwmb-canvas-readout .fwmb-legend-note {
     margin: 0;

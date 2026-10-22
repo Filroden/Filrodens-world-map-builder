@@ -228,6 +228,35 @@ test("a culture with two homelands spreads from both, and holds land at each", (
     assert.notEqual(placed.homelands[0][0], water);
 });
 
+test("automatic homelands: one each, apart, off the map's edge where there is room, and the narrowest habitat seated first", () => {
+    const { graph, cells } = islandGraph();
+    const land = [];
+    for (let cell = 0; cell < cells.count; cell++) if (!cells.water[cell] && cells.landKm2[cell] > 0) land.push(cell);
+    const four = ["A", "B", "C", "D"].map((name) => ({ name }));
+    const data = spreadCultures(graph, resolveCultures(four));
+    const homes = data.homelands.map((list) => list[0]);
+    assert.equal(new Set(homes).size, 4, "four different homelands");
+    for (let index = 0; index < 4; index++) assert.equal(data.dominant[homes[index]], index, "each holds its own homeland");
+    // Every culture holds a share of the island worth the name
+    for (let index = 0; index < 4; index++) assert.ok(land.filter((cell) => data.dominant[cell] === index).length >= land.length * 0.05, `culture ${index} holds land`);
+    assert.ok(data.homelandNotes.every((note) => note.auto));
+
+    // A people of the island's highest ground, listed last, is seated first and gets it
+    const heights = land.map((cell) => cells.heightM[cell]).sort((a, b) => a - b);
+    const high = heights[Math.floor(heights.length * 0.9)];
+    const withHill = spreadCultures(graph, resolveCultures([...four.slice(0, 3), { name: "Hill", habitat: { heightM: [high, 99999] } }]));
+    assert.ok(cells.heightM[withHill.homelands[3][0]] >= high * 0.9, "the hill people's homeland is high ground");
+
+    // Given homelands are kept as given, and one culture alone is placed as it always was
+    const west = land.reduce((a, b) => (cells.x[a] < cells.x[b] ? a : b));
+    const mixed = spreadCultures(graph, resolveCultures([{ name: "W", homelandCell: west }, { name: "Auto" }]));
+    assert.deepEqual(Array.from(mixed.homelands[0]), [west]);
+    assert.notEqual(mixed.homelands[1][0], west);
+    const single = spreadCultures(graph, resolveCultures([{ name: "Only" }]));
+    const best = land.reduce((a, b) => ((cells.density[b] + 1) > (cells.density[a] + 1) ? b : a));
+    assert.equal(single.homelands[0][0], best, "one culture with no habitat: the land that feeds the most");
+});
+
 // ------------------------------------------------------------------ names and routes
 
 test("names are deterministic for a seed, and differ for another", () => {

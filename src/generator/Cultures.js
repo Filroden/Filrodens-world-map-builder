@@ -194,22 +194,123 @@ function meanFit(fit, cells, land) {
 
 /**
  * Each culture's homelands: the given land cells (several start it at once), or, with none on
- * land, the best fit x food land not within HOMELAND_SPACING_KM of an earlier homeland.
+ * land, one placed where the culture fits best (see #placeAuto).
+ *
+ * Placing homelands one culture at a time in list order let the first cultures take the best land
+ * and leave a later one whatever was left: often a strip on the map's edge, or ground it barely
+ * fits, from which it could not spread against its neighbours. So with several cultures:
+ * - given homelands are claimed first, since they are fixed;
+ * - cultures that fit the least of the world (the narrowest habitats) are placed next, so a
+ *   mountain or desert people is seated in its niche before a people that could live anywhere;
+ * - homelands keep HOMELAND_EDGE_KM from the map's edges where they can, since a people seated on
+ *   the edge has half the room to grow;
+ * - beyond the spacing every homeland keeps from the others, a place is favoured the further it
+ *   is from them (up to twice the spacing), so homelands spread out rather than packing along the
+ *   edge of each other's spacing;
+ * - the spacing shrinks on a world with little land for its cultures (see homelandSpacing), so
+ *   each culture still finds free ground;
+ * - when no free ground is left at all, the culture takes its best place regardless.
+ * A single culture (the default one, or one of the map's own) is placed as it always was, so a run
+ * with no cultures gives exactly the model's culture-free output.
  */
 function placeHomelands(graph, cultures, fits, land, base) {
-    const taken = new Uint8Array(graph.count);
-    const space = new SearchSpace(graph);
-    const spacing = FILRODENSWMB.GENERATOR.CULTURES.HOMELAND_SPACING_KM;
     const isLand = new Uint8Array(graph.count);
     for (const cell of land) isLand[cell] = 1;
-    return cultures.map((culture, index) => {
-        const asked = givenHomelands(culture);
-        const onLand = (cell) => Number.isInteger(cell) && cell >= 0 && cell < graph.count && isLand[cell] === 1;
-        const given = [...new Set(asked.filter(onLand))];
-        const cells = given.length ? given : [bestHomeland(graph.cells, fits[index], land, taken)];
-        space.run(cells, base, { limit: spacing, visit: (reached) => (taken[reached] = 1) });
-        return { cells: Int32Array.from(cells), auto: given.length === 0, offLand: asked.filter((cell) => !onLand(cell)).length };
-    });
+    const onLand = (cell) => Number.isInteger(cell) && cell >= 0 && cell < graph.count && isLand[cell] === 1;
+    const asked = cultures.map((culture) => givenHomelands(culture));
+    const given = asked.map((cells) => [...new Set(cells.filter(onLand))]);
+    const results = cultures.map((_, index) => ({ cells: Int32Array.from(given[index]), auto: given[index].length === 0, offLand: asked[index].filter((cell) => !onLand(cell)).length }));
+
+    const autos = results.map((result, index) => (result.auto ? index : -1)).filter((index) => index >= 0);
+    if (!autos.length) return results;
+    const spacing = homelandSpacing(graph.cells, land, autos.length);
+    const taken = new Uint8Array(graph.count);
+    const space = new SearchSpace(graph);
+    const claim = (cells) => space.run(cells, base, { limit: spacing, visit: (reached) => (taken[reached] = 1) });
+    for (const cells of given) if (cells.length) claim(cells);
+
+    if (cultures.length === 1) {
+        const cell = bestHomeland(graph.cells, fits[0], land, taken);
+        results[0].cells = Int32Array.of(cell);
+        return results;
+    }
+    const nearEdge = edgeBand(graph.cells, land);
+    const meanFits = fits.map((fit) => meanFit(fit, graph.cells, land));
+    // Narrowest habitats first; equal ones in list order, so the result never depends on sorting
+    const order = [...autos].sort((a, b) => meanFits[a] - meanFits[b] || a - b);
+    const placed = given.flat();
+    for (const index of order) {
+        const distance = placed.length ? searchAll(graph, placed, base).best : null;
+        const cell = placeAuto(graph.cells, fits[index], land, { taken, nearEdge, distance, spacing });
+        results[index].cells = Int32Array.of(cell);
+        placed.push(cell);
+        claim([cell]);
+    }
+    return results;
+}
+
+/**
+ * The spacing between automatic homelands: HOMELAND_SPACING_KM, or less on a world whose land
+ * would not otherwise hold them all (about HOMELAND_SHARE of the side of each culture's even share
+ * of the land).
+ */
+function homelandSpacing(cells, land, count) {
+    const { HOMELAND_SPACING_KM, HOMELAND_SHARE } = FILRODENSWMB.GENERATOR.CULTURES;
+    let area = 0;
+    for (const cell of land) area += cells.landKm2[cell];
+    return Math.min(HOMELAND_SPACING_KM, HOMELAND_SHARE * Math.sqrt(area / Math.max(1, count)));
+}
+
+/** Land cells within HOMELAND_EDGE_KM of the map's edge (the model sites' bounds). */
+function edgeBand(cells, land) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (let cell = 0; cell < cells.count; cell++) {
+        minX = Math.min(minX, cells.x[cell]);
+        maxX = Math.max(maxX, cells.x[cell]);
+        minY = Math.min(minY, cells.y[cell]);
+        maxY = Math.max(maxY, cells.y[cell]);
+    }
+    const margin = FILRODENSWMB.GENERATOR.CULTURES.HOMELAND_EDGE_KM / cells.kmPerPx;
+    const band = new Uint8Array(cells.count);
+    for (const cell of land) {
+        const x = cells.x[cell];
+        const y = cells.y[cell];
+        if (x - minX < margin || maxX - x < margin || y - minY < margin || maxY - y < margin) band[cell] = 1;
+    }
+    return band;
+}
+
+/**
+ * An automatic homeland: the free land cell with the best fit x food x room, where room grows
+ * from a half at the spacing to 1 at twice the spacing from the homelands already placed. Free
+ * means outside the others' spacing and, while any such cell is left, off the edge band; with no
+ * free land at all, the best cell anywhere.
+ */
+function placeAuto(cells, fit, land, { taken, nearEdge, distance, spacing }) {
+    const score = (cell) => {
+        const room = distance ? Math.min(1, 0.5 + (0.5 * Math.max(0, distance[cell] - spacing)) / spacing) : 1;
+        return fit[cell] * (cells.density[cell] + 1) * room;
+    };
+    const best = (allowed) => {
+        let chosen = -1;
+        let top = -Infinity;
+        for (const cell of land) {
+            if (!allowed(cell)) continue;
+            const value = score(cell);
+            if (value > top) {
+                top = value;
+                chosen = cell;
+            }
+        }
+        return chosen;
+    };
+    const inland = best((cell) => !taken[cell] && !nearEdge[cell]);
+    if (inland >= 0) return inland;
+    const free = best((cell) => !taken[cell]);
+    return free >= 0 ? free : best(() => true);
 }
 
 /** The homeland cells a culture was given (a list, or the single cell of older settings). */

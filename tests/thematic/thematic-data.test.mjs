@@ -11,6 +11,9 @@ const { LAYERS, ThematicSource, blendValues, blendWeights, rampLookup, scalePosi
 const { decodeModelRun, encodeModelRun, resampleModelRun } = await import("../../src/generator/ModelRun.js");
 const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
 
+/** "#rrggbb" as [r, g, b]. */
+const hexRgb = (hex) => [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
+
 /** A run of the small mesh's model cells, its arrays from a function of each cell's site. */
 function runOf(mesh, values) {
     const count = mesh.modelCount;
@@ -58,7 +61,7 @@ test("a ramp's lookup leaves step 0 empty and runs from its first colour to its 
     assert.deepEqual([...lookup.slice(0, 4)], [0, 0, 0, 0], "no value is transparent");
     assert.deepEqual([...lookup.slice(4, 8)], [0, 0, 0, 255]);
     assert.deepEqual([...lookup.slice(255 * 4)], [255, 128, 0, 255]);
-    for (const layer of FILRODENSWMB.THEMATIC.LAYERS) assert.ok(layer.ramp.length >= 2 && layer.ramp.every((colour) => /^#[0-9a-f]{6}$/.test(colour)), layer.id);
+    for (const layer of FILRODENSWMB.THEMATIC.LAYERS.filter((each) => each.legend === "ramp")) assert.ok(layer.ramp.length >= 2 && layer.ramp.every((colour) => /^#[0-9a-f]{6}$/.test(colour)), layer.id);
 });
 
 test("the blend between model sites reproduces a value that varies evenly across the map", () => {
@@ -140,4 +143,75 @@ test("a run moved with its map takes each cell's values from where its site came
     assert.deepEqual(moved.history[0].seats, []);
     assert.deepEqual(moved.cultures[0].homelands, [4]);
     assert.equal(decodeModelRun(run).population[0], 0, "the original run is untouched, for undo");
+});
+
+test("capacity is food per km² of land; cleared land and danger are shares, with no value on water", () => {
+    const mesh = smallMesh();
+    const run = runOf(mesh, { capacity: () => 600, landArea: () => 20, cleared: (cell, x) => (x < 200 ? 0.8 : 0.2), security: () => 0.75, water: (cell, x) => (x > 380 ? 1 : 0) });
+    const source = ThematicSource.of(run, mesh);
+    for (const id of ["capacity", "cleared", "danger"]) assert.ok(source.has(id), id);
+    const capacity = source.modelValues("capacity");
+    const cleared = source.modelValues("cleared");
+    const danger = source.modelValues("danger");
+    for (let cell = 0; cell < mesh.modelCount; cell++) {
+        assert.equal(capacity[cell], 30);
+        if (mesh.siteX(cell) > 380) {
+            assert.ok(Number.isNaN(cleared[cell]) && Number.isNaN(danger[cell]), "a water cell has no share");
+            continue;
+        }
+        assert.ok(Math.abs(cleared[cell] - (mesh.siteX(cell) < 200 ? 0.8 : 0.2)) < 0.01);
+        assert.ok(Math.abs(danger[cell] - 0.25) < 0.01, "danger is the security turned round");
+    }
+    assert.equal(source.lookup("capacity"), source.lookup("capacity"), "a lookup is made once");
+});
+
+test("the culture layer: each model cell in its dominant culture's colour, fainter where its share is lower", () => {
+    const mesh = smallMesh();
+    const count = mesh.modelCount;
+    const west = (cell) => mesh.siteX(cell) < 200;
+    const mixed = (cell) => Math.abs(mesh.siteX(cell) - 200) < 40;
+    const shareStart = [0];
+    const shareCulture = [];
+    const shareValue = [];
+    for (let cell = 0; cell < count; cell++) {
+        const own = west(cell) ? 0 : 1;
+        if (mixed(cell)) shareCulture.push(own, 1 - own), shareValue.push(0.55, 0.45);
+        else shareCulture.push(own), shareValue.push(1);
+        shareStart.push(shareCulture.length);
+    }
+    const run = runOf(mesh, { culture: (cell) => (west(cell) ? 0 : 1) });
+    const packed = JSON.parse(JSON.stringify(encodeModelRun({
+        modelCells: { ...decodeModelRun(run), shareStart: Int32Array.from(shareStart), shareCulture: Int32Array.from(shareCulture), shareValue: Float32Array.from(shareValue) },
+        settings: resolveSettings({}, "SEED"),
+        cellCount: count,
+        cultures: [{ id: "cultureAAAAAAAAA", name: "Westfolk", color: "#ff0000" }, { id: "cultureBBBBBBBBB", name: "Eastfolk", color: null }],
+        stats: {},
+    }, "runAAAAAAAAAAAAA")));
+    const source = ThematicSource.of(packed, mesh);
+    assert.ok(source.has("culture"));
+    assert.ok(ThematicSource.isClassLayer("culture") && !ThematicSource.isClassLayer("population"));
+
+    const bytes = source.displayBytes("culture");
+    const lookup = source.lookup("culture");
+    for (let cell = 0; cell < mesh.cellCount; cell++) {
+        const model = mesh.parentOf[cell];
+        const step = bytes[cell];
+        const [r, g, b, a] = lookup.slice(step * 4, step * 4 + 4);
+        if (west(model)) assert.deepEqual([r, g, b], [255, 0, 0], "the culture's own colour");
+        else assert.deepEqual([r, g, b], hexRgb(FILRODENSWMB.THEMATIC.CULTURE.PALETTE[1]), "a culture without a colour takes the palette's");
+        if (mixed(model)) assert.ok(a < 255, "a mixed cell is fainter");
+        else assert.equal(a, 255);
+    }
+    const at = source.cultureAt(mesh.childrenOf(0)[0]);
+    assert.equal(at.name, west(0) ? "Westfolk" : "Eastfolk");
+    assert.deepEqual(source.cultureClasses().map((entry) => entry.name), ["Westfolk", "Eastfolk"]);
+    assert.equal(source.cultureAt(-1), null);
+
+    // With only the run's default culture, the layer says why it cannot be shown
+    const single = ThematicSource.of(runOf(mesh, { culture: () => 0 }), mesh);
+    assert.equal(single.missing("culture"), "cultures");
+    assert.equal(single.has("culture"), false);
+    const older = structuredClone(run);
+    delete older.cells.landArea;
+    assert.equal(ThematicSource.of(older, mesh).missing("population"), "run");
 });

@@ -786,8 +786,9 @@ export const FILRODENSWMB = {
     // and max (values beyond them take the end colours), TICKS are the legend's labelled values,
     // and RAMP its colours from min to max (ColorBrewer's sequential schemes, which stay readable
     // with the common colour-vision deficiencies). READOUT names how a value is worded: "perArea"
-    // is a number per square map unit. NEEDS lists the run's arrays a layer is worked out from: a
-    // run saved before one existed cannot show the layer.
+    // is a number per square map unit, "percent" a share, "culture" the culture's name and share.
+    // NEEDS lists the run's arrays a layer is worked out from: a run saved before one existed
+    // cannot show the layer.
     THEMATIC: Object.freeze({
         OPACITY: 0.7,
         OPACITY_RANGE: Object.freeze({ MIN: 0.1, MAX: 1, STEP: 0.05 }),
@@ -806,7 +807,71 @@ export const FILRODENSWMB = {
                 ramp: Object.freeze(["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#bd0026", "#800026"]),
                 readout: "perArea",
             }),
+            Object.freeze({
+                id: "capacity",
+                label: "FILRODENSWMB.UI.ThematicCapacity",
+                hint: "FILRODENSWMB.UI.ThematicCapacityHint",
+                unit: "FILRODENSWMB.UI.ThematicCapacityUnit",
+                legend: "ramp",
+                needs: Object.freeze(["capacity", "landArea"]),
+                // Population's scale, so the two layers can be compared colour for colour
+                scale: Object.freeze({ kind: "log", min: 0.5, max: 100 }),
+                ticks: Object.freeze([1, 10, 100]),
+                // YlGn
+                ramp: Object.freeze(["#ffffe5", "#f7fcb9", "#d9f0a3", "#addd8e", "#78c679", "#41ab5d", "#238443", "#006837", "#004529"]),
+                readout: "perArea",
+            }),
+            Object.freeze({
+                id: "cleared",
+                label: "FILRODENSWMB.UI.ThematicCleared",
+                hint: "FILRODENSWMB.UI.ThematicClearedHint",
+                unit: "FILRODENSWMB.UI.ThematicClearedUnit",
+                legend: "ramp",
+                needs: Object.freeze(["cleared", "water"]),
+                scale: Object.freeze({ kind: "linear", min: 0, max: 1 }),
+                ticks: Object.freeze([0, 0.5, 1]),
+                // BuGn: a green of its own, apart from Capacity's
+                ramp: Object.freeze(["#f7fcfd", "#e5f5f9", "#ccece6", "#99d8c9", "#66c2a4", "#41ae76", "#238b45", "#006d2c", "#00441b"]),
+                readout: "percent",
+            }),
+            Object.freeze({
+                id: "danger",
+                label: "FILRODENSWMB.UI.ThematicDanger",
+                hint: "FILRODENSWMB.UI.ThematicDangerHint",
+                unit: "FILRODENSWMB.UI.ThematicDangerUnit",
+                legend: "ramp",
+                needs: Object.freeze(["security", "water"]),
+                // The share of a cell's people lost to raiders and strife (1 - the generator's
+                // security): up to the age's strife, which a war-torn age or an invasion takes
+                // towards 1, so the scale runs the whole way
+                scale: Object.freeze({ kind: "linear", min: 0, max: 1 }),
+                ticks: Object.freeze([0, 0.5, 1]),
+                // Purples
+                ramp: Object.freeze(["#fcfbfd", "#efedf5", "#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3", "#54278f", "#3f007d"]),
+                readout: "percent",
+            }),
+            Object.freeze({
+                id: "culture",
+                label: "FILRODENSWMB.UI.ThematicCulture",
+                hint: "FILRODENSWMB.UI.ThematicCultureHint",
+                unit: "FILRODENSWMB.UI.ThematicCultureUnit",
+                // A class per culture, in the culture's own colour, paler where its share of the
+                // people is lower (see ThematicData.cultureLookup); shown at model-cell resolution,
+                // since a class cannot be blended
+                legend: "classes",
+                needs: Object.freeze(["culture", "shareStart", "shareCulture", "shareValue"]),
+                readout: "culture",
+            }),
         ]),
+        // The culture layer's fading: a cell whose dominant culture holds SHARE_FULL of its people
+        // or more is drawn at full strength, one at SHARE_FAINT or less at ALPHA_FAINT, and between
+        // them in proportion; the palette a culture with no colour of its own takes
+        CULTURE: Object.freeze({
+            SHARE_FAINT: 0.4,
+            SHARE_FULL: 0.9,
+            ALPHA_FAINT: 0.3,
+            PALETTE: Object.freeze(["#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666"]),
+        }),
     }),
     // The map controls' Detail menu (see DetailLevel): a level shows every pin and region level at
     // or below it. Pins take theirs from their style (PINS.DEFAULT_STYLES) and a Political set's
@@ -2018,9 +2083,13 @@ export const FILRODENSWMB = {
             SPECIALIST_BONUS: 0.4,
             // Blend width between two fully open cultures (flat-km of extra travel); shares below
             // MIN_SHARE are dropped; auto-placed homelands are at least HOMELAND_SPACING_KM apart
+            // (less on a small world: HOMELAND_SHARE of the side of each culture's share of the
+            // land) and, where they can be, HOMELAND_EDGE_KM from the map's edges
             BLEND_KM: 250,
             MIN_SHARE: 0.02,
             HOMELAND_SPACING_KM: 500,
+            HOMELAND_SHARE: 0.5,
+            HOMELAND_EDGE_KM: 150,
             // A town's culture mix drops cultures below this share
             MIX_MIN_SHARE: 0.01,
         }),

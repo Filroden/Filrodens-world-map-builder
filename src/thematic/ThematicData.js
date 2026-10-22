@@ -31,7 +31,19 @@ export const LAYERS = new Map(FILRODENSWMB.THEMATIC.LAYERS.map((layer) => [layer
 const MODEL_VALUE = Object.freeze({
     // People per km² of land
     population: (arrays, cell) => (arrays.landArea[cell] > 0 ? arrays.population[cell] / arrays.landArea[cell] : Number.NaN),
+    // People the land could feed per km² of it
+    capacity: (arrays, cell) => (arrays.landArea[cell] > 0 ? arrays.capacity[cell] / arrays.landArea[cell] : Number.NaN),
+    // The share of the land cleared for farming (a cell that is mostly water has no value)
+    cleared: (arrays, cell) => (arrays.water[cell] ? Number.NaN : arrays.cleared[cell]),
+    // The share of the people lost to raiders and strife: the generator's security, turned round
+    danger: (arrays, cell) => (arrays.water[cell] ? Number.NaN : 1 - arrays.security[cell]),
 });
+
+/** The layers drawn as classes rather than on a scale (see ThematicSource's culture methods). */
+const CLASS_LAYERS = new Set(["culture"]);
+const CULTURE = FILRODENSWMB.THEMATIC.CULTURE;
+/** The most fading steps a culture's colour takes; fewer when many cultures share the 255 steps. */
+const MAX_BANDS = 10;
 
 /** Ramp steps a value can take: 1 to 255 (0 is "no value" in the drawn bytes). */
 const STEPS = 255;
@@ -223,8 +235,11 @@ export function blendValues(modelValues, { sites, weights }) {
 export class ThematicSource {
     #arrays;
     #mesh;
+    #cultures;
     #values = new Map();
     #bytes = new Map();
+    #lookups = new Map();
+    #dominant = null;
 
     /**
      * @param {object} modelRun - A saved run (see ModelRun).
@@ -233,6 +248,7 @@ export class ThematicSource {
     constructor(modelRun, mesh) {
         this.#arrays = decodeModelRun(modelRun);
         this.#mesh = mesh;
+        this.#cultures = Array.isArray(modelRun.cultures) ? modelRun.cultures : [];
     }
 
     /**
@@ -245,10 +261,33 @@ export class ThematicSource {
         return new ThematicSource(modelRun, mesh);
     }
 
-    /** Whether the run holds what a layer is worked out from (an older run may lack an array). */
+    /**
+     * Whether the run holds what a layer is worked out from (an older run may lack an array). The
+     * culture layer also needs a culture of the map's own: with none, the run's one default
+     * culture covers the land and the layer would be one colour.
+     */
     has(layerId) {
+        return this.missing(layerId) === null;
+    }
+
+    /**
+     * Why the run cannot show a layer: "run" when it lacks an array the layer is worked out from
+     * (it was saved before the layer existed), "cultures" when the map had no culture of its own;
+     * null when it can.
+     * @returns {"run"|"cultures"|null}
+     */
+    missing(layerId) {
         const layer = LAYERS.get(layerId);
-        return !!layer && !!MODEL_VALUE[layerId] && layer.needs.every((name) => this.#arrays[name]?.length === this.#mesh.modelCount);
+        if (!layer || !(MODEL_VALUE[layerId] || CLASS_LAYERS.has(layerId))) return "run";
+        // The arrays' lengths were checked when the run was loaded (see MapImport)
+        if (!layer.needs.every((name) => this.#arrays[name] !== undefined)) return "run";
+        if (layerId === "culture" && !this.#cultures.some((culture) => culture?.id != null)) return "cultures";
+        return null;
+    }
+
+    /** Whether a layer is drawn as classes (a key-and-label legend) rather than on a scale. */
+    static isClassLayer(layerId) {
+        return CLASS_LAYERS.has(layerId);
     }
 
     /** A layer's value in each model cell (NaN for none). */
@@ -263,9 +302,16 @@ export class ThematicSource {
         return this.#values.get(layerId);
     }
 
-    /** A layer as the drawn layer reads it: one byte per display cell, 0 for no value, else its ramp step. */
+    /**
+     * A layer as the drawn layer reads it: one byte per display cell, 0 for no value, else its
+     * step (a ramp step, or a culture's fading step; see cultureStep).
+     */
     displayBytes(layerId) {
         if (this.#bytes.has(layerId)) return this.#bytes.get(layerId);
+        if (CLASS_LAYERS.has(layerId)) {
+            this.#bytes.set(layerId, this.#cultureBytes());
+            return this.#bytes.get(layerId);
+        }
         const { scale } = LAYERS.get(layerId);
         const values = this.displayValues(layerId);
         const bytes = new Uint8Array(values.length);
@@ -277,9 +323,106 @@ export class ThematicSource {
         return bytes;
     }
 
-    /** A layer's value in a display cell, NaN for none. */
+    /** A layer's value in a display cell, NaN for none (a graded layer's; see cultureAt for culture). */
     valueAt(layerId, cell) {
         if (!(cell >= 0 && cell < this.#mesh.cellCount)) return Number.NaN;
         return this.displayValues(layerId)[cell];
+    }
+
+    /** A layer's colour lookup for the drawn layer (see rampLookup and cultureLookup). */
+    lookup(layerId) {
+        if (!this.#lookups.has(layerId)) this.#lookups.set(layerId, CLASS_LAYERS.has(layerId) ? this.#cultureLookup() : rampLookup(LAYERS.get(layerId).ramp));
+        return this.#lookups.get(layerId);
+    }
+
+    // ------------------------------------------------------------------ culture
+
+    /**
+     * Each model cell's dominant culture (an index into the run's cultures, -1 for none) and the
+     * share of its people that culture holds (from the run's sparse shares).
+     */
+    #dominantCultures() {
+        if (this.#dominant) return this.#dominant;
+        const { culture, shareStart, shareCulture, shareValue } = this.#arrays;
+        const count = this.#mesh.modelCount;
+        const index = new Int32Array(count).fill(-1);
+        const share = new Float32Array(count);
+        for (let cell = 0; cell < count; cell++) {
+            const dominant = culture[cell];
+            if (!(dominant >= 0) || dominant >= this.#cultures.length) continue;
+            index[cell] = dominant;
+            share[cell] = 1;
+            for (let entry = shareStart[cell]; entry < shareStart[cell + 1]; entry++) if (shareCulture[entry] === dominant) share[cell] = shareValue[entry];
+        }
+        this.#dominant = { index, share };
+        return this.#dominant;
+    }
+
+    /** How many fading steps each culture has: the 255 steps shared out, at most MAX_BANDS each. */
+    #bands() {
+        return Math.max(1, Math.min(MAX_BANDS, Math.floor(STEPS / Math.max(1, this.#cultures.length))));
+    }
+
+    /** A culture and its share as a step: 1 + culture × bands + band (fainter bands for lower shares). */
+    #cultureStep(index, share) {
+        const bands = this.#bands();
+        const strength = Math.min(1, Math.max(0, (share - CULTURE.SHARE_FAINT) / (CULTURE.SHARE_FULL - CULTURE.SHARE_FAINT)));
+        return 1 + index * bands + Math.round(strength * (bands - 1));
+    }
+
+    /**
+     * The culture layer per display cell: its model cell's step (a class is not blended, so the
+     * layer keeps the run's cells).
+     */
+    #cultureBytes() {
+        const { index, share } = this.#dominantCultures();
+        const bytes = new Uint8Array(this.#mesh.cellCount);
+        for (let cell = 0; cell < bytes.length; cell++) {
+            const model = this.#mesh.parentOf[cell];
+            if (index[model] >= 0) bytes[cell] = this.#cultureStep(index[model], share[model]);
+        }
+        return bytes;
+    }
+
+    /** Each culture's colour at each of its fading steps, faintest first. */
+    #cultureLookup() {
+        const bytes = new Uint8Array(LOOKUP_SIZE * BYTES_PER_COLOUR);
+        const bands = this.#bands();
+        this.#cultures.forEach((_, index) => {
+            const [r, g, b] = rgb(this.cultureColor(index));
+            for (let band = 0; band < bands; band++) {
+                const step = 1 + index * bands + band;
+                if (step >= LOOKUP_SIZE) return;
+                const alpha = bands > 1 ? CULTURE.ALPHA_FAINT + ((1 - CULTURE.ALPHA_FAINT) * band) / (bands - 1) : 1;
+                bytes.set([r, g, b, Math.round(alpha * 255)], step * BYTES_PER_COLOUR);
+            }
+        });
+        return bytes;
+    }
+
+    /** A culture's colour as the run recorded it, or one from the palette for a culture with none. */
+    cultureColor(index) {
+        const color = this.#cultures[index]?.color;
+        return typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color) ? color : CULTURE.PALETTE[index % CULTURE.PALETTE.length];
+    }
+
+    /**
+     * The culture in a display cell: its index in the run's cultures, its name as the run recorded
+     * it, and the share of the cell's people it holds; null for none.
+     */
+    cultureAt(cell) {
+        if (!(cell >= 0 && cell < this.#mesh.cellCount)) return null;
+        const { index, share } = this.#dominantCultures();
+        const model = this.#mesh.parentOf[cell];
+        if (!(index[model] >= 0)) return null;
+        return { index: index[model], name: this.#cultures[index[model]]?.name ?? "", share: share[model] };
+    }
+
+    /** The cultures dominant somewhere on land, in the run's order, for the legend. */
+    cultureClasses() {
+        const { index } = this.#dominantCultures();
+        const seen = new Set();
+        for (let cell = 0; cell < index.length; cell++) if (index[cell] >= 0 && !this.#arrays.water[cell]) seen.add(index[cell]);
+        return [...seen].sort((a, b) => a - b).map((at) => ({ index: at, name: this.#cultures[at]?.name ?? "", color: this.cultureColor(at) }));
     }
 }
