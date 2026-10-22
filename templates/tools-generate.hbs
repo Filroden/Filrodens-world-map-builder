@@ -21,6 +21,7 @@
         </div>
     </div>
 
+    {{#unless cultureList.count}}
     <div class="fwmb-form-group">
         <label for="fwmb-generator-name-base">{{localize "FILRODENSWMB.UI.GenerateNameStyle"}}</label>
         <div class="fwmb-form-fields">
@@ -32,6 +33,7 @@
             <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateNameStyleHint'}}"></i>
         </div>
     </div>
+    {{/unless}}
 
     {{#if generate.estimate}}
     <div class="fwmb-form-group">
@@ -54,6 +56,45 @@
     {{#each generate.world}}
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name=this.name label=this.label hint=this.hint value=this.value min=this.min max=this.max step=this.step resetTo=this.resetTo}}
     {{/each}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateCultures" title="FILRODENSWMB.UI.SectionGenerateCultures" count=cultureList.count badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
+    <p class="fwmb-hint">{{#if cultureList.count}}{{localize "FILRODENSWMB.UI.CulturesHint"}}{{else}}{{localize "FILRODENSWMB.UI.CulturesNoneHint"}}{{/if}}</p>
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionGenerateCultures'}}" data-list-nav data-culture-list class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+        {{#each cultureList.rows}}
+            {{#if this.naming}}
+            <div class="fwmb-list-item fwmb-list-item--naming" role="option" aria-selected="true">
+                <input type="text" class="fwmb-input" value="{{this.value}}" maxlength="{{fwmbTextLimit 'name'}}" aria-label="{{localize this.label}}" data-culture-naming data-panel-ui autocomplete="off" spellcheck="false" />
+            </div>
+            {{else}}
+            <div role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="openCulture">
+                <span class="fwmb-chip-swatch" aria-hidden="true" style="--swatch: {{this.color}}"></span>
+                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
+                <span class="fwmb-meta" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateNameStyle'}}">{{this.names}}</span>
+                <span class="fwmb-actions">
+                    <div class="fwmb-dropdown fwmb-row-menu">
+                        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" aria-label="{{localize 'FILRODENSWMB.UI.MoreOptions'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MoreOptions'}}">
+                            <i class="fwmb-icon fwmb-icon--more-vert"></i>
+                        </button>
+                        <div class="fwmb-dropdown-menu">
+                            <button type="button" data-action="renameCulture"><i class="fwmb-icon fwmb-icon--edit"></i> {{localize "FILRODENSWMB.UI.Rename"}}</button>
+                            <button type="button" data-action="duplicateCulture"><i class="fwmb-icon fwmb-icon--content-copy"></i> {{localize "FILRODENSWMB.UI.Duplicate"}}</button>
+                            <button type="button" data-action="deleteCulture" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>
+                        </div>
+                    </div>
+                </span>
+            </div>
+            {{/if}}
+        {{/each}}
+        {{#if cultureList.empty}}<div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.CulturesEmpty"}}</div>{{/if}}
+        {{#if cultureList.canAdd}}
+        <div class="fwmb-list-add" role="none">
+            <button type="button" class="fwmb-btn fwmb-btn--subtle" role="option" aria-selected="false" tabindex="-1" data-list-item data-action="addCulture">
+                <i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.CultureAdd"}}
+            </button>
+        </div>
+        {{/if}}
+    </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateOutput" title="FILRODENSWMB.UI.SectionGenerateOutput"}}

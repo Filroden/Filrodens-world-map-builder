@@ -545,7 +545,8 @@
 .fwmb-swatch:focus-visible,
 .fwmb-list-item:focus-visible,
 .fwmb-rail-btn:focus-visible,
-.fwmb-map-btn:focus-visible {
+.fwmb-map-btn:focus-visible,
+.fwmb-rule-handle:focus-visible {
     outline: 2px solid var(--fwmb-border-focus);
     outline-offset: 2px;
 }
@@ -5147,6 +5148,22 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     flex-wrap: wrap;
     gap: var(--fwmb-size-2);
     margin-block-start: var(--fwmb-size-2);
+}
+
+/* A band field (parts/range-band.hbs, RangeTrack): the rule editor's track in a form, its ends
+   named under it and its quick picks below */
+.fwmb-range-band .fwmb-range-band-track {
+    margin-block: var(--fwmb-size-4) var(--fwmb-size-2);
+    cursor: default;
+}
+.fwmb-range-band-ends {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--fwmb-size-11);
+    color: var(--fwmb-text-muted);
+}
+.fwmb-range-band .fwmb-range-band-zones {
+    margin-block-start: var(--fwmb-size-4);
 }
 
 .fwmb button.fwmb-rule-zone-chip {

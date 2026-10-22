@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { cultureId, cultureMix } from "./CultureIds.js";
 import { resolveOutput } from "./GeneratorSettings.js";
 import { buildPolitical, installPolitical } from "./MaterialiseRegions.js";
 import { buildRoutes } from "./MaterialiseRoutes.js";
@@ -97,7 +98,7 @@ function buildPins(session, result, { runId, idFactory, names, pinStyleFor, appl
             pinStyle: null,
             label: { fontSize: FILRODENSWMB.PINS.DEFAULT_SCALE },
             cell: place.cell,
-            generated: { run: runId, kind: place.kind, tier, sourceId: index, population: place.population ?? null, culture: place.culture ?? null, edited: false, locked: false },
+            generated: { run: runId, kind: place.kind, tier, sourceId: index, population: place.population ?? null, culture: cultureId(result, place.culture), ...cultureMix(result, place.mix), edited: false, locked: false },
         };
         const style = pinStyleFor(tier);
         if (style) applyPinStyle(pin, style);

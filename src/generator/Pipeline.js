@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { buildModelCells } from "./CellValues.js";
 import { CellGraph, EDGE } from "./CellGraph.js";
+import { engineCultures } from "./CultureInput.js";
 import { resolveCultures, sharesOf, spreadCultures, townMix } from "./Cultures.js";
 import { feedbackPass } from "./Feedback.js";
 import { resolveSettings } from "./GeneratorSettings.js";
@@ -56,7 +57,7 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
 
     run.cells = await driver.step("values", () => buildModelCells({ ...payload, biome: modelBiomeRaster(payload) }, settings.world), run);
     run.graph = new CellGraph(run.cells);
-    run.cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(cultureList(settings))), run);
+    run.cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(cultureList(settings, payload))), run);
     const common = { cultures: run.cultures, world: settings.world };
 
     const towns = await driver.stage("towns", () => placeTowns(run.graph, { ...common, era: age }), run);
@@ -72,9 +73,9 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     return assembleResult(run, { feedback, finalTrade, finalRealms, names });
 }
 
-/** The cultures of a run; with none, the default culture speaking the run's name style. */
-function cultureList(settings) {
-    if (settings.cultures.length) return settings.cultures;
+/** The cultures of a run (the map's, in the engine's form); with none, the default culture speaking the run's name style. */
+function cultureList(settings, payload) {
+    if (settings.cultures.length) return engineCultures(settings.cultures, payload);
     return [{ ...FILRODENSWMB.GENERATOR.CULTURES.DEFAULT, nameBase: settings.nameBase }];
 }
 
@@ -161,7 +162,9 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
         settings,
         modelCells: modelCellOutput(run, feedback, finalRealms),
         modelGraph: { neighbourStart: Int32Array.from(cells.neighbourStart), neighbourList: Int32Array.from(cells.neighbourList) },
-        cultures: cultures.cultures.map((culture, index) => ({ name: culture.name, nameBase: culture.nameBase, homeland: cultures.homelands[index] })),
+        // Each culture as the run used it: the map's id (none for the default culture), its name and
+        // colour then, and its homeland cells (given, or placed) with how many points it was given
+        cultures: cultures.cultures.map((culture, index) => ({ id: culture.id ?? null, name: culture.name, color: culture.color ?? null, nameBase: culture.nameBase, homelands: Array.from(cultures.homelands[index]), homelandsGiven: culture.homelandsGiven ?? 0 })),
         places,
         realms: finalRealms.realms.map((realm, index) => ({
             kind: realm.kind,

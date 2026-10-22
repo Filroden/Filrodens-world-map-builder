@@ -1,0 +1,46 @@
+{{!--
+    A band on one track: two handles and the range between them, as the biome rule editor draws
+    its ranges (see RangeTrack). Its value is a hidden input named as the field ("lo,hi"); the
+    handles are dragged or moved with the arrow keys, a quick pick sets the band, and a double-click
+    on the track takes the whole track (no limit). The handles, fill and reading are placed by
+    RangeTrack.sync after each draw.
+
+    Parameters (hash arguments):
+      name: the field's name
+      label: localisation key for its name
+      hint: optional localisation key for the info icon's tooltip
+      lo, hi: the band (the whole track when not given)
+      min, max, step: the track's ends and a handle's step
+      format: "percent" to read values as percentages of the track's scale, else the number
+      startLabel, endLabel: localisation keys naming the track's ends (Cold, Hot), shown under it
+          and read for a handle at an end
+      anyLabel: localisation key read when the band is the whole track
+      zones: optional quick picks: { label (localisation key), from, to }
+      marker: optional value marked on the track (the sea level)
+--}}
+<div class="fwmb-range fwmb-range-band" data-range-band data-min="{{min}}" data-max="{{max}}" data-step="{{step}}" {{#if format}}data-format="{{format}}"{{/if}} {{#if startLabel}}data-start-label="{{localize startLabel}}"{{/if}} {{#if endLabel}}data-end-label="{{localize endLabel}}"{{/if}} {{#if anyLabel}}data-any-label="{{localize anyLabel}}"{{/if}}>
+    <div class="fwmb-range-header">
+        <span class="fwmb-range-label">
+            <span class="fwmb-range-name">{{localize label}}</span>
+            {{#if hint}}<i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize hint}}"></i>{{/if}}
+        </span>
+        <span class="fwmb-range-reading"><output class="fwmb-range-value" data-band-reading></output></span>
+    </div>
+    <div class="fwmb-rule-track fwmb-range-band-track" data-band-track data-tooltip="{{localize 'FILRODENSWMB.UI.RangeBandResetHint'}}">
+        {{#if marker}}<div class="fwmb-rule-sea-level-line" style="left: {{marker}}%;"></div>{{/if}}
+        <div class="fwmb-rule-fill"></div>
+        <div class="fwmb-rule-handle" role="slider" tabindex="0" data-band-edge="0" aria-label="{{localize 'FILRODENSWMB.UI.RangeBandFrom' name=(localize label)}}"></div>
+        <div class="fwmb-rule-handle" role="slider" tabindex="0" data-band-edge="1" aria-label="{{localize 'FILRODENSWMB.UI.RangeBandTo' name=(localize label)}}"></div>
+    </div>
+    {{#if startLabel}}
+    <div class="fwmb-range-band-ends" aria-hidden="true"><span>{{localize startLabel}}</span><span>{{localize endLabel}}</span></div>
+    {{/if}}
+    {{#if zones}}
+    <div class="fwmb-rule-zone-picker fwmb-range-band-zones">
+        {{#each zones}}
+        <button type="button" class="fwmb-rule-zone-chip" data-band-zone="{{this.from}},{{this.to}}">{{localize this.label}}</button>
+        {{/each}}
+    </div>
+    {{/if}}
+    <input type="hidden" name="{{name}}" value="{{#if (or lo (eq lo 0))}}{{lo}},{{hi}}{{else}}{{min}},{{max}}{{/if}}" />
+</div>

@@ -51,7 +51,7 @@ export class GeneratePanel {
         return {
             seed: settings.seed,
             mapSeed: String(app.uiState.mapSeed ?? ""),
-            nameBases: this.#nameBases(settings.nameBase),
+            nameBases: this.nameBaseChoices(settings.nameBase),
             estimate: this.#estimate(app),
             stale,
             // The Generation section's badge: Out of date once what the last run read has changed
@@ -76,8 +76,8 @@ export class GeneratePanel {
         };
     }
 
-    /** The name styles, by their localised names, with the chosen one marked. */
-    static #nameBases(chosen) {
+    /** The name styles, by their localised names, with the chosen one marked (also a culture's Name style). */
+    static nameBaseChoices(chosen) {
         return nameBaseNames()
             .map((name) => ({ value: name, label: platform.i18n.localize(`FILRODENSWMB.NameBase.${name.replaceAll(" ", "")}`), selected: name === chosen }))
             .sort((a, b) => a.label.localeCompare(b.label));

@@ -37,6 +37,8 @@ import { RegionPanel } from "./RegionPanel.js";
 import { RegionLists } from "./RegionLists.js";
 import { StyleEditors } from "./StyleEditors.js";
 import { StyleLists } from "./StyleLists.js";
+import { CultureEditor } from "./CultureEditor.js";
+import { CultureLists } from "./CultureLists.js";
 import { RegionPainter } from "./RegionPainter.js";
 import { Inspector } from "./Inspector.js";
 import { RegionEditor } from "./RegionEditor.js";
@@ -118,6 +120,11 @@ export class MapStudio {
     // prettier-ignore
     static ACTIONS = {
         // --- STYLES AND ICONS: the map's styles (see StyleLists) ---
+        openCulture(e, t)       { if (!MapStudio.#fromRowControl(e, t)) CultureEditor.open(this, t.dataset.id, MapStudio.#FROM_LIST); },
+        addCulture(_e, _t)      { CultureLists.startAdding(this); },
+        renameCulture(_e, t)    { CultureLists.startRename(this, t.closest("[data-id]")?.dataset.id); },
+        duplicateCulture(_e, t) { CultureLists.duplicate(this, t.closest("[data-id]")?.dataset.id); },
+        deleteCulture(_e, t)    { CultureLists.delete(this, t.closest("[data-id]")?.dataset.id); },
         openStyle(e, t)      { if (!MapStudio.#fromRowControl(e, t)) StyleEditors.open(this, t.dataset.styleType, t.dataset.id, MapStudio.#FROM_LIST); },
         addStyle(_e, t)      { StyleLists.startAdding(this, t.dataset.styleType); },
         renameStyle(_e, t)   { const row = t.closest("[data-style-type][data-id]"); StyleLists.startRename(this, row?.dataset.styleType, row?.dataset.id); },
@@ -444,6 +451,8 @@ export class MapStudio {
         this.regionNaming = null;
         // The style being named in Styles and icons (see StyleLists)
         this.styleNaming = null;
+        // The culture being named in the Generate panel (see CultureLists)
+        this.cultureNaming = null;
         // Each long list's search, filters and page (see ListQuery), for the session
         this.listQueries = {};
         this.mapRoutes = [];
@@ -1237,7 +1246,10 @@ export class MapStudio {
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
             if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
-            if (this.activeTool === "generate") context.generate = GeneratePanel.context(this);
+            if (this.activeTool === "generate") {
+                context.generate = GeneratePanel.context(this);
+                context.cultureList = CultureLists.context(this);
+            }
 
             if (this.activeTool === "manage") {
                 context.savedMaps = MapStudio.#namedMaps(await platform.store.getSavedMaps());
@@ -1470,10 +1482,12 @@ export class MapStudio {
         root.addEventListener("focusout", (event) => {
             RegionLists.handleFocusOut(this, event);
             StyleLists.handleFocusOut(this, event);
+            CultureLists.handleFocusOut(this, event);
         });
         root.addEventListener("input", (event) => {
             RegionLists.handleInput(this, event);
             StyleLists.handleInput(this, event);
+            CultureLists.handleInput(this, event);
         });
         root.addEventListener("input", (event) => this.#routeFieldEvent(event));
         root.addEventListener("change", (event) => this.#routeFieldEvent(event));
@@ -1523,7 +1537,7 @@ export class MapStudio {
         // would otherwise reach the window and pan the scene behind it
         if (MapStudio.#isMovementKey(event)) event.stopPropagation();
         // The Regions lists' keys: moving through a list, Unassigned, and naming
-        if (AppearanceMenu.handleKey(this.root, event) || RegionLists.handleKey(this, event) || StyleLists.handleKey(this, event) || ListNav.handleKey(event)) {
+        if (AppearanceMenu.handleKey(this.root, event) || RegionLists.handleKey(this, event) || StyleLists.handleKey(this, event) || CultureLists.handleKey(this, event) || ListNav.handleKey(event)) {
             event.preventDefault();
             return;
         }
@@ -3713,6 +3727,7 @@ export class MapStudio {
         this.uiState.world = payload.world ?? null;
         this.uiState.generatorStale = payload.generatorStale === true;
         this.uiState.generatorSettings = panelSettings(payload.generatorSettings);
+        this.uiState.cultures = Array.isArray(payload.cultures) ? payload.cultures : [];
         this.upwindMargin = payload.upwindMargin ?? null;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
@@ -4206,6 +4221,7 @@ export class MapStudio {
             world: this.uiState.world,
             generatorStale: this.uiState.generatorStale === true,
             generatorSettings: panelSettings(this.uiState.generatorSettings),
+            cultures: platform.utils.deepClone(this.uiState.cultures ?? []),
             upwindMargin: this.upwindMargin ?? null,
             terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
             springsBaked: this.uiState.springsBaked,
@@ -4367,6 +4383,11 @@ export class MapStudio {
         if (!this.modelRun || this.uiState.generatorStale) return;
         this.uiState.generatorStale = true;
         if (this.activeTool === "generate") this.view?.render(["context"]);
+    }
+
+    /** The same, for what changes the generator's input outside the studio's own handlers (a custom biome's Behaves like, the cultures). */
+    markGeneratorStale() {
+        this.#markGeneratorStale();
     }
 
     /**
@@ -4954,6 +4975,7 @@ export class MapStudio {
         this.#clearMassEditState();
         RegionLists.reset(this);
         StyleLists.reset(this);
+        CultureLists.reset(this);
         // Help closes with the inspector below, and what it covered belongs to the tool being left
         HelpPanel.forget(this);
         // The inspector belongs to the tool its object was opened from

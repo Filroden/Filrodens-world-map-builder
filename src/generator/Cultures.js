@@ -25,7 +25,8 @@ import { SearchSpace, searchAll } from "./Search.js";
  * @property {number} density - Population multiplier.
  * @property {object} habitat - Soft ranges: temperature and moisture [lo, hi] (0 to 1), heightM
  *     and reliefM [lo, hi] (metres), coast and river affinity (-1 avoids to 1 seeks).
- * @property {number} [homelandCell] - A model cell, or undefined to place it automatically.
+ * @property {number[]} [homelandCells] - Model cells it starts from (all at once), or none to
+ *     place one automatically. (`homelandCell`, a single cell, is read as a list of one.)
  */
 
 /**
@@ -36,7 +37,7 @@ import { SearchSpace, searchAll } from "./Search.js";
  * @property {Float64Array} shareValue - Largest first within a cell.
  * @property {Int32Array} dominant - The culture holding each land cell, or -1.
  * @property {Float64Array} popMult
- * @property {Int32Array} homelands - The homeland cell of each culture.
+ * @property {Int32Array[]} homelands - The homeland cells of each culture.
  */
 
 /** The cultures a run uses: the given ones, or the single default culture. */
@@ -186,18 +187,27 @@ function meanFit(fit, cells, land) {
 }
 
 /**
- * Each culture's homeland: the given cell, or the best fit x food land not within
- * HOMELAND_SPACING_KM of an earlier homeland.
+ * Each culture's homelands: the given land cells (several start it at once), or, with none on
+ * land, the best fit x food land not within HOMELAND_SPACING_KM of an earlier homeland.
  */
 function placeHomelands(graph, cultures, fits, land, base) {
     const taken = new Uint8Array(graph.count);
     const space = new SearchSpace(graph);
     const spacing = FILRODENSWMB.GENERATOR.CULTURES.HOMELAND_SPACING_KM;
-    return Int32Array.from(cultures.map((culture, index) => {
-        const cell = Number.isInteger(culture.homelandCell) && land.includes(culture.homelandCell) ? culture.homelandCell : bestHomeland(graph.cells, fits[index], land, taken);
-        space.run([cell], base, { limit: spacing, visit: (reached) => (taken[reached] = 1) });
-        return cell;
-    }));
+    const isLand = new Uint8Array(graph.count);
+    for (const cell of land) isLand[cell] = 1;
+    return cultures.map((culture, index) => {
+        const given = [...new Set(givenHomelands(culture))].filter((cell) => Number.isInteger(cell) && cell >= 0 && cell < graph.count && isLand[cell]);
+        const cells = given.length ? given : [bestHomeland(graph.cells, fits[index], land, taken)];
+        space.run(cells, base, { limit: spacing, visit: (reached) => (taken[reached] = 1) });
+        return Int32Array.from(cells);
+    });
+}
+
+/** The homeland cells a culture was given (a list, or the single cell of older settings). */
+function givenHomelands(culture) {
+    if (Array.isArray(culture.homelandCells)) return culture.homelandCells;
+    return Number.isInteger(culture.homelandCell) ? [culture.homelandCell] : [];
 }
 
 function bestHomeland(cells, fit, land, taken) {
@@ -214,12 +224,12 @@ function bestHomeland(cells, fit, land, taken) {
     return chosen >= 0 ? chosen : land[0];
 }
 
-/** A culture's arrival cost at every cell, spreading from its homeland. */
-function spreadCost(graph, base, fit, mean, homeland) {
+/** A culture's arrival cost at every cell, spreading from all its homelands at once. */
+function spreadCost(graph, base, fit, mean, homelands) {
     const { FIT_COST, SPECIALIST_BONUS } = FILRODENSWMB.GENERATOR.CULTURES;
     const bonus = 1 - SPECIALIST_BONUS * (1 - mean);
     const cost = graph.costs((edge) => base[edge] * (1 + FIT_COST * (1 - 0.5 * (fit[graph.edgeA[edge]] + fit[graph.edgeB[edge]]))) * bonus);
-    return searchAll(graph, [homeland], cost).best;
+    return searchAll(graph, Array.from(homelands), cost).best;
 }
 
 /** Shares, dominant culture and population multiplier of every land cell. */

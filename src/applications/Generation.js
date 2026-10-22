@@ -155,7 +155,7 @@ export class Generation {
             biomeParams: { customBiomeRules: params.customBiomeRules, biomePalette: params.biomePalette, biomeSides: params.biomeSides },
             customBiomes: app.uiState.customBiomes ?? [],
             mapSeed: app.uiState.mapSeed,
-            settings: { seed: settings.seed || undefined, nameBase: settings.nameBase, world: settings.world },
+            settings: { seed: settings.seed || undefined, nameBase: settings.nameBase, world: settings.world, cultures: app.uiState.cultures ?? [] },
         });
     }
 

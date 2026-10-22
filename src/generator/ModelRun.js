@@ -110,7 +110,10 @@ export function encodeModelRun(result, runId) {
         seed: result.settings.seed,
         settings: structuredClone(result.settings),
         cellCount: result.cellCount,
-        cultures: result.cultures.map(({ name, nameBase, homeland }) => ({ name, nameBase, homeland })),
+        // The run's cultures in the order the cells' shares count them: each map culture's id (null
+        // for the default culture), so a culture renamed or deleted since is still found, its name
+        // and colour as they were, and its homeland cells
+        cultures: result.cultures.map(({ id = null, name, color = null, nameBase, homelands = [] }) => ({ id, name, color, nameBase, homelands })),
         stats: { ...result.stats },
         cells,
         history: [],

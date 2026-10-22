@@ -532,6 +532,7 @@ export class MapDialogManager {
                     biome: { ...biome, hex: ColorMath.rgbToHex(biome.color) },
                     palette: FILRODENSWMB.LABELS?.PRESETS || [],
                     placements: this.#biomePlacementChoices(BiomePlacement.placementOfCustom(biome)),
+                    behaviours: this.#behavesLikeChoices(biome.behavesLike),
                 }),
                 // Checked as an import is (see MapRules.typed)
                 onExtract: (form, fallbackName) => ({
@@ -540,6 +541,7 @@ export class MapDialogManager {
                         code: form.elements["biomeCode"].value.trim() || null,
                         color: ColorMath.hexToRgb(form.elements["biomeColor"].value),
                         placement: form.elements["biomePlacement"].value,
+                        behavesLike: form.elements["biomeBehavesLike"].value || null,
                     }),
                     // Superseded by `placement`, which takes priority over it anyway (see
                     // BiomePlacement.placementOfCustom); cleared so an older map's flag is not
@@ -558,6 +560,18 @@ export class MapDialogManager {
      */
     static #biomePlacementChoices(selected) {
         return Object.values(FILRODENSWMB.BIOME_PLACEMENT).map((value) => ({ value, label: BiomePlacement.labelOf(value), selected: value === selected }));
+    }
+
+    /**
+     * The choices for a custom biome's Behaves like select: the biome the climate gives where it
+     * lies (the default), then each built-in land biome the generator knows, by name.
+     * @param {string|null|undefined} selected - A key of GENERATOR.BIOMES, or none.
+     * @returns {Array<{value: string, label: string, selected: boolean}>}
+     */
+    static #behavesLikeChoices(selected) {
+        const keys = Object.keys(FILRODENSWMB.GENERATOR.BIOMES);
+        const current = keys.includes(selected) ? selected : "";
+        return [{ value: "", label: "FILRODENSWMB.UI.BiomeBehavesLikeUnderlying", selected: current === "" }, ...keys.map((key) => ({ value: key, label: `FILRODENSWMB.BIOMES.${key}`, selected: key === current }))];
     }
 
     // --- ADD ACTIONS ---
@@ -588,6 +602,7 @@ export class MapDialogManager {
         const id = Number(target.closest(".fwmb-list-item").dataset.id);
         const biome = app.uiState.customBiomes.find((b) => b.id === id);
         if (!biome) return;
+        const behavedLike = biome.behavesLike ?? null;
 
         await this._processEditDialog(app, biome, {
             titleKey: "FILRODENSWMB.UI.Edit",
@@ -596,6 +611,10 @@ export class MapDialogManager {
             repaintCanvas: true,
             renderParts: ["context", "toolbar"],
             onExtract: (form) => config.onExtract(form, biome.name),
+            // What the generator reads of the biome changed: a run made before is out of date
+            onSave: (entity) => {
+                if ((entity.behavesLike ?? null) !== behavedLike) app.markGeneratorStale?.();
+            },
         });
     }
 
@@ -712,6 +731,8 @@ export class MapDialogManager {
         if (!confirmed) return;
 
         MapStateManager.pushVectorState(app);
+        // Its land now behaves as the biome beneath, so a run made while it behaved as another is out of date
+        if (app.uiState.customBiomes.find((c) => c.id === id)?.behavesLike) app.markGeneratorStale?.();
         app.uiState.customBiomes = app.uiState.customBiomes.filter((c) => c.id !== id);
 
         if (Number(app.uiState.brushBiome) === id) {

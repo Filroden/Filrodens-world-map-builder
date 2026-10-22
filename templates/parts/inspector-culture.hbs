@@ -1,0 +1,64 @@
+{{!--
+    The inspector's culture (see CultureEditor): its name, colour and name style; how open and
+    how dense it is; its habitat (bands on one track for temperature, moisture, height and
+    relief; coast and river from avoids to seeks); and its homelands. Every field applies when
+    committed, one undo step each (see Inspector).
+--}}
+<datalist id="fwmb-inspector-colors">
+    {{#each palette}}
+    <option value="{{this}}"></option>
+    {{/each}}
+</datalist>
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-name" name="cultureName" maxlength="{{fwmbTextLimit 'name'}}" value="{{culture.name}}" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-culture-color">{{localize "FILRODENSWMB.UI.InspectorColor"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="color" id="fwmb-inspector-culture-color" class="fwmb-swatch" name="cultureColor" value="{{culture.color}}" list="fwmb-inspector-colors" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-culture-names">{{localize "FILRODENSWMB.UI.GenerateNameStyle"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-culture-names" name="cultureNameBase">
+                {{#each nameBases}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.CultureNameStyleHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.CultureNameStyleHint'}}"></i>
+        </div>
+    </div>
+</div>
+
+<div class="fwmb-group">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.CulturePeople"}}</div>
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="cultureOpenness" label="FILRODENSWMB.UI.CultureOpenness" hint="FILRODENSWMB.UI.CultureOpennessHint" value=fields.openness.value min=fields.openness.min max=fields.openness.max step=fields.openness.step resetTo=fields.openness.resetTo}}
+    <div class="fwmb-range-band-ends" aria-hidden="true"><span>{{localize "FILRODENSWMB.UI.CultureClosed"}}</span><span>{{localize "FILRODENSWMB.UI.CultureOpen"}}</span></div>
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="cultureDensity" label="FILRODENSWMB.UI.CultureDensity" hint="FILRODENSWMB.UI.CultureDensityHint" value=fields.density.value min=fields.density.min max=fields.density.max step=fields.density.step resetTo=fields.density.resetTo}}
+</div>
+
+<div class="fwmb-group">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.CultureHabitat"}}</div>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.CultureHabitatHint"}}</p>
+    {{> "modules/filrodens-world-map-builder/templates/parts/range-band.hbs" name="habitatTemperature" label="FILRODENSWMB.UI.CultureTemperature" lo=bands.temperature.lo hi=bands.temperature.hi min=bands.temperature.min max=bands.temperature.max step=bands.temperature.step format="percent" startLabel="FILRODENSWMB.UI.CultureCold" endLabel="FILRODENSWMB.UI.CultureHot" anyLabel="FILRODENSWMB.UI.CultureAny"}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/range-band.hbs" name="habitatMoisture" label="FILRODENSWMB.UI.CultureMoisture" lo=bands.moisture.lo hi=bands.moisture.hi min=bands.moisture.min max=bands.moisture.max step=bands.moisture.step format="percent" startLabel="FILRODENSWMB.UI.CultureDry" endLabel="FILRODENSWMB.UI.CultureWet" anyLabel="FILRODENSWMB.UI.CultureAny"}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/range-band.hbs" name="habitatHeight" label="FILRODENSWMB.UI.CultureHeight" hint="FILRODENSWMB.UI.CultureHeightHint" lo=bands.height.lo hi=bands.height.hi min=bands.height.min max=bands.height.max step=bands.height.step format="percent" anyLabel="FILRODENSWMB.UI.CultureAny" zones=bands.height.zones}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/range-band.hbs" name="habitatRelief" label="FILRODENSWMB.UI.CultureRelief" hint="FILRODENSWMB.UI.CultureReliefHint" lo=bands.relief.lo hi=bands.relief.hi min=bands.relief.min max=bands.relief.max step=bands.relief.step format="percent" anyLabel="FILRODENSWMB.UI.CultureAny" zones=bands.relief.zones}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="habitatCoast" label="FILRODENSWMB.UI.CultureCoast" hint="FILRODENSWMB.UI.CultureCoastHint" value=fields.coast.value min=fields.coast.min max=fields.coast.max step=fields.coast.step resetTo=fields.coast.resetTo}}
+    <div class="fwmb-range-band-ends" aria-hidden="true"><span>{{localize "FILRODENSWMB.UI.CultureAvoids"}}</span><span>{{localize "FILRODENSWMB.UI.CultureSeeks"}}</span></div>
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="habitatRiver" label="FILRODENSWMB.UI.CultureRiver" hint="FILRODENSWMB.UI.CultureRiverHint" value=fields.river.value min=fields.river.min max=fields.river.max step=fields.river.step resetTo=fields.river.resetTo}}
+    <div class="fwmb-range-band-ends" aria-hidden="true"><span>{{localize "FILRODENSWMB.UI.CultureAvoids"}}</span><span>{{localize "FILRODENSWMB.UI.CultureSeeks"}}</span></div>
+</div>
+
+<div class="fwmb-group">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.CultureHomelands"}}</div>
+    <p class="fwmb-hint">{{#if homelands}}{{localize "FILRODENSWMB.UI.CultureHomelandsGiven" count=homelands}}{{else}}{{localize "FILRODENSWMB.UI.CultureHomelandsAuto"}}{{/if}}</p>
+    {{#if homelands}}
+    <button type="button" class="fwmb-btn fwmb-btn--secondary" data-inspector-action="autoHomelands">{{localize "FILRODENSWMB.UI.CultureHomelandsUseAuto"}}</button>
+    {{/if}}
+</div>

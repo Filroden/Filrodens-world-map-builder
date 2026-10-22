@@ -53,7 +53,8 @@ function v4Map() {
     mapData.customPinStyles = [{ id: "pinStyleAAAAAAAA", name: "Town", icon: "map_pin", scale: 1, color: "#ffffff", detailLevel: 1, label: { fontSize: 1, visibility: "all", quickStyle: "custom" } }];
     mapData.sizeRevision = FILRODENSWMB.SYMBOLS.REVISION;
     mapData.generatorSettings = { seed: "Avalon", nameBase: "Nordic", world: { density: 1.5, urbanisation: 1, realmSpacing: 0.8, fragmentation: 1 }, output: { duchies: true, counties: false, places: { city: true, largeTown: true, town: false, castle: true }, routes: { road: true, river: false, sea: true }, labels: true } };
-    mapData.customBiomes = [{ id: 14, name: "Moor", code: "MR", color: [90, 80, 70], placement: "land", rules: [{ elevation: [[0.2, 0.4, false, true]], moisture: [], temperature: [] }] }];
+    mapData.cultures = [{ id: "cultureAAAAAAAAA", name: "Hillfolk", color: "#8a6a4a", nameBase: "Nordic", openness: 0.3, density: 1.5, habitat: { temperature: [0, 0.4], moisture: null, height: [0.6, 1], relief: [0.05, 0.25], coast: -0.5, river: 0.5 }, homelands: [{ x: 12, y: 30 }, { x: 80, y: 44.5 }] }];
+    mapData.customBiomes = [{ id: 14, name: "Moor", code: "MR", color: [90, 80, 70], placement: "land", behavesLike: "TAIGA", rules: [{ elevation: [[0.2, 0.4, false, true]], moisture: [], temperature: [] }] }];
     return JSON.parse(JSON.stringify(MapJson.toExport(mapData, { levelAAAAAAAAAAA: encodeOwners(new Int32Array([0, 0, -1, 0])) })));
 }
 
@@ -310,8 +311,17 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     file.mapDecorations[0].src = "javascript:alert(1)";
     file.mapRoutes = [{ id: "routeAAAAAAAAAAA", style: "constructor", mode: "__proto__", waypoints: [1, -1, 2.5, "x", 3], legs: [[1, "x", 3]], transport: "road" }];
     file.history = [{ layer: "terrain", tool: "raise;", size: "huge", points: [{ x: 1, y: 2 }, { x: "a" }, [3, 4], 5] }];
+    file.customBiomes[0].behavesLike = "DEEP_OCEAN";
+    file.cultures[0].habitat.temperature = [0.6, 0.2];
+    file.cultures[0].habitat.relief = ["low", 1];
+    file.cultures[0].openness = 7;
+    file.cultures[0].homelands.push({ x: "1", y: 2 }, [3, 4]);
     const { mapData } = MapImport.read(file);
+    assert.ok(!("temperature" in mapData.cultures[0].habitat) && !("relief" in mapData.cultures[0].habitat), "a band must be two numbers, low first");
+    assert.equal(mapData.cultures[0].openness, 1);
+    assert.deepEqual(mapData.cultures[0].homelands, [{ x: 12, y: 30 }, { x: 80, y: 44.5 }]);
     assert.ok(!("src" in mapData.mapDecorations[0]));
+    assert.ok(!("behavesLike" in mapData.customBiomes[0]), "Behaves like names only a land biome the generator knows");
     assert.deepEqual(mapData.mapRoutes[0], { id: "routeAAAAAAAAAAA", waypoints: [1, 3], legs: [[1, 3]], transport: "road" });
     assert.deepEqual(mapData.history[0], { layer: "terrain", points: [{ x: 1, y: 2 }, [3, 4], 5] });
 });

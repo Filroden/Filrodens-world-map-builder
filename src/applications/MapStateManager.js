@@ -112,6 +112,7 @@ export class MapStateManager {
             // The Generate panel's settings: the run's seed (empty for the map's), name style,
             // world multipliers and output switches (see GeneratePanel)
             generatorSettings: panelSettings(),
+            cultures: [],
             // Set when the owner of a legacy map declined updating it and asked not to be asked
             // again (see TerrainUpgrade.dismiss); never true for a map built at the current revision.
             terrainUpgradeDismissed: false,
@@ -304,6 +305,8 @@ export class MapStateManager {
             activeRouteId: app.activeRouteId,
             activeRegionId: app.activeRegionId,
             customBiomes: platform.utils.deepClone(app.uiState?.customBiomes || []),
+            // The Generate panel's cultures, edited as the styles are (see CultureLists)
+            cultures: platform.utils.deepClone(app.uiState?.cultures ?? []),
             styles: Object.fromEntries(MapStateManager.STYLE_LISTS.map((key) => [key, platform.utils.deepClone(app.uiState?.[key] ?? null)])),
         };
     }
@@ -336,6 +339,7 @@ export class MapStateManager {
         app.activeRouteId = state.activeRouteId || null;
         app.activeRegionId = state.activeRegionId || null;
         app.uiState.customBiomes = state.customBiomes || app.uiState.customBiomes;
+        if (Array.isArray(state.cultures)) app.uiState.cultures = state.cultures;
         for (const key of MapStateManager.STYLE_LISTS) if (state.styles && key in state.styles) app.uiState[key] = state.styles[key];
     }
 

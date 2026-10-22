@@ -76,8 +76,9 @@ const custom = ref({ also: ["custom"] });
 /**
  * What the generator records on everything it makes: its run, what it is (a realm, duchy or
  * county; a town or castle; a route), its tier (kingdom or independent, a pin style tier, a route
- * class), its index in the run, its people and dominant culture, and whether the user has edited or
- * locked it (which a re-run reads).
+ * class), its index in the run, its people, its dominant culture and culture mix (by the map
+ * culture's id; a number is an older run's index into its own cultures), and whether the user has
+ * edited or locked it (which a re-run reads).
  */
 const GENERATED = obj(
     {
@@ -86,7 +87,8 @@ const GENERATED = obj(
         tier: { t: "key", nullable: true },
         sourceId: int(0),
         population: num(RANGE.COUNT, { nullable: true }),
-        culture: int(0, 1e6, { nullable: true }),
+        culture: { t: "cultureRef", nullable: true },
+        mix: list(obj({ culture: key, share: num(RANGE.UNIT) })),
         edited: bool,
         locked: bool,
     },
@@ -244,13 +246,31 @@ const LAYER_SET = obj({
 
 const generatorText = (field) => text("name", "FILRODENSWMB.UI.LimitKindGenerator", field);
 
+/** A habitat band: [lo, hi] (see CultureInput), or null for no limit. */
+const band = { t: "band", nullable: true };
+
+/**
+ * A culture (the Cultures section and the culture inspector; see CultureInput): its look, name
+ * base, how open and how dense it is, its habitat, and its homelands as map points.
+ */
+const CULTURE = obj({
+    id,
+    name: name("FILRODENSWMB.UI.LimitKindCulture"),
+    color,
+    nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
+    openness: num(RANGE.UNIT),
+    density: num({ min: FILRODENSWMB.GENERATOR.CULTURES.FIELDS.density.min, max: FILRODENSWMB.GENERATOR.CULTURES.FIELDS.density.max }),
+    habitat: obj({ temperature: band, moisture: band, height: band, relief: band, coast: num({ min: -1, max: 1 }), river: num({ min: -1, max: 1 }) }),
+    homelands: list({ t: "xy" }),
+});
+
 /** The settings a run was made with (see GeneratorSettings.resolveSettings). */
 const GENERATOR_SETTINGS = obj({
     seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
     nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
     world: obj({ density: num(RANGE.SCALE), urbanisation: num(RANGE.SCALE), realmSpacing: num(RANGE.SCALE), fragmentation: num(RANGE.SCALE) }),
     ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strifeName: key, strife: num(RANGE.UNIT) })),
-    cultures: list(obj({ name: generatorText("FILRODENSWMB.UI.LimitFieldName"), nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), openness: num(RANGE.UNIT), density: num(RANGE.SCALE), homelandCell: int(0, 1e9, { nullable: true }), habitat: numTree })),
+    cultures: list(CULTURE),
 });
 
 /** An object of on and off switches, by name. */
@@ -368,6 +388,8 @@ const CUSTOM_BIOME = obj({
     color: { t: "rgb" },
     placement: enumOf(Object.values(FILRODENSWMB.BIOME_PLACEMENT)),
     solidOverWater: bool,
+    // The built-in biome the generator treats it as (GENERATOR.BIOMES); null: the biome the climate gives
+    behavesLike: enumOf(Object.keys(FILRODENSWMB.GENERATOR.BIOMES), { nullable: true }),
     rules: list(obj({ elevation: list({ t: "segment" }), moisture: list({ t: "segment" }), temperature: list({ t: "segment" }) })),
 });
 
@@ -514,6 +536,7 @@ const MAP = obj({
     ),
     generatorStale: bool,
     generatorSettings: GENERATOR_PANEL,
+    cultures: list(CULTURE),
     upwindMargin: obj(
         {
             format: int(0, 1000),
@@ -591,7 +614,8 @@ const MODEL_RUN = obj({
     seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
     settings: GENERATOR_SETTINGS,
     cellCount: int(0, FILRODENSWMB.MESH.MAX_CELLS),
-    cultures: list(obj({ name: generatorText("FILRODENSWMB.UI.LimitFieldName"), nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), homeland: int(0, 1e9, { nullable: true }) })),
+    // Each culture as the run used it (see ModelRun); `homeland`, a single cell, is an older run's
+    cultures: list(obj({ id: { ...key, nullable: true }, name: generatorText("FILRODENSWMB.UI.LimitFieldName"), color: { ...color, nullable: true }, nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), homelands: { t: "cells" }, homeland: int(0, 1e9, { nullable: true }) })),
     stats: numTree,
     cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
     history: list(numTree),
@@ -613,6 +637,7 @@ export const RULES = Object.freeze({
     river: RIVER,
     landMask: LAND_MASK,
     customBiome: CUSTOM_BIOME,
+    culture: CULTURE,
     routeStyle: ROUTE_STYLE,
     regionStyle: REGION_STYLE,
     labelStyle: LABEL_STYLE,
@@ -698,6 +723,10 @@ const CLEANERS = {
     cells: (value) => (Array.isArray(value) ? value.filter(isCell) : DROP),
     legs: (value) => (Array.isArray(value) ? value.map((leg) => (Array.isArray(leg) ? leg.filter(isCell) : [])) : DROP),
     segment: (value) => cleanSegment(value),
+    // A map point: finite x and y within the coordinate range, and nothing else
+    xy: (value) => (value && typeof value === "object" && !Array.isArray(value) && [value.x, value.y].every((n) => Number.isFinite(n) && Math.abs(n) <= RANGE.COORD.max) ? { x: value.x, y: value.y } : DROP),
+    cultureRef: (value) => (Number.isInteger(value) && value >= 0 && value < 1e6 ? value : orDrop(Sanitize.id(value))),
+    band: (value) => (Array.isArray(value) && value.length === 2 && value.every(Number.isFinite) && value[0] <= value[1] ? [value[0], value[1]] : DROP),
     numTree: (value) => cleanNumTree(value, 0),
     obj: (value, rule, context) => cleanObject(value, rule.fields, context),
     list: (value, rule, context) => (Array.isArray(value) ? cleanList(value, rule.of, context) : DROP),

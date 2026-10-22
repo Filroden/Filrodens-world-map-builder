@@ -1,6 +1,7 @@
 import { Idiomorph } from "../../vendor/idiomorph/idiomorph.esm.js";
 import { Overlay } from "../ui/Overlay.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
+import { RangeTrack } from "../ui/RangeTrack.js";
 import { platform } from "../platform/index.js";
 
 /**
@@ -93,6 +94,7 @@ export class Inspector {
         this.#open.set(app, state);
         this.#rememberDefaults(state);
         RangeDisplay.syncAllFills(overlay.body);
+        RangeTrack.syncAll(overlay.body);
         this.#bind(app, state);
         overlay.closed.then(() => {
             if (this.#open.get(app) === state) this.#open.delete(app);
@@ -174,8 +176,10 @@ export class Inspector {
         for (const option of state.overlay.body.querySelectorAll("option")) option.selected = option.hasAttribute("selected");
         state.overlay.setHeader(state.kind.header(app, object, state.ref));
         this.#rememberDefaults(state);
-        // The morph takes away the sliders' filled tracks (a style the template does not write)
+        // The morph takes away the sliders' filled tracks and the bands' handles' places (styles
+        // the template does not write)
         RangeDisplay.syncAllFills(state.overlay.body);
+        RangeTrack.syncAll(state.overlay.body);
     }
 
     /**
@@ -212,6 +216,8 @@ export class Inspector {
 
     static #bind(app, state) {
         const dialog = state.overlay.element;
+        // Band fields (a culture's habitat): their handles, keys, quick picks and reset send change
+        RangeTrack.bind(dialog);
         dialog.addEventListener("change", (event) => {
             if (event.target.name) this.#commit(app, state, event.target.name);
         });

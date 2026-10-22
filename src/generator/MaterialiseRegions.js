@@ -3,6 +3,7 @@ import { OwnerLayer } from "../mesh/OwnerLayer.js";
 import { claimWaters } from "../mesh/RegionEdits.js";
 import { UNCLAIMED, addRegion, childLevelFields, createLayerSet, createLevel } from "../mesh/Schema.js";
 import { floodOwners, relaxBorders } from "../mesh/Territory.js";
+import { cultureId, cultureMix } from "./CultureIds.js";
 
 /**
  * A run's realms, duchies and counties as a "political" layer set on the display mesh: three
@@ -127,7 +128,7 @@ function addRealms(level, result, { runId, idFactory, label, duchyLabel }) {
             // Each region its own label (a moved label keeps its own position); an independent
             // duchy's in the duchies' look, so a realm's look marks a kingdom
             label: { ...(realm.kind === "kingdom" ? label : duchyLabel) },
-            generated: generatedFor(runId, "realm", index, { tier: realm.kind, population: realm.population, culture: realm.cultures?.[0]?.[0] ?? null }),
+            generated: generatedFor(runId, "realm", index, { tier: realm.kind, population: realm.population, culture: cultureId(result, realm.cultures?.[0]?.[0]), ...cultureMix(result, realm.cultures) }),
         }, idFactory);
     });
 }

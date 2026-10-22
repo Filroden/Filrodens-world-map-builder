@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 import { ColorMath } from "../tools/ColorMath.js";
 import { platform } from "../platform/index.js";
+import { RangeTrack } from "../ui/RangeTrack.js";
 
 /**
  * The "Biome Rule Stacker" - a dedicated, large dialogue window (not one of the module's
@@ -431,41 +432,37 @@ export class RuleEditorDialog {
     }
 
     /**
-     * Wires one handle's pointer drag. `edgeIndex` is 0 for the min end, 1 for the max end -
-     * each end is clamped so it can never cross the other. Updates `segment` in place and
-     * calls `syncVisual()` on every move; deliberately never calls the full `rerender`,
-     * since that would destroy this very handle mid-drag (its pointer capture included).
+     * Wires one handle: dragged with the pointer or moved with the keys (see RangeTrack). `edgeIndex`
+     * is 0 for the min end, 1 for the max end; each end is clamped so it never crosses the other.
+     * Updates `segment` in place and calls `syncVisual()` on every move; deliberately never calls
+     * the full `rerender`, since that would destroy this very handle mid-drag (its pointer capture
+     * included).
      */
     static #wireDragHandle(handle, track, segment, edgeIndex, syncVisual) {
-        handle.addEventListener("pointerdown", (event) => {
+        handle.setAttribute("role", "slider");
+        handle.setAttribute("aria-valuemin", "0");
+        handle.setAttribute("aria-valuemax", "1");
+        const set = (value) => {
+            let pct = RuleEditorDialog.#round2(Math.max(0, Math.min(1, value)));
+            if (edgeIndex === 0) {
+                pct = Math.min(pct, segment[1]);
+                segment[0] = pct;
+                segment[2] = pct <= RuleEditorDialog.#EPS;
+            } else {
+                pct = Math.max(pct, segment[0]);
+                segment[1] = pct;
+                segment[3] = pct >= 1 - RuleEditorDialog.#EPS;
+            }
+            handle.setAttribute("aria-valuenow", String(segment[edgeIndex]));
+            syncVisual();
+        };
+        handle.setAttribute("aria-valuenow", String(segment[edgeIndex]));
+        handle.addEventListener("pointerdown", (event) => RangeTrack.dragEdge(event, handle, track, { set }));
+        handle.addEventListener("keydown", (event) => {
+            const value = RangeTrack.stepKey(event, segment[edgeIndex], { min: 0, max: 1, step: 0.01 });
+            if (value === null) return;
             event.preventDefault();
-            handle.setPointerCapture(event.pointerId);
-
-            const onMove = (moveEvent) => {
-                const rect = track.getBoundingClientRect();
-                let pct = rect.width > 0 ? (moveEvent.clientX - rect.left) / rect.width : segment[edgeIndex];
-                pct = RuleEditorDialog.#round2(Math.max(0, Math.min(1, pct)));
-
-                if (edgeIndex === 0) {
-                    pct = Math.min(pct, segment[1]);
-                    segment[0] = pct;
-                    segment[2] = pct <= RuleEditorDialog.#EPS;
-                } else {
-                    pct = Math.max(pct, segment[0]);
-                    segment[1] = pct;
-                    segment[3] = pct >= 1 - RuleEditorDialog.#EPS;
-                }
-                syncVisual();
-            };
-
-            const onUp = (upEvent) => {
-                handle.releasePointerCapture(upEvent.pointerId);
-                window.removeEventListener("pointermove", onMove);
-                window.removeEventListener("pointerup", onUp);
-            };
-
-            window.addEventListener("pointermove", onMove);
-            window.addEventListener("pointerup", onUp);
+            set(value);
         });
     }
 
@@ -491,7 +488,7 @@ export class RuleEditorDialog {
         const picker = document.createElement("div");
         picker.className = "fwmb-rule-zone-picker";
 
-        for (const zone of RuleEditorDialog.#elevationZones(seaLevel)) {
+        for (const zone of RuleEditorDialog.elevationZones(seaLevel)) {
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "fwmb-rule-zone-chip";
@@ -522,7 +519,7 @@ export class RuleEditorDialog {
      * bands only, not tuned thresholds - expected to be revisited once sea-level rebasing
      * lands as its own feature.
      */
-    static #elevationZones(seaLevel) {
+    static elevationZones(seaLevel) {
         const span = (1 - seaLevel) / 4;
         // Rounded for the same reason a dragged handle is (see #round2): a quarter-of-the-
         // land-band boundary like seaLevel + span rarely lands on a clean two-decimal value

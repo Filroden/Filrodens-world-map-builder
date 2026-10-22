@@ -164,6 +164,7 @@ test("a custom biome behaves as the biome beneath it until told otherwise", () =
     sides[200] = 0xff;
     const painted = { ...base, biomeOverrides: new Uint8Array(size).fill(200), biomeParams: { biomePalette: { 200: [1, 2, 3] }, biomeSides: sides } };
     assert.deepEqual(modelBiomeRaster({ ...painted, customBiomes: [{ id: 200 }] }), plain, "underlying biome: no change");
+    assert.deepEqual(modelBiomeRaster({ ...painted, customBiomes: [{ id: 200, behavesLike: null }] }), plain, "The biome beneath, as saved by the dialogue: the same as before the field existed");
     const desert = modelBiomeRaster({ ...painted, customBiomes: [{ id: 200, behavesLike: "SUBTROPICAL_DESERT" }] });
     for (let pixel = 0; pixel < size; pixel++) assert.equal(desert[pixel], plain[pixel] ? FILRODENSWMB.BIOME_IDS.SUBTROPICAL_DESERT : 0);
     assert.equal(behavesLikeTable([{ id: 5, behavesLike: "DEEP_OCEAN" }]).get(5), 0, "only land biomes the model knows");
@@ -198,9 +199,31 @@ test("two cultures share the island, each holding its homeland", () => {
     const west = land.reduce((a, b) => (cells.x[a] < cells.x[b] ? a : b));
     const east = land.reduce((a, b) => (cells.x[a] > cells.x[b] ? a : b));
     const data = spreadCultures(graph, resolveCultures([{ name: "W", homelandCell: west, openness: 0.2 }, { name: "E", homelandCell: east, openness: 0.2 }]));
-    assert.deepEqual(Array.from(data.homelands), [west, east]);
+    assert.deepEqual(data.homelands.map((cells) => Array.from(cells)), [[west], [east]]);
     assert.equal(data.dominant[west], 0);
     assert.equal(data.dominant[east], 1);
+    const listed = spreadCultures(graph, resolveCultures([{ name: "W", homelandCells: [west], openness: 0.2 }, { name: "E", homelandCells: [east], openness: 0.2 }]));
+    assert.deepEqual(Array.from(listed.dominant), Array.from(data.dominant), "one homeland in a list is the single homeland of before");
+});
+
+test("a culture with two homelands spreads from both, and holds land at each", () => {
+    const { graph, cells } = islandGraph();
+    const land = [];
+    for (let cell = 0; cell < cells.count; cell++) if (!cells.water[cell] && cells.landKm2[cell] > 0) land.push(cell);
+    const by = (score) => land.reduce((a, b) => (score(a) < score(b) ? a : b));
+    const west = by((cell) => cells.x[cell]);
+    const east = by((cell) => -cells.x[cell]);
+    const north = by((cell) => cells.y[cell]);
+    const south = by((cell) => -cells.y[cell]);
+    // A closed people at the far west and east; an open one at the north and south
+    const data = spreadCultures(graph, resolveCultures([{ name: "Hill", homelandCells: [west, east], openness: 0.1 }, { name: "Plain", homelandCells: [north, south], openness: 0.1 }]));
+    assert.deepEqual(data.homelands.map((cells) => Array.from(cells).sort((a, b) => a - b)), [[west, east].sort((a, b) => a - b), [north, south].sort((a, b) => a - b)]);
+    for (const cell of [west, east]) assert.equal(data.dominant[cell], 0);
+    for (const cell of [north, south]) assert.equal(data.dominant[cell], 1);
+    const water = cells.water.findIndex((value) => value === 1);
+    const placed = spreadCultures(graph, resolveCultures([{ name: "Sea", homelandCells: [water, -4, 1e9, 2.5] }]));
+    assert.equal(placed.homelands[0].length, 1, "homelands off the land are skipped, and one is placed instead");
+    assert.notEqual(placed.homelands[0][0], water);
 });
 
 // ------------------------------------------------------------------ names and routes

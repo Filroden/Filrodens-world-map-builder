@@ -39,4 +39,18 @@
             </select>
         </div>
     </div>
+
+    <div class="fwmb-form-group fwmb-dialog-content fwmb-space-before">
+        <label class="fwmb-info-label">
+            {{localize "FILRODENSWMB.UI.BiomeBehavesLike"}}
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeBehavesLikeHint'}}"></i>
+        </label>
+        <div class="fwmb-form-fields">
+            <select name="biomeBehavesLike">
+                {{#each behaviours}}
+                    <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
 </div>

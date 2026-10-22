@@ -52,6 +52,7 @@ const FAMILIES = [
     "FILRODENSWMB.UI.PinDetailLevel",
     "FILRODENSWMB.UI.RouteClass",
     "FILRODENSWMB.UI.RuleEditorZone",
+    "FILRODENSWMB.UI.CultureRelief",
     "FILRODENSWMB.BIOMES.",
     // The generator's stages, by their ids in GENERATOR.STAGES (and writing onto the map)
     { prefix: "FILRODENSWMB.UI.GenerateStage", values: CONFIG + '"materialise"' },

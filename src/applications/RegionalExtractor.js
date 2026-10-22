@@ -69,6 +69,8 @@ export class RegionalExtractor {
             customPinStyles: state.customPinStyles,
             customLabelStyles: state.customLabelStyles,
             customRegionStyles: state.customRegionStyles,
+            // The cultures come too, their homelands moved onto the regional map (one outside it is left behind)
+            cultures: this.#translateCultures(state.cultures ?? [], cropBox, zoomScale, targetWidth, targetHeight),
             history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
             tectonicFaults: this.#translateFaults(app.tectonicFaults ?? [], cropBox, zoomScale, targetWidth, targetHeight),
             manualRivers: this.#scaleRiverWidths(translate(app.manualRivers), zoomScale),
@@ -402,6 +404,16 @@ export class RegionalExtractor {
     /** A coordinate kept a pixel inside the map, so a spring on the edge is traced from a real pixel. */
     static #clampInside(value, size) {
         return Math.min(size - 2, Math.max(1, Math.round(value)));
+    }
+
+    /** The cultures with their homelands in the regional map's pixels, those outside it left out. */
+    static #translateCultures(cultures, cropBox, zoomScale, targetWidth, targetHeight) {
+        return cultures.map((culture) => ({
+            ...platform.utils.deepClone(culture),
+            homelands: (culture.homelands ?? [])
+                .map((point) => ({ x: (point.x - cropBox.x) * zoomScale, y: (point.y - cropBox.y) * zoomScale }))
+                .filter((point) => point.x >= 0 && point.y >= 0 && point.x < targetWidth && point.y < targetHeight),
+        }));
     }
 
     static #translateVectorList(list, cropBox, zoomScale, targetWidth, targetHeight) {

@@ -1899,6 +1899,19 @@ export const FILRODENSWMB = {
         // Cultures. With the single default culture every culture effect is neutral.
         CULTURES: Object.freeze({
             DEFAULT: Object.freeze({ name: "", color: "#8a8a8a", nameBase: "Human Generic", openness: 0.5, density: 1, habitat: Object.freeze({}) }),
+            // A map's culture's fields (the culture inspector's ranges): openness, density, the
+            // relief track's top (in elevation units, about 2,500 m at METRES_PER_UNIT), and coast
+            // and river affinity (-1 avoids, 1 seeks)
+            FIELDS: Object.freeze({
+                openness: Object.freeze({ min: 0, max: 1, default: 0.5 }),
+                density: Object.freeze({ min: 0.25, max: 4, default: 1 }),
+                relief: Object.freeze({ min: 0, max: 0.25 }),
+                coast: Object.freeze({ min: -1, max: 1, default: 0 }),
+                river: Object.freeze({ min: -1, max: 1, default: 0 }),
+            }),
+            // The most cultures a map holds, and the most homelands each may have
+            MAX: 24,
+            MAX_HOMELANDS: 12,
             // The least a culture fits anywhere; a culture farming land that does not suit it
             // still reaches POP_FLOOR of its capacity
             FIT_FLOOR: 0.05,
