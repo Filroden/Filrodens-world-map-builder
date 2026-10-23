@@ -38,7 +38,8 @@ test("every tool has a Next entry and a state word entry", () => {
 });
 
 test("Next follows the stages' order, ends at the last tool, and gives its reason", () => {
-    const order = STAGES.flatMap((stage) => stage.tools);
+    // An optional stage's tools are outside the order of work
+    const order = STAGES.filter((stage) => !stage.optional).flatMap((stage) => stage.tools);
     for (const [index, tool] of order.entries()) {
         const next = NEXT[tool];
         if (index === order.length - 1) {

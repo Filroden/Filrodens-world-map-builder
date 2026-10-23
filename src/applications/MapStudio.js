@@ -3541,9 +3541,11 @@ export class MapStudio {
         this.canvasEngine.setNameFilter(shown.showsName);
         this.canvasEngine.setSymbolScale(SymbolScale.of(this.uiState));
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
-        const shownPins = past ? [] : shown.pins;
-        const shownRoutes = past ? [] : shown.routes;
-        this.canvasEngine.renderInfrastructure(shownPins.filter((p) => !!p.icon), shownRoutes, isInfraEdit, this.meshSession);
+        const pastContent = past ? HistoryView.pastContent(this) : null;
+        const shownPins = past ? DetailLevel.pinsShown(this, pastContent.pins) : shown.pins;
+        // In the History tool the present's roads are drawn as the earlier ages' are, for likeness
+        const shownRoutes = past ? pastContent.routes : HistoryView.presentRoutes(this) ?? shown.routes;
+        this.canvasEngine.renderInfrastructure(shownPins.filter((p) => !!p.icon), shownRoutes, isInfraEdit, past ? past.session : this.meshSession);
 
         // 3. Render Regions, from the display mesh, and the thematic layer under them
         if (past) {
@@ -5284,7 +5286,7 @@ export class MapStudio {
         const scale = await this.#chooseExportScale();
         if (!scale) return;
 
-        const mapName = this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.UnsavedMapName");
+        const mapName = HistoryView.exportName(this, this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.UnsavedMapName"));
         platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ExportPngStarted", { name: mapName }));
         await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingPng"));
         try {

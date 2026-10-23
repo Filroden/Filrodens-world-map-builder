@@ -2,7 +2,8 @@
     History (tool id "history"; see HistoryView): the ages of the map's last generator run, oldest
     first, with the present last. Choosing an earlier age draws it on the map while the tool is
     open. The age in brief, its realms (most people first; an earlier age's centre the map on
-    their realm, and those gone by the present are marked) and what changed by the age after it (for the present, since the age before).
+    their realm, and those gone by the present are marked), what changed by the age after it (for
+    the present, since the age before), and the age shown exported as an image.
 --}}
 {{#if history.ages}}
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="historyAges" title="FILRODENSWMB.UI.SectionHistoryAges" count=history.ages.length}}
@@ -71,6 +72,14 @@
         {{/each}}
     </dl>
     {{/if}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}
+
+{{#if history.canExport}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="historyExport" title="FILRODENSWMB.UI.SectionHistoryExport"}}
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="exportPng" data-tooltip="{{localize 'FILRODENSWMB.UI.HistoryExportHint'}}">
+        <i class="fwmb-icon fwmb-icon--png" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.ExportPNG"}}
+    </button>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 {{/if}}
 {{else}}

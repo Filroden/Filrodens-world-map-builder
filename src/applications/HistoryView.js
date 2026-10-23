@@ -2,7 +2,10 @@ import { FILRODENSWMB } from "../config.js";
 import { platform } from "../platform/index.js";
 import { decodeAge, decodeModelRun, packArray } from "../generator/ModelRun.js";
 import { pastRealmLayer } from "../generator/MaterialiseRegions.js";
-import { ageChanges, matchRealms, placeCells } from "../history/PastAge.js";
+import { buildRoutes } from "../generator/MaterialiseRoutes.js";
+import { ageChanges, chainRoads, matchRealms, placeCells } from "../history/PastAge.js";
+import { MapDialogManager } from "./MapDialogManager.js";
+import { PinStyles } from "./PinStyles.js";
 import { MeshSession } from "../mesh/MeshSession.js";
 import { claimWaters } from "../mesh/RegionEdits.js";
 import { UNCLAIMED, createLayerSet, createLevel, regionFillColor } from "../mesh/Schema.js";
@@ -25,6 +28,8 @@ import { UNCLAIMED, createLayerSet, createLevel, regionFillColor } from "../mesh
 
 /** Per studio: the past map last made, with what it was made from. */
 const pasts = new WeakMap();
+/** Per studio: the past map's pins and roads, with what they were made from. */
+const contents = new WeakMap();
 /** Per studio: the thematic run of the age shown (its cultures), with what it was made from. */
 const runs = new WeakMap();
 /** The id of the past map's layer set and level (never a map's own: those are random ids). */
@@ -33,6 +38,8 @@ const LEVEL_ID = "history-realms";
 /** How many names a list of changes gives before "and n more". */
 const NAMES_SHOWN = 5;
 const NO_VALUE = "–";
+/** A castle's name by its kind of keep (GENERATOR.CASTLE_WORDS), as the run names the present's. */
+const CASTLE_NAMES = Object.freeze({ castle: "FILRODENSWMB.UI.GeneratedCastleName", keep: "FILRODENSWMB.UI.GeneratedKeepName", hold: "FILRODENSWMB.UI.GeneratedHoldName", tower: "FILRODENSWMB.UI.GeneratedTowerName" });
 const PERCENT = 100;
 
 const formatCount = (value) => Math.round(value).toLocaleString(platform.i18n.lang);
@@ -165,6 +172,124 @@ export class HistoryView {
     }
 
     /**
+     * The past map's places and roads, drawn as the present's pins and routes are: each place a
+     * pin in the map's style for its tier (a realm's seat a capital, then city, large town and
+     * town; castles too), named as the run named it then, and the age's roads as routes in the
+     * map's Main road style, laid on the display mesh as a run lays them. Made once per age and
+     * kept while the map's styles stay the same, since laying the roads takes a moment.
+     * @returns {{pins: object[], routes: object[]}|null}
+     */
+    static pastContent(app) {
+        const past = this.pastMap(app);
+        if (!past) return null;
+        const look = JSON.stringify([app.uiState.customPinStyles, app.uiState.customRouteStyles, app.uiState.customLabelStyles]);
+        const cached = contents.get(app);
+        if (cached?.past === past && cached.look === look) return cached.content;
+        const content = { pins: this.#pastPins(app, past.index), routes: this.#pastRoutes(app, past.index) };
+        contents.set(app, { ...contents.get(app), past, look, content });
+        return content;
+    }
+
+    static #pastPins(app, index) {
+        const age = app.modelRun.history[index];
+        const mesh = app.meshSession.mesh;
+        const T = FILRODENSWMB.GENERATOR.PIN_TIERS;
+        const styles = PinStyles.list(app);
+        let defaults = null;
+        // The map's style for a tier, else the module's default for it (not added to the map)
+        const styleOf = (tier) => styles.find((style) => style.tier === tier) ?? (defaults ??= PinStyles.defaults()).find((style) => style.tier === tier) ?? null;
+        const pins = [];
+        const add = (key, cell, name, kind, tier) => {
+            if (!(cell >= 0 && cell < mesh.modelCount)) return;
+            const pin = {
+                id: `history-pin-${key}`,
+                name,
+                description: "",
+                icon: FILRODENSWMB.PINS.DEFAULT_ICON,
+                x: mesh.siteX(cell),
+                y: mesh.siteY(cell),
+                scale: FILRODENSWMB.PINS.DEFAULT_SCALE,
+                color: FILRODENSWMB.PINS.DEFAULT_COLOR,
+                visibility: "all",
+                pinStyle: null,
+                label: { fontSize: FILRODENSWMB.PINS.DEFAULT_SCALE },
+                cell,
+                generated: { kind, tier },
+            };
+            const style = styleOf(tier);
+            if (style) PinStyles.apply(app, pin, style);
+            pins.push(pin);
+        };
+        const places = age.places ?? [];
+        for (let at = 0; at + 2 < places.length; at += 3) {
+            const [cell, tier, seat] = [places[at], places[at + 1], places[at + 2]];
+            const pinTier = seat ? T.capital : tier === 0 ? T.city : tier === 1 ? T.largeTown : T.town;
+            add(`${index}-${at / 3}`, cell, age.placeNames?.[at / 3] ?? "", "town", pinTier);
+        }
+        (age.castles ?? []).forEach((cell, at) => add(`${index}-castle-${at}`, cell, this.#castleName(age.castleNames?.[at], age.castleKeeps?.[at]), "castle", T.castle));
+        return pins;
+    }
+
+    /** A castle's name with its kind of keep, as the run names the present's ("Ashford Keep"). */
+    static #castleName(name, keep) {
+        if (!name) return "";
+        return platform.i18n.localize(CASTLE_NAMES[keep] ?? CASTLE_NAMES.castle).replaceAll("{name}", name);
+    }
+
+    static #pastRoutes(app, index) {
+        const age = app.modelRun.history[index];
+        const { roadFrom, roadTo } = decodeAge(age);
+        if (!roadFrom || !roadTo) return [];
+        return this.#roadRoutes(app, roadFrom, roadTo, placeCells(age.places ?? []), `history-road-${index}`);
+    }
+
+    /**
+     * The present's roads drawn as an earlier age's are, while the History tool shows the present,
+     * so every age's roads look alike: the run's land trade (the roads it used) laid in the Main
+     * road style between the run's towns on the map. Null when the run has no earlier age or kept
+     * no trade (the map's own routes are drawn then).
+     * @returns {object[]|null}
+     */
+    static presentRoutes(app) {
+        if (app.activeTool !== "history" || this.ageCount(app) < 2 || this.isPast(app)) return null;
+        const cells = this.#cells(app);
+        if (!cells.tradeFrom || !cells.tradeTo || !cells.tradeKind) return null;
+        const look = JSON.stringify(app.uiState.customRouteStyles);
+        const cached = contents.get(app)?.present;
+        if (cached?.modelRun === app.modelRun && cached.look === look) return cached.routes;
+        const from = [];
+        const to = [];
+        cells.tradeFrom.forEach((cell, edge) => {
+            if (cells.tradeKind[edge] !== 0) return;
+            from.push(cell);
+            to.push(cells.tradeTo[edge]);
+        });
+        const places = new Set();
+        for (const pin of app.mapPins ?? []) if (pin.generated?.run === app.modelRun.run && pin.generated.kind === "town" && Number.isInteger(pin.cell)) places.add(pin.cell);
+        const routes = this.#roadRoutes(app, from, to, places, "history-road-present");
+        contents.set(app, { ...contents.get(app), present: { modelRun: app.modelRun, look, routes } });
+        return routes;
+    }
+
+    /** Roads (model cell pairs) as routes laid on the display mesh in the map's Main road style. */
+    static #roadRoutes(app, roadFrom, roadTo, places, prefix) {
+        const chains = chainRoads(roadFrom, roadTo, places);
+        const id = FILRODENSWMB.GENERATOR.ROUTE_STYLES.road.main;
+        const own = (app.uiState.customRouteStyles ?? []).find((style) => style.id === id);
+        const seed = own ? null : FILRODENSWMB.ROUTES.DEFAULT_STYLES.find((style) => style.id === id);
+        const style = own ?? (seed ? { ...seed, name: platform.i18n.localize(seed.nameKey) } : null);
+        let next = 0;
+        const routes = buildRoutes(app.meshSession, { routes: chains.map((cells) => ({ cells, transport: "road", class: "main" })) }, {
+            runId: null,
+            idFactory: () => `${prefix}-${next++}`,
+            styleFor: () => style,
+            styleFields: (chosen) => MapDialogManager.routeStyleFields(chosen),
+        });
+        for (const route of routes) route.generated = null;
+        return routes;
+    }
+
+    /**
      * The map's level filter (see DetailLevel.shown) for the past map: its realms are shown when
      * the map's own realm level is (on in the Regions menu, at the detail level), since they stand
      * in for it.
@@ -265,6 +390,15 @@ export class HistoryView {
         return thematic;
     }
 
+    /**
+     * An export's name: the map's, with the age added while an earlier age is shown, so an image
+     * of the past is not taken for the present ("Westmarch, age 2").
+     */
+    static exportName(app, name) {
+        const age = app.activeTool === "history" && this.ageCount(app) > 1 ? this.chosenAge(app) : null;
+        return age === null ? name : platform.i18n.format("FILRODENSWMB.UI.HistoryExportName", { name, number: age });
+    }
+
     // ------------------------------------------------------------------ the information bar
 
     /** The realm under the pointer in the age shown, in the information bar; hidden for the present. */
@@ -311,6 +445,8 @@ export class HistoryView {
             someFell: realms.some((realm) => realm.fell),
             changes: this.#changes(app, chosen),
             isPresent: chosen === count,
+            // Each age can be exported as shown, the present too, named with its age
+            canExport: true,
         };
     }
 

@@ -2,7 +2,7 @@
 // of its land; each later realm once), and what changed between two ages.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ageChanges, cultureShares, matchRealms, placeCells } from "../../src/history/PastAge.js";
+import { ageChanges, chainRoads, cultureShares, matchRealms, placeCells } from "../../src/history/PastAge.js";
 
 test("a realm carries on as the later realm holding its seat or most of its land, each later realm once", () => {
     // Ten cells. Earlier: realm 0 on cells 0 to 4 (seat 0), realm 1 on 5 to 7 (seat 6), realm 2 on 8 and 9 (seat 9)
@@ -34,4 +34,14 @@ test("the changes between two ages: realms fallen and risen, places founded and 
     assert.deepEqual(split.rose, [0, 1], "realm 0 holds nothing; realm 1 took the half without the seat");
     assert.equal(split.peoples, null, "an age without cultures has no peoples to compare");
     assert.deepEqual(Array.from(cultureShares([-1, -1], 2)), [0, 0]);
+});
+
+test("an age's roads chain between places, forks and ends, and round a loop with none", () => {
+    // A line 1-2-3-4 with a town on 3, a fork at 4 to 5 and 6, and a loop 10-11-12-10
+    const from = [1, 2, 3, 4, 4, 10, 11, 12];
+    const to = [2, 3, 4, 5, 6, 11, 12, 10];
+    const chains = chainRoads(from, to, new Set([3]));
+    const key = (chain) => (chain[0] <= chain.at(-1) ? chain : [...chain].reverse()).join("-");
+    assert.deepEqual(chains.map(key).sort(), ["1-2-3", "10-11-12-10", "3-4", "4-5", "4-6"].sort());
+    assert.equal(chains.flat().length - chains.length, from.length, "every road once");
 });

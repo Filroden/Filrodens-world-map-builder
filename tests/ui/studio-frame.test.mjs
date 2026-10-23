@@ -37,13 +37,14 @@ test("the studio's width classes switch at 1,400 and 1,200px, and the rail folds
     assert.equal(fold(400, rail), "files", "no further: the rail scrolls");
 });
 
-test("the rail holds the three stages in order, then the occasional tools", () => {
+test("the rail holds the stages in order (the optional one last), then the occasional tools", () => {
     assert.deepEqual(
         STAGES.map((stage) => [stage.id, stage.tools]),
         [
             ["shape", ["scene", "terrain", "biomes", "features"]],
             ["populate", ["generate", "regions", "infrastructure", "labels"]],
-            ["finish", ["cartography", "history", "export"]],
+            ["finish", ["cartography", "export"]],
+            ["explore", ["history"]],
         ],
     );
     assert.deepEqual(

@@ -682,7 +682,9 @@ export const FILRODENSWMB = {
         STAGES: [
             { id: "shape", label: "FILRODENSWMB.UI.StageShape", tools: ["scene", "terrain", "biomes", "features"] },
             { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["generate", "regions", "infrastructure", "labels"] },
-            { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "history", "export"] },
+            { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
+            // Tools to look at a finished map with, outside the order of work (no Next leads to them)
+            { id: "explore", label: "FILRODENSWMB.UI.StageExplore", tools: ["history"], optional: true },
         ],
         // The Appearance menu (the reader's colour theme, see AppearanceMenu) sits among them, and on
         // the web the full-screen toggle (shown only where the host can go full screen)
@@ -695,10 +697,10 @@ export const FILRODENSWMB = {
         ],
         // The panel's header: each stage's tools are numbered in order ("Shape · 2 of 4") except
         // Populate's, which are worked in any order. The engine is named for the tools it shapes.
-        UNNUMBERED_STAGES: ["populate"],
+        UNNUMBERED_STAGES: ["populate", "explore"],
         ENGINE_IN_HEADER: ["scene", "terrain"],
         // Each tool's Next footer: the tool that follows and why (a localisation key). Tools outside
-        // the stages, and the last one, have none.
+        // the stages, in an optional stage, and the last one, have none.
         NEXT: {
             scene: { tool: "terrain", reason: "FILRODENSWMB.UI.NextReasonScene" },
             terrain: { tool: "biomes", reason: "FILRODENSWMB.UI.NextReasonTerrain" },
@@ -708,9 +710,9 @@ export const FILRODENSWMB = {
             regions: { tool: "infrastructure", reason: "FILRODENSWMB.UI.NextReasonRegions" },
             infrastructure: { tool: "labels", reason: "FILRODENSWMB.UI.NextReasonInfrastructure" },
             labels: { tool: "cartography", reason: "FILRODENSWMB.UI.NextReasonLabels" },
-            cartography: { tool: "history", reason: "FILRODENSWMB.UI.NextReasonCartography" },
-            history: { tool: "export", reason: "FILRODENSWMB.UI.NextReasonHistory" },
+            cartography: { tool: "export", reason: "FILRODENSWMB.UI.NextReasonCartography" },
             export: null,
+            history: null,
             reference: null,
             library: null,
             manage: null,

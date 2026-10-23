@@ -105,3 +105,50 @@ export function ageChanges(earlier, later, cultureCount) {
     }
     return { fell, rose, founded, lost, peoples };
 }
+
+/**
+ * An age's roads as chains of model cells, for drawing as routes: each runs between two ends,
+ * where an end is a place (a road's town), a junction or a road's end, so a chain never runs
+ * through a town or a fork. Roads closing a loop with no end on it make one chain round it.
+ *
+ * @param {ArrayLike<number>} from - Each road's first model cell.
+ * @param {ArrayLike<number>} to - Each road's other model cell.
+ * @param {Set<number>} places - The age's place cells.
+ * @returns {number[][]} Each chain's cells, in order.
+ */
+export function chainRoads(from, to, places) {
+    const links = new Map();
+    const link = (a, b, road) => {
+        if (!links.has(a)) links.set(a, []);
+        links.get(a).push({ next: b, road });
+    };
+    for (let road = 0; road < from.length; road++) {
+        if (from[road] === to[road]) continue;
+        link(from[road], to[road], road);
+        link(to[road], from[road], road);
+    }
+    const isEnd = (cell) => places.has(cell) || links.get(cell).length !== 2;
+    const used = new Uint8Array(from.length);
+    const chains = [];
+    const walk = (start, first) => {
+        const cells = [start];
+        let { next, road } = first;
+        while (!used[road]) {
+            used[road] = 1;
+            cells.push(next);
+            if (isEnd(next)) break;
+            const onward = links.get(next).find((step) => !used[step.road]);
+            if (!onward) break;
+            ({ next, road } = onward);
+        }
+        return cells;
+    };
+    // Ends first, in cell order so the chains come out the same each time
+    const cells = [...links.keys()].sort((a, b) => a - b);
+    for (const cell of cells) {
+        if (!isEnd(cell)) continue;
+        for (const step of links.get(cell)) if (!used[step.road]) chains.push(walk(cell, step));
+    }
+    for (const cell of cells) for (const step of links.get(cell)) if (!used[step.road]) chains.push(walk(cell, step));
+    return chains;
+}

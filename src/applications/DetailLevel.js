@@ -79,11 +79,17 @@ export class DetailLevel {
         const levelOn = ContentRows.levelShown(app);
         if (level === DETAIL.EVERYTHING) return { pins, routes, showsName: () => true, showsLevel: (_set, regionLevel) => levelOn(regionLevel) };
         return {
-            pins: pins.filter((pin) => this.ofPin(app, pin) <= level),
+            pins: this.pinsShown(app, pins),
             routes,
             showsName: (pin) => this.ofName(app, pin) <= level,
             showsLevel: (set, regionLevel) => levelOn(regionLevel) && this.ofLevel(set, regionLevel) <= level,
         };
+    }
+
+    /** The pins of a list shown at the map's detail level (the map's own, or the History tool's). */
+    static pinsShown(app, pins) {
+        const level = this.current(app);
+        return level === DETAIL.EVERYTHING ? pins : pins.filter((pin) => this.ofPin(app, pin) <= level);
     }
 
     /**
