@@ -267,6 +267,28 @@ function savedModelRun() {
     return JSON.parse(JSON.stringify(encodeModelRun(result, "runAAAAAAAAAAAAA")));
 }
 
+test("a regional map's copy of its parent's run passes the importer whole, and a damaged one is dropped", async () => {
+    const { cropRun } = await import("../../src/generator/ParentRun.js");
+    const copyOf = () => cropRun(savedModelRun(), { sites: [0, 0, 10, 0, 0, 10, 10, 10], spacingPx: 10, spacingKm: 25, crop: { x: 0, y: 0, width: 10, height: 10 }, zoomScale: 2 });
+    const file = v4Map();
+    file.parentRun = copyOf();
+    const kept = MapImport.read(file);
+    assert.deepEqual(kept.mapData.parentRun, file.parentRun);
+    assert.equal(kept.corrected, 0);
+    const damaged = (change) => {
+        const broken = v4Map();
+        broken.parentRun = copyOf();
+        change(broken.parentRun);
+        return MapImport.read(broken);
+    };
+    const short = damaged((copy) => (copy.sites.x.data = copy.sites.x.data.slice(0, 8)));
+    assert.equal(short.mapData.parentRun, null, "fewer sites than cells");
+    assert.equal(short.corrected, 1);
+    assert.equal(damaged((copy) => (copy.cells.population.data = copy.cells.population.data.slice(0, 4))).mapData.parentRun, null, "an array shorter than the cells");
+    assert.equal(damaged((copy) => (copy.origin = "self")).mapData.parentRun, null, "not a parent's run");
+    assert.equal(damaged((copy) => (copy.spacingPx = "wide")).mapData.parentRun, null, "no spacing");
+});
+
 test("a saved model run passes the importer whole, and a damaged or hostile one is dropped", () => {
     const file = v4Map();
     file.modelRun = savedModelRun();

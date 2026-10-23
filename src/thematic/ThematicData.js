@@ -496,7 +496,7 @@ function legsByModelEdge(mesh, routes) {
  * once), its transport (an index into TRADE.TRANSPORTS), its class (TRADE.CLASSES) and its traffic.
  * Quiet lines come first, so the busiest are drawn on top.
  * @param {{from: ArrayLike<number>, to: ArrayLike<number>, kind: ArrayLike<number>, value: ArrayLike<number>}} trade
- * @param {import("../mesh/MeshBuilder.js").Mesh} mesh
+ * @param {import("../mesh/MeshBuilder.js").Mesh} mesh - Or cells of the same shape (see RunCells).
  * @param {object[]} routes - The map's routes.
  * @returns {{points: number[], kind: number, cls: number, value: number}[]}
  */
@@ -508,9 +508,11 @@ export function tradeLines(trade, mesh, routes) {
         const b = trade.to[edge];
         if (!(a >= 0 && a < mesh.modelCount && b >= 0 && b < mesh.modelCount)) continue;
         const leg = legs.get(a < b ? `${a},${b}` : `${b},${a}`);
-        const cells = leg ?? [a, b];
         const points = [];
-        for (const cell of cells) points.push(mesh.siteX(cell), mesh.siteY(cell));
+        if (leg) for (const cell of leg) points.push(mesh.siteX(cell), mesh.siteY(cell));
+        // A mesh's model sites are its first display sites; other cells (a regional map's copy of
+        // its parent's run; see RunCells) give their own sites
+        else for (const cell of [a, b]) points.push(mesh.modelSiteX?.(cell) ?? mesh.siteX(cell), mesh.modelSiteY?.(cell) ?? mesh.siteY(cell));
         lines.push({ points: smoothed(points), kind: trade.kind[edge], cls: tradeClassOf(trade.value[edge]), value: trade.value[edge] });
     }
     return lines.sort((x, y) => x.value - y.value);

@@ -21,6 +21,7 @@ import { MapDialogManager } from "./MapDialogManager.js";
 import { bindDropdownMenus, positionPopoverMenu } from "../ui/dropdowns.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
+import { ParentRunRecovery } from "./ParentRunRecovery.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
 import { cleanUnit, formatDistance, kmPerPxOf, scaleBarTick, unitFromSaved } from "../data/MapUnit.js";
@@ -543,6 +544,9 @@ export class MapStudio {
         // reads when it looks upwind past its own edge (see UpwindMargin); null for any other map.
         // Kept as saved, and passed on (and extended) to regional maps cut from this one.
         this.upwindMargin = null;
+        // A regional map's copy of the run of the map it was cut from (see ParentRun), which its
+        // figures read until it has a run of its own; null for any other map.
+        this.parentRun = null;
         this.isDirty = false;
 
         MapStateManager.allocateBuffers(this);
@@ -3889,6 +3893,7 @@ export class MapStudio {
         this.uiState.generatorSettings = panelSettings(payload.generatorSettings);
         this.uiState.cultures = Array.isArray(payload.cultures) ? payload.cultures : [];
         this.upwindMargin = payload.upwindMargin ?? null;
+        this.parentRun = payload.parentRun ?? null;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
 
@@ -4407,6 +4412,7 @@ export class MapStudio {
             generatorSettings: panelSettings(this.uiState.generatorSettings),
             cultures: platform.utils.deepClone(this.uiState.cultures ?? []),
             upwindMargin: this.upwindMargin ?? null,
+            parentRun: this.parentRun ?? null,
             terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
             springsBaked: this.uiState.springsBaked,
             mapWidth: this.mapWidth,
@@ -5075,8 +5081,10 @@ export class MapStudio {
         // A new map is built with the current terrain rules, so there is nothing to update
         this.terrainUpgrade = null;
         this.legacyRootSize = null;
-        // A new map is not a crop of anything, so has no parent ground beyond its edges
+        // A new map is not a crop of anything, so has no parent ground beyond its edges, nor a
+        // parent's run
         this.upwindMargin = null;
+        this.parentRun = null;
 
         // Reset biome colours to defaults so the DOM sync catches them
         this.customBiomeColors = {};
@@ -5806,6 +5814,9 @@ export class MapStudio {
             this.view?.render(["toolbar", "context"]);
             // A map migrated, given a new mesh or a new unit as it opened has changes to save
             this.isDirty = MeshIntegration.changedOnLoad(this) || this.unitConvertedOnLoad;
+            // A regional map cut before regional maps carried their parent's run reads it from its
+            // parent, so its thematic layers and farmland have figures (kept with its next save)
+            if (await ParentRunRecovery.recover(this)) this._repaintVectors();
 
             // Offered only once the map is fully generated and marked clean: the check reads the
             // generated climate, and an update applied here must leave the map marked unsaved.

@@ -69,6 +69,10 @@ const TRADE = Object.freeze({
     tradeValue: Object.freeze({ source: "value", type: "u32", scale: 1e6, offset: 0 }),
 });
 
+/** How a run's per-cell and trade arrays are packed, for whatever copies part of a run (see ParentRun). */
+export const CELL_FIELDS = FIELDS;
+export const TRADE_FIELDS = TRADE;
+
 /** The names of the arrays a saved run holds (the model cells', the culture shares' and the trade's). */
 export const MODEL_RUN_ARRAYS = Object.freeze([...Object.keys(FIELDS), "shareStart", "shareCulture", "shareValue", ...Object.keys(TRADE)]);
 

@@ -803,6 +803,11 @@ export const FILRODENSWMB = {
     // Travel time (the Travel tool; see TravelTime): the ways of travel over land, and each speed
     // as a day's distance in km (a land speed on a road over level ground; rivers are slower
     // against the current). The map keeps its own speeds (uiState.travel), these are the presets.
+    // A regional map's copy of its parent's run (see ParentRun): the cells within this many cell
+    // spacings of its edges are kept too, so a cell at its edge keeps its neighbours
+    PARENT_RUN: Object.freeze({
+        MARGIN_CELLS: 1.5,
+    }),
     TRAVEL_TIME: Object.freeze({
         MODES: Object.freeze(["foot", "wagon", "mount"]),
         // Per day, in km. A sailing ship keeps to the run's sea routes; off them, and on a river

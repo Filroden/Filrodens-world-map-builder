@@ -4,6 +4,7 @@ import { cleanUnit } from "../data/MapUnit.js";
 import { decodeModelRun } from "../generator/ModelRun.js";
 import { blendValues, blendWeights } from "../thematic/ThematicData.js";
 import { dayRings, edgeDays, flagRoute, groundPace, travelFrom, wayTo } from "../travel/TravelTime.js";
+import { RunCells } from "./RunCells.js";
 import { TravelNetwork } from "./TravelNetwork.js";
 
 /**
@@ -225,7 +226,7 @@ export class TravelView {
         const interval = this.interval(app);
         const mesh = app.meshSession?.mesh;
         if (!graph || !start || !mesh) return null;
-        const key = JSON.stringify([mode, speeds, interval, start, app.modelRun?.run ?? null]);
+        const key = JSON.stringify([mode, speeds, interval, start, app.modelRun?.run ?? app.parentRun?.run ?? null]);
         const cached = journeys.get(app);
         if (cached?.graph === graph && cached.key === key && cached.modelRun === app.modelRun) return cached.journey;
         const display = app.meshSession.cellAt(start.x, start.y);
@@ -280,11 +281,14 @@ export class TravelView {
             const display = app.meshSession.cellAt(pin.x, pin.y);
             if (display >= 0) towns.add(grid.of[display]);
         }
-        const run = app.modelRun ? decodeModelRun(app.modelRun) : {};
+        // The run's cleared land, from the map's own run or a regional map's copy of its parent's
+        const source = RunCells.of(app);
+        const run = source ? decodeModelRun(source.run) : {};
         let cleared = null;
         if (run.cleared) {
             cleared = new Float32Array(grid.count);
-            for (let cell = 0; cell < grid.count; cell++) cleared[cell] = run.cleared[mesh.parentOf[grid.siteCell[cell]]] ?? 0;
+            const runCellOf = (cell) => source.cells.parentOf[grid.siteCell?.[cell] ?? mesh.cellAt(grid.sites[cell * 2], grid.sites[cell * 2 + 1])];
+            for (let cell = 0; cell < grid.count; cell++) cleared[cell] = run.cleared[runCellOf(cell)] ?? 0;
         }
         return { road, lane, river, towns, cleared };
     }

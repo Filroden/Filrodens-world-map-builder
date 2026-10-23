@@ -4,6 +4,7 @@ import { cleanUnit, formatDistance } from "../data/MapUnit.js";
 import { LAYERS, ThematicSource, TradeIndex, scalePosition, tradeLines } from "../thematic/ThematicData.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 import { HistoryView } from "./HistoryView.js";
+import { RunCells } from "./RunCells.js";
 import { TravelView } from "./TravelView.js";
 
 /**
@@ -11,7 +12,9 @@ import { TravelView } from "./TravelView.js";
  * line layers beside it (the map's `thematic` view setting), what the Thematic layers menu offers,
  * the values under the pointer in the information bar, and the legends under it.
  *
- * The layers read the map's last generator run (app.modelRun) on its display mesh. The run's
+ * The layers read the map's last generator run (app.modelRun) on its display mesh, or on a regional
+ * map with no run of its own, its copy of its parent's run on the parent's cells (see RunCells),
+ * with a note in each legend that the figures come from the map it was cut from. The run's
  * values are worked out once per run and mesh (see ThematicSource) and kept here, so a new run, an
  * undo of one, or another map opened gives a fresh source and nothing stale is drawn.
  *
@@ -81,13 +84,24 @@ export class ThematicView {
      * alone; see HistoryView.thematicRun).
      */
     static source(app) {
-        const modelRun = HistoryView.thematicRun(app) ?? app.modelRun ?? null;
-        const mesh = app.meshSession?.mesh ?? null;
+        const { run: modelRun, cells: mesh } = this.#runCells(app);
         const cached = sources.get(app);
         if (cached?.modelRun === modelRun && cached?.mesh === mesh) return cached.source;
         const source = ThematicSource.of(modelRun, mesh);
         sources.set(app, { modelRun, mesh, source });
         return source;
+    }
+
+    /** The run the layers read and the cells it is on (see RunCells), the age shown first. */
+    static #runCells(app) {
+        const past = HistoryView.thematicRun(app);
+        if (past) return { run: past, cells: app.meshSession?.mesh ?? null, inherited: false };
+        return RunCells.of(app) ?? { run: null, cells: null, inherited: false };
+    }
+
+    /** Whether the layers come from the parent's run (a regional map not generated itself). */
+    static inherited(app) {
+        return this.#runCells(app).inherited && !!this.source(app);
     }
 
     /** The colour layer drawn now: the chosen one, when the run holds what it needs. */
@@ -115,7 +129,7 @@ export class ThematicView {
         const signature = routeSignature(app.mapRoutes);
         const cached = trades.get(app);
         if (cached?.source === source && cached.signature === signature) return cached;
-        const lines = tradeLines(trade, app.meshSession.mesh, app.mapRoutes);
+        const lines = tradeLines(trade, this.#runCells(app).cells, app.mapRoutes);
         const made = { source, signature, lines, index: new TradeIndex(lines, app.mapWidth) };
         trades.set(app, made);
         return made;
@@ -257,7 +271,7 @@ export class ThematicView {
         // The run's id stands for its cultures, which the culture legend lists (an earlier age's
         // run has its own id; see HistoryView.thematicRun)
         const travel = TravelView.legendSignature(app);
-        const signature = layer || trade || travel ? JSON.stringify([layer?.id ?? null, trade, travel, (HistoryView.thematicRun(app) ?? app.modelRun)?.run ?? null, cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, layer ? isFolded(layer.id) : false, isFolded("trade"), isFolded("travel")]) : "";
+        const signature = layer || trade || travel ? JSON.stringify([layer?.id ?? null, trade, travel, (HistoryView.thematicRun(app) ?? app.modelRun ?? app.parentRun)?.run ?? null, this.inherited(app), cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, layer ? isFolded(layer.id) : false, isFolded("trade"), isFolded("travel")]) : "";
         if (container.dataset.signature === signature) return;
         container.dataset.signature = signature;
         const legends = [];
@@ -310,7 +324,8 @@ export class ThematicView {
         section.append(title, this.#legendBody(app, layer, make, rtl));
 
         // The day bands are worked out now, from the terrain as it is, so they are never out of date
-        if (app.uiState?.generatorStale === true && layer.id !== "travel") section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicStale")));
+        if (layer.id !== "travel" && this.inherited(app)) section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicInherited")));
+        else if (app.uiState?.generatorStale === true && layer.id !== "travel") section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicStale")));
         return section;
     }
 

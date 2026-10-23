@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { normaliseAreaFactor, ownersKeyFor, randomId, resolveSpacing } from "../mesh/Schema.js";
 import { decodeAge, decodeModelRun } from "../generator/ModelRun.js";
+import { parentRunHoldsTogether } from "../generator/ParentRun.js";
 import { clean, cleanContext, RULES, STYLE_LIST_RULES } from "./MapRules.js";
 import { ImportRefusal, Sanitize } from "./Sanitize.js";
 import { needsRebase, rebaseStyles } from "./SymbolSizes.js";
@@ -84,6 +85,7 @@ export class MapImport {
         settleLevels(mapData);
         const owners = cleanOwners(tree.owners, mapData, context);
         const modelRun = cleanModelRun(tree.modelRun, context);
+        cleanParentRun(mapData, context);
         refuseOverLimit(context);
         normaliseAreaFactor(mapData);
         const name = typeof mapData.name === "string" && mapData.name.trim() ? mapData.name.trim() : null;
@@ -247,6 +249,18 @@ function cleanModelRun(raw, context) {
     if (modelRun && modelRunHoldsTogether(modelRun)) return modelRun;
     context.corrected += 1;
     return null;
+}
+
+/**
+ * A regional map's copy of its parent's run (see ParentRun), checked as a run is, with a site for
+ * each cell; one that does not hold together is dropped (its figures come back when the regional
+ * map is cut again or generated).
+ */
+function cleanParentRun(mapData, context) {
+    if (mapData.parentRun == null) return;
+    if (parentRunHoldsTogether(mapData.parentRun, modelRunHoldsTogether)) return;
+    mapData.parentRun = null;
+    context.corrected += 1;
 }
 
 function modelRunHoldsTogether(modelRun) {

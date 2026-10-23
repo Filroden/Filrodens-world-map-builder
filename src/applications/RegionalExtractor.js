@@ -9,6 +9,7 @@ import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { extractRegionalVectors } from "../mesh/RegionalMesh.js";
 import { clampAreaFactor, effectiveKmPerPx } from "../mesh/Schema.js";
 import { DetailLevel } from "./DetailLevel.js";
+import { RunCells } from "./RunCells.js";
 import { platform } from "../platform/index.js";
 
 export class RegionalExtractor {
@@ -84,6 +85,8 @@ export class RegionalExtractor {
             landMasks: state.generationEngine === "guided" ? this.#translateLandMasks(app.landMasks ?? [], cropBox, zoomScale) : [],
             mapDecorations: translate(app.mapDecorations),
             upwindMargin: upwindMargin(cropBox, zoomScale),
+            // The run its generated content came from, on its own area (see ParentRun)
+            parentRun: RunCells.forRegion(app, cropBox, zoomScale),
             parentId: app.currentSaveId,
         };
         // Closer in, more is shown: the parent's detail level, raised to what a run would start

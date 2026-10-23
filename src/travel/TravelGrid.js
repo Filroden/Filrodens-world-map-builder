@@ -10,9 +10,10 @@ import { Delaunay } from "../../vendor/d3-delaunay/d3-delaunay.js";
  * TRAVEL_TIME.MAX_CELLS of them. Otherwise they are the model cells themselves.
  *
  * Shape: { coarse, count, sites (x, y pairs), siteCell (the display cell of each site), of (the
- * travel cell holding each display cell), delaunay, spacingPx }, with the fields ThematicData's
- * blendWeights reads (cellCount, parentOf, modelDelaunay, modelSpacing, siteX, siteY), so the day
- * bands blend between travel cells as the thematic layers blend between model cells.
+ * travel cell holding each display cell), delaunay, spacingPx }, with the fields ThematicData
+ * reads of a mesh (modelCount, cellCount, parentOf, modelDelaunay, modelSpacing, siteX and siteY
+ * for display cells, modelSiteX and modelSiteY for these cells), so the day bands blend between
+ * travel cells as the thematic layers blend between model cells.
  *
  * @param {import("../mesh/MeshBuilder.js").Mesh} mesh - The map's display mesh.
  * @param {{cellPx: number, maxCells: number}} options
@@ -64,22 +65,46 @@ function coarseGrid(mesh) {
     return gridOf(mesh, { coarse: true, sites, siteCell, of: mesh.parentOf, delaunay: mesh.modelDelaunay, spacingPx: mesh.modelSpacing });
 }
 
-function gridOf(mesh, { coarse, sites, siteCell, of, delaunay, spacingPx }) {
+function gridOf(mesh, { coarse, sites, siteCell = null, of, delaunay, spacingPx }) {
+    const count = sites.length / 2;
     return {
         coarse,
-        count: siteCell.length,
+        count,
         sites,
         siteCell,
         of,
         delaunay,
         spacingPx,
+        modelCount: count,
         cellCount: mesh.cellCount,
         parentOf: of,
         modelDelaunay: delaunay,
         modelSpacing: spacingPx,
         siteX: (cell) => mesh.siteX(cell),
         siteY: (cell) => mesh.siteY(cell),
+        modelSiteX: (cell) => sites[cell * 2],
+        modelSiteY: (cell) => sites[cell * 2 + 1],
     };
+}
+
+/**
+ * Cells at any sites over a display mesh (a regional map's copy of its parent's run, whose sites
+ * are not the mesh's; see RunCells): each display cell in the cell of the site nearest it, in the
+ * same shape as the travel cells.
+ * @param {import("../mesh/MeshBuilder.js").Mesh} mesh
+ * @param {Float64Array} sites - x, y pairs in the mesh's pixels (some may lie off the map).
+ * @param {number} spacingPx - How far apart they are.
+ * @returns {object}
+ */
+export function cellsFromSites(mesh, sites, spacingPx) {
+    const delaunay = new Delaunay(sites);
+    const of = new Int32Array(mesh.cellCount);
+    let hint = 0;
+    for (let cell = 0; cell < mesh.cellCount; cell++) {
+        hint = delaunay.find(mesh.siteX(cell), mesh.siteY(cell), hint);
+        of[cell] = hint;
+    }
+    return gridOf(mesh, { coarse: false, sites, of, delaunay, spacingPx });
 }
 
 /** The travel cell under each pixel (for the network's build; see TravelNetwork). */

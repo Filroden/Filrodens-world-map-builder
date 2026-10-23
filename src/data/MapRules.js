@@ -531,6 +531,33 @@ const PARAMS = obj({
     solidOverWater: numTree,
 });
 
+/** One packed array of a run's model-cell outputs (see ModelRun.packArray). */
+const PACKED_ARRAY = obj({ type: enumOf(["u8", "u16", "u32"]), scale: num({ min: 1e-9, max: 1e9 }), offset: num(RANGE.SIGNED), data: { t: "base64" } });
+
+/** A culture as a run used it (see ModelRun); `homeland`, a single cell, is an older run's. */
+const RUN_CULTURE = obj({ id: { ...key, nullable: true }, name: generatorText("FILRODENSWMB.UI.LimitFieldName"), color: { ...color, nullable: true }, nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), homelands: { t: "cells" }, homelandsAuto: bool, homelandsLeftOut: int(0, 1e6), homeland: int(0, 1e9, { nullable: true }) });
+
+/**
+ * A regional map's copy of the run of the map it was cut from (see ParentRun): a run's cells and
+ * cultures, with each cell's site in the regional map's pixels. MapImport also checks that every
+ * array holds a value per cell.
+ */
+const PARENT_RUN = obj(
+    {
+        version: int(0, 1000),
+        origin: enumOf(["parent"]),
+        run: key,
+        revision: int(0, 1000),
+        cellCount: int(0, FILRODENSWMB.MESH.MAX_CELLS),
+        cultures: list(RUN_CULTURE),
+        cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
+        sites: obj({ x: PACKED_ARRAY, y: PACKED_ARRAY }),
+        spacingKm: num({ min: 1e-6, max: 1e6 }),
+        spacingPx: num({ min: 1e-6, max: 1e6 }),
+    },
+    { nullable: true },
+);
+
 const UPWIND_STRIP = obj({ start: num(RANGE.SIGNED), min: num(RANGE.SIGNED), max: num(RANGE.SIGNED), data: { t: "base64" } });
 
 const MAP = obj({
@@ -572,6 +599,7 @@ const MAP = obj({
         },
         { nullable: true },
     ),
+    parentRun: PARENT_RUN,
     terrainUpgradeDismissed: bool,
     springsBaked: bool,
     mapWidth: num(RANGE.SIZE),
@@ -642,8 +670,6 @@ const MAP = obj({
 /** A name an earlier age gave a place, castle or realm, or a kind of keep (empty for none). */
 const HISTORY_NAME = generatorText("FILRODENSWMB.UI.LimitFieldName");
 
-/** One packed array of a run's model-cell outputs (see ModelRun.packArray). */
-const PACKED_ARRAY = obj({ type: enumOf(["u8", "u16", "u32"]), scale: num({ min: 1e-9, max: 1e9 }), offset: num(RANGE.SIGNED), data: { t: "base64" } });
 
 /**
  * A run's saved model-cell outputs (see ModelRun), kept beside the map data. MapImport also checks
@@ -657,7 +683,7 @@ const MODEL_RUN = obj({
     settings: GENERATOR_SETTINGS,
     cellCount: int(0, FILRODENSWMB.MESH.MAX_CELLS),
     // Each culture as the run used it (see ModelRun); `homeland`, a single cell, is an older run's
-    cultures: list(obj({ id: { ...key, nullable: true }, name: generatorText("FILRODENSWMB.UI.LimitFieldName"), color: { ...color, nullable: true }, nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"), homelands: { t: "cells" }, homelandsAuto: bool, homelandsLeftOut: int(0, 1e6), homeland: int(0, 1e9, { nullable: true }) })),
+    cultures: list(RUN_CULTURE),
     stats: numTree,
     cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
     ages: obj({ asked: int(1, 100), run: int(1, 100) }),

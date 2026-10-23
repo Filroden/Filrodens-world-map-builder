@@ -145,15 +145,7 @@ function tryPlaceAround(points, grid, rng, site, width, height) {
  * @returns {{sites: Float64Array, modelCount: number}}
  */
 export function generateSites({ width, height, spacing, modelSpacing, seed }) {
-    const rng = mulberry32(seed);
-    const points = [width / 2, height / 2];
-
-    // A model spacing below the display spacing would put model sites closer than the display
-    // grid allows; the model mesh then simply is the display mesh.
-    const modelRadius = Math.max(modelSpacing, spacing);
-    const modelGrid = new AcceptanceGrid(width, height, modelRadius);
-    modelGrid.insert(0, points[0], points[1]);
-    poissonFill(points, [0], modelGrid, rng, width, height);
+    const { points, rng } = sampleModelSites({ width, height, spacing, modelSpacing, seed });
     const modelCount = points.length / 2;
 
     const displayGrid = new AcceptanceGrid(width, height, spacing);
@@ -164,6 +156,31 @@ export function generateSites({ width, height, spacing, modelSpacing, seed }) {
     }
     poissonFill(points, active, displayGrid, rng, width, height);
     return { sites: hilbertOrdered(points, modelCount, width, height), modelCount };
+}
+
+/** The model sites, sampled first from the map centre, with the random stream left where they end. */
+function sampleModelSites({ width, height, spacing, modelSpacing, seed }) {
+    const rng = mulberry32(seed);
+    const points = [width / 2, height / 2];
+    // A model spacing below the display spacing would put model sites closer than the display
+    // grid allows; the model mesh then simply is the display mesh.
+    const modelRadius = Math.max(modelSpacing, spacing);
+    const modelGrid = new AcceptanceGrid(width, height, modelRadius);
+    modelGrid.insert(0, points[0], points[1]);
+    poissonFill(points, [0], modelGrid, rng, width, height);
+    return { points, rng };
+}
+
+/**
+ * The model sites alone, exactly as generateSites places and numbers them, without sampling the
+ * display sites (far more of them): for reading a saved map's run without building its mesh (see
+ * ParentRunRecovery).
+ * @param {{width: number, height: number, spacing: number, modelSpacing: number, seed: number}} params
+ * @returns {Float64Array} x, y pairs.
+ */
+export function generateModelSites(params) {
+    const { points } = sampleModelSites(params);
+    return hilbertOrdered(points, points.length / 2, params.width, params.height);
 }
 
 /**
