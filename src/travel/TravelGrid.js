@@ -54,7 +54,8 @@ export function travelGrid(mesh, { cellPx, maxCells }) {
         hint = delaunay.find(mesh.siteX(cell), mesh.siteY(cell), hint);
         of[cell] = hint;
     }
-    return gridOf(mesh, { coarse: false, sites, siteCell, of, delaunay, spacingPx: spacing });
+    // Asked closer than the display sites lie, the cells are as far apart as the sites allow
+    return gridOf(mesh, { coarse: false, sites, siteCell, of, delaunay, spacingPx: Math.max(spacing, Math.sqrt((mesh.width * mesh.height) / siteCell.length)) });
 }
 
 /** The model cells as travel cells. */

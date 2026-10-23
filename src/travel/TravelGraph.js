@@ -21,9 +21,22 @@ import { FILRODENSWMB } from "../config.js";
  * @returns {object}
  */
 export function buildTravelGraph(payload) {
+    return travelShape(...travelCells(payload));
+}
+
+/**
+ * The model cells and their graph as a travel network builds them (see buildTravelGraph), for
+ * whatever needs the cells' other figures too (see Infill).
+ * @returns {[import("../generator/CellValues.js").ModelCells, CellGraph]}
+ */
+export function travelCells(payload) {
     const cells = buildModelCells({ ...payload, biome: modelBiomeRaster(payload) }, payload.settings?.world ?? {});
     scaleRelief(cells, payload.reliefScale ?? 1);
-    const graph = new CellGraph(cells);
+    return [cells, new CellGraph(cells)];
+}
+
+/** The travel network's shape (see buildTravelGraph) of built cells and their graph. */
+export function travelShape(cells, graph) {
     const count = graph.count;
     const port = portCost(cells);
     return {

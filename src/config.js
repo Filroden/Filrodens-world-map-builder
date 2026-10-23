@@ -805,6 +805,27 @@ export const FILRODENSWMB = {
     // against the current). The map keeps its own speeds (uiState.travel), these are the presets.
     // A regional map's copy of its parent's run (see ParentRun): the cells within this many cell
     // spacings of its edges are kept too, so a cell at its edge keeps its neighbours
+    // Regional in-fill (see Infill): villages and market towns between the towns a regional map
+    // inherited, joined by local lanes, from its parent's people
+    INFILL: Object.freeze({
+        // The in-fill cells' spacing, in effective km (a village's fields and a walk across them)
+        CELL_KM: 5,
+        // Offered once the generator's cells lie at least this many map pixels apart
+        MIN_PARENT_PX: 30,
+        // A place is served by a market within this many days' walk on foot (a day's round trip)
+        MARKET_REACH_DAYS: 0.5,
+        // A market town draws this share of the country people it serves, and has at least MARKET_MIN_POP
+        MARKET_SHARE: 0.06,
+        MARKET_MIN_POP: 300,
+        // A market needs at least this many people within its reach that no town serves yet
+        MARKET_MIN_SERVED: 4000,
+        // A cell with fewer country people than this has hamlets and farms, not a village
+        VILLAGE_MIN_POP: 100,
+        // A village holds at most this many; more people in its cell live in hamlets and farms
+        VILLAGE_MAX_POP: 2000,
+        // At most this many villages, the largest kept
+        MAX_VILLAGES: 4000,
+    }),
     PARENT_RUN: Object.freeze({
         MARGIN_CELLS: 1.5,
     }),
