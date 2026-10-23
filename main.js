@@ -40,6 +40,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/tools-reference.hbs",
         "modules/filrodens-world-map-builder/templates/tools-generate.hbs",
         "modules/filrodens-world-map-builder/templates/tools-history.hbs",
+        "modules/filrodens-world-map-builder/templates/tools-travel.hbs",
         "modules/filrodens-world-map-builder/templates/tools-regions.hbs",
         "modules/filrodens-world-map-builder/templates/tools-scene.hbs",
         "modules/filrodens-world-map-builder/templates/tools-terrain.hbs",

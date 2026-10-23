@@ -261,8 +261,9 @@ export class MapStateManager {
             thematic: { fill: null, lines: [], opacity: FILRODENSWMB.THEMATIC.OPACITY },
             // The age the History tool shows (see HistoryView): null for the age before the present
             historyAge: null,
-            // The Travel tool's way of travel, speeds (km a day) and start (see TravelTime)
-            travel: { mode: "foot", speeds: { ...FILRODENSWMB.TRAVEL_TIME.SPEEDS }, start: null },
+            // The Travel tool's way of travel, speeds (km a day), band width (null for automatic) and
+            // start (see TravelView)
+            travel: { mode: "foot", speeds: { ...FILRODENSWMB.TRAVEL_TIME.SPEEDS }, interval: null, start: null },
             // The map's unit (see MapUnit): the name every distance shown is labelled with
             mapUnit: FILRODENSWMB.MAP_UNIT.DEFAULT,
             cartographyScaleEnable: false,

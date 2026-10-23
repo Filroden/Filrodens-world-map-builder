@@ -4,6 +4,7 @@ import { cleanUnit, formatDistance } from "../data/MapUnit.js";
 import { LAYERS, ThematicSource, TradeIndex, scalePosition, tradeLines } from "../thematic/ThematicData.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 import { HistoryView } from "./HistoryView.js";
+import { TravelView } from "./TravelView.js";
 
 /**
  * The studio side of the thematic layers: which colour layer is shown and how strongly, and which
@@ -91,6 +92,8 @@ export class ThematicView {
 
     /** The colour layer drawn now: the chosen one, when the run holds what it needs. */
     static shownLayer(app) {
+        // The Travel tool's day bands take the colour layer's place while it is open
+        if (TravelView.active(app)) return null;
         const { fill } = this.setting(app);
         return fill && this.source(app)?.has(fill) ? LAYERS.get(fill) : null;
     }
@@ -141,9 +144,9 @@ export class ThematicView {
         const rows = THEMATIC.LAYERS.map((layer) => {
             const missing = source?.missing(layer.id);
             // An earlier age's cultures came later than its brief: an older run lacks them
-            const why = past && layer.id === "culture" && missing === "run" ? "FILRODENSWMB.UI.ThematicNeedsRerunAge" : reasons[missing];
+            const why = TravelView.active(app) ? "FILRODENSWMB.UI.ThematicTravelShown" : past && layer.id === "culture" && missing === "run" ? "FILRODENSWMB.UI.ThematicNeedsRerunAge" : reasons[missing];
             // A row the run cannot show says why; one it can, what it shows
-            return { id: layer.id, disabled: !source || !!missing, title: platform.i18n.localize(why ?? layer.hint) };
+            return { id: layer.id, disabled: !source || !!missing || TravelView.active(app), title: platform.i18n.localize(why ?? layer.hint) };
         });
         const lines = THEMATIC.LINES.map((id) => ({
             id,
@@ -153,7 +156,8 @@ export class ThematicView {
         }));
         // The chosen layer stays the map's setting when the run cannot show it (a map opened before
         // generating), but the menu marks what is drawn: None
-        return { fill: this.shownLayer(app)?.id ?? null, rows, lines, opacity, note: reason ? platform.i18n.localize(reason) : "" };
+        // The opacity also fades the Travel tool's day bands, so it stays usable while they show
+        return { fill: this.shownLayer(app)?.id ?? null, bands: TravelView.active(app), rows, lines, opacity, note: reason ? platform.i18n.localize(reason) : "" };
     }
 
     // ------------------------------------------------------------------ drawing
@@ -162,7 +166,8 @@ export class ThematicView {
     static render(app) {
         const layer = this.shownLayer(app);
         const source = this.source(app);
-        const display = layer ? { values: source.displayBytes(layer.id), lookup: source.lookup(layer.id), opacity: this.setting(app).opacity } : null;
+        const { opacity } = this.setting(app);
+        const display = TravelView.active(app) ? TravelView.bandsDisplay(app, opacity) : layer ? { values: source.displayBytes(layer.id), lookup: source.lookup(layer.id), opacity } : null;
         app.canvasEngine?.renderThematic(app.meshSession, display);
         app.canvasEngine?.renderTrade(this.tradeShown(app) ? (this.#trade(app)?.lines ?? null) : null);
         this.renderLegend(app);
@@ -251,12 +256,14 @@ export class ThematicView {
         const isFolded = (id) => folded.get(app)?.has(id) ?? false;
         // The run's id stands for its cultures, which the culture legend lists (an earlier age's
         // run has its own id; see HistoryView.thematicRun)
-        const signature = layer || trade ? JSON.stringify([layer?.id ?? null, trade, (HistoryView.thematicRun(app) ?? app.modelRun)?.run ?? null, cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, layer ? isFolded(layer.id) : false, isFolded("trade")]) : "";
+        const travel = TravelView.legendSignature(app);
+        const signature = layer || trade || travel ? JSON.stringify([layer?.id ?? null, trade, travel, (HistoryView.thematicRun(app) ?? app.modelRun)?.run ?? null, cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, layer ? isFolded(layer.id) : false, isFolded("trade"), isFolded("travel")]) : "";
         if (container.dataset.signature === signature) return;
         container.dataset.signature = signature;
         const legends = [];
         if (layer) legends.push(this.#legend(app, layer, { rtl, isFolded: isFolded(layer.id) }));
         if (trade) legends.push(this.#legend(app, { id: "trade", label: "FILRODENSWMB.UI.ThematicTrade" }, { rtl, isFolded: isFolded("trade") }));
+        if (travel) legends.unshift(this.#legend(app, { id: "travel", label: "FILRODENSWMB.UI.TravelLegendTitle" }, { rtl, isFolded: isFolded("travel") }));
         container.replaceChildren(...legends);
     }
 
@@ -302,7 +309,8 @@ export class ThematicView {
         title.append(name, toggle);
         section.append(title, this.#legendBody(app, layer, make, rtl));
 
-        if (app.uiState?.generatorStale === true) section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicStale")));
+        // The day bands are worked out now, from the terrain as it is, so they are never out of date
+        if (app.uiState?.generatorStale === true && layer.id !== "travel") section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicStale")));
         return section;
     }
 
@@ -332,6 +340,7 @@ export class ThematicView {
     /** A legend's body by its form: the trade key, a class list (culture) or a graded scale. */
     static #legendBody(app, layer, make, rtl) {
         if (layer.id === "trade") return this.#tradeKey(make);
+        if (layer.id === "travel") return TravelView.legendBody(app, make);
         return ThematicSource.isClassLayer(layer.id) ? this.#classes(app, layer, make) : this.#ramp(app, layer, make, rtl);
     }
 

@@ -1123,6 +1123,53 @@
     align-items: center;
     gap: 0.375rem;
 }
+/* The Travel tool: the start with its Clear button, and each speed on a row (its name, the
+   number, the unit) */
+.fwmb-travel-start {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+/* A way of travel is one line, so its row is shorter than an age's */
+.fwmb .fwmb-travel-modes .fwmb-list-item {
+    min-block-size: 2rem;
+}
+.fwmb-travel-speeds {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    margin-block: 0.25rem 0.5rem;
+}
+.fwmb-travel-speed {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.fwmb-travel-speed > :first-child {
+    flex: 1;
+    min-inline-size: 0;
+    overflow-wrap: break-word;
+}
+.fwmb .fwmb-travel-speed .fwmb-input {
+    inline-size: 4.5rem;
+    min-inline-size: 0;
+    flex: none;
+}
+.fwmb-travel-speed .fwmb-meta {
+    flex: none;
+    min-inline-size: 3.5rem;
+}
+/* The travel legend's days in one row of swatches */
+.fwmb-canvas-readout .fwmb-classes.fwmb-travel-days {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 0.125rem 0.25rem;
+}
+/* Each day under its swatch, so wide bands' three-figure days fit */
+.fwmb-canvas-readout .fwmb-classes.fwmb-travel-days span {
+    flex-direction: column;
+    gap: 0.125rem;
+    font-variant-numeric: tabular-nums;
+}
 /* A list of names in What changed: across the card, under its label */
 .fwmb .fwmb-generate-results .fwmb-history-wide {
     grid-column: 1 / -1;

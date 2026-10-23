@@ -140,7 +140,7 @@ function syncThematic(root, thematic) {
     });
     root.querySelectorAll("[data-thematic-opacity]").forEach((input) => {
         input.value = String(thematic.opacity);
-        input.disabled = !thematic.fill;
+        input.disabled = !thematic.fill && !thematic.bands;
         RangeDisplay.sync(input);
     });
     for (const line of thematic.lines ?? []) {

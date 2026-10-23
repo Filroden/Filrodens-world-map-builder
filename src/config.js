@@ -503,6 +503,8 @@ export const FILRODENSWMB = {
                 crop: ["CropDraw", "CropMove", "CropResize"],
                 // A culture's homeland being picked on the map (see CultureMarkers)
                 homeland: ["PlaceHomeland", "StopHomeland"],
+                // The Travel tool: a click sets where the journey starts (see TravelView)
+                travel: ["SetTravelStart"],
                 terrain: ["PaintTerrain"],
                 biomes: ["PaintBiomes"],
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
@@ -606,6 +608,7 @@ export const FILRODENSWMB = {
                         { caption: "FILRODENSWMB.UI.ShortcutsMove", context: "cartography" },
                     ],
                 },
+                { title: "FILRODENSWMB.UI.ToolTravel", tables: [{ caption: null, context: "travel" }] },
                 {
                     title: "FILRODENSWMB.UI.ShortcutsHolding",
                     tables: [
@@ -674,6 +677,7 @@ export const FILRODENSWMB = {
             labels: { icon: "insert-text", label: "FILRODENSWMB.UI.ToolLabels" },
             cartography: { icon: "explore", label: "FILRODENSWMB.UI.ToolCartography" },
             history: { icon: "history", label: "FILRODENSWMB.UI.ToolHistory" },
+            travel: { icon: "travel-explore", label: "FILRODENSWMB.UI.ToolTravel" },
             export: { icon: "png", label: "FILRODENSWMB.UI.ToolExport" },
             reference: { icon: "image", label: "FILRODENSWMB.UI.ToolReference" },
             library: { icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary" },
@@ -684,7 +688,7 @@ export const FILRODENSWMB = {
             { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["generate", "regions", "infrastructure", "labels"] },
             { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
             // Tools to look at a finished map with, outside the order of work (no Next leads to them)
-            { id: "explore", label: "FILRODENSWMB.UI.StageExplore", tools: ["history"], optional: true },
+            { id: "explore", label: "FILRODENSWMB.UI.StageExplore", tools: ["history", "travel"], optional: true },
         ],
         // The Appearance menu (the reader's colour theme, see AppearanceMenu) sits among them, and on
         // the web the full-screen toggle (shown only where the host can go full screen)
@@ -713,6 +717,7 @@ export const FILRODENSWMB = {
             cartography: { tool: "export", reason: "FILRODENSWMB.UI.NextReasonCartography" },
             export: null,
             history: null,
+            travel: null,
             reference: null,
             library: null,
             manage: null,
@@ -733,6 +738,7 @@ export const FILRODENSWMB = {
             labels: "placing",
             cartography: "placing",
             history: null,
+            travel: null,
             export: null,
             reference: null,
             library: null,
@@ -799,16 +805,55 @@ export const FILRODENSWMB = {
     // against the current). The map keeps its own speeds (uiState.travel), these are the presets.
     TRAVEL_TIME: Object.freeze({
         MODES: Object.freeze(["foot", "wagon", "mount"]),
-        SPEEDS: Object.freeze({ foot: 30, wagon: 25, mount: 60, riverDown: 60, riverUp: 20, sea: 150 }),
+        // Per day, in km. A sailing ship keeps to the run's sea routes; off them, and on a river
+        // with no trade, a small boat
+        SPEEDS: Object.freeze({ foot: 30, wagon: 25, mount: 60, riverDown: 60, riverUp: 20, sea: 150, boat: 40 }),
         SPEED_RANGE: Object.freeze({ MIN: 1, MAX: 1000 }),
-        // The days the bands and rings show, from the start
+        // The bands and rings shown, from the start, each INTERVALS days wide: a small region reads
+        // best by the day, a world by ten. Automatic picks by the map's longer side (AUTO_KM, km).
         MAX_DAYS: 10,
-        // How the generator's land costs (made to compare ways, not to time them) become pace:
-        // open level ground off the road is OFF_ROAD of the road's pace, and cover and relief
-        // slow a step by their cost to the power TERRAIN (so a cost of 4, dense forest on hills,
-        // halves the pace rather than quartering it). The ordering of ways is the generator's.
-        OFF_ROAD: 0.65,
-        TERRAIN: 0.5,
+        INTERVALS: Object.freeze([1, 2, 5, 10]),
+        AUTO_KM: Object.freeze([700, 1500, 4000]),
+        // The day bands' colours, nearest first (ColorBrewer YlGnBu), one per band
+        RAMP: Object.freeze(["#ffffd9", "#edf8b1", "#c7e9b4", "#7fcdbb", "#41b6c4", "#1d91c0", "#225ea8", "#253494", "#081d58", "#040e2c"]),
+        // The day rings: line width in pixels of a BASELINE_DIMENSION map, and their alpha; the way
+        // to the pointer drawn in the trade layer's transport colours (THEMATIC.TRADE.TRANSPORTS).
+        // A pale halo under each ring keeps it readable over the ramp's dark far days.
+        RING_WIDTH: 1.2,
+        RING_COLOR: "#1a1a1a",
+        RING_ALPHA: 0.75,
+        RING_HALO: "#f4f1e8",
+        RING_HALO_WIDTH: 2.8,
+        RING_HALO_ALPHA: 0.85,
+        WAY_WIDTH: 3,
+        // The start's mark: its radius in pixels of a BASELINE_DIMENSION map
+        START_RADIUS: 5,
+        // The turn between one ring's name and the next, round the start (radians)
+        LABEL_TURN: Math.PI / 6,
+        // How the generator's land costs (made to compare ways, not to time them) become pace.
+        // Open level ground off the road goes at a share of the road's pace: land cleared for
+        // farming has tracks, the wilds have none, and a mount or a wagon loses more of its lead
+        // there than a walker. Cover and relief then slow a step by their cost to the power
+        // TERRAIN (a cost of 4, dense forest on hills, about a third of the pace). The ordering of
+        // ways is the generator's.
+        OFF_ROAD: Object.freeze({
+            foot: Object.freeze({ wild: 0.5, cleared: 0.8 }),
+            wagon: Object.freeze({ wild: 0.15, cleared: 0.5 }),
+            mount: Object.freeze({ wild: 0.3, cleared: 0.6 }),
+        }),
+        TERRAIN: 0.7,
+        // Days to find passage when going aboard at sea: at a town's harbour, and anywhere else on
+        // the coast. Coming ashore takes no wait.
+        HARBOUR_DAYS: 0.25,
+        SHORE_DAYS: 2,
+        // How close to a place a click must fall to start there, in screen pixels
+        SNAP_PX: 12,
+        // The travel cells (see TravelGrid): about CELL_PX map pixels apart where the generator's
+        // cells lie further apart than that (a regional map), and never more than MAX_CELLS
+        CELL_PX: 10,
+        MAX_CELLS: 40000,
+        // Edges longer than this many cell spacings are not travelled (see TravelTime.edgeDays)
+        MAX_EDGE_SPACINGS: 2.5,
     }),
     THEMATIC: Object.freeze({
         OPACITY: 0.7,

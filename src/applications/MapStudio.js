@@ -26,6 +26,7 @@ import { clampAreaFactor } from "../mesh/Schema.js";
 import { cleanUnit, formatDistance, kmPerPxOf, scaleBarTick, unitFromSaved } from "../data/MapUnit.js";
 import { ThematicView } from "./ThematicView.js";
 import { HistoryView } from "./HistoryView.js";
+import { TravelView } from "./TravelView.js";
 import { TerrainUpgrade } from "./TerrainUpgrade.js";
 import { RiverSources } from "../generation/RiverSources.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
@@ -273,6 +274,9 @@ export class MapStudio {
         toggleThematicLegend(_e, t)     { ThematicView.toggleLegend(this, t.dataset.thematicLegendId); },
         chooseHistoryAge(_e, t)         { this.#chooseHistoryAge(Number(t.dataset.age)); },
         focusHistoryRealm(_e, t)        { HistoryView.focusRealm(this, Number(t.dataset.realm)); },
+        chooseTravelMode(_e, t)         { TravelView.chooseMode(this, t.dataset.mode); },
+        resetTravelSpeeds()             { TravelView.resetSpeeds(this); },
+        clearTravelStart()              { TravelView.clearStart(this); },
         toggleLabelOverlaps()           { this.#toggleLabelOverlaps(); },
         setSymbolSize(_e, t)            { this.#setSymbolSize(t.dataset.symbolSize); },
         toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
@@ -1273,6 +1277,7 @@ export class MapStudio {
 
             if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
             if (this.activeTool === "history") context.history = HistoryView.context(this);
+            if (this.activeTool === "travel") context.travel = TravelView.context(this);
             if (this.activeTool === "generate") {
                 context.generate = GeneratePanel.context(this);
                 context.cultureList = CultureLists.context(this);
@@ -1649,8 +1654,9 @@ export class MapStudio {
         // Fields that only steer the panel itself (a list's filter, a name being typed in the
         // Regions tree, a Mass Edit tick) are not map settings
         if (target.closest("[data-panel-ui]")) return;
-        // The Generate panel's settings (see GeneratePanel)
+        // The Generate panel's settings (see GeneratePanel), and the Travel tool's speeds
         if (GeneratePanel.handleInput(this, event)) return;
+        if (TravelView.handleInput(this, event)) return;
 
         if (event.type === "change" && target.matches('file-picker[name="referenceImage"]')) {
             // Only a source the studio accepts reaches the canvas (see Sanitize.imageSource)
@@ -2222,10 +2228,12 @@ export class MapStudio {
                 for (const value of readout.querySelectorAll('[id^="fwmb-readout-"]')) value.textContent = "–";
                 ThematicView.readout(this, null, null);
                 HistoryView.readout(this, null, null);
+                TravelView.readout(this, null, null);
                 return;
             }
             ThematicView.readout(this, x, y);
             HistoryView.readout(this, x, y);
+            TravelView.readout(this, x, y);
 
             const index = y * this.mapWidth + x;
             const elev = this.currentElevationData[index];
@@ -2424,6 +2432,7 @@ export class MapStudio {
             isMaskDrawing: this.#isMaskDrawingMode(),
             heldItem: this.canvasEngine?.heldItem ?? null,
             pickingHomeland: CultureMarkers.picking(this),
+            travelPicking: TravelView.picking(this),
         });
 
         CanvasHints.render(element, CanvasHints.getItems(context), (key) => platform.i18n.localize(key));
@@ -3557,6 +3566,9 @@ export class MapStudio {
         ThematicView.render(this);
         // The realm under the pointer is read while an earlier age is shown, and hidden otherwise
         HistoryView.readout(this, null, null);
+        // The Travel tool's day rings (its bands are drawn with the thematic layer)
+        TravelView.render(this);
+        TravelView.readout(this, null, null);
 
         // 4. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
@@ -5166,9 +5178,13 @@ export class MapStudio {
         this.#updateBiomeOpacity();
         this.#updateCanvasModes(newTool);
 
+        // The Travel tool takes the map's clicks for its start while it is open
+        TravelView.toolChanged(this);
+
         // 4. Paint
         this._repaintVectors();
         this.view?.render(["toolbar", "context", "editToolbar"]);
+        this.#updateCanvasHint();
     }
 
     /**
@@ -5288,7 +5304,7 @@ export class MapStudio {
         const scale = await this.#chooseExportScale();
         if (!scale) return;
 
-        const mapName = HistoryView.exportName(this, this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.UnsavedMapName"));
+        const mapName = TravelView.exportName(this, HistoryView.exportName(this, this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.UnsavedMapName")));
         platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ExportPngStarted", { name: mapName }));
         await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingPng"));
         try {

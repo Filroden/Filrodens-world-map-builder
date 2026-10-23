@@ -32,6 +32,7 @@ export class CanvasHints {
      *   faults, land masks, decorations).
      * @param {boolean} [state.isMaskDrawing]  Whether the Scene tool is drawing land masks.
      * @param {boolean} [state.pickingHomeland]  Whether the next click adds a culture's homeland (see CultureMarkers).
+     * @param {boolean} [state.travelPicking]  Whether a click sets the Travel tool's start (see TravelView).
      * @param {string|null} [state.heldItem]  What the pointer holds: label, decoration, pin or
      *   mask (a land mask).
      * @returns {string}  A key of CANVAS_HINTS.CONTEXTS.
@@ -42,6 +43,7 @@ export class CanvasHints {
         const held = CanvasHints.#heldContext(state.heldItem);
         if (held) return held;
         if (state.pickingHomeland) return "homeland";
+        if (state.travelPicking) return "travel";
         if (state.isReferenceMode) return "reference";
         if (state.isCropMode) return "crop";
         if (!state.isEditMode) return "view";

@@ -13,6 +13,7 @@ import { LabelLayout } from "./LabelLayout.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
 import { ThematicLayer } from "./ThematicLayer.js";
 import { TradeFlowLayer } from "./TradeFlowLayer.js";
+import { TravelLayer } from "./TravelLayer.js";
 import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
 import { HomelandMarkers } from "./HomelandMarkers.js";
@@ -116,6 +117,9 @@ export class StudioCanvas {
             // (under them it would be hidden, as most trade runs along a route) and under the nodes
             // and pins
             trade: new PIXI.Container(),
+            // The Travel tool's day rings and way (see renderTravel): over the routes and pins,
+            // under the names
+            travel: new PIXI.Container(),
             labels: new PIXI.Container(),
             reference: new PIXI.Container(),
             cartography: new PIXI.Container(),
@@ -220,6 +224,7 @@ export class StudioCanvas {
             this.layers.features,
             this.layers.regions,
             this.layers.infrastructure,
+            this.layers.travel,
             this.layers.reference,
             this.gridLayer,
             this.layers.labels,
@@ -985,6 +990,7 @@ export class StudioCanvas {
             this.terrainCompositor.destroy();
             this.#dropThematic();
             this.#trade?.destroy();
+            this.#travel?.destroy();
             this.regionLevels.clear();
             this.app.destroy(true, { children: true, texture: true, baseTexture: true });
         }
@@ -1626,6 +1632,25 @@ export class StudioCanvas {
     /** The trade layer, made when first drawn (see renderTrade). */
     #trade = null;
 
+    /**
+     * Draws the Travel tool's day rings, the way to the pointer and the start (see TravelLayer),
+     * or none.
+     * @param {object[]|null} rings - From TravelTime.dayRings, or null for none.
+     * @param {{points: number[], kinds: string[]}|null} [way]
+     * @param {{x: number, y: number}|null} [start]
+     */
+    renderTravel(rings, way = null, start = null) {
+        if (!rings && !this.#travel) return;
+        this.#travel ??= new TravelLayer(PIXI, this.layers.travel);
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        this.#travel.showRings(rings, resScale, start);
+        this.#travel.showWay(rings ? way : null, resScale);
+        this.#travel.showStart(rings ? start : null, resScale);
+    }
+
+    /** The Travel tool's layer, made when first drawn (see renderTravel). */
+    #travel = null;
+
     /** The thematic layer's GPU objects, with the mesh they were made for (see renderThematic). */
     #thematic = null;
 
@@ -2142,6 +2167,7 @@ export class StudioCanvas {
             features: this.layers.features.visible,
             thematic: this.layers.thematic.visible,
             trade: this.layers.trade.visible,
+            travel: this.layers.travel.visible,
         };
 
         this.layers.reference.visible = false;
@@ -2159,6 +2185,7 @@ export class StudioCanvas {
             // player image already
             this.layers.thematic.visible = false;
             this.layers.trade.visible = false;
+            this.layers.travel.visible = false;
             this.layers.features.visible = false;
             this.gridLayer.visible = false;
             this.layers.cartography.visible = false;
@@ -2196,6 +2223,7 @@ export class StudioCanvas {
         this.layers.features.visible = originalVisibility.features;
         this.layers.thematic.visible = originalVisibility.thematic;
         this.layers.trade.visible = originalVisibility.trade;
+        this.layers.travel.visible = originalVisibility.travel;
 
         return new Promise((resolve) => {
             canvas.toBlob((blob) => {
