@@ -8,7 +8,7 @@ import { smallMesh } from "../mesh/helpers.mjs";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
 const { LAYERS, ThematicSource, TradeIndex, blendValues, blendWeights, rampLookup, scalePosition, stepOf, tradeClassOf, tradeLines } = await import("../../src/thematic/ThematicData.js");
-const { decodeModelRun, encodeModelRun, resampleModelRun } = await import("../../src/generator/ModelRun.js");
+const { decodeAge, decodeModelRun, encodeModelRun, packArray, resampleModelRun } = await import("../../src/generator/ModelRun.js");
 const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
 
 /** "#rrggbb" as [r, g, b]. */
@@ -121,7 +121,23 @@ test("population is people per km² of land, and a run of another mesh has no la
 test("a run moved with its map takes each cell's values from where its site came from, and moves its places", () => {
     const mesh = smallMesh();
     const run = runOf(mesh, { population: (cell) => cell, landArea: () => 1, realm: (cell) => cell % 3 });
-    run.history = [{ development: 0.5, plague: 0, strife: 0.2, places: [0, 1, 1, 5, 2, 0], castles: [3], seats: [0], realm: run.cells.realm }];
+    const road = (cells) => packArray(cells, { type: "index" });
+    run.history = [{
+        development: 0.5,
+        plague: 0,
+        strife: 0.2,
+        places: [0, 1, 1, 5, 2, 0],
+        placeNames: ["Ashby", "Brook"],
+        castles: [3, 0],
+        castleNames: ["Crag", "Dun"],
+        castleKeeps: ["keep", "hold"],
+        seats: [0, 5],
+        realmNames: ["Ashmark", "Brookland"],
+        realm: run.cells.realm,
+        culture: run.cells.realm,
+        roadFrom: road([5, 0, 6]),
+        roadTo: road([6, 5, 7]),
+    }];
 
     // The identity move changes nothing
     const all = Int32Array.from({ length: mesh.modelCount }, (_, cell) => cell);
@@ -139,9 +155,17 @@ test("a run moved with its map takes each cell's values from where its site came
     assert.equal(arrays.realm[mesh.modelCount - 1], -1);
     assert.equal(arrays.shareStart.length, mesh.modelCount + 1);
     assert.equal(arrays.shareCulture.length, mesh.modelCount - 1, "the cell from beyond the map has no culture shares");
-    assert.deepEqual(moved.history[0].places, [4, 2, 0], "the place in cell 0 moved off the map; cell 5's to 4");
-    assert.deepEqual(moved.history[0].castles, [2]);
-    assert.deepEqual(moved.history[0].seats, []);
+    const age = moved.history[0];
+    assert.deepEqual(age.places, [4, 2, 0], "the place in cell 0 moved off the map; cell 5's to 4");
+    assert.deepEqual(age.placeNames, ["Brook"], "names go with their places");
+    assert.deepEqual(age.castles, [2]);
+    assert.deepEqual([age.castleNames, age.castleKeeps], [["Crag"], ["keep"]]);
+    assert.deepEqual(age.seats, [-1, 4], "a seat moved off the map keeps its realm's slot");
+    assert.deepEqual(age.realmNames, ["Ashmark", "Brookland"]);
+    const ageArrays = decodeAge(age);
+    assert.equal(ageArrays.culture[0], 1, "cell 0 takes cell 1's culture");
+    assert.equal(ageArrays.culture[mesh.modelCount - 1], -1);
+    assert.deepEqual([Array.from(ageArrays.roadFrom), Array.from(ageArrays.roadTo)], [[4, 5], [5, 6]], "the road from cell 0 moved off the map");
     assert.deepEqual(moved.cultures[0].homelands, [4]);
     assert.equal(decodeModelRun(run).population[0], 0, "the original run is untouched, for undo");
 });

@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { runGenerator } = await import("../../src/generator/Pipeline.js");
-const { encodeModelRun, unpackArray } = await import("../../src/generator/ModelRun.js");
+const { decodeAge, encodeModelRun, unpackArray } = await import("../../src/generator/ModelRun.js");
 const { RULES, clean, cleanContext } = await import("../../src/data/MapRules.js");
 const { syntheticMap } = await import("./synthetic.mjs");
 
@@ -46,6 +46,31 @@ test("calm ages carry their towns and realm seats on", async () => {
     assert.equal(unpackArray(encodeModelRun(result, "r").history[0].realm).length, result.cellCount);
 });
 
+test("earlier ages keep their names, cultures and roads", async () => {
+    const result = await twoCalmAges();
+    const age = result.history[0];
+    assert.equal(age.placeNames.length, age.places.length / 3);
+    assert.ok(age.placeNames.every((name) => name.length > 0), "every place is named");
+    assert.equal(age.castleNames.length, age.castles.length);
+    assert.equal(age.castleKeeps.length, age.castles.length);
+    assert.equal(age.realmNames.length, age.seats.length);
+    assert.ok(age.realmNames.every((name) => name.length > 0), "every realm is named");
+    const nowByCell = new Map(result.places.filter((place) => place.kind === "town").map((place) => [place.cell, place.name]));
+    historyTowns(age).forEach((cell, index) => {
+        if (nowByCell.has(cell)) assert.equal(age.placeNames[index], nowByCell.get(cell), "a town carrying on has its present name");
+    });
+    assert.equal(age.culture.length, result.cellCount);
+    assert.ok(age.culture.some((culture) => culture === 0), "the default people hold land");
+    assert.ok(age.roadFrom.length > 10 && age.roadFrom.length === age.roadTo.length, `roads kept (${age.roadFrom.length})`);
+    assert.equal(age.cultureIds, undefined, "the age's own culture list is not kept");
+
+    const saved = encodeModelRun(result, "r").history[0];
+    const arrays = decodeAge(saved);
+    assert.deepEqual(Array.from(arrays.culture), Array.from(age.culture));
+    assert.deepEqual(Array.from(arrays.roadFrom), Array.from(age.roadFrom));
+    assert.deepEqual(saved.placeNames, age.placeNames);
+});
+
 test("a plague and a war-torn age leaves fewer towns and fewer people", async () => {
     const calmResult = await twoCalmAges();
     const hard = await run({ ages: [{}, { era: "afterPlague", strife: "warTorn" }] });
@@ -73,6 +98,11 @@ test("a culture arriving is absent from the ages before; one invading takes more
     assert.ok(share(invasion, "east") > share(arrival, "east"), "the invader holds more");
     const onlyLater = await run({ cultures, ages: [{}, { event: { kind: "arrival", culture: "east" } }] }, { isStopping: () => true });
     assert.deepEqual(onlyLater.cultures.map((culture) => culture.id), ["west"], "absent from the age before it arrives");
+    // The age before the arrival counts its cells' cultures as the present does: West only
+    const east = arrival.cultures.findIndex((culture) => culture.id === "east");
+    const west = arrival.cultures.findIndex((culture) => culture.id === "west");
+    const before = Array.from(arrival.history[0].culture);
+    assert.ok(before.includes(west) && !before.includes(east), "the age before holds West and no East");
 });
 
 test("a run asked to stop ends with the ages finished; the saved history is checked on import", async () => {

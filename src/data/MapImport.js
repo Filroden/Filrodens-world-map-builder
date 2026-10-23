@@ -1,6 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { normaliseAreaFactor, ownersKeyFor, randomId, resolveSpacing } from "../mesh/Schema.js";
-import { decodeModelRun, unpackArray } from "../generator/ModelRun.js";
+import { decodeAge, decodeModelRun } from "../generator/ModelRun.js";
 import { clean, cleanContext, RULES, STYLE_LIST_RULES } from "./MapRules.js";
 import { ImportRefusal, Sanitize } from "./Sanitize.js";
 import { needsRebase, rebaseStyles } from "./SymbolSizes.js";
@@ -263,17 +263,35 @@ function modelRunHoldsTogether(modelRun) {
     // The land area came later: a run without it is whole, and its density layers have no data
     if (arrays.landArea && arrays.landArea.length !== count) return false;
     if (!tradeHoldsTogether(arrays, count)) return false;
-    // An earlier age's realms, one per cell like the run's own
-    for (const age of modelRun.history ?? []) {
-        try {
-            if (age.realm && unpackArray(age.realm).length !== count) return false;
-        } catch {
-            return false;
-        }
-    }
+    if (!(modelRun.history ?? []).every((age) => ageHoldsTogether(age, count))) return false;
     const { shareStart, shareCulture, shareValue } = arrays;
     if (!shareStart || shareStart.length !== count + 1 || shareCulture?.length !== shareValue?.length) return false;
     return shareStart.every((start, index) => start >= 0 && start <= shareCulture.length && (index === 0 || start >= shareStart[index - 1]));
+}
+
+/**
+ * An earlier age (see ModelRun): its realms and cultures one per cell like the run's own, its
+ * names one per place, castle and realm, and its roads in pairs between the run's cells. The names,
+ * cultures and roads came later, so an age without them is whole.
+ */
+function ageHoldsTogether(age, count) {
+    let arrays;
+    try {
+        arrays = decodeAge(age);
+    } catch {
+        return false;
+    }
+    const { realm, culture, roadFrom, roadTo } = arrays;
+    if (realm && realm.length !== count) return false;
+    if (culture && culture.length !== count) return false;
+    const listed = (names, length) => names === undefined || names.length === length;
+    if (!listed(age.placeNames, (age.places?.length ?? 0) / 3)) return false;
+    if (!listed(age.castleNames, age.castles?.length ?? 0) || !listed(age.castleKeeps, age.castles?.length ?? 0)) return false;
+    if (!listed(age.realmNames, age.seats?.length ?? 0)) return false;
+    if (!roadFrom !== !roadTo) return false;
+    if (!roadFrom) return true;
+    const inRun = (cell) => Number.isInteger(cell) && cell >= 0 && cell < count;
+    return roadFrom.length === roadTo.length && roadFrom.every(inRun) && roadTo.every(inRun);
 }
 
 /**

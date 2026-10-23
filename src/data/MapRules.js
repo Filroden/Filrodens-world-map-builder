@@ -629,6 +629,9 @@ const MAP = obj({
 
 // ------------------------------------------------------------------ the generator's outputs
 
+/** A name an earlier age gave a place, castle or realm, or a kind of keep (empty for none). */
+const HISTORY_NAME = generatorText("FILRODENSWMB.UI.LimitFieldName");
+
 /** One packed array of a run's model-cell outputs (see ModelRun.packArray). */
 const PACKED_ARRAY = obj({ type: enumOf(["u8", "u16", "u32"]), scale: num({ min: 1e-9, max: 1e9 }), offset: num(RANGE.SIGNED), data: { t: "base64" } });
 
@@ -648,8 +651,24 @@ const MODEL_RUN = obj({
     stats: numTree,
     cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
     ages: obj({ asked: int(1, 100), run: int(1, 100) }),
-    // Each age before the last, in brief (see ModelRun)
-    history: list(obj({ development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strife: num(RANGE.UNIT), places: { t: "cells" }, castles: { t: "cells" }, seats: { t: "cells" }, realm: PACKED_ARRAY })),
+    // Each age before the last, in brief (see ModelRun); MapImport checks that its names run with
+    // its places, castles and seats, and its arrays with the run's cells
+    history: list(obj({
+        development: num(RANGE.UNIT),
+        plague: num(RANGE.UNIT),
+        strife: num(RANGE.UNIT),
+        places: { t: "cells" },
+        placeNames: list(HISTORY_NAME),
+        castles: { t: "cells" },
+        castleNames: list(HISTORY_NAME),
+        castleKeeps: list(HISTORY_NAME),
+        seats: { t: "cellSlots" },
+        realmNames: list(HISTORY_NAME),
+        realm: PACKED_ARRAY,
+        culture: PACKED_ARRAY,
+        roadFrom: PACKED_ARRAY,
+        roadTo: PACKED_ARRAY,
+    })),
 });
 
 /** The rules, by kind. `map` is a whole saved map; the rest are the objects inside it. */
@@ -752,6 +771,9 @@ const CLEANERS = {
     base64: (value) => (typeof value === "string" && /^[A-Za-z0-9+/]*={0,2}$/.test(value) ? value : DROP),
     points: (value) => (Array.isArray(value) ? value.filter(isPoint) : DROP),
     cells: (value) => (Array.isArray(value) ? value.filter(isCell) : DROP),
+    // Cells that stand at fixed places in a list (an age's realm seats), so one moved off the map
+    // is -1 rather than dropped
+    cellSlots: (value) => (Array.isArray(value) && value.every((cell) => cell === -1 || isCell(cell)) ? value : DROP),
     legs: (value) => (Array.isArray(value) ? value.map((leg) => (Array.isArray(leg) ? leg.filter(isCell) : [])) : DROP),
     segment: (value) => cleanSegment(value),
     // A map point: finite x and y within the coordinate range, and nothing else

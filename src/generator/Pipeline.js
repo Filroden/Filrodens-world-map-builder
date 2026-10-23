@@ -81,6 +81,8 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
 
     let previous = null;
     const history = [];
+    // Each earlier age as it ran, for naming its places once the present's are named
+    const pastAges = [];
     let last = null;
     let before = null;
     for (let index = 0; index < ages.length; index++) {
@@ -91,7 +93,10 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
             throw error;
         });
         if (!finished) break;
-        if (last) history.push(ageHistory(last, ages[index - 1]));
+        if (last) {
+            history.push(ageHistory(run.graph, last, ages[index - 1]));
+            pastAges.push(last);
+        }
         before = last;
         last = finished.age;
         previous = finished.next(previous);
@@ -103,10 +108,11 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     const { feedback, finalTrade, finalRealms } = last;
     const former = before ? formerAge(run.graph, before, last, settings.nameBase) : null;
     const formerNames = former ? { towns: former.ruins, castles: former.castles } : null;
-    const names = await driver.step("names", () => nameEverything({ seed: settings.seed, nameBase: settings.nameBase, cultures: run.cultures, towns: finalTrade.towns, castles: feedback.castles, realms: finalRealms, former: formerNames }), run);
+    const pastForNames = pastAges.map((age) => ({ cultures: age.cultures, towns: age.finalTrade.towns, castles: age.feedback.castles, realms: age.finalRealms }));
+    const names = await driver.step("names", () => nameEverything({ seed: settings.seed, nameBase: settings.nameBase, cultures: run.cultures, towns: finalTrade.towns, castles: feedback.castles, realms: finalRealms, former: formerNames, history: pastForNames }), run);
     driver.report("names", 1);
     const result = assembleResult(run, { feedback, finalTrade, finalRealms, names });
-    result.history = history;
+    result.history = history.map((age, at) => namedHistory(age, names.history[at], run.cultures));
     result.ages = { asked: ages.length, run: run.agesRun };
     if (former) Object.assign(result, formerResult(run, result, former, names, history));
     return result;
@@ -224,19 +230,49 @@ function formerResult(run, result, former, names, history) {
 
 /**
  * An earlier age in brief, kept in the run's history so the map's past can be shown: its era and strife,
- * its places (cell, tier and whether a realm's seat, three numbers each), castles, realm seats and
- * each cell's realm.
+ * its places (cell, tier and whether a realm's seat, three numbers each), castles, realm seats (one
+ * per realm, in the realms' order), each cell's realm, each cell's main culture (as that age's
+ * cultures count them, until namedHistory) and the land edges that carried its trade (its roads).
  */
-function ageHistory(age, settingsOfAge) {
-    const seats = new Set(age.finalRealms.realms.map((realm) => realm.seat));
+function ageHistory(graph, age, settingsOfAge) {
+    const seats = age.finalRealms.realms.map((realm) => realm.seat);
+    const seatCells = new Set(seats);
+    const roads = [];
+    for (let edge = 0; edge < graph.edgeCount; edge++) if (age.finalTrade.traffic[edge] > 0 && graph.edgeKind[edge] === EDGE.LAND) roads.push(edge);
     return {
         development: settingsOfAge.development,
         plague: settingsOfAge.plague,
         strife: settingsOfAge.strife,
-        places: age.finalTrade.towns.flatMap((town) => [town.cell, town.tier, seats.has(town.cell) ? 1 : 0]),
+        places: age.finalTrade.towns.flatMap((town) => [town.cell, town.tier, seatCells.has(town.cell) ? 1 : 0]),
         castles: age.feedback.castles.map((castle) => castle.cell),
-        seats: [...seats],
+        seats,
         realm: Int32Array.from(age.finalRealms.realmOfCell),
+        culture: Int32Array.from(age.cultures.dominant),
+        cultureIds: age.cultures.cultures.map((culture) => culture.id ?? null),
+        roadFrom: Int32Array.from(roads, (edge) => graph.edgeA[edge]),
+        roadTo: Int32Array.from(roads, (edge) => graph.edgeB[edge]),
+    };
+}
+
+/**
+ * An earlier age's brief with its names (see Names.nameEverything), and its cells' cultures counted
+ * as the run's own cultures are (by id, since a later age can bring in a people the earlier ones
+ * lacked); a people the present does not know (the default people of an age before every map
+ * culture had arrived) counts as none.
+ */
+function namedHistory(age, names, presentCultures) {
+    const { cultureIds, ...kept } = age;
+    const presentIds = presentCultures.cultures.map((culture) => culture.id ?? null);
+    const toPresent = cultureIds.map((id) => presentIds.indexOf(id));
+    const places = [];
+    for (let index = 0; index < age.places.length; index += 3) places.push(names.places.get(age.places[index]) ?? "");
+    return {
+        ...kept,
+        culture: Int32Array.from(age.culture, (culture) => (culture >= 0 ? toPresent[culture] : -1)),
+        placeNames: places,
+        castleNames: names.castles.map((castle) => castle.name),
+        castleKeeps: names.castles.map((castle) => castle.keep),
+        realmNames: names.realms,
     };
 }
 

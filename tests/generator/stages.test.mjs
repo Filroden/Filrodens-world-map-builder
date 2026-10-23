@@ -273,6 +273,33 @@ test("names are deterministic for a seed, and differ for another", () => {
     assert.ok(nameBaseNames().includes(FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE));
 });
 
+test("earlier ages are named last: the present's names are unchanged, and a place keeps its name through the ages", () => {
+    const realms = { counties: [{ seat: 1 }], duchies: [{ seat: 1 }], realms: [{ kind: "kingdom", seat: 1 }] };
+    const cultures = { cultures: resolveCultures([]), dominant: new Int32Array(8) };
+    const towns = [{ cell: 1, population: 2000 }, { cell: 2, population: 1000 }];
+    const context = { seed: "A", nameBase: "German", cultures, towns, castles: [{ cell: 0 }], realms, former: { towns: [{ cell: 3, population: 500, nameBase: "German" }], castles: [] } };
+    // Age 1 had towns on cells 4 and 3 (3 is the age-before ruin); age 2 on cells 1, 3 and 4
+    const pastRealms = (seat) => ({ realms: [{ kind: "kingdom", seat }, { kind: "principality", seat: 1 }] });
+    const history = [
+        { cultures, towns: [{ cell: 4, population: 900 }, { cell: 3, population: 400 }], castles: [{ cell: 5 }], realms: pastRealms(4) },
+        { cultures, towns: [{ cell: 1, population: 1500 }, { cell: 3, population: 600 }, { cell: 4, population: 300 }], castles: [{ cell: 0 }], realms: pastRealms(3) },
+    ];
+    const plain = nameEverything(context);
+    const named = nameEverything({ ...context, history });
+    const { history: _none, ...presentPlain } = plain;
+    const { history: ages, ...present } = named;
+    assert.deepEqual(present, presentPlain, "the present's and the ruins' names are the same with or without the earlier ages");
+    assert.equal(ages.length, 2);
+    assert.equal(ages[1].places.get(1), plain.towns.get(1), "a present town's place keeps its name");
+    assert.equal(ages[1].places.get(3), plain.former.towns.get(3), "an age-before ruin keeps its name");
+    assert.equal(ages[0].places.get(4), ages[1].places.get(4), "a place gone by the present keeps one name through the ages");
+    assert.deepEqual(ages[1].castles[0], plain.castles[0], "a present castle's place keeps its name");
+    assert.ok(ages[0].castles[0].name && FILRODENSWMB.GENERATOR.CASTLE_WORDS.includes(ages[0].castles[0].keep));
+    assert.equal(ages[0].realms.length, 2);
+    assert.equal(ages[0].realms[1], plain.towns.get(1), "a principality takes its seat's name");
+    assert.ok(ages[0].realms[0] && !named.realms.some((realm) => realm.name === ages[0].realms[0]), "a kingdom's name is its own");
+});
+
 test("route chains run between towns and junctions, one transport and class each", () => {
     const { graph } = islandGraph();
     const traffic = new Float64Array(graph.edgeCount);

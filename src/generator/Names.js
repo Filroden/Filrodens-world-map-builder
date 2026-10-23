@@ -33,9 +33,15 @@ export function nameBaseNames() {
  *     The places the age before the present left (ruins and abandoned castles; see FormerAge), each
  *     named in the name base of the people living there then. They are named after everything
  *     else, so the present's names are the same with or without them.
- * @returns {{towns: Map<number, string>, castles: {name: string, keep: string}[], counties: string[], duchies: string[], realms: {name: string, capital: string}[], former: {towns: Map<number, string>, castles: {name: string, keep: string}[]}}}
+ * @param {{cultures: import("./Cultures.js").CultureData, towns: object[], castles: {cell: number}[], realms: object}[]} [context.history] -
+ *     The ages before the present, oldest first: each age's cultures, towns, castles and realms.
+ *     They are named last of all (so every other name is the same with or without them), newest
+ *     age first: a place keeps the name its cell's place has in the present, as an age-before ruin
+ *     or in a later age, and anything else is named in the name base of the people living there
+ *     in that age.
+ * @returns {{towns: Map<number, string>, castles: {name: string, keep: string}[], counties: string[], duchies: string[], realms: {name: string, capital: string}[], former: {towns: Map<number, string>, castles: {name: string, keep: string}[]}, history: {places: Map<number, string>, castles: {name: string, keep: string}[], realms: string[]}[]}}
  */
-export function nameEverything({ seed, nameBase, cultures, towns, castles, realms, former = null }) {
+export function nameEverything({ seed, nameBase, cultures, towns, castles, realms, former = null, history = [] }) {
     const generator = new NamesGenerator(stageRandom(seed, "names"));
     const baseAt = baseChooser(generator, nameBase, cultures, towns);
     const used = new Set();
@@ -77,7 +83,39 @@ export function nameEverything({ seed, nameBase, cultures, towns, castles, realm
         name: unique(() => generator.getBaseShort(baseOf(castle.nameBase))),
         keep: words[Math.floor(generator.rng() * words.length)],
     }));
-    return { towns: townNames, castles: castleNames, counties: countyNames, duchies: duchyNames, realms: realmList, former: { towns: formerTowns, castles: formerCastles } };
+
+    // The ages before the present. A cell's place is one place through the ages, so once named it
+    // keeps its name in every earlier age it stood in
+    const knownTowns = new Map([...townNames, ...formerTowns]);
+    const knownCastles = new Map();
+    castles.forEach((castle, index) => knownCastles.set(castle.cell, castleNames[index]));
+    (former?.castles ?? []).forEach((castle, index) => knownCastles.set(castle.cell, formerCastles[index]));
+    const historyNames = new Array(history.length);
+    for (let at = history.length - 1; at >= 0; at--) {
+        const age = history[at];
+        const ageBaseAt = baseChooser(generator, nameBase, age.cultures, age.towns);
+        const places = new Map();
+        for (const town of [...age.towns].sort((a, b) => b.population - a.population || a.cell - b.cell)) {
+            if (!knownTowns.has(town.cell)) knownTowns.set(town.cell, unique(() => generator.getBase(ageBaseAt(town.cell))));
+            places.set(town.cell, knownTowns.get(town.cell));
+        }
+        const ageCastles = age.castles.map((castle) => {
+            if (!knownCastles.has(castle.cell)) {
+                knownCastles.set(castle.cell, {
+                    name: unique(() => generator.getBaseShort(ageBaseAt(castle.cell))),
+                    keep: words[Math.floor(generator.rng() * words.length)],
+                });
+            }
+            return knownCastles.get(castle.cell);
+        });
+        const ageRealms = age.realms.realms.map((realm) => {
+            if (!knownTowns.has(realm.seat)) knownTowns.set(realm.seat, unique(() => generator.getBase(ageBaseAt(realm.seat))));
+            const capital = knownTowns.get(realm.seat);
+            return realm.kind === "kingdom" ? unique(() => generator.getState(capital, ageBaseAt(realm.seat)), realmNames) : capital;
+        });
+        historyNames[at] = { places, castles: ageCastles, realms: ageRealms };
+    }
+    return { towns: townNames, castles: castleNames, counties: countyNames, duchies: duchyNames, realms: realmList, former: { towns: formerTowns, castles: formerCastles }, history: historyNames };
 }
 
 /** The name base index for a cell: its town's culture, else the cell's dominant culture, else `nameBase`. */

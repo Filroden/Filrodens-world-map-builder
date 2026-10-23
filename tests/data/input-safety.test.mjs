@@ -246,6 +246,22 @@ function savedModelRun() {
         cultures: [{ name: "Northfolk", nameBase: "english", homeland: 0 }],
         stats: { kingdoms: 2, independents: 0 },
         trade: { from: [0, 1], to: [1, 3], kind: [0, 2], value: [1, 0.25] },
+        history: [{
+            development: 0.5,
+            plague: 0,
+            strife: 0.2,
+            places: [0, 1, 1, 3, 2, 0],
+            placeNames: ["Ashby", "Brook"],
+            castles: [1],
+            castleNames: ["Crag"],
+            castleKeeps: ["keep"],
+            seats: [0, -1],
+            realmNames: ["Ashmark", "Brookland"],
+            realm: [0, 0, -1, 1],
+            culture: [0, 0, -1, 0],
+            roadFrom: [0, 1],
+            roadTo: [1, 3],
+        }],
     };
     return JSON.parse(JSON.stringify(encodeModelRun(result, "runAAAAAAAAAAAAA")));
 }
@@ -272,6 +288,17 @@ test("a saved model run passes the importer whole, and a damaged or hostile one 
     assert.equal(hostile((run) => (run.cells.tradeFrom.data = btoa(String.fromCharCode(0, 9)))).modelRun, null, "a trade edge from a cell the run does not have");
     assert.equal(hostile((run) => (run.cells.tradeKind.data = btoa(String.fromCharCode(0, 7)))).modelRun, null, "an unknown transport");
     assert.ok(hostile((run) => ["tradeFrom", "tradeTo", "tradeKind", "tradeValue"].forEach((name) => delete run.cells[name])).modelRun, "a run saved before trade was kept is whole");
+    // An earlier age: its names run with its places, castles and realms, and its arrays with the cells
+    const age = (change) => hostile((run) => change(run.history[0])).modelRun;
+    assert.equal(age((saved) => saved.placeNames.pop()), null, "a place with no name");
+    assert.equal(age((saved) => saved.castleKeeps.push("tower")), null, "more keeps than castles");
+    assert.equal(age((saved) => saved.realmNames.pop()), null, "a realm with no name");
+    assert.equal(age((saved) => (saved.culture.data = saved.culture.data.slice(0, 4))), null, "cultures shorter than the run's cells");
+    assert.equal(age((saved) => delete saved.roadTo), null, "a road with one end");
+    assert.equal(age((saved) => (saved.roadTo.data = btoa(String.fromCharCode(1, 9)))), null, "a road to a cell the run does not have");
+    assert.equal(age((saved) => (saved.seats = [0, -2])), null, "a seat that is no cell");
+    assert.ok(age((saved) => ["placeNames", "castleNames", "castleKeeps", "realmNames", "culture", "roadFrom", "roadTo"].forEach((name) => delete saved[name])), "an age saved before names, cultures and roads were kept is whole");
+    assert.equal(age((saved) => (saved.placeNames[0] = 7)).history[0].placeNames[0], "7", "a name is text");
     // A run saved before land areas were kept is whole: only its density layers have no data
     const older = hostile((run) => delete run.cells.landArea);
     assert.ok(older.modelRun && !older.modelRun.cells.landArea);

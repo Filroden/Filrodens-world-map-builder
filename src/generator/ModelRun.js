@@ -17,10 +17,16 @@ import { FILRODENSWMB } from "../config.js";
  *          cells: { <name>: { type, scale, offset, data } }, ages, history }
  *
  * `cells` also holds the last round's trade, per edge rather than per cell (tradeFrom, tradeTo,
- * tradeKind, tradeValue; see TRADE). `ages` is how many ages were asked for and run; `history` holds each age before the last in
- * brief (its era's development and plague, its strife, its places as cell, tier and seat triples,
- * its castles and realm seats, and each cell's realm, packed as the cells' arrays are), for the
- * history layer to read.
+ * tradeKind, tradeValue; see TRADE). `ages` is how many ages were asked for and run; `history`
+ * holds each age before the last in brief, for the History tool to draw:
+ *   - its era's development and plague, and its strife;
+ *   - its places as cell, tier and seat triples, with their names (`placeNames`);
+ *   - its castles, with their names and kinds of keep (`castleNames`, `castleKeeps`);
+ *   - its realms' seats (one per realm, -1 for one moved off the map) and names (`realmNames`);
+ *   - each cell's realm and main culture (as the run's `cultures` count them), packed as the
+ *     cells' arrays are;
+ *   - its roads, the land edges that carried its trade (`roadFrom`, `roadTo`, packed).
+ * A run saved before the names, cultures and roads were kept lacks them.
  */
 
 export const MODEL_RUN_VERSION = 1;
@@ -142,8 +148,34 @@ export function encodeModelRun(result, runId) {
         stats: { ...result.stats },
         cells,
         ages: { asked: result.ages?.asked ?? 1, run: result.ages?.run ?? 1 },
-        history: (result.history ?? []).map((age) => ({ ...age, places: Array.from(age.places), castles: Array.from(age.castles), seats: Array.from(age.seats), realm: packArray(age.realm, FIELDS.realm) })),
+        history: (result.history ?? []).map(encodeAge),
     };
+}
+
+/** How an age's roads are kept: model cell ids. */
+const ROAD = Object.freeze({ type: "index", scale: 1, offset: 0 });
+
+/** An earlier age in its saved form: its lists as plain arrays, its per-cell and road arrays packed. */
+function encodeAge(age) {
+    const { realm, culture, roadFrom, roadTo, ...rest } = age;
+    const saved = { ...rest, places: Array.from(age.places), castles: Array.from(age.castles), seats: Array.from(age.seats), realm: packArray(realm, FIELDS.realm) };
+    if (culture) saved.culture = packArray(culture, FIELDS.culture);
+    if (roadFrom && roadTo) {
+        saved.roadFrom = packArray(roadFrom, ROAD);
+        saved.roadTo = packArray(roadTo, ROAD);
+    }
+    return saved;
+}
+
+/**
+ * A saved earlier age's packed arrays as numbers: each cell's realm and culture (-1 for none), and
+ * its roads' ends. An array the age lacks is null.
+ * @param {object} age - One entry of a saved run's history.
+ * @returns {{realm: Float64Array|null, culture: Float64Array|null, roadFrom: Float64Array|null, roadTo: Float64Array|null}}
+ */
+export function decodeAge(age) {
+    const read = (packed) => (packed && TYPES[packed.type] ? unpackArray(packed) : null);
+    return { realm: read(age?.realm), culture: read(age?.culture), roadFrom: read(age?.roadFrom), roadTo: read(age?.roadTo) };
 }
 
 /**
@@ -197,15 +229,51 @@ export function resampleModelRun(modelRun, sourceOf, targetOf) {
     Object.assign(cells, movedTrade(arrays, targetOf));
 
     const moveCells = (list) => Array.from(list ?? [], targetOf).filter((cell) => cell >= 0);
-    const history = (modelRun.history ?? []).map((age) => ({
-        ...age,
-        places: movedPlaces(age.places ?? [], targetOf),
-        castles: moveCells(age.castles),
-        seats: moveCells(age.seats),
-        realm: age.realm ? packArray(take(unpackArray(age.realm), EMPTY.realm), FIELDS.realm) : age.realm,
-    }));
+    const history = (modelRun.history ?? []).map((age) => movedAge(age, take, targetOf));
     const cultures = (modelRun.cultures ?? []).map((culture) => ({ ...culture, homelands: moveCells(culture.homelands) }));
     return { ...modelRun, cultures, cells, history };
+}
+
+/**
+ * An earlier age moved with its map: its per-cell arrays taken from their source cells, its places
+ * and castles moved with their names (those moved off the map dropped with them), its seats moved
+ * in place (-1 for one off the map, so each still stands at its realm's index), and its roads moved
+ * as the trade's edges are.
+ */
+function movedAge(age, take, targetOf) {
+    const moved = { ...age };
+    const places = movedPlaces(age.places ?? [], targetOf, age.placeNames);
+    moved.places = places.places;
+    if (age.placeNames) moved.placeNames = places.names;
+    const castles = [];
+    const kept = [];
+    (age.castles ?? []).forEach((cell, index) => {
+        const target = targetOf(cell);
+        if (target < 0) return;
+        castles.push(target);
+        kept.push(index);
+    });
+    moved.castles = castles;
+    if (age.castleNames) moved.castleNames = kept.map((index) => age.castleNames[index]);
+    if (age.castleKeeps) moved.castleKeeps = kept.map((index) => age.castleKeeps[index]);
+    moved.seats = Array.from(age.seats ?? [], (cell) => (cell >= 0 ? targetOf(cell) : -1));
+    const { realm, culture, roadFrom, roadTo } = decodeAge(age);
+    if (realm) moved.realm = packArray(take(realm, EMPTY.realm), FIELDS.realm);
+    if (culture) moved.culture = packArray(take(culture, EMPTY.culture), FIELDS.culture);
+    if (roadFrom && roadTo) {
+        const from = [];
+        const to = [];
+        for (let edge = 0; edge < roadFrom.length; edge++) {
+            const a = targetOf(roadFrom[edge]);
+            const b = targetOf(roadTo[edge]);
+            if (a < 0 || b < 0 || a === b) continue;
+            from.push(a);
+            to.push(b);
+        }
+        moved.roadFrom = packArray(from, ROAD);
+        moved.roadTo = packArray(to, ROAD);
+    }
+    return moved;
 }
 
 /** The culture shares, each cell's run taken from its source cell (none for a cell from beyond the map). */
@@ -249,12 +317,18 @@ function movedTrade(arrays, targetOf) {
     return Object.fromEntries(Object.entries(TRADE).map(([name, field]) => [name, packArray(kept[field.source], field)]));
 }
 
-/** A history's places (cell, tier, seat triples) with their cells moved, those moved off the map dropped. */
-function movedPlaces(places, targetOf) {
+/**
+ * A history's places (cell, tier, seat triples) with their cells moved, and their names with them;
+ * those moved off the map are dropped.
+ */
+function movedPlaces(places, targetOf, names = null) {
     const moved = [];
+    const movedNames = [];
     for (let index = 0; index + PLACE_FIELDS <= places.length; index += PLACE_FIELDS) {
         const cell = targetOf(places[index]);
-        if (cell >= 0) moved.push(cell, places[index + 1], places[index + 2]);
+        if (cell < 0) continue;
+        moved.push(cell, places[index + 1], places[index + 2]);
+        movedNames.push(names?.[index / PLACE_FIELDS] ?? "");
     }
-    return moved;
+    return { places: moved, names: movedNames };
 }
