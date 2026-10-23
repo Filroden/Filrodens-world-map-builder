@@ -360,7 +360,9 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     file.cultures[0].openness = 7;
     file.cultures[0].homelands.push({ x: "1", y: 2 }, [3, 4]);
     file.thematic = { fill: "__proto__", opacity: 40 };
+    file.travel = { mode: "dragon", speeds: { foot: 5000, sea: -3, riverUp: "fast" }, start: { x: 10, y: "2" } };
     const { mapData } = MapImport.read(file);
+    assert.deepEqual(mapData.travel, { speeds: { foot: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MAX, sea: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MIN } }, "an unknown way of travel, a speed that is no number and a broken start are dropped; speeds are kept in range");
     assert.deepEqual(mapData.thematic, { opacity: FILRODENSWMB.THEMATIC.OPACITY_RANGE.MAX }, "an unknown thematic layer is dropped and the opacity kept in range");
     assert.ok(!("temperature" in mapData.cultures[0].habitat) && !("relief" in mapData.cultures[0].habitat), "a band must be two numbers, low first");
     assert.equal(mapData.cultures[0].openness, 1);

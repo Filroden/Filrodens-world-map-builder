@@ -1,6 +1,7 @@
 import { GenerationWorkers } from "../tools/GenerationWorkers.js";
 import { payloadTransfer } from "./GeneratorInput.js";
 import { runGenerator } from "./Pipeline.js";
+import { buildTravelGraph } from "../travel/TravelGraph.js";
 
 /**
  * Runs the generator in the background worker (the `generate` task), or on the main thread where
@@ -32,4 +33,18 @@ export function generateInBackground(makePayload, { onProgress = null, signal = 
 /** True once the payload's buffers have been transferred away (a detached buffer has no bytes). */
 function isDetached(payload) {
     return payload.elevation.byteLength === 0;
+}
+
+/**
+ * Builds the generator's travel network for the Travel tool (see TravelGraph) in the background
+ * worker, or on the main thread as generateInBackground does.
+ * @param {function(): import("./GeneratorInput.js").GeneratorPayload} makePayload
+ * @returns {Promise<object>}
+ */
+export function travelGraphInBackground(makePayload) {
+    const payload = makePayload();
+    return GenerationWorkers.runOne("travelGraph", payload, {
+        transfer: payloadTransfer(payload),
+        alone: () => buildTravelGraph(isDetached(payload) ? makePayload() : payload),
+    });
 }

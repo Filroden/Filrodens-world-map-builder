@@ -4554,6 +4554,8 @@ export class MapStudio {
      * changed. A map without a run has nothing to be out of date.
      */
     #markGeneratorStale() {
+        // The Travel tool's network is built from the same input (see TravelNetwork)
+        this.travelInputs = (this.travelInputs ?? 0) + 1;
         if (!this.modelRun || this.uiState.generatorStale) return;
         this.uiState.generatorStale = true;
         if (this.activeTool === "generate") this.view?.render(["context"]);

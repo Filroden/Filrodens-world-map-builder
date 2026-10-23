@@ -794,6 +794,22 @@ export const FILRODENSWMB = {
     // is a number per square map unit, "percent" a share, "culture" the culture's name and share.
     // NEEDS lists the run's arrays a layer is worked out from: a run saved before one existed
     // cannot show the layer.
+    // Travel time (the Travel tool; see TravelTime): the ways of travel over land, and each speed
+    // as a day's distance in km (a land speed on a road over level ground; rivers are slower
+    // against the current). The map keeps its own speeds (uiState.travel), these are the presets.
+    TRAVEL_TIME: Object.freeze({
+        MODES: Object.freeze(["foot", "wagon", "mount"]),
+        SPEEDS: Object.freeze({ foot: 30, wagon: 25, mount: 60, riverDown: 60, riverUp: 20, sea: 150 }),
+        SPEED_RANGE: Object.freeze({ MIN: 1, MAX: 1000 }),
+        // The days the bands and rings show, from the start
+        MAX_DAYS: 10,
+        // How the generator's land costs (made to compare ways, not to time them) become pace:
+        // open level ground off the road is OFF_ROAD of the road's pace, and cover and relief
+        // slow a step by their cost to the power TERRAIN (so a cost of 4, dense forest on hills,
+        // halves the pace rather than quartering it). The ordering of ways is the generator's.
+        OFF_ROAD: 0.65,
+        TERRAIN: 0.5,
+    }),
     THEMATIC: Object.freeze({
         OPACITY: 0.7,
         OPACITY_RANGE: Object.freeze({ MIN: 0.1, MAX: 1, STEP: 0.05 }),

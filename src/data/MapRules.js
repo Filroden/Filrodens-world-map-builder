@@ -586,6 +586,12 @@ const MAP = obj({
     hiddenLabelStyles: list(key),
     hiddenLevels: list(key),
     hideRegionFills: bool,
+    // The Travel tool's way of travel, the map's speeds (km a day) and its start (see TravelTime)
+    travel: obj({
+        mode: enumOf(FILRODENSWMB.TRAVEL_TIME.MODES),
+        speeds: obj(Object.fromEntries(Object.keys(FILRODENSWMB.TRAVEL_TIME.SPEEDS).map((key) => [key, num({ min: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MIN, max: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MAX })]))),
+        start: { t: "xy", nullable: true },
+    }),
     // The age the History tool shows (see HistoryView), from 1; null until one is chosen
     historyAge: int(1, 100, { nullable: true }),
     // The thematic layer shown over the map and its opacity (see ThematicView)

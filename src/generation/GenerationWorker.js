@@ -18,6 +18,7 @@ import { LayerPainting } from "../canvas/LayerPainting.js";
 import { buildMeshData } from "../mesh/MeshBuilder.js";
 import { runGenerator } from "../generator/Pipeline.js";
 import { resultTransfer } from "../generator/GeneratorInput.js";
+import { buildTravelGraph, travelGraphTransfer } from "../travel/TravelGraph.js";
 
 /** One band's rows, newly allocated: `width` values per row. */
 const bandBuffer = (width, rowStart, rowEnd) => new Float32Array((rowEnd - rowStart) * width);
@@ -82,7 +83,13 @@ async function generate(payload, job) {
     return { value: result, transfer: resultTransfer(result) };
 }
 
-const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh, generate };
+/** The generator's travel network for the Travel tool (see TravelGraph). */
+function travelGraph(payload) {
+    const graph = buildTravelGraph(payload);
+    return { value: graph, transfer: travelGraphTransfer(graph) };
+}
+
+const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh, generate, travelGraph };
 
 /** Ids of jobs asked to stop (cancelled), and of jobs asked to end early with what they have. */
 const cancelled = new Set();
