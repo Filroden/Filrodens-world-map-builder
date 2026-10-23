@@ -483,7 +483,7 @@
     "FILRODENSWMB.UI.TravelRiverUp": "River boat, upstream",
     "FILRODENSWMB.UI.TravelSea": "Sailing ship",
     "FILRODENSWMB.UI.TravelBoat": "Small boat",
-    "FILRODENSWMB.UI.TravelSpeedsHint": "A day's travel. Over land, on a road across level ground: off the road, through forest and over hills is slower, and farmland is quicker than the wilds. Ships sail the map's sea routes, and river boats its river trade routes; elsewhere only small boats are found. Passage takes a few hours to find at a town's harbour and days elsewhere on the coast.",
+    "FILRODENSWMB.UI.TravelSpeedsHint": "A day's travel. Over land, each speed is on a road across level ground: off the road, forest and hills are slower, and farmland is quicker than the wilds. Ships keep to the map's sea routes and river boats to its river trade routes; elsewhere only small boats are found. Passage takes a few hours to find at a town's harbour and days elsewhere on the coast.",
     "FILRODENSWMB.UI.TravelPerDay": "{unit} a day",
     "FILRODENSWMB.UI.TravelInterval": "Days per band",
     "FILRODENSWMB.UI.TravelIntervalAuto": "Automatic ({days})",

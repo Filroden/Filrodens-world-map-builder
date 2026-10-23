@@ -1068,6 +1068,11 @@
 .fwmb .fwmb-history-ages .fwmb-list-item[aria-checked="true"] {
     background: var(--fwmb-bg-highlight);
 }
+/* These lists scroll, which cuts off anything outside them: room round the rows for the focus
+   ring (2px wide, 2px outside the row) */
+.fwmb .fwmb-section :is(.fwmb-history-ages, .fwmb-history-realms) {
+    padding: 0.25rem;
+}
 /* An age's name with its era and strife below, so a narrow panel keeps both whole; a row grows
    with what it holds (it never shrinks into the next) */
 .fwmb .fwmb-history-ages .fwmb-list-item {
@@ -1142,11 +1147,14 @@
 }
 .fwmb-travel-speed {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem 0.5rem;
 }
+/* The name takes the room left; when there is too little for it, the field and its unit wrap
+   below it rather than squeezing it */
 .fwmb-travel-speed > :first-child {
-    flex: 1;
+    flex: 1 1 8rem;
     min-inline-size: 0;
     overflow-wrap: break-word;
 }
@@ -1156,8 +1164,9 @@
     flex: none;
 }
 .fwmb-travel-speed .fwmb-meta {
-    flex: none;
+    flex: 0 1 auto;
     min-inline-size: 3.5rem;
+    overflow-wrap: break-word;
 }
 /* The travel legend's days in one row of swatches */
 .fwmb-canvas-readout .fwmb-classes.fwmb-travel-days {
@@ -2039,6 +2048,15 @@
 :where(.fwmb) button:where(:hover) {
     background: var(--fwmb-fill-accent-hover);
     color: var(--fwmb-text-inverse);
+    box-shadow: none;
+}
+
+/* Foundry rings and glows every button it focuses, a mouse click included; the studio's buttons
+   take only the ring below, from the keyboard. Kept as specific as Foundry's own rule, so the
+   studio's own focus ring and shadows still win */
+:where(.fwmb) button:focus,
+:where(.fwmb) a.button:focus {
+    outline: none;
     box-shadow: none;
 }
 
@@ -2977,6 +2995,11 @@
    are not run together into one span with the name's gap on its far side */
 .fwmb-canvas-readout .fwmb-values > span > * {
     unicode-bidi: isolate;
+}
+/* A journey's time is words as well as figures: it takes its direction from its own first letter,
+   so "11 days, 15 hours" keeps its order beside a right-to-left name */
+.fwmb-canvas-readout .fwmb-values [data-travel-value] {
+    unicode-bidi: plaintext;
 }
 .fwmb-canvas-readout .fwmb-values .fwmb-k {
     color: var(--fwmb-overlay-muted);
