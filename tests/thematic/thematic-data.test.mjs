@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { smallMesh } from "../mesh/helpers.mjs";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { LAYERS, ThematicSource, blendValues, blendWeights, rampLookup, scalePosition, stepOf } = await import("../../src/thematic/ThematicData.js");
+const { LAYERS, ThematicSource, TradeIndex, blendValues, blendWeights, rampLookup, scalePosition, stepOf, tradeClassOf, tradeLines } = await import("../../src/thematic/ThematicData.js");
 const { decodeModelRun, encodeModelRun, resampleModelRun } = await import("../../src/generator/ModelRun.js");
 const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
 
@@ -38,6 +38,7 @@ function runOf(mesh, values) {
         cellCount: count,
         cultures: [{ name: "Folk", nameBase: "english", homelands: [0, 5] }],
         stats: {},
+        ...(values.trade ? { trade: values.trade } : {}),
     };
     return JSON.parse(JSON.stringify(encodeModelRun(result, "runAAAAAAAAAAAAA")));
 }
@@ -214,4 +215,43 @@ test("the culture layer: each model cell in its dominant culture's colour, faint
     const older = structuredClone(run);
     delete older.cells.landArea;
     assert.equal(ThematicSource.of(older, mesh).missing("population"), "run");
+});
+
+test("trade: saved per edge, drawn along the generated route joining its cells or else straight, quietest first", () => {
+    const mesh = smallMesh();
+    // Three model cells in a row along the middle, and a fourth far off
+    const sites = [...Array(mesh.modelCount).keys()];
+    const near = (x, y) => sites.reduce((a, b) => (Math.hypot(mesh.siteX(a) - x, mesh.siteY(a) - y) < Math.hypot(mesh.siteX(b) - x, mesh.siteY(b) - y) ? a : b));
+    const [a, b, c] = [near(100, 150), near(115, 150), near(130, 150)];
+    const far = near(350, 250);
+    const trade = { from: Int32Array.of(a, b, c), to: Int32Array.of(b, c, far), kind: Uint8Array.of(0, 1, 2), value: Float32Array.of(1, 0.004, 0.06) };
+    const run = runOf(mesh, { trade });
+    const source = ThematicSource.of(run, mesh);
+    assert.ok(source.hasTrade());
+    const saved = source.trade();
+    assert.deepEqual([...saved.from], [a, b, c]);
+    assert.ok(Math.abs(saved.value[1] - 0.004) < 1e-6, "kept to a millionth");
+
+    // A generated road from a to b with a leg through a display cell between them
+    const middle = mesh.cellAt(107, 151);
+    const road = { id: "r", generated: { run: "x" }, waypoints: [a, b], legs: [[a, middle, b]] };
+    const old = { id: "o", generated: { run: "x", oldRoad: true }, waypoints: [b, c], legs: [[b, mesh.cellAt(122, 140), c]] };
+    const lines = tradeLines(saved, mesh, [road, old]);
+    assert.deepEqual(lines.map((line) => line.value.toFixed(3)), ["0.004", "0.060", "1.000"], "quietest first");
+    const busiest = lines.at(-1);
+    assert.equal(busiest.points.length, 12, "the leg's three cells, smoothed once: its two ends and two points for each of its two segments");
+    assert.equal(busiest.cls, tradeClassOf(1));
+    assert.equal(lines[0].points.length, 4, "an old road carries no trade: straight between the sites");
+    assert.deepEqual([tradeClassOf(0.004), tradeClassOf(0.06), tradeClassOf(1)], [0, 2, 3]);
+
+    const index = new TradeIndex(lines, mesh.width);
+    assert.equal(index.nearest(mesh.siteX(a) + 1, mesh.siteY(a) + 2, 6), 2, "the busiest line under the pointer");
+    assert.equal(index.nearest(10, 290, 6), -1);
+
+    // A run without trade has none, and moving a run moves its trade, dropping edges moved off the map
+    assert.equal(ThematicSource.of(runOf(mesh, {}), mesh).hasTrade(), false);
+    const all = Int32Array.from({ length: mesh.modelCount }, (_, cell) => cell);
+    const moved = decodeModelRun(resampleModelRun(run, all, (cell) => (cell === far ? -1 : cell)));
+    assert.deepEqual([...moved.tradeFrom], [a, b]);
+    assert.deepEqual([...moved.tradeKind], [0, 1]);
 });

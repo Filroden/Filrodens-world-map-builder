@@ -262,6 +262,7 @@ function modelRunHoldsTogether(modelRun) {
     if (!perCell.every((name) => arrays[name]?.length === count)) return false;
     // The land area came later: a run without it is whole, and its density layers have no data
     if (arrays.landArea && arrays.landArea.length !== count) return false;
+    if (!tradeHoldsTogether(arrays, count)) return false;
     // An earlier age's realms, one per cell like the run's own
     for (const age of modelRun.history ?? []) {
         try {
@@ -273,6 +274,22 @@ function modelRunHoldsTogether(modelRun) {
     const { shareStart, shareCulture, shareValue } = arrays;
     if (!shareStart || shareStart.length !== count + 1 || shareCulture?.length !== shareValue?.length) return false;
     return shareStart.every((start, index) => start >= 0 && start <= shareCulture.length && (index === 0 || start >= shareStart[index - 1]));
+}
+
+/**
+ * The run's trade, when it has any (a run saved before trade was kept has none): its four arrays
+ * one entry per edge each, every edge between two of the run's cells, and a known transport.
+ */
+function tradeHoldsTogether({ tradeFrom, tradeTo, tradeKind, tradeValue }, count) {
+    const parts = [tradeFrom, tradeTo, tradeKind, tradeValue];
+    if (parts.every((part) => !part)) return true;
+    if (!parts.every((part) => part && part.length === tradeFrom.length)) return false;
+    const inRun = (cell) => Number.isInteger(cell) && cell >= 0 && cell < count;
+    const transports = FILRODENSWMB.THEMATIC.TRADE.TRANSPORTS.length;
+    for (let edge = 0; edge < tradeFrom.length; edge++) {
+        if (!inRun(tradeFrom[edge]) || !inRun(tradeTo[edge]) || !(tradeKind[edge] < transports)) return false;
+    }
+    return true;
 }
 
 /** Refuses a file holding free text past its limit, naming the first place and counting the rest. */

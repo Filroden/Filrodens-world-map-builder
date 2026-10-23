@@ -347,6 +347,7 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
         settings,
         modelCells: modelCellOutput(run, feedback, finalRealms),
         modelGraph: { neighbourStart: Int32Array.from(cells.neighbourStart), neighbourList: Int32Array.from(cells.neighbourList) },
+        trade: tradeOutput(graph, finalTrade.traffic),
         // Each culture as the run used it: the map's id (none for the default culture), its name and
         // colour then, and its homeland cells (given, or placed) with how many points it was given
         // and how many of the points it was given were left out (off the map, or not on land)
@@ -462,6 +463,26 @@ function modelCellOutput(run, feedback, realms) {
         shareStart: Int32Array.from(cultures.shareStart),
         shareCulture: Int32Array.from(cultures.shareCulture),
         shareValue: Float32Array.from(cultures.shareValue),
+    };
+}
+
+/** How a trade edge's kind is saved: the transport its route takes (see RouteChains). */
+const TRADE_KIND = Object.freeze({ [EDGE.LAND]: 0, [EDGE.RIVER]: 1, [EDGE.SEA]: 2, [EDGE.PORT]: 2 });
+
+/**
+ * The trade the last round carried, edge by edge, for the thematic trade layer: each edge with
+ * any traffic as its two model cells, its transport (0 road, 1 river, 2 sea) and its traffic as a
+ * share of the busiest edge's (the rounds' traffic is already scaled so; see Trade).
+ * @returns {{from: Int32Array, to: Int32Array, kind: Uint8Array, value: Float32Array}}
+ */
+function tradeOutput(graph, traffic) {
+    const used = [];
+    for (let edge = 0; edge < graph.edgeCount; edge++) if (traffic[edge] > 0) used.push(edge);
+    return {
+        from: Int32Array.from(used, (edge) => graph.edgeA[edge]),
+        to: Int32Array.from(used, (edge) => graph.edgeB[edge]),
+        kind: Uint8Array.from(used, (edge) => TRADE_KIND[graph.edgeKind[edge]]),
+        value: Float32Array.from(used, (edge) => traffic[edge]),
     };
 }
 

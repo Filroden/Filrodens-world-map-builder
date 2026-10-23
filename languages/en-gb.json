@@ -21,5 +21,6 @@
     "FILRODENSWMB.UI.GenerateUrbanization": "Urbanisation",
     "FILRODENSWMB.UI.MapUnitHint": "The name of the unit every distance on this map is shown in: the scale bar, territorial waters and the scale below. The module measures distances in kilometres and shows the number with this name, so the figures are true kilometres whatever the unit is called. Change it to give the unit your world's own name.",
     "FILRODENSWMB.UI.MapUnitConverted": "This map's scale bar used the old default unit, Miles, for distances the module measures in kilometres. Its map unit is now km (in New map, under Generation). Save the map to keep the change.",
-    "FILRODENSWMB.UI.ThematicCultureHint": "The culture most of the people belong to in the last generator run, in its colour. The colour is paler where several peoples live together."
+    "FILRODENSWMB.UI.ThematicCultureHint": "The culture most of the people belong to in the last generator run, in its colour. The colour is paler where several peoples live together.",
+    "FILRODENSWMB.UI.ThematicTradeHint": "The trade the last generator run carried, along its roads, rivers and sea lanes: the wider the line, the busier the route. Shown beside a colour layer."
 }

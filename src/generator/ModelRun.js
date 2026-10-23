@@ -16,7 +16,8 @@ import { FILRODENSWMB } from "../config.js";
  * Shape: { version, run, revision, seed, settings, cellCount, cultures, stats,
  *          cells: { <name>: { type, scale, offset, data } }, ages, history }
  *
- * `ages` is how many ages were asked for and run; `history` holds each age before the last in
+ * `cells` also holds the last round's trade, per edge rather than per cell (tradeFrom, tradeTo,
+ * tradeKind, tradeValue; see TRADE). `ages` is how many ages were asked for and run; `history` holds each age before the last in
  * brief (its era's development and plague, its strife, its places as cell, tier and seat triples,
  * its castles and realm seats, and each cell's realm, packed as the cells' arrays are), for the
  * history layer to read.
@@ -48,8 +49,21 @@ const FIELDS = Object.freeze({
     culture: Object.freeze({ type: "index", scale: 1, offset: 1 }),
 });
 
-/** The names of the arrays a saved run holds (the model cells' and the culture shares'). */
-export const MODEL_RUN_ARRAYS = Object.freeze([...Object.keys(FIELDS), "shareStart", "shareCulture", "shareValue"]);
+/**
+ * The last round's trade, one entry per edge that carried any: its two model cells, its transport
+ * (0 road, 1 river, 2 sea) and its traffic as a share of the busiest edge's, kept to a millionth
+ * (the busiest edge carries a thousand times the quietest's and more, so a coarser step would
+ * round the quiet lanes away).
+ */
+const TRADE = Object.freeze({
+    tradeFrom: Object.freeze({ source: "from", type: "index", scale: 1, offset: 0 }),
+    tradeTo: Object.freeze({ source: "to", type: "index", scale: 1, offset: 0 }),
+    tradeKind: Object.freeze({ source: "kind", type: "u8", scale: 1, offset: 0 }),
+    tradeValue: Object.freeze({ source: "value", type: "u32", scale: 1e6, offset: 0 }),
+});
+
+/** The names of the arrays a saved run holds (the model cells', the culture shares' and the trade's). */
+export const MODEL_RUN_ARRAYS = Object.freeze([...Object.keys(FIELDS), "shareStart", "shareCulture", "shareValue", ...Object.keys(TRADE)]);
 
 // ------------------------------------------------------------------ bytes and base64
 
@@ -112,6 +126,8 @@ export function encodeModelRun(result, runId) {
     cells.shareStart = packArray(result.modelCells.shareStart, { type: "index" });
     cells.shareCulture = packArray(result.modelCells.shareCulture, { type: "index", offset: 1 });
     cells.shareValue = packArray(result.modelCells.shareValue, { type: "u8", scale: UNIT });
+    // Kept with the cells' arrays (they are packed the same way), though they run per edge
+    if (result.trade) for (const [name, field] of Object.entries(TRADE)) cells[name] = packArray(result.trade[field.source], field);
     return {
         version: MODEL_RUN_VERSION,
         run: runId,
@@ -178,6 +194,7 @@ export function resampleModelRun(modelRun, sourceOf, targetOf) {
         if (arrays[name]) cells[name] = packArray(take(arrays[name], EMPTY[name] ?? 0), field);
     }
     Object.assign(cells, resampledShares(arrays, sourceOf));
+    Object.assign(cells, movedTrade(arrays, targetOf));
 
     const moveCells = (list) => Array.from(list ?? [], targetOf).filter((cell) => cell >= 0);
     const history = (modelRun.history ?? []).map((age) => ({
@@ -211,6 +228,25 @@ function resampledShares({ shareStart, shareCulture, shareValue }, sourceOf) {
         shareCulture: packArray(culture, { type: "index", offset: 1 }),
         shareValue: packArray(value, { type: "u8", scale: UNIT }),
     };
+}
+
+/**
+ * The trade edges with their cells moved; an edge either end of which moved off the map, or whose
+ * ends now share a cell, is dropped.
+ */
+function movedTrade(arrays, targetOf) {
+    if (!arrays.tradeFrom || !arrays.tradeTo || !arrays.tradeKind || !arrays.tradeValue) return {};
+    const kept = { from: [], to: [], kind: [], value: [] };
+    for (let edge = 0; edge < arrays.tradeFrom.length; edge++) {
+        const from = targetOf(arrays.tradeFrom[edge]);
+        const to = targetOf(arrays.tradeTo[edge]);
+        if (from < 0 || to < 0 || from === to) continue;
+        kept.from.push(from);
+        kept.to.push(to);
+        kept.kind.push(arrays.tradeKind[edge]);
+        kept.value.push(arrays.tradeValue[edge]);
+    }
+    return Object.fromEntries(Object.entries(TRADE).map(([name, field]) => [name, packArray(kept[field.source], field)]));
 }
 
 /** A history's places (cell, tier, seat triples) with their cells moved, those moved off the map dropped. */

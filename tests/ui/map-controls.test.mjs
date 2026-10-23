@@ -195,6 +195,13 @@ test("the thematic layers' menu marks the layer drawn in both forms, the rows th
         assert.equal(input.closest(".fwmb-range").querySelector("output").value, "0.4");
     }
     assert.equal(button.getAttribute("aria-pressed"), "true");
+
+    // A line layer alone presses the button too, and its row is ticked in both forms
+    syncMapControls(root, viewState({ thematic: { fill: null, rows: [], lines: [{ id: "trade", on: true, disabled: false, title: "Trade" }], opacity: 0.7, note: "" } }), label, detailLabel);
+    const trade = [...root.querySelectorAll('[data-action="toggleThematicLine"][data-thematic-line="trade"]')];
+    assert.equal(trade.length, 2);
+    for (const element of trade) assert.equal(element.getAttribute("aria-checked"), "true");
+    assert.equal(button.getAttribute("aria-pressed"), "true");
 });
 
 test("the Layers menu lists every wide toggle, in the same order", () => {

@@ -335,6 +335,20 @@ export class ThematicSource {
         return this.#lookups.get(layerId);
     }
 
+    // ------------------------------------------------------------------ trade
+
+    /** Whether the run kept its trade (a run saved before trade was kept did not). */
+    hasTrade() {
+        return ["tradeFrom", "tradeTo", "tradeKind", "tradeValue"].every((name) => this.#arrays[name] !== undefined);
+    }
+
+    /** The run's trade edges (see ModelRun's TRADE), or null without any. */
+    trade() {
+        if (!this.hasTrade()) return null;
+        const { tradeFrom, tradeTo, tradeKind, tradeValue } = this.#arrays;
+        return { from: tradeFrom, to: tradeTo, kind: tradeKind, value: tradeValue };
+    }
+
     // ------------------------------------------------------------------ culture
 
     /**
@@ -425,4 +439,154 @@ export class ThematicSource {
         for (let cell = 0; cell < index.length; cell++) if (index[cell] >= 0 && !this.#arrays.water[cell]) seen.add(index[cell]);
         return [...seen].sort((a, b) => a - b).map((at) => ({ index: at, name: this.#cultures[at]?.name ?? "", color: this.cultureColor(at) }));
     }
+}
+
+// ------------------------------------------------------------------ trade
+
+const TRADE = FILRODENSWMB.THEMATIC.TRADE;
+const NO_LINE = -1;
+
+/** A trade edge's class by its traffic (see THEMATIC.TRADE.CLASSES): the last whose start it reaches. */
+export function tradeClassOf(value) {
+    let index = 0;
+    TRADE.CLASSES.forEach((entry, at) => {
+        if (value >= entry.from) index = at;
+    });
+    return index;
+}
+
+/** One pass of corner cutting (Chaikin) over a polyline of x, y pairs, keeping its ends. */
+function smoothed(points) {
+    if (points.length <= 4) return points;
+    const out = [points[0], points[1]];
+    for (let at = 0; at + 3 < points.length; at += 2) {
+        const [x0, y0, x1, y1] = points.slice(at, at + 4);
+        out.push(0.75 * x0 + 0.25 * x1, 0.75 * y0 + 0.25 * y1, 0.25 * x0 + 0.75 * x1, 0.25 * y0 + 0.75 * y1);
+    }
+    out.push(points.at(-2), points.at(-1));
+    return out;
+}
+
+/**
+ * The display legs of the generated routes, by the pair of model cells they join ("a,b", the lower
+ * first): a generated route's waypoints are the model sites its chain ran through (or display cells
+ * beside them, where a lane or river route had to be snapped onto water), so each leg joins two
+ * model cells that a trade edge joins. Old roads (an earlier age's) are left out: they carry no
+ * trade now. A route the user has deleted leaves no leg, and its edges are drawn straight.
+ */
+function legsByModelEdge(mesh, routes) {
+    const legs = new Map();
+    for (const route of routes ?? []) {
+        if (!route?.generated || route.generated.oldRoad || !Array.isArray(route.waypoints) || !Array.isArray(route.legs)) continue;
+        for (let at = 0; at + 1 < route.waypoints.length; at++) {
+            const a = mesh.parentOf[route.waypoints[at]];
+            const b = mesh.parentOf[route.waypoints[at + 1]];
+            const leg = route.legs[at];
+            if (a === undefined || b === undefined || a === b || !Array.isArray(leg) || leg.length < 2) continue;
+            legs.set(a < b ? `${a},${b}` : `${b},${a}`, leg);
+        }
+    }
+    return legs;
+}
+
+/**
+ * The trade as lines to draw: each edge along the display leg of the generated route that joins
+ * its two model cells, so the flow follows the drawn roads, rivers and lanes, or, where no route
+ * joins them, straight between the two model sites. Each line has its points (map pixels, smoothed
+ * once), its transport (an index into TRADE.TRANSPORTS), its class (TRADE.CLASSES) and its traffic.
+ * Quiet lines come first, so the busiest are drawn on top.
+ * @param {{from: ArrayLike<number>, to: ArrayLike<number>, kind: ArrayLike<number>, value: ArrayLike<number>}} trade
+ * @param {import("../mesh/MeshBuilder.js").Mesh} mesh
+ * @param {object[]} routes - The map's routes.
+ * @returns {{points: number[], kind: number, cls: number, value: number}[]}
+ */
+export function tradeLines(trade, mesh, routes) {
+    const legs = legsByModelEdge(mesh, routes);
+    const lines = [];
+    for (let edge = 0; edge < trade.from.length; edge++) {
+        const a = trade.from[edge];
+        const b = trade.to[edge];
+        if (!(a >= 0 && a < mesh.modelCount && b >= 0 && b < mesh.modelCount)) continue;
+        const leg = legs.get(a < b ? `${a},${b}` : `${b},${a}`);
+        const cells = leg ?? [a, b];
+        const points = [];
+        for (const cell of cells) points.push(mesh.siteX(cell), mesh.siteY(cell));
+        lines.push({ points: smoothed(points), kind: trade.kind[edge], cls: tradeClassOf(trade.value[edge]), value: trade.value[edge] });
+    }
+    return lines.sort((x, y) => x.value - y.value);
+}
+
+/**
+ * The trade lines' segments in a grid, so the line nearest the pointer is found by looking at the
+ * few grid squares around it rather than every segment.
+ */
+export class TradeIndex {
+    #lines;
+    #size;
+    #columns;
+    #buckets = new Map();
+
+    /**
+     * @param {{points: number[]}[]} lines - From tradeLines.
+     * @param {number} width - The map's width in pixels.
+     * @param {number} [size] - The grid's square, in map pixels.
+     */
+    constructor(lines, width, size = 32) {
+        this.#lines = lines;
+        this.#size = size;
+        this.#columns = Math.ceil(width / size) + 1;
+        lines.forEach((line, index) => {
+            for (let at = 0; at + 3 < line.points.length; at += 2) this.#add(index, at, line.points);
+        });
+    }
+
+    #key(column, row) {
+        return row * this.#columns + column;
+    }
+
+    #add(line, at, points) {
+        const [x0, y0, x1, y1] = points.slice(at, at + 4);
+        const size = this.#size;
+        for (let column = Math.floor(Math.min(x0, x1) / size); column <= Math.floor(Math.max(x0, x1) / size); column++) {
+            for (let row = Math.floor(Math.min(y0, y1) / size); row <= Math.floor(Math.max(y0, y1) / size); row++) {
+                const key = this.#key(column, row);
+                if (!this.#buckets.has(key)) this.#buckets.set(key, []);
+                this.#buckets.get(key).push(line, at);
+            }
+        }
+    }
+
+    /**
+     * The line nearest (x, y) within `reach` map pixels, the busiest where several are as near; -1
+     * for none.
+     */
+    nearest(x, y, reach) {
+        const size = this.#size;
+        let best = NO_LINE;
+        let bestDistance = reach;
+        for (let column = Math.floor((x - reach) / size); column <= Math.floor((x + reach) / size); column++) {
+            for (let row = Math.floor((y - reach) / size); row <= Math.floor((y + reach) / size); row++) {
+                const bucket = this.#buckets.get(this.#key(column, row));
+                for (let entry = 0; bucket && entry < bucket.length; entry += 2) {
+                    const line = bucket[entry];
+                    const distance = segmentDistance(this.#lines[line].points, bucket[entry + 1], x, y);
+                    if (distance < bestDistance || (distance === bestDistance && best >= 0 && this.#lines[line].value > this.#lines[best].value)) {
+                        best = line;
+                        bestDistance = distance;
+                    }
+                }
+            }
+        }
+        return best;
+    }
+}
+
+/** The distance from (x, y) to the segment starting at `at` in a polyline. */
+function segmentDistance(points, at, x, y) {
+    const [x0, y0, x1, y1] = points.slice(at, at + 4);
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const length = dx * dx + dy * dy;
+    const t = length ? Math.min(1, Math.max(0, ((x - x0) * dx + (y - y0) * dy) / length)) : 0;
+    return Math.hypot(x - (x0 + t * dx), y - (y0 + t * dy));
 }

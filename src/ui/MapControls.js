@@ -117,12 +117,12 @@ export function syncMapControls(root, state, layersLabel, detailLabel, autoLabel
 
 /**
  * The thematic layers' menu (in its wide form and in the Layers menu): the colour layer chosen
- * (None when none is drawn), the layers the map's run cannot show marked disabled with the reason
- * as their tooltip, the note at its head, the opacity slider (idle while no layer is drawn), and
- * the button pressed while a layer is drawn.
+ * (None when none is drawn), the line layers shown, the layers the map's run cannot show marked
+ * disabled with the reason as their tooltip, the note at its head, the opacity slider (idle while
+ * no colour layer is drawn), and the button pressed while any layer is drawn.
  *
  * @param {ParentNode} root
- * @param {{fill: string|null, rows: {id: string, disabled: boolean, title: string}[], opacity: number, note: string}} thematic
+ * @param {{fill: string|null, rows: {id: string, disabled: boolean, title: string}[], lines?: {id: string, on: boolean, disabled: boolean, title: string}[], opacity: number, note: string}} thematic
  */
 function syncThematic(root, thematic) {
     const rows = new Map(thematic.rows.map((row) => [row.id, row]));
@@ -143,7 +143,15 @@ function syncThematic(root, thematic) {
         input.disabled = !thematic.fill;
         RangeDisplay.sync(input);
     });
-    root.querySelectorAll('.fwmb-layer-group[data-layer-group="thematic"] > [data-action="toggleLayerMenu"]').forEach((button) => setPressed(button, !!thematic.fill));
+    for (const line of thematic.lines ?? []) {
+        root.querySelectorAll(`[data-action="toggleThematicLine"][data-thematic-line="${line.id}"]`).forEach((element) => {
+            element.setAttribute("aria-checked", String(line.on));
+            element.setAttribute("aria-disabled", String(line.disabled));
+            element.dataset.tooltip = line.title;
+        });
+    }
+    const anyShown = !!thematic.fill || (thematic.lines ?? []).some((line) => line.on);
+    root.querySelectorAll('.fwmb-layer-group[data-layer-group="thematic"] > [data-action="toggleLayerMenu"]').forEach((button) => setPressed(button, anyShown));
 }
 
 /**

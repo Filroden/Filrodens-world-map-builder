@@ -863,6 +863,28 @@ export const FILRODENSWMB = {
                 readout: "culture",
             }),
         ]),
+        // The line layers, shown beside the colour layer: TRADE draws the last run's trade along
+        // the edges that carried it, its width by class (CLASSES, by the traffic's share of the
+        // busiest edge's, least first; WIDTH_PX in map pixels at the baseline map size, scaled
+        // with the map as pins are) and its colour by transport (Dark2, readable over land and sea
+        // and with the common colour-vision deficiencies). HIT_PX is how near the pointer must be
+        // for the information bar to read a line.
+        LINES: Object.freeze(["trade"]),
+        TRADE: Object.freeze({
+            CLASSES: Object.freeze([
+                Object.freeze({ id: "light", from: 0, label: "FILRODENSWMB.UI.ThematicTradeLight", widthPx: 1 }),
+                Object.freeze({ id: "moderate", from: 0.01, label: "FILRODENSWMB.UI.ThematicTradeModerate", widthPx: 2 }),
+                Object.freeze({ id: "heavy", from: 0.05, label: "FILRODENSWMB.UI.ThematicTradeHeavy", widthPx: 3.5 }),
+                Object.freeze({ id: "major", from: 0.2, label: "FILRODENSWMB.UI.ThematicTradeMajor", widthPx: 6 }),
+            ]),
+            TRANSPORTS: Object.freeze([
+                Object.freeze({ id: "road", label: "FILRODENSWMB.UI.ThematicTradeRoad", value: "FILRODENSWMB.UI.ThematicTradeRoadValue", color: "#d95f02" }),
+                Object.freeze({ id: "river", label: "FILRODENSWMB.UI.ThematicTradeRiver", value: "FILRODENSWMB.UI.ThematicTradeRiverValue", color: "#1b9e77" }),
+                Object.freeze({ id: "sea", label: "FILRODENSWMB.UI.ThematicTradeSea", value: "FILRODENSWMB.UI.ThematicTradeSeaValue", color: "#7570b3" }),
+            ]),
+            ALPHA: 0.85,
+            HIT_PX: 6,
+        }),
         // The culture layer's fading: a cell whose dominant culture holds SHARE_FULL of its people
         // or more is drawn at full strength, one at SHARE_FAINT or less at ALPHA_FAINT, and between
         // them in proportion; the palette a culture with no colour of its own takes

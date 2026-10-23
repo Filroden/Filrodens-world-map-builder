@@ -12,6 +12,7 @@ import { ExportScale } from "../tools/ExportScale.js";
 import { LabelLayout } from "./LabelLayout.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
 import { ThematicLayer } from "./ThematicLayer.js";
+import { TradeFlowLayer } from "./TradeFlowLayer.js";
 import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
 import { HomelandMarkers } from "./HomelandMarkers.js";
@@ -111,6 +112,10 @@ export class StudioCanvas {
             features: new PIXI.Container(),
             infrastructure: new PIXI.Container(),
             regions: new PIXI.Container(),
+            // The trade layer (see renderTrade): held in infrastructure, over the routes it follows
+            // (under them it would be hidden, as most trade runs along a route) and under the nodes
+            // and pins
+            trade: new PIXI.Container(),
             labels: new PIXI.Container(),
             reference: new PIXI.Container(),
             cartography: new PIXI.Container(),
@@ -153,6 +158,7 @@ export class StudioCanvas {
         this.pinContainer = new PIXI.Container();
 
         this.layers.infrastructure.addChild(this.routeGraphics);
+        this.layers.infrastructure.addChild(this.layers.trade);
         this.layers.infrastructure.addChild(this.nodeContainer); // Render nodes above lines
         this.layers.infrastructure.addChild(this.pinContainer); // Render pins above nodes
 
@@ -978,6 +984,7 @@ export class StudioCanvas {
             // released geometry
             this.terrainCompositor.destroy();
             this.#dropThematic();
+            this.#trade?.destroy();
             this.regionLevels.clear();
             this.app.destroy(true, { children: true, texture: true, baseTexture: true });
         }
@@ -1607,6 +1614,18 @@ export class StudioCanvas {
         this.layers.thematic.visible = true;
     }
 
+    /**
+     * Draws the trade lines (see TradeFlowLayer), or none.
+     * @param {object[]|null} lines - From ThematicData.tradeLines, or null.
+     */
+    renderTrade(lines) {
+        this.#trade ??= new TradeFlowLayer(PIXI, this.layers.trade);
+        this.#trade.show(lines, Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION);
+    }
+
+    /** The trade layer, made when first drawn (see renderTrade). */
+    #trade = null;
+
     /** The thematic layer's GPU objects, with the mesh they were made for (see renderThematic). */
     #thematic = null;
 
@@ -2122,6 +2141,7 @@ export class StudioCanvas {
             contours: this.layers.contours.visible,
             features: this.layers.features.visible,
             thematic: this.layers.thematic.visible,
+            trade: this.layers.trade.visible,
         };
 
         this.layers.reference.visible = false;
@@ -2138,6 +2158,7 @@ export class StudioCanvas {
             // The GM overlay holds only what players must not see; a thematic layer is in the
             // player image already
             this.layers.thematic.visible = false;
+            this.layers.trade.visible = false;
             this.layers.features.visible = false;
             this.gridLayer.visible = false;
             this.layers.cartography.visible = false;
@@ -2174,6 +2195,7 @@ export class StudioCanvas {
         this.layers.contours.visible = originalVisibility.contours;
         this.layers.features.visible = originalVisibility.features;
         this.layers.thematic.visible = originalVisibility.thematic;
+        this.layers.trade.visible = originalVisibility.trade;
 
         return new Promise((resolve) => {
             canvas.toBlob((blob) => {

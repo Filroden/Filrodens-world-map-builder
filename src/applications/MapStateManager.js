@@ -256,8 +256,9 @@ export class MapStateManager {
             // atlas without choosing any; a saved map keeps its own (see MapStudio's load)
             customLabelStyles: FILRODENSWMB.LABELS.DEFAULT_STYLES.map(({ nameKey, ...style }) => ({ ...style, name: platform.i18n.localize(nameKey) })),
 
-            // The thematic layer shown over the map, and how strongly (see ThematicView)
-            thematic: { fill: null, opacity: FILRODENSWMB.THEMATIC.OPACITY },
+            // The thematic layers shown over the map (one colour layer, any line layers) and the colour
+            // layer's opacity (see ThematicView)
+            thematic: { fill: null, lines: [], opacity: FILRODENSWMB.THEMATIC.OPACITY },
             // The map's unit (see MapUnit): the name every distance shown is labelled with
             mapUnit: FILRODENSWMB.MAP_UNIT.DEFAULT,
             cartographyScaleEnable: false,

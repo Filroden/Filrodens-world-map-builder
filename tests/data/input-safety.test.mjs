@@ -245,6 +245,7 @@ function savedModelRun() {
         cellCount: 4,
         cultures: [{ name: "Northfolk", nameBase: "english", homeland: 0 }],
         stats: { kingdoms: 2, independents: 0 },
+        trade: { from: [0, 1], to: [1, 3], kind: [0, 2], value: [1, 0.25] },
     };
     return JSON.parse(JSON.stringify(encodeModelRun(result, "runAAAAAAAAAAAAA")));
 }
@@ -267,6 +268,10 @@ test("a saved model run passes the importer whole, and a damaged or hostile one 
     assert.equal(short.corrected, 1);
     assert.equal(hostile((run) => (run.cells.realm.data = "not base64!")).modelRun, null);
     assert.equal(hostile((run) => (run.cells.landArea.data = run.cells.landArea.data.slice(0, 8))).modelRun, null, "a land area shorter than the run's cells");
+    assert.equal(hostile((run) => (run.cells.tradeTo.data = run.cells.tradeTo.data.slice(0, 1))).modelRun, null, "trade arrays of different lengths");
+    assert.equal(hostile((run) => (run.cells.tradeFrom.data = btoa(String.fromCharCode(0, 9)))).modelRun, null, "a trade edge from a cell the run does not have");
+    assert.equal(hostile((run) => (run.cells.tradeKind.data = btoa(String.fromCharCode(0, 7)))).modelRun, null, "an unknown transport");
+    assert.ok(hostile((run) => ["tradeFrom", "tradeTo", "tradeKind", "tradeValue"].forEach((name) => delete run.cells[name])).modelRun, "a run saved before trade was kept is whole");
     // A run saved before land areas were kept is whole: only its density layers have no data
     const older = hostile((run) => delete run.cells.landArea);
     assert.ok(older.modelRun && !older.modelRun.cells.landArea);

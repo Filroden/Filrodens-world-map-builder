@@ -1,9 +1,9 @@
 {{!--
     The thematic layers' rows (see ThematicView), shared by the wide Thematic layers menu and the
     folded Layers menu: a note when the map's run cannot show them, the colour layers as one
-    choice with None first, and the colour layer's opacity. Their state is written by
-    MapControls.syncMapControls; the opacity slider has no name, so a save's read of the panel
-    never takes it for a map setting (the setting is uiState.thematic).
+    choice with None first, the line layers (each on or off), and the colour layer's opacity.
+    Their state is written by MapControls.syncMapControls; the opacity slider has no name, so a
+    save's read of the panel never takes it for a map setting (the setting is uiState.thematic).
 
     Parameters: thematic (ThematicView.menuContext), indent (true in the folded Layers menu).
 --}}
@@ -13,6 +13,13 @@
 </button>
 {{#each thematic.layers}}
 <button type="button" role="menuitemradio" aria-checked="false" data-action="setThematicFill" data-thematic-layer="{{this.id}}"{{#if ../indent}} class="fwmb-layer-menu-sub"{{/if}}>
+    <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+</button>
+{{/each}}
+{{!-- The line layers, shown beside the colour layer, each on or off --}}
+<div class="fwmb-layer-menu-sep" role="separator"></div>
+{{#each thematic.lines}}
+<button type="button" role="menuitemcheckbox" aria-checked="false" data-action="toggleThematicLine" data-thematic-line="{{this.id}}"{{#if ../indent}} class="fwmb-layer-menu-sub"{{/if}}>
     <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
 </button>
 {{/each}}

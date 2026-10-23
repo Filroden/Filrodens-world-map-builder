@@ -1695,6 +1695,13 @@
     position: absolute;
     transform: translateX(calc(-50% * var(--fwmb-dir-flip)));
 }
+/* A trade legend's line sample: as thick as its class's line, relative to the others */
+.fwmb-canvas-readout .fwmb-classes i.fwmb-line-sample {
+    width: 1.25rem;
+    height: var(--fwmb-line-rem, 0.125rem);
+    border-radius: 1rem;
+    background: var(--fwmb-overlay-text);
+}
 /* A class legend: the culture under the pointer stands out in the accent */
 .fwmb-canvas-readout .fwmb-legend-classes {
     display: flex;

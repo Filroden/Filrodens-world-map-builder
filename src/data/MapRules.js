@@ -589,6 +589,7 @@ const MAP = obj({
     // The thematic layer shown over the map and its opacity (see ThematicView)
     thematic: obj({
         fill: enumOf(FILRODENSWMB.THEMATIC.LAYERS.map((layer) => layer.id), { nullable: true }),
+        lines: list(enumOf(FILRODENSWMB.THEMATIC.LINES)),
         opacity: num({ min: FILRODENSWMB.THEMATIC.OPACITY_RANGE.MIN, max: FILRODENSWMB.THEMATIC.OPACITY_RANGE.MAX }),
     }),
     params: PARAMS,

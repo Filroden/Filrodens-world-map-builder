@@ -1,13 +1,13 @@
 import { FILRODENSWMB } from "../config.js";
 import { platform } from "../platform/index.js";
 import { cleanUnit, formatDistance } from "../data/MapUnit.js";
-import { LAYERS, ThematicSource, scalePosition } from "../thematic/ThematicData.js";
+import { LAYERS, ThematicSource, TradeIndex, scalePosition, tradeLines } from "../thematic/ThematicData.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 
 /**
- * The studio side of the thematic layers: which layer is shown and how strongly (the map's
- * `thematic` view setting), what the Thematic layers menu offers, the value under the pointer in
- * the information bar, and the legend under it.
+ * The studio side of the thematic layers: which colour layer is shown and how strongly, and which
+ * line layers beside it (the map's `thematic` view setting), what the Thematic layers menu offers,
+ * the values under the pointer in the information bar, and the legends under it.
  *
  * The layers read the map's last generator run (app.modelRun) on its display mesh. The run's
  * values are worked out once per run and mesh (see ThematicSource) and kept here, so a new run, an
@@ -26,24 +26,44 @@ const doc = (app) => app.root.ownerDocument;
 /** A dash for no value, as the information bar shows off the map. */
 const NO_VALUE = "–";
 const PERCENT = 100;
+/** A trade legend sample's thickness per map pixel of the line it stands for (rem). */
+const LINE_SAMPLE_REM = 0.0625;
 
+/** What the generated routes are now, in brief: the trade lines follow their legs. */
+function routeSignature(routes) {
+    let signature = "";
+    for (const route of routes ?? []) {
+        if (!route?.generated || route.generated.oldRoad) continue;
+        let cells = 0;
+        for (const leg of route.legs ?? []) cells += leg.length;
+        signature += `${route.id}:${route.waypoints?.length ?? 0}:${cells};`;
+    }
+    return signature;
+}
+
+/** The line layers' names in the menu. */
+const LINE_LABELS = Object.freeze({ trade: "FILRODENSWMB.UI.ThematicTrade" });
 /** Per studio: the source for its run and mesh (which keeps the layers' values and colours). */
 const sources = new WeakMap();
 /** Per studio: the legends folded by the user (by layer id), kept while the studio is open. */
 const folded = new WeakMap();
+/** Per studio: the trade lines and their index, with what they were made from (see #trade). */
+const trades = new WeakMap();
+const TRADE = THEMATIC.TRADE;
 
 export class ThematicView {
     /**
-     * A saved `thematic` setting made valid: a known colour layer or none, and an opacity within
-     * its range (the default when missing).
+     * A saved `thematic` setting made valid: a known colour layer or none, the known line layers
+     * shown (each once), and an opacity within its range (the default when missing).
      * @param {*} saved
-     * @returns {{fill: string|null, opacity: number}}
+     * @returns {{fill: string|null, lines: string[], opacity: number}}
      */
     static valid(saved) {
         const fill = typeof saved?.fill === "string" && LAYERS.has(saved.fill) ? saved.fill : null;
+        const lines = THEMATIC.LINES.filter((id) => Array.isArray(saved?.lines) && saved.lines.includes(id));
         const { MIN, MAX } = THEMATIC.OPACITY_RANGE;
         const opacity = Number.isFinite(saved?.opacity) ? Math.min(MAX, Math.max(MIN, saved.opacity)) : THEMATIC.OPACITY;
-        return { fill, opacity };
+        return { fill, lines, opacity };
     }
 
     /** The map's setting, as it stands. */
@@ -66,6 +86,29 @@ export class ThematicView {
     static shownLayer(app) {
         const { fill } = this.setting(app);
         return fill && this.source(app)?.has(fill) ? LAYERS.get(fill) : null;
+    }
+
+    /** Whether the trade lines are drawn: chosen, and kept by the run (a run saved before trade was kept has none). */
+    static tradeShown(app) {
+        return this.setting(app).lines.includes("trade") && !!this.source(app)?.hasTrade();
+    }
+
+    /**
+     * The trade lines and their index (see ThematicData.tradeLines), worked out again only when
+     * the run or the generated routes they follow change (a route edited, deleted or undone).
+     * @returns {{lines: object[], index: TradeIndex}|null}
+     */
+    static #trade(app) {
+        const source = this.source(app);
+        const trade = source?.trade();
+        if (!trade) return null;
+        const signature = routeSignature(app.mapRoutes);
+        const cached = trades.get(app);
+        if (cached?.source === source && cached.signature === signature) return cached;
+        const lines = tradeLines(trade, app.meshSession.mesh, app.mapRoutes);
+        const made = { source, signature, lines, index: new TradeIndex(lines, app.mapWidth) };
+        trades.set(app, made);
+        return made;
     }
 
     /**
@@ -92,9 +135,15 @@ export class ThematicView {
             // A row the run cannot show says why; one it can, what it shows
             title: platform.i18n.localize(MISSING_REASON[source?.missing(layer.id)] ?? layer.hint),
         }));
+        const lines = THEMATIC.LINES.map((id) => ({
+            id,
+            on: id === "trade" && this.tradeShown(app),
+            disabled: !source?.hasTrade(),
+            title: platform.i18n.localize(source && !source.hasTrade() ? "FILRODENSWMB.UI.ThematicNeedsRerun" : "FILRODENSWMB.UI.ThematicTradeHint"),
+        }));
         // The chosen layer stays the map's setting when the run cannot show it (a map opened before
         // generating), but the menu marks what is drawn: None
-        return { fill: this.shownLayer(app)?.id ?? null, rows, opacity, note: reason ? platform.i18n.localize(reason) : "" };
+        return { fill: this.shownLayer(app)?.id ?? null, rows, lines, opacity, note: reason ? platform.i18n.localize(reason) : "" };
     }
 
     // ------------------------------------------------------------------ drawing
@@ -105,6 +154,7 @@ export class ThematicView {
         const source = this.source(app);
         const display = layer ? { values: source.displayBytes(layer.id), lookup: source.lookup(layer.id), opacity: this.setting(app).opacity } : null;
         app.canvasEngine?.renderThematic(app.meshSession, display);
+        app.canvasEngine?.renderTrade(this.tradeShown(app) ? (this.#trade(app)?.lines ?? null) : null);
         this.renderLegend(app);
     }
 
@@ -118,6 +168,7 @@ export class ThematicView {
      * @param {number|null} y
      */
     static readout(app, x, y) {
+        this.#readTrade(app, x, y);
         const element = app.root?.querySelector("[data-thematic-readout]");
         if (!element) return;
         const layer = this.shownLayer(app);
@@ -134,6 +185,25 @@ export class ThematicView {
         const value = this.source(app).valueAt(layer.id, cell);
         text.textContent = Number.isFinite(value) ? this.formatValue(app, layer, value) : NO_VALUE;
         this.#moveMarker(app, layer, value);
+    }
+
+    /**
+     * The trade line under the pointer in the information bar: its class and transport ("Heavy
+     * road trade"), from the nearest line within TRADE.HIT_PX screen pixels; a dash for none.
+     */
+    static #readTrade(app, x, y) {
+        const element = app.root?.querySelector("[data-thematic-trade-readout]");
+        if (!element) return;
+        const shown = this.tradeShown(app);
+        element.classList.toggle("fwmb-hidden", !shown);
+        if (!shown) return;
+        const trade = this.#trade(app);
+        const zoom = app.canvasEngine?.stage?.scale?.x || 1;
+        const index = x === null || y === null || !trade ? -1 : trade.index.nearest(x, y, TRADE.HIT_PX / zoom);
+        const line = index >= 0 ? trade.lines[index] : null;
+        const transport = line ? TRADE.TRANSPORTS[line.kind] ?? TRADE.TRANSPORTS[0] : null;
+        element.querySelector("[data-thematic-trade-value]").textContent = line ? platform.i18n.format(transport.value, { class: platform.i18n.localize(TRADE.CLASSES[line.cls].label) }) : NO_VALUE;
+        for (const item of app.root.querySelectorAll('[data-thematic-legend="trade"] [data-trade-class]')) item.classList.toggle("fwmb-is-current", !!line && Number(item.dataset.tradeClass) === line.cls);
     }
 
     /** A value as the information bar and the legend's ticks word it (see THEMATIC's READOUT). */
@@ -161,27 +231,35 @@ export class ThematicView {
         const readout = app.root?.querySelector("[data-thematic-readout]");
         if (!container) return;
         const layer = this.shownLayer(app);
+        const trade = this.tradeShown(app);
         if (readout) {
             readout.classList.toggle("fwmb-hidden", !layer);
             if (layer) readout.querySelector("[data-thematic-key]").textContent = platform.i18n.localize(layer.label);
         }
+        app.root.querySelector("[data-thematic-trade-readout]")?.classList.toggle("fwmb-hidden", !trade);
         const rtl = app.root.ownerDocument?.documentElement?.dir === "rtl" || app.root.closest?.('[dir="rtl"]') !== null;
-        const isFolded = !!layer && (folded.get(app)?.has(layer.id) ?? false);
+        const isFolded = (id) => folded.get(app)?.has(id) ?? false;
         // The run's id stands for its cultures, which the culture legend lists
-        const signature = layer ? JSON.stringify([layer.id, app.modelRun?.run ?? null, cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, isFolded]) : "";
+        const signature = layer || trade ? JSON.stringify([layer?.id ?? null, trade, app.modelRun?.run ?? null, cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, layer ? isFolded(layer.id) : false, isFolded("trade")]) : "";
         if (container.dataset.signature === signature) return;
         container.dataset.signature = signature;
-        container.replaceChildren(...(layer ? [this.#legend(app, layer, { rtl, isFolded })] : []));
+        const legends = [];
+        if (layer) legends.push(this.#legend(app, layer, { rtl, isFolded: isFolded(layer.id) }));
+        if (trade) legends.push(this.#legend(app, { id: "trade", label: "FILRODENSWMB.UI.ThematicTrade" }, { rtl, isFolded: isFolded("trade") }));
+        container.replaceChildren(...legends);
     }
 
-    /** Folds or unfolds the shown layer's legend (its title's button). */
-    static toggleLegend(app) {
-        const layer = this.shownLayer(app);
-        if (!layer) return;
+    /**
+     * Folds or unfolds a legend (its title's button).
+     * @param {object} app
+     * @param {string} id - The legend's layer.
+     */
+    static toggleLegend(app, id) {
+        if (!id) return;
         if (!folded.has(app)) folded.set(app, new Set());
         const set = folded.get(app);
-        if (set.has(layer.id)) set.delete(layer.id);
-        else set.add(layer.id);
+        if (set.has(id)) set.delete(id);
+        else set.add(id);
         this.renderLegend(app);
     }
 
@@ -201,6 +279,7 @@ export class ThematicView {
         const toggle = make("button", "fwmb-toggle");
         toggle.type = "button";
         toggle.dataset.action = "toggleThematicLegend";
+        toggle.dataset.thematicLegendId = layer.id;
         toggle.setAttribute("aria-expanded", String(!isFolded));
         const toggleLabel = platform.i18n.localize(isFolded ? "FILRODENSWMB.UI.ThematicLegendShow" : "FILRODENSWMB.UI.ThematicLegendHide");
         toggle.setAttribute("aria-label", toggleLabel);
@@ -210,7 +289,7 @@ export class ThematicView {
         arrow.setAttribute("aria-hidden", "true");
         toggle.append(arrow);
         title.append(name, toggle);
-        section.append(title, ThematicSource.isClassLayer(layer.id) ? this.#classes(app, layer, make) : this.#ramp(app, layer, make, rtl));
+        section.append(title, this.#legendBody(app, layer, make, rtl));
 
         if (app.uiState?.generatorStale === true) section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicStale")));
         return section;
@@ -237,6 +316,39 @@ export class ThematicView {
         const unit = make("div", "fwmb-ramp-unit", platform.i18n.format(layer.unit, { unit: cleanUnit(app.uiState?.mapUnit) }));
         ramp.append(bar, ticks, unit);
         return ramp;
+    }
+
+    /** A legend's body by its form: the trade key, a class list (culture) or a graded scale. */
+    static #legendBody(app, layer, make, rtl) {
+        if (layer.id === "trade") return this.#tradeKey(make);
+        return ThematicSource.isClassLayer(layer.id) ? this.#classes(app, layer, make) : this.#ramp(app, layer, make, rtl);
+    }
+
+    /**
+     * The trade legend: the line widths by class (in a neutral colour) and the colours by transport.
+     * The class under the pointer is marked (see #readTrade).
+     */
+    static #tradeKey(make) {
+        const wrapper = make("div", "fwmb-legend-classes");
+        const widths = make("div", "fwmb-classes");
+        TRADE.CLASSES.forEach((entry, index) => {
+            const item = make("span");
+            item.dataset.tradeClass = String(index);
+            const sample = make("i", "fwmb-line-sample");
+            sample.style.setProperty("--fwmb-line-rem", `${LINE_SAMPLE_REM * (1 + entry.widthPx)}rem`);
+            item.append(sample, make("span", "", platform.i18n.localize(entry.label)));
+            widths.append(item);
+        });
+        const colours = make("div", "fwmb-classes");
+        for (const transport of TRADE.TRANSPORTS) {
+            const item = make("span");
+            const swatch = make("i");
+            swatch.style.setProperty("--swatch", transport.color);
+            item.append(swatch, make("span", "", platform.i18n.localize(transport.label)));
+            colours.append(item);
+        }
+        wrapper.append(widths, colours, make("div", "fwmb-ramp-unit", platform.i18n.localize("FILRODENSWMB.UI.ThematicTradeUnit")));
+        return wrapper;
     }
 
     /**
@@ -279,7 +391,12 @@ export class ThematicView {
     /** The menu's colour layers, for the map region's template. */
     static menuContext() {
         const { MIN, MAX, STEP } = THEMATIC.OPACITY_RANGE;
-        return { layers: THEMATIC.LAYERS.map((layer) => ({ id: layer.id, label: layer.label })), none: NONE, opacity: { min: MIN, max: MAX, step: STEP, value: THEMATIC.OPACITY } };
+        return {
+            layers: THEMATIC.LAYERS.map((layer) => ({ id: layer.id, label: layer.label })),
+            lines: THEMATIC.LINES.map((id) => ({ id, label: LINE_LABELS[id] })),
+            none: NONE,
+            opacity: { min: MIN, max: MAX, step: STEP, value: THEMATIC.OPACITY },
+        };
     }
 
     /**
@@ -293,6 +410,18 @@ export class ThematicView {
         if (fill && !this.source(app)?.has(fill)) return null;
         if (fill === setting.fill) return null;
         return { ...setting, fill };
+    }
+
+    /**
+     * The setting with a line layer shown or hidden; a layer the run cannot show is refused.
+     * @returns {{fill: string|null, lines: string[], opacity: number}|null} The new setting, or null for no change.
+     */
+    static withLine(app, id) {
+        const setting = this.setting(app);
+        if (!THEMATIC.LINES.includes(id)) return null;
+        const on = setting.lines.includes(id);
+        if (!on && !this.source(app)?.hasTrade()) return null;
+        return { ...setting, lines: on ? setting.lines.filter((line) => line !== id) : [...setting.lines, id] };
     }
 
     /** The setting with a new opacity (the menu's slider), or null for no change. */
