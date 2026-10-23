@@ -2833,6 +2833,11 @@
     font: 500 0.8125rem/1rem var(--fwmb-font-readout);
     font-variant-numeric: tabular-nums;
 }
+/* Each name and value is isolated, so in a right-to-left language a left-to-right name and value
+   are not run together into one span with the name's gap on its far side */
+.fwmb-canvas-readout .fwmb-values > span > * {
+    unicode-bidi: isolate;
+}
 .fwmb-canvas-readout .fwmb-values .fwmb-k {
     color: var(--fwmb-overlay-muted);
     font: 400 0.6875rem/1rem var(--fwmb-font-ui);
