@@ -1068,8 +1068,12 @@
 .fwmb .fwmb-history-ages .fwmb-list-item[aria-checked="true"] {
     background: var(--fwmb-bg-highlight);
 }
-/* An age's name with its era and strife below, so a narrow panel keeps both whole */
+/* An age's name with its era and strife below, so a narrow panel keeps both whole; a row grows
+   with what it holds (it never shrinks into the next) */
 .fwmb .fwmb-history-ages .fwmb-list-item {
+    flex: none;
+    block-size: auto;
+    padding-block: 0.25rem;
     flex-direction: column;
     align-items: flex-start;
     justify-content: center;
@@ -1102,6 +1106,8 @@
     max-block-size: 20rem;
 }
 .fwmb .fwmb-history-realms .fwmb-list-item {
+    flex: none;
+    block-size: auto;
     min-block-size: 2.75rem;
 }
 .fwmb-history-realm .fwmb-meta {
@@ -1661,7 +1667,8 @@
    values side by side, in the studio's own colours whatever the host gives a dl */
 .fwmb .fwmb-generate-results {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    /* A label keeps its words whole; a long value wraps rather than squeezing it */
+    grid-template-columns: minmax(min-content, 1fr) minmax(0, max-content);
     gap: 0.25rem 0.75rem;
     margin: 0;
 }
@@ -1676,6 +1683,7 @@
 }
 .fwmb .fwmb-generate-results dd {
     text-align: end;
+    overflow-wrap: break-word;
 }
 .fwmb-processing-detail {
     margin: 0;
