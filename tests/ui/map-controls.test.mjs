@@ -165,11 +165,13 @@ test("the Detail menu marks the map's symbol size, naming Auto with its value", 
     assert.equal(rows[0].getAttribute("aria-checked"), "false");
 });
 
-test("the thematic layers' menu marks the layer drawn in both forms, the rows the run cannot show, its note and its opacity", () => {
+test("the thematic layers' menu, beside Detail, marks the layer drawn, the rows the run cannot show, its note and its opacity", () => {
     const root = drawMap();
     const rows = (id) => [...root.querySelectorAll(`[data-action="setThematicFill"][data-thematic-layer="${id}"]`)];
     const button = root.querySelector('.fwmb-layer-group[data-layer-group="thematic"] > [data-action="toggleLayerMenu"]');
-    assert.equal(rows("population").length, 2, "in the wide menu and the Layers menu");
+    assert.equal(rows("population").length, 1, "one menu, shown at every width");
+    assert.ok(button.closest(".fwmb-map-control-group").querySelector('[data-layer-group="detail"]'), "in Detail's group");
+    assert.equal(button.closest(".fwmb-map-controls-wide, .fwmb-map-controls-folded"), null, "not folded away");
 
     syncMapControls(root, viewState({ thematic: { fill: null, rows: [{ id: "population", disabled: true, title: "Generate again" }], opacity: 0.7, note: "Generate this map to see these layers." } }), label, detailLabel);
     for (const row of rows("none")) assert.equal(row.getAttribute("aria-checked"), "true");
@@ -196,10 +198,10 @@ test("the thematic layers' menu marks the layer drawn in both forms, the rows th
     }
     assert.equal(button.getAttribute("aria-pressed"), "true");
 
-    // A line layer alone presses the button too, and its row is ticked in both forms
+    // A line layer alone presses the button too, and its row is ticked
     syncMapControls(root, viewState({ thematic: { fill: null, rows: [], lines: [{ id: "trade", on: true, disabled: false, title: "Trade" }], opacity: 0.7, note: "" } }), label, detailLabel);
     const trade = [...root.querySelectorAll('[data-action="toggleThematicLine"][data-thematic-line="trade"]')];
-    assert.equal(trade.length, 2);
+    assert.equal(trade.length, 1);
     for (const element of trade) assert.equal(element.getAttribute("aria-checked"), "true");
     assert.equal(button.getAttribute("aria-pressed"), "true");
 });

@@ -116,7 +116,7 @@ export function syncMapControls(root, state, layersLabel, detailLabel, autoLabel
 }
 
 /**
- * The thematic layers' menu (in its wide form and in the Layers menu): the colour layer chosen
+ * The thematic layers' menu: the colour layer chosen
  * (None when none is drawn), the line layers shown, the layers the map's run cannot show marked
  * disabled with the reason as their tooltip, the note at its head, the opacity slider (idle while
  * no colour layer is drawn), and the button pressed while any layer is drawn.

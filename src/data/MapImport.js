@@ -271,8 +271,9 @@ function modelRunHoldsTogether(modelRun) {
 
 /**
  * An earlier age (see ModelRun): its realms and cultures one per cell like the run's own, its
- * names one per place, castle and realm, and its roads in pairs between the run's cells. The names,
- * cultures and roads came later, so an age without them is whole.
+ * names one per place, castle and realm, its people one per realm, and its roads in pairs between
+ * the run's cells. The names, people, cultures and roads came later, so an age without them is
+ * whole.
  */
 function ageHoldsTogether(age, count) {
     let arrays;
@@ -287,7 +288,7 @@ function ageHoldsTogether(age, count) {
     const listed = (names, length) => names === undefined || names.length === length;
     if (!listed(age.placeNames, (age.places?.length ?? 0) / 3)) return false;
     if (!listed(age.castleNames, age.castles?.length ?? 0) || !listed(age.castleKeeps, age.castles?.length ?? 0)) return false;
-    if (!listed(age.realmNames, age.seats?.length ?? 0)) return false;
+    if (!listed(age.realmNames, age.seats?.length ?? 0) || !listed(age.realmPeople, age.seats?.length ?? 0)) return false;
     if (!roadFrom !== !roadTo) return false;
     if (!roadFrom) return true;
     const inRun = (cell) => Number.isInteger(cell) && cell >= 0 && cell < count;

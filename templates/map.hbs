@@ -27,6 +27,7 @@
                 {{!-- The shown thematic layer's value under the pointer, in the overlay accent (see ThematicView) --}}
                 <span class="fwmb-hidden" data-thematic-readout><span class="fwmb-k" data-thematic-key></span><span class="fwmb-thematic" data-thematic-value>–</span></span>
                 <span class="fwmb-hidden" data-thematic-trade-readout><span class="fwmb-k">{{localize "FILRODENSWMB.UI.ThematicTrade"}}</span><span class="fwmb-thematic" data-thematic-trade-value>–</span></span>
+                <span class="fwmb-hidden" data-history-readout><span class="fwmb-k">{{localize "FILRODENSWMB.UI.HistoryReadoutRealm"}}</span><span class="fwmb-thematic" data-history-value>–</span></span>
             </div>
             {{!-- The thematic layers' legends go here --}}
             <div class="fwmb-legends"></div>
@@ -55,7 +56,7 @@
                 </button>
             </div>
 
-            {{!-- Detail: how much of the generated content is shown (see DetailLevel), one choice; whether names avoid each other (see LabelLayout); and the symbol size (see SymbolScale) --}}
+            {{!-- Detail: how much of the generated content is shown (see DetailLevel), one choice; whether names avoid each other (see LabelLayout); and the symbol size (see SymbolScale). Then the thematic layers. --}}
             <div class="fwmb-map-control-group">
                 <div class="fwmb-layer-group" data-layer-group="detail">
                     <button type="button" class="fwmb-map-btn" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize 'FILRODENSWMB.UI.DetailMenu'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DetailMenu'}}">
@@ -82,6 +83,17 @@
                             <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.SymbolSizePercent" percent=this.percent}}
                         </button>
                         {{/each}}
+                    </div>
+                </div>
+                {{!-- The thematic layers (see ThematicView): what the generator's last run left on the
+                     map, one colour layer at a time and the line layers. Beside Detail, since both
+                     choose how the map's content is shown, and shown while the controls are folded. --}}
+                <div class="fwmb-layer-group" data-layer-group="thematic">
+                    <button type="button" class="fwmb-map-btn" aria-pressed="false" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize 'FILRODENSWMB.UI.ThematicLayers'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ThematicLayers'}}">
+                        <span class="fwmb-icon fwmb-icon--gradient" aria-hidden="true"></span>
+                    </button>
+                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.ThematicLayers'}}">
+                        {{> "modules/filrodens-world-map-builder/templates/parts/thematic-menu.hbs" thematic=thematic}}
                     </div>
                 </div>
             </div>
@@ -138,19 +150,6 @@
                 {{/each}}
             </div>
 
-            {{!-- The thematic layers (see ThematicView): what the generator's last run left on the map,
-                 one colour layer at a time. Hidden while folded. --}}
-            <div class="fwmb-map-control-group fwmb-map-controls-wide">
-                <div class="fwmb-layer-group" data-layer-group="thematic">
-                    <button type="button" class="fwmb-map-btn" aria-pressed="false" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize 'FILRODENSWMB.UI.ThematicLayers'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ThematicLayers'}}">
-                        <span class="fwmb-icon fwmb-icon--gradient" aria-hidden="true"></span>
-                    </button>
-                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.ThematicLayers'}}">
-                        {{> "modules/filrodens-world-map-builder/templates/parts/thematic-menu.hbs" thematic=thematic}}
-                    </div>
-                </div>
-            </div>
-
             {{!-- Folded: every layer toggle above in one menu, in the same order. Group rows tick
                  or untick their whole group; their layers sit indented below them. --}}
             <div class="fwmb-map-control-group fwmb-map-controls-folded">
@@ -187,10 +186,6 @@
                             <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
                         </button>
                         {{/each}}
-                        {{!-- The thematic layers, after a separator --}}
-                        <div class="fwmb-layer-menu-sep" role="separator"></div>
-                        <div class="fwmb-layer-menu-label" role="presentation">{{localize "FILRODENSWMB.UI.ThematicLayers"}}</div>
-                        {{> "modules/filrodens-world-map-builder/templates/parts/thematic-menu.hbs" thematic=thematic indent=true}}
                     </div>
                 </div>
             </div>

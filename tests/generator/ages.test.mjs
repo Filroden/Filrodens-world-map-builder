@@ -55,6 +55,8 @@ test("earlier ages keep their names, cultures and roads", async () => {
     assert.equal(age.castleKeeps.length, age.castles.length);
     assert.equal(age.realmNames.length, age.seats.length);
     assert.ok(age.realmNames.every((name) => name.length > 0), "every realm is named");
+    assert.equal(age.realmPeople.length, age.seats.length);
+    assert.ok(age.realmPeople.every((people) => Number.isInteger(people) && people > 0), "every realm has people");
     const nowByCell = new Map(result.places.filter((place) => place.kind === "town").map((place) => [place.cell, place.name]));
     historyTowns(age).forEach((cell, index) => {
         if (nowByCell.has(cell)) assert.equal(age.placeNames[index], nowByCell.get(cell), "a town carrying on has its present name");

@@ -586,6 +586,8 @@ const MAP = obj({
     hiddenLabelStyles: list(key),
     hiddenLevels: list(key),
     hideRegionFills: bool,
+    // The age the History tool shows (see HistoryView), from 1; null until one is chosen
+    historyAge: int(1, 100, { nullable: true }),
     // The thematic layer shown over the map and its opacity (see ThematicView)
     thematic: obj({
         fill: enumOf(FILRODENSWMB.THEMATIC.LAYERS.map((layer) => layer.id), { nullable: true }),
@@ -664,6 +666,7 @@ const MODEL_RUN = obj({
         castleKeeps: list(HISTORY_NAME),
         seats: { t: "cellSlots" },
         realmNames: list(HISTORY_NAME),
+        realmPeople: list(int(0, 1e12)),
         realm: PACKED_ARRAY,
         culture: PACKED_ARRAY,
         roadFrom: PACKED_ARRAY,

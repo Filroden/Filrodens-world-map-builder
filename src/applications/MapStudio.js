@@ -25,6 +25,7 @@ import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
 import { cleanUnit, formatDistance, kmPerPxOf, scaleBarTick, unitFromSaved } from "../data/MapUnit.js";
 import { ThematicView } from "./ThematicView.js";
+import { HistoryView } from "./HistoryView.js";
 import { TerrainUpgrade } from "./TerrainUpgrade.js";
 import { RiverSources } from "../generation/RiverSources.js";
 import { ProceduralOrchestrator } from "../ProceduralOrchestrator.js";
@@ -270,6 +271,8 @@ export class MapStudio {
         setThematicFill(_e, t)          { this.#setThematic(ThematicView.withFill(this, t.dataset.thematicLayer)); },
         toggleThematicLine(_e, t)       { this.#setThematic(ThematicView.withLine(this, t.dataset.thematicLine)); },
         toggleThematicLegend(_e, t)     { ThematicView.toggleLegend(this, t.dataset.thematicLegendId); },
+        chooseHistoryAge(_e, t)         { this.#chooseHistoryAge(Number(t.dataset.age)); },
+        focusHistoryRealm(_e, t)        { HistoryView.focusRealm(this, Number(t.dataset.realm)); },
         toggleLabelOverlaps()           { this.#toggleLabelOverlaps(); },
         setSymbolSize(_e, t)            { this.#setSymbolSize(t.dataset.symbolSize); },
         toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
@@ -1269,6 +1272,7 @@ export class MapStudio {
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
             if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
+            if (this.activeTool === "history") context.history = HistoryView.context(this);
             if (this.activeTool === "generate") {
                 context.generate = GeneratePanel.context(this);
                 context.cultureList = CultureLists.context(this);
@@ -2217,9 +2221,11 @@ export class MapStudio {
             if (x === null || y === null || x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight || !this.currentElevationData) {
                 for (const value of readout.querySelectorAll('[id^="fwmb-readout-"]')) value.textContent = "–";
                 ThematicView.readout(this, null, null);
+                HistoryView.readout(this, null, null);
                 return;
             }
             ThematicView.readout(this, x, y);
+            HistoryView.readout(this, x, y);
 
             const index = y * this.mapWidth + x;
             const elev = this.currentElevationData[index];
@@ -3525,23 +3531,34 @@ export class MapStudio {
             this.canvasEngine.renderManualRivers(this.manualRivers, isRiverEdit, this.activeRiverId, isRiverEdit && !picking);
         }
 
-        // 2. Render Infrastructure, at the map's detail level (as are the regions and labels)
+        // 2. Render Infrastructure, at the map's detail level (as are the regions and labels). While
+        // the History tool shows an earlier age, the present's regions, pins and routes give way
+        // to that age's (see HistoryView), drawn by the same rules
+        const past = HistoryView.pastMap(this);
         const shown = DetailLevel.shown(this);
-        this.canvasEngine.setDetailFilter(shown.showsLevel);
+        this.canvasEngine.setDetailFilter(past ? HistoryView.levelFilter(past, shown.showsLevel) : shown.showsLevel);
         this.canvasEngine.setLabelFilter(ContentRows.labelShown(this));
         this.canvasEngine.setNameFilter(shown.showsName);
         this.canvasEngine.setSymbolScale(SymbolScale.of(this.uiState));
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
-        const infraPins = shown.pins.filter((p) => !!p.icon);
-        this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isInfraEdit, this.meshSession);
+        const shownPins = past ? [] : shown.pins;
+        const shownRoutes = past ? [] : shown.routes;
+        this.canvasEngine.renderInfrastructure(shownPins.filter((p) => !!p.icon), shownRoutes, isInfraEdit, this.meshSession);
 
         // 3. Render Regions, from the display mesh, and the thematic layer under them
-        MeshIntegration.renderRegions(this);
+        if (past) {
+            this.canvasEngine.renderRegionLevels(past.session, { fills: ContentRows.fillsShown(this) });
+            MeshIntegration.updateOutline(this);
+        } else {
+            MeshIntegration.renderRegions(this);
+        }
         ThematicView.render(this);
+        // The realm under the pointer is read while an earlier age is shown, and hidden otherwise
+        HistoryView.readout(this, null, null);
 
         // 4. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
-        this.canvasEngine.renderLabels(this.mapLabels, shown.pins, shown.routes, isLabelEdit, this.meshSession);
+        this.canvasEngine.renderLabels(this.mapLabels, shownPins, shownRoutes, isLabelEdit, past ? past.session : this.meshSession);
 
         // 5. Render Land Masks
         if (this.canvasEngine.renderLandMasks) {
@@ -6334,6 +6351,17 @@ export class MapStudio {
      * @param {{save?: boolean}} [options] - save: false while the opacity slider is being dragged,
      *     so the map is marked changed once, when it is let go.
      */
+    /**
+     * Chooses the age the History tool shows (see HistoryView) and draws it. Saved with the map,
+     * as a view is.
+     */
+    #chooseHistoryAge(age) {
+        if (!HistoryView.choose(this, age)) return;
+        this.markDirty();
+        this._repaintVectors();
+        this.view?.render(["context"]);
+    }
+
     #setThematic(next, { save = true } = {}) {
         if (next) {
             this.uiState.thematic = next;

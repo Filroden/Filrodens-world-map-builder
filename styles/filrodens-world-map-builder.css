@@ -44,6 +44,9 @@
 .fwmb-icon--gradient {
     --fwmb-mask: url("../assets/icons/gradient.svg");
 }
+.fwmb-icon--history {
+    --fwmb-mask: url("../assets/icons/history.svg");
+}
 .fwmb-icon--detail {
     --fwmb-mask: url("../assets/icons/filter_list.svg");
 }
@@ -1047,6 +1050,81 @@
 .fwmb-list-item[aria-selected="true"] {
     background: var(--fwmb-bg-highlight);
 }
+/* The History tool: its ages as one choice (the chosen one highlighted, as a selected row is),
+   and its realms, each a swatch, its name with its capital below, and its people */
+.fwmb .fwmb-history-ages .fwmb-list-item,
+.fwmb .fwmb-history-realms button.fwmb-list-item {
+    inline-size: 100%;
+    border: none;
+    background: transparent;
+    font: inherit;
+    text-align: start;
+    cursor: pointer;
+}
+.fwmb .fwmb-history-ages .fwmb-list-item:hover,
+.fwmb .fwmb-history-realms button.fwmb-list-item:hover {
+    background: var(--fwmb-bg-hover);
+}
+.fwmb .fwmb-history-ages .fwmb-list-item[aria-checked="true"] {
+    background: var(--fwmb-bg-highlight);
+}
+/* An age's name with its era and strife below, so a narrow panel keeps both whole */
+.fwmb .fwmb-history-ages .fwmb-list-item {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+    min-block-size: 2.75rem;
+}
+.fwmb-history-age .fwmb-meta {
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-history-age[aria-checked="true"] .fwmb-history-age-name {
+    color: var(--fwmb-accent-main);
+    font-weight: 600;
+}
+.fwmb-history-realm {
+    flex: 1;
+    min-inline-size: 0;
+}
+.fwmb-history-realm {
+    display: flex;
+    flex-direction: column;
+    padding-block: 0.25rem;
+}
+.fwmb-history-realm > * {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb-history-realms {
+    max-block-size: 20rem;
+}
+.fwmb .fwmb-history-realms .fwmb-list-item {
+    min-block-size: 2.75rem;
+}
+.fwmb-history-realm .fwmb-meta {
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+.fwmb-history-fell {
+    flex: none;
+    color: var(--fwmb-text-muted);
+}
+.fwmb-history-note {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+/* A list of names in What changed: across the card, under its label */
+.fwmb .fwmb-generate-results .fwmb-history-wide {
+    grid-column: 1 / -1;
+}
+.fwmb .fwmb-generate-results dd.fwmb-history-wide {
+    margin-block-end: 0.25rem;
+    text-align: start;
+}
 .fwmb-list-item.fwmb-is-working {
     background: var(--fwmb-bg-highlight);
     box-shadow: inset 0.1875rem 0 0 var(--fwmb-accent-secondary);
@@ -1579,17 +1657,24 @@
     flex: 1;
     justify-content: center;
 }
-.fwmb-generate-results {
+/* A list of figures (Generate's results, the History tool's brief and changes): labels and
+   values side by side, in the studio's own colours whatever the host gives a dl */
+.fwmb .fwmb-generate-results {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.25rem 0.75rem;
     margin: 0;
 }
-.fwmb-generate-results dt {
+.fwmb .fwmb-generate-results :is(dt, dd) {
+    display: block;
+    margin: 0;
+    text-shadow: none;
+    color: var(--fwmb-text-primary);
+}
+.fwmb .fwmb-generate-results dt {
     color: var(--fwmb-text-secondary);
 }
-.fwmb-generate-results dd {
-    margin: 0;
+.fwmb .fwmb-generate-results dd {
     text-align: end;
 }
 .fwmb-processing-detail {
@@ -3047,9 +3132,6 @@
     --fwmb-range-track: var(--fwmb-overlay-border);
     --fwmb-range-fill: var(--fwmb-overlay-accent);
     --fwmb-bg-panel: var(--fwmb-overlay-bg);
-}
-.fwmb-layer-menu-range.fwmb-layer-menu-sub {
-    padding-inline-start: 1.75rem;
 }
 .fwmb .fwmb-layer-menu-range .fwmb-range-label {
     color: var(--fwmb-overlay-muted);

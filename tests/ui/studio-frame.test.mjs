@@ -43,7 +43,7 @@ test("the rail holds the three stages in order, then the occasional tools", () =
         [
             ["shape", ["scene", "terrain", "biomes", "features"]],
             ["populate", ["generate", "regions", "infrastructure", "labels"]],
-            ["finish", ["cartography", "export"]],
+            ["finish", ["cartography", "history", "export"]],
         ],
     );
     assert.deepEqual(

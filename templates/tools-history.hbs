@@ -1,0 +1,78 @@
+{{!--
+    History (tool id "history"; see HistoryView): the ages of the map's last generator run, oldest
+    first, with the present last. Choosing an earlier age draws it on the map while the tool is
+    open. The age in brief, its realms (most people first; an earlier age's centre the map on
+    their realm, and those gone by the present are marked) and what changed by the age after it (for the present, since the age before).
+--}}
+{{#if history.ages}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="historyAges" title="FILRODENSWMB.UI.SectionHistoryAges" count=history.ages.length}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.HistoryAgesHint"}}</p>
+    <div role="radiogroup" aria-label="{{localize 'FILRODENSWMB.UI.SectionHistoryAges'}}" class="fwmb-list-container fwmb-history-ages">
+        {{#each history.ages}}
+        <button type="button" role="radio" aria-checked="{{#if this.chosen}}true{{else}}false{{/if}}" class="fwmb-list-item fwmb-history-age" data-action="chooseHistoryAge" data-age="{{this.number}}">
+            <span class="fwmb-history-age-name">{{this.label}}</span>
+            {{#if this.meta}}<span class="fwmb-meta">{{this.meta}}</span>{{/if}}
+        </button>
+        {{/each}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="historyBrief" title="FILRODENSWMB.UI.SectionHistoryBrief"}}
+    <dl class="fwmb-generate-results">
+        {{#each history.brief}}
+        <dt>{{localize this.label}}</dt>
+        <dd class="fwmb-readout">{{this.value}}</dd>
+        {{/each}}
+    </dl>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="historyRealms" title="FILRODENSWMB.UI.SectionHistoryRealms" count=history.realms.length}}
+    {{#if history.someFell}}<p class="fwmb-hint fwmb-history-note"><i class="fwmb-icon fwmb-icon--cancel fwmb-history-fell" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.HistoryRealmFellHint"}}</p>{{/if}}
+    <div role="list" aria-label="{{localize 'FILRODENSWMB.UI.SectionHistoryRealms'}}" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-history-realms">
+        {{#each history.realms}}
+        {{#if this.focusable}}
+        <button type="button" role="listitem" class="fwmb-list-item" data-action="focusHistoryRealm" data-realm="{{this.key}}" data-tooltip="{{localize 'FILRODENSWMB.UI.HistoryRealmFocus'}}">
+        {{else}}
+        <div role="listitem" class="fwmb-list-item">
+        {{/if}}
+            <span class="fwmb-chip-swatch" aria-hidden="true" style="--swatch: {{this.color}}"></span>
+            <span class="fwmb-history-realm">
+                <span class="fwmb-name" title="{{this.name}}">{{this.name}}</span>
+                {{#if this.capital}}<span class="fwmb-meta" title="{{this.capital}}">{{localize "FILRODENSWMB.UI.HistoryCapital" name=this.capital}}</span>{{/if}}
+            </span>
+            {{#if this.fell}}<i class="fwmb-icon fwmb-icon--cancel fwmb-history-fell" role="img" aria-label="{{localize 'FILRODENSWMB.UI.HistoryRealmFell'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.HistoryRealmFell'}}"></i>{{/if}}
+            {{#if this.people}}<span class="fwmb-meta fwmb-readout">{{this.people}}</span>{{/if}}
+        {{#if this.focusable}}
+        </button>
+        {{else}}
+        </div>
+        {{/if}}
+        {{else}}
+        <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.HistoryRealmsEmpty"}}</div>
+        {{/each}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#if history.changes}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="historyChanges" title="FILRODENSWMB.UI.SectionHistoryChanges"}}
+    <div class="fwmb-range-group-heading">{{history.changes.title}}</div>
+    <dl class="fwmb-generate-results">
+        {{#each history.changes.rows}}
+        <dt{{#if this.wide}} class="fwmb-history-wide"{{/if}}>{{localize this.label}}</dt>
+        <dd class="{{#if this.wide}}fwmb-history-wide{{else}}fwmb-readout{{/if}}">{{this.value}}</dd>
+        {{/each}}
+    </dl>
+    {{#if history.changes.peoples.length}}
+    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.HistoryPeoples"}}</div>
+    <dl class="fwmb-generate-results">
+        {{#each history.changes.peoples}}
+        <dt><span class="fwmb-chip-swatch" aria-hidden="true" {{#if this.color}}style="--swatch: {{this.color}}"{{/if}}></span> {{this.name}}</dt>
+        <dd class="fwmb-readout">{{this.value}}</dd>
+        {{/each}}
+    </dl>
+    {{/if}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}
+{{else}}
+<p class="fwmb-hint">{{history.note}}</p>
+{{/if}}

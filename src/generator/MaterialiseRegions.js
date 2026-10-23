@@ -72,6 +72,27 @@ export function buildPolitical(session, result, { runId, idFactory, names, water
 }
 
 /**
+ * An earlier age's realms on the display mesh, for the History tool: laid out as the present's
+ * counties are (carried from their model cells, the model's coarse coast joined overland, and the
+ * borders relaxed onto ridges and rivers with each seat kept), with each realm's index as its key.
+ * Land only; the caller claims the waters (RegionEdits.claimWaters) once the level is in a session.
+ *
+ * @param {import("../mesh/MeshSession.js").MeshSession} session - Needs mesh and aggregates.
+ * @param {ArrayLike<number>} realmOfModelCell - Each model cell's realm in that age, or -1.
+ * @param {ArrayLike<number>} modelWater - Each model cell's water flag (the run's `water`).
+ * @param {number[]} seats - Each realm's seat (a model cell, which is also its site's display cell), or -1.
+ * @returns {OwnerLayer}
+ */
+export function pastRealmLayer(session, realmOfModelCell, modelWater, seats) {
+    const result = { modelCells: { realm: realmOfModelCell, water: modelWater } };
+    const keyOf = Int32Array.from({ length: seats.length }, (_, index) => index);
+    const layer = carry(session, result, "realm", keyOf);
+    joinCoast(session, result, layer);
+    relaxBorders(session.mesh, layer, session.aggregates, {}, { anchors: seats.filter((cell) => cell >= 0) });
+    return layer;
+}
+
+/**
  * Puts the political set into the session beside the map's other sets, installs its owner arrays
  * and claims every level's waters. Returns each level's final owners, encoded.
  *

@@ -673,6 +673,7 @@ export const FILRODENSWMB = {
             infrastructure: { icon: "location-city", label: "FILRODENSWMB.UI.ToolInfrastructure" },
             labels: { icon: "insert-text", label: "FILRODENSWMB.UI.ToolLabels" },
             cartography: { icon: "explore", label: "FILRODENSWMB.UI.ToolCartography" },
+            history: { icon: "history", label: "FILRODENSWMB.UI.ToolHistory" },
             export: { icon: "png", label: "FILRODENSWMB.UI.ToolExport" },
             reference: { icon: "image", label: "FILRODENSWMB.UI.ToolReference" },
             library: { icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary" },
@@ -681,7 +682,7 @@ export const FILRODENSWMB = {
         STAGES: [
             { id: "shape", label: "FILRODENSWMB.UI.StageShape", tools: ["scene", "terrain", "biomes", "features"] },
             { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["generate", "regions", "infrastructure", "labels"] },
-            { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
+            { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "history", "export"] },
         ],
         // The Appearance menu (the reader's colour theme, see AppearanceMenu) sits among them, and on
         // the web the full-screen toggle (shown only where the host can go full screen)
@@ -707,7 +708,8 @@ export const FILRODENSWMB = {
             regions: { tool: "infrastructure", reason: "FILRODENSWMB.UI.NextReasonRegions" },
             infrastructure: { tool: "labels", reason: "FILRODENSWMB.UI.NextReasonInfrastructure" },
             labels: { tool: "cartography", reason: "FILRODENSWMB.UI.NextReasonLabels" },
-            cartography: { tool: "export", reason: "FILRODENSWMB.UI.NextReasonCartography" },
+            cartography: { tool: "history", reason: "FILRODENSWMB.UI.NextReasonCartography" },
+            history: { tool: "export", reason: "FILRODENSWMB.UI.NextReasonHistory" },
             export: null,
             reference: null,
             library: null,
@@ -728,6 +730,7 @@ export const FILRODENSWMB = {
             infrastructure: { pin: "placing", route: "drawing" },
             labels: "placing",
             cartography: "placing",
+            history: null,
             export: null,
             reference: null,
             library: null,

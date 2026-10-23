@@ -230,8 +230,8 @@ function formerResult(run, result, former, names, history) {
 
 /**
  * An earlier age in brief, kept in the run's history so the map's past can be shown: its era and strife,
- * its places (cell, tier and whether a realm's seat, three numbers each), castles, realm seats (one
- * per realm, in the realms' order), each cell's realm, each cell's main culture (as that age's
+ * its places (cell, tier and whether a realm's seat, three numbers each), castles, realm seats and
+ * people (one each per realm, in the realms' order), each cell's realm, each cell's main culture (as that age's
  * cultures count them, until namedHistory) and the land edges that carried its trade (its roads).
  */
 function ageHistory(graph, age, settingsOfAge) {
@@ -239,6 +239,7 @@ function ageHistory(graph, age, settingsOfAge) {
     const seatCells = new Set(seats);
     const roads = [];
     for (let edge = 0; edge < graph.edgeCount; edge++) if (age.finalTrade.traffic[edge] > 0 && graph.edgeKind[edge] === EDGE.LAND) roads.push(edge);
+    const people = peopleByUnit(age.feedback.cellPop, age.finalRealms);
     return {
         development: settingsOfAge.development,
         plague: settingsOfAge.plague,
@@ -246,6 +247,7 @@ function ageHistory(graph, age, settingsOfAge) {
         places: age.finalTrade.towns.flatMap((town) => [town.cell, town.tier, seatCells.has(town.cell) ? 1 : 0]),
         castles: age.feedback.castles.map((castle) => castle.cell),
         seats,
+        realmPeople: Array.from(people.realm, Math.round),
         realm: Int32Array.from(age.finalRealms.realmOfCell),
         culture: Int32Array.from(age.cultures.dominant),
         cultureIds: age.cultures.cultures.map((culture) => culture.id ?? null),

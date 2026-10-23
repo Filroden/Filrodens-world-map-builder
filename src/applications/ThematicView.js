@@ -3,6 +3,7 @@ import { platform } from "../platform/index.js";
 import { cleanUnit, formatDistance } from "../data/MapUnit.js";
 import { LAYERS, ThematicSource, TradeIndex, scalePosition, tradeLines } from "../thematic/ThematicData.js";
 import { CultureMarkers } from "./CultureMarkers.js";
+import { HistoryView } from "./HistoryView.js";
 
 /**
  * The studio side of the thematic layers: which colour layer is shown and how strongly, and which
@@ -21,6 +22,8 @@ const THEMATIC = FILRODENSWMB.THEMATIC;
 const NONE = "none";
 /** Why a row cannot be chosen, by ThematicSource.missing's answer (with no run, the menu's note says why). */
 const MISSING_REASON = Object.freeze({ run: "FILRODENSWMB.UI.ThematicNeedsRerun", cultures: "FILRODENSWMB.UI.ThematicNoCultures" });
+/** The same while the History tool shows an earlier age, which keeps its cultures alone. */
+const PAST_REASON = Object.freeze({ run: "FILRODENSWMB.UI.ThematicPresentOnly", cultures: "FILRODENSWMB.UI.ThematicNoCultures" });
 /** The studio's document, for making legend nodes. */
 const doc = (app) => app.root.ownerDocument;
 /** A dash for no value, as the information bar shows off the map. */
@@ -71,9 +74,13 @@ export class ThematicView {
         return this.valid(app.uiState?.thematic);
     }
 
-    /** The source of the layers for the map's run and mesh, or null when there is no usable run. */
+    /**
+     * The source of the layers for the map's run and mesh, or null when there is no usable run.
+     * While the History tool shows an earlier age, the run as that age left it (its cultures
+     * alone; see HistoryView.thematicRun).
+     */
     static source(app) {
-        const modelRun = app.modelRun ?? null;
+        const modelRun = HistoryView.thematicRun(app) ?? app.modelRun ?? null;
         const mesh = app.meshSession?.mesh ?? null;
         const cached = sources.get(app);
         if (cached?.modelRun === modelRun && cached?.mesh === mesh) return cached.source;
@@ -129,17 +136,20 @@ export class ThematicView {
         const source = this.source(app);
         const { opacity } = this.setting(app);
         const reason = this.unavailableReason(app);
-        const rows = THEMATIC.LAYERS.map((layer) => ({
-            id: layer.id,
-            disabled: !source?.has(layer.id),
+        const past = HistoryView.isPast(app);
+        const reasons = past ? PAST_REASON : MISSING_REASON;
+        const rows = THEMATIC.LAYERS.map((layer) => {
+            const missing = source?.missing(layer.id);
+            // An earlier age's cultures came later than its brief: an older run lacks them
+            const why = past && layer.id === "culture" && missing === "run" ? "FILRODENSWMB.UI.ThematicNeedsRerunAge" : reasons[missing];
             // A row the run cannot show says why; one it can, what it shows
-            title: platform.i18n.localize(MISSING_REASON[source?.missing(layer.id)] ?? layer.hint),
-        }));
+            return { id: layer.id, disabled: !source || !!missing, title: platform.i18n.localize(why ?? layer.hint) };
+        });
         const lines = THEMATIC.LINES.map((id) => ({
             id,
             on: id === "trade" && this.tradeShown(app),
             disabled: !source?.hasTrade(),
-            title: platform.i18n.localize(source && !source.hasTrade() ? "FILRODENSWMB.UI.ThematicNeedsRerun" : "FILRODENSWMB.UI.ThematicTradeHint"),
+            title: platform.i18n.localize(past ? "FILRODENSWMB.UI.ThematicPresentOnly" : source && !source.hasTrade() ? "FILRODENSWMB.UI.ThematicNeedsRerun" : "FILRODENSWMB.UI.ThematicTradeHint"),
         }));
         // The chosen layer stays the map's setting when the run cannot show it (a map opened before
         // generating), but the menu marks what is drawn: None
@@ -239,8 +249,9 @@ export class ThematicView {
         app.root.querySelector("[data-thematic-trade-readout]")?.classList.toggle("fwmb-hidden", !trade);
         const rtl = app.root.ownerDocument?.documentElement?.dir === "rtl" || app.root.closest?.('[dir="rtl"]') !== null;
         const isFolded = (id) => folded.get(app)?.has(id) ?? false;
-        // The run's id stands for its cultures, which the culture legend lists
-        const signature = layer || trade ? JSON.stringify([layer?.id ?? null, trade, app.modelRun?.run ?? null, cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, layer ? isFolded(layer.id) : false, isFolded("trade")]) : "";
+        // The run's id stands for its cultures, which the culture legend lists (an earlier age's
+        // run has its own id; see HistoryView.thematicRun)
+        const signature = layer || trade ? JSON.stringify([layer?.id ?? null, trade, (HistoryView.thematicRun(app) ?? app.modelRun)?.run ?? null, cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, layer ? isFolded(layer.id) : false, isFolded("trade")]) : "";
         if (container.dataset.signature === signature) return;
         container.dataset.signature = signature;
         const legends = [];

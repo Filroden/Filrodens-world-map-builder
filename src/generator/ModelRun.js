@@ -22,11 +22,12 @@ import { FILRODENSWMB } from "../config.js";
  *   - its era's development and plague, and its strife;
  *   - its places as cell, tier and seat triples, with their names (`placeNames`);
  *   - its castles, with their names and kinds of keep (`castleNames`, `castleKeeps`);
- *   - its realms' seats (one per realm, -1 for one moved off the map) and names (`realmNames`);
+ *   - its realms' seats (one per realm, -1 for one moved off the map), names (`realmNames`) and
+ *     people (`realmPeople`);
  *   - each cell's realm and main culture (as the run's `cultures` count them), packed as the
  *     cells' arrays are;
  *   - its roads, the land edges that carried its trade (`roadFrom`, `roadTo`, packed).
- * A run saved before the names, cultures and roads were kept lacks them.
+ * A run saved before the names, people, cultures and roads were kept lacks them.
  */
 
 export const MODEL_RUN_VERSION = 1;

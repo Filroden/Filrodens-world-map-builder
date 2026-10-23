@@ -259,6 +259,8 @@ export class MapStateManager {
             // The thematic layers shown over the map (one colour layer, any line layers) and the colour
             // layer's opacity (see ThematicView)
             thematic: { fill: null, lines: [], opacity: FILRODENSWMB.THEMATIC.OPACITY },
+            // The age the History tool shows (see HistoryView): null for the age before the present
+            historyAge: null,
             // The map's unit (see MapUnit): the name every distance shown is labelled with
             mapUnit: FILRODENSWMB.MAP_UNIT.DEFAULT,
             cartographyScaleEnable: false,
