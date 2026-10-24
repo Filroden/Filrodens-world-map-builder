@@ -88,7 +88,7 @@ Link to map JSON file: [<https://github.com/Filroden/Filrodens-world-map-builder
 
 In Foundry, open the **Scenes** sidebar and click **Map builder** at its top (only a GM sees it). On the web, go to [fwmb.filroden.com](https://fwmb.filroden.com): nothing needs installing.
 
-The map builder needs a mouse and keyboard. The map is edited with clicks, drags, the scroll wheel and the Shift and Ctrl keys, so touch screens are not supported.
+The map builder works with a mouse and keyboard or with a touch screen. On a tablet, tap and drag with one finger, pan and pinch with two, and press and hold to finish a line. A few actions (Shift, Ctrl or Alt with a click) still need a keyboard. The wiki's Map Canvas page has the details.
 
 Please see the [Wiki](https://github.com/Filroden/Filrodens-world-map-builder/wiki) for more details on how to use the module.
 

@@ -14,7 +14,9 @@ const isWeb = process.argv.includes('--web');
 // though the folder is also gitignored and absent from a CI checkout.
 const isRelease = Boolean(process.env.CI);
 
-const excludedFolders = ['dist', 'dist-web', 'node_modules', '.git', '.github', 'scripts', 'tests', 'wiki'];
+// .wrangler is Cloudflare's local cache from deploying the web version by hand, and Claude outputs
+// is a local folder of files shared while working; neither belongs in a pack
+const excludedFolders = ['dist', 'dist-web', 'node_modules', '.git', '.github', '.wrangler', 'Claude outputs', 'scripts', 'tests', 'wiki'];
 if (isRelease) excludedFolders.push('design');
 
 // The web page, the web host's services and the libraries Foundry already provides (PixiJS and
