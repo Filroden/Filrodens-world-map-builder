@@ -1936,7 +1936,9 @@ export const FILRODENSWMB = {
         // Finding a route's legs by hand (see RouteEdits.transportCost): a step along an existing
         // route of the same transport costs SHARED_STEP of its usual cost, so a new road joins the
         // network rather than running beside it; a river route pays RIVER_LAND_STEP for a step over
-        // land without a river, so it keeps to rivers and water and crosses land only to reach them.
+        // land without a river, so it keeps to rivers and water and crosses land only to reach them
+        // (a river being the cells drawn within RIVER_CHANNEL_MARGIN pixels of a channel; see
+        // MeshSession.riverChannel).
         // A road never enters water and a sea route never enters land, except that a road allowed
         // to span water (route.spanWater) pays SPAN_WATER_STEP for each step over water, on top of
         // ROUTE_COST.WATER_STEP, so it bridges a strait when the way round is longer than that and
@@ -1944,7 +1946,7 @@ export const FILRODENSWMB = {
         // cells of a shore (see MeshSession.shoreDistance), so the widest water it can bridge is
         // about SPAN_WATER_MAX_CELLS cells across; wider water needs a sea route. Simple factors
         // until the generator's cost model replaces them.
-        ROUTE: { SHARED_STEP: 0.5, RIVER_LAND_STEP: 6, SPAN_WATER_STEP: 6, SPAN_WATER_MAX_CELLS: 12 },
+        ROUTE: { SHARED_STEP: 0.5, RIVER_LAND_STEP: 6, SPAN_WATER_STEP: 6, SPAN_WATER_MAX_CELLS: 12, RIVER_CHANNEL_MARGIN: 1 },
         // Corner-cutting passes applied to borders and smoothed routes. Each pass doubles the
         // points; one is enough to hide the Voronoi corners at the display spacing.
         CHAIKIN_PASSES: 1,

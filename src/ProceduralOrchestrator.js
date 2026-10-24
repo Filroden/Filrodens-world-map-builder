@@ -973,6 +973,8 @@ export class ProceduralOrchestrator {
             previousNetwork,
         );
         app.currentRiverData.network = network;
+        // The cells river routes keep to follow the image (see MeshSession.riverChannel)
+        app.meshSession?.setRiverImage(app.bufferRivers);
 
         const canLimit = isTracked && previous !== null;
         if (!canLimit) {

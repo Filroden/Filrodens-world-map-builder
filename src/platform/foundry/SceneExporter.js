@@ -154,7 +154,7 @@ export class SceneExporter {
             }
         };
 
-        // The items that get a page: generated ones only at the map's detail level (see GeneratedDetails)
+        // The items that get a page: generated ones only where the map labels them (see GeneratedDetails)
         const pages = GeneratedDetails.journalPages(app);
         for (const { item, text } of pages.pins) {
             if (item.type === "spring" || item.type === "block_spring") continue;

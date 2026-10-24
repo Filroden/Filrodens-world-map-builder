@@ -143,6 +143,8 @@ export class MeshIntegration {
     static #adopt(app, { session, mapData, changed }) {
         const state = this.#state(app);
         app.meshSession = session;
+        // River routes keep to the rivers as drawn (see MeshSession.riverChannel)
+        session.setRiverImage(app.bufferRivers);
         app.layerSets = mapData.layerSets ?? [];
         app.mapRoutes = mapData.mapRoutes ?? [];
         app.mapPins = mapData.mapPins ?? [];
@@ -197,7 +199,9 @@ export class MeshIntegration {
         this.#meshLoader()
             .then((loader) => MeshSession.create(mapData, { buffers: this.terrainBuffers(app), loadMeshData: (params) => loader.load(params) }))
             .then((session) => {
-                if (state.token === token) app.meshSession = session;
+                if (state.token !== token) return;
+                app.meshSession = session;
+                session.setRiverImage(app.bufferRivers);
             })
             .catch((error) => console.error("FWMB | The new map's mesh could not be built:", error));
     }

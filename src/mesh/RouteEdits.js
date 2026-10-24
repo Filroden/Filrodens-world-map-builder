@@ -28,7 +28,8 @@ const PASSABLE = Object.freeze({
 /**
  * The cost of a step for a transport, and where it may go: a road keeps to land, a sea route to
  * water, and a river route follows river cells and water, paying RIVER_LAND_STEP for a step over
- * land that has no river. A step along an existing route of the same transport (other than the
+ * land that has no river: the cells the map draws a river through (MeshSession.riverChannel), or
+ * without a river image, those its traced course crosses. A step along an existing route of the same transport (other than the
  * route being edited) costs SHARED_STEP of its usual cost, so new routes join the network.
  *
  * A road allowed to span water keeps its waypoints on land (`passable`) but may step over water
@@ -50,9 +51,11 @@ export function transportCost(session, transport, routes, excludeRouteId = null,
     const base = aggregates ? terrainCost(mesh, aggregates) : (a, b) => mesh.distance(a, b);
     const land = aggregates?.land;
     const river = aggregates?.riverCount;
+    // The river as drawn, where the map has one; else the course the terrain traced
+    const channel = typeof session.riverChannel === "function" ? session.riverChannel() : null;
     const shared = sharedCells(routes, transport, excludeRouteId);
     const { SHARED_STEP, RIVER_LAND_STEP, SPAN_WATER_STEP, SPAN_WATER_MAX_CELLS } = FILRODENSWMB.MESH.ROUTE;
-    const onRiver = (cell) => !land || land[cell] !== 1 || (river && river[cell] > 0);
+    const onRiver = (cell) => !land || land[cell] !== 1 || (channel ? channel[cell] === 1 : river && river[cell] > 0);
     const spanning = spanWater && transport === "road" && land;
     const shore = spanning ? session.shoreDistance() : null;
     const reach = SPAN_WATER_MAX_CELLS / 2;

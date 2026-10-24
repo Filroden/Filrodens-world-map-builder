@@ -572,6 +572,7 @@ const MAP = obj({
     // Whether generated names hidden by older runs have been shown again (see NameLevels)
     nameLevels: bool,
     localLevel: bool,
+    waterRoutes: bool,
     world: obj(
         {
             zoom: num(RANGE.SIGNED),
@@ -605,6 +606,7 @@ const MAP = obj({
     parentRun: PARENT_RUN,
     // A regional map asked to be filled in when cut, not yet filled in (see Infilling)
     infillPending: bool,
+    riverRoutes: bool,
     terrainUpgradeDismissed: bool,
     springsBaked: bool,
     mapWidth: num(RANGE.SIZE),

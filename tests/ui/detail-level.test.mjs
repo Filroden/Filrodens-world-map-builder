@@ -182,15 +182,25 @@ test("a generated region's section counts the duchies and counties beneath it", 
     assert.equal(GeneratedDetails.forRegion(app, app.layerSets[1].levels[0].regions[0]), null);
 });
 
-test("a scene export gives generated items pages only at the map's detail level, with their figures", () => {
+test("a scene export gives generated items pages only where the map labels them, with their figures", () => {
     const world = GeneratedDetails.journalPages(generatedMap(0));
     assert.deepEqual(world.pins.map((page) => page.item.id), ["city", "inn"], "the town is below the detail level; the hand-made pin keeps its page");
     assert.deepEqual(world.regions.map((page) => page.item.name), ["Ashford", "Grange"]);
     assert.deepEqual(world.routes, [], "an unnamed route has no page");
     assert.equal(world.pins[0].text, "On the river.\n\nFILRODENSWMB.UI.GeneratedPlace: FILRODENSWMB.UI.PinStyleCity\nFILRODENSWMB.UI.GeneratedPopulation: 15,234\nFILRODENSWMB.UI.GeneratedShownFrom: FILRODENSWMB.UI.DetailWorld\nFILRODENSWMB.UI.GeneratedNextRun: FILRODENSWMB.UI.GeneratedReplaced");
-    const everything = GeneratedDetails.journalPages(generatedMap(3));
+    const regional = GeneratedDetails.journalPages(generatedMap(2));
+    assert.deepEqual(regional.pins.map((page) => page.item.id), ["city", "inn"], "the town is shown at Regional but named only from Local");
+    const everything = GeneratedDetails.journalPages(generatedMap(FILRODENSWMB.DETAIL.EVERYTHING));
     assert.equal(everything.pins.length, 3);
     assert.equal(everything.regions.length, 7);
+    const hidden = generatedMap(FILRODENSWMB.DETAIL.EVERYTHING);
+    hidden.mapPins[1].label = { visibility: "none" };
+    hidden.layerSets[0].levels[2].regions[0].label = { visibility: "all", quickStyle: "label-style-county" };
+    hidden.uiState.customLabelStyles = [{ id: "label-style-county" }];
+    hidden.uiState.hiddenLabelStyles = ["label-style-county"];
+    const unlabelled = GeneratedDetails.journalPages(hidden);
+    assert.deepEqual(unlabelled.pins.map((page) => page.item.id), ["city", "inn"], "a place whose label is hidden");
+    assert.equal(unlabelled.regions.length, 6, "a region whose label style is turned off in the Labels menu");
 });
 
 test("with ages, a place's section gives its history and when it was a capital; a ruin what it was; an old road its kind", () => {

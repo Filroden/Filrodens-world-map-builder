@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { platform } from "../platform/index.js";
+import { ContentRows } from "./ContentRows.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { Regeneration } from "./Regeneration.js";
 
@@ -83,24 +84,29 @@ export class GeneratedDetails {
 
     /**
      * The pins, regions and routes a scene export gives journal pages, each with its page text.
-     * A generated item has a page only while the map's detail level shows it (a run makes thousands
-     * of places); its page holds its description, then its generated figures as plain lines. Others
-     * have one as before: when they have a name or a description.
+     * A generated item has a page only while the map labels it at its detail level (a run makes
+     * thousands of places, and a fill-in thousands more): shown, with its name drawn at that level,
+     * its label not hidden and its label style not turned off in the Labels menu. Its page holds its
+     * description, then its generated figures as plain lines. Others have one as before: when they
+     * have a name or a description.
      * @param {object} app
      * @returns {{pins: {item: object, text: string}[], regions: {item: object, text: string}[], routes: {item: object, text: string}[]}}
      */
     static journalPages(app) {
         const page = (item, rows) => ({ item, text: this.#pageText(item.description, rows) });
         const wanted = (item) => !!(item.name || item.description);
-        const pins = (app.mapPins ?? []).filter((pin) => wanted(pin) && (!pin.generated || DetailLevel.shows(app, "pin", pin))).map((pin) => page(pin, this.forPin(app, pin)));
+        const { showsName } = DetailLevel.shown(app);
+        const styleShown = ContentRows.labelShown(app);
+        const labelled = (item) => !!item.name && item.label?.visibility !== "none" && styleShown(item.label);
+        const pins = (app.mapPins ?? []).filter((pin) => wanted(pin) && (!pin.generated || (DetailLevel.shows(app, "pin", pin) && showsName(pin) && labelled(pin)))).map((pin) => page(pin, this.forPin(app, pin)));
         const regions = [];
         for (const set of app.layerSets ?? []) {
             for (const level of set.levels) {
                 const shown = DetailLevel.shows(app, "region", { set, level });
-                for (const region of level.regions) if (wanted(region) && (!region.generated || shown)) regions.push(page(region, this.forRegion(app, region)));
+                for (const region of level.regions) if (wanted(region) && (!region.generated || (shown && labelled(region)))) regions.push(page(region, this.forRegion(app, region)));
             }
         }
-        const routes = (app.mapRoutes ?? []).filter(wanted).map((route) => page(route, null));
+        const routes = (app.mapRoutes ?? []).filter((route) => wanted(route) && (!route.generated || labelled(route))).map((route) => page(route, null));
         return { pins, regions, routes };
     }
 

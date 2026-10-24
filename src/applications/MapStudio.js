@@ -22,6 +22,7 @@ import { bindDropdownMenus, positionPopoverMenu } from "../ui/dropdowns.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { ParentRunRecovery } from "./ParentRunRecovery.js";
+import { RiverRelay } from "./RiverRelay.js";
 import { RunCells } from "./RunCells.js";
 import { Infilling } from "./Infilling.js";
 import { InfillInput } from "./InfillInput.js";
@@ -76,6 +77,7 @@ import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { rebaseMap } from "../data/SymbolSizes.js";
 import { addLocalLevelOnce } from "../data/LocalLevel.js";
+import { refreshWaterRoutesOnce } from "../data/WaterRouteStyles.js";
 import { showNamesOnce } from "../data/NameLevels.js";
 import { SymbolScale } from "../tools/SymbolScale.js";
 import { ExportScale } from "../tools/ExportScale.js";
@@ -554,6 +556,8 @@ export class MapStudio {
         this.parentRun = null;
         // A regional map asked to be filled in when it was cut, until it has been (see Infilling)
         this.infillPending = false;
+        // Whether a regional map's inherited river routes have been laid over its own rivers (see RiverRelay)
+        this.riverRoutesLaid = false;
         this.isDirty = false;
 
         MapStateManager.allocateBuffers(this);
@@ -3911,6 +3915,8 @@ export class MapStudio {
         showNamesOnce(payload);
         // A map saved before the Local detail level keeps what Everything showed (see LocalLevel)
         addLocalLevelOnce(payload);
+        // Water route styles still on their old defaults take the new look (see WaterRouteStyles)
+        refreshWaterRoutesOnce(payload);
         this.modelRun = modelRun ?? null;
         // Regions and routes come from the display mesh, whose session opens once the terrain
         // exists (see the end of this method)
@@ -3935,6 +3941,7 @@ export class MapStudio {
         this.upwindMargin = payload.upwindMargin ?? null;
         this.parentRun = payload.parentRun ?? null;
         this.infillPending = payload.infillPending === true;
+        this.riverRoutesLaid = payload.riverRoutes === true;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
 
@@ -4450,6 +4457,7 @@ export class MapStudio {
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             nameLevels: true,
             localLevel: true,
+            waterRoutes: true,
             world: this.uiState.world,
             mapUnit: cleanUnit(this.uiState.mapUnit),
             generatorStale: this.uiState.generatorStale === true,
@@ -4458,6 +4466,7 @@ export class MapStudio {
             upwindMargin: this.upwindMargin ?? null,
             parentRun: this.parentRun ?? null,
             infillPending: this.infillPending === true,
+            riverRoutes: this.riverRoutesLaid === true,
             terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
             springsBaked: this.uiState.springsBaked,
             mapWidth: this.mapWidth,
@@ -5131,6 +5140,7 @@ export class MapStudio {
         this.upwindMargin = null;
         this.parentRun = null;
         this.infillPending = false;
+        this.riverRoutesLaid = false;
 
         // Reset biome colours to defaults so the DOM sync catches them
         this.customBiomeColors = {};
@@ -5864,6 +5874,13 @@ export class MapStudio {
             // A regional map cut before regional maps carried their parent's run reads it from its
             // parent, so its thematic layers and farmland have figures (kept with its next save)
             if (await ParentRunRecovery.recover(this)) this._repaintVectors();
+            // A regional map's inherited river trade routes are laid again over its own rivers,
+            // once (kept with its next save), before a fill-in reads them
+            if (RiverRelay.needed(this)) {
+                this.riverRoutesLaid = true;
+                const { laid, removed } = RiverRelay.run(this);
+                if (laid + removed) this._repaintVectors();
+            }
             // Filled in now when asked for as it was cut; the map then has changes to save
             if (this.infillPending) {
                 this.infillPending = false;

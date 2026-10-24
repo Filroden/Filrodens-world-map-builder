@@ -6,6 +6,7 @@ import { OwnerLayer, decodeOwners, encodeOwners, mergePatchList } from "./OwnerL
 import { nodesMarkedLine, resampleOwners, retraceLine, routeMarkedLine } from "./Resample.js";
 import { routeRuns } from "./RouteMerge.js";
 import { routePolyline } from "./RoutePath.js";
+import { RiverNetwork } from "../generation/RiverNetwork.js";
 import { UNCLAIMED, VECTOR_SCHEMA_VERSION, createMeshBlock, normaliseAreaFactor, normaliseVectorData, randomId, validateOwners, validateVectorData } from "./Schema.js";
 
 /**
@@ -53,6 +54,9 @@ export class MeshSession {
     #ownerChanges = new Map();
     /** Each water cell's distance from land in cells (see shoreDistance), or null until asked for. */
     #shoreDistance = null;
+    /** The river image the map is painted from (see setRiverImage), and the cells it covers, or null until asked for. */
+    #riverImage = null;
+    #riverChannel = null;
     #hint = 0;
     /** The stroke under way (see beginStroke): its patches by level id, or null. */
     #stroke = null;
@@ -538,6 +542,42 @@ export class MeshSession {
     #landChanged() {
         this.#arcs.clear();
         this.#shoreDistance = null;
+    }
+
+    /**
+     * Gives the session the river image the map is painted from (`bufferRivers`, see
+     * RiverNetwork.rasterise), when it is made or drawn again, so the cells it covers are worked
+     * out afresh when next asked for (see riverChannel).
+     * @param {Uint8Array|null} image - RGBA per map pixel.
+     */
+    setRiverImage(image) {
+        this.#riverImage = image ?? null;
+        this.#riverChannel = null;
+    }
+
+    /**
+     * The cells a river is drawn through: 1 for a cell with a pixel in a drawn channel or within
+     * MESH.ROUTE.RIVER_CHANNEL_MARGIN pixels of one (so a river drawn thinner than a pixel still
+     * marks its cells). The map draws its rivers smoothed, meandered and at their width, apart
+     * from the one-pixel course the terrain traced (`riverCount`), so river routes follow these
+     * cells to stay on the river as it is seen (see RouteEdits.transportCost).
+     * @returns {Uint8Array|null} null without a river image, or with no river drawn in it.
+     */
+    riverChannel() {
+        if (this.#riverChannel) return this.#riverChannel.cells;
+        const image = this.#riverImage;
+        const raster = this.mesh.cellRaster;
+        if (!image || image.length !== raster.length * 4) return null;
+        const cells = new Uint8Array(this.mesh.cellCount);
+        const margin = FILRODENSWMB.MESH.ROUTE.RIVER_CHANNEL_MARGIN;
+        let any = false;
+        for (let pixel = 0; pixel < raster.length; pixel++) {
+            if (!RiverNetwork.isNearChannel(image, pixel, margin)) continue;
+            cells[raster[pixel]] = 1;
+            any = true;
+        }
+        this.#riverChannel = { cells: any ? cells : null };
+        return this.#riverChannel.cells;
     }
 
     /**
