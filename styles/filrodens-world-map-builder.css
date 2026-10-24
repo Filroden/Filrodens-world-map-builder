@@ -4552,6 +4552,16 @@ input.fwmb-swatch {
     align-items: center;
 }
 
+/* A tick box and its text: a long label (in a longer language) wraps beside the box rather than
+   spilling out of the panel, and the box keeps its size */
+.fwmb label.fwmb-setting-row {
+    white-space: normal;
+}
+
+.fwmb label.fwmb-setting-row > input {
+    flex: none;
+}
+
 input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     width: 1.5rem;
     height: 1.5rem;
