@@ -10,6 +10,7 @@ import { LabelWidth } from "../tools/LabelWidth.js";
 import { SymbolScale } from "../tools/SymbolScale.js";
 import { ExportScale } from "../tools/ExportScale.js";
 import { LabelLayout } from "./LabelLayout.js";
+import { borderLines } from "./MapBorder.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
 import { ThematicLayer } from "./ThematicLayer.js";
 import { TradeFlowLayer } from "./TradeFlowLayer.js";
@@ -74,6 +75,9 @@ export class StudioCanvas {
 
     /** The map's symbol size, which multiplies every pin and label (see setSymbolScale). */
     #symbolScale = 1;
+
+    /** How far in from the map's edges names keep (see setNameInset). */
+    #nameInset = 0;
 
     constructor(htmlContainer) {
         this.container = htmlContainer;
@@ -1808,7 +1812,7 @@ export class StudioCanvas {
 
         // 2. Where each goes
         const shownPins = mapPins.filter((pin) => pin.icon && this.#isVisibleInCurrentPass(pin.visibility, "all", false));
-        const layout = this.#labelLayout.layout(items, { pins: shownPins, pinWidth, meshSession, pass: this.renderPassMode, avoid: this.#avoidLabelOverlaps, bounds: { width: this.mapWidth, height: this.mapHeight } });
+        const layout = this.#labelLayout.layout(items, { pins: shownPins, pinWidth, meshSession, pass: this.renderPassMode, avoid: this.#avoidLabelOverlaps, bounds: { width: this.mapWidth, height: this.mapHeight, inset: this.#nameInset } });
 
         // 3. Drawn there; a name with no room only while labels are edited, faintly
         for (const item of items) {
@@ -1865,6 +1869,11 @@ export class StudioCanvas {
     /** The map's symbol size (see SymbolScale): every pin and label is drawn this much bigger. */
     setSymbolScale(scale) {
         this.#symbolScale = Number(scale) > 0 ? scale : 1;
+    }
+
+    /** How far in from the map's edges names keep, in map pixels (see MapBorder.nameInset). */
+    setNameInset(px) {
+        this.#nameInset = Number(px) > 0 ? px : 0;
     }
 
     /**
@@ -1998,32 +2007,27 @@ export class StudioCanvas {
         if (!uiState.cartographyBorderEnable) return;
 
         const vectorLayer = new PIXI.Graphics();
+        // Over everything on the map, pins and names included, so the frame stays clean (names
+        // keep clear of it, see MapBorder.nameInset; a pin at the very edge goes under it)
         this.layers.cartography.addChild(vectorLayer);
 
         const borderColorHex = ColorMath.hexToPackedInt(uiState.cartographyBorderColor || "#000000");
-        const style = uiState.cartographyBorderStyle;
-        const margin = 20;
+        const { outer, inner, corner, innerMargin: margin } = borderLines(uiState.cartographyBorderStyle);
 
-        if (style === "solid") {
-            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
-            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-        } else if (style === "double") {
-            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
-            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-            vectorLayer.lineStyle(3, borderColorHex, 1, 0);
+        // Each line's width runs inwards from its rectangle (alignment 0)
+        vectorLayer.lineStyle(outer, borderColorHex, 1, 0);
+        vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+        if (inner > 0) {
+            vectorLayer.lineStyle(inner, borderColorHex, 1, 0);
             vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
-        } else if (style === "ornate") {
-            vectorLayer.lineStyle(12, borderColorHex, 1, 0);
-            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-            vectorLayer.lineStyle(4, borderColorHex, 1, 0);
-            vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
-
-            const boxSize = 40;
+        }
+        if (corner > 0) {
+            vectorLayer.lineStyle(0);
             vectorLayer.beginFill(borderColorHex);
-            vectorLayer.drawRect(0, 0, boxSize, boxSize);
-            vectorLayer.drawRect(mapWidth - boxSize, 0, boxSize, boxSize);
-            vectorLayer.drawRect(0, mapHeight - boxSize, boxSize, boxSize);
-            vectorLayer.drawRect(mapWidth - boxSize, mapHeight - boxSize, boxSize, boxSize);
+            vectorLayer.drawRect(0, 0, corner, corner);
+            vectorLayer.drawRect(mapWidth - corner, 0, corner, corner);
+            vectorLayer.drawRect(0, mapHeight - corner, corner, corner);
+            vectorLayer.drawRect(mapWidth - corner, mapHeight - corner, corner, corner);
             vectorLayer.endFill();
         }
     }

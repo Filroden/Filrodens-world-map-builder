@@ -87,7 +87,8 @@ export class LabelLayout {
      * @param {object|null} context.meshSession
      * @param {string} context.pass - The render pass, each with its own last result.
      * @param {boolean} context.avoid - Whether names avoid each other (the Detail menu's Avoid overlaps).
-     * @param {{width: number, height: number}} [context.bounds] - The map's size: places off it cost more.
+     * @param {{width: number, height: number, inset?: number}} [context.bounds] - The map's size, and how far
+     *     in from its edges names keep (a border's band): places beyond that cost more.
      * @returns {{position: function(LabelItem): ({x: number, y: number}|null), dropped: Set<string>, stats: object|null}}
      */
     layout(items, { pins = [], pinWidth, meshSession = null, pass = "normal", avoid = true, bounds = null }) {
@@ -209,12 +210,23 @@ export function pinCandidates(item) {
 }
 
 /**
- * Names kept on the map: a region's or route's place partly off it is moved just inside, for a
- * little more; a pin's name keeps to its own places round the pin, those partly off the map
- * costing much more (a pin at the edge has its name on its other side).
+ * Names kept on the map, clear of the band a border covers along its edges (`bounds.inset`): a
+ * region's or route's place partly beyond it is moved just inside, for a little more; a pin's name
+ * keeps to its own places round the pin, those partly beyond costing much more (a pin at the edge
+ * has its name on its other side). A pin beyond the map's edge (one the studio shows round the map,
+ * which an export leaves out) keeps its name off the map the same way, rather than reaching onto it.
  */
 function withinMap(candidates, item, bounds) {
-    const inside = (value, half, size) => Math.min(Math.max(value, half), Math.max(half, size - half));
+    const inset = Math.max(0, bounds.inset ?? 0);
+    const inside = (value, half, size) => Math.min(Math.max(value, inset + half), Math.max(inset + half, size - inset - half));
+    const pin = item.type === "pin" ? item.pin : null;
+    if (pin && (pin.x < 0 || pin.y < 0 || pin.x > bounds.width || pin.y > bounds.height)) {
+        const map = { width: bounds.width, height: bounds.height, inset: 0 };
+        return candidates.map((candidate) => {
+            const onMap = 1 - offMapShare(candidate, item.w, item.h, map);
+            return onMap > 0 ? { ...candidate, cost: candidate.cost + OFF_MAP_COST * onMap } : candidate;
+        });
+    }
     return candidates.map((candidate) => {
         const share = offMapShare(candidate, item.w, item.h, bounds);
         if (share === 0) return candidate;
@@ -223,10 +235,12 @@ function withinMap(candidates, item, bounds) {
     });
 }
 
-/** The share of a box (centred on a place) outside the map. */
+/** The share of a box (centred on a place) outside the map, or within its border's band. */
 function offMapShare(place, w, h, bounds) {
-    const inside = Math.max(0, Math.min(place.x + w / 2, bounds.width) - Math.max(place.x - w / 2, 0)) * Math.max(0, Math.min(place.y + h / 2, bounds.height) - Math.max(place.y - h / 2, 0));
-    return 1 - inside / Math.max(1, w * h);
+    const inset = Math.max(0, bounds.inset ?? 0);
+    const across = Math.max(0, Math.min(place.x + w / 2, bounds.width - inset) - Math.max(place.x - w / 2, inset));
+    const down = Math.max(0, Math.min(place.y + h / 2, bounds.height - inset) - Math.max(place.y - h / 2, inset));
+    return 1 - (across * down) / Math.max(1, w * h);
 }
 
 /** The share of a box (centred on a place) whose sample points fall outside the region. */

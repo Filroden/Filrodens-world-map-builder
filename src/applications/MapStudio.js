@@ -80,6 +80,7 @@ import { addLocalLevelOnce } from "../data/LocalLevel.js";
 import { refreshWaterRoutesOnce } from "../data/WaterRouteStyles.js";
 import { showNamesOnce } from "../data/NameLevels.js";
 import { SymbolScale } from "../tools/SymbolScale.js";
+import { nameInset } from "../canvas/MapBorder.js";
 import { ExportScale } from "../tools/ExportScale.js";
 
 // Turns a fraction into a percentage for the timing summary
@@ -2693,6 +2694,7 @@ export class MapStudio {
         this.canvasEngine.setLabelFilter(ContentRows.labelShown(this));
         this.canvasEngine.setNameFilter(shown.showsName);
         this.canvasEngine.setSymbolScale(SymbolScale.of(this.uiState));
+        this.canvasEngine.setNameInset?.(nameInset(this.uiState));
         if (this.activeTool === "infrastructure") {
             const infraPins = shown.pins.filter((p) => !!p.icon);
             this.canvasEngine.renderInfrastructure(infraPins, shown.routes, isEdit, this.meshSession);
@@ -3595,6 +3597,7 @@ export class MapStudio {
         this.canvasEngine.setLabelFilter(ContentRows.labelShown(this));
         this.canvasEngine.setNameFilter(shown.showsName);
         this.canvasEngine.setSymbolScale(SymbolScale.of(this.uiState));
+        this.canvasEngine.setNameInset?.(nameInset(this.uiState));
         const isInfraEdit = this.activeTool === "infrastructure" && isEditModeActive;
         const pastContent = past ? HistoryView.pastContent(this) : null;
         const shownPins = past ? DetailLevel.pinsShown(this, pastContent.pins) : shown.pins;

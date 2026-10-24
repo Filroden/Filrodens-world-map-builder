@@ -1,7 +1,7 @@
 // Where the map's names are drawn (LabelLayout): a pin's name beside it, keeping clear of other
 // pins; a capital's name before a realm's, which is fitted round it and always drawn; a label with
 // its own position staying there; a region name preferring places that do not spill over its
-// border; and every name at its first place with Avoid overlaps off.
+// border; every name at its first place with Avoid overlaps off; and names clear of a map border.
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -80,4 +80,31 @@ test("with Avoid overlaps off every name is at its first place, overlapping or n
     const placed = new LabelLayout().layout(items, { pins: items.map((item) => item.pin), pinWidth, pass: "normal", avoid: false });
     assert.deepEqual(placed.position(items[0]), placed.position(items[1]));
     assert.equal(placed.dropped.size, 0);
+});
+
+test("names keep clear of a border's band along the map's edges", async () => {
+    const { nameInset } = await import("../../src/canvas/MapBorder.js");
+    assert.equal(nameInset({ cartographyBorderEnable: false, cartographyBorderStyle: "double" }), 0, "no border, no band");
+    const inset = nameInset({ cartographyBorderEnable: true, cartographyBorderStyle: "double" });
+    assert.ok(inset > nameInset({ cartographyBorderEnable: true, cartographyBorderStyle: "solid" }), "a double border's band is deeper than a solid one's");
+
+    // A pin by the left edge: its name goes to its right, inside the band
+    const layout = new LabelLayout();
+    const pin = pinItem("edge", inset - 2, 100, "town");
+    const bounds = { width: 400, height: 300, inset };
+    const placed = layout.layout([pin], { pins: [pin.pin], pinWidth, pass: "normal", bounds });
+    const at = placed.position(pin);
+    assert.ok(at.x - pin.w / 2 >= inset, `the name is clear of the band: ${at.x - pin.w / 2} against ${inset}`);
+
+    // A pin just below the band: its name, which would reach into it beside the pin, goes below
+    const top = pinItem("top", 200, inset + 2, "town");
+    const none = new LabelLayout().layout([top], { pins: [top.pin], pinWidth, pass: "normal", bounds: { ...bounds, inset: 0 } });
+    const banded = new LabelLayout().layout([top], { pins: [top.pin], pinWidth, pass: "normal", bounds });
+    assert.ok(none.position(top).y - top.h / 2 < inset, "without a border it sits beside the pin, reaching into the band");
+    assert.ok(banded.position(top).y - top.h / 2 >= inset, "with one, clear of the band");
+
+    // A pin beyond the map's left edge: its name keeps off the map, on the pin's far side
+    const beyond = pinItem("beyond", -8, 150, "town");
+    const outside = new LabelLayout().layout([beyond], { pins: [beyond.pin], pinWidth, pass: "normal", bounds });
+    assert.ok(outside.position(beyond).x + beyond.w / 2 <= 0, `off the map: ${outside.position(beyond).x + beyond.w / 2}`);
 });
