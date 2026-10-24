@@ -395,11 +395,13 @@ test("a new map starts with the road (lane and old road too), sea lane and river
         ["FILRODENSWMB.UI.RouteStyleLane", "road", 0.9, "solid", false],
         ["FILRODENSWMB.UI.RouteStyleOldRoad", "road", 1, "dashed", false],
         ["FILRODENSWMB.UI.RouteStyleSeaLane", "sea", 1.5, "dashed", false],
-        ["FILRODENSWMB.UI.RouteStyleMinorSeaLane", "sea", 1, "dashed", false],
-        ["FILRODENSWMB.UI.RouteStyleRiverTrade", "river", 1.5, "solid", false],
-        ["FILRODENSWMB.UI.RouteStyleMinorRiverTrade", "river", 1, "solid", false],
+        ["FILRODENSWMB.UI.RouteStyleMinorSeaLane", "sea", 1, "dotted", false],
+        ["FILRODENSWMB.UI.RouteStyleRiverTrade", "river", 1.5, "dashed", false],
+        ["FILRODENSWMB.UI.RouteStyleMinorRiverTrade", "river", 1, "dotted", false],
     ]);
     assert.ok(state.customRouteStyles.every((style) => style.smoothing === false && !("nameKey" in style)));
+    const water = state.customRouteStyles.filter((style) => style.transport === "sea" || style.transport === "river");
+    assert.ok(water.length === 4 && water.every((style) => style.color === "#8db2cc"), "water routes share one pale blue");
     const road = state.customLabelStyles.find((style) => style.id === "label-style-road");
     const lane = state.customLabelStyles.find((style) => style.id === "label-style-sea-lane");
     assert.deepEqual([road.fontFamily, road.fontSize, road.fillColor, road.bold, road.italic], ["Barlow Semi Condensed", 1.4, "#5a3a1e", false, false]);

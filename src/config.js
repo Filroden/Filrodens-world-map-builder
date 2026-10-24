@@ -1612,10 +1612,12 @@ export const FILRODENSWMB = {
             // In-fill's lanes (see Infill): lighter and finer than a minor road
             Object.freeze({ id: "route-style-lane", nameKey: "FILRODENSWMB.UI.RouteStyleLane", transport: "road", color: "#a8916f", thickness: 0.9, style: "solid", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-old-road", nameKey: "FILRODENSWMB.UI.RouteStyleOldRoad", transport: "road", color: "#8c7f6c", thickness: 1, style: "dashed", outline: false, smoothing: false }),
-            Object.freeze({ id: "route-style-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleSeaLane", transport: "sea", color: "#2e5f8a", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
-            Object.freeze({ id: "route-style-minor-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleMinorSeaLane", transport: "sea", color: "#5f89ad", thickness: 1, style: "dashed", outline: false, smoothing: false }),
-            Object.freeze({ id: "route-style-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleRiverTrade", transport: "river", color: "#3d7fb8", thickness: 1.5, style: "solid", outline: false, smoothing: false }),
-            Object.freeze({ id: "route-style-minor-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleMinorRiverTrade", transport: "river", color: "#6a9fcc", thickness: 1, style: "solid", outline: false, smoothing: false }),
+            // Water routes share one pale blue (a colour picker preset) that stands out against the
+            // water's blues; thickness and dashes tell them apart
+            Object.freeze({ id: "route-style-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleSeaLane", transport: "sea", color: "#8db2cc", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-minor-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleMinorSeaLane", transport: "sea", color: "#8db2cc", thickness: 1, style: "dotted", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleRiverTrade", transport: "river", color: "#8db2cc", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-minor-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleMinorRiverTrade", transport: "river", color: "#8db2cc", thickness: 1, style: "dotted", outline: false, smoothing: false }),
         ]),
     },
     // Pins and labels are sized in UNIT steps of what size 1 meant before size revision REVISION:
