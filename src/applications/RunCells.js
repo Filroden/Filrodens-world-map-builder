@@ -51,4 +51,16 @@ export class RunCells {
         if (app.parentRun) return cropRun(app.parentRun, { sites: parentRunSites(app.parentRun), spacingPx: app.parentRun.spacingPx, spacingKm: app.parentRun.spacingKm, crop, zoomScale });
         return null;
     }
+
+    /**
+     * How far apart, in this map's pixels, the cells are that a regional map cut from it inherits
+     * (see forRegion): times the cut's zoom, their spacing on the regional map, which decides
+     * whether in-fill is offered there (see InfillInput.offered). Null with no run to inherit.
+     * @param {object} app
+     */
+    static regionSpacingPx(app) {
+        const mesh = app.meshSession?.mesh ?? null;
+        if (mesh && app.modelRun?.cellCount === mesh.modelCount) return mesh.modelSpacing;
+        return app.parentRun?.spacingPx ?? null;
+    }
 }

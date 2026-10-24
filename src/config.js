@@ -812,18 +812,29 @@ export const FILRODENSWMB = {
         CELL_KM: 5,
         // Offered once the generator's cells lie at least this many map pixels apart
         MIN_PARENT_PX: 30,
-        // A place is served by a market within this many days' walk on foot (a day's round trip)
+        // Market towns and villages stand only within this many effective km over land of an
+        // inherited road, river route or town; beyond, people live in hamlets and farms
+        ROUTE_REACH_KM: 15,
+        // A place is served by a market within this many days' walk on foot (a day's round trip).
+        // Markets stand this times the square root of the map's area factor apart, so they thin
+        // out as villages do
         MARKET_REACH_DAYS: 0.5,
-        // A market town draws this share of the country people it serves, and has at least MARKET_MIN_POP
+        // A market town draws this share of the country people it serves (over the square root of
+        // the area factor, as it serves more of them), and has at least MARKET_MIN_POP
         MARKET_SHARE: 0.06,
         MARKET_MIN_POP: 300,
-        // A market needs at least this many people within its reach that no town serves yet
+        // A market needs at least this many people within its reach that no town or market serves yet
         MARKET_MIN_SERVED: 4000,
         // A cell with fewer country people than this has hamlets and farms, not a village
         VILLAGE_MIN_POP: 100,
         // A village holds at most this many; more people in its cell live in hamlets and farms
         VILLAGE_MAX_POP: 2000,
-        // At most this many villages, the largest kept
+        // A village of at least this many people is a large village, shown from the Local detail level
+        LARGE_VILLAGE_POP: 1000,
+        // A place keeps this many map pixels clear of a river as the map draws it
+        RIVER_MARGIN_PX: 3,
+        // At most this many villages. About one settled cell in the map's area factor has one, the
+        // area factor being the map's trade between a real landscape and a believable one
         MAX_VILLAGES: 4000,
     }),
     PARENT_RUN: Object.freeze({
@@ -992,12 +1003,15 @@ export const FILRODENSWMB = {
     // levels from their place in it (Realms, Duchies, Counties). Routes are shown at every level
     DETAIL: Object.freeze({
         LEVELS: Object.freeze([
-            Object.freeze({ value: 3, label: "FILRODENSWMB.UI.DetailEverything" }),
+            Object.freeze({ value: 4, label: "FILRODENSWMB.UI.DetailEverything" }),
+            Object.freeze({ value: 3, label: "FILRODENSWMB.UI.DetailLocal" }),
             Object.freeze({ value: 2, label: "FILRODENSWMB.UI.DetailRegional" }),
             Object.freeze({ value: 1, label: "FILRODENSWMB.UI.DetailProvince" }),
             Object.freeze({ value: 0, label: "FILRODENSWMB.UI.DetailWorld" }),
         ]),
-        EVERYTHING: 3,
+        // Local (3) came between Regional and Everything later; see LocalLevel
+        EVERYTHING: 4,
+        LOCAL: 3,
         // A run starts the map at the most detailed level whose places are still this many map
         // pixels apart, from each tier's typical spacing (GENERATOR.TOWNS.TIERS)
         MIN_SPACING_PX: 60,
@@ -1537,6 +1551,8 @@ export const FILRODENSWMB = {
                 ruinedLargeTown: Object.freeze({ order: 5, weight: 1 }),
                 ruinedTown: Object.freeze({ order: 5, weight: 1 }),
                 abandonedCastle: Object.freeze({ order: 5, weight: 1 }),
+                marketTown: Object.freeze({ order: 5, weight: 1.2 }),
+                largeVillage: Object.freeze({ order: 5, weight: 1.1 }),
                 village: Object.freeze({ order: 5, weight: 1 }),
             }),
             OTHER_PIN: Object.freeze({ order: 5, weight: 2 }),
@@ -1593,6 +1609,8 @@ export const FILRODENSWMB = {
             Object.freeze({ id: "route-style-main-road", nameKey: "FILRODENSWMB.UI.RouteStyleMainRoad", transport: "road", color: "#8a5a2b", thickness: 2, style: "solid", outline: true, smoothing: false }),
             Object.freeze({ id: "route-style-minor-road", nameKey: "FILRODENSWMB.UI.RouteStyleMinorRoad", transport: "road", color: "#8a6a45", thickness: 1.25, style: "solid", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-track", nameKey: "FILRODENSWMB.UI.RouteStyleTrack", transport: "road", color: "#7a6a55", thickness: 1, style: "dotted", outline: false, smoothing: false }),
+            // In-fill's lanes (see Infill): lighter and finer than a minor road
+            Object.freeze({ id: "route-style-lane", nameKey: "FILRODENSWMB.UI.RouteStyleLane", transport: "road", color: "#a8916f", thickness: 0.9, style: "solid", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-old-road", nameKey: "FILRODENSWMB.UI.RouteStyleOldRoad", transport: "road", color: "#8c7f6c", thickness: 1, style: "dashed", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleSeaLane", transport: "sea", color: "#2e5f8a", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-minor-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleMinorSeaLane", transport: "sea", color: "#5f89ad", thickness: 1, style: "dashed", outline: false, smoothing: false }),
@@ -1630,9 +1648,13 @@ export const FILRODENSWMB = {
         DEFAULT_STYLES: [
             { tier: "capital", icon: "circle_outline_with_star", scale: 1.6, labelSize: 1.6, labelStyle: "label-style-capital", detailLevel: 0, labelDetailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCapital" },
             { tier: "city", icon: "star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 0, labelDetailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCity" },
-            { tier: "largeTown", icon: "circle_outline_with_dot", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLargeTown" },
-            { tier: "town", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleTown" },
-            { tier: "village", icon: "dot_outline", scale: 0.5, labelSize: 0.5, labelStyle: "label-style-settlement", detailLevel: 3, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleVillage" },
+            { tier: "largeTown", icon: "circle_with_dot", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLargeTown" },
+            { tier: "town", icon: "circle_outline_with_dot", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleTown" },
+            // The places regional in-fill adds (see Infill), shown only at the most detailed level
+            { tier: "marketTown", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 3, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleMarketTown" },
+            // A filled-in village of at least INFILL.LARGE_VILLAGE_POP, shown from Local and named at Everything
+            { tier: "largeVillage", icon: "dot_outline", scale: 0.5, labelSize: 0.5, labelStyle: "label-style-settlement", detailLevel: 3, labelDetailLevel: 4, name: "FILRODENSWMB.UI.PinStyleLargeVillage" },
+            { tier: "village", icon: "dot_outline", scale: 0.5, labelSize: 0.5, labelStyle: "label-style-settlement", detailLevel: 4, labelDetailLevel: 4, name: "FILRODENSWMB.UI.PinStyleVillage" },
             { tier: "castle", icon: "castle", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleCastle" },
             { tier: "fortifiedTown", icon: "fortress", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleFortifiedTown" },
             { tier: "port", icon: "anchor", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStylePort" },
@@ -1641,14 +1663,14 @@ export const FILRODENSWMB = {
             // the ruins' colour, so a ruin reads as what it was
             { tier: "ruinedCapital", icon: "circle_outline_with_star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCapital" },
             { tier: "ruinedCity", icon: "star", scale: 1, labelSize: 1, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCity" },
-            { tier: "ruinedLargeTown", icon: "circle_outline_with_dot", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedLargeTown" },
-            { tier: "ruinedTown", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedTown" },
+            { tier: "ruinedLargeTown", icon: "circle_with_dot", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedLargeTown" },
+            { tier: "ruinedTown", icon: "circle_outline_with_dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedTown" },
             { tier: "abandonedCastle", icon: "castle", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleAbandonedCastle" },
             { tier: "landmark", icon: "jp_landmark", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLandmark" },
         ],
         // The colour the default styles use (unless one gives its own), and the detail levels a style may have
         DEFAULT_STYLE_COLOR: "#ffffff",
-        DETAIL_LEVELS: [0, 1, 2, 3],
+        DETAIL_LEVELS: [0, 1, 2, 3, 4],
         // Where a pin's name starts, from the pin's centre, in pin widths: a little beyond the
         // pin's edge (half a width)
         LABEL_OFFSET: 0.6,
@@ -2321,7 +2343,7 @@ export const FILRODENSWMB = {
         // and the route style each transport and class takes (see ROUTES.DEFAULT_STYLES' ids).
         // Pins below LABELLED_TIERS were given a hidden label by runs before names followed the
         // detail level (see NameLevels, which shows them again once).
-        PIN_TIERS: Object.freeze({ capital: "capital", city: "city", largeTown: "largeTown", town: "town", castle: "castle", fortifiedTown: "fortifiedTown", port: "port", ruinedCapital: "ruinedCapital", ruinedCity: "ruinedCity", ruinedLargeTown: "ruinedLargeTown", ruinedTown: "ruinedTown", abandonedCastle: "abandonedCastle" }),
+        PIN_TIERS: Object.freeze({ capital: "capital", city: "city", largeTown: "largeTown", town: "town", marketTown: "marketTown", largeVillage: "largeVillage", village: "village", castle: "castle", fortifiedTown: "fortifiedTown", port: "port", ruinedCapital: "ruinedCapital", ruinedCity: "ruinedCity", ruinedLargeTown: "ruinedLargeTown", ruinedTown: "ruinedTown", abandonedCastle: "abandonedCastle" }),
         LABELLED_TIERS: Object.freeze(["capital", "city"]),
         // The label style each political level's generated regions take (see LABELS.DEFAULT_STYLES)
         REGION_LABEL_STYLES: Object.freeze({ realm: "label-style-realm", duchy: "label-style-duchy", county: "label-style-county" }),
@@ -2331,6 +2353,8 @@ export const FILRODENSWMB = {
             river: Object.freeze({ trunk: "route-style-river-trade", main: "route-style-river-trade", minor: "route-style-minor-river-trade" }),
             // The roads of the age before that carry nothing now
             old: Object.freeze({ trunk: "route-style-old-road", main: "route-style-old-road", minor: "route-style-old-road" }),
+            // Regional in-fill's lanes (see Infill)
+            lane: Object.freeze({ trunk: "route-style-lane", main: "route-style-lane", minor: "route-style-lane" }),
         }),
         // The run's stages in order, each with its share of the run's time (for the progress bar)
         STAGES: Object.freeze([

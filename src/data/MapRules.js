@@ -97,6 +97,8 @@ const GENERATED = obj(
         formerTier: int(0, 10, { nullable: true }),
         formerPopulation: num(RANGE.COUNT, { nullable: true }),
         oldRoad: bool,
+        // Added by the map's own Fill in (see Infilling)
+        infill: bool,
         edited: bool,
         locked: bool,
     },
@@ -569,6 +571,7 @@ const MAP = obj({
     sizeRevision: int(0, 1000),
     // Whether generated names hidden by older runs have been shown again (see NameLevels)
     nameLevels: bool,
+    localLevel: bool,
     world: obj(
         {
             zoom: num(RANGE.SIGNED),
@@ -600,6 +603,8 @@ const MAP = obj({
         { nullable: true },
     ),
     parentRun: PARENT_RUN,
+    // A regional map asked to be filled in when cut, not yet filled in (see Infilling)
+    infillPending: bool,
     terrainUpgradeDismissed: bool,
     springsBaked: bool,
     mapWidth: num(RANGE.SIZE),

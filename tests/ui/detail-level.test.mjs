@@ -40,8 +40,10 @@ test("a pin takes its style's level, then its generated tier's, and is otherwise
 });
 
 test("each level shows what is at or below it; Everything is the arrays themselves", () => {
-    const everything = studio(3);
+    const everything = studio(FILRODENSWMB.DETAIL.EVERYTHING);
     assert.equal(DetailLevel.shown(everything).pins, everything.mapPins);
+    const local = DetailLevel.shown(studio(FILRODENSWMB.DETAIL.LOCAL));
+    assert.deepEqual(ids(local.pins), ["city", "town", "hamlet", "unstyled-town", "unstyled-largeTown", "own"], "Local shows a style at level 3");
     const world = DetailLevel.shown(studio(0));
     assert.deepEqual(ids(world.pins), ["city", "own"]);
     assert.deepEqual(ids(world.routes), ["trunk", "main", "minor", "drawn"], "routes are shown at every level");
@@ -57,23 +59,47 @@ test("each level shows what is at or below it; Everything is the arrays themselv
 });
 
 test("a saved level is made valid, and a map without one shows everything", () => {
-    assert.equal(DetailLevel.current({ uiState: {} }), 3);
-    assert.equal(DetailLevel.valid(7), 3);
+    assert.equal(DetailLevel.current({ uiState: {} }), 4);
+    assert.equal(DetailLevel.valid(7), 4);
     assert.equal(DetailLevel.valid(1), 1);
-    assert.deepEqual(DetailLevel.choices(studio(2)).map((choice) => [choice.value, choice.selected]), [[3, false], [2, true], [1, false], [0, false]]);
+    assert.deepEqual(DetailLevel.choices(studio(2)).map((choice) => [choice.value, choice.selected]), [[4, false], [3, false], [2, true], [1, false], [0, false]]);
     assert.equal(clean({ detailLevel: 2 }, RULES.map, cleanContext(() => "x")).detailLevel, 2, "saved with the map");
     const hostile = clean({ detailLevel: 9 }, RULES.map, cleanContext(() => "x")).detailLevel;
-    assert.ok(hostile === undefined || hostile <= 3);
+    assert.ok(hostile === undefined || hostile <= 4);
 });
 
 test("a run starts at the most detailed level whose places are still far enough apart", () => {
     const [, largeTowns, towns] = FILRODENSWMB.GENERATOR.TOWNS.TIERS;
     const minimum = FILRODENSWMB.DETAIL.MIN_SPACING_PX;
-    assert.equal(DetailLevel.forScale(towns.spacingKm / minimum), 3, "towns exactly far enough apart: everything");
+    assert.equal(DetailLevel.forScale(towns.spacingKm / minimum), 4, "towns exactly far enough apart: everything");
     assert.equal(DetailLevel.forScale(towns.spacingKm / minimum + 0.1), 1, "towns too close: large towns and above");
     assert.equal(DetailLevel.forScale(largeTowns.spacingKm / minimum + 0.1), 0, "large towns too close: the world view");
     assert.equal(DetailLevel.forScale(3.2), 0, "EXBQDK's whole-globe span");
-    assert.equal(DetailLevel.forScale(0), 3);
+    assert.equal(DetailLevel.forScale(0), 4);
+});
+
+test("a map or styles file saved before Local keeps what Everything showed", async () => {
+    const { addLocalLevelOnce, moveStyleLevels } = await import("../../src/data/LocalLevel.js");
+    const saved = () => ({
+        detailLevel: 3,
+        customPinStyles: [
+            { id: "v", tier: "village", detailLevel: 3, label: { detailLevel: 3 } },
+            { id: "t", tier: "town", detailLevel: 2, label: { detailLevel: 3 } },
+            { id: "own", detailLevel: 3, label: {} },
+        ],
+    });
+    const map = saved();
+    assert.equal(addLocalLevelOnce(map), true);
+    assert.equal(map.detailLevel, 4, "Everything stays Everything");
+    assert.deepEqual(map.customPinStyles.map((style) => [style.detailLevel, style.label.detailLevel]), [[4, 4], [2, 3], [3, undefined]], "only the village style moves on");
+    assert.equal(map.localLevel, true);
+    assert.equal(addLocalLevelOnce(map), false, "once");
+    const current = { ...saved(), localLevel: true };
+    addLocalLevelOnce(current);
+    assert.equal(current.detailLevel, 3, "a map saved since keeps Local");
+    const styles = saved().customPinStyles;
+    moveStyleLevels(styles);
+    assert.equal(styles[0].detailLevel, 4);
 });
 
 test("a level the detail level hides is not drawn, unless it is being painted", () => {

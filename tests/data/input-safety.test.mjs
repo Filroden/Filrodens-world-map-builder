@@ -289,6 +289,23 @@ test("a regional map's copy of its parent's run passes the importer whole, and a
     assert.equal(damaged((copy) => (copy.spacingPx = "wide")).mapData.parentRun, null, "no spacing");
 });
 
+test("a fill-in's marks pass the importer, and a hostile one is dropped", () => {
+    const file = v4Map();
+    file.infillPending = true;
+    file.mapPins[0].generated = { run: "runAAAAAAAAAAAAA", kind: "town", tier: "marketTown", sourceId: 0, population: 400, infill: true, edited: false, locked: false };
+    const kept = MapImport.read(file);
+    assert.equal(kept.mapData.infillPending, true);
+    assert.equal(kept.mapData.mapPins[0].generated.infill, true);
+    assert.equal(kept.mapData.mapPins[0].generated.tier, "marketTown");
+
+    const hostile = v4Map();
+    hostile.infillPending = SCRIPT;
+    hostile.mapPins[0].generated = { run: "runAAAAAAAAAAAAA", kind: "town", infill: SCRIPT };
+    const cleaned = MapImport.read(hostile);
+    assert.notEqual(cleaned.mapData.infillPending, SCRIPT);
+    assert.notEqual(cleaned.mapData.mapPins[0].generated?.infill, SCRIPT);
+});
+
 test("a saved model run passes the importer whole, and a damaged or hostile one is dropped", () => {
     const file = v4Map();
     file.modelRun = savedModelRun();

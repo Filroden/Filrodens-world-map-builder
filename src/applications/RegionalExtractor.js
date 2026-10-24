@@ -10,6 +10,7 @@ import { extractRegionalVectors } from "../mesh/RegionalMesh.js";
 import { clampAreaFactor, effectiveKmPerPx } from "../mesh/Schema.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { RunCells } from "./RunCells.js";
+import { scaleBarOnMap, scaleBarTick, worldScaleTick } from "../data/MapUnit.js";
 import { platform } from "../platform/index.js";
 
 export class RegionalExtractor {
@@ -45,6 +46,10 @@ export class RegionalExtractor {
         state.terrainVersion = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
         // The regional map shows the same world, so keeps its parent's area factor
         state.world = world ? { ...world, areaFactor: clampAreaFactor(app.uiState.world?.areaFactor) } : world;
+        // With the regional map's scale known, the whole scale bar is brought onto it
+        const bar = scaleBarOnMap(state, targetWidth, targetHeight);
+        state.cartographyScaleX = bar.x;
+        state.cartographyScaleY = bar.y;
         state.windDistance = windDistance;
 
         // 3. Derive Map Parameters
@@ -60,6 +65,7 @@ export class RegionalExtractor {
             terrainVersion: state.terrainVersion,
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             nameLevels: true,
+            localLevel: true,
             world: state.world,
             // The regional map shows the same world, so keeps its parent's unit
             mapUnit: state.mapUnit,
@@ -93,7 +99,13 @@ export class RegionalExtractor {
         // the regional map at for its scale (see DetailLevel.forScale), so its places and their
         // names appear as the zoom gives them room
         payload.detailLevel = Math.max(DetailLevel.current(app), DetailLevel.forScale(effectiveKmPerPx(payload)));
-        return { payload, owners: this.#meshVectors(app, payload, cropBox, zoomScale) };
+        const owners = this.#meshVectors(app, payload, cropBox, zoomScale);
+        // A regional map's own Fill in replaces only what it added itself: what the map it was cut
+        // from filled in is inherited content on it, like that map's own run's
+        for (const item of [...payload.mapPins, ...payload.mapRoutes]) if (item.generated) delete item.generated.infill;
+        // Filled in once opened, when asked for and the regional map is close enough in (see Infilling)
+        if (app.uiState.regionalInfill === true && payload.parentRun?.spacingPx >= FILRODENSWMB.INFILL.MIN_PARENT_PX) payload.infillPending = true;
+        return { payload, owners };
     }
 
     /**
@@ -243,13 +255,16 @@ export class RegionalExtractor {
         state.latBottom = originalLatTop - ((cropBox.y + cropBox.height) / originalMapHeight) * latRange;
         state.gridSize = gridSize;
 
-        if (state.cartographyScaleEnable && state.cartographyScaleX !== undefined) {
-            state.cartographyScaleX = (state.cartographyScaleX - cropBox.x) * zoomScale;
-            state.cartographyScaleY = (state.cartographyScaleY - cropBox.y) * zoomScale;
-            state.cartographyScaleInterval = Math.round(state.cartographyScaleInterval * zoomScale);
-
-            state.cartographyScaleX = Math.max(FILRODENSWMB.UI.REGIONAL_CROP.PADDING, Math.min(state.cartographyScaleX, targetWidth - FILRODENSWMB.UI.REGIONAL_CROP.PADDING));
-            state.cartographyScaleY = Math.max(FILRODENSWMB.UI.REGIONAL_CROP.PADDING, Math.min(state.cartographyScaleY, targetHeight - FILRODENSWMB.UI.REGIONAL_CROP.PADDING));
+        // The scale bar keeps its place on the land it was over, on or off (it may be turned on
+        // later), and its ticks their length on the map: one the parent set by hand keeps measuring
+        // true, its distance per tick rounded (see worldScaleTick) with the tick fitted to it
+        state.cartographyScaleX = ((state.cartographyScaleX ?? FILRODENSWMB.UI.REGIONAL_CROP.PADDING) - cropBox.x) * zoomScale;
+        state.cartographyScaleY = ((state.cartographyScaleY ?? originalMapHeight - FILRODENSWMB.UI.REGIONAL_CROP.PADDING) - cropBox.y) * zoomScale;
+        if (state.cartographyScaleMatchWorld !== true) {
+            const { value, intervalPx } = scaleBarTick(state, originalMapHeight);
+            const tick = worldScaleTick(value / intervalPx / zoomScale, intervalPx);
+            state.cartographyScaleValue = tick.value;
+            state.cartographyScaleInterval = Math.max(1, Math.round(tick.intervalPx));
         }
     }
 

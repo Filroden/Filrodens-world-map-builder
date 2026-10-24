@@ -196,9 +196,9 @@ export class Generation {
             layerSets: app.layerSets ?? [],
             names: this.#names(),
             watersPx: this.#watersPx(session.mesh.kmPerPx),
-            routeStyleFor: this.#routeStyleFinder(app),
+            routeStyleFor: this.routeStyleFinder(app),
             routeStyleFields: (style) => MapDialogManager.routeStyleFields(style),
-            pinStyleFor: this.#pinStyleFinder(app),
+            pinStyleFor: this.pinStyleFinder(app),
             applyPinStyle: (pin, style) => PinStyles.apply(app, pin, style),
             regionLabel: this.#regionLabels(app),
             output,
@@ -285,7 +285,7 @@ export class Generation {
     }
 
     /** Finds (or adds from the defaults) the route style of a transport and class. */
-    static #routeStyleFinder(app) {
+    static routeStyleFinder(app) {
         app.uiState.customRouteStyles ??= [];
         const styles = app.uiState.customRouteStyles;
         return (transport, routeClass) => {
@@ -307,7 +307,7 @@ export class Generation {
      * failing that, a style of a map made before styles were marked, recognised by its default
      * icon, which is marked now; failing that, the default style, added.
      */
-    static #pinStyleFinder(app) {
+    static pinStyleFinder(app) {
         PinStyles.ensure(app);
         const styles = app.uiState.customPinStyles;
         const defaults = PinStyles.defaults();

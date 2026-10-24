@@ -2,6 +2,7 @@ import { GenerationWorkers } from "../tools/GenerationWorkers.js";
 import { payloadTransfer } from "./GeneratorInput.js";
 import { runGenerator } from "./Pipeline.js";
 import { buildTravelGraph } from "../travel/TravelGraph.js";
+import { runInfill } from "./Infill.js";
 
 /**
  * Runs the generator in the background worker (the `generate` task), or on the main thread where
@@ -46,5 +47,21 @@ export function travelGraphInBackground(makePayload) {
     return GenerationWorkers.runOne("travelGraph", payload, {
         transfer: payloadTransfer(payload),
         alone: () => buildTravelGraph(isDetached(payload) ? makePayload() : payload),
+    });
+}
+
+/**
+ * Regional in-fill (see Infill) in the background worker, or on the main thread as
+ * generateInBackground does.
+ * @param {function(): object} makeInput - Builds Infill.runInfill's input (its payload's buffers are transferred).
+ * @param {{signal?: AbortSignal}} [options]
+ * @returns {Promise<object>}
+ */
+export function infillInBackground(makeInput, { signal = null } = {}) {
+    const input = makeInput();
+    return GenerationWorkers.runOne("infill", input, {
+        signal,
+        transfer: [...payloadTransfer(input.payload), input.parentOf.buffer],
+        alone: () => runInfill(isDetached(input.payload) ? makeInput() : input),
     });
 }

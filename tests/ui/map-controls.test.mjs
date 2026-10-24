@@ -142,8 +142,8 @@ test("the Detail menu marks the map's one detail level and names it on its butto
     syncMapControls(root, viewState({ detailLevel: 1, avoidOverlaps: false }), label, detailLabel);
     assert.equal(root.querySelector('[data-action="toggleLabelOverlaps"]').getAttribute("aria-checked"), "false", "Avoid overlaps is a switch in the same menu");
     const rows = [...root.querySelectorAll('[data-action="setDetailLevel"]')];
-    assert.deepEqual(rows.map((row) => row.dataset.detailLevel), ["3", "2", "1", "0"], "most detailed first");
-    assert.deepEqual(rows.map((row) => row.getAttribute("aria-checked")), ["false", "false", "true", "false"]);
+    assert.deepEqual(rows.map((row) => row.dataset.detailLevel), ["4", "3", "2", "1", "0"], "most detailed first");
+    assert.deepEqual(rows.map((row) => row.getAttribute("aria-checked")), ["false", "false", "false", "true", "false"]);
     assert.ok(rows.every((row) => row.getAttribute("role") === "menuitemradio"));
     const button = root.querySelector('.fwmb-layer-group[data-layer-group="detail"] > [data-action="toggleLayerMenu"]');
     assert.equal(button.getAttribute("aria-label"), "Detail: 1");

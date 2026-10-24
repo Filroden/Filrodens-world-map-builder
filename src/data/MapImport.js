@@ -5,6 +5,7 @@ import { parentRunHoldsTogether } from "../generator/ParentRun.js";
 import { clean, cleanContext, RULES, STYLE_LIST_RULES } from "./MapRules.js";
 import { ImportRefusal, Sanitize } from "./Sanitize.js";
 import { needsRebase, rebaseStyles } from "./SymbolSizes.js";
+import { moveStyleLevels } from "./LocalLevel.js";
 
 /**
  * Reads a map (or a styles file) someone may have made elsewhere into data the studio can trust.
@@ -119,6 +120,8 @@ export class MapImport {
         refuseOverLimit(context);
         // A file exported before the current size unit holds older pin and label sizes
         if (needsRebase(tree.sizeRevision)) rebaseStyles(categories.customPinStyles, categories.customLabelStyles);
+        // A file exported before the Local detail level keeps its villages at Everything
+        if (tree.localLevel !== true) moveStyleLevels(categories.customPinStyles);
         return { categories, corrected: context.corrected };
     }
 }

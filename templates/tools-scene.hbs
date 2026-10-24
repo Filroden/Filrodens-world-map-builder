@@ -137,6 +137,10 @@
                 <span>{{localize "FILRODENSWMB.UI.LatBottom"}}: <strong id="fwmb-readout-lat-bottom">--&deg;</strong></span>
             </div>
         </div>
+        <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.RegionalInfillHint'}}">
+            <input type="checkbox" name="regionalInfill" class="fwmb-checkbox" {{#if uiState.regionalInfill}}checked{{/if}} {{#unless regionalInfillOffered}}disabled{{/unless}} data-regional-infill />
+            {{localize "FILRODENSWMB.UI.RegionalInfill"}}
+        </label>
         <button type="button" data-action="generateRegionalMap" class="fwmb-btn fwmb-btn--wide">
             <i class="fwmb-icon fwmb-icon--map"></i> {{localize "FILRODENSWMB.UI.GenerateMap"}}
         </button>

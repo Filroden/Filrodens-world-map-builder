@@ -64,7 +64,7 @@ test("a style writes its icon, scale, colour and label onto a pin, taking the la
     town.color = "#ff0000";
 
     const fields = PinStyles.fields(app, town);
-    assert.deepEqual(fields, { icon: "dot", scale: 0.6, color: "#ff0000", label: { quickStyle: "serif", fontFamily: "Georgia", fillColor: "#112233", maxChars: 12, justify: "center", fontSize: 0.6, visibility: "gm" } });
+    assert.deepEqual(fields, { icon: "circle_outline_with_dot", scale: 0.7, color: "#ff0000", label: { quickStyle: "serif", fontFamily: "Georgia", fillColor: "#112233", maxChars: 12, justify: "center", fontSize: 0.7, visibility: "gm" } });
 
     const pin = app.mapPins[0];
     PinStyles.apply(app, pin, town);

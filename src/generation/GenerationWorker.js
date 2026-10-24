@@ -19,6 +19,7 @@ import { buildMeshData } from "../mesh/MeshBuilder.js";
 import { runGenerator } from "../generator/Pipeline.js";
 import { resultTransfer } from "../generator/GeneratorInput.js";
 import { buildTravelGraph, travelGraphTransfer } from "../travel/TravelGraph.js";
+import { runInfill } from "../generator/Infill.js";
 
 /** One band's rows, newly allocated: `width` values per row. */
 const bandBuffer = (width, rowStart, rowEnd) => new Float32Array((rowEnd - rowStart) * width);
@@ -89,7 +90,13 @@ function travelGraph(payload) {
     return { value: graph, transfer: travelGraphTransfer(graph) };
 }
 
-const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh, generate, travelGraph };
+/** Regional in-fill (see Infill). */
+function infill(input) {
+    const result = runInfill(input);
+    return { value: result, transfer: [result.people.buffer] };
+}
+
+const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh, generate, travelGraph, infill };
 
 /** Ids of jobs asked to stop (cancelled), and of jobs asked to end early with what they have. */
 const cancelled = new Set();

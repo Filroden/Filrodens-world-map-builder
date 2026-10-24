@@ -16,19 +16,25 @@ import { edgeDays, flagRoute } from "../travel/TravelTime.js";
  *    food and travel figures from the regional map's own terrain (TravelGraph.travelCells).
  * 2. **People:** each parent cell's country people (its people less those of the inherited places
  *    in it) are shared among the in-fill cells inside it by the food each can grow.
- * 3. **Market towns:** a market serves the people within MARKET_REACH_DAYS on foot, along the
+ * 3. **Near the network:** market towns and villages stand only within ROUTE_REACH_KM over land of
+ *    an inherited road, river route or town; beyond, the country people live in hamlets and farms
+ *    (building even a track to the nearest road is costly, so settlement follows the roads). A map
+ *    with no inherited road, river or town has no such limit.
+ * 4. **Market towns:** a market serves the people within MARKET_REACH_DAYS on foot, along the
  *    tracks they would walk (a road's pace, slowed by hills). The settled cell beyond every town's
- *    reach with the most people round it becomes a market town if enough people beyond every
- *    town's reach live within its own (MARKET_MIN_SERVED), and so on. Markets therefore stand
- *    about a day's round trip apart where the land is settled, further apart where it is not, and
- *    none crowds an inherited town. Each draws MARKET_SHARE of the country people it serves.
- * 4. **Villages:** one in each settled cell with at least VILLAGE_MIN_POP country people (after
- *    its market's share), or, where that would be more than MAX_VILLAGES, spaced a step or more
- *    apart, each gathering the people round it (see placeVillages).
- * 5. **Lanes:** each market town is joined to the nearest inherited road or town, then each village
+ *    reach, and further than that times the square root of the map's area factor from every
+ *    market, with the most people round it becomes a market town if enough people beyond them all
+ *    live within its reach (MARKET_MIN_SERVED), and so on. Markets so fill the gaps between the
+ *    inherited towns but stand further apart as the area factor shows fewer places. Each draws
+ *    MARKET_SHARE of the country people it serves, over the square root of the area factor, so it
+ *    stays a market town's size though it serves more of them.
+ * 5. **Villages:** about one settled cell in the map's area factor, picked by chance weighted by
+ *    its country people (after its market's share), so they cluster in rich country without
+ *    falling on a pattern; each holds its own cell's people (see placeVillages).
+ * 6. **Lanes:** each market town is joined to the nearest inherited road or town, then each village
  *    to the nearest road, town, market or lane, along the quickest way on foot over land. The ways
  *    form one tree from the network, so lanes merge as they near it.
- * 6. **Names:** in the name base of the culture most of the parent cell's people belong to, none
+ * 7. **Names:** in the name base of the culture most of the parent cell's people belong to, none
  *    the same as a name already on the map (where avoidable).
  *
  * Deterministic for its seed.
@@ -45,12 +51,14 @@ import { edgeDays, flagRoute } from "../travel/TravelTime.js";
  * @param {Object<string, number>} input.speeds - The travel speeds (see TRAVEL_TIME.SPEEDS).
  * @param {string} input.seed
  * @param {string} input.nameBase - The name base where a culture names none.
+ * @param {Uint8Array} [input.dry] - Each cell's flag: 1 where a place could stand clear of the drawn rivers (see InfillInput.dryCell).
+ * @param {number} [input.areaFactor] - The map's area factor: about one settled cell in this many has a village (see placeVillages).
  * @param {Iterable<string>} [input.names] - Names already on the map.
  * @param {object} [input.options] - Overrides of FILRODENSWMB.INFILL.
  * @returns {{places: {cell: number, tier: string, population: number, name: string}[], lanes: {cells: number[]}[], people: Float64Array, stats: object}}
  */
 export function runInfill(input) {
-    const options = { ...FILRODENSWMB.INFILL, ...(input.options ?? {}) };
+    const options = { ...FILRODENSWMB.INFILL, areaFactor: input.areaFactor ?? FILRODENSWMB.MESH.AREA_FACTOR, ...(input.options ?? {}) };
     const timings = {};
     const time = (name, work) => {
         const start = performance.now();
@@ -73,7 +81,10 @@ export function runInfill(input) {
     // A market's reach is measured along the tracks its people walk to it, so as if every step
     // over land had one (at a road's pace, slowed by hills), and by river and sea as usual
     const trackDays = edgeDays(graph, { speeds: input.speeds, mode: "foot", road: new Uint8Array(graph.edgeA.length).fill(1), river: flags.river, lane: flags.sea, maxKm: 2.5 * meanEdgeKm(graph) });
-    const markets = time("markets", () => placeMarkets(graph, trackDays, people, townCells, options));
+    const near = time("reach", () => nearNetwork(graph, flags, townCells, options.ROUTE_REACH_KM));
+    // A cell wholly under a river as the map draws it has nowhere for a place to stand
+    if (input.dry) for (let cell = 0; cell < count; cell++) if (!input.dry[cell]) near[cell] = 0;
+    const markets = time("markets", () => placeMarkets(graph, trackDays, people, townCells, near, options));
     const catchment = nearestOf(graph, trackDays, [...townCells, ...markets.map((market) => market.cell)]);
     const marketIndex = new Map(markets.map((market, index) => [market.cell, index]));
     // A market draws its share of the country people it serves
@@ -81,14 +92,14 @@ export function runInfill(input) {
     for (let cell = 0; cell < count; cell++) {
         const index = marketIndex.get(catchment.source[cell]);
         if (index === undefined || !(people[cell] > 0)) continue;
-        const share = people[cell] * options.MARKET_SHARE;
+        const share = (people[cell] * options.MARKET_SHARE) / Math.sqrt(Math.max(1, options.areaFactor));
         drawn[index] += share;
         people[cell] -= share;
     }
     markets.forEach((market, index) => (market.population = Math.max(options.MARKET_MIN_POP, Math.round(drawn[index]))));
 
     const taken = new Set([...townCells, ...markets.map((market) => market.cell)]);
-    const { villages, villagesLeftOut, villageHops } = time("villages", () => placeVillages(graph, people, taken, options));
+    const { villages, villagesLeftOut } = time("villages", () => placeVillages(graph, people, taken, near, options, stageRandom(input.seed, "infill-villages")));
 
     const lanes = time("lanes", () => buildLanes(graph, cellGraph, days, { roadEdges: flags.road, townCells, markets, villages }));
     const places = [...markets, ...villages];
@@ -100,11 +111,10 @@ export function runInfill(input) {
         stats: {
             cells: count,
             landCells: graph.water.reduce((sum, water) => sum + (water ? 0 : 1), 0),
-            people: Math.round(people.reduce((sum, value) => sum + value, 0) + places.reduce((sum, place) => sum + (place.tier === "village" ? 0 : place.population), 0)),
+            people: Math.round(people.reduce((sum, value) => sum + value, 0) + places.reduce((sum, place) => sum + (place.tier === "marketTown" ? place.population : 0), 0)),
             markets: markets.length,
             villages: villages.length,
             villagesLeftOut,
-            villageHops,
             lanes: lanes.length,
             laneKm: Math.round(lanes.reduce((sum, lane) => sum + lane.km, 0)),
             timings,
@@ -194,31 +204,78 @@ function nearestOf(graph, days, sources) {
 }
 
 /**
- * Market towns: the settled cells beyond every town's reach, most people round them first, each
- * becoming a market when enough people beyond every town's reach (MARKET_MIN_SERVED) live within
- * its own. Reach only grows as markets are added, so a cell passed over stays passed over, and
- * each cell is tried once.
+ * The cells within `limitKm` over land of the inherited network: a road or river route, or a town
+ * (1 where a place may stand). All of them when there is no network at all.
  */
-function placeMarkets(graph, days, people, townCells, options) {
+function nearNetwork(graph, flags, townCells, limitKm) {
+    const count = graph.count;
+    const near = new Uint8Array(count);
+    const best = new Float64Array(count).fill(Infinity);
+    const heap = new MinHeap(1024);
+    const start = (cell) => {
+        if (cell >= 0 && cell < count && best[cell] > 0) {
+            best[cell] = 0;
+            heap.push(0, cell);
+        }
+    };
+    for (let edge = 0; edge < graph.edgeA.length; edge++) {
+        if (!flags.road[edge] && !flags.river[edge]) continue;
+        start(graph.edgeA[edge]);
+        start(graph.edgeB[edge]);
+    }
+    for (const cell of townCells) start(cell);
+    if (!heap.size) return near.fill(1);
+    while (heap.size) {
+        const km = heap.peekPriority();
+        const cell = heap.pop();
+        if (km > best[cell]) continue;
+        near[cell] = 1;
+        for (let slot = graph.adjStart[cell]; slot < graph.adjStart[cell + 1]; slot++) {
+            const edge = graph.adjEdge[slot];
+            const kind = graph.edgeKind[edge];
+            if (kind === EDGE.SEA || kind === EDGE.PORT) continue;
+            const next = graph.adjCell[slot];
+            const arrive = km + graph.edgeKm[edge];
+            if (arrive <= limitKm && arrive < best[next]) {
+                best[next] = arrive;
+                heap.push(arrive, next);
+            }
+        }
+    }
+    return near;
+}
+
+/**
+ * Market towns: the settled cells near the network and beyond every town's reach
+ * (MARKET_REACH_DAYS) and every market's (that times the square root of the area factor), most
+ * people round them first, each becoming a market when enough people beyond every town's and
+ * market's reach (MARKET_MIN_SERVED) live within its own. Reach only grows as markets are added,
+ * so a cell passed over stays passed over, and each cell is tried once. Markets fill the gaps
+ * between the inherited towns as before, but stand further apart from one another.
+ */
+function placeMarkets(graph, days, people, townCells, near, options) {
     const count = graph.count;
     const score = new Float64Array(count);
     const candidates = [];
     for (let cell = 0; cell < count; cell++) {
-        if (!(people[cell] >= options.VILLAGE_MIN_POP)) continue;
+        if (!near[cell] || !(people[cell] >= options.VILLAGE_MIN_POP)) continue;
         let sum = people[cell];
         for (let slot = graph.adjStart[cell]; slot < graph.adjStart[cell + 1]; slot++) sum += people[graph.adjCell[slot]];
         score[cell] = sum;
         candidates.push(cell);
     }
     candidates.sort((a, b) => score[b] - score[a] || a - b);
-    const reach = nearestOf(graph, days, townCells);
     const limit = options.MARKET_REACH_DAYS;
+    const spacing = limit * Math.sqrt(Math.max(1, options.areaFactor));
+    const towns = nearestOf(graph, days, townCells);
+    const others = nearestOf(graph, days, []);
+    const unserved = (cell) => towns.best[cell] > limit && others.best[cell] > spacing;
     const markets = [];
     for (const cell of candidates) {
-        if (reach.best[cell] <= limit) continue;
-        if (servedWithin(graph, days, cell, limit, (other) => (reach.best[other] > limit ? people[other] : 0)) < options.MARKET_MIN_SERVED) continue;
+        if (!unserved(cell)) continue;
+        if (servedWithin(graph, days, cell, limit, (other) => (unserved(other) ? people[other] : 0)) < options.MARKET_MIN_SERVED) continue;
         markets.push({ cell, tier: "marketTown", population: 0 });
-        reach.add(cell);
+        others.add(cell);
     }
     return markets;
 }
@@ -247,74 +304,57 @@ function servedWithin(graph, days, start, limit, count) {
 }
 
 /**
- * Villages: the settled cells with the most country people first, each blocking the cells within
- * `hops` steps of it, the fewest hops (0, one per cell) that keep them to MAX_VILLAGES; so where
- * there are too many for one per cell they thin out evenly, a walk further apart, rather than the
- * sparser country losing all of its own. Each village gathers the country people of the settled
- * cells nearest it within those steps (at most VILLAGE_MAX_POP; the rest live in its hamlets and
- * farms), and needs VILLAGE_MIN_POP of them. Past MAX_VILLAGES even so, the largest are kept.
+ * Villages: about one in `areaFactor` of the settled cells near the network (the share a map's
+ * area factor shows; see MESH.AREA_FACTOR), picked by chance weighted by the cell's country
+ * people, so dense country has more of them but none fall on a regular pattern (a weighted
+ * sample: each cell's key is u^(1/w) for a draw u and its people w, highest first). A village is
+ * never next to another village, a town or a market. It holds its own cell's country people (at
+ * least VILLAGE_MIN_POP, at most VILLAGE_MAX_POP), and with at least LARGE_VILLAGE_POP is a large
+ * village (shown a detail level sooner); the people of the cells without one live in hamlets and
+ * farms. At most MAX_VILLAGES.
  */
-function placeVillages(graph, people, taken, options) {
+function placeVillages(graph, people, taken, near, options, random) {
     const count = graph.count;
     const settled = (cell) => !graph.water[cell] && !taken.has(cell) && people[cell] > 0;
-    const candidates = [];
-    for (let cell = 0; cell < count; cell++) if (settled(cell)) candidates.push(cell);
-    candidates.sort((a, b) => people[b] - people[a] || a - b);
-    const within = (start, hops, visit) => {
-        let ring = [start];
-        const seen = new Set(ring);
-        for (let step = 0; step <= hops && ring.length; step++) {
-            for (const cell of ring) visit(cell, step);
-            if (step === hops) break;
-            const next = [];
-            for (const cell of ring) {
-                for (let slot = graph.adjStart[cell]; slot < graph.adjStart[cell + 1]; slot++) {
-                    const other = graph.adjCell[slot];
-                    if (seen.has(other) || graph.water[other]) continue;
-                    seen.add(other);
-                    next.push(other);
-                }
-            }
-            ring = next;
-        }
+    const neighbours = (cell, visit) => {
+        for (let slot = graph.adjStart[cell]; slot < graph.adjStart[cell + 1]; slot++) visit(graph.adjCell[slot]);
     };
-    let picked = [];
-    let hops = 0;
-    for (; hops <= MAX_VILLAGE_HOPS; hops++) {
-        const blocked = new Uint8Array(count);
-        picked = [];
-        for (const cell of candidates) {
-            if (blocked[cell] || people[cell] < options.VILLAGE_MIN_POP / (hops + 1)) continue;
-            picked.push(cell);
-            within(cell, hops, (other) => (blocked[other] = 1));
-        }
-        if (picked.length <= options.MAX_VILLAGES) break;
+    // The log of u^(1/w), which sorts the same and does not underflow
+    const key = new Float64Array(count);
+    const candidates = [];
+    for (let cell = 0; cell < count; cell++) {
+        // One draw per cell whatever it holds, so a change in one cell's people moves no other's draw
+        const draw = random();
+        if (!near[cell] || !settled(cell) || people[cell] < options.VILLAGE_MIN_POP) continue;
+        key[cell] = Math.log(Math.max(draw, Number.MIN_VALUE)) / people[cell];
+        candidates.push(cell);
     }
-    hops = Math.min(hops, MAX_VILLAGE_HOPS);
-    // Each settled cell's people go to the nearest village within those steps
-    const gathered = new Float64Array(count);
-    const owner = new Int32Array(count).fill(-1);
-    const step = new Float64Array(count).fill(Infinity);
-    for (const village of picked) {
-        within(village, hops, (other, distance) => {
-            if (settled(other) && distance < step[other]) {
-                step[other] = distance;
-                owner[other] = village;
-            }
-        });
-    }
-    for (let cell = 0; cell < count; cell++) if (owner[cell] >= 0) gathered[owner[cell]] += people[cell];
-    let villages = picked
-        .filter((cell) => gathered[cell] >= options.VILLAGE_MIN_POP)
-        .map((cell) => ({ cell, tier: "village", population: Math.round(Math.min(gathered[cell], options.VILLAGE_MAX_POP)) }))
-        .sort((a, b) => b.population - a.population || a.cell - b.cell);
-    const villagesLeftOut = Math.max(0, villages.length - options.MAX_VILLAGES);
-    villages = villages.slice(0, options.MAX_VILLAGES);
-    return { villages, villagesLeftOut, villageHops: hops };
-}
+    candidates.sort((a, b) => key[b] - key[a] || a - b);
+    const wanted = Math.ceil(candidates.length / Math.max(1, options.areaFactor));
+    const target = Math.min(options.MAX_VILLAGES, wanted);
 
-/** The furthest apart villages thin out to (steps between cells). */
-const MAX_VILLAGE_HOPS = 3;
+    const blocked = new Uint8Array(count);
+    const block = (cell) => {
+        blocked[cell] = 1;
+        neighbours(cell, (other) => (blocked[other] = 1));
+    };
+    for (const cell of taken) if (cell >= 0 && cell < count) block(cell);
+    const picked = [];
+    for (const cell of candidates) {
+        if (picked.length >= target) break;
+        if (blocked[cell]) continue;
+        picked.push(cell);
+        block(cell);
+    }
+
+    const villages = picked
+        .map((cell) => {
+            const population = Math.round(Math.min(people[cell], options.VILLAGE_MAX_POP));
+            return { cell, tier: population >= options.LARGE_VILLAGE_POP ? "largeVillage" : "village", population };
+        })
+        .sort((a, b) => b.population - a.population || a.cell - b.cell);
+    return { villages, villagesLeftOut: Math.max(0, wanted - target) };
+}
 
 /**
  * The lanes: each market joined to the nearest inherited road or town, then each village to the

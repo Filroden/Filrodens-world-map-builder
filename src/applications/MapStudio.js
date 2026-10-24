@@ -22,9 +22,12 @@ import { bindDropdownMenus, positionPopoverMenu } from "../ui/dropdowns.js";
 import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getPinIconLabel, findUnresolvedPinIcons } from "../data/pinIcons.js";
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { ParentRunRecovery } from "./ParentRunRecovery.js";
+import { RunCells } from "./RunCells.js";
+import { Infilling } from "./Infilling.js";
+import { InfillInput } from "./InfillInput.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
-import { cleanUnit, formatDistance, kmPerPxOf, scaleBarTick, unitFromSaved } from "../data/MapUnit.js";
+import { cleanUnit, formatDistance, kmPerPxOf, scaleBarOnMap, scaleBarTick, unitFromSaved } from "../data/MapUnit.js";
 import { ThematicView } from "./ThematicView.js";
 import { HistoryView } from "./HistoryView.js";
 import { TravelView } from "./TravelView.js";
@@ -72,6 +75,7 @@ import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { rebaseMap } from "../data/SymbolSizes.js";
+import { addLocalLevelOnce } from "../data/LocalLevel.js";
 import { showNamesOnce } from "../data/NameLevels.js";
 import { SymbolScale } from "../tools/SymbolScale.js";
 import { ExportScale } from "../tools/ExportScale.js";
@@ -278,6 +282,7 @@ export class MapStudio {
         chooseTravelMode(_e, t)         { TravelView.chooseMode(this, t.dataset.mode); },
         resetTravelSpeeds()             { TravelView.resetSpeeds(this); },
         clearTravelStart()              { TravelView.clearStart(this); },
+        fillIn()                        { Infilling.run(this); },
         toggleLabelOverlaps()           { this.#toggleLabelOverlaps(); },
         setSymbolSize(_e, t)            { this.#setSymbolSize(t.dataset.symbolSize); },
         toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
@@ -547,6 +552,8 @@ export class MapStudio {
         // A regional map's copy of the run of the map it was cut from (see ParentRun), which its
         // figures read until it has a run of its own; null for any other map.
         this.parentRun = null;
+        // A regional map asked to be filled in when it was cut, until it has been (see Infilling)
+        this.infillPending = false;
         this.isDirty = false;
 
         MapStateManager.allocateBuffers(this);
@@ -1205,6 +1212,7 @@ export class MapStudio {
         context.currentSaveName = this.currentSaveName;
         context.terrainUpgradeAvailable = this.terrainUpgrade !== null;
         context.canCreateRegionalMap = TerrainVersion.canCreateRegionalMap(this.uiState);
+        context.regionalInfillOffered = this.#regionalInfillOffered(this.canvasEngine?.cropBox);
         context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
         context.engineLabels = this.#getEngineLabels();
 
@@ -1283,7 +1291,7 @@ export class MapStudio {
             if (this.activeTool === "history") context.history = HistoryView.context(this);
             if (this.activeTool === "travel") context.travel = TravelView.context(this);
             if (this.activeTool === "generate") {
-                context.generate = GeneratePanel.context(this);
+                context.generate = { ...GeneratePanel.context(this), infill: Infilling.context(this) };
                 context.cultureList = CultureLists.context(this);
             }
 
@@ -1748,6 +1756,22 @@ export class MapStudio {
         const latBottomEl = this.root.querySelector("#fwmb-readout-lat-bottom");
         if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;
         if (latBottomEl) latBottomEl.innerHTML = `${newLatBottom.toFixed(2)}&deg;`;
+
+        const infillBox = this.root.querySelector("[data-regional-infill]");
+        if (infillBox) infillBox.disabled = !this.#regionalInfillOffered(cropBox, plan);
+    }
+
+    /**
+     * Whether the regional map a crop makes could be filled in when first opened: this map has a
+     * run for it to inherit, whose cells lie at least INFILL.MIN_PARENT_PX apart on the regional
+     * map (see InfillInput.offered, which asks the same of the regional map once made).
+     */
+    #regionalInfillOffered(cropBox, plan = null) {
+        if (!cropBox || !(cropBox.width > 0) || !(cropBox.height > 0)) return false;
+        const spacing = RunCells.regionSpacingPx(this);
+        if (!(spacing > 0)) return false;
+        const { zoomScale } = plan ?? this.#planCrop(cropBox);
+        return spacing * zoomScale >= FILRODENSWMB.INFILL.MIN_PARENT_PX;
     }
 
     /**
@@ -1987,6 +2011,11 @@ export class MapStudio {
         if (MapStudio.#NEW_MAP_SIZE_INPUTS.has(name)) return this.#recordNewMapSize(target, name);
         // The regional map's size is in New map's Regional map section; the crop on the map follows it
         if (name === "regionalTargetWidth") return this.#handleToolbarInput(event);
+        // Filling in a regional map when first opened is an option for the cut, not part of this map
+        if (name === "regionalInfill") {
+            this.uiState.regionalInfill = target.checked;
+            return;
+        }
 
         // Skip marking dirty for temporary visual overlays
         if (!name.startsWith("reference")) this.markDirty();
@@ -2026,8 +2055,17 @@ export class MapStudio {
         else if (target.type === "number") value = Number(target.value);
 
         this.uiState[name] = value;
+        // A bar turned on, or made longer, stays wholly on the map
+        if (name.startsWith("cartographyScale")) this.#keepScaleBarOnMap();
         this.#syncScaleBarFields();
         this._repaintVectors();
+    }
+
+    /** Moves the scale bar in just far enough that all of it is on the map (see MapUnit.scaleBarOnMap). */
+    #keepScaleBarOnMap() {
+        const { x, y } = scaleBarOnMap(this.uiState, this.mapWidth, this.mapHeight);
+        this.uiState.cartographyScaleX = x;
+        this.uiState.cartographyScaleY = y;
     }
 
     /**
@@ -3871,6 +3909,8 @@ export class MapStudio {
         rebaseMap(payload);
         // Generated names that older runs hid are given back to their styles, once (see NameLevels)
         showNamesOnce(payload);
+        // A map saved before the Local detail level keeps what Everything showed (see LocalLevel)
+        addLocalLevelOnce(payload);
         this.modelRun = modelRun ?? null;
         // Regions and routes come from the display mesh, whose session opens once the terrain
         // exists (see the end of this method)
@@ -3894,6 +3934,7 @@ export class MapStudio {
         this.uiState.cultures = Array.isArray(payload.cultures) ? payload.cultures : [];
         this.upwindMargin = payload.upwindMargin ?? null;
         this.parentRun = payload.parentRun ?? null;
+        this.infillPending = payload.infillPending === true;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
 
@@ -4011,6 +4052,8 @@ export class MapStudio {
         this.uiState.cartographyScaleMinorTicks = c.scaleMinorTicks ?? this.defaultUiState.cartographyScaleMinorTicks;
         this.uiState.cartographyScaleX = c.scaleX ?? this.defaultUiState.cartographyScaleX;
         this.uiState.cartographyScaleY = c.scaleY ?? this.defaultUiState.cartographyScaleY;
+        // A bar left off the map (by a regional map cut before bars were brought onto it) comes back
+        this.#keepScaleBarOnMap();
         this.uiState.cartographyBorderEnable = c.borderEnable ?? this.defaultUiState.cartographyBorderEnable;
         this.uiState.cartographyBorderStyle = c.borderStyle ?? this.defaultUiState.cartographyBorderStyle;
         this.uiState.cartographyBorderColor = c.borderColor ?? this.defaultUiState.cartographyBorderColor;
@@ -4406,6 +4449,7 @@ export class MapStudio {
             terrainVersion: this.uiState.terrainVersion,
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             nameLevels: true,
+            localLevel: true,
             world: this.uiState.world,
             mapUnit: cleanUnit(this.uiState.mapUnit),
             generatorStale: this.uiState.generatorStale === true,
@@ -4413,6 +4457,7 @@ export class MapStudio {
             cultures: platform.utils.deepClone(this.uiState.cultures ?? []),
             upwindMargin: this.upwindMargin ?? null,
             parentRun: this.parentRun ?? null,
+            infillPending: this.infillPending === true,
             terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
             springsBaked: this.uiState.springsBaked,
             mapWidth: this.mapWidth,
@@ -5085,6 +5130,7 @@ export class MapStudio {
         // parent's run
         this.upwindMargin = null;
         this.parentRun = null;
+        this.infillPending = false;
 
         // Reset biome colours to defaults so the DOM sync catches them
         this.customBiomeColors = {};
@@ -5617,6 +5663,7 @@ export class MapStudio {
         const exportData = {
             schemaVersion: 1,
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
+            localLevel: true,
             fwmbVersion: platform.module.version,
             categories,
         };
@@ -5817,6 +5864,11 @@ export class MapStudio {
             // A regional map cut before regional maps carried their parent's run reads it from its
             // parent, so its thematic layers and farmland have figures (kept with its next save)
             if (await ParentRunRecovery.recover(this)) this._repaintVectors();
+            // Filled in now when asked for as it was cut; the map then has changes to save
+            if (this.infillPending) {
+                this.infillPending = false;
+                if (InfillInput.offered(this)) await Infilling.run(this, { ask: false });
+            }
 
             // Offered only once the map is fully generated and marked clean: the check reads the
             // generated climate, and an update applied here must leave the map marked unsaved.

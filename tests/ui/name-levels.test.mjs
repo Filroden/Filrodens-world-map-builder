@@ -36,11 +36,11 @@ function studio(detailLevel) {
     };
 }
 
-test("the default styles name capitals and cities from World, the middling tiers from Regional and the rest from Everything, never before their pins", () => {
+test("the default styles name capitals and cities from World, the middling tiers from Regional, the rest from Local and villages from Everything, never before their pins", () => {
     const byTier = Object.fromEntries(PinStyles.defaults().map((style) => [style.tier, style]));
     const levels = Object.fromEntries(Object.entries(byTier).map(([tier, style]) => [tier, style.label.detailLevel]));
     assert.deepEqual(levels, {
-        capital: 0, city: 0, largeTown: 2, town: 3, village: 3, castle: 2, fortifiedTown: 2, port: 2, ruin: 3,
+        capital: 0, city: 0, largeTown: 2, town: 3, marketTown: 3, largeVillage: 4, village: 4, castle: 2, fortifiedTown: 2, port: 2, ruin: 3,
         ruinedCapital: 3, ruinedCity: 3, ruinedLargeTown: 3, ruinedTown: 3, abandonedCastle: 3, landmark: 2,
     });
     for (const style of Object.values(byTier)) assert.ok(style.label.detailLevel >= style.detailLevel, style.tier);

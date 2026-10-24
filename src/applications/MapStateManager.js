@@ -281,6 +281,7 @@ export class MapStateManager {
 
             regionalTargetWidth: 1000,
             regionalTargetHeight: 1000,
+            regionalInfill: false,
         };
     }
 

@@ -1,5 +1,6 @@
 {{!--
-    Generate (tool id "generate"; see GeneratePanel): the run itself at the top, then the settings
+    Generate (tool id "generate"; see GeneratePanel): the run itself at the top, on a regional map
+    Fill in (see Infilling), then the settings
     the settlements, routes and realms are made with, what the last run made, and Remove generated
     content. Fields are named
     "generator.<path>" and kept with the map. The estimate and the notices come from GeneratePanel.
@@ -51,6 +52,29 @@
     {{#each generate.notices}}<p class="fwmb-hint fwmb-generate-notice">{{#if this.text}}{{this.text}}{{else}}{{localize this}}{{/if}}</p>{{/each}}
 
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#if generate.infill}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateInfill" title="FILRODENSWMB.UI.SectionGenerateInfill"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.InfillHint"}}</p>
+    {{#if generate.infill.offered}}
+    {{#if generate.infill.again}}
+    <dl class="fwmb-generate-results">
+        <dt>{{localize "FILRODENSWMB.UI.InfillMarkets"}}</dt>
+        <dd class="fwmb-readout">{{generate.infill.shown.markets}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.InfillVillages"}}</dt>
+        <dd class="fwmb-readout">{{generate.infill.shown.villages}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.InfillLanes"}}</dt>
+        <dd class="fwmb-readout">{{generate.infill.shown.lanes}}</dd>
+    </dl>
+    {{/if}}
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="fillIn" data-tooltip="{{localize 'FILRODENSWMB.UI.InfillRunHint'}}">
+        {{#if generate.infill.again}}{{localize "FILRODENSWMB.UI.InfillAgain"}}{{else}}{{localize "FILRODENSWMB.UI.InfillRun"}}{{/if}}
+    </button>
+    {{else}}
+    <p class="fwmb-hint fwmb-generate-notice">{{localize generate.infill.reason}}</p>
+    {{/if}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateWorld" title="FILRODENSWMB.UI.SectionGenerateWorld" badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
     {{#each generate.world}}

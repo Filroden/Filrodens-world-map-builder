@@ -3,7 +3,8 @@
     first, with the present last. Choosing an earlier age draws it on the map while the tool is
     open. The age in brief, its realms (most people first; an earlier age's centre the map on
     their realm, and those gone by the present are marked), what changed by the age after it (for
-    the present, since the age before), and the age shown exported as an image.
+    the present, since the age before), and the age shown exported as an image. With no ages to
+    show, why not, in the Ages section.
 --}}
 {{#if history.ages}}
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="historyAges" title="FILRODENSWMB.UI.SectionHistoryAges" count=history.ages.length}}
@@ -83,5 +84,8 @@
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 {{/if}}
 {{else}}
-<p class="fwmb-hint">{{history.note}}</p>
+{{!-- No history to show: the note sits in the Ages section, so it has the panel's padding --}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="historyAges" title="FILRODENSWMB.UI.SectionHistoryAges"}}
+    <p class="fwmb-hint">{{history.note}}</p>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 {{/if}}

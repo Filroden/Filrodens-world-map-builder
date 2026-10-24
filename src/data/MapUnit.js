@@ -130,3 +130,26 @@ export function scaleBarTick(state, mapHeight) {
     if (state.cartographyScaleMatchWorld === true) return worldScaleTick(kmPerPxOf(state, mapHeight), intervalPx);
     return { value: state.cartographyScaleValue || 1, intervalPx };
 }
+
+/**
+ * Where the scale bar can stand so that all of it is on the map: its position as set, moved in
+ * just far enough that the bar and its labels clear the edges by MARGIN_PX. A bar wider than the
+ * map starts at the margin.
+ * @param {object} state - The studio's uiState (the bar's position, interval and ticks).
+ * @param {number} mapWidth
+ * @param {number} mapHeight
+ * @returns {{x: number, y: number}}
+ */
+export function scaleBarOnMap(state, mapWidth, mapHeight) {
+    const margin = SCALE_BAR_MARGIN_PX;
+    const width = scaleBarTick(state, mapHeight).intervalPx * (state.cartographyScaleMajorTicks || 4);
+    const x = Number.isFinite(state.cartographyScaleX) ? state.cartographyScaleX : margin;
+    const y = Number.isFinite(state.cartographyScaleY) ? state.cartographyScaleY : mapHeight - margin;
+    return {
+        x: Math.max(margin, Math.min(x, mapWidth - margin - width)),
+        y: Math.max(margin, Math.min(y, mapHeight - margin)),
+    };
+}
+
+/** How far the scale bar keeps from the map's edges, in pixels: room for its labels above it. */
+const SCALE_BAR_MARGIN_PX = 50;

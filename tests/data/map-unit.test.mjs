@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { cleanUnit, formatDistance, kmPerPxOf, niceDistance, scaleBarTick, unitFromSaved, worldScaleTick } = await import("../../src/data/MapUnit.js");
+const { cleanUnit, formatDistance, kmPerPxOf, niceDistance, scaleBarOnMap, scaleBarTick, unitFromSaved, worldScaleTick } = await import("../../src/data/MapUnit.js");
 const { effectiveKmPerPx } = await import("../../src/mesh/Schema.js");
 const { RangeDisplay } = await import("../../src/tools/RangeDisplay.js");
 
@@ -85,4 +85,13 @@ test("a slider stored in pixels shows its value in the map unit as it moves", ()
     // Without a factor the slider shows its own value
     RangeDisplay.sync({ ...input, dataset: {} });
     assert.equal(output.value, "40");
+});
+
+test("a scale bar is moved in just far enough that all of it is on the map", () => {
+    const bar = { cartographyScaleInterval: 100, cartographyScaleMajorTicks: 4, cartographyScaleValue: 10 };
+    assert.deepEqual(scaleBarOnMap({ ...bar, cartographyScaleX: 200, cartographyScaleY: 900 }, 1000, 1000), { x: 200, y: 900 }, "on the map already");
+    assert.deepEqual(scaleBarOnMap({ ...bar, cartographyScaleX: 50, cartographyScaleY: 3950 }, 1000, 1000), { x: 50, y: 950 }, "below the map");
+    assert.deepEqual(scaleBarOnMap({ ...bar, cartographyScaleX: 900, cartographyScaleY: 10 }, 1000, 1000), { x: 550, y: 50 }, "its end past the right edge");
+    assert.equal(scaleBarOnMap({ ...bar, cartographyScaleInterval: 400, cartographyScaleX: 300, cartographyScaleY: 500 }, 1000, 1000).x, 50, "wider than the map");
+    assert.deepEqual(scaleBarOnMap(bar, 1000, 800), { x: 50, y: 750 }, "no place set");
 });
