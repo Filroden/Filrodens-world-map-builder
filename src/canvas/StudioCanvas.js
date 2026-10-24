@@ -18,6 +18,7 @@ import { TravelLayer } from "./TravelLayer.js";
 import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
 import { HomelandMarkers } from "./HomelandMarkers.js";
+import { TouchGestures } from "./TouchGestures.js";
 import { platform } from "../platform/index.js";
 import { cleanUnit, formatDistance, scaleBarTick } from "../data/MapUnit.js";
 
@@ -55,6 +56,9 @@ const HEX_STAGGERED_SPACING = 1.5;
 /** The smallest distance (map pixels) from a decoration's centre that still picks it up, however small its image. */
 const DECORATION_MIN_HIT_RADIUS = 16;
 
+/** How long (milliseconds) after a touch the browser's own double-click is ignored: touch double-taps are recognised by TouchGestures. */
+const TOUCH_DOUBLE_CLICK_GRACE_MS = 800;
+
 /** The width and height of the box round a w by h box turned by an angle (radians). */
 function turnedBox(w, h, angle) {
     if (!angle) return { w, h };
@@ -64,6 +68,18 @@ function turnedBox(w, h, angle) {
 }
 
 export class StudioCanvas {
+    /** Turns touch input into the mouse's actions (see TouchGestures). */
+    #touch = null;
+
+    /** When a finger last touched the canvas (see TOUCH_DOUBLE_CLICK_GRACE_MS). */
+    #lastTouchAt = -Infinity;
+
+    /** The camera when a touch gesture started: { scale, x, y }. */
+    #touchCameraStart = null;
+
+    /** The touch press under way, for a release that comes without an event of its own. */
+    #touchPress = null;
+
     /** Whether destroy() has run (see destroy). */
     #destroyed = false;
 
@@ -351,17 +367,109 @@ export class StudioCanvas {
         // Focusable from script only (not by Tab), and focused by a press, so the keys a tool
         // listens for (Escape, Enter, undo) reach the studio after working on the map
         canvasElement.tabIndex = -1;
+
+        // Fingers go to TouchGestures, which calls the mouse's handlers back (see #createTouchGestures);
+        // the mouse and a pen come straight here
+        this.#touch = this.#createTouchGestures(canvasElement);
+        const isTouch = (e) => {
+            if (e.pointerType !== "touch") return false;
+            this.#lastTouchAt = performance.now();
+            return true;
+        };
+
         canvasElement.addEventListener("wheel", (e) => this.#handleWheel(e, canvasElement));
         canvasElement.addEventListener("contextmenu", (e) => e.preventDefault());
-        canvasElement.addEventListener("pointerdown", (e) => this.#handlePointerDown(e, canvasElement));
-        canvasElement.addEventListener("pointermove", (e) => this.#handlePointerMove(e, canvasElement));
+        canvasElement.addEventListener("pointerdown", (e) => (isTouch(e) ? this.#touch.down(e) : this.#handlePointerDown(e, canvasElement)));
+        canvasElement.addEventListener("pointermove", (e) => (isTouch(e) ? this.#touch.move(e) : this.#handlePointerMove(e, canvasElement)));
         canvasElement.addEventListener("dblclick", (e) => this.#handleDoubleClick(e, canvasElement));
 
         // Unified completion events prevent duplicate listener binds
-        const endInteraction = (e) => this.#handlePointerUp(e, canvasElement);
-        canvasElement.addEventListener("pointerup", endInteraction);
-        canvasElement.addEventListener("pointercancel", endInteraction);
-        canvasElement.addEventListener("pointerleave", (e) => this.#handlePointerLeave(e, canvasElement));
+        canvasElement.addEventListener("pointerup", (e) => (isTouch(e) ? this.#touch.up(e) : this.#handlePointerUp(e, canvasElement)));
+        canvasElement.addEventListener("pointercancel", (e) => (isTouch(e) ? this.#touch.up(e, true) : this.#handlePointerUp(e, canvasElement)));
+        // A lifted finger also leaves the canvas; the information bar keeps the point last touched,
+        // since a finger has no hover to show another
+        canvasElement.addEventListener("pointerleave", (e) => {
+            if (!isTouch(e)) this.#handlePointerLeave(e, canvasElement);
+        });
+    }
+
+    /** Touch input, turned into the canvas's own mouse handling (see TouchGestures). */
+    #createTouchGestures(canvasElement) {
+        return new TouchGestures({
+            press: (e) => {
+                this.#touchPress = e;
+                // A finger has no hover, so the information bar shows the point it pressed
+                const { x, y } = this.#getMapCoordinates(e, canvasElement);
+                if (this.onCanvasHover) this.onCanvasHover(x, y);
+                this.#handlePointerDown(e, canvasElement);
+            },
+            move: (e) => this.#handlePointerMove(e, canvasElement),
+            release: (e) => {
+                this.#releasePrimary(e ?? this.#touchPress, canvasElement);
+                this.#touchPress = null;
+            },
+            rightClick: () => this.onRightClick?.(),
+            doubleClick: (e) => this.#doubleClickAt(e, canvasElement),
+            isTurnableAt: (e) => this.#isTurnableAt(e, canvasElement),
+            isHoldingTurnable: () => StudioCanvas.#isWheelTransformable(this.#heldWrapper()),
+            panByDefault: () => !this.isEditMode && !this.isCropMode && !this.isReferenceMode && !this.pickPointerTool,
+            cameraStart: () => {
+                this.#touchCameraStart = { scale: this.stage.scale.x, x: this.stage.position.x, y: this.stage.position.y };
+            },
+            camera: (from, to, ratio) => this.#moveCameraByTouch(canvasElement, from, to, ratio),
+            turnHeld: (degrees, steps) => this.#turnHeldByTouch(degrees, steps),
+        });
+    }
+
+    /**
+     * Whether a press at the event's place, while editing, would pick up an item the wheel turns
+     * and resizes. A tool taking the press (a Select mode, a route or region tool) picks nothing up.
+     */
+    #isTurnableAt(e, canvasElement) {
+        if (!this.isEditMode || this.isCropMode || this.isReferenceMode || this.#pointerTool()) return false;
+        const { x, y } = this.#getMapCoordinates(e, canvasElement);
+        return StudioCanvas.#isWheelTransformable(this.#getHitTarget(x, y));
+    }
+
+    /** The interactive target the pointer holds, if any. */
+    #heldWrapper() {
+        return this.activeDrag ? this.interactiveTargets.find((t) => t.target === this.activeDrag.target) : null;
+    }
+
+    /** The highest zoom the camera allows for this map's size. */
+    #maxZoom() {
+        return Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+    }
+
+    /**
+     * Moves the camera for a touch gesture: zoomed by `ratio` since the gesture started, and placed
+     * so the map point that was under screen point `from` when it started is now under `to`.
+     */
+    #moveCameraByTouch(canvasElement, from, to, ratio) {
+        const start = this.#touchCameraStart;
+        if (!start) return;
+        const rect = canvasElement.getBoundingClientRect();
+        const scale = Math.max(0.1, Math.min(start.scale * ratio, this.#maxZoom()));
+        const localX = (from.x - rect.left - start.x) / start.scale;
+        const localY = (from.y - rect.top - start.y) / start.scale;
+
+        this.stage.scale.set(scale);
+        this.stage.position.set(to.x - rect.left - localX * scale, to.y - rect.top - localY * scale);
+        this.#updateNodeScales();
+        if (this.isCropMode) this.#drawCropOverlay();
+    }
+
+    /**
+     * Turns and resizes the held label, decoration or pin for a two-finger twist and pinch, as the
+     * wheel and Shift+wheel do (pins only resize).
+     */
+    #turnHeldByTouch(degrees, steps) {
+        const wrapper = this.#heldWrapper();
+        if (!StudioCanvas.#isWheelTransformable(wrapper)) return;
+        this.#beginDragOnce();
+        if (degrees && !wrapper.isIconPin) wrapper.target.rotation = CanvasTransforms.normalizeAngle((wrapper.target.rotation || 0) + degrees);
+        for (let step = 0; step < Math.abs(steps); step++) this.#resizeHeldItem(wrapper, steps > 0);
+        if (this.onInfraDrag) this.onInfraDrag();
     }
 
     #handleWheel(e, canvasElement) {
@@ -378,7 +486,7 @@ export class StudioCanvas {
         // --- Held Item Transformation Intercept ---
         // While a label, decoration or pin is held with the left button, the wheel changes that
         // item instead of the camera, so a slip of the wheel mid-drag never moves the view.
-        const dragWrapper = this.activeDrag ? this.interactiveTargets.find((t) => t.target === this.activeDrag.target) : null;
+        const dragWrapper = this.#heldWrapper();
 
         if (StudioCanvas.#isWheelTransformable(dragWrapper)) {
             e.preventDefault();
@@ -390,7 +498,7 @@ export class StudioCanvas {
         e.preventDefault();
 
         const scaleDirection = isZoomIn ? config.CAMERA_FACTOR : 1 / config.CAMERA_FACTOR;
-        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+        const maxZoom = this.#maxZoom();
 
         const rect = canvasElement.getBoundingClientRect();
         const localX = (e.clientX - rect.left - this.stage.x) / this.stage.scale.x;
@@ -464,7 +572,9 @@ export class StudioCanvas {
     }
 
     #handlePointerDown(e, canvasElement) {
-        canvasElement.setPointerCapture(e.pointerId);
+        // A finger is captured by the element it lands on without asking (and a touch press is
+        // passed on here after a delay, when the finger may already have lifted)
+        if (e.pointerType !== "touch") canvasElement.setPointerCapture(e.pointerId);
         canvasElement.focus({ preventScroll: true });
 
         // Right/Middle Click Drag Pan
@@ -852,6 +962,13 @@ export class StudioCanvas {
     }
 
     #handleDoubleClick(e, canvasElement) {
+        // A double-tap is recognised by TouchGestures; the browser's own may follow it
+        if (performance.now() - this.#lastTouchAt < TOUCH_DOUBLE_CLICK_GRACE_MS) return;
+        this.#doubleClickAt(e, canvasElement);
+    }
+
+    /** Opens what lies under a double-click or double-tap, while editing (or hands it to the tool taking the pointer). */
+    #doubleClickAt(e, canvasElement) {
         if (!this.isEditMode) return;
 
         const coords = this.#getMapCoordinates(e, canvasElement);
@@ -886,6 +1003,11 @@ export class StudioCanvas {
             return;
         }
         if (e.button !== POINTER_BUTTON.PRIMARY) return;
+        this.#releasePrimary(e, canvasElement);
+    }
+
+    /** Ends a primary-button press: the tool taking the pointer gets its release, or the action under way ends. */
+    #releasePrimary(e, canvasElement) {
         if (this.pointerToolPressed) {
             this.pointerToolPressed = false;
             const coords = this.#getMapCoordinates(e, canvasElement);
@@ -950,7 +1072,7 @@ export class StudioCanvas {
         const localX = (center.x - this.stage.x) / this.stage.scale.x;
         const localY = (center.y - this.stage.y) / this.stage.scale.y;
 
-        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+        const maxZoom = this.#maxZoom();
 
         this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * factor, maxZoom));
         this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * factor, maxZoom));
@@ -969,7 +1091,7 @@ export class StudioCanvas {
         const scaleY = this.app.screen.height / paddedHeight;
         const optimalScale = Math.min(scaleX, scaleY);
 
-        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+        const maxZoom = this.#maxZoom();
         const finalScale = Math.max(0.1, Math.min(optimalScale, maxZoom));
 
         this.stage.scale.set(finalScale);

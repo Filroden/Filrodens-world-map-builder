@@ -97,14 +97,31 @@ export class CanvasHints {
      * ink, then the common movement (pan and zoom), muted. A held item's list describes only what
      * can be done to that item while it is held, so it has no movement.
      *
+     * On a touch screen each action a finger can make is worded for the finger (CANVAS_HINTS.TOUCH):
+     * "Tap" for a click, "Press and hold" for a right-click, a second finger for the wheel.
+     *
      * @param {string} context  From resolveContext.
+     * @param {object} [options]
+     * @param {boolean} [options.touch]  Whether the screen is a touch screen (see isTouchScreen).
      * @returns {{key: string, more: boolean}[]}
      */
-    static getItems(context) {
-        const { COMMON, CONTEXTS } = FILRODENSWMB.UI.CANVAS_HINTS;
-        const own = (CONTEXTS[context] ?? []).map((suffix) => ({ key: `${CanvasHints.#KEY_PREFIX}${suffix}`, more: false }));
+    static getItems(context, { touch = false } = {}) {
+        const { COMMON, CONTEXTS, TOUCH } = FILRODENSWMB.UI.CANVAS_HINTS;
+        const item = (suffix, more) => ({ key: `${CanvasHints.#KEY_PREFIX}${(touch && TOUCH[suffix]) || suffix}`, more });
+        const own = (CONTEXTS[context] ?? []).map((suffix) => item(suffix, false));
         if (context.startsWith("held")) return own;
-        return [...own, ...COMMON.map((suffix) => ({ key: `${CanvasHints.#KEY_PREFIX}${suffix}`, more: true }))];
+        return [...own, ...COMMON.map((suffix) => item(suffix, true))];
+    }
+
+    /**
+     * Whether the window's main pointer is a finger: no hovering pointer and a coarse one. A
+     * laptop with a touch screen and a mouse or trackpad keeps the mouse's wording.
+     *
+     * @param {Window} [view]
+     * @returns {boolean}
+     */
+    static isTouchScreen(view = globalThis) {
+        return !!view.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches;
     }
 
     /**

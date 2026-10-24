@@ -55,7 +55,7 @@ The map builder makes a world in two parts: the land, worked out from a procedur
 
 #### Sharing the map
 
-- **Export to a Foundry scene (Foundry module version only):** every object and layer can be shown to everyone, to the GM only or to no one. The players' map becomes the scene's background, a tile over it holds what only the GM sees, and a journal with a page for each named place, route and region (with the generator's figures) is linked from map notes on the scene so you can add your own detail about key locations. Each grid cell's biome, terrain, regions, places and routes are written onto the scene for other modules and game systems to read.
+- **Export to a Foundry scene (Foundry module version only):** every object and layer can be shown to everyone, to the GM only or to no one. The players' map becomes the scene's background, a tile over it holds what only the GM sees, and a journal with a page for each named place, route and region (with the generator's figures) is made so you can add your own detail about key locations. Each grid cell's biome, terrain, regions, places and routes are written onto the scene for other modules and game systems to read.
 - **Export to PNG:** export the map as you see it, at a scale chosen so its smallest names can be read.
 - **The 3D view:** see the map draped over its own terrain, with its water, rivers and light.
 

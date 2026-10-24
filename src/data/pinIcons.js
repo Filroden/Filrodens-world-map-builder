@@ -9,8 +9,8 @@ import { Sanitize } from "./Sanitize.js";
  * data - never uploaded or copied, see world settings below).
  *
  * Both registries feed the same picker lists used when placing or editing a pin, and the
- * same path resolution used when baking the raster export and creating exported Journal
- * Map Notes - see resolvePinIconPath().
+ * same path resolution used when drawing pins and baking the raster export - see
+ * resolvePinIconPath().
  */
 
 /**

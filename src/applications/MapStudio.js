@@ -2482,7 +2482,8 @@ export class MapStudio {
             travelPicking: TravelView.picking(this),
         });
 
-        CanvasHints.render(element, CanvasHints.getItems(context), (key) => platform.i18n.localize(key));
+        const touch = CanvasHints.isTouchScreen(element.ownerDocument.defaultView ?? globalThis);
+        CanvasHints.render(element, CanvasHints.getItems(context, { touch }), (key) => platform.i18n.localize(key));
     }
 
     /** The list of canvas actions brought up to date outside a redraw (a culture's homeland pick starting or ending). */

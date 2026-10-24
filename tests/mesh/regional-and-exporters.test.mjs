@@ -153,28 +153,3 @@ test("grid data: region coverage from the cell raster matches the polygon test w
     assert.equal(mesh.schemaVersion, polygons.schemaVersion, "same schema");
     assert.ok(Object.values(mesh.cells).some((cell) => cell.infrastructure.routes.length > 0), "routes on the mesh still mark the cells they cross");
 });
-
-test("scene notes for regions sit at the label anchor", { skip: P0_SKIP }, async () => {
-    const { SceneExporter } = await import("../../src/platform/foundry/SceneExporter.js");
-    const { session, mapData } = await openV3();
-    const levels = structuredClone(mapData.layerSets.flatMap((set) => set.levels));
-    levels[0].regions[0].journalPageId = "page";
-    const anchors = SceneExporter.regionNoteAnchors({ meshSession: session, regionLevels: levels });
-    assert.equal(anchors.length, 1);
-    const expected = session.labelAnchor(levels[0].id, levels[0].regions[0].key);
-    assert.deepEqual([anchors[0].x, anchors[0].y], [expected.x, expected.y]);
-});
-
-test("scene notes for routes sit on the line, where the label is drawn", { skip: P0_SKIP }, async () => {
-    const { SceneExporter } = await import("../../src/platform/foundry/SceneExporter.js");
-    const { session, mapData } = await openV3();
-    const routes = structuredClone(mapData.mapRoutes.filter((route) => route.legs?.length));
-    assert.ok(routes.length >= 2, "the fixture has routes");
-    routes[0].journalPageId = "page";
-    const anchors = SceneExporter.routeNoteAnchors({ meshSession: session, mapRoutes: routes });
-    assert.equal(anchors.length, 1, "only routes with a journal page");
-    const line = session.routeLine(routes[0]);
-    const onLine = [...Array(line.length / 2).keys()].some((i) => line[2 * i] === anchors[0].x && line[2 * i + 1] === anchors[0].y);
-    assert.ok(onLine, "the note is on a vertex of the route's line");
-    assert.deepEqual(anchors[0], { route: routes[0], ...session.routeMidpoint(routes[0]) });
-});

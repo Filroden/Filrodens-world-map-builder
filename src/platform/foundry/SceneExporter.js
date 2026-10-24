@@ -1,5 +1,4 @@
 import { FILRODENSWMB } from "../../config.js";
-import { resolvePinIconPath } from "../../data/pinIcons.js";
 import { Sanitize } from "../../data/Sanitize.js";
 import { GridDataExporter } from "../../applications/GridDataExporter.js";
 import { MapStateManager } from "../../applications/MapStateManager.js";
@@ -17,11 +16,6 @@ import { GeneratedDetails } from "../../applications/GeneratedDetails.js";
 function journalHtml(description) {
     return foundry.utils.cleanHTML(Sanitize.textToHtml(description ?? ""));
 }
-
-// Map note icons are one fiftieth of the map's width, kept between 32 and 96 pixels
-const NOTE_ICON_WIDTH_RATIO = 50;
-const NOTE_ICON_MIN_PX = 32;
-const NOTE_ICON_MAX_PX = 96;
 
 export class SceneExporter {
     /**
@@ -56,7 +50,7 @@ export class SceneExporter {
             gmImgPath = `${targetPath}/${gmFilename}`;
         }
 
-        // 4. Generate Journals & Notes
+        // 4. Generate Journals
         let journalObj = null;
         if (generateJournals) {
             ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepJournals"));
@@ -168,7 +162,7 @@ export class SceneExporter {
 
     /**
      * Creates the Scene for the exported map, or updates the one of the same name from an earlier
-     * export, then adds the GM overlay tile, the map notes and a thumbnail, and finally shows it.
+     * export, then adds the GM overlay tile and a thumbnail, and finally shows it.
      * Each extra is optional: a failure in one is logged and the rest of the export carries on.
      */
     static async #createScene(app, sceneName, bgPath, gmOverlayPath, journalObj) {
@@ -180,7 +174,6 @@ export class SceneExporter {
 
         this.#warnIfGridSizeChanged(scene, sceneData, gridData);
         if (gmOverlayPath) await this.#createGmOverlayTile(app, scene, gmOverlayPath);
-        if (journalObj) await this.#createMapNotes(app, scene, journalObj);
         await this.#updateThumbnail(scene);
 
         // Save the map payload so the new journalPageId links persist
@@ -282,6 +275,9 @@ export class SceneExporter {
         const oldTiles = scene.tiles.filter((t) => t.texture?.src?.includes("_gm.png")).map((t) => t.id);
         if (oldTiles.length > 0) await scene.deleteEmbeddedDocuments("Tile", oldTiles);
 
+        // The scene gets no map notes (at map scale they cover the map, and a scene offers no
+        // easy way to hide them); notes an earlier export made for this map's journal go, so a
+        // re-export leaves the scene clear. The journal is reached through its own sidebar.
         if (!journalObj) return;
         const oldNotes = scene.notes.filter((n) => n.entryId === journalObj.id).map((n) => n.id);
         if (oldNotes.length > 0) await scene.deleteEmbeddedDocuments("Note", oldNotes);
@@ -315,80 +311,6 @@ export class SceneExporter {
         } catch (err) {
             console.error("FWMB | Tile creation error:", err);
         }
-    }
-
-    /** Adds a map note for every icon pin, region and route that has a journal page. */
-    static async #createMapNotes(app, scene, journalObj) {
-        try {
-            // Scale note icons with the map's width, within fixed limits
-            const iconSize = Math.max(NOTE_ICON_MIN_PX, Math.min(Math.round(app.mapWidth / NOTE_ICON_WIDTH_RATIO), NOTE_ICON_MAX_PX));
-
-            // Only items given a page in this export: a generated one the detail level hides keeps
-            // the page an earlier export made, but gets no note
-            const paged = new Set(Object.values(GeneratedDetails.journalPages(app)).flatMap((pages) => pages.map((page) => page.item)));
-            const pinNotes = app.mapPins.filter((pin) => pin.icon && pin.journalPageId && paged.has(pin)).map((pin) => this.#pinNote(pin, journalObj, iconSize));
-            const regionNotes = this.regionNoteAnchors(app).filter(({ region }) => paged.has(region)).map(({ region, x, y }) => ({ entryId: journalObj.id, pageId: region.journalPageId, x, y, iconSize }));
-            const routeNotes = this.routeNoteAnchors(app).filter(({ route }) => paged.has(route)).map(({ route, x, y }) => ({ entryId: journalObj.id, pageId: route.journalPageId, x, y, iconSize }));
-            const noteData = [...pinNotes, ...regionNotes, ...routeNotes];
-
-            if (noteData.length > 0) {
-                await scene.createEmbeddedDocuments("Note", noteData);
-            }
-        } catch (err) {
-            console.error("FWMB | Map Note creation error:", err);
-        }
-    }
-
-    /** A map note on an icon pin, showing the pin's icon. */
-    static #pinNote(pin, journalObj, iconSize) {
-        return {
-            entryId: journalObj.id,
-            pageId: pin.journalPageId,
-            x: pin.x,
-            y: pin.y,
-            iconSize,
-            texture: { src: resolvePinIconPath(pin.icon) },
-        };
-    }
-
-    /**
-     * Where each region with a journal page gets its map note. On the display mesh that is the
-     * region's label anchor (the deepest point of its largest part; see MeshSession.labelAnchor),
-     * which always lies inside the region, unlike the centre of its bounding box (which can fall
-     * outside a crescent or ring-shaped region, or in the sea). Without a mesh session (the
-     * map's mesh could not be prepared) regions have no cells, and no notes.
-     *
-     * @param {object} app - Reads regionLevels and meshSession.
-     * @returns {Array<{region: object, x: number, y: number}>}
-     */
-    static regionNoteAnchors(app) {
-        const anchors = [];
-        for (const layer of app.regionLevels ?? []) {
-            for (const region of layer.regions) {
-                if (!region.journalPageId) continue;
-                const anchor = app.meshSession?.labelAnchor(layer.id, region.key) ?? null;
-                if (anchor) anchors.push({ region, x: anchor.x, y: anchor.y });
-            }
-        }
-        return anchors;
-    }
-
-    /**
-     * Where each route with a journal page gets its map note: the point its label is drawn above
-     * (see MeshSession.routeMidpoint), always on the route's line. Without a mesh session routes
-     * have no line, and no notes.
-     *
-     * @param {object} app - Reads mapRoutes and meshSession.
-     * @returns {Array<{route: object, x: number, y: number}>}
-     */
-    static routeNoteAnchors(app) {
-        const anchors = [];
-        for (const route of app.mapRoutes ?? []) {
-            if (!route.journalPageId) continue;
-            const point = app.meshSession?.routeMidpoint(route) ?? null;
-            if (point) anchors.push({ route, x: point.x, y: point.y });
-        }
-        return anchors;
     }
 
     /** Generates the Scene's thumbnail. It is only a convenience, so a failure is skipped quietly. */

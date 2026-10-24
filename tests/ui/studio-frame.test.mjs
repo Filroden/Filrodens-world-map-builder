@@ -98,6 +98,27 @@ test("a hint lists the mode's actions first in the normal ink, then movement, mu
     assert.ok(CanvasHints.getItems("view").every((item) => item.more));
 });
 
+test("on a touch screen a hint is worded for the finger, where a finger can make the action", () => {
+    const { CONTEXTS, COMMON, TOUCH } = FILRODENSWMB.UI.CANVAS_HINTS;
+    const suffixes = (context, options) => CanvasHints.getItems(context, options).map((item) => item.key.replace("FILRODENSWMB.UI.Hint", ""));
+    assert.deepEqual(suffixes("pinPlace", { touch: true }), ["PlacePinTouch", "MovePin", "ResizePinTouch", "DeletePin", "EditPinTouch", "PanTouch", "ZoomTouch"]);
+    assert.deepEqual(suffixes("pinPlace"), [...CONTEXTS.pinPlace, ...COMMON], "the mouse's wording by default");
+
+    const used = new Set([...COMMON, ...Object.values(CONTEXTS).flat()]);
+    for (const [suffix, touch] of Object.entries(TOUCH)) {
+        assert.ok(used.has(suffix), `${suffix} is a hint`);
+        assert.ok(STRINGS[`FILRODENSWMB.UI.Hint${touch}`], `${touch} has a string`);
+        assert.doesNotMatch(STRINGS[`FILRODENSWMB.UI.Hint${touch}`], /click|scroll/i, `${touch} is worded for a finger`);
+    }
+});
+
+test("only a screen whose main pointer is a finger counts as a touch screen", () => {
+    const media = (matches) => ({ matchMedia: (query) => ({ matches: matches && query.includes("hover: none") && query.includes("pointer: coarse") }) });
+    assert.equal(CanvasHints.isTouchScreen(media(true)), true);
+    assert.equal(CanvasHints.isTouchScreen(media(false)), false);
+    assert.equal(CanvasHints.isTouchScreen({}), false, "no matchMedia, no touch");
+});
+
 test("the hint draws one item per action, movement muted", () => {
     const window = new Window();
     after(() => window.happyDOM.close());
