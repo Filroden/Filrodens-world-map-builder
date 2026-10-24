@@ -21,7 +21,7 @@ import { cultureId, cultureMix } from "./CultureIds.js";
  *    once the set is in the session.
  *
  * Realms fill in colours chosen so that neighbouring realms differ; duchies and counties are drawn
- * as borders only (the atlas convention for child levels).
+ * as borders only (the atlas convention for child levels): duchies dashed, counties dotted.
  */
 
 /**
@@ -53,7 +53,12 @@ export function buildPolitical(session, result, { runId, idFactory, names, water
     const withDuchies = output.duchies !== false;
     const withCounties = withDuchies && output.counties !== false;
     if (withDuchies) levels.push(createLevel({ name: names.levels[1], titleTemplate: names.titles.duchy, ...childLevelFields(levels[0].id) }, idFactory));
-    if (withCounties) levels.push(createLevel({ name: names.levels[2], titleTemplate: names.titles.county, ...childLevelFields(levels[1].id) }, idFactory));
+    if (withCounties) {
+        // Counties dotted, land and sea, so each of the three levels has its own line
+        const fields = childLevelFields(levels[1].id);
+        fields.style = { ...fields.style, lineStyle: "dotted", seaLineStyle: "dotted" };
+        levels.push(createLevel({ name: names.levels[2], titleTemplate: names.titles.county, ...fields }, idFactory));
+    }
     set.levels.push(...levels);
 
     const realmVisibility = output.labels === false ? "none" : "all";

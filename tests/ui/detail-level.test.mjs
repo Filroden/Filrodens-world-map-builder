@@ -112,15 +112,17 @@ test("a level the detail level hides is not drawn, unless it is being painted", 
     assert.deepEqual(describeLevels(session, all, "counties", showsLevel).map((entry) => entry.level.id), ["counties"]);
 });
 
-test("with the Regions menu's Fills off, levels are drawn as borders alone at full strength, except while painting", () => {
+test("a level's fill opacity fades its fill, not its borders; with the Regions menu's Fills off, borders alone at full strength, except while painting", () => {
     const app = studio(3);
     const session = { layerSets: app.layerSets, level: (id) => app.layerSets.flatMap((set) => set.levels).find((level) => level.id === id) };
     for (const set of app.layerSets) for (const level of set.levels) Object.assign(level, { visibility: "all", regions: [], parentLevelId: null, opacity: 1 });
     app.layerSets[0].opacity = 0.5;
     app.layerSets[1].opacity = 0;
+    app.layerSets[0].levels[1].opacity = 0;
     const all = () => true;
     const filled = describeLevels(session, all, null, () => true);
-    assert.deepEqual(filled[0].opacity, { fill: 0.5, arcs: 0.5 }, "fills on: the level's opacity for both");
+    assert.deepEqual(filled[0].opacity, { fill: 0.5, arcs: 0.5 }, "fills on: the fill at the level's opacity times the set's, borders at the set's");
+    assert.deepEqual(filled[1].opacity, { fill: 0, arcs: 0.5 }, "a level drawn as borders only (fill opacity 0) still shows its borders");
     const bare = describeLevels(session, all, null, () => true, { fills: false });
     assert.deepEqual(bare[0].opacity, { fill: 0, arcs: 1 });
     assert.deepEqual(bare.at(-1).opacity, { fill: 0, arcs: 0 }, "a set faded to nothing stays hidden");

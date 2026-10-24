@@ -218,20 +218,23 @@ function focusLineage(session, levelId) {
 }
 
 /**
- * How a level is drawn when the map is viewed: fill and borders at its own opacity times its
- * set's; with fills off, borders alone at full strength (none for a level faded to nothing).
+ * How a level is drawn when the map is viewed: its fill at its own fill opacity times its set's,
+ * its borders at its set's opacity alone, so a level drawn as borders only (a child level made at
+ * fill opacity 0, the atlas convention) still shows them; with fills off, borders alone at full
+ * strength. A set faded to nothing shows neither.
  */
 function viewOpacity(level, set, fills = true) {
-    const opacity = drawnOpacity(level, set);
-    if (!fills) return { fill: 0, arcs: opacity > 0 ? 1 : 0 };
-    return { fill: opacity, arcs: opacity };
+    const ofSet = setOpacity(set);
+    if (!fills) return { fill: 0, arcs: ofSet > 0 ? 1 : 0 };
+    return { fill: drawnOpacity(level, set), arcs: ofSet };
 }
 
 /** How a level is drawn while one is painted: the painted level at a working fill, its ancestors as borders only. */
 function focusOpacity(level, set, isPainted) {
-    const opacity = drawnOpacity(level, set);
-    if (!isPainted) return { fill: 0, arcs: Math.max(opacity, FILRODENSWMB.MESH.PAINT.EDIT_FILL_OPACITY) };
-    return { fill: Math.max(opacity, FILRODENSWMB.MESH.PAINT.EDIT_FILL_OPACITY), arcs: Math.max(opacity, FILRODENSWMB.MESH.PAINT.EDIT_FILL_OPACITY) };
+    const working = FILRODENSWMB.MESH.PAINT.EDIT_FILL_OPACITY;
+    const arcs = Math.max(setOpacity(set), working);
+    if (!isPainted) return { fill: 0, arcs };
+    return { fill: Math.max(drawnOpacity(level, set), working), arcs };
 }
 
 /** A GM-only parent makes a child GM-only; hidden stays hidden. */
@@ -275,8 +278,12 @@ function regionPalette(level, levelVisibility, isVisible) {
  */
 function drawnOpacity(level, set) {
     const own = Number.isFinite(level.opacity) ? level.opacity : 1;
-    const ofSet = Number.isFinite(set?.opacity) ? set.opacity : FILRODENSWMB.DISPLAY.REGION_OPACITY;
-    return own * ofSet;
+    return own * setOpacity(set);
+}
+
+/** A layer set's opacity (the region opacity of a map from before sets had one). */
+function setOpacity(set) {
+    return Number.isFinite(set?.opacity) ? set.opacity : FILRODENSWMB.DISPLAY.REGION_OPACITY;
 }
 
 // ------------------------------------------------------------------ borders

@@ -105,6 +105,9 @@ test("every region keeps ground and every county holds its seat", async () => {
         assert.deepEqual(empty.map((region) => region.name), [], `${level.name} without ground`);
     }
     const counties = made.set.levels[2];
+    const [realms, duchies] = made.set.levels;
+    assert.ok(realms.opacity > 0 && duchies.opacity === 0 && counties.opacity === 0, "realms fill; duchies and counties are borders only");
+    assert.deepEqual([duchies.style.lineStyle, counties.style.lineStyle, counties.style.seaLineStyle], ["dashed", "dotted", "dotted"], "each level its own line");
     const owners = session.layer(counties.id).owners;
     for (const region of counties.regions) {
         const seat = result.counties[region.generated.sourceId].seat;

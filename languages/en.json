@@ -838,7 +838,7 @@
     "FILRODENSWMB.UI.DeleteLayerSetTitle": "Delete layer set",
     "FILRODENSWMB.UI.DeleteLayerSetConfirm": "Delete the layer set {name}? Its {levels} layers and {regions} regions go with it.",
     "FILRODENSWMB.UI.LayerSetOpacity": "Opacity",
-    "FILRODENSWMB.UI.LayerSetOpacityHint": "Multiplies the fill opacity of every layer in the set, so the whole set can be faded without changing the balance between its layers.",
+    "FILRODENSWMB.UI.LayerSetOpacityHint": "Multiplies the fill opacity of every layer in the set and sets how strongly their borders are drawn, so the whole set can be faded without changing the balance between its layers.",
     "FILRODENSWMB.UI.LayerSetWaterTint": "Fill over water",
     "FILRODENSWMB.UI.LayerSetWaterTintHint": "Shows a faint fill where the set's regions claim water. Off, regions are filled over land only.",
     "FILRODENSWMB.UI.NestingFreeBadge": "free",
