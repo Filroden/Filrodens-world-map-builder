@@ -14,12 +14,15 @@ import { edgeDays, flagRoute } from "../travel/TravelTime.js";
  *
  * 1. **Cells:** the in-fill cells (finer than the generator's; see TravelGrid), with their land,
  *    food and travel figures from the regional map's own terrain (TravelGraph.travelCells).
- * 2. **People:** each parent cell's country people (its people less those of the inherited places
- *    in it) are shared among the in-fill cells inside it by the food each can grow.
+ * 2. **People:** each parent cell's country people (its people less those the inherited places drew
+ *    from it) are shared among the in-fill cells inside it by the food each can grow. A town of the
+ *    generator's tiers drew its people from the country within its tier's reach, as the run sized
+ *    it, so it takes the same share of every parent cell there; a smaller place, its own cell's.
  * 3. **Near the network:** market towns and villages stand only within ROUTE_REACH_KM over land of
- *    an inherited road, river route or town; beyond, the country people live in hamlets and farms
- *    (building even a track to the nearest road is costly, so settlement follows the roads). A map
- *    with no inherited road, river or town has no such limit.
+ *    an inherited road, river route or town (a big town further: TOWN_REACH_SCALE by its tier);
+ *    beyond, the country people live in hamlets and farms (building even a track to the nearest
+ *    road is costly, so settlement follows the roads). A map with no inherited road, river or town
+ *    has no such limit.
  * 4. **Market towns:** a market serves the people within MARKET_REACH_DAYS on foot, along the
  *    tracks they would walk (a road's pace, slowed by hills). The settled cell beyond every town's
  *    reach, and further than that times the square root of the map's area factor from every
@@ -44,9 +47,10 @@ import { edgeDays, flagRoute } from "../travel/TravelTime.js";
  * @param {object} input
  * @param {object} input.payload - The generator's payload over the in-fill cells (see TravelNetwork).
  * @param {Int32Array} input.parentOf - Each in-fill cell's parent cell (-1 for none).
- * @param {{population: ArrayLike<number>, landArea?: ArrayLike<number>, cultureOf: ArrayLike<number>, nameBases: (string|null)[]}} input.parent -
- *     Each parent cell's people and main culture, and each culture's name base.
- * @param {{cell: number, population: number}[]} input.towns - The inherited places, by in-fill cell.
+ * @param {{population: ArrayLike<number>, landArea?: ArrayLike<number>, cultureOf: ArrayLike<number>, nameBases: (string|null)[], sites?: ArrayLike<number>, kmPerPx?: number, mapSize?: {width: number, height: number}}} input.parent -
+ *     Each parent cell's people and main culture, each culture's name base, and where each cell
+ *     lies (x, y pairs in map pixels) with the run's km per map pixel and the map's size in pixels.
+ * @param {{cell: number, population: number, x?: number, y?: number}[]} input.towns - The inherited places, by in-fill cell, with where each stands.
  * @param {{cells: number[], transport: string}[]} input.routes - The inherited routes, as the in-fill cells they pass through.
  * @param {Object<string, number>} input.speeds - The travel speeds (see TRAVEL_TIME.SPEEDS).
  * @param {string} input.seed
@@ -81,7 +85,7 @@ export function runInfill(input) {
     // A market's reach is measured along the tracks its people walk to it, so as if every step
     // over land had one (at a road's pace, slowed by hills), and by river and sea as usual
     const trackDays = edgeDays(graph, { speeds: input.speeds, mode: "foot", road: new Uint8Array(graph.edgeA.length).fill(1), river: flags.river, lane: flags.sea, maxKm: 2.5 * meanEdgeKm(graph) });
-    const near = time("reach", () => nearNetwork(graph, flags, townCells, options.ROUTE_REACH_KM));
+    const near = time("reach", () => nearNetwork(graph, flags, townReach(input.towns, count, options), options.ROUTE_REACH_KM));
     // A cell wholly under a river as the map draws it has nowhere for a place to stand
     if (input.dry) for (let cell = 0; cell < count; cell++) if (!input.dry[cell]) near[cell] = 0;
     const markets = time("markets", () => placeMarkets(graph, trackDays, people, townCells, near, options));
@@ -130,20 +134,16 @@ function meanEdgeKm(graph) {
 }
 
 /**
- * Each in-fill cell's country people: its parent cell's people less those of the inherited places in
- * it, shared among the parent cell's land in-fill cells by the food each grows (evenly where none
- * grows any). A parent cell with no land in-fill cell (the regional map's coast differs) keeps its
- * people out of the in-fill, and one partly off the map brings only the share of its land on it.
+ * Each in-fill cell's country people: its parent cell's people less those the inherited places drew
+ * from it (see townDraw), shared among the parent cell's land in-fill cells by the food each grows
+ * (evenly where none grows any). A parent cell with no land in-fill cell (the regional map's coast
+ * differs) keeps its people out of the in-fill, and one partly off the map brings only the share of
+ * its land on it.
  */
 function sharePeople(cells, { parentOf, parent, towns }) {
     const count = cells.count;
     const parents = parent.population.length;
     const landKm2 = new Float64Array(parents);
-    const townPeople = new Float64Array(parents);
-    for (const town of towns) {
-        const owner = town.cell >= 0 && town.cell < count ? parentOf[town.cell] : -1;
-        if (owner >= 0) townPeople[owner] += town.population;
-    }
     const food = new Float64Array(parents);
     const landCells = new Float64Array(parents);
     for (let cell = 0; cell < count; cell++) {
@@ -156,14 +156,81 @@ function sharePeople(cells, { parentOf, parent, towns }) {
     // A parent cell at the map's edge lies partly off it: only the share of its land on the map
     // brings its people
     const onMap = Float64Array.from({ length: parents }, (_, owner) => (parent.landArea?.[owner] > 0 ? Math.min(1, landKm2[owner] / parent.landArea[owner]) : 1));
+    const onMapPeople = Float64Array.from({ length: parents }, (_, owner) => (landCells[owner] > 0 ? parent.population[owner] * onMap[owner] : 0));
+    const townPeople = townDraw(towns, { parentOf, parent, count, onMapPeople });
     const people = new Float64Array(count);
     for (let cell = 0; cell < count; cell++) {
         const owner = parentOf[cell];
         if (owner < 0 || cells.water[cell]) continue;
-        const country = Math.max(0, parent.population[owner] * onMap[owner] - townPeople[owner]);
+        const country = Math.max(0, onMapPeople[owner] - townPeople[owner]);
         people[cell] = country * (food[owner] > 0 ? Math.max(0, cells.food[cell]) / food[owner] : 1 / landCells[owner]);
     }
     return people;
+}
+
+/**
+ * The people the inherited places drew from each parent cell.
+ *
+ * A town big enough for one of the generator's tiers (GENERATOR.TOWNS.TIERS, the largest whose
+ * minimum it reaches) was sized from the people of its catchment, as far as that tier's reach: a
+ * capital of 200,000 draws on a whole realm, not on the 25 km cell it stands in. So it takes the
+ * same share of every parent cell within that reach, as much as they hold. Where most of its reach
+ * lies beyond the map, the part beyond is taken to hold its share of the people (as many for its
+ * area as the part on the map), so the map's cells give only theirs. A smaller place (a village or
+ * market town an earlier fill-in made) holds its own cell's people.
+ *
+ * Without where the parent cells lie, every place draws on its own cell.
+ */
+function townDraw(towns, { parentOf, parent, count, onMapPeople }) {
+    const parents = onMapPeople.length;
+    const drawn = new Float64Array(parents);
+    const sites = parent.sites;
+    const kmPerPx = parent.kmPerPx;
+    const tiers = FILRODENSWMB.GENERATOR.TOWNS.TIERS;
+    for (const town of towns) {
+        const owner = town.cell >= 0 && town.cell < count ? parentOf[town.cell] : -1;
+        if (owner < 0 || !(town.population > 0)) continue;
+        const tier = tiers.find((candidate) => town.population >= candidate.minPop);
+        if (!tier || !sites || !(kmPerPx > 0) || !Number.isFinite(town.x) || !Number.isFinite(town.y)) {
+            drawn[owner] += town.population;
+            continue;
+        }
+        const reachPx = tier.reachKm / kmPerPx;
+        const within = [];
+        let reachPeople = 0;
+        for (let cell = 0; cell < parents; cell++) {
+            if (!(onMapPeople[cell] > 0)) continue;
+            if (Math.hypot(sites[2 * cell] - town.x, sites[2 * cell + 1] - town.y) > reachPx) continue;
+            within.push(cell);
+            reachPeople += onMapPeople[cell];
+        }
+        if (!(reachPeople > 0)) {
+            drawn[owner] += town.population;
+            continue;
+        }
+        // The part of its reach beyond the map gave the rest
+        const onMapShare = parent.mapSize ? discOnMap(town.x, town.y, reachPx, parent.mapSize) : 1;
+        const share = Math.min(1, (town.population * onMapShare) / reachPeople);
+        for (const cell of within) drawn[cell] += onMapPeople[cell] * share;
+    }
+    return drawn;
+}
+
+/** The share of a disc (centre and radius in map pixels) that lies on the map, sampled on a grid. */
+function discOnMap(cx, cy, radius, { width, height }) {
+    const STEPS = 48;
+    let inside = 0;
+    let onMap = 0;
+    for (let i = 0; i < STEPS; i++) {
+        for (let j = 0; j < STEPS; j++) {
+            const x = cx - radius + ((i + 0.5) / STEPS) * 2 * radius;
+            const y = cy - radius + ((j + 0.5) / STEPS) * 2 * radius;
+            if (Math.hypot(x - cx, y - cy) > radius) continue;
+            inside++;
+            if (x >= 0 && x <= width && y >= 0 && y <= height) onMap++;
+        }
+    }
+    return inside ? onMap / inside : 1;
 }
 
 /** The step from `from` to `to` along an edge, in days (the edge's way of travel that direction). */
@@ -204,8 +271,28 @@ function nearestOf(graph, days, sources) {
 }
 
 /**
- * The cells within `limitKm` over land of the inherited network: a road or river route, or a town
- * (1 where a place may stand). All of them when there is no network at all.
+ * How much further than ROUTE_REACH_KM each town's cell reaches, in km: a town of the generator's
+ * tiers (the largest whose minimum it reaches) by its tier's TOWN_REACH_SCALE, any other none.
+ * @returns {Map<number, number>} Each town cell's extra reach.
+ */
+function townReach(towns, count, options) {
+    const tiers = FILRODENSWMB.GENERATOR.TOWNS.TIERS;
+    const scales = options.TOWN_REACH_SCALE ?? [];
+    const extra = new Map();
+    for (const town of towns) {
+        if (!(town.cell >= 0 && town.cell < count)) continue;
+        const tier = tiers.findIndex((candidate) => town.population >= candidate.minPop);
+        const more = tier >= 0 ? Math.max(0, (scales[tier] ?? 1) - 1) * options.ROUTE_REACH_KM : 0;
+        extra.set(town.cell, Math.max(extra.get(town.cell) ?? 0, more));
+    }
+    return extra;
+}
+
+/**
+ * The cells within `limitKm` over land of the inherited network: a road or river route, or a town,
+ * a town's cell reaching further by its extra reach (1 where a place may stand). All of them when
+ * there is no network at all.
+ * @param {Map<number, number>} townCells - Each town cell's extra reach, in km.
  */
 function nearNetwork(graph, flags, townCells, limitKm) {
     const count = graph.count;
@@ -223,7 +310,13 @@ function nearNetwork(graph, flags, townCells, limitKm) {
         start(graph.edgeA[edge]);
         start(graph.edgeB[edge]);
     }
-    for (const cell of townCells) start(cell);
+    // A town starts as far below zero as it reaches beyond the limit
+    for (const [cell, extra] of townCells) {
+        if (cell >= 0 && cell < count && best[cell] > -extra) {
+            best[cell] = -extra;
+            heap.push(-extra, cell);
+        }
+    }
     if (!heap.size) return near.fill(1);
     while (heap.size) {
         const km = heap.peekPriority();

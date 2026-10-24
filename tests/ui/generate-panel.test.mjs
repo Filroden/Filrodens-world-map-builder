@@ -194,6 +194,8 @@ test("Output decides the levels, the places, the routes and the names a run writ
     assert.ok(made.routes.every((route) => route.transport !== "sea"));
     assert.ok(made.pins.every((pin) => pin.label.visibility === "none"));
     assert.ok(made.set.levels[0].regions.every((region) => region.label.visibility === "none"));
+    const unnamed = (await materialiseWith({ labels: false })).made;
+    assert.ok(unnamed.set.levels.every((level) => level.regions.every((region) => region.label.visibility === "none")), "no level's names");
 
     const noCounties = (await materialiseWith({ counties: false })).made;
     assert.deepEqual(noCounties.set.levels.map((level) => level.name), ["Realms", "Duchies"]);

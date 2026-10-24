@@ -80,15 +80,29 @@ test("villages: a share of the settled cells by the area factor, none on a town 
     assert.ok(capped.stats.villagesLeftOut > 0);
 });
 
-test("market towns and villages stand only near the inherited roads and towns", () => {
+test("market towns and villages stand only near the inherited roads and towns, a big town reaching further", () => {
     const { input, grid, mesh, result } = infill();
     const near = runInfill({ ...input, options: {} });
-    const reachKm = FILRODENSWMB.INFILL.ROUTE_REACH_KM;
-    const network = [...new Set([...input.routes.flatMap((route) => route.cells), ...input.towns.map((town) => town.cell)])].filter((cell) => cell >= 0);
+    const { ROUTE_REACH_KM: reachKm, TOWN_REACH_SCALE } = FILRODENSWMB.INFILL;
+    const { TIERS } = FILRODENSWMB.GENERATOR.TOWNS;
+    // Each town's reach by its tier (Ashby, 5,000 people, is a large town's tier; Brook is none)
+    const townReachKm = (town) => {
+        const tier = TIERS.findIndex((candidate) => town.population >= candidate.minPop);
+        return reachKm * (tier >= 0 ? TOWN_REACH_SCALE[tier] : 1);
+    };
+    const network = [...new Set(input.routes.flatMap((route) => route.cells))].filter((cell) => cell >= 0).map((cell) => ({ cell, reach: reachKm }));
+    for (const town of input.towns) network.push({ cell: town.cell, reach: townReachKm(town) });
     const km = (a, b) => Math.hypot(grid.sites[a * 2] - grid.sites[b * 2], grid.sites[a * 2 + 1] - grid.sites[b * 2 + 1]) * mesh.kmPerPx;
     assert.ok(near.places.length > 0);
     assert.ok(near.places.length < result.places.length / 2, `${near.places.length} near the road against ${result.places.length} across the island`);
-    assert.ok(near.places.every((place) => network.some((cell) => km(place.cell, cell) <= reachKm + 1e-6)), `all within ${reachKm} km`);
+    assert.ok(near.places.every((place) => network.some(({ cell, reach }) => km(place.cell, cell) <= reach + 1e-6)), "all within reach");
+
+    const ashby = input.towns.find((town) => town.population === 5000);
+    assert.equal(townReachKm(ashby), reachKm * TOWN_REACH_SCALE[1]);
+    const plain = runInfill({ ...input, options: { TOWN_REACH_SCALE: [1, 1, 1] } });
+    const beyond = (run) => run.places.filter((place) => km(place.cell, ashby.cell) > reachKm && !network.some(({ cell, reach }) => cell !== ashby.cell && km(place.cell, cell) <= reach)).length;
+    assert.equal(beyond(plain), 0, "at the plain reach, nothing beyond it");
+    assert.ok(beyond(near) > 0, "the large town's country reaches further");
 });
 
 test("lanes join every place to the network", () => {
@@ -109,4 +123,33 @@ test("names follow each place's culture, avoid the map's names, and the run is r
     const again = runInfill(input);
     assert.deepEqual(again.places, result.places, "the same seed gives the same places and names");
     assert.deepEqual(again.lanes.map((lane) => lane.cells), result.lanes.map((lane) => lane.cells));
+});
+
+test("a town of the generator's tiers draws its people from its reach, so the country round it keeps theirs", () => {
+    const { mesh, makePayload } = syntheticMap();
+    const payload = makePayload();
+    const parentRun = parentRunOf(mesh, payload);
+    // Three parent cells' people: as on a regional map cut close round a capital
+    const big = { name: "Kingsport", x: 240, y: 180, generated: { kind: "town", population: 60000 } };
+    const { input } = InfillInput.gather({ mesh, parentRun, payload, pins: [big], routes: [], speeds: FILRODENSWMB.TRAVEL_TIME.SPEEDS, seed: "SYNTH", nameBase: "English" });
+    input.options = { ROUTE_REACH_KM: 1e9 };
+    const result = runInfill(input);
+    const own = input.parentOf[input.towns[0].cell];
+    let ownPeople = 0;
+    for (let cell = 0; cell < input.parentOf.length; cell++) if (input.parentOf[cell] === own) ownPeople += result.people[cell];
+    assert.ok(ownPeople > 0, "its own cell keeps country people");
+    assert.ok(result.places.some((place) => isVillage(place)), "with villages");
+
+    // What it drew: the country people with no town, less those with it (before markets draw theirs)
+    const countryOf = (run) => run.people.reduce((sum, value) => sum + value, 0) + run.places.filter((place) => place.tier === "marketTown").reduce((sum, place) => sum + place.population, 0);
+    const none = runInfill({ ...input, towns: [] });
+    const drawn = countryOf(none) - countryOf(result);
+    const slack = (result.stats.markets + none.stats.markets) * FILRODENSWMB.INFILL.MARKET_MIN_POP + 1;
+    assert.ok(drawn > -slack && drawn <= big.generated.population + slack, `the town draws no more than its own people: ${Math.round(drawn)} of ${big.generated.population}`);
+
+    // Without where the parent cells lie, as before: all from its own cell
+    const local = runInfill({ ...input, parent: { ...input.parent, sites: null } });
+    let localOwn = 0;
+    for (let cell = 0; cell < input.parentOf.length; cell++) if (input.parentOf[cell] === own) localOwn += local.people[cell];
+    assert.equal(Math.round(localOwn), 0, "a town bigger than its cell empties it");
 });

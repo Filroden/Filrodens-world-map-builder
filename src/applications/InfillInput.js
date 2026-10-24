@@ -50,7 +50,8 @@ export class InfillInput {
         const reliefScale = Math.max(1, FILRODENSWMB.MESH.MODEL_SPACING_KM / (grid.spacingPx * mesh.kmPerPx));
         const finePayload = { ...payload, modelSites: Float64Array.from(grid.sites), modelOf: travelCellOfPixels(mesh, grid), reliefScale };
         // Each in-fill cell's parent cell: the one its site's display cell lies in
-        const parentCells = cellsFromSites(mesh, parentRunSites(parentRun), parentRun.spacingPx);
+        const parentSites = parentRunSites(parentRun);
+        const parentCells = cellsFromSites(mesh, parentSites, parentRun.spacingPx);
         const parentOf = Int32Array.from(grid.siteCell, (display) => parentCells.of[display]);
         const arrays = decodeModelRun(parentRun);
         const cellOf = (x, y) => {
@@ -61,7 +62,7 @@ export class InfillInput {
         for (const pin of pins ?? []) {
             if (pin?.generated?.kind !== "town") continue;
             const cell = cellOf(pin.x, pin.y);
-            if (cell >= 0) towns.push({ cell, population: Number(pin.generated.population) || 0 });
+            if (cell >= 0) towns.push({ cell, population: Number(pin.generated.population) || 0, x: pin.x, y: pin.y });
         }
         const fineRoutes = (routes ?? []).map((route) => ({
             transport: route.transport ?? "road",
@@ -70,7 +71,17 @@ export class InfillInput {
         const input = {
             payload: finePayload,
             parentOf,
-            parent: { population: arrays.population ?? new Float64Array(parentRun.cellCount), landArea: arrays.landArea ?? null, cultureOf: mainCultures(arrays, parentRun.cellCount), nameBases: (parentRun.cultures ?? []).map((culture) => culture?.nameBase ?? null) },
+            parent: {
+                population: arrays.population ?? new Float64Array(parentRun.cellCount),
+                landArea: arrays.landArea ?? null,
+                cultureOf: mainCultures(arrays, parentRun.cellCount),
+                nameBases: (parentRun.cultures ?? []).map((culture) => culture?.nameBase ?? null),
+                // Where each parent cell lies, and the run's km per map pixel, for how far a town's
+                // people came from (see Infill.sharePeople)
+                sites: parentSites,
+                kmPerPx: parentRun.spacingKm > 0 && parentRun.spacingPx > 0 ? parentRun.spacingKm / parentRun.spacingPx : null,
+                mapSize: { width: mesh.width, height: mesh.height },
+            },
             towns,
             routes: fineRoutes,
             speeds,

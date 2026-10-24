@@ -116,8 +116,9 @@ test("generated regions and pins take the label styles made for them, added from
     const [realms, duchies, counties] = app.layerSets[0].levels;
     const realmStyle = labelStyles.find((style) => style.id === REGION_LABEL_STYLES.realm);
     for (const region of realms.regions) assert.deepEqual([region.label.quickStyle, region.label.fontSize, region.label.fontFamily, region.label.visibility], [realmStyle.id, realmStyle.fontSize, realmStyle.fontFamily, "all"]);
-    assert.ok(duchies.regions.every((region) => region.label.quickStyle === REGION_LABEL_STYLES.duchy && region.label.visibility === "none"));
-    assert.ok(counties.regions.every((region) => region.label.quickStyle === REGION_LABEL_STYLES.county && region.label.visibility === "none"));
+    // Shown with their borders' detail level (see DetailLevel.ofLevel)
+    assert.ok(duchies.regions.every((region) => region.label.quickStyle === REGION_LABEL_STYLES.duchy && region.label.visibility === "all"));
+    assert.ok(counties.regions.every((region) => region.label.quickStyle === REGION_LABEL_STYLES.county && region.label.visibility === "all"));
     const capital = app.mapPins.find((pin) => pin.generated.tier === "capital");
     const capitalStyle = labelStyles.find((style) => style.id === "label-style-capital");
     assert.deepEqual([capital.label.quickStyle, capital.label.fontFamily], [capitalStyle.id, capitalStyle.fontFamily]);

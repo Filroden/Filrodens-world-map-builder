@@ -45,7 +45,8 @@ export class GridDataExporter {
         const { params } = MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors);
         const biomeIdToKey = GridDataExporter.#buildBiomeIdToKeyMap();
         const visibleRegions = regions ?? (app.meshSession ? GridDataExporter.#collectMeshRegions(app.meshSession) : []);
-        const visiblePins = (app.mapPins || []).filter((pin) => pin.visibility !== "none" && pin.icon);
+        const pinStyles = GridDataExporter.#stylesById(app.uiState.customPinStyles);
+        const visiblePins = (app.mapPins || []).filter((pin) => pin.visibility !== "none" && pin.icon).map((pin) => GridDataExporter.#pinEntry(pin, pinStyles));
         const visibleRoutes = GridDataExporter.#collectVisibleRoutes(app);
         const namedRivers = (app.manualRivers || []).filter((river) => river.points?.length >= 2);
 
@@ -144,13 +145,61 @@ export class GridDataExporter {
      * the line drawn through their cells (see MeshSession.routeLine).
      */
     static #collectVisibleRoutes(app) {
+        const styles = GridDataExporter.#stylesById(app.uiState.customRouteStyles);
         const routes = [];
         for (const route of app.mapRoutes || []) {
             if (route.visibility === "none") continue;
             const points = route.points ?? GridDataExporter.#meshRoutePoints(app.meshSession, route);
-            if (points.length >= 2) routes.push({ id: route.id, name: route.name, visibility: route.visibility, points });
+            if (points.length < 2) continue;
+            routes.push({
+                entry: {
+                    id: route.id,
+                    name: route.name,
+                    visibility: route.visibility,
+                    // What kind of way it is: generated routes have no name, so these tell a
+                    // consumer a trade road from a lane or a sea lane
+                    transport: route.transport ?? "road",
+                    class: route.class ?? null,
+                    style: GridDataExporter.#styleOf(route.quickStyle, styles),
+                },
+                points,
+            });
         }
         return routes;
+    }
+
+    /** A map's style list by id. */
+    static #stylesById(styles) {
+        return new Map((styles ?? []).map((style) => [style.id, style]));
+    }
+
+    /** The `{id, name}` of the map style an item uses, or null for one styled by hand. */
+    static #styleOf(id, styles) {
+        const style = id ? styles.get(id) : null;
+        return style ? { id: style.id, name: style.name ?? "" } : null;
+    }
+
+    /**
+     * A pin as the cell data lists it. A generated place also says what it is (`kind`, such as
+     * town or castle; `tier`, such as city or village) and its population where it has one, so a
+     * consumer can tell a city from a hamlet; a pin placed by hand has null for all three.
+     */
+    static #pinEntry(pin, styles) {
+        const generated = pin.generated ?? null;
+        return {
+            x: pin.x,
+            y: pin.y,
+            entry: {
+                id: pin.id,
+                name: pin.name,
+                icon: pin.icon,
+                visibility: pin.visibility,
+                style: GridDataExporter.#styleOf(pin.pinStyle, styles),
+                kind: generated?.kind ?? null,
+                tier: generated?.tier ?? null,
+                population: Number.isFinite(generated?.population) ? generated.population : null,
+            },
+        };
     }
 
     static #meshRoutePoints(session, route) {
@@ -341,7 +390,7 @@ export class GridDataExporter {
         const pins = [];
         for (const pin of visiblePins) {
             if (!GridAggregator.pointInPolygon(pin.x, pin.y, polygon)) continue;
-            pins.push({ id: pin.id, name: pin.name, icon: pin.icon, visibility: pin.visibility });
+            pins.push(pin.entry);
         }
         return pins;
     }
@@ -350,7 +399,7 @@ export class GridDataExporter {
         const routes = [];
         for (const route of visibleRoutes) {
             if (!GridDataExporter.#linestringCrossesCell(route.points, cellPolygon, cellBounds)) continue;
-            routes.push({ id: route.id, name: route.name, visibility: route.visibility });
+            routes.push(route.entry);
         }
         return routes;
     }

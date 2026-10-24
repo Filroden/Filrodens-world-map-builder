@@ -875,6 +875,8 @@
 .fwmb-section > summary .fwmb-badge {
     flex: 0 1 auto;
     min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 .fwmb-section .fwmb-body {
     padding: 0 0.75rem 0.75rem;
@@ -1034,8 +1036,41 @@
 .fwmb-list-item > :is(.fwmb-meta, .fwmb-state, .fwmb-badge) {
     flex: none;
 }
+/* A longer meta or badge (another language) shortens with an ellipsis once the name has given
+   all its room, rather than pushing the row's actions past the panel */
+.fwmb-list-item > :is(.fwmb-meta, .fwmb-badge) {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    max-inline-size: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-list-item .fwmb-row-count {
     display: none;
+}
+/* In a compact panel the rows of pins, routes, regions and labels: an eye, an icon or swatch and
+   up to three actions would take all the row and leave the name little or no room, so the actions
+   show only on the row the pointer or focus is on, or the chosen one, over the name's end rather
+   than beside it: the name keeps its room, nothing moves */
+.fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-list-item:is([data-type="pin"], [data-type="route"], [data-type="region"], [data-type="label"]) {
+    position: relative;
+}
+.fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-list-item:is([data-type="pin"], [data-type="route"], [data-type="region"], [data-type="label"]) > .fwmb-actions {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    align-items: center;
+    padding-inline: 0.25rem;
+    border-radius: 0.375rem;
+    background: var(--fwmb-bg-hover);
+    visibility: hidden;
+}
+.fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-list-item:is([data-type="pin"], [data-type="route"], [data-type="region"], [data-type="label"])[aria-selected="true"] > .fwmb-actions {
+    background: var(--fwmb-bg-highlight);
+}
+.fwmb-studio:is([data-fwmb-width="compact"], [data-fwmb-width="narrow"]) .fwmb-list-item:is([data-type="pin"], [data-type="route"], [data-type="region"], [data-type="label"]):is(:hover, :focus-within, [aria-selected="true"]) > .fwmb-actions {
+    visibility: visible;
 }
 .fwmb-list-item:hover {
     background: var(--fwmb-bg-hover);
@@ -1144,6 +1179,10 @@
     flex-direction: column;
     gap: 0.375rem;
     margin-block: 0.25rem 0.5rem;
+}
+/* Each speed is a <label>, which keeps to one line everywhere else (see .fwmb label) */
+.fwmb label.fwmb-travel-speed {
+    white-space: normal;
 }
 .fwmb-travel-speed {
     display: flex;
@@ -3409,6 +3448,16 @@
     min-width: 0;
     overflow-wrap: anywhere;
 }
+/* The label is a <label>, which keeps to one line everywhere else (see .fwmb label), so the name
+   could not wrap and ran under its info icon; the icon keeps its size beside the wrapped name */
+.fwmb .fwmb-range-label,
+.fwmb .fwmb-info-label {
+    white-space: normal;
+}
+.fwmb .fwmb-range-label > .fwmb-icon,
+.fwmb .fwmb-info-label > .fwmb-icon {
+    flex: none;
+}
 .fwmb .fwmb-range-header {
     align-items: flex-start;
 }
@@ -3915,6 +3964,11 @@
     gap: var(--fwmb-size-10);
     min-width: 0;
     color: var(--fwmb-text-primary);
+}
+
+/* A <label>, so it would keep to one line (see .fwmb label) */
+.fwmb label.fwmb-biome-label {
+    white-space: normal;
 }
 
 .fwmb-biome-label {

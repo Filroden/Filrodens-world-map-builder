@@ -815,6 +815,10 @@ export const FILRODENSWMB = {
         // Market towns and villages stand only within this many effective km over land of an
         // inherited road, river route or town; beyond, people live in hamlets and farms
         ROUTE_REACH_KM: 15,
+        // A town of the generator's tiers (GENERATOR.TOWNS.TIERS, largest first) reaches this many
+        // times as far, for the country a big town feeds and is fed by; it matters most where a
+        // land has no road (one joined to the rest by sea lanes alone)
+        TOWN_REACH_SCALE: Object.freeze([3, 2, 1]),
         // A place is served by a market within this many days' walk on foot (a day's round trip).
         // Markets stand this times the square root of the map's area factor apart, so they thin
         // out as villages do

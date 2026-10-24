@@ -41,7 +41,7 @@ import { cultureId, cultureMix } from "./CultureIds.js";
  *     (realm, duchy, county): a label style's fields and its id as quickStyle.
  * @param {{duchies?: boolean, counties?: boolean, labels?: boolean}} [options.output] - Which levels
  *     below Realms the set holds (the counties are laid out either way, since the levels above are
- *     made from them), and whether the realms' names are shown.
+ *     made from them), and whether the regions' names are shown.
  * @returns {{set: object, owners: Object<string, Int32Array>}}
  */
 export function buildPolitical(session, result, { runId, idFactory, names, watersPx, regionLabel = () => ({}), output = {} }) {
@@ -61,10 +61,13 @@ export function buildPolitical(session, result, { runId, idFactory, names, water
     }
     set.levels.push(...levels);
 
-    const realmVisibility = output.labels === false ? "none" : "all";
-    addRealms(levels[0], result, { runId, idFactory, label: { ...regionLabel("realm"), visibility: realmVisibility }, duchyLabel: { ...regionLabel("duchy"), visibility: realmVisibility } });
-    if (withDuchies) addChildren(levels[1], units.duchies, units.duchyParent, { kind: "duchy", units: result.duchies }, { runId, idFactory, label: regionLabel("duchy"), result });
-    if (withCounties) addChildren(levels[2], units.counties, units.countyParent, { kind: "county", units: result.counties }, { runId, idFactory, label: regionLabel("county"), result });
+    // Every level's names are shown: the detail level shows a level's names with its borders
+    // (duchies from Province, counties from Regional), and names with no room are not placed
+    const visibility = output.labels === false ? "none" : "all";
+    const label = (kind) => ({ ...regionLabel(kind), visibility });
+    addRealms(levels[0], result, { runId, idFactory, label: label("realm"), duchyLabel: label("duchy") });
+    if (withDuchies) addChildren(levels[1], units.duchies, units.duchyParent, { kind: "duchy", units: result.duchies }, { runId, idFactory, label: label("duchy"), result });
+    if (withCounties) addChildren(levels[2], units.counties, units.countyParent, { kind: "county", units: result.counties }, { runId, idFactory, label: label("county"), result });
 
     const counties = carry(session, result, "county", units.countyKey);
     joinCoast(session, result, counties);
@@ -161,7 +164,7 @@ function addRealms(level, result, { runId, idFactory, label, duchyLabel }) {
 
 /**
  * A child level's regions: one per unit in `list` (indices into `units`), keyed in list order,
- * each with the key of its parent region and a hidden label in the level's look.
+ * each with the key of its parent region and a label in the level's look.
  */
 function addChildren(level, list, parentKeys, { kind, units }, { runId, idFactory, label, result }) {
     list.forEach((sourceIndex, key) => {
@@ -169,7 +172,7 @@ function addChildren(level, list, parentKeys, { kind, units }, { runId, idFactor
         addRegion(level, {
             name: unit.name,
             parentKey: parentKeys[key],
-            label: { ...label, visibility: "none" },
+            label: { ...label },
             generated: generatedFor(runId, kind, sourceIndex, { population: unit.population, culture: cultureId(result, unit.culture) }),
         }, idFactory);
     });
