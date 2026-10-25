@@ -165,6 +165,26 @@ test("Backspace or Ctrl+Z takes the last press back (a click, or a whole stroke)
     assert.equal(app.pinHistory.length, 0);
 });
 
+test("while a route is being placed, the studio's Undo takes its last waypoint back, not the history's last step", async () => {
+    const { app, overlays } = await studio();
+    const tool = RouteTool.tool(app);
+    placeRoad(app, tool);
+    assert.equal(app.pinHistory.length, 1, "a finished route in the history");
+    assert.equal(RouteTool.drafting(app), false);
+    assert.equal(RouteTool.undoDraftStep(app), false, "nothing being placed: Undo goes to the history");
+
+    click(tool, 150, 250);
+    click(tool, 250, 250);
+    assert.equal(RouteTool.drafting(app), true);
+    assert.equal(RouteTool.undoDraftStep(app), true);
+    assert.equal(overlays.handles.points.length, 2, "one waypoint left");
+    assert.equal(app.mapRoutes.length, 1, "the finished route is untouched");
+    assert.equal(app.pinHistory.length, 1, "and so is the history");
+    assert.equal(RouteTool.undoDraftStep(app), true);
+    assert.equal(RouteTool.drafting(app), false, "the last waypoint taken back ends the draft");
+    assert.equal(overlays.draft, null);
+});
+
 test("a sea route cannot start on land, and says so", async () => {
     const { app } = await studio();
     app.uiState.routeTransport = "sea";

@@ -170,11 +170,7 @@ export class RouteTool {
         const state = this.#state(app);
         if (event.key === "Enter" && state.draft) return this.finishDraft(app);
         const undo = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
-        if ((event.key === "Backspace" || undo) && state.draft) {
-            this.#undoStep(state);
-            this.#drawDraft(app, state, null);
-            return true;
-        }
+        if ((event.key === "Backspace" || undo) && this.undoDraftStep(app)) return true;
         if (event.key !== "Escape") return false;
         if (state.draft || state.press || state.drag) {
             this.cancel(app);
@@ -183,6 +179,25 @@ export class RouteTool {
         if (!app.activeRouteId) return false;
         if (Inspector.current(app)?.kind.id === "route") Inspector.close(app);
         this.select(app, null);
+        return true;
+    }
+
+    /** Whether a route is being placed (not yet finished), so Undo takes its last press back first. */
+    static drafting(app) {
+        return !!this.#state(app).draft;
+    }
+
+    /**
+     * Takes the last press of the route being placed back (see #undoStep). The studio's Undo, by
+     * key or by button, does this first while a route is being placed: the route is not in the
+     * history until it is finished, so the history's last step would otherwise be undone under it.
+     * @returns {boolean} Whether a route was being placed.
+     */
+    static undoDraftStep(app) {
+        const state = this.#state(app);
+        if (!state.draft) return false;
+        this.#undoStep(state);
+        this.#drawDraft(app, state, null);
         return true;
     }
 
@@ -543,6 +558,8 @@ export class RouteTool {
      * stroke being traced, and handles at its waypoints and at the bends the stroke would keep.
      */
     static #drawDraft(app, state, previewCell) {
+        // The studio's Undo button is enabled while a route is being placed, history or not
+        app.refreshHistoryButtons?.();
         const overlays = app.canvasEngine?.routeOverlays;
         const session = app.meshSession;
         if (!overlays || !session) return;

@@ -371,6 +371,7 @@
     "FILRODENSWMB.UI.ToolRoughen": "Roughen terrain",
     "FILRODENSWMB.UI.Undo": "Undo",
     "FILRODENSWMB.UI.Redo": "Redo",
+    "FILRODENSWMB.UI.UndoWaypoint": "Undo the last waypoint",
     "FILRODENSWMB.UI.UndoCount": "Undo ({count})",
     "FILRODENSWMB.UI.RedoCount": "Redo ({count})",
 

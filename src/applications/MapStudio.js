@@ -1795,6 +1795,11 @@ export class MapStudio {
      * #handleBrushEnd, since ending a paint/terrain stroke changes the ledger without
      * triggering a render of its own.
      */
+    /** The Undo and Redo buttons brought up to date outside a redraw (a route's waypoints placed or taken back). */
+    refreshHistoryButtons() {
+        this.#updateHistoryButtons();
+    }
+
     #updateHistoryButtons() {
         const undoBtn = this.root.querySelector('[data-action="undoBrush"]');
         const redoBtn = this.root.querySelector('[data-action="redoBrush"]');
@@ -1803,9 +1808,11 @@ export class MapStudio {
         const redoCount = this.globalRedoLedger?.length ?? 0;
 
         if (undoBtn) {
-            undoBtn.disabled = undoCount === 0;
-            undoBtn.dataset.tooltip =
-                undoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.UndoCount", { count: undoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Undo");
+            // While a route is being placed, Undo takes its last waypoint back (see #processHistoryStep)
+            const drafting = RouteTool.drafting(this);
+            undoBtn.disabled = undoCount === 0 && !drafting;
+            if (drafting) undoBtn.dataset.tooltip = platform.i18n.localize("FILRODENSWMB.UI.UndoWaypoint");
+            else undoBtn.dataset.tooltip = undoCount > 0 ? platform.i18n.format("FILRODENSWMB.UI.UndoCount", { count: undoCount }) : platform.i18n.localize("FILRODENSWMB.UI.Undo");
         }
 
         if (redoBtn) {
@@ -4683,6 +4690,8 @@ export class MapStudio {
      */
     #previewActionBounds(direction) {
         if (!this.canvasEngine) return;
+        // Undo while a route is being placed takes back its last waypoint, which the draft shows
+        if (direction === "undo" && RouteTool.drafting(this)) return;
 
         const ledger = direction === "undo" ? this.globalHistoryLedger : this.globalRedoLedger;
         const actionType = ledger.at(-1);
@@ -4906,6 +4915,10 @@ export class MapStudio {
      * tried, so a single Undo or Redo always changes something while anything is left.
      */
     async #processHistoryStep(isUndo) {
+        // A route being placed is not in the history until it is finished: Undo takes its last
+        // press back first, rather than the history's last step under it
+        if (isUndo && RouteTool.undoDraftStep(this)) return;
+
         // Dynamically assign the source and target ledgers based on the direction
         const sourceLedger = isUndo ? this.globalHistoryLedger : this.globalRedoLedger;
         const targetLedger = isUndo ? this.globalRedoLedger : this.globalHistoryLedger;
