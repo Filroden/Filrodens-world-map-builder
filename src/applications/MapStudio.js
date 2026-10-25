@@ -1757,6 +1757,11 @@ export class MapStudio {
         const newLatTop = this.uiState.latTop - (plan.cropBox.y / this.mapHeight) * latRange;
         const newLatBottom = this.uiState.latTop - ((plan.cropBox.y + plan.cropBox.height) / this.mapHeight) * latRange;
 
+        // A whole number on a map with a grid (see RegionalExtractor.planCrop); a gridless map's
+        // zoom is whatever the crop gives, shown to one decimal place
+        const zoomEl = this.root.querySelector("#fwmb-readout-regional-zoom");
+        if (zoomEl) zoomEl.textContent = platform.i18n.format("FILRODENSWMB.UI.RegionalZoomValue", { zoom: new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(plan.zoomScale) });
+
         const latTopEl = this.root.querySelector("#fwmb-readout-lat-top");
         const latBottomEl = this.root.querySelector("#fwmb-readout-lat-bottom");
         if (latTopEl) latTopEl.innerHTML = `${newLatTop.toFixed(2)}&deg;`;

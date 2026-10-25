@@ -28,7 +28,7 @@ export class RegionalExtractor {
         const upwindMargin = this.#buildUpwindMargin(app, state);
 
         // 1. Size, zoom and grid. From here on the crop is the one the regional map actually
-        // shows, snapped from the drawn one so its grid lines up with the parent's (see planCrop)
+        // shows, fitted round the drawn one so its grid lines up with the parent's (see planCrop)
         const { cropBox, zoomScale, targetWidth, targetHeight, gridSize } = this.planCrop(drawnCropBox, state.regionalTargetWidth, { type: state.gridType, size: state.gridSize }, app.mapWidth ?? state.mapWidth, app.mapHeight ?? state.mapHeight);
 
         // 2. Mutate Map State Properties
@@ -158,29 +158,31 @@ export class RegionalExtractor {
      * Works out the regional map a drawn crop makes: its size, its zoom, its grid, and the part of
      * the parent it actually shows.
      *
-     * Foundry always starts a scene's grid at the scene's top-left corner, and the grid itself
-     * cannot be shifted. So a regional map's grid lines up with its parent's only when the crop's
-     * top-left corner sits on a point of the parent's grid and the regional grid is exactly the
-     * parent's scaled by the zoom. The crop is therefore snapped:
-     * - Its top-left corner moves to the nearest point where the parent's grid pattern starts
-     *   again (see #gridPeriod): a cell corner on a square grid; on a hex grid, the same place in
-     *   the pattern, which repeats every two rows (or columns).
-     * - The regional grid is the parent's at the requested zoom, rounded to a whole pixel, and
-     *   the zoom becomes that grid divided by the parent's, so the two scale exactly.
-     * - The regional map is the requested width, and its height is the crop's at that zoom to the
-     *   nearest pixel; the crop's size follows (a fraction of a percent from what was drawn).
-     * - The crop is kept inside the parent, by moving it back a whole grid period if needed.
+     * A regional map keeps its parent's grid size in pixels, so a scene made from it is played at
+     * the same zoom as its parent's; what changes is the ground a cell covers, which shrinks with
+     * the zoom. Foundry always starts a scene's grid at the scene's top-left corner, and the grid
+     * itself cannot be shifted, so the two grids line up only when:
+     * - the zoom is a whole number: every parent cell is then exactly zoom x zoom regional cells
+     *   on a square grid, and on a hex grid every parent hex's centre is a regional hex's centre
+     *   (the hex pattern repeats every two rows, and a whole number of those fits each parent's);
+     * - the crop's top-left corner sits where the parent's grid pattern starts again (see
+     *   #gridPeriod): a cell corner on a square grid, the same place in the pattern on a hex grid.
+     * The crop is therefore fitted round what was drawn:
+     * - The zoom is the requested width over the drawn crop's, to the nearest whole number (at
+     *   least 1, and enough for the parent to fill the width).
+     * - The regional map is the requested width, and its height the drawn crop's at that zoom to
+     *   the nearest pixel; the crop is that size in the parent's pixels, centred where the drawn
+     *   one was, so it grows or shrinks a little to fit the zoom.
+     * - Its corner moves to the nearest start of the parent's grid pattern, kept inside the parent
+     *   by moving back a whole period if needed.
      * The zoom is the same across and down, so the latitude range matches the terrain.
      *
      * A gridless parent has nothing to line up with: the zoom is the requested width divided by
      * the crop's, and the crop keeps its corner (its height moves by under a pixel).
      *
-     * Regional maps used to be rounded to whole grid cells instead, with the width rounded
-     * (changing the zoom) and the height rounded separately. That never lined the grids up (the
-     * corner was not snapped), changed the requested width, left a grid that did not fit the
-     * rounded size, and stretched or squeezed latitude down the map against its terrain: a
-     * 125 x 100 crop at 800 wide, with a 50 pixel grid, made a 960 x 640 map showing 83 rows of the
-     * parent's terrain under 100 rows' worth of latitude.
+     * Regional maps used to scale the grid with the zoom instead, so each parent cell stayed one
+     * cell: a regional map of a regional map at x4 each time had a grid of 800 pixels on a 50 pixel
+     * parent, too large to play on or to zoom out from in Foundry.
      *
      * @param {{x: number, y: number, width: number, height: number}} cropBox - The crop as drawn, in the parent's pixels.
      * @param {number} baseTargetWidth - The requested width of the regional map.
@@ -191,13 +193,13 @@ export class RegionalExtractor {
      *   The crop the regional map shows, the zoom, the regional map's size and its grid size.
      */
     static planCrop(cropBox, baseTargetWidth, grid, mapWidth, mapHeight) {
-        const parentGrid = Math.max(this.#MIN_GRID, Number(grid.size) || this.#MIN_GRID);
-        const period = this.#gridPeriod(grid.type, parentGrid);
+        const gridSize = Math.max(this.#MIN_GRID, Number(grid.size) || this.#MIN_GRID);
+        const period = this.#gridPeriod(grid.type, gridSize);
         const requestedWidth = Math.max(1, Math.round(baseTargetWidth));
+        const drawnWidth = Math.max(1, cropBox.width);
 
-        // The zoom: exactly regional grid / parent grid when there is a grid to line up
-        const gridSize = Math.max(this.#MIN_GRID, Math.round((parentGrid * requestedWidth) / cropBox.width));
-        const zoomScale = period ? gridSize / parentGrid : requestedWidth / cropBox.width;
+        // A whole-number zoom when there is a grid to line up, large enough that the parent fills the width
+        const zoomScale = period ? Math.max(1, Math.round(requestedWidth / drawnWidth), Math.ceil(requestedWidth / mapWidth - 1e-9)) : requestedWidth / drawnWidth;
 
         // The size, no larger than the parent can show at this zoom
         const targetWidth = Math.min(requestedWidth, Math.max(1, Math.floor(mapWidth * zoomScale + 1e-9)));
@@ -205,9 +207,13 @@ export class RegionalExtractor {
         const width = targetWidth / zoomScale;
         const height = targetHeight / zoomScale;
 
-        const x = period ? this.#snapToPeriod(cropBox.x, period.x, mapWidth - width) : Math.max(0, Math.min(mapWidth - width, cropBox.x));
-        const y = period ? this.#snapToPeriod(cropBox.y, period.y, mapHeight - height) : Math.max(0, Math.min(mapHeight - height, cropBox.y + (cropBox.height - height) / 2));
-
+        if (!period) {
+            const x = Math.max(0, Math.min(mapWidth - width, cropBox.x));
+            const y = Math.max(0, Math.min(mapHeight - height, cropBox.y + (cropBox.height - height) / 2));
+            return { cropBox: { x, y, width, height }, zoomScale, targetWidth, targetHeight, gridSize };
+        }
+        const x = this.#snapToPeriod(cropBox.x + (cropBox.width - width) / 2, period.x, mapWidth - width);
+        const y = this.#snapToPeriod(cropBox.y + (cropBox.height - height) / 2, period.y, mapHeight - height);
         return { cropBox: { x, y, width, height }, zoomScale, targetWidth, targetHeight, gridSize };
     }
 

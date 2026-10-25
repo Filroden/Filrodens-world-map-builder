@@ -3,6 +3,7 @@ import { Sanitize } from "../../data/Sanitize.js";
 import { GridDataExporter } from "../../applications/GridDataExporter.js";
 import { MapStateManager } from "../../applications/MapStateManager.js";
 import { GeneratedDetails } from "../../applications/GeneratedDetails.js";
+import { cleanUnit, kmPerPxOf } from "../../data/MapUnit.js";
 
 /**
  * A description as a journal page's HTML. Descriptions are plain text (typed into a textarea, or
@@ -16,6 +17,9 @@ import { GeneratedDetails } from "../../applications/GeneratedDetails.js";
 function journalHtml(description) {
     return foundry.utils.cleanHTML(Sanitize.textToHtml(description ?? ""));
 }
+
+/** Significant figures kept in a scene's grid distance: enough for the ruler, without a long tail of digits. */
+const GRID_DISTANCE_FIGURES = 3;
 
 export class SceneExporter {
     /**
@@ -206,6 +210,7 @@ export class SceneExporter {
         // document's own grid config and the exported grid-data payload always agree on which
         // numeric type a given uiState.gridType maps to.
         const mappedGridType = FILRODENSWMB.GRID_TYPES[app.uiState.gridType]?.value ?? 1;
+        const gridSize = MapStateManager.gridSizeOf(app.uiState.gridSize);
 
         const sceneData = {
             name: sceneName,
@@ -220,7 +225,9 @@ export class SceneExporter {
             grid: {
                 type: mappedGridType,
                 // The same size the grid data was built with (see MapStateManager.gridSizeOf)
-                size: MapStateManager.gridSizeOf(app.uiState.gridSize),
+                size: gridSize,
+                // What one cell measures in the map's own unit, so Foundry's ruler reads true
+                ...this.gridScale(app, gridSize),
                 color: "#000000",
                 alpha: 0.4, // Fixed opacity to guarantee visibility in Foundry
             },
@@ -311,6 +318,21 @@ export class SceneExporter {
         } catch (err) {
             console.error("FWMB | Tile creation error:", err);
         }
+    }
+
+    /**
+     * The ground one grid cell covers, as Foundry's grid distance and units: the cell's width at
+     * the map's scale (see MapUnit.kmPerPxOf), to three significant figures, in the map's unit. A
+     * regional map keeps its parent's grid size in pixels, so its cells measure less.
+     *
+     * @param {object} app - Reads uiState (latitudes, world, map unit) and mapHeight.
+     * @param {number} gridSize - The grid's size in pixels.
+     * @returns {{distance: number, units: string}|{}} Nothing when the scale cannot be worked out.
+     */
+    static gridScale(app, gridSize) {
+        const distance = gridSize * kmPerPxOf(app.uiState, app.mapHeight);
+        if (!(distance > 0) || !Number.isFinite(distance)) return {};
+        return { distance: Number(distance.toPrecision(GRID_DISTANCE_FIGURES)), units: cleanUnit(app.uiState.mapUnit) };
     }
 
     /** Generates the Scene's thumbnail. It is only a convenience, so a failure is skipped quietly. */
