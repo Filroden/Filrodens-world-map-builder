@@ -18,9 +18,9 @@ export function pageStem(page) {
     return `${String(page.number).padStart(2, "0")}-${page.slug}`;
 }
 
-/** The wiki page's name ("Tutorial 1 A new world") and its file ("Tutorial-1-A-new-world.md"). */
+/** The wiki page's name ("Tutorial 01 A new world", two digits so the pages sort in order) and its file ("Tutorial-01-A-new-world.md"). */
 export function wikiName(page) {
-    return `Tutorial ${page.number} ${page.title}`;
+    return `Tutorial ${String(page.number).padStart(2, "0")} ${page.title}`;
 }
 
 export function wikiFile(page) {
@@ -81,8 +81,10 @@ export function wikiMarkdown(page, pages, source) {
         const marker = `${number}. `;
         lines.push(`${marker}${indent(body.join("\n"), " ".repeat(marker.length)).trimStart()}`, "");
     }
+    const checkpoint = page.checkpoint === false ? "" : `${pageStem(page)}.json`;
+    const download = checkpoint ? `To compare your map with the tutorial's, or to start the next page from exactly this map, download [${checkpoint}](${RAW_SAMPLES}/${checkpoint}) and import it in **Maps** with **Import JSON**.` : "";
     for (const [heading, text] of [
-        ["What you should see", page.whatYouSee],
+        ["What you should see", [page.whatYouSee?.trim(), download].filter(Boolean).join("\n\n")],
         ["In Foundry", page.foundry],
         ["On your own map", page.onYourOwn],
     ]) {

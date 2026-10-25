@@ -4,7 +4,7 @@
 //
 //   wiki/images/tutorial/<nn>-<slug>-<shot>.png   the step screenshots
 //   samples/tutorial/<nn>-<slug>.json             the map at the end of the page (the next page's start)
-//   wiki/Tutorial-<n>-<Title>.md                  the wiki page
+//   wiki/Tutorial-<nn>-<Title>.md                 the wiki page
 //   tests/tutorial/scripts/<nn>-<slug>.md         the video's shooting script
 //
 //   node tests/tutorial/run.mjs                    # play every page, write nothing (what npm test checks)

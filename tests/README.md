@@ -34,7 +34,7 @@ What a build writes:
 
 - `wiki/images/tutorial/<nn>-<slug>-<shot>.png`: the step screenshots, in the wiki's own repository.
 - `samples/tutorial/<nn>-<slug>.json`: the map at the end of the page, exported through **Maps**, which the next page starts from (imported through **Import JSON**, as the page tells the reader). Tracked: the check starts each page from it.
-- `wiki/Tutorial-<n>-<Title>.md`: the wiki page, with a note that it is generated.
+- `wiki/Tutorial-<nn>-<Title>.md`: the wiki page, with a note that it is generated.
 - `tutorial/scripts/<nn>-<slug>.md`: the video's shooting script: per step, the narration, what happens on screen, the camera and how long to hold.
 
 Random numbers in the page are seeded (`lib/studio.mjs`), so a rebuild writes the same ids, the same checkpoint and, on the same Chromium, the same screenshots, byte for byte.

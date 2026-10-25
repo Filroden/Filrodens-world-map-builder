@@ -44,7 +44,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
         {
             id: "seed",
             title: "The seed",
-            instruction: "In the **Generation** section, type `P0JBVA` in **Map seed** (the fourth character is a zero). The seed decides every random choice the engine makes, so the same seed, engine and settings always give the same map.",
+            instruction: "In the **Generation** section, type `P0JBVA` in **Map seed** (the second character is a zero). The seed decides every random choice the engine makes, so the same seed, engine and settings always give the same map.",
             action: { do: "set", field: "#fwmb-map-seed", value: "P0JBVA", label: "Map seed" },
             narration: "Type the seed, P zero J B V A. The same seed and settings always give the same map, which is how you can follow along exactly.",
         },
@@ -126,6 +126,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             ],
             screenshot: { name: "islands", region: "studio" },
             caption: "The continent and the three islands, listed under Land masks.",
+            note: "> **Tip:** each point you place makes the engine build the whole map again, which takes a few seconds at this size. To place several points without waiting, click **Pause regeneration** on the bar (the toggle beside **Random map**) before you draw; your changes are collected, and applied when you click **Apply changes**, turn the toggle back on, or stop drawing.",
             narration: "Add the three islands to the east the same way, finishing each one with a right-click.",
             pause: 3,
         },
