@@ -3775,6 +3775,14 @@ export class MapStudio {
     }
 
     /**
+     * Whether a terrain, climate or feature refresh is running or waiting. Scripted runs of the
+     * studio (the tutorial's) read it to know when the map has settled after an edit.
+     */
+    get refreshing() {
+        return this.#refreshes?.busy ?? false;
+    }
+
+    /**
      * Recomputes the climate over an area (or, with none, over the area painted since the last
      * refresh, or else the whole map), then the rivers and the canvas, after any refresh already
      * running (see RefreshQueue).

@@ -4,45 +4,69 @@ name: Tests
 # within a couple of minutes without waiting for a release. release-on-tag.yaml runs the same
 # suite again as the gate before a release is drafted.
 on:
-  push:
-    paths-ignore:
-      - '**.md'
-      - 'wiki/**'
-      - 'design/**'
-  pull_request:
-    paths-ignore:
-      - '**.md'
-      - 'wiki/**'
-      - 'design/**'
+    push:
+        paths-ignore:
+            - "**.md"
+            - "wiki/**"
+            - "design/**"
+    pull_request:
+        paths-ignore:
+            - "**.md"
+            - "wiki/**"
+            - "design/**"
 
 # A newer push to the same branch cancels the run still going for the older one
 concurrency:
-  group: tests-${{ github.ref }}
-  cancel-in-progress: true
+    group: tests-${{ github.ref }}
+    cancel-in-progress: true
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
 
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
+            - name: Install dependencies
+              run: npm ci --ignore-scripts
 
-      # Fails on errors only; warnings are reported in the log
-      - name: Lint
-        run: npm run lint
+            # Fails on errors only; warnings are reported in the log
+            - name: Lint
+              run: npm run lint
 
-      # Builds the P0JBVA terrain rasters (derived data, about 8 s) then runs every test under tests/
-      - name: Run tests
-        run: npm test
+            # Builds the P0JBVA terrain rasters (derived data, about 8 s) then runs every test under tests/
+            - name: Run tests
+              run: npm test
+
+    # Plays every tutorial page in the web studio (headless Chromium), so a change to the interface
+    # that breaks a tutorial step fails here, naming the step. Kept apart from the suite above,
+    # which has no browser (its tutorial check skips), because the pages take minutes.
+    tutorial:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
+
+            - name: Install dependencies
+              run: npm ci --ignore-scripts
+
+            - name: Install Chromium for Playwright
+              run: npx playwright install --with-deps chromium
+
+            - name: Run the tutorial pages
+              run: node --test tests/tutorial/tutorial.test.mjs

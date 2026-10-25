@@ -1102,7 +1102,7 @@
     "FILRODENSWMB.UI.NoDecorations": "No decorations yet. Add one with Add decoration on the bar.",
 
     "FILRODENSWMB.UI.Warning": "Warning",
-    "FILRODENSWMB.UI.UnsavedChangesWarning": "You have unsaved changes. Do you want to save your map before closing?",
+    "FILRODENSWMB.UI.UnsavedChangesWarning": "You have unsaved changes. Do you want to save the open map first?",
     "FILRODENSWMB.UI.WarnScaleLimit": "Landscape scale limit reached.",
 
     "FILRODENSWMB.JOURNAL.Title": "World map parameter log",

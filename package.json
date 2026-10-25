@@ -9,6 +9,8 @@
     "fixtures": "node tests/mesh/fixtures/build-p0jbva.mjs",
     "pretest": "node tests/mesh/fixtures/build-p0jbva.mjs --if-missing",
     "test": "node --test \"tests/**/*.test.mjs\"",
+    "tutorial:build": "node tests/tutorial/run.mjs --build",
+    "tutorial:script": "node tests/tutorial/script.mjs",
     "lint": "eslint main.js src tests scripts web"
   },
   "devDependencies": {
