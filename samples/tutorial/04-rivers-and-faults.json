@@ -1,0 +1,2048 @@
+{
+  "name": "Tutorial world",
+  "seed": "P0JBVA",
+  "generationEngine": "guided",
+  "terrainVersion": 2,
+  "sizeRevision": 2,
+  "nameLevels": true,
+  "localLevel": true,
+  "waterRoutes": true,
+  "world": null,
+  "mapUnit": "km",
+  "generatorStale": false,
+  "generatorSettings": {
+    "seed": "",
+    "nameBase": "Human Generic",
+    "world": {
+      "density": 1,
+      "urbanisation": 1,
+      "realmSpacing": 1,
+      "fragmentation": 1
+    },
+    "ages": [
+      {
+        "era": "highMedieval",
+        "strife": "troubled",
+        "event": null
+      }
+    ],
+    "output": {
+      "duchies": true,
+      "counties": true,
+      "places": {
+        "city": true,
+        "largeTown": true,
+        "town": true,
+        "castle": true
+      },
+      "routes": {
+        "road": true,
+        "river": true,
+        "sea": true
+      },
+      "labels": true,
+      "history": true,
+      "defaultStyles": null
+    }
+  },
+  "cultures": [],
+  "upwindMargin": null,
+  "parentRun": null,
+  "infillPending": false,
+  "riverRoutes": false,
+  "terrainUpgradeDismissed": false,
+  "springsBaked": true,
+  "mapWidth": 2000,
+  "mapHeight": 1600,
+  "gridType": "square",
+  "gridSize": 50,
+  "gridVisible": false,
+  "detailLevel": 4,
+  "avoidLabelOverlaps": true,
+  "symbolSize": null,
+  "hiddenLabelStyles": [],
+  "hiddenLevels": [],
+  "hideRegionFills": false,
+  "thematic": {
+    "fill": null,
+    "lines": [],
+    "opacity": 0.7
+  },
+  "params": {
+    "seaLevel": 0.35,
+    "tectonicPlates": 10,
+    "coastlineFracture": 0.1,
+    "continentalGrouping": 0.4,
+    "shelfRange": 0.2,
+    "coastalPlain": 0.2,
+    "flatTexture": false,
+    "continentScale": 400,
+    "oceanScale": 200,
+    "oceanRidges": 0.5,
+    "globalTemp": 0.5,
+    "seasonOffset": 0,
+    "latTop": 60,
+    "latBottom": -60,
+    "globalMoisture": 0.5,
+    "riverDensity": 40,
+    "terrain": {
+      "extraOctaves": 0,
+      "detailOctaves": 1,
+      "resolutionScale": 2,
+      "fillEnclosedCoast": true,
+      "coastalBuffers": true,
+      "world": {
+        "zoom": 1,
+        "originX": 0,
+        "originY": 0,
+        "rootW": 2000,
+        "rootH": 1600
+      },
+      "faultFrame": {
+        "zoom": 1,
+        "originX": 0,
+        "originY": 0
+      },
+      "currentRivers": true,
+      "exactDistances": true
+    },
+    "noise": {
+      "offsetX": 0,
+      "offsetY": 0,
+      "moistureOffset": 10000,
+      "tempOffset": 20000,
+      "elevation": {
+        "scale": 0.002,
+        "octaves": 8,
+        "stretch": 1.75
+      },
+      "moisture": {
+        "scale": 0.001,
+        "octaves": 3
+      },
+      "temperature": {
+        "scale": 0.001,
+        "octaves": 2
+      }
+    },
+    "hydrology": {
+      "maxLakeSize": 8000,
+      "springAltOffset": 0.25,
+      "springMoistMin": 0.45,
+      "meanderJitter": 0,
+      "riverMeander": 1,
+      "riverWidthScale": 1
+    },
+    "climate": {
+      "altCooling": 0.4,
+      "freezingThreshold": 0.2,
+      "windDistance": 40
+    },
+    "biomePalette": {
+      "0": [
+        0,
+        0,
+        0
+      ],
+      "1": [
+        26,
+        75,
+        132
+      ],
+      "2": [
+        46,
+        117,
+        182
+      ],
+      "3": [
+        240,
+        240,
+        240
+      ],
+      "4": [
+        149,
+        163,
+        164
+      ],
+      "5": [
+        77,
+        107,
+        83
+      ],
+      "6": [
+        141,
+        163,
+        104
+      ],
+      "7": [
+        58,
+        122,
+        70
+      ],
+      "8": [
+        41,
+        92,
+        53
+      ],
+      "9": [
+        194,
+        178,
+        128
+      ],
+      "10": [
+        23,
+        66,
+        32
+      ],
+      "11": [
+        196,
+        186,
+        114
+      ],
+      "12": [
+        214,
+        198,
+        137
+      ],
+      "13": [
+        225,
+        235,
+        240
+      ],
+      "14": [
+        140,
+        122,
+        138
+      ],
+      "ERASER": [
+        0,
+        0,
+        0
+      ],
+      "DEEP_OCEAN": [
+        26,
+        75,
+        132
+      ],
+      "SHALLOW_OCEAN": [
+        46,
+        117,
+        182
+      ],
+      "SNOW": [
+        240,
+        240,
+        240
+      ],
+      "TUNDRA": [
+        149,
+        163,
+        164
+      ],
+      "TAIGA": [
+        77,
+        107,
+        83
+      ],
+      "GRASSLAND": [
+        141,
+        163,
+        104
+      ],
+      "DECIDUOUS_FOREST": [
+        58,
+        122,
+        70
+      ],
+      "TEMPERATE_RAINFOREST": [
+        41,
+        92,
+        53
+      ],
+      "TEMPERATE_DESERT": [
+        194,
+        178,
+        128
+      ],
+      "TROPICAL_RAINFOREST": [
+        23,
+        66,
+        32
+      ],
+      "SAVANNA": [
+        196,
+        186,
+        114
+      ],
+      "SUBTROPICAL_DESERT": [
+        214,
+        198,
+        137
+      ],
+      "PACK_ICE": [
+        225,
+        235,
+        240
+      ]
+    },
+    "biomeSides": {
+      "0": 7,
+      "1": 2,
+      "2": 2,
+      "3": 1,
+      "4": 1,
+      "5": 1,
+      "6": 1,
+      "7": 1,
+      "8": 1,
+      "9": 1,
+      "10": 1,
+      "11": 1,
+      "12": 1,
+      "13": 4,
+      "14": 1,
+      "15": 0,
+      "16": 0,
+      "17": 0,
+      "18": 0,
+      "19": 0,
+      "20": 0,
+      "21": 0,
+      "22": 0,
+      "23": 0,
+      "24": 0,
+      "25": 0,
+      "26": 0,
+      "27": 0,
+      "28": 0,
+      "29": 0,
+      "30": 0,
+      "31": 0,
+      "32": 0,
+      "33": 0,
+      "34": 0,
+      "35": 0,
+      "36": 0,
+      "37": 0,
+      "38": 0,
+      "39": 0,
+      "40": 0,
+      "41": 0,
+      "42": 0,
+      "43": 0,
+      "44": 0,
+      "45": 0,
+      "46": 0,
+      "47": 0,
+      "48": 0,
+      "49": 0,
+      "50": 0,
+      "51": 0,
+      "52": 0,
+      "53": 0,
+      "54": 0,
+      "55": 0,
+      "56": 0,
+      "57": 0,
+      "58": 0,
+      "59": 0,
+      "60": 0,
+      "61": 0,
+      "62": 0,
+      "63": 0,
+      "64": 0,
+      "65": 0,
+      "66": 0,
+      "67": 0,
+      "68": 0,
+      "69": 0,
+      "70": 0,
+      "71": 0,
+      "72": 0,
+      "73": 0,
+      "74": 0,
+      "75": 0,
+      "76": 0,
+      "77": 0,
+      "78": 0,
+      "79": 0,
+      "80": 0,
+      "81": 0,
+      "82": 0,
+      "83": 0,
+      "84": 0,
+      "85": 0,
+      "86": 0,
+      "87": 0,
+      "88": 0,
+      "89": 0,
+      "90": 0,
+      "91": 0,
+      "92": 0,
+      "93": 0,
+      "94": 0,
+      "95": 0,
+      "96": 0,
+      "97": 0,
+      "98": 0,
+      "99": 0,
+      "100": 0,
+      "101": 0,
+      "102": 0,
+      "103": 0,
+      "104": 0,
+      "105": 0,
+      "106": 0,
+      "107": 0,
+      "108": 0,
+      "109": 0,
+      "110": 0,
+      "111": 0,
+      "112": 0,
+      "113": 0,
+      "114": 0,
+      "115": 0,
+      "116": 0,
+      "117": 0,
+      "118": 0,
+      "119": 0,
+      "120": 0,
+      "121": 0,
+      "122": 0,
+      "123": 0,
+      "124": 0,
+      "125": 0,
+      "126": 0,
+      "127": 0,
+      "128": 0,
+      "129": 0,
+      "130": 0,
+      "131": 0,
+      "132": 0,
+      "133": 0,
+      "134": 0,
+      "135": 0,
+      "136": 0,
+      "137": 0,
+      "138": 0,
+      "139": 0,
+      "140": 0,
+      "141": 0,
+      "142": 0,
+      "143": 0,
+      "144": 0,
+      "145": 0,
+      "146": 0,
+      "147": 0,
+      "148": 0,
+      "149": 0,
+      "150": 0,
+      "151": 0,
+      "152": 0,
+      "153": 0,
+      "154": 0,
+      "155": 0,
+      "156": 0,
+      "157": 0,
+      "158": 0,
+      "159": 0,
+      "160": 0,
+      "161": 0,
+      "162": 0,
+      "163": 0,
+      "164": 0,
+      "165": 0,
+      "166": 0,
+      "167": 0,
+      "168": 0,
+      "169": 0,
+      "170": 0,
+      "171": 0,
+      "172": 0,
+      "173": 0,
+      "174": 0,
+      "175": 0,
+      "176": 0,
+      "177": 0,
+      "178": 0,
+      "179": 0,
+      "180": 0,
+      "181": 0,
+      "182": 0,
+      "183": 0,
+      "184": 0,
+      "185": 0,
+      "186": 0,
+      "187": 0,
+      "188": 0,
+      "189": 0,
+      "190": 0,
+      "191": 0,
+      "192": 0,
+      "193": 0,
+      "194": 0,
+      "195": 0,
+      "196": 0,
+      "197": 0,
+      "198": 0,
+      "199": 0,
+      "200": 0,
+      "201": 0,
+      "202": 0,
+      "203": 0,
+      "204": 0,
+      "205": 0,
+      "206": 0,
+      "207": 0,
+      "208": 0,
+      "209": 0,
+      "210": 0,
+      "211": 0,
+      "212": 0,
+      "213": 0,
+      "214": 0,
+      "215": 0,
+      "216": 0,
+      "217": 0,
+      "218": 0,
+      "219": 0,
+      "220": 0,
+      "221": 0,
+      "222": 0,
+      "223": 0,
+      "224": 0,
+      "225": 0,
+      "226": 0,
+      "227": 0,
+      "228": 0,
+      "229": 0,
+      "230": 0,
+      "231": 0,
+      "232": 0,
+      "233": 0,
+      "234": 0,
+      "235": 0,
+      "236": 0,
+      "237": 0,
+      "238": 0,
+      "239": 0,
+      "240": 0,
+      "241": 0,
+      "242": 0,
+      "243": 0,
+      "244": 0,
+      "245": 0,
+      "246": 0,
+      "247": 0,
+      "248": 0,
+      "249": 0,
+      "250": 0,
+      "251": 0,
+      "252": 0,
+      "253": 0,
+      "254": 0,
+      "255": 0
+    },
+    "customColors": {
+      "DEEP_OCEAN": [
+        26,
+        75,
+        132
+      ],
+      "SHALLOW_OCEAN": [
+        46,
+        117,
+        182
+      ],
+      "PACK_ICE": [
+        225,
+        235,
+        240
+      ],
+      "SNOW": [
+        240,
+        240,
+        240
+      ],
+      "TUNDRA": [
+        149,
+        163,
+        164
+      ],
+      "TAIGA": [
+        77,
+        107,
+        83
+      ],
+      "GRASSLAND": [
+        141,
+        163,
+        104
+      ],
+      "DECIDUOUS_FOREST": [
+        58,
+        122,
+        70
+      ],
+      "TEMPERATE_RAINFOREST": [
+        41,
+        92,
+        53
+      ],
+      "TEMPERATE_DESERT": [
+        194,
+        178,
+        128
+      ],
+      "TROPICAL_RAINFOREST": [
+        23,
+        66,
+        32
+      ],
+      "SAVANNA": [
+        196,
+        186,
+        114
+      ],
+      "SUBTROPICAL_DESERT": [
+        214,
+        198,
+        137
+      ]
+    },
+    "customBiomeRules": {
+      "rowCount": 1,
+      "rowBiomeId": {
+        "0": 14
+      },
+      "rowSides": {
+        "0": 1
+      },
+      "rowElevStart": {
+        "0": 0
+      },
+      "rowElevCount": {
+        "0": 1
+      },
+      "rowMoistStart": {
+        "0": 0
+      },
+      "rowMoistCount": {
+        "0": 1
+      },
+      "rowTempStart": {
+        "0": 0
+      },
+      "rowTempCount": {
+        "0": 1
+      },
+      "elevSegments": {
+        "0": 0.5099999904632568,
+        "1": 0.6800000071525574
+      },
+      "moistSegments": {
+        "0": 0,
+        "1": 0.44999998807907104
+      },
+      "tempSegments": {
+        "0": 0,
+        "1": 0.5
+      }
+    },
+    "display": {
+      "contourInterval": 0.1,
+      "reliefShading": 0.5,
+      "reliefEmphasis": 20,
+      "seabedRelief": 0.75,
+      "waterClarity": 1,
+      "waterHue": 210,
+      "waterSaturation": 1,
+      "biomeAlphaActive": 0.85,
+      "biomeAlphaInactive": 0.65,
+      "regionOpacity": 0.5
+    },
+    "cartography": {
+      "scaleEnable": false,
+      "scaleMatchWorld": true,
+      "scaleInterval": 100,
+      "scaleValue": 1,
+      "scaleMajorTicks": 4,
+      "scaleMinorTicks": 4,
+      "scaleX": 50,
+      "scaleY": 1550,
+      "borderEnable": false,
+      "borderStyle": "solid",
+      "borderColor": "#000000"
+    }
+  },
+  "customBiomes": [
+    {
+      "id": 14,
+      "name": "Moorland",
+      "color": [
+        140,
+        122,
+        138
+      ],
+      "placement": "land",
+      "behavesLike": null,
+      "rules": [
+        {
+          "elevation": [
+            [
+              0.51,
+              0.68,
+              false,
+              false
+            ]
+          ],
+          "moisture": [
+            [
+              0,
+              0.45,
+              true,
+              false
+            ]
+          ],
+          "temperature": [
+            [
+              0,
+              0.5,
+              true,
+              false
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "nextCustomBiomeId": 15,
+  "customRouteStyles": [
+    {
+      "id": "route-style-trunk-road",
+      "name": "Trunk road",
+      "transport": "road",
+      "color": "#6b3a1f",
+      "thickness": 3,
+      "style": "solid",
+      "outline": true,
+      "smoothing": false
+    },
+    {
+      "id": "route-style-main-road",
+      "name": "Main road",
+      "transport": "road",
+      "color": "#8a5a2b",
+      "thickness": 2,
+      "style": "solid",
+      "outline": true,
+      "smoothing": false
+    },
+    {
+      "id": "route-style-minor-road",
+      "name": "Minor road",
+      "transport": "road",
+      "color": "#8a6a45",
+      "thickness": 1.25,
+      "style": "solid",
+      "outline": false,
+      "smoothing": false
+    },
+    {
+      "id": "route-style-track",
+      "name": "Track",
+      "transport": "road",
+      "color": "#7a6a55",
+      "thickness": 1,
+      "style": "dotted",
+      "outline": false,
+      "smoothing": false
+    },
+    {
+      "id": "route-style-lane",
+      "name": "Lane",
+      "transport": "road",
+      "color": "#a8916f",
+      "thickness": 0.9,
+      "style": "solid",
+      "outline": false,
+      "smoothing": false
+    },
+    {
+      "id": "route-style-old-road",
+      "name": "Old road",
+      "transport": "road",
+      "color": "#8c7f6c",
+      "thickness": 1,
+      "style": "dashed",
+      "outline": false,
+      "smoothing": false
+    },
+    {
+      "id": "route-style-sea-lane",
+      "name": "Sea lane",
+      "transport": "sea",
+      "color": "#8db2cc",
+      "thickness": 1.5,
+      "style": "dashed",
+      "outline": false,
+      "smoothing": false
+    },
+    {
+      "id": "route-style-minor-sea-lane",
+      "name": "Minor sea lane",
+      "transport": "sea",
+      "color": "#8db2cc",
+      "thickness": 1,
+      "style": "dotted",
+      "outline": false,
+      "smoothing": false
+    },
+    {
+      "id": "route-style-river-trade",
+      "name": "River trade",
+      "transport": "river",
+      "color": "#8db2cc",
+      "thickness": 1.5,
+      "style": "dashed",
+      "outline": false,
+      "smoothing": false
+    },
+    {
+      "id": "route-style-minor-river-trade",
+      "name": "Minor river trade",
+      "transport": "river",
+      "color": "#8db2cc",
+      "thickness": 1,
+      "style": "dotted",
+      "outline": false,
+      "smoothing": false
+    }
+  ],
+  "customLabelStyles": [
+    {
+      "id": "label-style-realm",
+      "name": "Realm",
+      "fontFamily": "Cinzel",
+      "fontSize": 3,
+      "fillColor": "#CEBB92",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": true,
+      "italic": false
+    },
+    {
+      "id": "label-style-place",
+      "name": "Place",
+      "fontFamily": "EB Garamond",
+      "fontSize": 2,
+      "fillColor": "#DEDCD3",
+      "maxChars": 0,
+      "justify": "left",
+      "bold": true,
+      "italic": false
+    },
+    {
+      "id": "label-style-water",
+      "name": "Water",
+      "fontFamily": "EB Garamond",
+      "fontSize": 2.4,
+      "fillColor": "#E0F0FA",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": false,
+      "italic": true
+    },
+    {
+      "id": "label-style-note",
+      "name": "Note",
+      "fontFamily": "Kalam",
+      "fontSize": 1.6,
+      "fillColor": "#DEDCD3",
+      "maxChars": 24,
+      "justify": "left",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "id": "label-style-road",
+      "name": "Road",
+      "fontFamily": "Barlow Semi Condensed",
+      "fontSize": 1.4,
+      "fillColor": "#5a3a1e",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "id": "label-style-sea-lane",
+      "name": "Sea lane",
+      "fontFamily": "Noto Serif",
+      "fontSize": 1.4,
+      "fillColor": "#2e5f8a",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": false,
+      "italic": true
+    },
+    {
+      "id": "label-style-duchy",
+      "name": "Duchy",
+      "fontFamily": "Cinzel",
+      "fontSize": 2.2,
+      "fillColor": "#CEBB92",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": false,
+      "italic": false
+    },
+    {
+      "id": "label-style-county",
+      "name": "County",
+      "fontFamily": "EB Garamond",
+      "fontSize": 1.6,
+      "fillColor": "#CEBB92",
+      "maxChars": 0,
+      "justify": "center",
+      "bold": false,
+      "italic": true
+    },
+    {
+      "id": "label-style-capital",
+      "name": "Capital",
+      "fontFamily": "EB Garamond",
+      "fontSize": 1.6,
+      "fillColor": "#FFFFFF",
+      "maxChars": 0,
+      "justify": "left",
+      "bold": true,
+      "italic": false
+    },
+    {
+      "id": "label-style-settlement",
+      "name": "Settlement",
+      "fontFamily": "EB Garamond",
+      "fontSize": 1.2,
+      "fillColor": "#DEDCD3",
+      "maxChars": 0,
+      "justify": "left",
+      "bold": false,
+      "italic": false
+    }
+  ],
+  "customRegionStyles": [],
+  "customPinStyles": [
+    {
+      "id": "ilfVT1Fwz3Tly2Bv",
+      "name": "Capital",
+      "tier": "capital",
+      "icon": "circle_outline_with_star",
+      "scale": 1.6,
+      "color": "#ffffff",
+      "detailLevel": 0,
+      "label": {
+        "fontSize": 1.6,
+        "visibility": "all",
+        "quickStyle": "label-style-capital",
+        "detailLevel": 0
+      }
+    },
+    {
+      "id": "C68Ah9TdBp9t1nDy",
+      "name": "City",
+      "tier": "city",
+      "icon": "star",
+      "scale": 1.2,
+      "color": "#ffffff",
+      "detailLevel": 0,
+      "label": {
+        "fontSize": 1.2,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 0
+      }
+    },
+    {
+      "id": "2pyTVo96ZIzwGHQ6",
+      "name": "Large town",
+      "tier": "largeTown",
+      "icon": "circle_with_dot",
+      "scale": 0.8,
+      "color": "#ffffff",
+      "detailLevel": 1,
+      "label": {
+        "fontSize": 0.8,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 2
+      }
+    },
+    {
+      "id": "eahnx7IqcO2DkQa6",
+      "name": "Town",
+      "tier": "town",
+      "icon": "circle_outline_with_dot",
+      "scale": 0.7,
+      "color": "#ffffff",
+      "detailLevel": 2,
+      "label": {
+        "fontSize": 0.7,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 3
+      }
+    },
+    {
+      "id": "FQqXdKfXjb8ddREG",
+      "name": "Market town",
+      "tier": "marketTown",
+      "icon": "dot",
+      "scale": 0.6,
+      "color": "#ffffff",
+      "detailLevel": 3,
+      "label": {
+        "fontSize": 0.6,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 3
+      }
+    },
+    {
+      "id": "bYcRnRmCsvlRKjF8",
+      "name": "Large village",
+      "tier": "largeVillage",
+      "icon": "dot_outline",
+      "scale": 0.5,
+      "color": "#ffffff",
+      "detailLevel": 3,
+      "label": {
+        "fontSize": 0.5,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 4
+      }
+    },
+    {
+      "id": "MX7hIkI8yd9f4BBO",
+      "name": "Village",
+      "tier": "village",
+      "icon": "dot_outline",
+      "scale": 0.5,
+      "color": "#ffffff",
+      "detailLevel": 4,
+      "label": {
+        "fontSize": 0.5,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 4
+      }
+    },
+    {
+      "id": "1WQZbjZ6Q1kLMzIw",
+      "name": "Castle",
+      "tier": "castle",
+      "icon": "castle",
+      "scale": 0.8,
+      "color": "#ffffff",
+      "detailLevel": 1,
+      "label": {
+        "fontSize": 0.8,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 2
+      }
+    },
+    {
+      "id": "oz9I0iPyQHirOHow",
+      "name": "Fortified town",
+      "tier": "fortifiedTown",
+      "icon": "fortress",
+      "scale": 0.8,
+      "color": "#ffffff",
+      "detailLevel": 1,
+      "label": {
+        "fontSize": 0.8,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 2
+      }
+    },
+    {
+      "id": "aVJU3eJxubd4PUbK",
+      "name": "Port",
+      "tier": "port",
+      "icon": "anchor",
+      "scale": 0.8,
+      "color": "#ffffff",
+      "detailLevel": 1,
+      "label": {
+        "fontSize": 0.8,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 2
+      }
+    },
+    {
+      "id": "PiBZ1POClHg0pFL4",
+      "name": "Ruin",
+      "tier": "ruin",
+      "icon": "classical_building",
+      "scale": 0.6,
+      "color": "#ffffff",
+      "detailLevel": 2,
+      "label": {
+        "fontSize": 0.6,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 3
+      }
+    },
+    {
+      "id": "nAkQr1f6Xi1zlt70",
+      "name": "Ruined capital",
+      "tier": "ruinedCapital",
+      "icon": "circle_outline_with_star",
+      "scale": 1.2,
+      "color": "#ff6464",
+      "detailLevel": 1,
+      "label": {
+        "fontSize": 1.2,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 3
+      }
+    },
+    {
+      "id": "gNfSqDeSdjlmtm8B",
+      "name": "Ruined city",
+      "tier": "ruinedCity",
+      "icon": "star",
+      "scale": 1,
+      "color": "#ff6464",
+      "detailLevel": 1,
+      "label": {
+        "fontSize": 1,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 3
+      }
+    },
+    {
+      "id": "wbHUqk8ojxlqfQol",
+      "name": "Ruined large town",
+      "tier": "ruinedLargeTown",
+      "icon": "circle_with_dot",
+      "scale": 0.7,
+      "color": "#ff6464",
+      "detailLevel": 2,
+      "label": {
+        "fontSize": 0.7,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 3
+      }
+    },
+    {
+      "id": "kSkZp3NO8P25Gxa0",
+      "name": "Ruined town",
+      "tier": "ruinedTown",
+      "icon": "circle_outline_with_dot",
+      "scale": 0.6,
+      "color": "#ff6464",
+      "detailLevel": 2,
+      "label": {
+        "fontSize": 0.6,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 3
+      }
+    },
+    {
+      "id": "hpponvZSwUOFsDMK",
+      "name": "Abandoned castle",
+      "tier": "abandonedCastle",
+      "icon": "castle",
+      "scale": 0.7,
+      "color": "#ff6464",
+      "detailLevel": 2,
+      "label": {
+        "fontSize": 0.7,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 3
+      }
+    },
+    {
+      "id": "QwGdY3JVEKHmUnAm",
+      "name": "Landmark",
+      "tier": "landmark",
+      "icon": "jp_landmark",
+      "scale": 0.8,
+      "color": "#ffffff",
+      "detailLevel": 2,
+      "label": {
+        "fontSize": 0.8,
+        "visibility": "all",
+        "quickStyle": "label-style-settlement",
+        "detailLevel": 2
+      }
+    }
+  ],
+  "history": [
+    {
+      "layer": "terrain",
+      "tool": "raise",
+      "size": 40,
+      "strength": 0.01,
+      "feather": 0.8,
+      "paintValue": null,
+      "revision": 2,
+      "points": [
+        {
+          "x": 1540,
+          "y": 1030
+        },
+        {
+          "x": 1548,
+          "y": 1050
+        },
+        {
+          "x": 1556,
+          "y": 1070
+        },
+        {
+          "x": 1562,
+          "y": 1090
+        },
+        {
+          "x": 1566,
+          "y": 1110
+        },
+        {
+          "x": 1568,
+          "y": 1130
+        },
+        {
+          "x": 1566,
+          "y": 1150
+        },
+        {
+          "x": 1560,
+          "y": 1170
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "smooth",
+      "size": 40,
+      "strength": 0.05,
+      "feather": 0.8,
+      "paintValue": null,
+      "revision": 2,
+      "points": [
+        {
+          "x": 1750,
+          "y": 622
+        },
+        {
+          "x": 1770,
+          "y": 624
+        },
+        {
+          "x": 1790,
+          "y": 627
+        },
+        {
+          "x": 1810,
+          "y": 629
+        },
+        {
+          "x": 1830,
+          "y": 632
+        },
+        {
+          "x": 1850,
+          "y": 634
+        },
+        {
+          "x": 1870,
+          "y": 636
+        },
+        {
+          "x": 1890,
+          "y": 639
+        },
+        {
+          "x": 1910,
+          "y": 641
+        },
+        {
+          "x": 1930,
+          "y": 644
+        },
+        {
+          "x": 1950,
+          "y": 646
+        },
+        {
+          "x": 1970,
+          "y": 648
+        },
+        {
+          "x": 1990,
+          "y": 651
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "smooth",
+      "size": 40,
+      "strength": 0.05,
+      "feather": 0.8,
+      "paintValue": null,
+      "revision": 2,
+      "points": [
+        {
+          "x": 1990,
+          "y": 651
+        },
+        {
+          "x": 1970,
+          "y": 648
+        },
+        {
+          "x": 1950,
+          "y": 646
+        },
+        {
+          "x": 1930,
+          "y": 644
+        },
+        {
+          "x": 1910,
+          "y": 641
+        },
+        {
+          "x": 1890,
+          "y": 639
+        },
+        {
+          "x": 1870,
+          "y": 636
+        },
+        {
+          "x": 1850,
+          "y": 634
+        },
+        {
+          "x": 1830,
+          "y": 632
+        },
+        {
+          "x": 1810,
+          "y": 629
+        },
+        {
+          "x": 1790,
+          "y": 627
+        },
+        {
+          "x": 1770,
+          "y": 624
+        },
+        {
+          "x": 1750,
+          "y": 622
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "smooth",
+      "size": 40,
+      "strength": 0.05,
+      "feather": 0.8,
+      "paintValue": null,
+      "revision": 2,
+      "points": [
+        {
+          "x": 1750,
+          "y": 622
+        },
+        {
+          "x": 1770,
+          "y": 624
+        },
+        {
+          "x": 1790,
+          "y": 627
+        },
+        {
+          "x": 1810,
+          "y": 629
+        },
+        {
+          "x": 1830,
+          "y": 632
+        },
+        {
+          "x": 1850,
+          "y": 634
+        },
+        {
+          "x": 1870,
+          "y": 636
+        },
+        {
+          "x": 1890,
+          "y": 639
+        },
+        {
+          "x": 1910,
+          "y": 641
+        },
+        {
+          "x": 1930,
+          "y": 644
+        },
+        {
+          "x": 1950,
+          "y": 646
+        },
+        {
+          "x": 1970,
+          "y": 648
+        },
+        {
+          "x": 1990,
+          "y": 651
+        }
+      ]
+    },
+    {
+      "layer": "terrain",
+      "tool": "roughen",
+      "size": 40,
+      "strength": 0.05,
+      "feather": 0.8,
+      "paintValue": null,
+      "revision": 2,
+      "points": [
+        {
+          "x": 1750,
+          "y": 622
+        },
+        {
+          "x": 1770,
+          "y": 624
+        },
+        {
+          "x": 1790,
+          "y": 627
+        },
+        {
+          "x": 1810,
+          "y": 629
+        },
+        {
+          "x": 1830,
+          "y": 632
+        },
+        {
+          "x": 1850,
+          "y": 634
+        },
+        {
+          "x": 1870,
+          "y": 636
+        },
+        {
+          "x": 1890,
+          "y": 639
+        },
+        {
+          "x": 1910,
+          "y": 641
+        },
+        {
+          "x": 1930,
+          "y": 644
+        },
+        {
+          "x": 1950,
+          "y": 646
+        },
+        {
+          "x": 1970,
+          "y": 648
+        },
+        {
+          "x": 1990,
+          "y": 651
+        }
+      ]
+    },
+    {
+      "layer": "biome",
+      "tool": "paint",
+      "size": 10,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": 14,
+      "paintSides": 1,
+      "points": [
+        {
+          "x": 1546,
+          "y": 1044
+        },
+        {
+          "x": 1550,
+          "y": 1056
+        },
+        {
+          "x": 1554,
+          "y": 1066
+        }
+      ]
+    },
+    {
+      "layer": "biome",
+      "tool": "paint",
+      "size": 10,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": 14,
+      "paintSides": 1,
+      "points": [
+        {
+          "x": 1560,
+          "y": 1088
+        },
+        {
+          "x": 1563,
+          "y": 1098
+        },
+        {
+          "x": 1565,
+          "y": 1108
+        }
+      ]
+    },
+    {
+      "layer": "biome",
+      "tool": "paint",
+      "size": 10,
+      "strength": 0.02,
+      "feather": 0.4,
+      "paintValue": 14,
+      "paintSides": 1,
+      "points": [
+        {
+          "x": 1566,
+          "y": 1128
+        },
+        {
+          "x": 1566,
+          "y": 1138
+        },
+        {
+          "x": 1565,
+          "y": 1148
+        }
+      ]
+    }
+  ],
+  "tectonicFaults": [
+    {
+      "id": "sw8dAp2qR9SZ1IXi",
+      "name": "Fault 1",
+      "description": "",
+      "points": [
+        {
+          "x": 690,
+          "y": 1530
+        },
+        {
+          "x": 820,
+          "y": 1500
+        },
+        {
+          "x": 950,
+          "y": 1490
+        },
+        {
+          "x": 1080,
+          "y": 1475
+        },
+        {
+          "x": 1240,
+          "y": 1450
+        }
+      ],
+      "type": "rift",
+      "thickness": 90,
+      "strength": 0.15,
+      "color": "#06b6d4",
+      "visibility": "all",
+      "revision": 2
+    }
+  ],
+  "manualRivers": [
+    {
+      "id": "wLVV93SzwVve6SlW",
+      "name": "Manual River 1",
+      "points": [
+        {
+          "x": 900,
+          "y": 1340
+        },
+        {
+          "x": 950,
+          "y": 1305
+        },
+        {
+          "x": 1000,
+          "y": 1285
+        },
+        {
+          "x": 1050,
+          "y": 1275
+        },
+        {
+          "x": 1100,
+          "y": 1288
+        },
+        {
+          "x": 1150,
+          "y": 1298
+        },
+        {
+          "x": 1200,
+          "y": 1302
+        },
+        {
+          "x": 1245,
+          "y": 1310
+        }
+      ],
+      "width": "4",
+      "visibility": "all"
+    }
+  ],
+  "mapPins": [
+    {
+      "id": "lL3hd5ZeDFbAdNYT",
+      "name": "River Source",
+      "x": 1200,
+      "y": 600,
+      "type": "spring",
+      "radius": 6,
+      "visibility": "all",
+      "color": "#ffffff",
+      "cell": 100862,
+      "pinStyle": null,
+      "generated": null
+    },
+    {
+      "id": "VJFFSYZ4aqDPZ83A",
+      "name": "Removed River Source",
+      "x": 470.5,
+      "y": 387.5,
+      "type": "block_spring",
+      "radius": 6,
+      "visibility": "all",
+      "cell": 20230,
+      "pinStyle": null,
+      "generated": null
+    }
+  ],
+  "mapRoutes": [],
+  "landMasks": [
+    {
+      "id": "vU6KpTZW3GCmEM7h",
+      "name": "Landmass 1",
+      "operation": "add",
+      "points": [
+        {
+          "x": -51,
+          "y": -20
+        },
+        {
+          "x": -55,
+          "y": 471
+        },
+        {
+          "x": 34,
+          "y": 542
+        },
+        {
+          "x": 157,
+          "y": 672
+        },
+        {
+          "x": 222,
+          "y": 757
+        },
+        {
+          "x": 300,
+          "y": 797
+        },
+        {
+          "x": 427,
+          "y": 684
+        },
+        {
+          "x": 518,
+          "y": 693
+        },
+        {
+          "x": 564,
+          "y": 755
+        },
+        {
+          "x": 417,
+          "y": 839
+        },
+        {
+          "x": 426,
+          "y": 914
+        },
+        {
+          "x": 502,
+          "y": 961
+        },
+        {
+          "x": 559,
+          "y": 1087
+        },
+        {
+          "x": 658,
+          "y": 1234
+        },
+        {
+          "x": 719,
+          "y": 1444
+        },
+        {
+          "x": 716,
+          "y": 1626
+        },
+        {
+          "x": 1384,
+          "y": 1627
+        },
+        {
+          "x": 1146,
+          "y": 1507
+        },
+        {
+          "x": 1252,
+          "y": 1439
+        },
+        {
+          "x": 1200,
+          "y": 1330
+        },
+        {
+          "x": 1279,
+          "y": 1341
+        },
+        {
+          "x": 1331,
+          "y": 1106
+        },
+        {
+          "x": 1318,
+          "y": 1048
+        },
+        {
+          "x": 1237,
+          "y": 1028
+        },
+        {
+          "x": 1389,
+          "y": 769
+        },
+        {
+          "x": 1359,
+          "y": 683
+        },
+        {
+          "x": 1437,
+          "y": 529
+        },
+        {
+          "x": 1309,
+          "y": 434
+        },
+        {
+          "x": 1394,
+          "y": 424
+        },
+        {
+          "x": 1465,
+          "y": 364
+        },
+        {
+          "x": 1579,
+          "y": 403
+        },
+        {
+          "x": 1625,
+          "y": 371
+        },
+        {
+          "x": 1617,
+          "y": 269
+        },
+        {
+          "x": 1740,
+          "y": 230
+        },
+        {
+          "x": 1871,
+          "y": 283
+        },
+        {
+          "x": 1897,
+          "y": 337
+        },
+        {
+          "x": 2012,
+          "y": 362
+        },
+        {
+          "x": 2026,
+          "y": -16
+        }
+      ]
+    },
+    {
+      "id": "kcA29BVUHetvDA2M",
+      "name": "Landmass 2",
+      "operation": "add",
+      "points": [
+        {
+          "x": 1598,
+          "y": 1247
+        },
+        {
+          "x": 1530,
+          "y": 1245
+        },
+        {
+          "x": 1517,
+          "y": 1167
+        },
+        {
+          "x": 1470,
+          "y": 1114
+        },
+        {
+          "x": 1447,
+          "y": 1073
+        },
+        {
+          "x": 1475,
+          "y": 1015
+        },
+        {
+          "x": 1568,
+          "y": 954
+        },
+        {
+          "x": 1660,
+          "y": 997
+        },
+        {
+          "x": 1659,
+          "y": 1065
+        },
+        {
+          "x": 1616,
+          "y": 1094
+        },
+        {
+          "x": 1657,
+          "y": 1129
+        },
+        {
+          "x": 1651,
+          "y": 1169
+        }
+      ]
+    },
+    {
+      "id": "zOWhBRWWSf45Jt3Q",
+      "name": "Landmass 3",
+      "operation": "add",
+      "points": [
+        {
+          "x": 2022,
+          "y": 489
+        },
+        {
+          "x": 1915,
+          "y": 510
+        },
+        {
+          "x": 1784,
+          "y": 535
+        },
+        {
+          "x": 1690,
+          "y": 646
+        },
+        {
+          "x": 1783,
+          "y": 717
+        },
+        {
+          "x": 1888,
+          "y": 728
+        },
+        {
+          "x": 1957,
+          "y": 755
+        },
+        {
+          "x": 2024,
+          "y": 724
+        }
+      ]
+    },
+    {
+      "id": "Imcf93vYYOg0V6Mb",
+      "name": "Landmass 4",
+      "operation": "add",
+      "points": [
+        {
+          "x": 2024,
+          "y": 1310
+        },
+        {
+          "x": 1958,
+          "y": 1324
+        },
+        {
+          "x": 1890,
+          "y": 1314
+        },
+        {
+          "x": 1847,
+          "y": 1313
+        },
+        {
+          "x": 1827,
+          "y": 1372
+        },
+        {
+          "x": 1839,
+          "y": 1432
+        },
+        {
+          "x": 1907,
+          "y": 1500
+        },
+        {
+          "x": 1925,
+          "y": 1550
+        },
+        {
+          "x": 2010,
+          "y": 1566
+        }
+      ]
+    },
+    {
+      "id": "4g4vgyxy9v8SwkrC",
+      "name": "Ocean Hole 5",
+      "operation": "subtract",
+      "points": [
+        {
+          "x": 1004,
+          "y": 784
+        },
+        {
+          "x": 1066,
+          "y": 804
+        },
+        {
+          "x": 1111,
+          "y": 849
+        },
+        {
+          "x": 1063,
+          "y": 933
+        },
+        {
+          "x": 1013,
+          "y": 950
+        },
+        {
+          "x": 964,
+          "y": 925
+        },
+        {
+          "x": 952,
+          "y": 860
+        }
+      ]
+    }
+  ],
+  "mapLabels": [],
+  "mapDecorations": [],
+  "reference": null,
+  "parentId": null,
+  "vectorSchemaVersion": 4,
+  "mesh": {
+    "seed": 3957674699,
+    "spacing": 4,
+    "cells": 119788,
+    "modelSpacingKm": 25,
+    "modelSpacingPx": 11.60966230877523,
+    "width": 2000,
+    "height": 1600,
+    "version": 1
+  },
+  "layerSets": [
+    {
+      "id": "S0OTqMr8r1BSOt3n",
+      "name": "Regions",
+      "kind": "custom",
+      "visibility": "all",
+      "waterTint": true,
+      "opacity": 1,
+      "levels": [
+        {
+          "id": "mFIG6tmH96BRprtT",
+          "name": "Layer 1",
+          "titleTemplate": "{name}",
+          "parentLevelId": null,
+          "nestingMode": "constrained",
+          "visibility": "all",
+          "opacity": 0.5,
+          "watersPx": 40,
+          "nextKey": 0,
+          "regions": [],
+          "style": {
+            "quickStyle": null,
+            "lineColor": "#ffffff",
+            "lineThickness": 1.5,
+            "lineStyle": "solid",
+            "seaLineThickness": 0.75,
+            "seaLineStyle": "dashed",
+            "scaleWithMap": false
+          },
+          "ownersKey": "owners.mFIG6tmH96BRprtT"
+        }
+      ]
+    }
+  ],
+  "owners": {
+    "mFIG6tmH96BRprtT": "7KcHAeynBw=="
+  }
+}

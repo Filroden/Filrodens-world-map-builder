@@ -95,6 +95,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
                     do: "expect",
                     check: (studio, seed) => (studio.uiState.generationEngine === "guided" && studio.mapWidth === 2000 && studio.mapHeight === 1600 && studio.uiState.mapSeed === seed && studio.uiState.isEditMode) || "the new Guided map was not made as asked",
                     args: P0JBVA.seed,
+                    within: 60000,
                 },
             ],
             screenshot: { name: "empty", region: "studio" },
@@ -170,7 +171,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             action: [
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "dialog", button: "ok", input: "Tutorial world", label: "Confirm" },
-                { do: "expect", check: (studio) => (!!studio.currentSaveId && !studio.isDirty) || "the map was not saved" },
+                { do: "expect", check: (studio) => (!!studio.currentSaveId && !studio.isDirty) || "the map was not saved", within: 30000 },
             ],
             narration: "Finally, save the map, and call it Tutorial world. Next, we shape the land.",
         },
