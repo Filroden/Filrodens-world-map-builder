@@ -4,7 +4,8 @@ import { FILRODENSWMB } from "../config.js";
  * The PNG export's scales: what each makes, which the map allows, and which is recommended, so
  * the smallest name shown can be read in the image without zooming in.
  *
- * A scale is allowed while the image stays within EXPORT_PNG.MAX_SIDE on a side and
+ * A scale is allowed while the image stays within EXPORT_PNG.MAX_SIDE on a side (or a smaller
+ * limit given, such as the graphics card's largest texture for a scene's background) and
  * EXPORT_PNG.MAX_PIXELS in all. The recommended scale is the smallest allowed one at which the
  * smallest name shown is at least EXPORT_PNG.MIN_LABEL_PX tall, in whole pixels; when none reaches it, the largest
  * allowed; with no names shown, 1x.
@@ -15,10 +16,12 @@ export class ExportScale {
      * @param {number} options.width - The map's width in pixels (the image's at 1x).
      * @param {number} options.height
      * @param {number|null} options.smallestLabelPx - The smallest name shown, in map pixels (null for none).
+     * @param {number} [options.maxSide] - The longest side allowed, if less than EXPORT_PNG.MAX_SIDE.
      * @returns {{options: {scale: number, width: number, height: number, allowed: boolean, recommended: boolean}[], recommended: number, reason: {kind: string, px?: number, scaledPx?: number, scale?: number}}}
      */
-    static plan({ width, height, smallestLabelPx }) {
-        const { SCALES, MIN_LABEL_PX, MAX_SIDE, MAX_PIXELS } = FILRODENSWMB.EXPORT_PNG;
+    static plan({ width, height, smallestLabelPx, maxSide = Infinity }) {
+        const { SCALES, MIN_LABEL_PX, MAX_PIXELS } = FILRODENSWMB.EXPORT_PNG;
+        const MAX_SIDE = Math.min(FILRODENSWMB.EXPORT_PNG.MAX_SIDE, maxSide);
         const options = SCALES.map((scale) => {
             const w = Math.round(width * scale);
             const h = Math.round(height * scale);

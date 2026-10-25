@@ -1683,6 +1683,7 @@
     "FILRODENSWMB.UI.ExportPngScaleOption": "{scale}× ({width} × {height})",
     "FILRODENSWMB.UI.ExportPngScaleRecommended": "{scale}× ({width} × {height}), recommended",
     "FILRODENSWMB.UI.ExportPngScaleTooLarge": "{scale}× ({width} × {height}), too large",
+    "FILRODENSWMB.UI.ExportSceneScaleHint": "The scene is made the size of its image, with its grid scaled alike, so a larger scale shows the map larger in Foundry with sharper names, and takes longer to load. A cell still measures the same distance. Export again at the same scale to keep walls, lights and tokens where you placed them. Scales larger than this computer's graphics card can show are left out.",
     "FILRODENSWMB.UI.ExportPngReasonNone": "No names are shown, so the map's own size is enough.",
     "FILRODENSWMB.UI.ExportPngReasonEnough": "The smallest names shown are {px} px tall, so the map's own size is enough to read them.",
     "FILRODENSWMB.UI.ExportPngReasonReaches": "The smallest names shown are {px} px tall at 1×; {scale}× makes them {scaledPx} px, enough to read.",

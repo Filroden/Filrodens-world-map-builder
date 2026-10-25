@@ -63,7 +63,7 @@ export class SceneExporter {
 
         // 5. Construct the Scene
         ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepScene"));
-        await this.#createScene(app, sceneName, playerImgPath, gmImgPath, journalObj);
+        await this.#createScene(app, sceneName, playerImgPath, gmImgPath, journalObj, this.sceneScale(config.scale));
 
         // The scene's name is the GM's own text: it goes in as a format value, which Foundry's
         // notifications escape
@@ -165,19 +165,36 @@ export class SceneExporter {
     }
 
     /**
+     * The export's scale as a whole number from 1 (the scales offered are whole; see ExportScale).
+     * @param {*} value
+     * @returns {number}
+     */
+    static sceneScale(value) {
+        const scale = Math.round(Number(value));
+        return scale >= 1 ? scale : 1;
+    }
+
+    /**
      * Creates the Scene for the exported map, or updates the one of the same name from an earlier
      * export, then adds the GM overlay tile and a thumbnail, and finally shows it.
      * Each extra is optional: a failure in one is logged and the rest of the export carries on.
+     *
+     * The scene is the size of its images: the map's size times the export's scale, with the grid
+     * scaled alike. Foundry fits a background to the scene's size, so a 2x image on a scene of the
+     * map's own size would be shrunk back on screen and its names drawn no larger than at 1x; on a
+     * 2x scene they are shown as the 2x PNG shows them. Every cell is the same cell of the map at
+     * any scale (the grid data is keyed by cell, not by pixel), and measures the same ground.
      */
-    static async #createScene(app, sceneName, bgPath, gmOverlayPath, journalObj) {
+    static async #createScene(app, sceneName, bgPath, gmOverlayPath, journalObj, scale = 1) {
         const gridData = this.#buildGridData(app);
-        const sceneData = this.#sceneData(app, sceneName, bgPath, gridData);
+        const sceneData = this.#sceneData(app, sceneName, bgPath, gridData, scale);
+        if (gridData) gridData.grid.size = sceneData.grid.size;
 
         const scene = await this.#saveScene(sceneName, sceneData, gridData, journalObj);
         if (!scene) return;
 
         this.#warnIfGridSizeChanged(scene, sceneData, gridData);
-        if (gmOverlayPath) await this.#createGmOverlayTile(app, scene, gmOverlayPath);
+        if (gmOverlayPath) await this.#createGmOverlayTile(scene, sceneData, gmOverlayPath);
         await this.#updateThumbnail(scene);
 
         // Save the map payload so the new journalPageId links persist
@@ -205,7 +222,7 @@ export class SceneExporter {
     }
 
     /** The Scene document's data: the map as its background, its grid, and the grid data flag when there is grid data. */
-    static #sceneData(app, sceneName, bgPath, gridData) {
+    static #sceneData(app, sceneName, bgPath, gridData, scale = 1) {
         // Foundry's raw integer grid-type constants, shared with GridDataExporter so the Scene
         // document's own grid config and the exported grid-data payload always agree on which
         // numeric type a given uiState.gridType maps to.
@@ -214,8 +231,8 @@ export class SceneExporter {
 
         const sceneData = {
             name: sceneName,
-            width: app.mapWidth,
-            height: app.mapHeight,
+            width: Math.round(app.mapWidth * scale),
+            height: Math.round(app.mapHeight * scale),
             padding: 0,
             backgroundColor: "#222222",
             tokenVision: false,
@@ -225,8 +242,9 @@ export class SceneExporter {
             grid: {
                 type: mappedGridType,
                 // The same size the grid data was built with (see MapStateManager.gridSizeOf)
-                size: gridSize,
-                // What one cell measures in the map's own unit, so Foundry's ruler reads true
+                size: gridSize * scale,
+                // What one cell measures in the map's own unit, so Foundry's ruler reads true (the
+                // same at any export scale: a cell is the same piece of the map)
                 ...this.gridScale(app, gridSize),
                 color: "#000000",
                 alpha: 0.4, // Fixed opacity to guarantee visibility in Foundry
@@ -301,16 +319,16 @@ export class SceneExporter {
         ui.notifications.warn(game.i18n.localize("FILRODENSWMB.UI.GridDataSizeMismatch"));
     }
 
-    /** Adds the GM overlay as a hidden, locked tile covering the whole map. */
-    static async #createGmOverlayTile(app, scene, gmOverlayPath) {
+    /** Adds the GM overlay as a hidden, locked tile covering the whole scene. */
+    static async #createGmOverlayTile(scene, sceneData, gmOverlayPath) {
         try {
             await scene.createEmbeddedDocuments("Tile", [
                 {
                     texture: { src: gmOverlayPath },
-                    width: app.mapWidth,
-                    height: app.mapHeight,
-                    x: app.mapWidth / 2,
-                    y: app.mapHeight / 2,
+                    width: sceneData.width,
+                    height: sceneData.height,
+                    x: sceneData.width / 2,
+                    y: sceneData.height / 2,
                     hidden: true,
                     locked: true,
                 },

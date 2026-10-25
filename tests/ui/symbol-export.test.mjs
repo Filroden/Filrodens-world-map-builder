@@ -66,6 +66,14 @@ test("the export recommends the smallest allowed scale that makes the smallest n
     assert.deepEqual(large.reason, { kind: "short", px: 2, scaledPx: 4, scale: 2 });
 });
 
+test("a scene's scales stop at the graphics card's largest texture, the recommendation with them", () => {
+    const scene = ExportScale.plan({ width: 3000, height: 1680, smallestLabelPx: 4, maxSide: 8192 });
+    assert.deepEqual(scene.options.map((option) => option.allowed), [true, true, false, false], "6000 fits 8192; 9000 does not");
+    assert.equal(scene.recommended, 2);
+    assert.equal(scene.reason.kind, "short");
+    assert.deepEqual(ExportScale.plan({ width: 3000, height: 1680, smallestLabelPx: 4, maxSide: 100_000 }).options.map((option) => option.allowed), [true, true, true, true], "never past the PNG's own limit");
+});
+
 test("the tiles cover the image exactly, none larger than the limit", () => {
     const tiles = ExportScale.tiles(9000, 5040, 4096);
     assert.equal(tiles.length, 6);

@@ -93,3 +93,11 @@ test("a scene's grid measures one cell at the map's scale, in the map's unit", (
 
     assert.equal(SceneExporter.gridScale({ uiState: { mapUnit: "" }, mapHeight: 1600 }, 50).units, "km", "no unit named, the default");
 });
+
+test("a scene's scale is a whole number from 1", () => {
+    assert.equal(SceneExporter.sceneScale(2), 2);
+    assert.equal(SceneExporter.sceneScale("3"), 3);
+    assert.equal(SceneExporter.sceneScale(0), 1);
+    assert.equal(SceneExporter.sceneScale(undefined), 1);
+    assert.equal(SceneExporter.sceneScale(Number.NaN), 1);
+});

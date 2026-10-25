@@ -5389,13 +5389,38 @@ export class MapStudio {
     }
 
     /**
-     * Asks for the PNG's scale (see ExportScale): each with the image's size, the recommended one
-     * chosen, from the smallest name drawn now, with the reason. Resolves with the scale, or null
-     * when cancelled.
+     * Asks for the PNG's scale (see #exportScales). Resolves with the scale, or null when cancelled.
      * @returns {Promise<number|null>}
      */
     async #chooseExportScale() {
-        const plan = ExportScale.plan({ width: this.mapWidth, height: this.mapHeight, smallestLabelPx: this.canvasEngine.smallestLabelPx() });
+        const { plan, options, reason } = this.#exportScales();
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-png.hbs", { options, reason });
+        const chosen = await platform.dialogs.prompt({
+            classes: ["fwmb"],
+            title: platform.i18n.localize("FILRODENSWMB.UI.ExportPNG"),
+            content,
+            onSubmit: (form) => Number(form.elements.exportScale.value),
+        });
+        return MapStudio.#allowedScale(plan, chosen);
+    }
+
+    /** The scale chosen, if the plan allows it; null otherwise (a cancelled dialogue included). */
+    static #allowedScale(plan, chosen) {
+        return plan.options.some((option) => option.allowed && option.scale === chosen) ? chosen : null;
+    }
+
+    /**
+     * The export scales offered (see ExportScale), for the PNG export and the scene export alike:
+     * each with the image's size, the recommended one marked, from the smallest name drawn now,
+     * and the reason as text. A scene's background must fit the graphics card's largest texture to
+     * be shown, so for a scene no larger scale is allowed.
+     * @param {object} [options]
+     * @param {boolean} [options.forScene]
+     * @returns {{plan: object, options: object[], reason: string}}
+     */
+    #exportScales({ forScene = false } = {}) {
+        const maxSide = forScene ? this.canvasEngine.maxTextureSize() : Infinity;
+        const plan = ExportScale.plan({ width: this.mapWidth, height: this.mapHeight, smallestLabelPx: this.canvasEngine.smallestLabelPx(), maxSide });
         const number = (value) => value.toLocaleString();
         const options = plan.options.map((option) => {
             const key = option.recommended ? "FILRODENSWMB.UI.ExportPngScaleRecommended" : option.allowed ? "FILRODENSWMB.UI.ExportPngScaleOption" : "FILRODENSWMB.UI.ExportPngScaleTooLarge";
@@ -5409,14 +5434,7 @@ export class MapStudio {
             reaches: () => platform.i18n.format("FILRODENSWMB.UI.ExportPngReasonReaches", { px: px(reason.px), scale: reason.scale, scaledPx: px(reason.scaledPx) }),
             short: () => platform.i18n.format("FILRODENSWMB.UI.ExportPngReasonShort", { px: px(reason.px), scale: reason.scale, scaledPx: px(reason.scaledPx) }),
         };
-        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-png.hbs", { options, reason: reasons[reason.kind]() });
-        const chosen = await platform.dialogs.prompt({
-            classes: ["fwmb"],
-            title: platform.i18n.localize("FILRODENSWMB.UI.ExportPNG"),
-            content,
-            onSubmit: (form) => Number(form.elements.exportScale.value),
-        });
-        return plan.options.some((option) => option.allowed && option.scale === chosen) ? chosen : null;
+        return { plan, options, reason: reasons[reason.kind]() };
     }
 
     /**
@@ -5431,7 +5449,8 @@ export class MapStudio {
         const defaultName = this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.DefaultSceneName");
         const defaultFolder = "fwmb-exports";
 
-        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder });
+        const scales = this.#exportScales({ forScene: true });
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder, options: scales.options, reason: scales.reason });
 
         const config = await platform.dialogs.prompt({
             classes: ["fwmb"],
@@ -5443,6 +5462,7 @@ export class MapStudio {
                 generateJournals: form.elements["generateJournals"].checked,
                 overwriteJournals: form.elements["overwriteJournals"].checked,
                 createGmOverlay: form.elements["createGmOverlay"].checked,
+                scale: MapStudio.#allowedScale(scales.plan, Number(form.elements.exportScale.value)) ?? 1,
             }),
         });
 
@@ -5481,7 +5501,7 @@ export class MapStudio {
             // YIELD to the browser so the newly created PIXI SVG Sprites can upload to the GPU
             await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
 
-            const playerBlob = await this.canvasEngine.extractCanvasBlob("player");
+            const playerBlob = await this.canvasEngine.extractCanvasBlob("player", config.scale);
 
             // --- 2. GM OVERLAY PASS ---
             let gmBlob = null;
@@ -5494,7 +5514,7 @@ export class MapStudio {
                 // YIELD again for the new GM sprites
                 await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
 
-                gmBlob = await this.canvasEngine.extractCanvasBlob("gm");
+                gmBlob = await this.canvasEngine.extractCanvasBlob("gm", config.scale);
             }
 
             if (textEl) textEl.textContent = platform.i18n.localize("FILRODENSWMB.UI.ExportStepScene");

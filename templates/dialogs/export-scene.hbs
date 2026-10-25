@@ -15,6 +15,18 @@
         <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.ExportFolderHint"}}</p>
     </div>
 
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label for="fwmb-export-scene-scale">{{localize "FILRODENSWMB.UI.ExportPngScale"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-export-scene-scale" name="exportScale">
+                {{#each options}}
+                <option value="{{this.scale}}" {{#if this.recommended}}selected{{/if}} {{#unless this.allowed}}disabled{{/unless}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+        <p class="fwmb-hint">{{reason}} {{localize "FILRODENSWMB.UI.ExportSceneScaleHint"}}</p>
+    </div>
+
     <div class="fwmb-divider"></div>
 
     <div class="fwmb-form-group fwmb-form-group--stacked">

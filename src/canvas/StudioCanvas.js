@@ -1442,41 +1442,23 @@ export class StudioCanvas {
     }
 
     /**
-     * Exports the map as a PNG at a scale (see ExportScale): drawn in tiles of at most
-     * EXPORT_PNG.TILE_PX (and the graphics card's texture limit), joined onto one canvas, with
-     * every name and other text redrawn at the scale so it is sharp rather than enlarged. The
-     * terrain is enlarged from the map's own resolution. The reference image and the land masks'
-     * outlines are working aids, never exported. The file is downloaded through a detached link,
-     * which Electron's navigation interceptors leave alone.
-     * @param {string} [filename]
-     * @param {number} [scale] - 1 draws the map at its own size.
-     * @returns {Promise<boolean>} Whether the image was made.
+     * Draws the stage for an export at a scale (see ExportScale), onto one canvas of the map's
+     * size times the scale: in tiles of at most EXPORT_PNG.TILE_PX (and the graphics card's
+     * texture limit), with every name and other text redrawn at the scale so it is sharp rather
+     * than enlarged. The terrain is enlarged from the map's own resolution. The PNG export and
+     * both scene images are drawn here, so they are always made the same way. The camera and the
+     * texts' resolutions are put back afterwards, whatever happens.
+     * @param {number} scale - 1 draws the map at its own size.
+     * @returns {HTMLCanvasElement}
      */
-    async exportToPNG(filename = "world-map", scale = 1) {
-        const referenceVisible = this.layers.reference.visible;
-        const landMasksVisible = this.layers.landMasks.visible;
+    #renderForExport(scale) {
+        const factor = Number(scale) > 0 ? scale : 1;
         const origX = this.stage.position.x;
         const origY = this.stage.position.y;
         const origScaleX = this.stage.scale.x;
         const origScaleY = this.stage.scale.y;
         const texts = [];
-        const restore = () => {
-            this.stage.position.set(origX, origY);
-            this.stage.scale.set(origScaleX, origScaleY);
-            this.layers.reference.visible = referenceVisible;
-            this.layers.landMasks.visible = landMasksVisible;
-            for (const { text, resolution, auto } of texts) {
-                if (text.destroyed) continue;
-                text.resolution = resolution;
-                // PIXI's own flag: the text follows the screen's pixel ratio again
-                text._autoResolution = auto;
-            }
-        };
         try {
-            this.layers.reference.visible = false;
-            this.layers.landMasks.visible = false;
-
-            const factor = Number(scale) > 0 ? scale : 1;
             const width = Math.round(this.mapWidth * factor);
             const height = Math.round(this.mapHeight * factor);
 
@@ -1494,17 +1476,65 @@ export class StudioCanvas {
             output.width = width;
             output.height = height;
             const context = output.getContext("2d");
-            const gl = this.app.renderer.gl;
-            const tileLimit = Math.min(FILRODENSWMB.EXPORT_PNG.TILE_PX, gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : FILRODENSWMB.EXPORT_PNG.TILE_PX);
             this.stage.scale.set(factor);
-            for (const tile of ExportScale.tiles(width, height, tileLimit)) {
+            for (const tile of ExportScale.tiles(width, height, this.#exportTileLimit())) {
                 const renderTexture = PIXI.RenderTexture.create({ width: tile.width, height: tile.height, resolution: 1 });
                 this.stage.position.set(-tile.x, -tile.y);
                 this.app.renderer.render(this.stage, { renderTexture });
                 context.drawImage(this.app.renderer.extract.canvas(renderTexture), tile.x, tile.y);
                 renderTexture.destroy(true);
             }
-            restore();
+            return output;
+        } finally {
+            this.stage.position.set(origX, origY);
+            this.stage.scale.set(origScaleX, origScaleY);
+            for (const { text, resolution, auto } of texts) {
+                if (text.destroyed) continue;
+                text.resolution = resolution;
+                // PIXI's own flag: the text follows the screen's pixel ratio again
+                text._autoResolution = auto;
+            }
+        }
+    }
+
+    /** The largest tile an export draws at once: EXPORT_PNG.TILE_PX, or less if the graphics card's textures are smaller. */
+    #exportTileLimit() {
+        return Math.min(FILRODENSWMB.EXPORT_PNG.TILE_PX, this.maxTextureSize());
+    }
+
+    /**
+     * The largest texture side this graphics card takes (MIN_GUARANTEED_TEXTURE_SIZE when it
+     * cannot be read). A scene's background must fit it to be shown, so the scene export offers
+     * no scale beyond it (see ExportScale.plan).
+     * @returns {number}
+     */
+    maxTextureSize() {
+        const gl = this.app?.renderer?.gl;
+        const size = gl ? Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) : 0;
+        return size > 0 ? size : MIN_GUARANTEED_TEXTURE_SIZE;
+    }
+
+    /**
+     * Exports the map as a PNG at a scale (see #renderForExport). The reference image and the
+     * land masks' outlines are working aids, never exported. The file is downloaded through a
+     * detached link, which Electron's navigation interceptors leave alone.
+     * @param {string} [filename]
+     * @param {number} [scale] - 1 draws the map at its own size.
+     * @returns {Promise<boolean>} Whether the image was made.
+     */
+    async exportToPNG(filename = "world-map", scale = 1) {
+        const referenceVisible = this.layers.reference.visible;
+        const landMasksVisible = this.layers.landMasks.visible;
+        try {
+            this.layers.reference.visible = false;
+            this.layers.landMasks.visible = false;
+            let output;
+            try {
+                output = this.#renderForExport(scale);
+            } finally {
+                this.layers.reference.visible = referenceVisible;
+                this.layers.landMasks.visible = landMasksVisible;
+            }
 
             const blob = await new Promise((resolve) => output.toBlob(resolve, "image/png"));
             if (!blob) throw new Error("The image could not be encoded");
@@ -1518,7 +1548,6 @@ export class StudioCanvas {
             setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
             return true;
         } catch (err) {
-            restore();
             console.error("FWMB | Failed to export PNG:", err);
             platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ExportPngFailed"));
             return false;
@@ -2280,83 +2309,35 @@ export class StudioCanvas {
     }
 
     /**
-     * Extracts the canvas to a binary Blob, manipulating heavy background layers based on the pass type.
+     * One of a scene export's images as a PNG blob, drawn exactly as the PNG export draws (see
+     * #renderForExport) at the scale chosen: the player image (no grid, which Foundry draws), or
+     * the GM overlay (only what players must not see: no terrain, contours, thematic layers,
+     * rivers and faults, grid or cartography). The reference image and the land masks' outlines
+     * are never exported. Every layer goes back to how it was.
+     * @param {"player"|"gm"} [passType]
+     * @param {number} [scale] - 1 draws the map at its own size.
+     * @returns {Promise<Blob|null>}
      */
-    async extractCanvasBlob(passType = "player") {
-        const originalVisibility = {
-            grid: this.gridLayer.visible,
-            reference: this.layers.reference.visible,
-            cartography: this.layers.cartography.visible,
-            landMasks: this.layers.landMasks.visible,
-            terrain: this.layers.terrain.visible,
-            contours: this.layers.contours.visible,
-            features: this.layers.features.visible,
-            thematic: this.layers.thematic.visible,
-            trade: this.layers.trade.visible,
-            travel: this.layers.travel.visible,
-        };
-
-        this.layers.reference.visible = false;
-        // Guided mode's land mask editing polygons are an in-Studio authoring aid only, never
-        // part of the finished map, so they're kept out of every export pass regardless of
-        // whether they happened to be left visible from the Scene tool.
-        this.layers.landMasks.visible = false;
-
-        if (passType === "player") {
-            this.gridLayer.visible = false;
-        } else if (passType === "gm") {
-            this.layers.terrain.visible = false;
-            this.layers.contours.visible = false;
+    async extractCanvasBlob(passType = "player", scale = 1) {
+        const hidden = [this.gridLayer, this.layers.reference, this.layers.landMasks];
+        if (passType === "gm") {
             // The GM overlay holds only what players must not see; a thematic layer is in the
             // player image already
-            this.layers.thematic.visible = false;
-            this.layers.trade.visible = false;
-            this.layers.travel.visible = false;
-            this.layers.features.visible = false;
-            this.gridLayer.visible = false;
-            this.layers.cartography.visible = false;
+            const { terrain, contours, thematic, trade, travel, features, cartography } = this.layers;
+            hidden.push(terrain, contours, thematic, trade, travel, features, cartography);
         }
-
-        // Dynamically oversample small maps for vector crispness, capped at 2x.
-        const optimalRes = 2000 / this.mapWidth;
-        const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
-
-        // Physically multiply the pixel bounds rather than relying on PIXI's resolution flag
-        const renderTexture = PIXI.RenderTexture.create({
-            width: Math.round(this.mapWidth * dynamicRes),
-            height: Math.round(this.mapHeight * dynamicRes),
-            resolution: 1,
-        });
-
-        // Temporarily scale the stage up to draw into the larger texture
-        const origScaleX = this.stage.scale.x;
-        const origScaleY = this.stage.scale.y;
-        this.stage.scale.set(dynamicRes);
-
-        this.app.renderer.render(this.stage, { renderTexture: renderTexture });
-        const canvas = this.app.renderer.extract.canvas(renderTexture);
-
-        // Restore the original scale
-        this.stage.scale.set(origScaleX, origScaleY);
-
-        this.gridLayer.visible = originalVisibility.grid;
-        this.layers.reference.visible = originalVisibility.reference;
-        this.layers.cartography.visible = originalVisibility.cartography;
-        this.layers.landMasks.visible = originalVisibility.landMasks;
-        // Each layer goes back to how the person had it, rather than always to visible
-        this.layers.terrain.visible = originalVisibility.terrain;
-        this.layers.contours.visible = originalVisibility.contours;
-        this.layers.features.visible = originalVisibility.features;
-        this.layers.thematic.visible = originalVisibility.thematic;
-        this.layers.trade.visible = originalVisibility.trade;
-        this.layers.travel.visible = originalVisibility.travel;
-
-        return new Promise((resolve) => {
-            canvas.toBlob((blob) => {
-                renderTexture.destroy(true);
-                resolve(blob);
-            }, "image/png");
-        });
+        const visibility = hidden.map((layer) => layer.visible);
+        let canvas;
+        try {
+            for (const layer of hidden) layer.visible = false;
+            canvas = this.#renderForExport(scale);
+        } finally {
+            // Each layer goes back to how the person had it, rather than always to visible
+            hidden.forEach((layer, index) => {
+                layer.visible = visibility[index];
+            });
+        }
+        return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     }
 
     setRenderPass(mode) {
