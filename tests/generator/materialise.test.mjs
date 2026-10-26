@@ -167,6 +167,19 @@ test("a stretch two routes share is drawn by the higher class only", () => {
     assert.deepEqual(routeRuns([{ ...minor, legs: [[1, 2]] }, trunk], 100).get("a"), [], "a route wholly under another draws nothing");
 });
 
+test("a road drawn by hand ranks by its style's class, and before a generated road of its class", () => {
+    const generated = { run: "run", kind: "route" };
+    const minor = { id: "a", transport: "road", class: "minor", quickStyle: "route-style-minor-road", thickness: 1.25, generated, legs: [[0, 1, 2, 3]] };
+    const drawn = { id: "z", transport: "road", class: null, quickStyle: "route-style-trunk-road", thickness: 3, generated: null, legs: [[1, 2, 3, 4]] };
+    const runs = routeRuns([minor, drawn], 100);
+    assert.equal(runs.get("z"), null, "a road drawn as a trunk road draws whole over a generated minor road");
+    assert.deepEqual(runs.get("a"), [[0, 1]]);
+    const sameClass = routeRuns([{ ...minor, class: "trunk", quickStyle: "route-style-trunk-road", thickness: 3 }, drawn], 100);
+    assert.equal(sameClass.get("z"), null, "the reader's own road before a generated one of its class");
+    const oldStyle = routeRuns([minor, { ...drawn, quickStyle: "route-style-old-road" }], 100);
+    assert.equal(oldStyle.get("a"), null, "a style every class takes gives no class, so the classed road draws");
+});
+
 test("the session's draw lines are cached until a route changes", async () => {
     const { session, made } = await materialised();
     const first = session.routeDrawLines(made.routes);

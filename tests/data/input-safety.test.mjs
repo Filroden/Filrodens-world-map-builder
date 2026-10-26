@@ -5,7 +5,7 @@
 // escaping, the owner decoder's guard, the web host's merge, and the names imports are given.
 // SVG cleaning needs a real browser and is checked in svg-clean.test.mjs.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import Handlebars from "handlebars";
 
@@ -91,6 +91,16 @@ test("a complete v4 map, and the older sample maps, pass the importer with nothi
         // The one value an import has always repaired rather than kept: the area factor
         normaliseAreaFactor(sample);
         assert.deepEqual(result.mapData, sample, name);
+    }
+});
+
+test("maps the studio exported itself (the tutorial's checkpoints) import with nothing corrected", () => {
+    const folder = new URL("../../samples/tutorial/", import.meta.url);
+    const names = readdirSync(folder).filter((name) => name.endsWith(".json"));
+    assert.ok(names.length > 0, "no tutorial checkpoints");
+    for (const name of names) {
+        const result = MapImport.read(JSON.parse(readFileSync(new URL(name, folder), "utf8")));
+        assert.equal(result.corrected, 0, name);
     }
 });
 

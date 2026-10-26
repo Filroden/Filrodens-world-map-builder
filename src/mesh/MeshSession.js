@@ -334,12 +334,12 @@ export class MeshSession {
      * The lines to draw for the routes of a render pass, with the stretches several routes share
      * drawn once (see RouteMerge): by route id, the route's own line when it draws whole, or the
      * lines of the runs it still draws. Cached until any route in the pass, its legs, transport,
-     * class, thickness or smoothing changes.
+     * class, style, thickness or smoothing changes.
      * @param {object[]} routes - The routes visible in the pass.
      * @returns {Map<string, Float64Array[]>}
      */
     routeDrawLines(routes) {
-        const inputs = routes.map((route) => [route, route.legs, route.transport, route.class, route.thickness, route.smoothing === true]);
+        const inputs = routes.map((route) => [route, route.legs, route.transport, route.class, route.quickStyle, route.thickness, route.smoothing === true]);
         const cached = this.#drawnRoutes;
         if (sameInputs(cached.inputs, inputs)) return cached.lines;
         const runs = routeRuns(routes, this.mesh.cellCount);

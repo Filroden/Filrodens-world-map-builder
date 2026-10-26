@@ -303,7 +303,8 @@ const GENERATOR_PANEL = obj({
         routes: flags(Object.keys(FILRODENSWMB.GENERATOR.OUTPUT.routes)),
         labels: bool,
         history: bool,
-        defaultStyles: bool,
+        // null until the run (or the reader) first chooses it, so a map saved before that keeps null
+        defaultStyles: { t: "bool", nullable: true },
     }),
 });
 

@@ -1,8 +1,8 @@
 import { FILRODENSWMB } from "../config.js";
 
 /**
- * The default sea and river route styles were redrawn in one pale blue that shows against the
- * water, told apart by their dashes (see ROUTES.DEFAULT_STYLES). Once, as a map saved before then
+ * The default sea and river route styles were redrawn in pale colours that show against the
+ * water and the land, told apart by their dashes (see ROUTES.DEFAULT_STYLES). Once, as a map saved before then
  * is read, each of those styles still in its old default colour and line takes the new ones, and
  * so does each route following it that still looks as the old style did. A style or route given
  * another colour or line is the reader's own and is left as it is; thickness never changes.

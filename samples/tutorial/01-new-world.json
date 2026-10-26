@@ -711,7 +711,7 @@
     {
       "id": "route-style-sea-lane",
       "transport": "sea",
-      "color": "#8db2cc",
+      "color": "#fff29e",
       "thickness": 1.5,
       "style": "dashed",
       "outline": false,
@@ -721,7 +721,7 @@
     {
       "id": "route-style-minor-sea-lane",
       "transport": "sea",
-      "color": "#8db2cc",
+      "color": "#fff29e",
       "thickness": 1,
       "style": "dotted",
       "outline": false,
