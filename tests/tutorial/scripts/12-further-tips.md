@@ -182,18 +182,98 @@
 
 **Matches the wiki's image:** `12-further-tips-traced.png`
 
-## 12. Carry on
+## 12. Try another seed
 
-**Narration:** Stop drawing, hide the reference image, and save. From here, everything in this tutorial applies to your own map.
+**Narration:** The outline is right, but the hills inside it are the seed's choice. Change the seed and create a new map: the land masks stay, and only the terrain changes.
 
 **On screen:**
 
 - Click Stop drawing.
 - Click Close on the inspector.
+- Set Map seed to 51745D.
+- Click Create new map.
+- Click Discard in the dialogue.
+- Wait for the map to update.
+
+**Camera:** the whole studio
+
+**Hold:** 2 s after the action
+
+## 13. Smooth the coast
+
+**Narration:** In Terrain, lower the coastal fracture for a smoother coast, closer to the sketch, and hide the reference image.
+
+**On screen:**
+
+- Click Terrain on the rail.
+- Set Coastal fracture to 0.1.
+- Wait for the map to update.
 - Click Reference image in the map controls.
 - Reset view.
+
+**Camera:** the map from 0, 0 to 1200, 900
+
+**Hold:** 4 s after the action
+
+**Matches the wiki's image:** `12-further-tips-coast.png`
+
+## 14. Place the towns
+
+**Narration:** Place the sketch's four towns, each beside a river, and name them.
+
+**On screen:**
+
+- Click Routes and pins on the rail.
+- Choose Place on the bar.
+- Set Pin style to Town.
+- Reset view.
+- Click the map to place Thornby.
+- Set Name to Thornby.
+- Reset view.
+- Click the map to place Ashcombe.
+- Set Name to Ashcombe.
+- Reset view.
+- Click the map to place Wetherhold.
+- Set Name to Wetherhold.
+- Reset view.
+- Click the map to place Gull Rock.
+- Set Name to Gull Rock.
+
+**Camera:** the whole studio
+
+**Hold:** 2 s after the action
+
+## 15. Make them larger
+
+**Narration:** Their pins and names are small on a map this size, so mass edit all four: a larger scale, and the Place label style at a larger size.
+
+**On screen:**
+
+- Set Search by name to .
+- Set Made by to Hand-made.
+- Click Select items for mass edit.
+- Click Select all.
+- Click Mass edit.
+- The dialogue opens.
+- Set Scale to 2.2.
+- Set Label style to Place.
+- Set Label size to 2.2.
+- Click Confirm in the dialogue.
+- Choose Select on the bar.
+
+**Camera:** the whole studio
+
+**Hold:** 2 s after the action
+
+## 16. Save it
+
+**Narration:** Save it. A sketch on paper has become a map with real terrain, and everything in this tutorial now applies to it.
+
+**On screen:**
+
 - Click Save map.
 - Type "The Isle of Ashgrove" in the dialogue and click Confirm.
+- Reset view.
 
 **Camera:** the map from 0, 0 to 1200, 900
 
@@ -203,4 +283,4 @@
 
 ---
 
-12 steps; at least 35 s of holds, plus the actions themselves.
+16 steps; at least 45 s of holds, plus the actions themselves.

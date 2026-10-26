@@ -16,6 +16,14 @@ const ISLAND = [[250, 250], [420, 170], [610, 190], [780, 140], [930, 240], [960
 const ISLE = [[1010, 600], [1090, 570], [1130, 650], [1080, 730], [1000, 700]];
 const LAKE = [[560, 420], [640, 400], [680, 460], [620, 510], [550, 480]];
 
+/** The sketch's towns, placed beside the rivers this seed makes rather than exactly where the sketch has them. */
+const TOWNS = [
+    ["Thornby", [340, 507]],
+    ["Ashcombe", [800, 439]],
+    ["Wetherhold", [700, 599]],
+    ["Gull Rock", [1032, 653]],
+];
+
 /** Above the new map's top edge, in its margin: a right-click there finishes a shape. */
 const FINISH_AT = [600, -60];
 
@@ -148,7 +156,7 @@ export default {
         {
             id: "new-map",
             title: "Start a map to trace",
-            instruction: `Now bring in an existing map. Download the sketch [ashgrove-sketch.png](${SKETCH_URL}), an island drawn by hand, 1,200 × 900 pixels. Click **New map** on the rail, set **Size** to \`1200\` × \`900\`, the same as the image, so the image lies over the map pixel for pixel, and click **Create new map**. A new map keeps the land masks of the map that was open, so click **Delete all land masks** in the **Land masks** section and **Yes**: the map is all ocean.`,
+            instruction: `Now bring in an existing map. Download the sketch [ashgrove-sketch.png](${SKETCH_URL}), an island drawn by hand, 1,200 × 900 pixels. Click **New map** on the rail, set **Size** to \`1200\` × \`900\`, the same as the image, so the image lies over the map pixel for pixel, and click **Create new map**. A new map keeps the land masks of the map that was open (you'll see why below), so to start from a clean view, click **Delete all land masks** in the **Land masks** section and **Yes**: the map is all ocean.`,
             action: [
                 { do: "tool", tool: "scene", label: "New map" },
                 { do: "set", field: 'input[name="mapWidth"]', value: SKETCH_SIZE[0], label: "the map's width" },
@@ -191,26 +199,94 @@ export default {
             pause: 4,
         },
         {
-            id: "finish",
-            title: "Carry on",
-            instruction: "Click **Stop drawing**, close the inspector, and turn off **Reference image** in the map controls to see the map on its own. Save the map, naming it `The Isle of Ashgrove`. From here, the rest of the tutorial applies: shape the hills where the sketch has them (page 2), place Thornby, Wetherhold and Ashcombe as pins (page 8), or generate the island's people (page 5).",
+            id: "seed",
+            title: "Try another seed",
+            instruction: "Click **Stop drawing** and close the inspector. The outlines are right, but the hills and valleys inside them are the seed's choice. In the **Generation** section, change **Map seed** to `51745D` and click **Create new map**. The studio asks about the map you haven't saved: click **Discard**. The new map keeps your land masks, so the island's outline stays and only the terrain inside it changes; with this seed the hills sit nearer where the sketch draws them. Try a few seeds until one suits you.",
             action: [
                 { do: "click", target: { role: "button", name: "Stop drawing" }, label: "Stop drawing" },
                 { do: "click", target: `${INSPECTOR} .fwmb-overlay-close`, label: "Close on the inspector" },
+                { do: "set", field: "#fwmb-map-seed", value: "51745D", label: "Map seed" },
+                { do: "click", target: '[data-region="context"] [data-action="applyResolution"]', label: "Create new map" },
+                { do: "dialog", button: "Discard", label: "Discard" },
+                { do: "expect", check: (studio) => (studio.uiState.mapSeed === "51745D" && studio.landMasks.length === 3) || "the new map did not keep the land masks with the new seed", within: 120000 },
+                { do: "settle" },
+            ],
+            note: "This is why a new map keeps the open map's land masks: trying seeds, or a new size, on the same outlines is one click. To start from open sea, click **Delete all land masks**, as above.",
+            narration: "The outline is right, but the hills inside it are the seed's choice. Change the seed and create a new map: the land masks stay, and only the terrain changes.",
+        },
+        {
+            id: "coast",
+            title: "Smooth the coast",
+            instruction: "Click **Terrain** on the rail and lower **Coastal fracture** to `0.1`: the coast breaks up less into islets and inlets, nearer the sketch's simple outline. Then turn off **Reference image** in the map controls and click **Reset view** to see the island on its own.",
+            action: [
+                { do: "tool", tool: "terrain", label: "Terrain" },
+                { do: "set", field: 'input[name="coastlineFracture"]', value: 0.1, label: "Coastal fracture" },
+                { do: "expect", check: (studio) => Number(studio.uiState.coastlineFracture) === 0.1 || "coastal fracture is not 0.1", within: 30000 },
+                { do: "settle" },
                 { do: "click", target: '.fwmb-map-btn[data-action="toggleLayer"][data-layer="reference"]', label: "Reference image in the map controls" },
                 { do: "camera", view: "fit" },
+            ],
+            screenshot: { name: "coast", region: { map: [0, 0, SKETCH_SIZE[0], SKETCH_SIZE[1]] }, mapOnly: true },
+            caption: "The island with the new seed and a smoother coast.",
+            narration: "In Terrain, lower the coastal fracture for a smoother coast, closer to the sketch, and hide the reference image.",
+            pause: 4,
+        },
+        {
+            id: "towns",
+            title: "Place the towns",
+            instruction: "Click **Routes and pins** on the rail, choose **Place** on the bar and set **Pin style** to **Town**. Place the sketch's four towns, each beside a river or on the coast near where the sketch has it, naming each in the inspector as you go: **Thornby** in the west, **Ashcombe** in the east, **Wetherhold** in the south and **Gull Rock** on the isle.",
+            action: [
+                { do: "tool", tool: "infrastructure", label: "Routes and pins" },
+                { do: "mode", action: "setPickMode", mode: "place", label: "Place" },
+                { do: "set", field: '[data-region="editToolbar"] select[name="activePinStyle"]', value: "Town", label: "Pin style" },
+                ...TOWNS.flatMap(([name, at]) => [
+                    { do: "camera", view: "fit" },
+                    { do: "mapClick", at, label: `Click the map to place ${name}.` },
+                    { do: "set", field: `${INSPECTOR} input[name="pinName"]`, value: name, commit: "Enter", label: "Name" },
+                ]),
+                { do: "expect", check: (studio, names) => names.every((name) => studio.mapPins.some((pin) => pin.name === name)) || "not every town was placed", args: TOWNS.map(([name]) => name), within: 30000 },
+            ],
+            note: "The sketch's river runs straight from the hills to the south coast; the engine's rivers follow the land instead. To have the sketch's river exactly, draw it as a custom river in **Rivers and faults** (page 4), though a river that ignores the lie of the land can look out of place.",
+            narration: "Place the sketch's four towns, each beside a river, and name them.",
+        },
+        {
+            id: "town-size",
+            title: "Make them larger",
+            instruction: "On a map this size the Town style's pins and names are small. Make all four larger at once: set the Pins list's **Made by** filter to **Hand-made**, click **Select items for mass edit**, **Select all**, then **Mass edit (4)**. Set **Scale** to `2.2`, and in **Label**, set **Style** to **Place** and **Size** to `2.2`. Click **Confirm**.",
+            action: [
+                { do: "set", field: PIN_SEARCH, value: "", label: "Search by name" },
+                { do: "set", field: PIN_LIST("origin"), value: "handmade", valueLabel: "Hand-made", label: "Made by" },
+                { do: "click", target: '[data-action="toggleMassEditMode"][data-type="pin"]', label: "Select items for mass edit" },
+                { do: "click", target: '[data-action="massEditSelectAll"][data-type="pin"]', label: "Select all" },
+                { do: "click", target: '[data-action="openMassEdit"][data-type="pin"]', label: "Mass edit" },
+                { do: "waitForDialog" },
+                { do: "set", field: 'dialog.fwmb-overlay-modal[open] input[name="item.scale"]', value: 2.2, label: "Scale" },
+                { do: "set", field: 'dialog.fwmb-overlay-modal[open] select[name="label.quickStyle"]', value: "label-style-place", valueLabel: "Place", label: "Label style" },
+                { do: "set", field: 'dialog.fwmb-overlay-modal[open] input[name="label.fontSize"]', value: 2.2, label: "Label size" },
+                { do: "dialog", button: "ok", label: "Confirm" },
+                { do: "expect", check: (studio, names) => names.every((name) => studio.mapPins.find((pin) => pin.name === name)?.scale === 2.2) || "the towns were not made larger", args: TOWNS.map(([name]) => name), within: 30000 },
+                { do: "mode", action: "setPickMode", mode: "select", label: "Select" },
+            ],
+            narration: "Their pins and names are small on a map this size, so mass edit all four: a larger scale, and the Place label style at a larger size.",
+        },
+        {
+            id: "save",
+            title: "Save it",
+            instruction: "Save the map, naming it `The Isle of Ashgrove`. A sketch has become a map with real terrain, climate and rivers; from here everything in this tutorial applies to it, from generating its people (page 5) to exporting it (page 10).",
+            action: [
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "dialog", button: "ok", input: "The Isle of Ashgrove", label: "Confirm" },
                 { do: "expect", check: (studio) => (!!studio.currentSaveId && !studio.isDirty) || "the map was not saved", within: 30000 },
+                { do: "camera", view: "fit" },
             ],
             screenshot: { name: "ashgrove", region: { map: [0, 0, SKETCH_SIZE[0], SKETCH_SIZE[1]] }, mapOnly: true },
             caption: "The Isle of Ashgrove, made from the sketch.",
-            narration: "Stop drawing, hide the reference image, and save. From here, everything in this tutorial applies to your own map.",
+            narration: "Save it. A sketch on paper has become a map with real terrain, and everything in this tutorial now applies to it.",
             pause: 4,
         },
     ],
 
-    whatYouSee: "Two saved maps besides Tutorial world: The Red Hills, with its ruined towns GM only and Redwatch hidden, and The Isle of Ashgrove, traced from the sketch.",
+    whatYouSee: "Two saved maps besides Tutorial world: The Red Hills, with its ruined towns GM only and Redwatch hidden, and The Isle of Ashgrove, traced from the sketch, with the seed 51745D, a smoother coast and its four towns.",
     foundry: "Everything on this page is the same in Foundry, apart from where the sketch comes from: in Foundry, **Image source** opens Foundry's file picker, so upload the image to your world's data first.",
     onYourOwn: `Use the filters and **Select all** whenever you want to change a kind of thing everywhere, and think about styles too: a change to a pin, route or label style reaches every item that follows it. Decide early what your players should not see, and set it GM only as you go; check with **GM view** off before you export. To recreate a map you already have, make the new map the same shape as the image, trace the coasts as land masks, and lower the image's **Opacity** to check the terrain against it. See [[Map Making Tools]] (mass edit), [[Map Canvas]] (view filters), [[Export]] and [[Reference image]].`,
     related: ["Map Making Tools", "Map Canvas", "Export", "Reference image"],
