@@ -24,7 +24,7 @@ export default {
     title: "A new world",
     goal: "Create the map the whole tutorial builds on: a Guided map with the seed P0JBVA, 2,000 by 1,600 pixels, from 60° north to 60° south, with one large continent, three islands and an inland sea.",
     startText: "Nothing: this page makes the map. If the studio already has a map open that you want to keep, save it first.",
-    intro: `Over these ten pages you build one complete map, using nearly every tool in the studio. Each page ends with the map saved, and the next page starts from it, so you can follow the whole tutorial on one map. If you skip a page, or your map has drifted from the pictures, each page links the map as it should be at its start.
+    intro: `Over these twelve pages you build one complete map, using nearly every tool in the studio. Each page ends with the map saved, and the next page starts from it, so you can follow the whole tutorial on one map. If you skip a page, or your map has drifted from the pictures, each page links the map as it should be at its start.
 
 The tutorial's map uses the **Guided** engine: you draw where the land goes and the engine makes the terrain inside your shapes. Your shapes will not match the pictures exactly, and that is fine. To have exactly the tutorial's map, import the file in **Start from** at the top of the next page.`,
     narration: "In this first video we create the map the whole tutorial builds on: a Guided map, where we draw where the land goes and the engine does the rest.",
@@ -177,6 +177,6 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
 
     whatYouSee: `A map of one large continent running from the north-west corner down to the south, three islands to the east and an inland sea, all with hills, mountains and coasts the engine made. The map is saved as **Tutorial world**. The colours come from the biomes the module has worked out from the terrain and climate; later pages change both.`,
     foundry: "Everything on this page is the same in Foundry, apart from opening the studio (from the **Scenes** sidebar) and where the map is saved (in the world, where every GM can open it).",
-    onYourOwn: `Choose the engine that fits what you have in mind (see [[New map]] for the four engines): **Guided** when you know the shape of your world, **Standard** or **Advanced (tectonics)** to browse random worlds by changing the seed. Set the latitudes before you go further, since they decide the climate. Leave the size modest while you experiment: you can make a larger regional map of any part later (page 9).`,
+    onYourOwn: `Choose the engine that fits what you have in mind (see [[New map]] for the four engines): **Guided** when you know the shape of your world, **Standard** or **Advanced (tectonics)** to browse random worlds by changing the seed. Set the latitudes before you go further, since they decide the climate. Leave the size modest while you experiment: you can make a larger regional map of any part later (page 11).`,
     related: ["New map", "Getting Started", "Maps"],
 };

@@ -2027,8 +2027,10 @@ export class MapStudio {
         // The resolution fields describe the next map Create New Map will build, not the open
         // map, so changing them neither marks the map unsaved nor regenerates anything
         if (MapStudio.#NEW_MAP_SIZE_INPUTS.has(name)) return this.#recordNewMapSize(target, name);
-        // The regional map's size is in New map's Regional map section; the crop on the map follows it
-        if (name === "regionalTargetWidth") return this.#handleToolbarInput(event);
+        // The regional map's size is in New map's Regional map section; the crop on the map follows
+        // it. Like the resolution fields, it describes the next map (the cut), not the open one,
+        // so it doesn't mark the map unsaved: cutting would otherwise ask to save the map first
+        if (name === "regionalTargetWidth") return this.#recordRegionalWidth(event, target);
         // Filling in a regional map when first opened is an option for the cut, not part of this map
         if (name === "regionalInfill") {
             this.uiState.regionalInfill = target.checked;
@@ -2219,6 +2221,15 @@ export class MapStudio {
     #recordNewMapSize(target, name) {
         const size = Number.parseInt(target.value, 10);
         if (!Number.isNaN(size)) this.uiState[name] = size;
+    }
+
+    /** The regional map's width, once the field is left (not per keystroke), and the crop fitted to it. */
+    #recordRegionalWidth(event, target) {
+        if (event.type === "input") return;
+        const width = Number(target.value);
+        if (!Number.isFinite(width)) return;
+        this.uiState.regionalTargetWidth = width;
+        this.#syncCropLiveEdits("regionalTargetWidth");
     }
 
     /** The map settings the terrain shader reads directly (see #syncTerrainSettings). */

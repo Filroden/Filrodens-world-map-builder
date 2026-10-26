@@ -8,7 +8,12 @@
 // An action is a plain object, { do: "<kind>", ...its fields, label? }. `label` is the reader's
 // name for the control (the video script says "Click Create new map" from it); without one the
 // script falls back to a description built from the fields.
+import { basename, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { mapToScreen, settle } from "./studio.mjs";
+
+/** The repository's root, which a chosen file's path is relative to. */
+const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 
 /** Longer than the studio's shortest time between two brush stamps (100 ms). */
 const BRUSH_STAMP_MS = 160;
@@ -376,6 +381,16 @@ export const ACTIONS = Object.freeze({
             await page.mouse.move(point.x, point.y);
         },
         describe: ({ label }) => label ?? "Point at the map.",
+    },
+
+    /** Clicks a control that opens the system's file dialogue, and chooses a file there (a path from the repository's root). */
+    chooseFile: {
+        async run(page, { target, file }) {
+            const chooser = page.waitForEvent("filechooser", { timeout: FIND_MS });
+            await clickControl(page, target);
+            await (await chooser).setFiles(join(ROOT, file));
+        },
+        describe: ({ file, label }) => `Click ${label ?? "the file button"} and choose ${basename(file)}.`,
     },
 
     /** Imports a map file through the Maps tool's Import JSON, as a reader does with a checkpoint. */
