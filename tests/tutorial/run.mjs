@@ -5,8 +5,8 @@
 //   wiki/images/tutorial/<nn>-<slug>-<shot>.png   the step screenshots
 //   samples/tutorial/<nn>-<slug>.json             the map at the end of the page (the next page's start)
 //   tests/mesh/fixtures/p0jbva.json               page 4's map again, as the tests' P0JBVA
-//   wiki/Tutorial-<nn>-<Title>.md                 the wiki page
-//   tests/tutorial/scripts/<nn>-<slug>.md         the video's shooting script
+//   wiki/Tutorial-<nn>-<Title>.md                 every page's wiki page
+//   tests/tutorial/scripts/<nn>-<slug>.md         every page's video shooting script
 //
 //   node tests/tutorial/run.mjs                    # play every page, write nothing (what npm test checks)
 //   node tests/tutorial/run.mjs --build            # play and write everything (npm run tutorial:build)
@@ -140,9 +140,11 @@ async function main(args) {
             const started = performance.now();
             console.log(`${pageStem(page)}: ${page.title}`);
             await runPage(host, page, { build, log: (text) => console.log(text) });
-            if (build) writeTexts(page, pages);
             console.log(`  done in ${((performance.now() - started) / 1000).toFixed(0)} s`);
         }
+        // Every page's texts, not only the pages played: a new page changes the one before's Next
+        // link, and every page's count
+        if (build) for (const page of pages) writeTexts(page, pages);
     } finally {
         await host.close();
     }

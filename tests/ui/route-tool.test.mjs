@@ -141,6 +141,15 @@ test("Draw: a click places a waypoint, the next leg is previewed, and Enter fini
     assert.equal(overlays.draft, null);
 });
 
+test("a route drawn by hand names itself in its transport's label style, or the default label when the map has no such style", async () => {
+    const { app } = await studio();
+    const tool = RouteTool.tool(app);
+    assert.equal(placeRoad(app, tool).label, null, "no Road label style on this map");
+    app.uiState.customLabelStyles = [{ id: "label-style-road", name: "Road", fontFamily: "Barlow Semi Condensed", fontSize: 1.4, fillColor: "#5a3a1e", maxChars: 0, justify: "center", bold: false, italic: false }];
+    const road = placeRoad(app, tool);
+    assert.deepEqual(road.label, { quickStyle: "label-style-road", fontFamily: "Barlow Semi Condensed", fontSize: 1.4, fillColor: "#5a3a1e", maxChars: 0, justify: "center", bold: false, italic: false, visibility: "all" });
+});
+
 test("Backspace or Ctrl+Z takes the last press back (a click, or a whole stroke), Escape abandons the draft, and a one-waypoint route is not kept", async () => {
     const { app, overlays } = await studio();
     const tool = RouteTool.tool(app);

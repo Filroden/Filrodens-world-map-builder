@@ -667,4 +667,5 @@ test("Lock, in the Generated section, keeps an item on Generate again; one undo 
     assert.match(form(app).textContent, /GeneratedKeptLocked/);
     await undo(app);
     assert.equal(app.mapPins.find((each) => each.id === pin.id).generated.locked, false);
+    assert.equal(form(app).querySelector('[data-inspector-action="lock"]').checked, false, "the box follows the pin, not the click");
 });

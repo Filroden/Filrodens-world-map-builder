@@ -174,6 +174,10 @@ export class Inspector {
         // A select the reader has used keeps its own choice when its options' selected attributes
         // change, so each option is told whether it is chosen, as the object now says
         for (const option of state.overlay.body.querySelectorAll("option")) option.selected = option.hasAttribute("selected");
+        // So is a checkbox, as the object now says: one that runs an action (Lock) has its click's
+        // own toggle cancelled, which the browser puts back once the click is over, after the
+        // action has already changed the object
+        for (const box of state.overlay.body.querySelectorAll('input[type="checkbox"]')) box.checked = box.hasAttribute("checked");
         state.overlay.setHeader(state.kind.header(app, object, state.ref));
         this.#rememberDefaults(state);
         // The morph takes away the sliders' filled tracks and the bands' handles' places (styles

@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { FieldSpecs } from "./FieldSpecs.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MeshIntegration } from "./MeshIntegration.js";
 import { Inspector } from "./Inspector.js";
@@ -371,12 +372,13 @@ export class RouteTool {
 
     /**
      * The fields a route drawn now starts with: the bar's style (its line fields; with no style,
-     * the map's default line), leg mode and transport.
+     * the map's default line), leg mode and transport, and its transport's label style for its name.
      */
     static #newRouteFields(app) {
         const state = app.uiState;
         const style = (state.customRouteStyles ?? []).find((candidate) => candidate.id === state.activeRouteQuickStyle) ?? null;
         const line = Object.fromEntries(STYLE_FIELDS.map(([key, field]) => [field, style?.[field] ?? state[key]]));
+        const transport = this.transport(app);
         return {
             name: uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewRouteName"), app.mapRoutes ?? []),
             quickStyle: style?.id ?? "custom",
@@ -387,9 +389,17 @@ export class RouteTool {
             smoothing: line.smoothing === true,
             mode: state.routeMode,
             spanWater: state.routeSpanWater === true,
-            transport: this.transport(app),
+            transport,
             visibility: "all",
+            label: this.#newRouteLabel(app, transport),
         };
+    }
+
+    /** A new route's label: its transport's label style (see ROUTES.LABEL_STYLES), or null for the default. */
+    static #newRouteLabel(app, transport) {
+        const id = FILRODENSWMB.ROUTES.LABEL_STYLES[transport];
+        const style = (app.uiState.customLabelStyles ?? []).find((candidate) => candidate.id === id);
+        return style ? { quickStyle: style.id, ...FieldSpecs.labelStyleFields(style), visibility: "all" } : null;
     }
 
     /**

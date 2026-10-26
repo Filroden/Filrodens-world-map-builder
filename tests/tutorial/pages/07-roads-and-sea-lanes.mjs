@@ -94,7 +94,7 @@ export default {
         {
             id: "sea-lane",
             title: "Draw a sea lane",
-            instruction: "Click **Reset view**, choose **Draw**, set **Transport** to **Sea** and **Style** to **Sea lane**. Click the water off the east coast of the continent, south of the Red Hills, then the water off **Newcested**, Islemark's capital, and press Enter. A sea lane keeps to the water, rounding the coast.",
+            instruction: "Click **Reset view**, choose **Draw**, set **Transport** to **Sea** and **Style** to **Sea lane**. Click the water off the east coast of the continent, south of the Red Hills, then the water off **Newcested**, Islemark's capital, and press Enter. A sea lane keeps to the water, rounding the coast. In the inspector, change **Name** to `The Islemark Crossing` and press Enter (a new route is called **Route** until you name it).",
             action: [
                 { do: "camera", view: "fit" },
                 { do: "mode", action: "setRouteMode", mode: "draw", label: "Draw" },
@@ -103,12 +103,14 @@ export default {
                 ...SEA_LANE.map((at) => ({ do: "mapClick", at, label: "Click a waypoint on the water." })),
                 FINISH,
                 { do: "expect", check: (studio) => studio.mapRoutes.some((route) => !route.generated && route.transport === "sea") || "no sea lane of your own", within: 60000 },
+                { do: "set", field: 'dialog.fwmb-inspector[open] input[name="routeName"]', value: "The Islemark Crossing", commit: "Enter", label: "Name" },
+                { do: "expect", check: (studio) => studio.mapRoutes.some((route) => route.name === "The Islemark Crossing") || "no route named The Islemark Crossing", within: 30000 },
                 { do: "settle" },
                 { do: "frame", rect: [1300, 700, 1560, 1060], label: "Zoom in to look at the sea lane." },
             ],
             screenshot: { name: "sea-lane", region: { map: [1300, 700, 1560, 1060] }, mapOnly: true },
-            caption: "The sea lane from the continent to Islemark.",
-            narration: "Now a sea lane. Set the transport to Sea and the style to Sea lane, and click the water off the coast, then off Islemark's capital. The lane keeps to the water.",
+            caption: "The Islemark Crossing, from the continent to Islemark.",
+            narration: "Now a sea lane. Set the transport to Sea and the style to Sea lane, and click the water off the coast, then off Islemark's capital. The lane keeps to the water. Name it The Islemark Crossing.",
             pause: 4,
         },
         {
@@ -125,8 +127,8 @@ export default {
         },
     ],
 
-    whatYouSee: "A trunk road, The King's Road, from Kansmarda north through the Red Hills to Stansto, bending west where you moved its waypoint, and a sea lane from the continent's east coast to Newcested on Islemark.",
+    whatYouSee: "A trunk road, The King's Road, from Kansmarda north through the Red Hills to Stansto, bending west where you moved its waypoint, and a sea lane, The Islemark Crossing, from the continent's east coast to Newcested on Islemark.",
     foundry: "Everything on this page is the same in Foundry.",
-    onYourOwn: `A road you draw near an existing road tends to join it rather than run beside it, which is usually what a road network wants; add a waypoint where it should keep its distance. **Span water** lets a road bridge a strait or river where going round would be longer. To restyle every road of a kind at once, change its route style in [[Styles and icons]]. The [[Travel]] tool times journeys along the map's routes, yours and the run's alike. See [[Routes and pins]] for every mode, the inspector and mass edit.`,
+    onYourOwn: `Route names are placed after the names of places and regions, so on a crowded map a route's name may have no room and is left out; page 8 shows how to place one yourself. A road you draw near an existing road tends to join it rather than run beside it, which is usually what a road network wants; add a waypoint where it should keep its distance. **Span water** lets a road bridge a strait or river where going round would be longer. To restyle every road of a kind at once, change its route style in [[Styles and icons]]. The [[Travel]] tool times journeys along the map's routes, yours and the run's alike. See [[Routes and pins]] for every mode, the inspector and mass edit.`,
     related: ["Routes and pins", "Styles and icons", "Travel"],
 };

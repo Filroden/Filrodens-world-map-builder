@@ -1668,6 +1668,10 @@ export const FILRODENSWMB = {
             Object.freeze({ id: "route-style-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleRiverTrade", transport: "river", color: "#8db2cc", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
             Object.freeze({ id: "route-style-minor-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleMinorRiverTrade", transport: "river", color: "#8db2cc", thickness: 1, style: "dotted", outline: false, smoothing: false }),
         ]),
+        // The label style a route drawn by hand starts its name with, by transport (see
+        // LABELS.DEFAULT_STYLES), so its name looks like the map's other route names rather than
+        // the larger default label. A map that no longer has the style starts it with the default.
+        LABEL_STYLES: Object.freeze({ road: "label-style-road", sea: "label-style-sea-lane", river: "label-style-sea-lane" }),
     },
     // Pins and labels are sized in UNIT steps of what size 1 meant before size revision REVISION:
     // a pin of size 1 is PIN_PX x UNIT pixels across on a LIMITS.BASELINE_DIMENSION map, and a

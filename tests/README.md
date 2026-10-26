@@ -27,7 +27,7 @@ The wiki's tutorial is written as step files, one per page (`tutorial/pages/<nn>
 
     npm run tutorial:build             # play every page; write its screenshots, checkpoint, wiki page and video script
     npm run tutorial:build -- 1 3      # only pages 1 and 3
-    npm run tutorial:script            # only the video scripts, without a browser
+    npm run tutorial:texts             # only the wiki pages and video scripts, without a browser
     node --test tests/tutorial/tutorial.test.mjs   # play every page and write nothing (part of npm test)
 
 What a build writes:
@@ -36,6 +36,8 @@ What a build writes:
 - `samples/tutorial/<nn>-<slug>.json`: the map at the end of the page, exported through **Maps**, which the next page starts from (imported through **Import JSON**, as the page tells the reader). Tracked: the check starts each page from it.
 - `wiki/Tutorial-<nn>-<Title>.md`: the wiki page, with a note that it is generated.
 - `tutorial/scripts/<nn>-<slug>.md`: the video's shooting script: per step, the narration, what happens on screen, the camera and how long to hold.
+
+The wiki pages and scripts are written for every page, not only those played, since a page's text depends on its neighbours (its Start from and Next links, and the page count).
 
 Random numbers in the page are seeded (`lib/studio.mjs`), so a rebuild writes the same ids, the same checkpoint and, on the same Chromium, the same screenshots, byte for byte.
 
