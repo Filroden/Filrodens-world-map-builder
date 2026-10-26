@@ -400,7 +400,13 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     file.cultures[0].homelands.push({ x: "1", y: 2 }, [3, 4]);
     file.thematic = { fill: "__proto__", opacity: 40 };
     file.travel = { mode: "dragon", speeds: { foot: 5000, sea: -3, riverUp: "fast" }, start: { x: 10, y: "2" } };
+    file.manualRivers = [
+        { id: "riverAAAAAAAAAAA", name: "Text width", points: [{ x: 0, y: 0 }], width: "6" },
+        { id: "riverBBBBBBBBBBB", name: "Word width", points: [{ x: 0, y: 0 }], width: "wide" },
+    ];
     const { mapData } = MapImport.read(file);
+    assert.equal(mapData.manualRivers[0].width, 6, "a river's width saved as text by an older version is read as its number");
+    assert.ok(!("width" in mapData.manualRivers[1]), "a width that is no number is dropped");
     assert.deepEqual(mapData.travel, { speeds: { foot: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MAX, sea: FILRODENSWMB.TRAVEL_TIME.SPEED_RANGE.MIN } }, "an unknown way of travel, a speed that is no number and a broken start are dropped; speeds are kept in range");
     assert.deepEqual(mapData.thematic, { opacity: FILRODENSWMB.THEMATIC.OPACITY_RANGE.MAX }, "an unknown thematic layer is dropped and the opacity kept in range");
     assert.ok(!("temperature" in mapData.cultures[0].habitat) && !("relief" in mapData.cultures[0].habitat), "a band must be two numbers, low first");

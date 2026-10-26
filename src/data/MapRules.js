@@ -368,7 +368,9 @@ const RIVER = obj({
     id,
     name: name("FILRODENSWMB.UI.LimitKindRiver"),
     points,
-    width: num(RANGE.SIZE),
+    // Rivers drawn before the width was kept as a number carry it as text ("4"), so a numeric
+    // string is read as its number
+    width: num(RANGE.SIZE, { fromText: true }),
     widthScale: num(RANGE.SIZE),
     visibility,
     hidden,
@@ -807,7 +809,7 @@ const CLEANERS = {
     key: (value) => orDrop(Sanitize.id(value)),
     id: (value, rule, context) => cleanOwnId(value, rule, context),
     ref: (value, rule) => (rule.also?.includes(value) ? value : orDrop(Sanitize.id(value))),
-    num: (value, rule) => orDrop(Sanitize.number(value, rule)),
+    num: (value, rule) => orDrop(Sanitize.number(rule.fromText ? numberFromText(value) : value, rule)),
     bool: (value) => orDrop(Sanitize.bool(value)),
     null: () => null,
     font: (value) => orDrop(Sanitize.fontFamily(value)),
@@ -831,6 +833,9 @@ const CLEANERS = {
 };
 
 const orDrop = (value) => (value === null ? DROP : value);
+
+/** A number written as text ("4") as its number; anything else as it is. */
+const numberFromText = (value) => (typeof value === "string" && /^\s*-?\d+(\.\d+)?\s*$/.test(value) ? Number(value) : value);
 
 function checkText(value, rule, context) {
     if (value === null) return DROP;

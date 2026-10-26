@@ -1,11 +1,9 @@
 // Tutorial page 1: a new world. Creates the tutorial map, P0JBVA, from its seed, size and
-// latitudes, and draws its land masks, the same points as the P0JBVA test fixture, so a reader
-// who imports this page's checkpoint has exactly the map the rest of the tutorial uses.
-import { readFileSync } from "node:fs";
+// latitudes, and draws its land masks (p0jbva.mjs), so a reader who imports this page's
+// checkpoint has exactly the map the rest of the tutorial uses.
+import { MASKS, SEED } from "./p0jbva.mjs";
 
-const P0JBVA = JSON.parse(readFileSync(new URL("../../mesh/fixtures/p0jbva.json", import.meta.url), "utf8"));
-const masks = P0JBVA.landMasks.map((mask) => ({ name: mask.name, land: mask.operation === "add", points: mask.points.map(({ x, y }) => [x, y]) }));
-const [continent, ...rest] = masks;
+const [continent, ...rest] = MASKS;
 const islands = rest.filter((mask) => mask.land);
 const inlandSea = rest.find((mask) => !mask.land);
 
@@ -94,7 +92,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
                 {
                     do: "expect",
                     check: (studio, seed) => (studio.uiState.generationEngine === "guided" && studio.mapWidth === 2000 && studio.mapHeight === 1600 && studio.uiState.mapSeed === seed && studio.uiState.isEditMode) || "the new Guided map was not made as asked",
-                    args: P0JBVA.seed,
+                    args: SEED,
                     within: 60000,
                 },
             ],
@@ -155,7 +153,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
                         const drawn = studio.landMasks.map((mask) => ({ operation: mask.operation, points: mask.points.map(({ x, y }) => [x, y]) }));
                         return JSON.stringify(drawn) === JSON.stringify(expected) || "the land masks are not P0JBVA's";
                     },
-                    args: P0JBVA.landMasks.map((mask) => ({ operation: mask.operation, points: mask.points.map(({ x, y }) => [x, y]) })),
+                    args: MASKS.map((mask) => ({ operation: mask.land ? "add" : "subtract", points: mask.points })),
                     message: "land masks",
                 },
             ],

@@ -4,12 +4,13 @@
 // rebuilds them in about 10 s, locally and in CI.
 //
 //   node tests/mesh/fixtures/build-p0jbva.mjs                # always rebuild
-//   node tests/mesh/fixtures/build-p0jbva.mjs --if-missing   # only when a raster is absent (npm test)
+//   node tests/mesh/fixtures/build-p0jbva.mjs --if-missing   # only when a raster is absent or p0jbva.json has changed (npm test)
 //
 // Writes fixtures/p0jbva/p0.{meta.json, elev.f32, water.f32, river.u8}: elevation, the water mask
 // (> 0 where a pixel is lake) and the river map (> 0 where a pixel is river), the buffers
 // MeshIntegration.terrainBuffers hands to Mesh.aggregate; and p0.{moist.f32, temp.f32, rivers.json}:
 // moisture, temperature and the traced rivers with their flow, which the generator reads.
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,15 +21,27 @@ const out = join(here, "p0jbva");
 const prefix = join(out, "p0");
 const RASTERS = ["meta.json", "elev.f32", "water.f32", "river.u8", "moist.f32", "temp.f32", "rivers.json"];
 
-if (process.argv.includes("--if-missing") && RASTERS.every((name) => existsSync(`${prefix}.${name}`))) {
-    console.log("P0JBVA rasters present; not rebuilt (drop --if-missing to force)");
+// The rasters record the fixture they were built from, so a fixture replaced since (the tutorial
+// build copies a new P0JBVA in) is rebuilt even with --if-missing
+const source = readFileSync(join(here, "p0jbva.json"));
+const sourceHash = createHash("sha256").update(source).digest("hex");
+const builtFrom = () => {
+    try {
+        return JSON.parse(readFileSync(`${prefix}.meta.json`, "utf8")).source;
+    } catch {
+        return null;
+    }
+};
+
+if (process.argv.includes("--if-missing") && RASTERS.every((name) => existsSync(`${prefix}.${name}`)) && builtFrom() === sourceHash) {
+    console.log("P0JBVA rasters present and up to date; not rebuilt (drop --if-missing to force)");
     process.exit(0);
 }
 
 const { ProceduralOrchestrator } = await import("../../../src/ProceduralOrchestrator.js");
 const { setupApp } = await import("../../support/pipeline-setup.mjs");
 
-const payload = JSON.parse(readFileSync(join(here, "p0jbva.json"), "utf8"));
+const payload = JSON.parse(source.toString("utf8"));
 const app = setupApp(payload);
 app.markDirty = () => {};
 
@@ -45,7 +58,7 @@ writeFileSync(`${prefix}.river.u8`, Buffer.from(app.bufferRiverMap.buffer));
 writeFileSync(`${prefix}.moist.f32`, Buffer.from(app.currentMoistureData.buffer));
 writeFileSync(`${prefix}.temp.f32`, Buffer.from(app.currentTemperatureData.buffer));
 writeFileSync(`${prefix}.rivers.json`, JSON.stringify(riverRecord(app.currentRiverData)));
-writeFileSync(`${prefix}.meta.json`, JSON.stringify({ W: app.mapWidth, H: app.mapHeight, seaLevel: app.uiState.seaLevel, latTop: app.uiState.latTop, latBottom: app.uiState.latBottom }));
+writeFileSync(`${prefix}.meta.json`, JSON.stringify({ W: app.mapWidth, H: app.mapHeight, seaLevel: app.uiState.seaLevel, latTop: app.uiState.latTop, latBottom: app.uiState.latBottom, source: sourceHash }));
 console.log(`P0JBVA rasters written to ${out}`);
 process.exit(0);
 

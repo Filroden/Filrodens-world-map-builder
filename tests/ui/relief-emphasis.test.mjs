@@ -14,12 +14,14 @@ const { ProceduralEngine } = await import("../../src/generation/ProceduralEngine
 const fixture = JSON.parse(readFileSync(new URL("../mesh/fixtures/p0jbva.json", import.meta.url)));
 
 test("a map starts at the default Relief Emphasis and saves it with its display settings", () => {
-    const app = setupApp(fixture);
+    // An older map has no Relief Emphasis saved, and takes the default when loaded
+    const older = structuredClone(fixture);
+    delete older.params.display?.reliefEmphasis;
+    const app = setupApp(older);
     assert.equal(app.uiState.reliefEmphasis, FILRODENSWMB.DISPLAY.THREE_D.RELIEF.EMPHASIS);
     app.uiState.reliefEmphasis = 7;
     const { params } = MapStateManager.getMapParameters(app);
     assert.equal(params.display.reliefEmphasis, 7);
-    assert.equal(fixture.params.display?.reliefEmphasis, undefined, "older maps have none, and take the default when loaded");
 });
 
 test("the broad slope's scale follows the map's place in its chain of crops", () => {

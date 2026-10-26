@@ -44,6 +44,8 @@ export default {
     slug: "rivers-and-faults",
     title: "Rivers and faults",
     start: "03-climate-and-biomes",
+    // The map at the end of this page, with the land finished, is the tests' P0JBVA
+    fixture: "tests/mesh/fixtures/p0jbva.json",
     goal: "Add and remove river sources, draw a river of your own, and open a rift valley with a tectonic feature, reshaping it by its points and with Undo.",
     intro: `Rivers are worked out by themselves: they rise where the land is high and wet enough, and run downhill to the sea or into another river, pooling into lakes in hollows on the way. The **Rivers and faults** tool lets you move where they rise, draw rivers of your own, and draw tectonic features that reshape the land around a line.`,
     narration: "In this video we finish shaping the land: we add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.",

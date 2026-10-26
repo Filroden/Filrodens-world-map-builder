@@ -1841,8 +1841,9 @@ export class MapStudio {
         // brushBiome's options are always numeric biome ids, never free text - and BrushEngine's
         // paint guards (and the Eraser's own active-state matching) compare it with strict
         // equality, so it has to come out of here as a real Number, not the string every other
-        // <select> in this method is deliberately left as.
-        else if (name === "brushBiome") this.uiState[name] = Number(target.value);
+        // <select> in this method is deliberately left as. riverWidth's options are pixel widths:
+        // a new river takes the number, which the bar's select compares with and a map file keeps.
+        else if (name === "brushBiome" || name === "riverWidth") this.uiState[name] = Number(target.value);
         else this.uiState[name] = target.value;
 
         // 2. Delegate to Sub-Systems

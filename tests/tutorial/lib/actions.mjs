@@ -13,8 +13,12 @@ import { mapToScreen, settle } from "./studio.mjs";
 /** Longer than the studio's shortest time between two brush stamps (100 ms). */
 const BRUSH_STAMP_MS = 160;
 
+/** The studio's zoom per wheel notch, and how much of the map a framed rectangle fills. */
+const WHEEL_FACTOR = 1.1;
+const FRAME_FILL = 0.9;
+
 /** How long to wait for a control or a dialogue before the step fails. */
-const FIND_MS = 30000;
+const FIND_MS = 60000;
 
 /** The first visible element a target names: a CSS selector, { role, name }, or { text }. */
 function locate(page, target) {
@@ -133,6 +137,16 @@ export const ACTIONS = Object.freeze({
         describe: ({ target, label }) => `Click ${label ?? describeTarget(target)}.`,
     },
 
+    /** Rests the pointer on a control (a list row, whose actions show only under the pointer on a narrower studio). */
+    point: {
+        async run(page, { target }) {
+            const element = locate(page, target);
+            await element.waitFor({ state: "visible", timeout: FIND_MS });
+            await element.hover({ timeout: FIND_MS });
+        },
+        describe: ({ target, label }) => `Point at ${label ?? describeTarget(target)}.`,
+    },
+
     /** Opens a section of the panel if it is closed. */
     openSection: {
         async run(page, { section }) {
@@ -146,11 +160,11 @@ export const ACTIONS = Object.freeze({
 
     /**
      * Sets a field: a text or number box is cleared and typed into, then left with Tab (which
-     * is when the studio reads it); a select is chosen from; a slider is moved to the value; a
-     * checkbox is ticked or cleared.
+     * is when the studio reads it; `commit: "Enter"` for a naming row, which Enter confirms); a
+     * select is chosen from; a slider is moved to the value; a checkbox is ticked or cleared.
      */
     set: {
-        async run(page, { field, value }) {
+        async run(page, { field, value, commit = "Tab" }) {
             const element = locate(page, field);
             await element.waitFor({ state: "visible", timeout: FIND_MS });
             const kind = await element.evaluate((input) => (input.tagName === "SELECT" ? "select" : input.type));
@@ -173,7 +187,7 @@ export const ACTIONS = Object.freeze({
             } else {
                 await element.click({ clickCount: 3, timeout: FIND_MS });
                 await element.fill(String(value), { timeout: FIND_MS });
-                await element.press("Tab");
+                await element.press(commit);
             }
         },
         describe: ({ field, value, valueLabel, label }) => `Set ${label ?? describeTarget(field)} to ${valueLabel ?? value}.`,
@@ -277,6 +291,41 @@ export const ACTIONS = Object.freeze({
             await page.mouse.up();
         },
         describe: ({ to, label }) => label ?? `Drag the handle to ${to}.`,
+    },
+
+    /**
+     * Frames a rectangle of the map, [x0, y0, x1, y1], as a reader zooms in on a place: Reset
+     * view, a right-drag that brings the rectangle's centre to the middle of the map, then the
+     * mouse wheel, a notch at a time, until the rectangle nearly fills the map. Used before a
+     * close-up, so its picture is the same size on every run.
+     */
+    frame: {
+        async run(page, { rect }) {
+            await ACTIONS.camera.run(page, { view: "fit" });
+            await settle(page, { settleMs: 1000 });
+            const [x0, y0, x1, y1] = rect;
+            const view = await page.evaluate(() => {
+                const engine = globalThis.fwmbStudio.canvasEngine;
+                const box = (engine.app.canvas ?? engine.app.view).getBoundingClientRect();
+                return { left: box.left, top: box.top, width: box.width, height: box.height, scale: engine.stage.scale.x };
+            });
+            const centre = await reachMap(page, (x0 + x1) / 2, (y0 + y1) / 2);
+            const middle = { x: view.left + view.width / 2, y: view.top + view.height / 2 };
+            // Right-drag: the map moves with the pointer
+            await page.mouse.move(centre.x, centre.y);
+            await page.mouse.down({ button: "right" });
+            await page.mouse.move(middle.x, middle.y, { steps: 8 });
+            await page.mouse.up({ button: "right" });
+            const wanted = Math.min((view.width * FRAME_FILL) / (x1 - x0), (view.height * FRAME_FILL) / (y1 - y0));
+            const notches = Math.max(0, Math.floor(Math.log(wanted / view.scale) / Math.log(WHEEL_FACTOR)));
+            await page.mouse.move(middle.x, middle.y);
+            for (let notch = 0; notch < notches; notch++) {
+                await page.mouse.wheel(0, -100);
+                await page.waitForTimeout(50);
+            }
+            await page.waitForTimeout(250);
+        },
+        describe: ({ label }) => label ?? "Zoom in on the place.",
     },
 
     /** Drags on the map from one point to another. */

@@ -4,6 +4,7 @@
 //
 //   wiki/images/tutorial/<nn>-<slug>-<shot>.png   the step screenshots
 //   samples/tutorial/<nn>-<slug>.json             the map at the end of the page (the next page's start)
+//   tests/mesh/fixtures/p0jbva.json               page 4's map again, as the tests' P0JBVA
 //   wiki/Tutorial-<nn>-<Title>.md                 the wiki page
 //   tests/tutorial/scripts/<nn>-<slug>.md         the video's shooting script
 //
@@ -13,7 +14,8 @@
 //
 // The wiki folder is the wiki's own repository inside the working copy (git-ignored here); the
 // checkpoints are tracked, since each page's check starts from the one before.
-import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runActions } from "./lib/actions.mjs";
@@ -86,7 +88,14 @@ export async function runPage(host, page, { build = false, log = () => {} } = {}
     try {
         for (const step of page.steps) {
             const started = performance.now();
-            await runActions(browserPage, step, { page });
+            try {
+                await runActions(browserPage, step, { page });
+            } catch (error) {
+                // What the studio showed when the step failed, to see what was in the way
+                const shot = join(tmpdir(), `fwmb-tutorial-${pageStem(page)}-${step.id}.png`);
+                await browserPage.screenshot({ path: shot }).catch(() => {});
+                throw new Error(`${error.message}\n  (the studio at the failure: ${shot})`, { cause: error });
+            }
             if (step.settle !== false) await settle(browserPage, build ? {} : { settleMs: QUICK_SETTLE_MS });
             if (browserPage.fwmbErrors.length) throw new Error(`step "${step.id}": the page threw: ${browserPage.fwmbErrors.join("; ")}`);
             if (build && step.screenshot) {
@@ -95,7 +104,16 @@ export async function runPage(host, page, { build = false, log = () => {} } = {}
             }
             log(`  ${step.id} (${((performance.now() - started) / 1000).toFixed(1)} s)`);
         }
-        if (build && page.checkpoint !== false) log(`  checkpoint ${relative(ROOT, await writeCheckpoint(browserPage, page))}`);
+        if (build && page.checkpoint !== false) {
+            const checkpoint = await writeCheckpoint(browserPage, page);
+            log(`  checkpoint ${relative(ROOT, checkpoint)}`);
+            // The page whose map is a test fixture (P0JBVA, at the end of the terrain pages) copies
+            // it there too, so the tests always run on the map the tutorial makes
+            if (page.fixture) {
+                copyFileSync(checkpoint, join(ROOT, page.fixture));
+                log(`  fixture ${page.fixture} (run npm run fixtures to rebuild its rasters)`);
+            }
+        }
     } finally {
         await context.close();
     }

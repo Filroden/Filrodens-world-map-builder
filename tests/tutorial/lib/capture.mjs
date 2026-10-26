@@ -9,6 +9,8 @@ const TOOLTIP_CLEAR_MS = 400;
 async function elementBox(page, selector) {
     const element = page.locator(selector).filter({ visible: true }).first();
     if (!(await element.count())) throw new Error(`screenshot region "${selector}" is not on the screen`);
+    // A section further down a panel is scrolled into view, as a reader scrolls to it
+    await element.scrollIntoViewIfNeeded();
     return element.boundingBox();
 }
 
@@ -17,6 +19,13 @@ async function mapBox(page, [x0, y0, x1, y1]) {
     const a = await mapToScreen(page, x0, y0);
     const b = await mapToScreen(page, x1, y1);
     return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };
+}
+
+/** The part of one box inside another: a map rectangle is never pictured beyond the map's own view. */
+function intersect(a, b) {
+    const x = Math.max(a.x, b.x);
+    const y = Math.max(a.y, b.y);
+    return { x, y, width: Math.max(0, Math.min(a.x + a.width, b.x + b.width) - x), height: Math.max(0, Math.min(a.y + a.height, b.y + b.height) - y) };
 }
 
 /** A region (a name, { selector }, { map }, or { union: [regions] }) as a screen box, or null for the whole studio. */
@@ -28,7 +37,7 @@ async function regionBox(page, region) {
         return elementBox(page, selector);
     }
     if (region.selector) return elementBox(page, region.selector);
-    if (region.map) return mapBox(page, region.map);
+    if (region.map) return intersect(await mapBox(page, region.map), await elementBox(page, REGIONS.map));
     if (region.union) {
         const boxes = (await Promise.all(region.union.map((part) => regionBox(page, part)))).filter(Boolean);
         const x = Math.min(...boxes.map((box) => box.x));

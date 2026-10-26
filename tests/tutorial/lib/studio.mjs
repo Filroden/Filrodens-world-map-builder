@@ -97,15 +97,17 @@ export async function startStudioHost({ chromium, executablePath }) {
  * the tutorial's theme, with seeded random numbers, and waits until the starting map is ready.
  *
  * @param {{url: string, browser: object}} host
- * @param {{seed?: number, timeout?: number}} [options]
+ * @param {{seed?: number, timeout?: number, initScript?: string}} [options] - initScript runs
+ *     before the studio's own scripts (an investigation's stand-in for a browser setting).
  * @returns {Promise<{context: object, page: object}>}
  */
-export async function openStudio(host, { seed = 1, timeout = 180000 } = {}) {
+export async function openStudio(host, { seed = 1, timeout = 180000, initScript = null } = {}) {
     const context = await host.browser.newContext({ viewport: STUDIO_SIZE, deviceScaleFactor: 1, colorScheme: "dark", reducedMotion: "reduce", acceptDownloads: true });
     await context.addInitScript((theme) => {
         for (const [key, value] of Object.entries(theme)) localStorage.setItem(`fwmb.${key}`, JSON.stringify(value));
     }, THEME);
     await context.addInitScript(seededRandomScript(seed));
+    if (initScript) await context.addInitScript(initScript);
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
