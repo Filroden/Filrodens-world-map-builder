@@ -1063,15 +1063,14 @@ export const FILRODENSWMB = {
         // pixels apart, from each tier's typical spacing (GENERATOR.TOWNS.TIERS)
         MIN_SPACING_PX: 60,
     }),
-    // Help's links (see HelpPanel). The tutorial's link is null until the tutorial exists, which
-    // hides it.
+    // Help's links (see HelpPanel). A link set to null is hidden.
     HELP: {
         REPOSITORY: "https://github.com/Filroden/Filrodens-world-map-builder",
         LICENCE: "https://github.com/Filroden/Filrodens-world-map-builder/blob/main/LICENSE.md",
         SPONSOR: "https://github.com/sponsors/Filroden",
         CHANGELOG: "https://filroden.com/modules/filroden-s-world-map-builder/",
         WIKI: "https://github.com/Filroden/Filrodens-world-map-builder/wiki",
-        TUTORIAL: null,
+        TUTORIAL: "https://github.com/Filroden/Filrodens-world-map-builder/wiki/Tutorial-01-A-new-world",
         ISSUE: "https://github.com/Filroden/Filrodens-world-map-builder/issues/new",
         // The other host: the web version from Foundry, the Foundry module from the web
         WEB_VERSION: "https://fwmb.filroden.com",

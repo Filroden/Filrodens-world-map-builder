@@ -7,7 +7,7 @@ import { platform } from "../platform/index.js";
 /**
  * Help, in the inspector's column (see Inspector): About (the module's name and version, its
  * author with Sponsor, the repository, the licence, and the other host), Help (the changelog, the
- * wiki, the tutorial once it exists, reporting an issue, Copy version details, and the shortcuts,
+ * wiki, the tutorial, reporting an issue, Copy version details, and the shortcuts,
  * a fold per tool, with Show all shortcuts) and Acknowledgements (src/data/credits.js, the fonts as
  * one fold). Every link opens in a new tab.
  *

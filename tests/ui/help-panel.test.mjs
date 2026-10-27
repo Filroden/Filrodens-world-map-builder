@@ -78,7 +78,7 @@ test("Help holds About, Help and Acknowledgements, every link opening in a new t
     assert.ok(links.length > 10);
     assert.ok(links.every((link) => link.target === "_blank" && link.rel === "noopener" && link.querySelector(".fwmb-icon--open-in-new")));
     const hrefs = links.map((link) => link.getAttribute("href"));
-    for (const url of [FILRODENSWMB.HELP.SPONSOR, FILRODENSWMB.HELP.REPOSITORY, FILRODENSWMB.HELP.LICENCE, FILRODENSWMB.HELP.CHANGELOG, FILRODENSWMB.HELP.WIKI, FILRODENSWMB.HELP.ISSUE, FILRODENSWMB.HELP.FOUNDRY_PACKAGE]) assert.ok(hrefs.includes(url), url);
+    for (const url of [FILRODENSWMB.HELP.SPONSOR, FILRODENSWMB.HELP.REPOSITORY, FILRODENSWMB.HELP.LICENCE, FILRODENSWMB.HELP.CHANGELOG, FILRODENSWMB.HELP.WIKI, FILRODENSWMB.HELP.TUTORIAL, FILRODENSWMB.HELP.ISSUE, FILRODENSWMB.HELP.FOUNDRY_PACKAGE]) assert.ok(hrefs.includes(url), url);
     assert.equal(hrefs.includes(FILRODENSWMB.HELP.WEB_VERSION), false, "the web version is not offered on the web");
     assert.ok(dialog.querySelectorAll('[data-section^="helpShortcuts"]').length > 3, "a fold per tool");
     assert.ok(dialog.querySelector('[data-inspector-action="copyVersion"]') && dialog.querySelector('[data-inspector-action="showShortcuts"]'));
