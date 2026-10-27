@@ -18,7 +18,7 @@ It builds a world from a seed: the land, its climate, rivers and biomes, and the
 
 In Foundry, maps are saved as journals in a compendium. On the web, they are saved in your browser, and a map can be exported as a JSON file and imported into either version. Because the terrain is procedural and your edits are kept as a history of strokes, a saved map stays very small.
 
-![Module Interface](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/interface.png)
+![The studio on a finished map](https://raw.githubusercontent.com/wiki/Filroden/Filrodens-world-map-builder/images/home/home-studio.png)
 
 ### Main features
 
@@ -68,19 +68,19 @@ The map builder makes a world in two parts: the land, worked out from a procedur
 
 ### Example maps
 
-The following are two examples of maps I created in the module together with links to their JSON files which can be imported into the module.
+The map the [tutorial](https://github.com/Filroden/Filrodens-world-map-builder/wiki/Tutorial-01-A-new-world) builds, P0JBVA, and a regional map cut from it, each exported as a PNG at its own size. Their map files can be imported into the module.
 
-#### World map (generated at 4000 × 4000 pixels)
+#### The tutorial's world map (2,000 × 1,600 pixels)
 
-![World map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/original-map.png)
+![The tutorial's world map](https://raw.githubusercontent.com/wiki/Filroden/Filrodens-world-map-builder/images/home/home-world-map.png)
 
-Link to map JSON file: [https://github.com/Filroden/Filrodens-world-map-builder/samples/fwmb_aethoria.json](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/samples/fwmb_aethoria.json) (36 KB)
+Map file: [10-finishing-and-sharing.json](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/samples/tutorial/10-finishing-and-sharing.json)
 
-#### A regional map of the world map above (generated at 4000 × 2730 pixels)
+#### A regional map of its Red Hills (1,600 × 1,760 pixels), filled in with villages and market towns
 
-![Regional Map generated from the World map](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/assets/screenshots/regional-map.png)
+![A regional map of the Red Hills](https://raw.githubusercontent.com/wiki/Filroden/Filrodens-world-map-builder/images/home/home-regional-map.png)
 
-Link to map JSON file: [<https://github.com/Filroden/Filrodens-world-map-builder/samples/fwmb_eldoria.json>](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/samples/fwmb_eldoria.json) (32 KB)
+Map file: [11-a-regional-map.json](https://github.com/Filroden/Filrodens-world-map-builder/blob/main/samples/tutorial/11-a-regional-map.json)
 
 ---
 

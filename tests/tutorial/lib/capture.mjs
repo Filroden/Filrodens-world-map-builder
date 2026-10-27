@@ -60,14 +60,17 @@ function clipOf(box, pad = 0) {
  * Takes a step's screenshot.
  *
  * @param {object} page - Playwright's page.
- * @param {{name: string, region?: string|object, pad?: number, pointer?: number[], keepFocus?: boolean, mapOnly?: boolean}} shot
+ * @param {{name: string, region?: string|object, pad?: number, pointer?: number[]|"keep", keepFocus?: boolean, mapOnly?: boolean}} shot
  *     mapOnly: hides the map's overlays, for a picture of the map rather than the studio.
- *     pointer: a map pixel to rest the pointer on (so the information bar reads it); otherwise
- *     the pointer is parked on the panel's header, where nothing shows a tooltip.
+ *     pointer: a map pixel to rest the pointer on (so the information bar reads it), or "keep" to
+ *     leave it where the step left it (holding an item); otherwise the pointer is parked on the
+ *     panel's header, where nothing shows a tooltip.
  * @param {string} path - Where the PNG is written.
  */
 export async function takeScreenshot(page, shot, path) {
-    if (shot.pointer) {
+    if (shot.pointer === "keep") {
+        // The pointer stays where the step left it (holding an item, say)
+    } else if (shot.pointer) {
         const at = await mapToScreen(page, shot.pointer[0], shot.pointer[1]);
         await page.mouse.move(at.x, at.y);
     } else {

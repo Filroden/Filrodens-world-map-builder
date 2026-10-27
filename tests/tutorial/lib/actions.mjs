@@ -8,12 +8,16 @@
 // An action is a plain object, { do: "<kind>", ...its fields, label? }. `label` is the reader's
 // name for the control (the video script says "Click Create new map" from it); without one the
 // script falls back to a description built from the fields.
+import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mapToScreen, settle } from "./studio.mjs";
 
 /** The repository's root, which a chosen file's path is relative to. */
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+
+/** A file's path: "tmp:<name>" in the temporary folder (a file a step downloaded), anything else from the repository's root. */
+const filePath = (file) => (file.startsWith("tmp:") ? join(tmpdir(), file.slice(4)) : join(ROOT, file));
 
 /** Longer than the studio's shortest time between two brush stamps (100 ms). */
 const BRUSH_STAMP_MS = 160;
@@ -383,12 +387,52 @@ export const ACTIONS = Object.freeze({
         describe: ({ label }) => label ?? "Point at the map.",
     },
 
+    /** Presses the mouse button on a map point and holds it (until a release), as a reader holds an item to turn or resize it. */
+    press: {
+        async run(page, { at }) {
+            const point = await reachMap(page, at[0], at[1]);
+            if (!point.onMap) throw new Error(`map point ${at[0]}, ${at[1]} is not visible to press`);
+            await page.mouse.move(point.x, point.y);
+            await page.mouse.down();
+        },
+        describe: ({ label }) => label ?? "Press and hold on the map.",
+    },
+
+    /** Turns the mouse wheel where the pointer is, a notch at a time (positive notches scroll down), with keys held if asked. */
+    wheel: {
+        async run(page, { notches, modifiers = [] }) {
+            for (const key of modifiers) await page.keyboard.down(key);
+            for (let i = 0; i < Math.abs(notches); i++) {
+                await page.mouse.wheel(0, Math.sign(notches) * 100);
+                await page.waitForTimeout(120);
+            }
+            for (const key of modifiers.toReversed()) await page.keyboard.up(key);
+        },
+        describe: ({ label }) => label ?? "Scroll the mouse wheel.",
+    },
+
+    /** Lets go of the mouse button. */
+    release: {
+        run: (page) => page.mouse.up(),
+        describe: ({ label }) => label ?? "Let go.",
+    },
+
+    /** Clicks a control that downloads a file, and keeps the file in the temporary folder (as "tmp:<file>" for a later chooseFile). */
+    download: {
+        async run(page, { target, file }) {
+            const download = page.waitForEvent("download", { timeout: 180000 });
+            await clickControl(page, target);
+            await (await download).saveAs(filePath(`tmp:${file}`));
+        },
+        describe: ({ label }) => `Click ${label ?? "the download button"}; the file goes to your downloads.`,
+    },
+
     /** Clicks a control that opens the system's file dialogue, and chooses a file there (a path from the repository's root). */
     chooseFile: {
         async run(page, { target, file }) {
             const chooser = page.waitForEvent("filechooser", { timeout: FIND_MS });
             await clickControl(page, target);
-            await (await chooser).setFiles(join(ROOT, file));
+            await (await chooser).setFiles(filePath(file));
         },
         describe: ({ file, label }) => `Click ${label ?? "the file button"} and choose ${basename(file)}.`,
     },

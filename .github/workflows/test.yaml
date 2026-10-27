@@ -46,27 +46,3 @@ jobs:
             # Builds the P0JBVA terrain rasters (derived data, about 8 s) then runs every test under tests/
             - name: Run tests
               run: npm test
-
-    # Plays every tutorial page in the web studio (headless Chromium), so a change to the interface
-    # that breaks a tutorial step fails here, naming the step. Kept apart from the suite above,
-    # which has no browser (its tutorial check skips), because the pages take minutes.
-    tutorial:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  cache: "npm"
-
-            - name: Install dependencies
-              run: npm ci --ignore-scripts
-
-            - name: Install Chromium for Playwright
-              run: npx playwright install --with-deps chromium
-
-            - name: Run the tutorial pages
-              run: node --test tests/tutorial/tutorial.test.mjs

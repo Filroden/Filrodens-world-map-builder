@@ -49,10 +49,20 @@ export async function loadPages() {
 }
 
 /** Opens the map a page starts from: the default map for a new one, or the page before's checkpoint, imported and loaded as a reader would. */
-async function openStart(host, page) {
-    const { context, page: browserPage } = await openStudio(host, { seed: page.number * 1000 + 1 });
-    if (page.start) {
-        await runActions(browserPage, { id: "start", action: { do: "importMap", file: join(PATHS.checkpoints, `${page.start}.json`) } });
+function openStart(host, page) {
+    return openMap(host, { start: page.start, seed: page.number * 1000 + 1 });
+}
+
+/**
+ * Opens a fresh studio on a checkpoint (samples/tutorial/<start>.json, imported and loaded as a
+ * reader would), or on the studio's own new map when there is no start.
+ * @param {object} host - From startStudioHost.
+ * @param {{start?: string|null, seed: number}} options
+ */
+export async function openMap(host, { start = null, seed }) {
+    const { context, page: browserPage } = await openStudio(host, { seed });
+    if (start) {
+        await runActions(browserPage, { id: "start", action: { do: "importMap", file: join(PATHS.checkpoints, `${start}.json`) } });
         await browserPage.locator('.fwmb-map-card [data-action="manageMap"][data-action-type="load"]').first().click();
         await browserPage.waitForFunction(() => !!globalThis.fwmbStudio?.currentSaveId, null, { timeout: 60000 });
         await settle(browserPage);

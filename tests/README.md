@@ -39,6 +39,13 @@ What a build writes:
 
 The wiki pages and scripts are written for every page, not only those played, since a page's text depends on its neighbours (its Start from and Next links, and the page count).
 
+The wiki's other screenshots come from the same harness. Each wiki page marks where a picture goes with a comment, `<!-- screenshot: <slug> | <what it shows> -->`, and has a shots file (`tutorial/shots/<Wiki-page>.mjs`) saying, for each comment, which tutorial checkpoint it starts from, what to do in the studio and what to capture (`tutorial/shots/_common.mjs` holds what they share).
+
+    npm run tutorial:shots             # every wiki page's screenshots
+    npm run tutorial:shots -- Biomes   # only the Biomes page's
+
+A run writes `wiki/images/<page>/<slug>.png` and puts the image and its caption under the comment in the wiki page (the comment stays, so a rerun replaces them). A shot marked `provided` is a picture from Foundry, which the harness cannot open, saved by hand at its path. `tutorial/shots.test.mjs` (part of `npm test`) checks that the comments and the shots files match, where the wiki is checked out.
+
 Random numbers in the page are seeded (`lib/studio.mjs`), so a rebuild writes the same ids, the same checkpoint and, on the same Chromium, the same screenshots, byte for byte.
 
 A step file exports its page: `number`, `slug`, `title`, `goal`, `start` (the page before's stem, or none for page 1), the wiki's `intro`, `whatYouSee`, `foundry` and `onYourOwn`, an opening `narration`, and the `steps`. A step has an `id`; the reader's `instruction` (Markdown; a step without one is done but not shown); its `action`, one or a list of `{ do, ...fields, label }` (`tool`, `mode`, `click`, `openSection`, `set`, `dialog`, `waitForDialog`, `mapClick`, `shape`, `camera`, `zoom`, `slide`, `drag`, `brush`, `key`, `hover`, `importMap`, `settle`, `expect`; see `lib/actions.mjs`); an optional `screenshot` (`name`, `region`: `studio`, `rail`, `panel`, `bar`, `map`, `inspector`, `dialog`, `{ selector }`, `{ map: [x0, y0, x1, y1] }` or `{ union }`, with `pad`, `pointer` and `mapOnly`), `caption` and `note`; and the video's `narration`, `pause` (seconds to hold) and `camera`. After every step the runner waits for the map to settle; `settle: false` skips that (a step that leaves a dialogue open).
