@@ -1,3 +1,5 @@
+import { DEFAULT_LABEL_FONT } from "./data/fonts.js";
+
 export const FILRODENSWMB = {
     ID: "filrodens-world-map-builder",
     FLAGS: {
@@ -315,6 +317,60 @@ export const FILRODENSWMB = {
         // A shape still below this when the user finishes drawing it is discarded, since it could
         // never be selected or edited as a shape, and terrain generation ignores land masks below it.
         MIN_POLYGON_VERTICES: 3,
+        // The longest free text, in characters: what a field accepts (its maxlength), what an
+        // export writes and what an import accepts. An export or import holding longer text is
+        // refused rather than cut short, so nothing a user wrote is lost without them knowing.
+        // Raise these to test with longer text; every check reads them from here.
+        TEXT: {
+            // Names of maps, pins, routes, regions, layers, sets, styles, biomes and the like,
+            // and other one-line text (a seed, a title template, the scale bar's units)
+            NAME: 200,
+            // Descriptions of pins, routes, regions and faults (written into journal pages)
+            DESCRIPTION: 20000,
+            // The text of a standalone label
+            LABEL: 500,
+        },
+        // What a file opened for import may hold. Anything past these is refused before it reaches
+        // the map, so a damaged or hostile file cannot exhaust memory or stall the studio.
+        IMPORT: {
+            // The largest file read, in bytes
+            FILE_BYTES: 268435456,
+            // How deeply objects and arrays may nest
+            DEPTH: 32,
+            // How many values (objects, arrays, strings, numbers…) the file may hold in all
+            VALUES: 10000000,
+            // The longest array
+            ARRAY_LENGTH: 2000000,
+            // The longest string that is not free text (an embedded image, an encoded owner array)
+            STRING_LENGTH: 67108864,
+            // The smallest and largest map width or height, in pixels
+            MAP_DIMENSION_MIN: 16,
+            MAP_DIMENSION_MAX: 16384,
+            // The longest id or key
+            ID_LENGTH: 64,
+        },
+        // A backup of every saved map (a zip: manifest.json, maps/<id>.json, assets/<hash>.<ext>)
+        BACKUP: {
+            // A backup larger than this is offered without its images ("Maps only") as well
+            WARN_BYTES: 209715200,
+            // The largest backup file read, in bytes
+            BYTES: 1073741824,
+            // The most entries a backup may hold
+            ENTRIES: 10000,
+            // The most its entries may hold once unpacked, in bytes
+            UNPACKED_BYTES: 2147483648,
+            // An entry that unpacks to more than RATIO times its packed size is refused (a zip
+            // bomb); entries unpacking to less than RATIO_FLOOR bytes are too small to matter
+            RATIO: 100,
+            RATIO_FLOOR: 1048576,
+        },
+        // Images a user picks or a file brings in (reference images, decorations, custom pin icons)
+        IMAGE: {
+            // The largest image file, in bytes
+            BYTES: 33554432,
+            // The widest or tallest image, in pixels
+            DIMENSION: 8192,
+        },
     },
     // The random land mask button in Guided mode (see LandMaskGenerator). Sizes are fractions of
     // the map's shorter side, so a shape covers the same share of any map.
@@ -400,8 +456,8 @@ export const FILRODENSWMB = {
         // value always sits on a slider position and opening the dialogue never rounds it to
         // something else.
         WHEEL_RESIZE: {
-            LABEL_FONT_SIZE: { MIN: 0.2, MAX: 5, STEP: 0.1 },
-            PIN_SCALE: { MIN: 0.2, MAX: 4, STEP: 0.1 },
+            LABEL_FONT_SIZE: { MIN: 0.2, MAX: 20, STEP: 0.1 },
+            PIN_SCALE: { MIN: 0.2, MAX: 16, STEP: 0.1 },
             DECORATION_SCALE: { MIN: 0.05, MAX: 5, STEP: 0.05 },
         },
         // The rotation of labels and decorations, in degrees, as their edit dialogues' Rotation
@@ -430,12 +486,13 @@ export const FILRODENSWMB = {
             FADE_FRAMES: 90,
             FADE_GROWTH: 0.15,
         },
-        // The list of canvas actions in the map's bottom corner (see CanvasHints). Each context
+        // The list of canvas actions in the canvas's bottom start corner (see CanvasHints). Each context
         // lists the suffixes of its `FILRODENSWMB.UI.Hint…` localisation keys, in display order.
         // Every hint names the thing it acts on (a pin, the crop area, the whole region), so each
-        // reads on its own. COMMON is shown ahead of every context except a held item, whose own
-        // list replaces the whole hint while the pointer holds it. Keep these lists in step with
-        // the pointer and wheel handling in StudioCanvas and the tool click handlers in MapStudioApp.
+        // reads on its own. A context's own actions are shown first, in the normal ink; COMMON
+        // follows them, muted, for every context except a held item, whose own list replaces the
+        // whole hint while the pointer holds it. Keep these lists in step with the pointer and
+        // wheel handling in StudioCanvas and the tool click handlers in MapStudio.
         CANVAS_HINTS: {
             COMMON: ["Pan", "Zoom"],
             CONTEXTS: {
@@ -444,21 +501,169 @@ export const FILRODENSWMB = {
                 view3d: ["Rotate3D"],
                 reference: ["ReferenceMove", "ReferenceResize"],
                 crop: ["CropDraw", "CropMove", "CropResize"],
+                // A culture's homeland being picked on the map (see CultureMarkers)
+                homeland: ["PlaceHomeland", "StopHomeland"],
+                // The Travel tool: a click sets where the journey starts (see TravelView)
+                travel: ["SetTravelStart"],
                 terrain: ["PaintTerrain"],
                 biomes: ["PaintBiomes"],
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
                 line: ["AddPoint", "FinishLine", "MovePoint", "InsertPoint", "DeletePoint", "EditLine"],
-                region: ["AddPoint", "FinishRegion", "MovePoint", "MoveRegion", "InsertPoint", "DeletePoint", "EditRegion"],
+                // The Regions tool, by edit mode (see RegionPainter)
+                regionSelect: ["SelectRegion"],
+                regionPaint: ["RegionPaint", "RegionPaintShift"],
+                regionErase: ["RegionErase", "RegionEraseShift"],
+                regionFill: ["RegionFill", "RegionFillShift"],
+                // The Routes tool (Infrastructure in Route mode), by edit mode (see RouteTool)
+                routeSelect: ["SelectRoute"],
+                routeDraw: ["RouteAddWaypoint", "RouteTrace", "RouteFinish", "RouteUndoWaypoint", "RouteCancel"],
+                routeEdit: ["RouteMoveWaypoint", "RouteInsertWaypoint", "RouteRemoveWaypoint", "RouteSplit", "RouteJoin", "EditRoute"],
                 mask: ["AddPoint", "FinishMask", "MovePoint", "MoveMask", "InsertPoint", "DeletePoint", "EditMask"],
-                pin: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
-                labels: ["PlaceLabel", "MoveLabel", "RotateLabel", "ResizeLabel", "EditLabel"],
+                // Pins (Infrastructure in Pin mode) and labels, by mode (see PickTool)
+                pinSelect: ["SelectPin"],
+                pinPlace: ["PlacePin", "MovePin", "ResizePin", "DeletePin", "EditPin"],
+                labelSelect: ["SelectLabel"],
+                labelPlace: ["PlaceLabel", "MoveLabel", "RotateLabel", "ResizeLabel", "EditLabel"],
+                // Rivers and faults, land masks and decorations in their Select modes (see PickTool)
+                featureSelect: ["SelectFeature"],
+                maskSelect: ["SelectMask"],
+                cartographySelect: ["SelectDecoration"],
                 cartography: ["MoveDecoration", "RotateDecoration", "ResizeDecoration", "EditDecoration"],
                 heldLabel: ["RotateHeldLabel", "ResizeHeldLabel"],
                 heldDecoration: ["RotateHeldDecoration", "ResizeHeldDecoration"],
                 heldPin: ["ResizeHeldPin"],
-                heldRegion: ["DropRegion"],
                 heldMask: ["DropMask"],
             },
+            // On a touch screen (no hovering pointer), the action a finger takes in place of the
+            // mouse's: each hint named here shows its touch wording instead (see CanvasHints.getItems).
+            // Actions a finger cannot make (Shift, Ctrl and Alt with a click, and the keys) keep
+            // their wording, for a tablet with a keyboard.
+            TOUCH: {
+                Pan: "PanTouch",
+                Zoom: "ZoomTouch",
+                PlaceSpring: "PlaceSpringTouch",
+                AddPoint: "AddPointTouch",
+                FinishLine: "FinishLineTouch",
+                EditLine: "EditLineTouch",
+                SelectRegion: "SelectRegionTouch",
+                RegionFill: "RegionFillTouch",
+                SelectRoute: "SelectRouteTouch",
+                SelectFeature: "SelectFeatureTouch",
+                SelectMask: "SelectMaskTouch",
+                SelectDecoration: "SelectDecorationTouch",
+                EditRoute: "EditRouteTouch",
+                RouteAddWaypoint: "RouteAddWaypointTouch",
+                RouteFinish: "RouteFinishTouch",
+                FinishMask: "FinishMaskTouch",
+                EditMask: "EditMaskTouch",
+                SelectPin: "SelectPinTouch",
+                PlacePin: "PlacePinTouch",
+                ResizePin: "ResizePinTouch",
+                EditPin: "EditPinTouch",
+                SelectLabel: "SelectLabelTouch",
+                PlaceLabel: "PlaceLabelTouch",
+                RotateLabel: "RotateLabelTouch",
+                ResizeLabel: "ResizeLabelTouch",
+                EditLabel: "EditLabelTouch",
+                RotateDecoration: "RotateDecorationTouch",
+                ResizeDecoration: "ResizeDecorationTouch",
+                EditDecoration: "EditDecorationTouch",
+                RotateHeldLabel: "RotateHeldLabelTouch",
+                ResizeHeldLabel: "ResizeHeldLabelTouch",
+                RotateHeldDecoration: "RotateHeldDecorationTouch",
+                ResizeHeldDecoration: "ResizeHeldDecorationTouch",
+                ResizeHeldPin: "ResizeHeldPinTouch",
+                DropMask: "DropMaskTouch",
+                SetTravelStart: "SetTravelStartTouch",
+                PlaceHomeland: "PlaceHomelandTouch",
+            },
+        },
+        // The keyboard shortcuts sheet (see CanvasHints.sheet and dialogs/shortcuts.hbs). KEYS lists,
+        // per hint context, the keyboard shortcuts that are not among its hints, as suffixes of
+        // `FILRODENSWMB.UI.Shortcut…` keys; "everywhere" holds those that work in every tool. SHEET
+        // is the sheet's order: one table per tool, a caption per mode, each naming the hint
+        // context whose actions it lists. Keep KEYS in step with the key handling in MapStudio
+        // (#handleStudioKeydown), RegionPainter.handleKey, RouteTool.handleKey and PickTool.handleKey.
+        SHORTCUTS: {
+            KEYS: {
+                everywhere: ["Undo", "Redo", "Sheet", "Escape"],
+                regionSelect: ["RegionLetGo"],
+                regionPaint: ["RegionStopStroke"],
+                regionErase: ["RegionStopStroke"],
+                routeSelect: ["RouteLetGo"],
+                pinSelect: ["PickClose"],
+                labelSelect: ["PickClose"],
+                featureSelect: ["PickClose"],
+                maskSelect: ["PickClose"],
+                cartographySelect: ["PickClose"],
+            },
+            SHEET: [
+                { title: "FILRODENSWMB.UI.ShortcutsEverywhere", tables: [{ caption: null, context: "everywhere" }] },
+                {
+                    title: "FILRODENSWMB.UI.ToolCreateMap",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsLandMaskSelect", context: "maskSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsLandMasks", context: "mask" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsRegionalCrop", context: "crop" },
+                    ],
+                },
+                { title: "FILRODENSWMB.UI.ToolTerrain", tables: [{ caption: null, context: "terrain" }] },
+                { title: "FILRODENSWMB.UI.ToolBiomes", tables: [{ caption: null, context: "biomes" }] },
+                {
+                    title: "FILRODENSWMB.UI.ToolFeatures",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsSelect", context: "featureSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsRiverSources", context: "spring" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsLines", context: "line" },
+                    ],
+                },
+                { title: "FILRODENSWMB.UI.ToolGenerate", tables: [{ caption: "FILRODENSWMB.UI.ShortcutsHomeland", context: "homeland" }] },
+                {
+                    title: "FILRODENSWMB.UI.ToolRegions",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsSelect", context: "regionSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsPaint", context: "regionPaint" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsErase", context: "regionErase" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsFill", context: "regionFill" },
+                    ],
+                },
+                {
+                    title: "FILRODENSWMB.UI.ToolInfrastructure",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsPinSelect", context: "pinSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsPinPlace", context: "pinPlace" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsRouteSelect", context: "routeSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsRouteDraw", context: "routeDraw" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsRouteEdit", context: "routeEdit" },
+                    ],
+                },
+                {
+                    title: "FILRODENSWMB.UI.ToolLabels",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsSelect", context: "labelSelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsPlace", context: "labelPlace" },
+                    ],
+                },
+                {
+                    title: "FILRODENSWMB.UI.ToolCartography",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsSelect", context: "cartographySelect" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsMove", context: "cartography" },
+                    ],
+                },
+                { title: "FILRODENSWMB.UI.ToolTravel", tables: [{ caption: null, context: "travel" }] },
+                {
+                    title: "FILRODENSWMB.UI.ShortcutsHolding",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsHeldLabel", context: "heldLabel" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsHeldDecoration", context: "heldDecoration" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsHeldPin", context: "heldPin" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsHeldMask", context: "heldMask" },
+                    ],
+                },
+                { title: "FILRODENSWMB.UI.ToolReference", tables: [{ caption: null, context: "reference" }] },
+                { title: "FILRODENSWMB.UI.ThreeDView", tables: [{ caption: null, context: "view3d" }] },
+            ],
         },
         ZOOM: {
             FACTOR: 1.25,
@@ -472,7 +677,12 @@ export const FILRODENSWMB = {
         REFERENCE_IMAGE: {
             SCALE_MIN: 0.1,
             SCALE_MAX: 10,
+            // Per wheel notch (Shift+Scroll over the image)
             SCALE_FACTOR: 1.01,
+            // Per press of the panel's Zoom in and Zoom out buttons: one is the other's inverse, so
+            // a zoom in then a zoom out returns the image to the same scale
+            IN_FACTOR: 1.1,
+            OUT_FACTOR: 1 / 1.1,
         },
         REGIONAL_CROP: {
             PADDING: 50,
@@ -493,6 +703,378 @@ export const FILRODENSWMB = {
             // for not holding the memory while the map sits idle.
             SCRATCH_RELEASE: 30000,
         },
+    },
+    // The studio's frame (see toolbar.hbs). The rail groups the tools by the stage of making a map
+    // they belong to; each tool has its rail icon and name. The occasional tools sit below the
+    // stages (folding into More when the studio is short): a tool, an action of its own (the 3D
+    // view, full screen) or a menu (Appearance). Tool ids are the ones the changeTool action uses.
+    STUDIO: {
+        TOOLS: {
+            scene: { icon: "grid-on", label: "FILRODENSWMB.UI.ToolCreateMap" },
+            terrain: { icon: "landscape", label: "FILRODENSWMB.UI.ToolTerrain" },
+            biomes: { icon: "forest", label: "FILRODENSWMB.UI.ToolBiomes" },
+            features: { icon: "ssid-chart", label: "FILRODENSWMB.UI.ToolFeatures" },
+            generate: { icon: "generate", label: "FILRODENSWMB.UI.ToolGenerate" },
+            regions: { icon: "pentagon", label: "FILRODENSWMB.UI.ToolRegions" },
+            infrastructure: { icon: "location-city", label: "FILRODENSWMB.UI.ToolInfrastructure" },
+            labels: { icon: "insert-text", label: "FILRODENSWMB.UI.ToolLabels" },
+            cartography: { icon: "explore", label: "FILRODENSWMB.UI.ToolCartography" },
+            history: { icon: "history", label: "FILRODENSWMB.UI.ToolHistory" },
+            travel: { icon: "travel-explore", label: "FILRODENSWMB.UI.ToolTravel" },
+            export: { icon: "png", label: "FILRODENSWMB.UI.ToolExport" },
+            reference: { icon: "image", label: "FILRODENSWMB.UI.ToolReference" },
+            library: { icon: "palette", label: "FILRODENSWMB.UI.ToolLibrary" },
+            manage: { icon: "folder-open", label: "FILRODENSWMB.UI.ToolManage" },
+        },
+        STAGES: [
+            { id: "shape", label: "FILRODENSWMB.UI.StageShape", tools: ["scene", "terrain", "biomes", "features"] },
+            { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["generate", "regions", "infrastructure", "labels"] },
+            { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
+            // Tools to look at a finished map with, outside the order of work (no Next leads to them)
+            { id: "explore", label: "FILRODENSWMB.UI.StageExplore", tools: ["history", "travel"], optional: true },
+        ],
+        // The Appearance menu (the reader's colour theme, see AppearanceMenu) sits among them, and on
+        // the web the full-screen toggle (shown only where the host can go full screen)
+        OCCASIONAL: [
+            { tool: "reference" },
+            { tool: "library" },
+            { menu: "appearance", icon: "contrast", label: "FILRODENSWMB.UI.Appearance" },
+            { action: "threeDView", icon: "three-d", label: "FILRODENSWMB.UI.ThreeDView" },
+            { action: "toggleFullscreen", icon: "fullscreen", label: "FILRODENSWMB.UI.FullScreen", host: "fullscreen" },
+        ],
+        // The panel's header: each stage's tools are numbered in order ("Shape · 2 of 4") except
+        // Populate's, which are worked in any order. The engine is named for the tools it shapes.
+        UNNUMBERED_STAGES: ["populate", "explore"],
+        ENGINE_IN_HEADER: ["scene", "terrain"],
+        // Each tool's Next footer: the tool that follows and why (a localisation key). Tools outside
+        // the stages, in an optional stage, and the last one, have none.
+        NEXT: {
+            scene: { tool: "terrain", reason: "FILRODENSWMB.UI.NextReasonScene" },
+            terrain: { tool: "biomes", reason: "FILRODENSWMB.UI.NextReasonTerrain" },
+            biomes: { tool: "features", reason: "FILRODENSWMB.UI.NextReasonBiomes" },
+            features: { tool: "generate", reason: "FILRODENSWMB.UI.NextReasonFeatures" },
+            generate: { tool: "regions", reason: "FILRODENSWMB.UI.NextReasonGenerate" },
+            regions: { tool: "infrastructure", reason: "FILRODENSWMB.UI.NextReasonRegions" },
+            infrastructure: { tool: "labels", reason: "FILRODENSWMB.UI.NextReasonInfrastructure" },
+            labels: { tool: "cartography", reason: "FILRODENSWMB.UI.NextReasonLabels" },
+            cartography: { tool: "export", reason: "FILRODENSWMB.UI.NextReasonCartography" },
+            export: null,
+            history: null,
+            travel: null,
+            reference: null,
+            library: null,
+            manage: null,
+        },
+        // What the pointer does while a tool is editing, named in the state block and on the bar:
+        // a word per tool, or per mode where the tool's modes do different things. Cartography has
+        // no edit toggle (its decorations can always be moved), so its word stands for the tool.
+        // Tools with null have no editing at all.
+        STATE_WORD: {
+            scene: { addMask: "drawing", subtractMask: "drawing", crop: "cropping" },
+            terrain: "terraforming",
+            biomes: "painting",
+            // Select starts editing in River (see PickTool.settleForEditing)
+            features: { select: "drawing", spring: "placing", river: "drawing", fault: "drawing" },
+            generate: null,
+            regions: "painting",
+            infrastructure: { pin: "placing", route: "drawing" },
+            labels: "placing",
+            cartography: "placing",
+            history: null,
+            travel: null,
+            export: null,
+            reference: null,
+            library: null,
+            manage: null,
+        },
+        // The localisation keys of each state word: its name, the state block's start and stop
+        // buttons, and the line in a section its editing pauses
+        STATE_WORDS: {
+            terraforming: "Terraforming",
+            painting: "Painting",
+            drawing: "Drawing",
+            placing: "Placing",
+            cropping: "Cropping",
+        },
+        // The bar's modes that fold into More when the bar runs short (see BarFold), per tool and
+        // group, least used first. Modes not listed stay on the bar at every width, as does the
+        // mode in use.
+        FOLD_RANK: {
+            terrain: ["slopeDown", "slopeUp", "level", "roughen", "smooth"],
+            features: ["spring"],
+            regions: ["fill", "erase"],
+            route: ["edit"],
+        },
+        // The map controls' layer toggles after the Terrain and Biomes groups, in their order: the
+        // layers drawn on the map, then those drawn over it (the grid is a setting of the map, so it
+        // has its own action)
+        VIEW_LAYERS: [
+            { id: "infrastructure", icon: "location-city", label: "FILRODENSWMB.UI.LayerInfrastructure" },
+            // Regions and Labels open a menu of their levels and label styles (see ContentRows)
+            { id: "regions", icon: "pentagon", label: "FILRODENSWMB.UI.LayerRegions", rows: true },
+            { id: "labels", icon: "insert-text", label: "FILRODENSWMB.UI.LayerLabels", rows: true },
+            { id: "cartography", icon: "explore", label: "FILRODENSWMB.UI.LayerCartography" },
+        ],
+        OVERLAY_LAYERS: [
+            { id: "contours", action: "toggleLayer", icon: "scatter-plot", label: "FILRODENSWMB.UI.LayerContours" },
+            { id: null, action: "toggleGrid", icon: "grid-on", label: "FILRODENSWMB.UI.ToggleGrid" },
+            { id: "reference", action: "toggleLayer", icon: "image", label: "FILRODENSWMB.UI.LayerReference" },
+        ],
+    },
+    // The map's unit (see MapUnit): the name every distance the studio shows is labelled with. The
+    // model measures in kilometres, and a figure is shown as that number of kilometres under the
+    // map's own name for the unit, so the default is the name that makes the figure literally true.
+    // LEGACY_DEFAULT is the scale bar's built-in text before the map had a unit: a map saved with it
+    // untouched takes the default instead, since its figures would otherwise read as miles.
+    // The scale bar's Match world scale rounds the distance per major tick to one of NICE_STEPS
+    // times a power of ten.
+    MAP_UNIT: Object.freeze({
+        DEFAULT: "km",
+        LEGACY_DEFAULT: "Miles",
+        NICE_STEPS: Object.freeze([1, 2, 5]),
+    }),
+    // The thematic layers (see ThematicData and ThematicView): what the generator's last run left in
+    // each model cell, drawn over the map as colour. One colour layer shows at a time, at OPACITY
+    // (its default) or the map's own setting. A graded layer's scale is fixed, the same on every
+    // map, so a colour always means the same value: SCALE is linear or logarithmic between min
+    // and max (values beyond them take the end colours), TICKS are the legend's labelled values,
+    // and RAMP its colours from min to max (ColorBrewer's sequential schemes, which stay readable
+    // with the common colour-vision deficiencies). READOUT names how a value is worded: "perArea"
+    // is a number per square map unit, "percent" a share, "culture" the culture's name and share.
+    // NEEDS lists the run's arrays a layer is worked out from: a run saved before one existed
+    // cannot show the layer.
+    // Travel time (the Travel tool; see TravelTime): the ways of travel over land, and each speed
+    // as a day's distance in km (a land speed on a road over level ground; rivers are slower
+    // against the current). The map keeps its own speeds (uiState.travel), these are the presets.
+    // A regional map's copy of its parent's run (see ParentRun): the cells within this many cell
+    // spacings of its edges are kept too, so a cell at its edge keeps its neighbours
+    // Regional in-fill (see Infill): villages and market towns between the towns a regional map
+    // inherited, joined by local lanes, from its parent's people
+    INFILL: Object.freeze({
+        // The in-fill cells' spacing, in effective km (a village's fields and a walk across them)
+        CELL_KM: 5,
+        // Offered once the generator's cells lie at least this many map pixels apart
+        MIN_PARENT_PX: 30,
+        // Market towns and villages stand only within this many effective km over land of an
+        // inherited road, river route or town; beyond, people live in hamlets and farms
+        ROUTE_REACH_KM: 15,
+        // A town of the generator's tiers (GENERATOR.TOWNS.TIERS, largest first) reaches this many
+        // times as far, for the country a big town feeds and is fed by; it matters most where a
+        // land has no road (one joined to the rest by sea lanes alone)
+        TOWN_REACH_SCALE: Object.freeze([3, 2, 1]),
+        // A place is served by a market within this many days' walk on foot (a day's round trip).
+        // Markets stand this times the square root of the map's area factor apart, so they thin
+        // out as villages do
+        MARKET_REACH_DAYS: 0.5,
+        // A market town draws this share of the country people it serves (over the square root of
+        // the area factor, as it serves more of them), and has at least MARKET_MIN_POP
+        MARKET_SHARE: 0.06,
+        MARKET_MIN_POP: 300,
+        // A market needs at least this many people within its reach that no town or market serves yet
+        MARKET_MIN_SERVED: 4000,
+        // A cell with fewer country people than this has hamlets and farms, not a village
+        VILLAGE_MIN_POP: 100,
+        // A village holds at most this many; more people in its cell live in hamlets and farms
+        VILLAGE_MAX_POP: 2000,
+        // A village of at least this many people is a large village, shown from the Local detail level
+        LARGE_VILLAGE_POP: 1000,
+        // A place keeps this many map pixels clear of a river as the map draws it
+        RIVER_MARGIN_PX: 3,
+        // At most this many villages. About one settled cell in the map's area factor has one, the
+        // area factor being the map's trade between a real landscape and a believable one
+        MAX_VILLAGES: 4000,
+    }),
+    PARENT_RUN: Object.freeze({
+        MARGIN_CELLS: 1.5,
+    }),
+    TRAVEL_TIME: Object.freeze({
+        MODES: Object.freeze(["foot", "wagon", "mount"]),
+        // Per day, in km. A sailing ship keeps to the run's sea routes; off them, and on a river
+        // with no trade, a small boat
+        SPEEDS: Object.freeze({ foot: 30, wagon: 25, mount: 60, riverDown: 60, riverUp: 20, sea: 150, boat: 40 }),
+        SPEED_RANGE: Object.freeze({ MIN: 1, MAX: 1000 }),
+        // The bands and rings shown, from the start, each INTERVALS days wide: a small region reads
+        // best by the day, a world by ten. Automatic picks by the map's longer side (AUTO_KM, km).
+        MAX_DAYS: 10,
+        INTERVALS: Object.freeze([1, 2, 5, 10]),
+        AUTO_KM: Object.freeze([700, 1500, 4000]),
+        // The day bands' colours, nearest first (ColorBrewer YlGnBu), one per band
+        RAMP: Object.freeze(["#ffffd9", "#edf8b1", "#c7e9b4", "#7fcdbb", "#41b6c4", "#1d91c0", "#225ea8", "#253494", "#081d58", "#040e2c"]),
+        // The day rings: line width in pixels of a BASELINE_DIMENSION map, and their alpha; the way
+        // to the pointer drawn in the trade layer's transport colours (THEMATIC.TRADE.TRANSPORTS).
+        // A pale halo under each ring keeps it readable over the ramp's dark far days.
+        RING_WIDTH: 1.2,
+        RING_COLOR: "#1a1a1a",
+        RING_ALPHA: 0.75,
+        RING_HALO: "#f4f1e8",
+        RING_HALO_WIDTH: 2.8,
+        RING_HALO_ALPHA: 0.85,
+        WAY_WIDTH: 3,
+        // The start's mark: its radius in pixels of a BASELINE_DIMENSION map
+        START_RADIUS: 5,
+        // The turn between one ring's name and the next, round the start (radians)
+        LABEL_TURN: Math.PI / 6,
+        // How the generator's land costs (made to compare ways, not to time them) become pace.
+        // Open level ground off the road goes at a share of the road's pace: land cleared for
+        // farming has tracks, the wilds have none, and a mount or a wagon loses more of its lead
+        // there than a walker. Cover and relief then slow a step by their cost to the power
+        // TERRAIN (a cost of 4, dense forest on hills, about a third of the pace). The ordering of
+        // ways is the generator's.
+        OFF_ROAD: Object.freeze({
+            foot: Object.freeze({ wild: 0.5, cleared: 0.8 }),
+            wagon: Object.freeze({ wild: 0.15, cleared: 0.5 }),
+            mount: Object.freeze({ wild: 0.3, cleared: 0.6 }),
+        }),
+        TERRAIN: 0.7,
+        // Days to find passage when going aboard at sea: at a town's harbour, and anywhere else on
+        // the coast. Coming ashore takes no wait.
+        HARBOUR_DAYS: 0.25,
+        SHORE_DAYS: 2,
+        // How close to a place a click must fall to start there, in screen pixels
+        SNAP_PX: 12,
+        // The travel cells (see TravelGrid): about CELL_PX map pixels apart where the generator's
+        // cells lie further apart than that (a regional map), and never more than MAX_CELLS
+        CELL_PX: 10,
+        MAX_CELLS: 40000,
+        // Edges longer than this many cell spacings are not travelled (see TravelTime.edgeDays)
+        MAX_EDGE_SPACINGS: 2.5,
+    }),
+    THEMATIC: Object.freeze({
+        OPACITY: 0.7,
+        OPACITY_RANGE: Object.freeze({ MIN: 0.1, MAX: 1, STEP: 0.05 }),
+        LAYERS: Object.freeze([
+            Object.freeze({
+                id: "population",
+                label: "FILRODENSWMB.UI.ThematicPopulation",
+                hint: "FILRODENSWMB.UI.ThematicPopulationHint",
+                // The legend's caption for the scale, with the map unit
+                unit: "FILRODENSWMB.UI.ThematicPopulationUnit",
+                legend: "ramp",
+                needs: Object.freeze(["population", "landArea"]),
+                scale: Object.freeze({ kind: "log", min: 0.5, max: 100 }),
+                ticks: Object.freeze([1, 10, 100]),
+                // YlOrRd
+                ramp: Object.freeze(["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#bd0026", "#800026"]),
+                readout: "perArea",
+            }),
+            Object.freeze({
+                id: "capacity",
+                label: "FILRODENSWMB.UI.ThematicCapacity",
+                hint: "FILRODENSWMB.UI.ThematicCapacityHint",
+                unit: "FILRODENSWMB.UI.ThematicCapacityUnit",
+                legend: "ramp",
+                needs: Object.freeze(["capacity", "landArea"]),
+                // Population's scale, so the two layers can be compared colour for colour
+                scale: Object.freeze({ kind: "log", min: 0.5, max: 100 }),
+                ticks: Object.freeze([1, 10, 100]),
+                // YlGn
+                ramp: Object.freeze(["#ffffe5", "#f7fcb9", "#d9f0a3", "#addd8e", "#78c679", "#41ab5d", "#238443", "#006837", "#004529"]),
+                readout: "perArea",
+            }),
+            Object.freeze({
+                id: "cleared",
+                label: "FILRODENSWMB.UI.ThematicCleared",
+                hint: "FILRODENSWMB.UI.ThematicClearedHint",
+                unit: "FILRODENSWMB.UI.ThematicClearedUnit",
+                legend: "ramp",
+                needs: Object.freeze(["cleared", "water"]),
+                scale: Object.freeze({ kind: "linear", min: 0, max: 1 }),
+                ticks: Object.freeze([0, 0.5, 1]),
+                // BuGn: a green of its own, apart from Capacity's
+                ramp: Object.freeze(["#f7fcfd", "#e5f5f9", "#ccece6", "#99d8c9", "#66c2a4", "#41ae76", "#238b45", "#006d2c", "#00441b"]),
+                readout: "percent",
+            }),
+            Object.freeze({
+                id: "danger",
+                label: "FILRODENSWMB.UI.ThematicDanger",
+                hint: "FILRODENSWMB.UI.ThematicDangerHint",
+                unit: "FILRODENSWMB.UI.ThematicDangerUnit",
+                legend: "ramp",
+                needs: Object.freeze(["security", "water"]),
+                // The share of a cell's people lost to raiders and strife (1 - the generator's
+                // security): up to the age's strife, which a war-torn age or an invasion takes
+                // towards 1, so the scale runs the whole way
+                scale: Object.freeze({ kind: "linear", min: 0, max: 1 }),
+                ticks: Object.freeze([0, 0.5, 1]),
+                // Purples
+                ramp: Object.freeze(["#fcfbfd", "#efedf5", "#dadaeb", "#bcbddc", "#9e9ac8", "#807dba", "#6a51a3", "#54278f", "#3f007d"]),
+                readout: "percent",
+            }),
+            Object.freeze({
+                id: "culture",
+                label: "FILRODENSWMB.UI.ThematicCulture",
+                hint: "FILRODENSWMB.UI.ThematicCultureHint",
+                unit: "FILRODENSWMB.UI.ThematicCultureUnit",
+                // A class per culture, in the culture's own colour, paler where its share of the
+                // people is lower (see ThematicData.cultureLookup); shown at model-cell resolution,
+                // since a class cannot be blended
+                legend: "classes",
+                needs: Object.freeze(["culture", "shareStart", "shareCulture", "shareValue"]),
+                readout: "culture",
+            }),
+        ]),
+        // The line layers, shown beside the colour layer: TRADE draws the last run's trade along
+        // the edges that carried it, its width by class (CLASSES, by the traffic's share of the
+        // busiest edge's, least first; WIDTH_PX in map pixels at the baseline map size, scaled
+        // with the map as pins are) and its colour by transport (Dark2, readable over land and sea
+        // and with the common colour-vision deficiencies). HIT_PX is how near the pointer must be
+        // for the information bar to read a line.
+        LINES: Object.freeze(["trade"]),
+        TRADE: Object.freeze({
+            CLASSES: Object.freeze([
+                Object.freeze({ id: "light", from: 0, label: "FILRODENSWMB.UI.ThematicTradeLight", widthPx: 1 }),
+                Object.freeze({ id: "moderate", from: 0.01, label: "FILRODENSWMB.UI.ThematicTradeModerate", widthPx: 2 }),
+                Object.freeze({ id: "heavy", from: 0.05, label: "FILRODENSWMB.UI.ThematicTradeHeavy", widthPx: 3.5 }),
+                Object.freeze({ id: "major", from: 0.2, label: "FILRODENSWMB.UI.ThematicTradeMajor", widthPx: 6 }),
+            ]),
+            TRANSPORTS: Object.freeze([
+                Object.freeze({ id: "road", label: "FILRODENSWMB.UI.ThematicTradeRoad", value: "FILRODENSWMB.UI.ThematicTradeRoadValue", color: "#d95f02" }),
+                Object.freeze({ id: "river", label: "FILRODENSWMB.UI.ThematicTradeRiver", value: "FILRODENSWMB.UI.ThematicTradeRiverValue", color: "#1b9e77" }),
+                Object.freeze({ id: "sea", label: "FILRODENSWMB.UI.ThematicTradeSea", value: "FILRODENSWMB.UI.ThematicTradeSeaValue", color: "#7570b3" }),
+            ]),
+            ALPHA: 0.85,
+            HIT_PX: 6,
+        }),
+        // The culture layer's fading: a cell whose dominant culture holds SHARE_FULL of its people
+        // or more is drawn at full strength, one at SHARE_FAINT or less at ALPHA_FAINT, and between
+        // them in proportion; the palette a culture with no colour of its own takes
+        CULTURE: Object.freeze({
+            SHARE_FAINT: 0.4,
+            SHARE_FULL: 0.9,
+            ALPHA_FAINT: 0.3,
+            PALETTE: Object.freeze(["#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e", "#e6ab02", "#a6761d", "#666666"]),
+        }),
+    }),
+    // The map controls' Detail menu (see DetailLevel): a level shows every pin and region level at
+    // or below it. Pins take theirs from their style (PINS.DEFAULT_STYLES) and a Political set's
+    // levels from their place in it (Realms, Duchies, Counties). Routes are shown at every level
+    DETAIL: Object.freeze({
+        LEVELS: Object.freeze([
+            Object.freeze({ value: 4, label: "FILRODENSWMB.UI.DetailEverything" }),
+            Object.freeze({ value: 3, label: "FILRODENSWMB.UI.DetailLocal" }),
+            Object.freeze({ value: 2, label: "FILRODENSWMB.UI.DetailRegional" }),
+            Object.freeze({ value: 1, label: "FILRODENSWMB.UI.DetailProvince" }),
+            Object.freeze({ value: 0, label: "FILRODENSWMB.UI.DetailWorld" }),
+        ]),
+        // Local (3) came between Regional and Everything later; see LocalLevel
+        EVERYTHING: 4,
+        LOCAL: 3,
+        // A run starts the map at the most detailed level whose places are still this many map
+        // pixels apart, from each tier's typical spacing (GENERATOR.TOWNS.TIERS)
+        MIN_SPACING_PX: 60,
+    }),
+    // Help's links (see HelpPanel). A link set to null is hidden.
+    HELP: {
+        REPOSITORY: "https://github.com/Filroden/Filrodens-world-map-builder",
+        LICENCE: "https://github.com/Filroden/Filrodens-world-map-builder/blob/main/LICENSE.md",
+        SPONSOR: "https://github.com/sponsors/Filroden",
+        CHANGELOG: "https://filroden.com/modules/filroden-s-world-map-builder/",
+        WIKI: "https://github.com/Filroden/Filrodens-world-map-builder/wiki",
+        TUTORIAL: "https://github.com/Filroden/Filrodens-world-map-builder/wiki/Tutorial-01-A-new-world",
+        ISSUE: "https://github.com/Filroden/Filrodens-world-map-builder/issues/new",
+        // The other host: the web version from Foundry, the Foundry module from the web
+        WEB_VERSION: "https://fwmb.filroden.com",
+        FOUNDRY_PACKAGE: "https://foundryvtt.com/packages/filrodens-world-map-builder",
     },
     DISPLAY: {
         ALPHA: 0.8,
@@ -614,6 +1196,29 @@ export const FILRODENSWMB = {
             // How far above the sea's surface a surface biome (Pack Ice and the like) is raised,
             // so the surface does not cover it.
             SURFACE_LIFT: 0.05,
+            // The light (see Scene3D). The sun comes from the flat map's bearing
+            // (DISPLAY.LIGHT_DIRECTION), lower in the sky and over a weaker ambient than before, and
+            // is made just strong enough that flat ground stays as bright as it was: the old ambient
+            // 0.8 plus the old 1.2 sun at its old height, 0.8 + 1.2 × 2000 / |(-1000, 2000, 1000)|
+            FLAT_BRIGHTNESS: 0.8 + (1.2 * 2000) / Math.hypot(1000, 2000, 1000),
+            AMBIENT: 0.4,
+            // Degrees above the horizon
+            SUN_ALTITUDE: 35,
+            // How the terrain's lighting normals add its broad slope to each vertex's own (see
+            // LightingNormals), so land that rises gently over large areas reads as relief
+            RELIEF: {
+                // The per-map Relief Emphasis (params.display.reliefEmphasis): its default and most
+                EMPHASIS: 20,
+                EMPHASIS_MAX: 30,
+                // Baseline pixels the broad slope is measured over (scaled to the map's resolution)
+                RADIUS: 25,
+                // A soft cap on the broad slope's added tilt, as a gradient (1 = 45°)
+                TILT_LIMIT: 0.6,
+                // How strongly each vertex's own slope counts
+                FINE_GAIN: 1.5,
+                // The share of the emphasis the sea bed takes
+                SEABED_SHARE: 0.5,
+            },
         },
         // How far past a repaint area the colour, biome and contour painters also write: each pixel
         // there depends on its neighbours (contour lines sit between two pixels), so the ring just
@@ -852,7 +1457,7 @@ export const FILRODENSWMB = {
         // ProceduralEngine.resolveBiomeLookup already treats any override <= 0 as "no override,
         // compute the biome normally" (its `overrideId > 0` check); this just gives that existing
         // sentinel a name instead of a bare literal 0. Deliberately excluded from
-        // MapStudioApp's context.biomeList, since it's offered as its own toolbar icon rather
+        // MapStudio's context.biomeList, since it's offered as its own toolbar icon rather
         // than a dropdown option.
         ERASER: 0,
         DEEP_OCEAN: 1,
@@ -905,6 +1510,10 @@ export const FILRODENSWMB = {
         circle: "FILRODENSWMB.ICONS.Circle",
         circle_outline: "FILRODENSWMB.ICONS.CircleOutline",
         circle_outline_with_dot: "FILRODENSWMB.ICONS.CircleDotOutline",
+        circle_outline_with_dot_outline: "FILRODENSWMB.ICONS.CircleOutlineDotOutline",
+        circle_outline_with_star: "FILRODENSWMB.ICONS.CircleOutlineStar",
+        circle_with_dot: "FILRODENSWMB.ICONS.CircleDot",
+        circle_with_dot_outline: "FILRODENSWMB.ICONS.CircleDotOutlineHollow",
         city_gate: "FILRODENSWMB.ICONS.CityGate",
         classical_building: "FILRODENSWMB.ICONS.ClassicalBuilding",
         column_shrine: "FILRODENSWMB.ICONS.Shrine",
@@ -942,6 +1551,7 @@ export const FILRODENSWMB = {
         question_mark: "FILRODENSWMB.ICONS.QuestionMark",
         shipwreck_in_water: "FILRODENSWMB.ICONS.Shipwreck",
         skull: "FILRODENSWMB.ICONS.Skull",
+        star: "FILRODENSWMB.ICONS.Star",
         wall_tent: "FILRODENSWMB.ICONS.WallTent",
     },
     PIN_ICONS: {
@@ -958,14 +1568,166 @@ export const FILRODENSWMB = {
         PRESETS: ["#C84B31", "#E28743", "#E8B851", "#4F7942", "#8A9A5B", "#3B8388", "#2D70B3", "#4A4E69", "#7A5C9B", "#B56576", "#A0522D", "#CC7161", "#6C7A89", "#A89F91", "#E08E79"],
     },
     LABELS: {
-        DEFAULT_FONT: "Signika",
-        DEFAULT_SIZE: 1,
+        DEFAULT_FONT: DEFAULT_LABEL_FONT,
+        // The size new labels start with, and the size a label with none set is drawn at (what size 1
+        // was before SYMBOLS.REVISION, so older maps look as they did)
+        DEFAULT_SIZE: 2,
+        UNSET_SIZE: 4,
+        // A name's outline and shadow, in proportion to its height (pixels), within their limits,
+        // so a small name keeps its letters and a large one looks as it did (see SymbolScale.labelHalo)
+        HALO: Object.freeze({ STROKE: 0.125, STROKE_MIN: 1, STROKE_MAX: 3, SHADOW: 1 / 12, SHADOW_MIN: 0.5, SHADOW_MAX: 2 }),
         DEFAULT_COLOR: "#DEDCD3",
         DEFAULT_TEXT: "FILRODENSWMB.LABELS.DefaultLabel",
+        // Placing names so they do not cover each other (see LabelLayout). Each kind of label has
+        // its turn (lower first: capitals and cities are placed before the realm names fitted round
+        // them) and its weight (what dropping it costs). Realm names are always drawn.
+        PLACEMENT: Object.freeze({
+            PIN_TIERS: Object.freeze({
+                capital: Object.freeze({ order: 0, weight: 50 }),
+                city: Object.freeze({ order: 1, weight: 20 }),
+                largeTown: Object.freeze({ order: 5, weight: 3 }),
+                castle: Object.freeze({ order: 5, weight: 2 }),
+                fortifiedTown: Object.freeze({ order: 5, weight: 2 }),
+                port: Object.freeze({ order: 5, weight: 2 }),
+                landmark: Object.freeze({ order: 5, weight: 2 }),
+                town: Object.freeze({ order: 5, weight: 1.5 }),
+                ruin: Object.freeze({ order: 5, weight: 1 }),
+                ruinedCapital: Object.freeze({ order: 5, weight: 2 }),
+                ruinedCity: Object.freeze({ order: 5, weight: 1.5 }),
+                ruinedLargeTown: Object.freeze({ order: 5, weight: 1 }),
+                ruinedTown: Object.freeze({ order: 5, weight: 1 }),
+                abandonedCastle: Object.freeze({ order: 5, weight: 1 }),
+                marketTown: Object.freeze({ order: 5, weight: 1.2 }),
+                largeVillage: Object.freeze({ order: 5, weight: 1.1 }),
+                village: Object.freeze({ order: 5, weight: 1 }),
+            }),
+            OTHER_PIN: Object.freeze({ order: 5, weight: 2 }),
+            // Region names by their level's depth in its set: realms, then duchies, then counties
+            REGION_DEPTHS: Object.freeze([Object.freeze({ order: 2, weight: 30, mustShow: true }), Object.freeze({ order: 3, weight: 8 }), Object.freeze({ order: 4, weight: 4 })]),
+            ROUTE: Object.freeze({ order: 6, weight: 1 }),
+            // A pin's name beside it, in order of preference: right (as drawn without placement),
+            // upper right, left, above, lower right, below, upper left, lower left. `side` is where
+            // the name sits horizontally (1 right, -1 left, 0 centred) and `rise` vertically (-1 above)
+            PIN_CANDIDATES: Object.freeze([
+                Object.freeze({ side: 1, rise: 0, cost: 0 }),
+                Object.freeze({ side: 1, rise: -1, cost: 0.3 }),
+                Object.freeze({ side: -1, rise: 0, cost: 0.4 }),
+                Object.freeze({ side: 0, rise: -1, cost: 0.5 }),
+                Object.freeze({ side: 1, rise: 1, cost: 0.55 }),
+                Object.freeze({ side: 0, rise: 1, cost: 0.6 }),
+                Object.freeze({ side: -1, rise: -1, cost: 0.7 }),
+                Object.freeze({ side: -1, rise: 1, cost: 0.8 }),
+            ]),
+            // A region name's place costs this much for each share of its box outside the region
+            // (a goal, not a rule: a small region's name may spill over its border)
+            SPILL_COST: 2,
+            // A name drawn faintly where it would go when there is no room, while labels are edited
+            DROPPED_ALPHA: 0.35,
+            SEED: 1,
+        }),
+        // The label styles a new map starts with: realm names in engraved
+        // capitals, places in a book serif, water in its italic, and notes in handwriting
+        DEFAULT_STYLES: Object.freeze([
+            Object.freeze({ id: "label-style-realm", nameKey: "FILRODENSWMB.LABELS.StyleRealm", fontFamily: "Cinzel", fontSize: 3, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: true, italic: false }),
+            Object.freeze({ id: "label-style-place", nameKey: "FILRODENSWMB.LABELS.StylePlace", fontFamily: "EB Garamond", fontSize: 2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: true, italic: false }),
+            Object.freeze({ id: "label-style-water", nameKey: "FILRODENSWMB.LABELS.StyleWater", fontFamily: "EB Garamond", fontSize: 2.4, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
+            Object.freeze({ id: "label-style-note", nameKey: "FILRODENSWMB.LABELS.StyleNote", fontFamily: "Kalam", fontSize: 1.6, fillColor: "#DEDCD3", maxChars: 24, justify: "left", bold: false, italic: false }),
+            // For the routes' labels (see ROUTES.DEFAULT_STYLES)
+            Object.freeze({ id: "label-style-road", nameKey: "FILRODENSWMB.LABELS.StyleRoad", fontFamily: "Barlow Semi Condensed", fontSize: 1.4, fillColor: "#5a3a1e", maxChars: 0, justify: "center", bold: false, italic: false }),
+            Object.freeze({ id: "label-style-sea-lane", nameKey: "FILRODENSWMB.LABELS.StyleSeaLane", fontFamily: "Noto Serif", fontSize: 1.4, fillColor: "#2e5f8a", maxChars: 0, justify: "center", bold: false, italic: true }),
+            // For generated content: the political levels' region labels (see GENERATOR.REGION_LABEL_STYLES),
+            // in gold (the third preset, as Realm above) to set them apart from place names, and the
+            // settlements' pin labels (see PINS.DEFAULT_STYLES' labelStyle)
+            Object.freeze({ id: "label-style-duchy", nameKey: "FILRODENSWMB.LABELS.StyleDuchy", fontFamily: "Cinzel", fontSize: 2.2, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: false, italic: false }),
+            Object.freeze({ id: "label-style-county", nameKey: "FILRODENSWMB.LABELS.StyleCounty", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: false, italic: true }),
+            Object.freeze({ id: "label-style-capital", nameKey: "FILRODENSWMB.LABELS.StyleCapital", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#FFFFFF", maxChars: 0, justify: "left", bold: true, italic: false }),
+            Object.freeze({ id: "label-style-settlement", nameKey: "FILRODENSWMB.LABELS.StyleSettlement", fontFamily: "EB Garamond", fontSize: 1.2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: false, italic: false }),
+        ]),
         PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
     },
+    ROUTES: {
+        // The route styles a new map starts with (a saved map keeps its own), each for one
+        // transport, so the bar and the inspector offer a road's styles to roads and a sea lane's
+        // to sea routes. The generator uses the same names and looks. Their names come
+        // from the localisation keys, so a map keeps the names it was made with.
+        DEFAULT_STYLES: Object.freeze([
+            Object.freeze({ id: "route-style-trunk-road", nameKey: "FILRODENSWMB.UI.RouteStyleTrunkRoad", transport: "road", color: "#6b3a1f", thickness: 3, style: "solid", outline: true, smoothing: false }),
+            Object.freeze({ id: "route-style-main-road", nameKey: "FILRODENSWMB.UI.RouteStyleMainRoad", transport: "road", color: "#8a5a2b", thickness: 2, style: "solid", outline: true, smoothing: false }),
+            Object.freeze({ id: "route-style-minor-road", nameKey: "FILRODENSWMB.UI.RouteStyleMinorRoad", transport: "road", color: "#8a6a45", thickness: 1.25, style: "solid", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-track", nameKey: "FILRODENSWMB.UI.RouteStyleTrack", transport: "road", color: "#7a6a55", thickness: 1, style: "dotted", outline: false, smoothing: false }),
+            // In-fill's lanes (see Infill): lighter and finer than a minor road
+            Object.freeze({ id: "route-style-lane", nameKey: "FILRODENSWMB.UI.RouteStyleLane", transport: "road", color: "#a8916f", thickness: 0.9, style: "solid", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-old-road", nameKey: "FILRODENSWMB.UI.RouteStyleOldRoad", transport: "road", color: "#8c7f6c", thickness: 1, style: "dashed", outline: false, smoothing: false }),
+            // Sea lanes are a pale yellow: the sea already holds depth contours and territorial
+            // waters' limits in pale lines, and a blue lane was lost among them. River trade keeps a
+            // pale blue (a colour picker preset), which stands out against the land. Thickness and
+            // dashes tell each pair's busier and quieter routes apart
+            Object.freeze({ id: "route-style-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleSeaLane", transport: "sea", color: "#fff29e", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-minor-sea-lane", nameKey: "FILRODENSWMB.UI.RouteStyleMinorSeaLane", transport: "sea", color: "#fff29e", thickness: 1, style: "dotted", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleRiverTrade", transport: "river", color: "#8db2cc", thickness: 1.5, style: "dashed", outline: false, smoothing: false }),
+            Object.freeze({ id: "route-style-minor-river-trade", nameKey: "FILRODENSWMB.UI.RouteStyleMinorRiverTrade", transport: "river", color: "#8db2cc", thickness: 1, style: "dotted", outline: false, smoothing: false }),
+        ]),
+        // The label style a route drawn by hand starts its name with, by transport (see
+        // LABELS.DEFAULT_STYLES), so its name looks like the map's other route names rather than
+        // the larger default label. A map that no longer has the style starts it with the default.
+        LABEL_STYLES: Object.freeze({ road: "label-style-road", sea: "label-style-sea-lane", river: "label-style-sea-lane" }),
+    },
+    // Pins and labels are sized in UNIT steps of what size 1 meant before size revision REVISION:
+    // a pin of size 1 is PIN_PX x UNIT pixels across on a LIMITS.BASELINE_DIMENSION map, and a
+    // label of size 1 the page's root font size x UNIT, both growing with the map. Older maps and
+    // styles files are scaled up as they are read (see SymbolSizes), so they look as they did.
+    //
+    // Symbol size (see SymbolScale) multiplies every pin and label on a map: Auto grows them with
+    // the square root of how much the map is magnified against its whole world, from 1 (a top map)
+    // up to AUTO_MAX; or one of SIZES, chosen in the Detail menu.
+    SYMBOLS: Object.freeze({ REVISION: 2, UNIT: 0.25, PIN_PX: 24, AUTO_MAX: 2.5, SIZES: Object.freeze([0.75, 1, 1.25, 1.5, 2, 2.5]), RANGE: Object.freeze([0.5, 3]) }),
+    // The PNG export (see ExportScale): the scales offered, the height the smallest name shown
+    // should reach for a scale to be recommended, the largest image (a side, and in all) a scale
+    // may make, and the largest tile drawn at once
+    EXPORT_PNG: Object.freeze({ SCALES: Object.freeze([1, 2, 3, 4]), MIN_LABEL_PX: 12, MAX_SIDE: 16384, MAX_PIXELS: 150_000_000, TILE_PX: 4096 }),
     PINS: {
-        DEFAULT_SCALE: 1,
+        // The size new pins (and their labels) start with: small, so a map of many places stays readable
+        DEFAULT_SCALE: 1.2,
+        // The look of a pin placed with no style (its icon and colour are changed in the inspector)
+        DEFAULT_ICON: "map_pin",
+        DEFAULT_COLOR: "#ffffff",
+        // The pin styles every map starts with (see PinStyles): one per settlement or site tier
+        // (`tier`, which the generator finds a place's style by), each a built-in icon, a scale,
+        // the label's size and label style (see LABELS.DEFAULT_STYLES), and a detail level (0 is always shown;
+        // higher levels are the first hidden when a map is viewed at world scale, which the
+        // generator's tier filter reads). The label's detail level (labelDetailLevel) is the level
+        // from which the pin's name is drawn too, so stepping Detail up shows a tier's places one
+        // step before their names (see DetailLevel.ofName). Their names come from the NAME
+        // localisation keys, so a map made in one language keeps the names it was made with.
+        DEFAULT_STYLES: [
+            { tier: "capital", icon: "circle_outline_with_star", scale: 1.6, labelSize: 1.6, labelStyle: "label-style-capital", detailLevel: 0, labelDetailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCapital" },
+            { tier: "city", icon: "star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 0, labelDetailLevel: 0, name: "FILRODENSWMB.UI.PinStyleCity" },
+            { tier: "largeTown", icon: "circle_with_dot", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLargeTown" },
+            { tier: "town", icon: "circle_outline_with_dot", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleTown" },
+            // The places regional in-fill adds (see Infill), shown only at the most detailed level
+            { tier: "marketTown", icon: "dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 3, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleMarketTown" },
+            // A filled-in village of at least INFILL.LARGE_VILLAGE_POP, shown from Local and named at Everything
+            { tier: "largeVillage", icon: "dot_outline", scale: 0.5, labelSize: 0.5, labelStyle: "label-style-settlement", detailLevel: 3, labelDetailLevel: 4, name: "FILRODENSWMB.UI.PinStyleLargeVillage" },
+            { tier: "village", icon: "dot_outline", scale: 0.5, labelSize: 0.5, labelStyle: "label-style-settlement", detailLevel: 4, labelDetailLevel: 4, name: "FILRODENSWMB.UI.PinStyleVillage" },
+            { tier: "castle", icon: "castle", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleCastle" },
+            { tier: "fortifiedTown", icon: "fortress", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleFortifiedTown" },
+            { tier: "port", icon: "anchor", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStylePort" },
+            { tier: "ruin", icon: "classical_building", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, name: "FILRODENSWMB.UI.PinStyleRuin" },
+            // What the age before the present left (see GENERATOR.PIN_TIERS): the tier's own icon in
+            // the ruins' colour, so a ruin reads as what it was
+            { tier: "ruinedCapital", icon: "circle_outline_with_star", scale: 1.2, labelSize: 1.2, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCapital" },
+            { tier: "ruinedCity", icon: "star", scale: 1, labelSize: 1, labelStyle: "label-style-settlement", detailLevel: 1, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedCity" },
+            { tier: "ruinedLargeTown", icon: "circle_with_dot", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedLargeTown" },
+            { tier: "ruinedTown", icon: "circle_outline_with_dot", scale: 0.6, labelSize: 0.6, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleRuinedTown" },
+            { tier: "abandonedCastle", icon: "castle", scale: 0.7, labelSize: 0.7, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 3, color: "#ff6464", name: "FILRODENSWMB.UI.PinStyleAbandonedCastle" },
+            { tier: "landmark", icon: "jp_landmark", scale: 0.8, labelSize: 0.8, labelStyle: "label-style-settlement", detailLevel: 2, labelDetailLevel: 2, name: "FILRODENSWMB.UI.PinStyleLandmark" },
+        ],
+        // The colour the default styles use (unless one gives its own), and the detail levels a style may have
+        DEFAULT_STYLE_COLOR: "#ffffff",
+        DETAIL_LEVELS: [0, 1, 2, 3, 4],
+        // Where a pin's name starts, from the pin's centre, in pin widths: a little beyond the
+        // pin's edge (half a width)
+        LABEL_OFFSET: 0.6,
     },
     TECTONICS: {
         DEFAULT_THICKNESS: 40,
@@ -1184,17 +1946,497 @@ export const FILRODENSWMB = {
             },
         },
     },
+    // The version of the map's vector data (regions, routes and pins). Maps saved before it existed
+    // have no `vectorSchemaVersion` and hold regions as polygons and routes as node lists; version 4
+    // holds regions as cell ownership on the display mesh and routes as waypoint cells (see
+    // src/mesh/Migration.js, which converts the older shapes once).
+    VECTOR_SCHEMA_VERSION: 4,
+    // The display mesh: a Poisson-disc Voronoi mesh over the whole map that regions are painted on
+    // and routes are found across (see src/mesh/). Sizes are in map pixels unless they say km.
+    MESH: {
+        // Distance between neighbouring cell centres. Small enough that a border drawn along cell
+        // edges reads as a line, not a staircase, at the zoom levels a map is usually edited at.
+        SPACING: 4,
+        // Above this many cells (roughly 0.6 x width x height / spacing²) the spacing is widened
+        // until the mesh fits, so a very large map keeps a mesh that builds in a few seconds and a
+        // cell-id texture that fits in GPU memory. The widened spacing is stored with the map.
+        MAX_CELLS: 500000,
+        MIN_SPACING: 4,
+        // Spacing of the coarser model mesh the generator works on, in effective km (see
+        // AREA_FACTOR). Its sites are a subset of the display mesh's sites.
+        MODEL_SPACING_KM: 25,
+        // A drawn map shows a world this many times larger in area than its latitudes suggest
+        // would fit, so a continent spanning 120° of latitude has the size of a realistic
+        // medieval landscape. Effective km per pixel = latitude span x 111.2 / height / √AREA_FACTOR.
+        AREA_FACTOR: 15,
+        // Latitudes assumed when a map does not record its own (top, bottom)
+        DEFAULT_LAT_TOP: 60,
+        DEFAULT_LAT_BOTTOM: -60,
+        // How heights in the elevation buffer (0 to 1, with the sea level between) convert to
+        // metres: (elevation - sea level) x METRES_PER_UNIT.
+        METRES_PER_UNIT: 10000,
+        // Realms claim water up to this far from their coast (effective km)
+        CLAIM_KM: 60,
+        // Border relaxation: cells at least RINGS steps from a differently owned cell keep their
+        // owner; the band between is re-flooded with a cost that rises with the height climbed
+        // (doubling per RELIEF_M_PER_STEP metres) and with entering a cell on a river carrying at
+        // least RIVER_KM of upstream length (x RIVER_CROSS), so borders settle on ridges and rivers.
+        RELAX: { RINGS: 3, RELIEF_M_PER_STEP: 120, RIVER_KM: 40, RIVER_CROSS: 6 },
+        // Default route cost before the generator supplies its own: the step length, doubled per
+        // RELIEF_M_PER_STEP metres climbed, x WATER_STEP for a step into or across water.
+        ROUTE_COST: { RELIEF_M_PER_STEP: 120, WATER_STEP: 4 },
+        // Finding a route's legs by hand (see RouteEdits.transportCost): a step along an existing
+        // route of the same transport costs SHARED_STEP of its usual cost, so a new road joins the
+        // network rather than running beside it; a river route pays RIVER_LAND_STEP for a step over
+        // land without a river, so it keeps to rivers and water and crosses land only to reach them
+        // (a river being the cells drawn within RIVER_CHANNEL_MARGIN pixels of a channel; see
+        // MeshSession.riverChannel).
+        // A road never enters water and a sea route never enters land, except that a road allowed
+        // to span water (route.spanWater) pays SPAN_WATER_STEP for each step over water, on top of
+        // ROUTE_COST.WATER_STEP, so it bridges a strait when the way round is longer than that and
+        // keeps to land otherwise. Such a road only enters water within SPAN_WATER_MAX_CELLS / 2
+        // cells of a shore (see MeshSession.shoreDistance), so the widest water it can bridge is
+        // about SPAN_WATER_MAX_CELLS cells across; wider water needs a sea route. Simple factors
+        // until the generator's cost model replaces them.
+        ROUTE: { SHARED_STEP: 0.5, RIVER_LAND_STEP: 6, SPAN_WATER_STEP: 6, SPAN_WATER_MAX_CELLS: 12, RIVER_CHANNEL_MARGIN: 1 },
+        // Corner-cutting passes applied to borders and smoothed routes. Each pass doubles the
+        // points; one is enough to hide the Voronoi corners at the display spacing.
+        CHAIKIN_PASSES: 1,
+        // Version of the site sampler and mesh algorithms. A change that moves any cell centre
+        // must bump this, since stored owner arrays are only valid for the mesh they were made on.
+        ALGORITHM_VERSION: 1,
+        // The range a map's own area factor (world.areaFactor) may take, whole numbers only: 1
+        // shows the world exactly as drawn, 10 to 20 suits most fantasy maps, 40 is a very
+        // compressed sketch. Values outside it are clamped when a map is loaded.
+        AREA_FACTOR_RANGE: [1, 40],
+        // How region levels are drawn (see RegionMeshLayer and RegionLevelLayers)
+        FILL: {
+            // Opacity of a region's colour over water, as a share of its opacity over land, when
+            // its layer set tints claimed water (0 leaves claimed water untinted)
+            WATER_TINT_ALPHA: 0.35,
+            // Period of the diagonal and crosshatch fill patterns, in map pixels, and the width of
+            // each hatch line. These match the 16 px tile with 2 px strokes earlier versions drew
+            // hatched regions with, so a migrated map keeps its look.
+            HATCH_PERIOD: 16,
+            HATCH_LINE_WIDTH: 2,
+            // Cells per row of the owners and palette textures. A paint stroke then uploads only
+            // the rows of 1,024 cells it touched rather than the whole level.
+            TEXTURE_ROW: 1024,
+        },
+        // Border line styles by arc class: land borders take the level's own line style, sea and
+        // shore borders the level's sea style. Dash patterns are multiples of the line width.
+        ARCS: {
+            DASH: { dashed: [4, 3], dotted: [1, 2], dashdot: [4, 2, 1, 2] },
+            // Thickness is rounded to this step, so a slider can offer quarter pixels
+            THICKNESS_STEP: 0.25,
+        },
+        // The cell raster cache in the browser's IndexedDB (see MeshCache): rebuilding the mesh of
+        // a large map takes about a second, reading it back a fraction of that.
+        CACHE: { DATABASE: "fwmb-mesh", STORE: "rasters", MAX_ENTRIES: 8 },
+        // How close (in screen pixels) a click must be to a route's line to pick the route
+        ROUTE_HIT_PX: 8,
+        // The waypoint handles of the route being edited (see RouteOverlays), in screen pixels:
+        // a handle's radius, the held one's, their outline, and how near a press must be to take
+        // hold of one
+        ROUTE_HANDLES: { HANDLE_PX: 5, HANDLE_HELD_PX: 7, HANDLE_LINE_PX: 1.5, REACH_PX: 10 },
+        // Drawing routes (see RouteTool): a press that moves further than DRAG_PX screen pixels is a
+        // traced stroke rather than a click; the stroke is thinned to its bends with a tolerance of
+        // the toolbar's Detail setting in mesh cell spacings, offered from DETAIL.MIN to DETAIL.MAX
+        // cells (1 keeps every bend the mesh can hold; at the usual 4 px spacing the top of the
+        // range is a tolerance of a few hundred map pixels, which keeps little more than a sweeping
+        // stroke's ends) and starting at DETAIL.DEFAULT. A run of stroke longer than GAP_FACTOR
+        // times the tolerance gains waypoints along it (see RouteEdits.fillGaps), so a long straight
+        // stroke still holds a terrain-found route near itself.
+        ROUTE_DRAW: { DRAG_PX: 4, DETAIL: { MIN: 1, MAX: 60, DEFAULT: 6, GAP_FACTOR: 10 } },
+        // Territorial waters (see RegionEdits.claimWaters): a level's water cells go to the nearest
+        // of its regions by sea distance from that region's coast, up to the level's own limit, in
+        // map pixels (the map's own measure; the scale bar can name it in the map's units). A new
+        // top level starts at DEFAULT_PX; a child level at 0 (its parent's waters cover it), and
+        // the level editor offers up to MAX_PX.
+        WATERS: { DEFAULT_PX: 40, MAX_PX: 400, STEP_PX: 5 },
+        // How a child level is drawn when it is made (the atlas convention: the top level fills,
+        // the levels below it draw thinner, dashed borders inside it and no fill of their own)
+        CHILD_LEVEL: { OPACITY: 0, LINE_THICKNESS: 0.75, LINE_STYLE: "dashed", SEA_LINE_THICKNESS: 0.5 },
+        // The Regions tool's painting overlays (see RegionOverlays), all in screen pixels so they
+        // look the same at any zoom: the outline of the region being edited (a dark halo under
+        // an accent line), and the dashed outline of the area a Fill would take.
+        PAINT: {
+            OUTLINE_WIDTH_PX: 2.5,
+            OUTLINE_HALO_PX: 6,
+            OUTLINE_HALO_ALPHA: 0.45,
+            PREVIEW_WIDTH_PX: 1.5,
+            PREVIEW_DASH_PX: [6, 4],
+            // How long the pointer rests (in ms) before the Fill preview is worked out
+            PREVIEW_DELAY_MS: 60,
+            // While the Regions tool is editing, the level being painted is drawn at least this
+            // opaque, so a borders-only level still shows its regions while they are painted
+            EDIT_FILL_OPACITY: 0.5,
+        },
+    },
+    // The settlement, route and realm generator (see src/generator/). It runs on the model mesh
+    // (the display mesh's coarse sites, MESH.MODEL_SPACING_KM apart) in "flat-km": the time it
+    // takes to walk one effective km over flat open ground, so every cost below is a travel time.
+    // The figures are tuned to give believable medieval places at world scale, not to be realistic.
+    GENERATOR: {
+        // Stored with every run so an old run stays explainable after the model changes. Any change
+        // that alters the output for the same seed and settings must bump it.
+        REVISION: 1,
+        // The settings a new run starts from (see GeneratorSettings): one age, high medieval and
+        // troubled, the world multipliers at 1, Human Generic names.
+        DEFAULT_NAME_BASE: "Human Generic",
+        // Era: development is the share of the land's food capacity actually farmed; plague the share
+        // of people lost to a recent great pandemic (the Black Death took 30 to 50%).
+        ERAS: Object.freeze({
+            earlyMedieval: Object.freeze({ development: 0.45, plague: 0 }),
+            highMedieval: Object.freeze({ development: 0.7, plague: 0 }),
+            afterPlague: Object.freeze({ development: 0.75, plague: 0.35 }),
+        }),
+        DEFAULT_ERA: "highMedieval",
+        // Strife: how hard insecurity bites (the least secure ground keeps 1 - strife of its people)
+        STRIFES: Object.freeze({ peaceful: 0.2, troubled: 0.5, warTorn: 0.8 }),
+        DEFAULT_STRIFE: "troubled",
+        MAX_AGES: 8,
+        // Ages after the first start from the age before (see Pipeline): a town's cell is favoured
+        // when the next age places its towns (its potential x 1 + INERTIA, at its own tier and
+        // smaller), so most places carry on. An invading culture spreads at INVASION.SPREAD of the
+        // cost, taking land, and where it takes land from another people the age's strife there
+        // rises by INVASION.STRIFE (to at most 1).
+        AGES: Object.freeze({
+            INERTIA: 0.6,
+            INVASION: Object.freeze({ SPREAD: 0.5, STRIFE: 0.35 }),
+            EVENTS: Object.freeze(["arrival", "invasion"]),
+        }),
+        // What a run writes onto the map, as the Generate panel's Output section starts: the levels
+        // below Realms, the settlement tiers given pins (capitals always are), the kinds of route,
+        // and whether realm, capital and city names are shown
+        OUTPUT: Object.freeze({
+            duchies: true,
+            counties: true,
+            places: Object.freeze({ city: true, largeTown: true, town: true, castle: true }),
+            routes: Object.freeze({ road: true, river: true, sea: true }),
+            labels: true,
+            // What the age before the present leaves (with more than one age): ruins, abandoned
+            // castles and old roads
+            history: true,
+        }),
+        // The Generate panel's estimate of a run's time, in seconds: the per-pixel first stage
+        // (PER_PIXEL), the searches, which grow faster than the model cells (CELL_FACTOR x cells ^
+        // CELL_POWER), and writing the result onto the display mesh (PER_DISPLAY_CELL). Measured on
+        // P0JBVA (14,293 model cells, 2.9 s) and a 3200 x 2400 regional map (2,661 cells, 1.1 s).
+        // Above WARN_SECONDS the panel says the run will take a while.
+        ESTIMATE: Object.freeze({ PER_PIXEL: 1.2e-7, CELL_FACTOR: 1.5e-6, CELL_POWER: 1.5, PER_DISPLAY_CELL: 3e-6, WARN_SECONDS: 60 }),
+        // The settlement pin scales of the module's older default sets (in today's units), which
+        // suit an earlier scale: a map whose tier styles still match one of them (at least MIN of
+        // its tiers found) starts its runs with Use the default styles on
+        OLDER_PIN_SCALES: Object.freeze([
+            Object.freeze({ capital: 4, city: 3.4, largeTown: 2.8, town: 2.4, village: 2, castle: 2.8, fortifiedTown: 2.8, port: 2.4 }),
+            Object.freeze({ capital: 1.6, city: 1.2, largeTown: 0.8, town: 2.4, village: 2, castle: 0.8, fortifiedTown: 0.8, port: 0.8 }),
+        ]),
+        OLDER_PIN_SCALES_MIN: 3,
+        // A map with fewer land model cells than this covers too small an area for more than a few
+        // realms and the larger settlements, which the panel says
+        SMALL_WORLD_LAND_CELLS: 2000,
+        // The light-hearted lines shown under the progress while a run works, each for QUIP_MS
+        // before the next (see Generation)
+        QUIP_MS: 2500,
+        QUIPS: Object.freeze([
+            "FILRODENSWMB.UI.GenerateQuipTools",
+            "FILRODENSWMB.UI.GenerateQuipSeaLanes",
+            "FILRODENSWMB.UI.GenerateQuipBorders",
+            "FILRODENSWMB.UI.GenerateQuipSheep",
+            "FILRODENSWMB.UI.GenerateQuipForests",
+            "FILRODENSWMB.UI.GenerateQuipMarket",
+            "FILRODENSWMB.UI.GenerateQuipHighRoad",
+            "FILRODENSWMB.UI.GenerateQuipKings",
+            "FILRODENSWMB.UI.GenerateQuipWalls",
+            "FILRODENSWMB.UI.GenerateQuipHamlets",
+            "FILRODENSWMB.UI.GenerateQuipTaxes",
+            "FILRODENSWMB.UI.GenerateQuipAle",
+            "FILRODENSWMB.UI.GenerateQuipAlliances",
+            "FILRODENSWMB.UI.GenerateQuipInheritance",
+            "FILRODENSWMB.UI.GenerateQuipBridge",
+            "FILRODENSWMB.UI.GenerateQuipMercenaries",
+            "FILRODENSWMB.UI.GenerateQuipOldRoads",
+            "FILRODENSWMB.UI.GenerateQuipCathedral",
+            "FILRODENSWMB.UI.GenerateQuipRaiders",
+            "FILRODENSWMB.UI.GenerateQuipLighthouse",
+        ]),
+        // The world settings: multipliers of the model's own figures, 1 leaving them as they are.
+        // density scales how many people the land feeds; urbanisation the share of them living in
+        // towns; realmSpacing how far apart royal seats must be (more spacing, fewer realms);
+        // fragmentation divides the power exponents, so above 1 a lord's wealth carries him less
+        // far and the map breaks into more, smaller duchies and kingdoms.
+        WORLD: Object.freeze({
+            density: Object.freeze({ min: 0.25, max: 4, default: 1 }),
+            urbanisation: Object.freeze({ min: 0.25, max: 4, default: 1 }),
+            realmSpacing: Object.freeze({ min: 0.4, max: 2.5, default: 1 }),
+            fragmentation: Object.freeze({ min: 0.5, max: 2, default: 1 }),
+        }),
+        // What each built-in land biome means to the model. farming multiplies the climate's yield;
+        // cover is the share of farmland left after clearing effort (forest below 1, so land near
+        // towns and roads gains when it is cleared); travel the cost of crossing it off-road; and
+        // raiders how well it feeds raiders when no realm holds it. A custom biome behaves as one of
+        // these (its "behaves like" choice, or the built-in biome the climate would give there).
+        BIOMES: Object.freeze({
+            SNOW: Object.freeze({ farming: 1, cover: 1, travel: 4, raiders: 1 }),
+            TUNDRA: Object.freeze({ farming: 1, cover: 1, travel: 1.5, raiders: 1 }),
+            TAIGA: Object.freeze({ farming: 1, cover: 0.8, travel: 1.8, raiders: 1 }),
+            GRASSLAND: Object.freeze({ farming: 1, cover: 1, travel: 1, raiders: 1 }),
+            DECIDUOUS_FOREST: Object.freeze({ farming: 1, cover: 0.95, travel: 1.4, raiders: 1 }),
+            TEMPERATE_RAINFOREST: Object.freeze({ farming: 1, cover: 0.8, travel: 2, raiders: 1 }),
+            TEMPERATE_DESERT: Object.freeze({ farming: 1, cover: 1, travel: 1.5, raiders: 1 }),
+            TROPICAL_RAINFOREST: Object.freeze({ farming: 1, cover: 0.6, travel: 3, raiders: 1 }),
+            SAVANNA: Object.freeze({ farming: 1, cover: 1, travel: 1, raiders: 1 }),
+            SUBTROPICAL_DESERT: Object.freeze({ farming: 1, cover: 1, travel: 2, raiders: 1 }),
+        }),
+        // Stage 1, the base layer: what each model cell holds.
+        VALUES: Object.freeze({
+            // Rural people per km² on the best farmland; pasture feeds this share of it; fishing adds
+            // this many per km² of a coastal cell's land
+            PEAK_DENSITY: 60,
+            PASTURE_SHARE: 0.2,
+            FISHING_DENSITY: 8,
+            // Crops: no harvest below the first temperature, full by the second, losing HOT_LOSS
+            // towards the hottest (leached soils); moisture likewise, losing WET_LOSS when waterlogged
+            CROP_TEMPERATURE: Object.freeze([0.25, 0.5]),
+            CROP_HOT: Object.freeze([0.8, 1]),
+            HOT_LOSS: 0.2,
+            CROP_MOISTURE: Object.freeze([0.12, 0.42]),
+            CROP_WET: Object.freeze([0.8, 1]),
+            WET_LOSS: 0.3,
+            PASTURE_TEMPERATURE: Object.freeze([0.12, 0.35]),
+            PASTURE_MOISTURE: Object.freeze([0.04, 0.2]),
+            // Land this close to a river or lake is watered at least to IRRIGATED_MOISTURE
+            IRRIGATION_KM: 6,
+            IRRIGATED_MOISTURE: 0.5,
+            // Local relief (highest minus lowest land in a cell) at which farmland halves, and at
+            // which overland travel costs twice as much
+            RELIEF_HALF_M: 600,
+            RELIEF_COST_M: 500,
+            // Upstream river length at which a river carries boats
+            NAVIGABLE_KM: 250,
+            // Radius over which a coast's shelter (the share of land around it) is measured
+            SHELTER_KM: 25,
+            // A cell is land when at least this share of its pixels are; it is coastal when a
+            // neighbour is more than COASTAL_SEA_SHARE sea
+            LAND_SHARE: 0.5,
+            COASTAL_SEA_SHARE: 0.5,
+        }),
+        // Travel over the cell graph: per km by sea or lake, and along a navigable river; the cost of
+        // loading and unloading between land and water on an open coast, at a sheltered harbour or
+        // river mouth (shelter at least SHELTERED), and at a town that already has quays; built
+        // roads (relief only, no land cover) and established sea lanes cost these shares.
+        TRAVEL: Object.freeze({
+            SEA_COST: 0.2,
+            RIVER_COST: 0.35,
+            PORT_KM: 20,
+            SHELTERED_PORT_KM: 8,
+            SHELTERED: 0.6,
+            TOWN_PORT_KM: 4,
+            ROAD_FACTOR: 0.5,
+            LANE_FACTOR: 0.6,
+        }),
+        // Cultures. With the single default culture every culture effect is neutral.
+        CULTURES: Object.freeze({
+            DEFAULT: Object.freeze({ name: "", color: "#8a8a8a", nameBase: "Human Generic", openness: 0.5, density: 1, habitat: Object.freeze({}) }),
+            // A map's culture's fields (the culture inspector's ranges): openness, density, the
+            // relief track's top (in elevation units, about 2,500 m at METRES_PER_UNIT), and coast
+            // and river affinity (-1 avoids, 1 seeks)
+            FIELDS: Object.freeze({
+                openness: Object.freeze({ min: 0, max: 1, default: 0.5 }),
+                density: Object.freeze({ min: 0.25, max: 4, default: 1 }),
+                relief: Object.freeze({ min: 0, max: 0.25 }),
+                coast: Object.freeze({ min: -1, max: 1, default: 0 }),
+                river: Object.freeze({ min: -1, max: 1, default: 0 }),
+            }),
+            // The most cultures a map holds, and the most homelands each may have
+            MAX: 24,
+            MAX_HOMELANDS: 12,
+            // The least a culture fits anywhere; a culture farming land that does not suit it
+            // still reaches POP_FLOOR of its capacity
+            FIT_FLOOR: 0.05,
+            POP_FLOOR: 0.4,
+            // Political cost x (1 + BARRIER x closedness) into another culture's land; trade
+            // between different cultures keeps at least AFFINITY_FLOOR; border threat x (1 +
+            // HOSTILITY x closedness); towns draw open cultures from further (URBAN_PULL)
+            BARRIER: 3,
+            AFFINITY_FLOOR: 0.1,
+            HOSTILITY: 1,
+            URBAN_PULL: 1.5,
+            // Soft habitat bands ease to nothing over these widths outside their range
+            SOFT: Object.freeze({ temperature: 0.12, moisture: 0.12, heightM: 500, reliefM: 250 }),
+            // Coast and river affinity: seeking raises the fit by up to RAISE, avoiding lowers it
+            // by up to LOWER where the feature is missing
+            AFFINITY_RAISE: 0.5,
+            AFFINITY_LOWER: 0.3,
+            // Spreading through land of fit f costs x (1 + FIT_COST x (1 - f)); a culture fitting
+            // little of the world spreads up to SPECIALIST_BONUS cheaper through what it does fit
+            FIT_COST: 3,
+            SPECIALIST_BONUS: 0.4,
+            // Blend width between two fully open cultures (flat-km of extra travel); shares below
+            // MIN_SHARE are dropped; auto-placed homelands are at least HOMELAND_SPACING_KM apart
+            // (less on a small world: HOMELAND_SHARE of the side of each culture's share of the
+            // land) and, where they can be, HOMELAND_EDGE_KM from the map's edges
+            BLEND_KM: 250,
+            MIN_SHARE: 0.02,
+            HOMELAND_SPACING_KM: 500,
+            HOMELAND_SHARE: 0.5,
+            HOMELAND_EDGE_KM: 150,
+            // A town's culture mix drops cultures below this share
+            MIX_MIN_SHARE: 0.01,
+        }),
+        // Stage 2: population and central places. Tiers largest first: spacing and reach in flat-km,
+        // the urban share of the catchment, and the least a town of the tier may hold.
+        TOWNS: Object.freeze({
+            MARSH_PENALTY: 0.45,
+            // Malaria country: hot, wet, flat and low, worse beside rivers and lakes
+            MARSH_TEMPERATURE: Object.freeze([0.7, 0.9]),
+            MARSH_MOISTURE: Object.freeze([0.6, 0.85]),
+            MARSH_RELIEF_M: Object.freeze([150, 400]),
+            MARSH_HEIGHT_M: Object.freeze([200, 600]),
+            MARSH_DRY_SHARE: 0.7,
+            TIERS: Object.freeze([
+                Object.freeze({ spacingKm: 320, reachKm: 320, urbanShare: 0.025, minPop: 15000 }),
+                Object.freeze({ spacingKm: 130, reachKm: 130, urbanShare: 0.02, minPop: 4000 }),
+                Object.freeze({ spacingKm: 55, reachKm: 55, urbanShare: 0.045, minPop: 1500 }),
+            ]),
+            // Weak towns are dropped half at a time, for at most this many passes
+            PRUNE_PASSES: 6,
+            // A town keeps its place if it reaches this share of its tier's minimum
+            KEEP_SHARE: 0.8,
+        }),
+        // Stage 3: trade rounds. Gravity is popA x popB / max(cost, GRAVITY_FLOOR_KM)², each city
+        // trading with its CITY_PARTNERS strongest partners (plus a spanning tree), each large town
+        // with LARGE_PARTNERS within PARTNER_REACH_KM, each town with its nearest bigger place within
+        // MARKET_REACH_KM. Trade supports townspeople equal to URBAN_SHARE of the population, spread
+        // by score^EXPONENT, transfers at ports weighing PORT_WEIGHT; through trade feeds only towns
+        // and junctions of JUNCTION_DEGREE or more routes; a trade town needs no town within
+        // NEW_TOWN_GAP steps. In the final round a step through ground of security s costs
+        // x (1 + DANGER x (1 - s)).
+        TRADE: Object.freeze({
+            ROUNDS: 2,
+            CITY_PARTNERS: 4,
+            LARGE_PARTNERS: 2,
+            PARTNER_REACH_KM: 1200,
+            MARKET_REACH_KM: 400,
+            GRAVITY_FLOOR_KM: 60,
+            URBAN_SHARE: 0.015,
+            EXPONENT: 1.1,
+            PORT_WEIGHT: 2,
+            JUNCTION_DEGREE: 3,
+            NEW_TOWN_GAP: 1,
+            DANGER: 1,
+        }),
+        // Stage 4: counties (city and large-town seats, reach COUNTY_REACH_KM), duchies (city seats,
+        // reach x tax^DUCHY_POWER) and kingdoms (the richest duchies at least KINGDOM_SPACING_KM
+        // apart, reach KINGDOM_REACH_KM x tax^KINGDOM_POWER). Holding water costs SEA_HOLD x sailing
+        // it plus CROSSING_KM per landing. A kingdom of fewer than MIN_KINGDOM_DUCHIES duchies is an
+        // independent duchy; unclaimed pockets of up to ENCLAVE_MAX_CELLS join the county around them.
+        REALMS: Object.freeze({
+            TAX_SHARE: 0.1,
+            SEA_HOLD: 4,
+            CROSSING_KM: 40,
+            COUNTY_REACH_KM: 220,
+            DUCHY_POWER: 0.35,
+            KINGDOM_POWER: 0.5,
+            KINGDOM_SPACING_KM: 650,
+            KINGDOM_REACH_KM: 900,
+            MIN_KINGDOM_DUCHIES: 2,
+            ENCLAVE_MAX_CELLS: 40,
+        }),
+        // Border danger felt on each side of a realm border: power x permeability x culture.
+        BORDERS: Object.freeze({
+            POWER_EXP: 0.6,
+            POWER_FLOOR: 0.35,
+            PERMEABILITY_FLOOR: 0.35,
+            PERMEABILITY_MAX: 1.3,
+            HOSTILITY_MAX: 2.5,
+        }),
+        // Stage 5, the feedback pass: security (threats fading over BORDER_KM from a realm border,
+        // WILD_KM from unclaimed land that feeds at least WILD_HOSTS_PER_KM2, and SEA_RAID on an
+        // exposed coast until shelter reaches RAID_SHELTER; protection fading over SEAT_KM from
+        // royal and ducal seats), clearing (a town clears out to CLEAR_KM_PER_SQRT_POP x √pop, a
+        // road at least ROAD_CLEAR), concentration into walled seats, fortified towns and castles.
+        FEEDBACK: Object.freeze({
+            BORDER_KM: 90,
+            WILD_KM: 70,
+            WILD_HOSTS_PER_KM2: 4,
+            SEA_RAID: 0.35,
+            RAID_SHELTER: 0.8,
+            SEAT_KM: 160,
+            ROYAL_PROTECTION: 1,
+            DUCAL_PROTECTION: 0.6,
+            // Searches stop at these multiples of the fading distances, where the effect is gone
+            THREAT_REACH: 6,
+            SEAT_REACH: 4,
+            CLEAR_KM_PER_SQRT_POP: 0.25,
+            CLEAR_REACH: 2,
+            ROAD_CLEAR: 0.5,
+            CONCENTRATION: 0.6,
+            FORTIFIED_BELOW: 0.75,
+            CASTLE_SPACING_KM: 120,
+            CASTLE_SECURITY: 0.85,
+            CASTLE_TRAFFIC_RANK: 0.5,
+            CASTLE_PASS_RELIEF_M: 400,
+            CASTLE_BORDER_KM: 30,
+            CASTLE_SCORE: 1.5,
+        }),
+        // Generated routes are classed by traffic: the busiest TRUNK_SHARE of their steps trunk,
+        // up to MAIN_SHARE main, the rest minor.
+        ROUTES: Object.freeze({ TRUNK_SHARE: 0.08, MAIN_SHARE: 0.33 }),
+        // Names: a name is retried this many times to avoid a duplicate before one is accepted
+        NAME_RETRIES: 12,
+        CASTLE_WORDS: Object.freeze(["castle", "keep", "hold", "tower"]),
+        // Writing a run onto the map (see Materialise). COLOUR_RINGS: realms within this many model
+        // cell steps of each other take different fill colours, so realms parted by a thin strip of
+        // unclaimed land still differ. SNAP_CELLS: how far (in display cells) a route waypoint may
+        // move to reach ground its transport can stand on (a road's cell on the shore, a sea lane's
+        // last cell beside its port). LEG_STRETCH: a leg's search stops beyond this many times the
+        // straight distance's least cost, and the leg is drawn straight (an unreachable leg would
+        // otherwise search the whole landmass).
+        MATERIALISE: Object.freeze({ COLOUR_RINGS: 2, SNAP_CELLS: 40, LEG_STRETCH: 40 }),
+        // The pin style tier each kind of generated place takes (see PINS.DEFAULT_STYLES' tier keys)
+        // and the route style each transport and class takes (see ROUTES.DEFAULT_STYLES' ids).
+        // Pins below LABELLED_TIERS were given a hidden label by runs before names followed the
+        // detail level (see NameLevels, which shows them again once).
+        PIN_TIERS: Object.freeze({ capital: "capital", city: "city", largeTown: "largeTown", town: "town", marketTown: "marketTown", largeVillage: "largeVillage", village: "village", castle: "castle", fortifiedTown: "fortifiedTown", port: "port", ruinedCapital: "ruinedCapital", ruinedCity: "ruinedCity", ruinedLargeTown: "ruinedLargeTown", ruinedTown: "ruinedTown", abandonedCastle: "abandonedCastle" }),
+        LABELLED_TIERS: Object.freeze(["capital", "city"]),
+        // The label style each political level's generated regions take (see LABELS.DEFAULT_STYLES)
+        REGION_LABEL_STYLES: Object.freeze({ realm: "label-style-realm", duchy: "label-style-duchy", county: "label-style-county" }),
+        ROUTE_STYLES: Object.freeze({
+            road: Object.freeze({ trunk: "route-style-trunk-road", main: "route-style-main-road", minor: "route-style-minor-road" }),
+            sea: Object.freeze({ trunk: "route-style-sea-lane", main: "route-style-sea-lane", minor: "route-style-minor-sea-lane" }),
+            river: Object.freeze({ trunk: "route-style-river-trade", main: "route-style-river-trade", minor: "route-style-minor-river-trade" }),
+            // The roads of the age before that carry nothing now
+            old: Object.freeze({ trunk: "route-style-old-road", main: "route-style-old-road", minor: "route-style-old-road" }),
+            // Regional in-fill's lanes (see Infill)
+            lane: Object.freeze({ trunk: "route-style-lane", main: "route-style-lane", minor: "route-style-lane" }),
+        }),
+        // The run's stages in order, each with its share of the run's time (for the progress bar)
+        STAGES: Object.freeze([
+            Object.freeze({ id: "values", weight: 4 }),
+            Object.freeze({ id: "cultures", weight: 1 }),
+            Object.freeze({ id: "towns", weight: 6 }),
+            Object.freeze({ id: "trade", weight: 40 }),
+            Object.freeze({ id: "realms", weight: 2 }),
+            Object.freeze({ id: "feedback", weight: 2 }),
+            Object.freeze({ id: "finalTrade", weight: 20 }),
+            Object.freeze({ id: "finalRealms", weight: 2 }),
+            Object.freeze({ id: "names", weight: 1 }),
+        ]),
+    },
     ENTITY_CONFIG: {
         decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },
         // `smoothed: true` marks entities StudioCanvas always renders as a Catmull-Rom curve
         // (see #getSplinePoints), so node-insertion hit-testing must test against that curve too
         // rather than the straight chords between control points. Manual rivers render as a plain
         // straight polyline despite their name, so they are deliberately left un-smoothed here.
+        // Entities with a `toolCategory` are edited node by node in that tool; routes and regions
+        // live on the display mesh and have no nodes (routes keep an entry for deletion only).
         fault: { stateKey: "tectonicFaults", activeKey: "activeFaultId", triggersTerrain: true, toolCategory: "features", smoothed: true },
         label: { stateKey: "mapLabels", activeKey: null, triggersTerrain: false },
         pin: { stateKey: "mapPins", activeKey: null, triggersTerrain: false },
-        regionLayer: { stateKey: "regionLayers", activeKey: "activeRegionLayerId", triggersTerrain: false, isLayer: true },
         river: { stateKey: "manualRivers", activeKey: "activeRiverId", triggersTerrain: true, toolCategory: "features" },
-        route: { stateKey: "mapRoutes", activeKey: "activeRouteId", triggersTerrain: false, toolCategory: "infrastructure", smoothed: true },
+        route: { stateKey: "mapRoutes", activeKey: "activeRouteId", triggersTerrain: false },
     },
 };

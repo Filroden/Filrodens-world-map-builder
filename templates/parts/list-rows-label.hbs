@@ -1,0 +1,35 @@
+{{!--
+    The Labels list's rows (see ListQuery.html), rendered on their own and cached, so the panel is
+    drawn again without them while the list has not changed. The row in the inspector and the
+    ticks are marked after each draw (ListQuery.settle). Context: rows, massEdit (Mass Edit
+    is choosing labels), noMatches.
+--}}
+{{#each rows}}
+<div role="option" tabindex="-1" data-list-item class="fwmb-list-item{{#if (eq this.visibility 'none')}} fwmb-is-hidden{{/if}}" aria-selected="false" data-id="{{this.id}}" data-type="{{this.type}}" {{#if this.layerId}}data-layer-id="{{this.layerId}}"{{/if}} data-action="editLabel">
+    {{#if @root.massEdit}}
+        {{#if this.standalone}}
+        <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="label" data-panel-ui aria-label="{{localize 'FILRODENSWMB.UI.MassEditChoose' name=this.name}}" {{#if this.massEditSelected}}checked{{/if}} />
+        {{else}}
+        <span class="fwmb-checkbox-gap" aria-hidden="true"></span>
+        {{/if}}
+    {{/if}}
+    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="label" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+        <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
+    </button>
+    <span class="fwmb-name" title="{{this.name}}">{{this.name}}</span>
+    {{#if this.noRoom}}<span class="fwmb-badge fwmb-badge--instant" data-tooltip="{{localize 'FILRODENSWMB.UI.LabelNoRoomHint'}}">{{localize "FILRODENSWMB.UI.LabelNoRoom"}}</span>{{/if}}
+    {{#if this.meta}}<span class="fwmb-meta">{{this.meta}}</span>{{/if}}
+    <span class="fwmb-actions">
+        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+            <i class="fwmb-icon fwmb-icon--center-focus"></i>
+        </button>
+        {{#if this.standalone}}
+        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteLabel" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+            <i class="fwmb-icon fwmb-icon--delete"></i>
+        </button>
+        {{/if}}
+    </span>
+</div>
+{{else}}
+<div class="fwmb-list-empty" role="none">{{#if @root.noMatches}}{{localize "FILRODENSWMB.UI.ListNoMatches"}}{{else}}{{localize "FILRODENSWMB.UI.NoLabels"}}{{/if}}</div>
+{{/each}}

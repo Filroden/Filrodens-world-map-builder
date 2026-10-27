@@ -1,4 +1,10 @@
-<div class="{{#unless uiState.isEditMode}}fwmb-hidden{{/unless}}">
+{{!--
+    The context bar above the canvas, always present (so the canvas never moves when a mode
+    starts): the tool's pointer modes, the few settings of the mode in use, and the state readout.
+    It never wraps: when it runs short it folds (data-fold, see BarFold and StudioLayout). Tools
+    without modes show only the readout.
+--}}
+<div role="toolbar" aria-label="{{bar.label}}">
     <datalist id="fwmb-region-colors">
         {{#each uiState.regionPresets}}
             <option value="{{this}}"></option>
@@ -11,5 +17,10 @@
         {{/each}}
     </datalist>
 
-    {{> (lookup . 'toolbarPartial') }}
+    {{!-- The modes and settings clip at the bar's end if even the last fold cannot fit them; the
+         readout after them always stays --}}
+    <div class="fwmb-bar-main">
+        {{> (lookup . 'toolbarPartial') }}
+    </div>
+    {{> "modules/filrodens-world-map-builder/templates/parts/bar-state.hbs"}}
 </div>

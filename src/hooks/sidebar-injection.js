@@ -1,4 +1,4 @@
-import { MapStudioApp } from "../applications/MapStudioApp.js";
+import { MapStudioWindow } from "../platform/foundry/MapStudioWindow.js";
 
 export function registerSidebarInjection() {
     Hooks.on("renderSceneDirectory", injectSidebarButton);
@@ -29,7 +29,7 @@ function createMapBuilderButton() {
     button.dataset.tooltip = game.i18n.localize("FILRODENSWMB.UI.ControlTitle");
 
     const icon = document.createElement("i");
-    icon.className = "fwmb-icon map";
+    icon.className = "fwmb-icon fwmb-icon--map";
 
     // Add text label with a leading space for padding, natively localised
     const buttonText = " " + game.i18n.localize("FILRODENSWMB.UI.SidebarButton");
@@ -45,7 +45,6 @@ function createMapBuilderButton() {
 
 function handleMapBuilderButtonClick(event) {
     event.preventDefault();
-    // Instantiate our new standalone Map Studio Application
-    const app = new MapStudioApp({});
-    app.render({ force: true });
+    // Opens the map studio in a window of its own
+    new MapStudioWindow().render({ force: true });
 }

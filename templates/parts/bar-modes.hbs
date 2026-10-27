@@ -1,0 +1,32 @@
+{{!--
+    A group of the bar's pointer modes: a radio group (one mode is always checked; the arrow keys
+    move between them). Each mode is named by a short label (its icon is drawn too, for folding); its tooltip says more. When the bar
+    runs short (data-fold on the bar, see BarFold) the modes marked foldable move into More, then
+    the modes not in use show their icon only; the mode in use always keeps its label.
+
+    Parameters: group (from MapStudio's #barContext): { label, modes: [{ action, attr, value, label,
+    tooltip, icon, iconClass, checked, foldable, disabled }], hasFoldable }
+--}}
+<div class="fwmb-modes" role="radiogroup" aria-label="{{localize group.label}}">
+    {{#each group.modes}}
+    <button type="button" class="fwmb-mode" role="radio" aria-checked="{{#if this.checked}}true{{else}}false{{/if}}" tabindex="{{#if this.checked}}0{{else}}-1{{/if}}" data-action="{{this.action}}" data-{{this.attr}}="{{this.value}}" {{#if this.foldable}}data-fold-rank="{{this.foldable}}"{{/if}} aria-label="{{localize this.label}}" data-tooltip="{{localize this.tooltip}}" {{#if this.disabled}}disabled{{/if}}>
+        <span class="fwmb-icon fwmb-icon--{{this.icon}}{{#if this.iconClass}} {{this.iconClass}}{{/if}}" aria-hidden="true"></span><span class="fwmb-mode-label">{{localize this.label}}</span>
+    </button>
+    {{/each}}
+</div>
+{{#if group.hasFoldable}}
+<div class="fwmb-dropdown fwmb-bar-more" tabindex="-1">
+    <button type="button" class="fwmb-mode fwmb-bar-more-btn" aria-haspopup="menu" aria-label="{{localize 'FILRODENSWMB.UI.BarMoreModes'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.BarMoreModes'}}">
+        <span class="fwmb-mode-label">{{localize "FILRODENSWMB.UI.BarMore"}}</span><span class="fwmb-icon fwmb-icon--arrow-drop-down" aria-hidden="true"></span>
+    </button>
+    <div class="fwmb-dropdown-menu" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.BarMoreModes'}}">
+        {{#each group.modes}}
+        {{#if this.foldable}}
+        <button type="button" role="menuitemradio" aria-checked="{{#if this.checked}}true{{else}}false{{/if}}" data-action="{{this.action}}" data-{{this.attr}}="{{this.value}}" {{#if this.disabled}}disabled{{/if}}>
+            <span class="fwmb-icon fwmb-icon--{{this.icon}}{{#if this.iconClass}} {{this.iconClass}}{{/if}}" aria-hidden="true"></span> {{localize this.label}}
+        </button>
+        {{/if}}
+        {{/each}}
+    </div>
+</div>
+{{/if}}

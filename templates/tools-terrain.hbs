@@ -1,153 +1,145 @@
-<div class="fwmb-tool-content fwmb-scrollable">
-
+{{!--
+    Terrain: the engine's generation settings (which rebuild the whole map, so they pause while a
+    brush is in use), then the terrain's shading and water, which only redraw. The brush and its
+    modes are on the bar above the map.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="terrainGeneration" title="FILRODENSWMB.UI.SectionGeneration" badge="FILRODENSWMB.UI.BadgeRebuildsMap" rebuilds=true}}
     <!-- 1. Global Settings (Visible in Standard and Flat modes) -->
     {{#unless (or (eq uiState.generationEngine "advanced") (eq uiState.generationEngine "guided"))}}
-        <fieldset class="fwmb-fieldset">
-            <legend>{{localize "FILRODENSWMB.UI.GlobalSettings"}}</legend>
-
-            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="seaLevel" label="FILRODENSWMB.UI.SeaLevel" value=uiState.seaLevel min=0 max=1 step=0.01}}
-        </fieldset>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="seaLevel" label="FILRODENSWMB.UI.SeaLevel" value=uiState.seaLevel min=0 max=1 step=0.01}}
     {{/unless}}
 
     <!-- 2. Standard Engine Settings -->
     {{#if (eq uiState.generationEngine "standard")}}
-        <fieldset class="fwmb-fieldset">
-            <legend>{{localize "FILRODENSWMB.UI.MapTransform"}}</legend>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.octaves" label="FILRODENSWMB.UI.TopographicalDetail" value=(lookup uiState 'noise.elevation.octaves') min=1 max=10 step=1}}
+
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.stretch" label="FILRODENSWMB.UI.LandmassStretch" hint="FILRODENSWMB.UI.StretchTooltip" value=(lookup uiState 'noise.elevation.stretch') min=0.5 max=3.0 step=0.1}}
+
+        <div class="fwmb-noise-window">
             <input type="hidden" name="noise.elevation.scale" value="{{lookup uiState 'noise.elevation.scale'}}" />
             <input type="hidden" name="noise.offsetX" value="{{lookup uiState 'noise.offsetX'}}" />
             <input type="hidden" name="noise.offsetY" value="{{lookup uiState 'noise.offsetY'}}" />
 
-            <div class="form-group stacked">
+            <div class="fwmb-form-group fwmb-form-group--stacked">
+                <label>{{localize "FILRODENSWMB.UI.NoiseWindow"}} <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.MapTransformHint'}}"></i></label>
                 <div class="fwmb-transform-controls">
                     <div class="fwmb-transform-zoom">
-                        <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomIn'}}">
-                            <i class="fwmb-icon zoom-in"></i>
+                        <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="1" aria-label="{{localize 'FILRODENSWMB.UI.NoiseZoomIn'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomIn'}}">
+                            <i class="fwmb-icon fwmb-icon--zoom-in"></i>
                         </button>
-                        <button type="button" class="fwmb-btn" data-action="resetNoiseScale" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseReset'}}">
-                            <i class="fwmb-icon center-focus"></i>
+                        <button type="button" class="fwmb-btn" data-action="resetNoiseScale" aria-label="{{localize 'FILRODENSWMB.UI.NoiseReset'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseReset'}}">
+                            <i class="fwmb-icon fwmb-icon--center-focus"></i>
                         </button>
-                        <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomOut'}}">
-                            <i class="fwmb-icon zoom-out"></i>
+                        <button type="button" class="fwmb-btn" data-action="adjustNoiseScale" data-dir="-1" aria-label="{{localize 'FILRODENSWMB.UI.NoiseZoomOut'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.NoiseZoomOut'}}">
+                            <i class="fwmb-icon fwmb-icon--zoom-out"></i>
                         </button>
                     </div>
 
                     <div class="fwmb-transform-dpad">
-                        <button type="button" class="dpad-up" data-action="nudgeNoise" data-dx="0" data-dy="-50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
-                                class="fwmb-icon edit-arrow-up"
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-up" data-action="nudgeNoise" data-dx="0" data-dy="-50" aria-label="{{localize 'FILRODENSWMB.UI.PanNorth'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
+                                class="fwmb-icon fwmb-icon--edit-arrow-up"
                             ></i></button>
-                        <button type="button" class="dpad-left" data-action="nudgeNoise" data-dx="-50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
-                                class="fwmb-icon edit-arrow-up fwmb-rotate-270"
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-left" data-action="nudgeNoise" data-dx="-50" data-dy="0" aria-label="{{localize 'FILRODENSWMB.UI.PanWest'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
+                                class="fwmb-icon fwmb-icon--edit-arrow-up fwmb-rotate-270"
                             ></i></button>
-                        <button type="button" class="dpad-center" data-action="resetNoisePan" data-tooltip="{{localize 'FILRODENSWMB.UI.PanReset'}}"><i class="fwmb-icon center-focus"></i></button>
-                        <button type="button" class="dpad-right" data-action="nudgeNoise" data-dx="50" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
-                                class="fwmb-icon edit-arrow-up fwmb-rotate-90"
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-center" data-action="resetNoisePan" aria-label="{{localize 'FILRODENSWMB.UI.PanReset'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PanReset'}}"><i class="fwmb-icon fwmb-icon--center-focus"></i></button>
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-right" data-action="nudgeNoise" data-dx="50" data-dy="0" aria-label="{{localize 'FILRODENSWMB.UI.PanEast'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
+                                class="fwmb-icon fwmb-icon--edit-arrow-up fwmb-rotate-90"
                             ></i></button>
-                        <button type="button" class="dpad-down" data-action="nudgeNoise" data-dx="0" data-dy="50" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
-                                class="fwmb-icon edit-arrow-down"
+                        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-down" data-action="nudgeNoise" data-dx="0" data-dy="50" aria-label="{{localize 'FILRODENSWMB.UI.PanSouth'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
+                                class="fwmb-icon fwmb-icon--edit-arrow-down"
                             ></i></button>
                     </div>
                 </div>
-                <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.MapTransformHint"}}</div>
             </div>
-        </fieldset>
-
-        <fieldset class="fwmb-fieldset">
-            <legend>{{localize "FILRODENSWMB.UI.TopographicalDetail"}}</legend>
-            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.octaves" label="FILRODENSWMB.UI.TopographicalDetail" value=(lookup uiState 'noise.elevation.octaves') min=1 max=10 step=1}}
-
-            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.stretch" label="FILRODENSWMB.UI.LandmassStretch" hint="FILRODENSWMB.UI.StretchTooltip" value=(lookup uiState 'noise.elevation.stretch') min=0.5 max=3.0 step=0.1}}
-        </fieldset>
+        </div>
     {{/if}}
 
     <!-- 3. Advanced (Tectonics) Engine Settings -->
     {{#if (eq uiState.generationEngine "advanced")}}
-        <fieldset class="fwmb-fieldset">
-            <legend>{{localize "FILRODENSWMB.UI.TectonicGeneration"}}</legend>
 
-            {{#if usesCurrentCoastline}}
-                <!-- Plates and continent noise place the land; the coast is then shaped as in guided terrain -->
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="tectonicPlates" label="FILRODENSWMB.UI.TectonicPlates" hint="FILRODENSWMB.UI.TectonicPlatesHintV2" value=(lookup uiState 'tectonicPlates') min=5 max=50 step=1}}
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentalGrouping" label="FILRODENSWMB.UI.ContinentalGrouping" hint="FILRODENSWMB.UI.ContinentalGroupingHint" value=(lookup uiState 'continentalGrouping') min=0.1 max=0.9 step=0.05}}
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') min=0 max=1 step=0.05}}
-
-                <!-- Coastal shaping grouped by side of the coastline: on each side, the width of the band
-                     along the coast and then how quickly the ground rises or the seabed falls beyond it -->
-                <div class="fwmb-range-group">
-                    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastLand"}}</div>
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastalPlain" label="FILRODENSWMB.UI.CoastalPlains" hint="FILRODENSWMB.UI.CoastalPlainsHint" value=(lookup uiState 'coastalPlain') min=0 max=1 step=0.05}}
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentScale" label="FILRODENSWMB.UI.ContinentScale" hint="FILRODENSWMB.UI.ContinentScaleHint" value=(lookup uiState 'continentScale') min=0 max=500 step=50}}
-                </div>
-                <div class="fwmb-range-group">
-                    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastSea"}}</div>
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="shelfRange" label="FILRODENSWMB.UI.ContinentalShelf" hint="FILRODENSWMB.UI.ShelfWidthHint" value=(lookup uiState 'shelfRange') min=0 max=1 step=0.05}}
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="oceanScale" label="FILRODENSWMB.UI.OceanScale" hint="FILRODENSWMB.UI.OceanScaleHint" value=(lookup uiState 'oceanScale') min=0 max=500 step=50}}
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="oceanRidges" label="FILRODENSWMB.UI.OceanRidges" hint="FILRODENSWMB.UI.OceanRidgesHintTectonic" value=(lookup uiState 'oceanRidges') min=0 max=1 step=0.05}}
-                </div>
-
-                <div class="fwmb-range-group">
-                    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastGeneral"}}</div>
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.octaves" label="FILRODENSWMB.UI.SurfaceRoughness" hint="FILRODENSWMB.UI.SurfaceRoughnessHint" value=(lookup uiState 'noise.elevation.octaves') min=1 max=10 step=1}}
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.scale" label="FILRODENSWMB.UI.ErosionScale" hint="FILRODENSWMB.UI.ErosionScaleHint" value=(lookup uiState 'noise.elevation.scale') min=50 max=2000 step=10}}
-                </div>
-            {{else}}
-                <!-- Maps still on the original tectonic engine -->
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="tectonicPlates" label="FILRODENSWMB.UI.TectonicPlates" hint="FILRODENSWMB.UI.TectonicPlatesHint" value=(lookup uiState 'tectonicPlates') min=5 max=50 step=1}}
-
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') min=0 max=1 step=0.05}}
-
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="shelfRange" label="FILRODENSWMB.UI.ContinentalShelf" hint="FILRODENSWMB.UI.ShelfRangeHint" value=(lookup uiState 'shelfRange') min=0 max=0.5 step=0.05}}
-
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentalGrouping" label="FILRODENSWMB.UI.ContinentalGrouping" hint="FILRODENSWMB.UI.ContinentalGroupingHint" value=(lookup uiState 'continentalGrouping') min=0.1 max=0.9 step=0.05}}
-
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.octaves" label="FILRODENSWMB.UI.SurfaceRoughness" hint="FILRODENSWMB.UI.SurfaceRoughnessHint" value=(lookup uiState 'noise.elevation.octaves') min=1 max=10 step=1}}
-
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.scale" label="FILRODENSWMB.UI.ErosionScale" hint="FILRODENSWMB.UI.ErosionScaleHint" value=(lookup uiState 'noise.elevation.scale') min=50 max=2000 step=10}}
-            {{/if}}
-        </fieldset>
-    {{/if}}
-
-    <!-- 4. Guided Engine Settings -->
-    {{#if (eq uiState.generationEngine "guided")}}
-        <fieldset class="fwmb-fieldset">
-            <legend>{{localize "FILRODENSWMB.UI.GuidedGeneration"}}</legend>
-
+        {{#if usesCurrentCoastline}}
+            <!-- Plates and continent noise place the land; the coast is then shaped as in guided terrain -->
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="tectonicPlates" label="FILRODENSWMB.UI.TectonicPlates" hint="FILRODENSWMB.UI.TectonicPlatesHintV2" value=(lookup uiState 'tectonicPlates') min=5 max=50 step=1}}
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentalGrouping" label="FILRODENSWMB.UI.ContinentalGrouping" hint="FILRODENSWMB.UI.ContinentalGroupingHint" value=(lookup uiState 'continentalGrouping') min=0.1 max=0.9 step=0.05}}
             {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') min=0 max=1 step=0.05}}
 
-            {{#if usesCurrentCoastline}}
-                <!-- Coastal shaping grouped by side of the coastline: on each side, the width of the band
-                     along the coast and then how quickly the ground rises or the seabed falls beyond it -->
-                <div class="fwmb-range-group">
-                    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastLand"}}</div>
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastalPlain" label="FILRODENSWMB.UI.CoastalPlains" hint="FILRODENSWMB.UI.CoastalPlainsHint" value=(lookup uiState 'coastalPlain') min=0 max=1 step=0.05}}
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentScale" label="FILRODENSWMB.UI.ContinentScale" hint="FILRODENSWMB.UI.ContinentScaleHint" value=(lookup uiState 'continentScale') min=0 max=500 step=50}}
-                </div>
-                <div class="fwmb-range-group">
-                    <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastSea"}}</div>
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="shelfRange" label="FILRODENSWMB.UI.ContinentalShelf" hint="FILRODENSWMB.UI.ShelfWidthHint" value=(lookup uiState 'shelfRange') min=0 max=1 step=0.05}}
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="oceanScale" label="FILRODENSWMB.UI.OceanScale" hint="FILRODENSWMB.UI.OceanScaleHint" value=(lookup uiState 'oceanScale') min=0 max=500 step=50}}
-                    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="oceanRidges" label="FILRODENSWMB.UI.OceanRidges" hint="FILRODENSWMB.UI.OceanRidgesHint" value=(lookup uiState 'oceanRidges') min=0 max=1 step=0.05}}
-                </div>
-            {{else}}
-                <!-- Maps still on the legacy coastline rules: a shelf terrace around sea level, and one scale for land and sea -->
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="shelfRange" label="FILRODENSWMB.UI.ContinentalShelf" hint="FILRODENSWMB.UI.ShelfRangeHint" value=(lookup uiState 'shelfRange') min=0 max=0.5 step=0.05}}
-                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentScale" label="FILRODENSWMB.UI.ContinentScale" hint="FILRODENSWMB.UI.ContinentScaleHintLegacy" value=(lookup uiState 'continentScale') min=0 max=500 step=50}}
-            {{/if}}
+            <!-- Coastal shaping grouped by side of the coastline: on each side, the width of the band
+                 along the coast and then how quickly the ground rises or the seabed falls beyond it -->
+            <div class="fwmb-range-group">
+                <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastLand"}}</div>
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastalPlain" label="FILRODENSWMB.UI.CoastalPlains" hint="FILRODENSWMB.UI.CoastalPlainsHint" value=(lookup uiState 'coastalPlain') min=0 max=1 step=0.05}}
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentScale" label="FILRODENSWMB.UI.ContinentScale" hint="FILRODENSWMB.UI.ContinentScaleHint" value=(lookup uiState 'continentScale') min=0 max=500 step=50}}
+            </div>
+            <div class="fwmb-range-group">
+                <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastSea"}}</div>
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="shelfRange" label="FILRODENSWMB.UI.ContinentalShelf" hint="FILRODENSWMB.UI.ShelfWidthHint" value=(lookup uiState 'shelfRange') min=0 max=1 step=0.05}}
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="oceanScale" label="FILRODENSWMB.UI.OceanScale" hint="FILRODENSWMB.UI.OceanScaleHint" value=(lookup uiState 'oceanScale') min=0 max=500 step=50}}
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="oceanRidges" label="FILRODENSWMB.UI.OceanRidges" hint="FILRODENSWMB.UI.OceanRidgesHintTectonic" value=(lookup uiState 'oceanRidges') min=0 max=1 step=0.05}}
+            </div>
 
             <div class="fwmb-range-group">
                 <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastGeneral"}}</div>
                 {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.octaves" label="FILRODENSWMB.UI.SurfaceRoughness" hint="FILRODENSWMB.UI.SurfaceRoughnessHint" value=(lookup uiState 'noise.elevation.octaves') min=1 max=10 step=1}}
                 {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.scale" label="FILRODENSWMB.UI.ErosionScale" hint="FILRODENSWMB.UI.ErosionScaleHint" value=(lookup uiState 'noise.elevation.scale') min=50 max=2000 step=10}}
-                </div>
-        </fieldset>
+            </div>
+        {{else}}
+            <!-- Maps still on the original tectonic engine -->
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="tectonicPlates" label="FILRODENSWMB.UI.TectonicPlates" hint="FILRODENSWMB.UI.TectonicPlatesHint" value=(lookup uiState 'tectonicPlates') min=5 max=50 step=1}}
+
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') min=0 max=1 step=0.05}}
+
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="shelfRange" label="FILRODENSWMB.UI.ContinentalShelf" hint="FILRODENSWMB.UI.ShelfRangeHint" value=(lookup uiState 'shelfRange') min=0 max=0.5 step=0.05}}
+
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentalGrouping" label="FILRODENSWMB.UI.ContinentalGrouping" hint="FILRODENSWMB.UI.ContinentalGroupingHint" value=(lookup uiState 'continentalGrouping') min=0.1 max=0.9 step=0.05}}
+
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.octaves" label="FILRODENSWMB.UI.SurfaceRoughness" hint="FILRODENSWMB.UI.SurfaceRoughnessHint" value=(lookup uiState 'noise.elevation.octaves') min=1 max=10 step=1}}
+
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.scale" label="FILRODENSWMB.UI.ErosionScale" hint="FILRODENSWMB.UI.ErosionScaleHint" value=(lookup uiState 'noise.elevation.scale') min=50 max=2000 step=10}}
+        {{/if}}
     {{/if}}
 
-    <div class="fwmb-flex-1"></div>
-    <div class="fwmb-divider"></div>
+    <!-- 4. Guided Engine Settings -->
+    {{#if (eq uiState.generationEngine "guided")}}
 
-    <!-- The brush tool activation button remains globally available -->
-    <button type="button" class="fwmb-btn primary" data-action="toggleEditMode">
-        <i class="fwmb-icon brush"></i>
-        {{localize "FILRODENSWMB.UI.EditTerrain"}}
-    </button>
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') min=0 max=1 step=0.05}}
 
-</div>
+        {{#if usesCurrentCoastline}}
+            <!-- Coastal shaping grouped by side of the coastline: on each side, the width of the band
+                 along the coast and then how quickly the ground rises or the seabed falls beyond it -->
+            <div class="fwmb-range-group">
+                <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastLand"}}</div>
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastalPlain" label="FILRODENSWMB.UI.CoastalPlains" hint="FILRODENSWMB.UI.CoastalPlainsHint" value=(lookup uiState 'coastalPlain') min=0 max=1 step=0.05}}
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentScale" label="FILRODENSWMB.UI.ContinentScale" hint="FILRODENSWMB.UI.ContinentScaleHint" value=(lookup uiState 'continentScale') min=0 max=500 step=50}}
+            </div>
+            <div class="fwmb-range-group">
+                <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastSea"}}</div>
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="shelfRange" label="FILRODENSWMB.UI.ContinentalShelf" hint="FILRODENSWMB.UI.ShelfWidthHint" value=(lookup uiState 'shelfRange') min=0 max=1 step=0.05}}
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="oceanScale" label="FILRODENSWMB.UI.OceanScale" hint="FILRODENSWMB.UI.OceanScaleHint" value=(lookup uiState 'oceanScale') min=0 max=500 step=50}}
+                {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="oceanRidges" label="FILRODENSWMB.UI.OceanRidges" hint="FILRODENSWMB.UI.OceanRidgesHint" value=(lookup uiState 'oceanRidges') min=0 max=1 step=0.05}}
+            </div>
+        {{else}}
+            <!-- Maps still on the legacy coastline rules: a shelf terrace around sea level, and one scale for land and sea -->
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="shelfRange" label="FILRODENSWMB.UI.ContinentalShelf" hint="FILRODENSWMB.UI.ShelfRangeHint" value=(lookup uiState 'shelfRange') min=0 max=0.5 step=0.05}}
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentScale" label="FILRODENSWMB.UI.ContinentScale" hint="FILRODENSWMB.UI.ContinentScaleHintLegacy" value=(lookup uiState 'continentScale') min=0 max=500 step=50}}
+        {{/if}}
+
+        <div class="fwmb-range-group">
+            <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CoastGeneral"}}</div>
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.octaves" label="FILRODENSWMB.UI.SurfaceRoughness" hint="FILRODENSWMB.UI.SurfaceRoughnessHint" value=(lookup uiState 'noise.elevation.octaves') min=1 max=10 step=1}}
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="noise.elevation.scale" label="FILRODENSWMB.UI.ErosionScale" hint="FILRODENSWMB.UI.ErosionScaleHint" value=(lookup uiState 'noise.elevation.scale') min=50 max=2000 step=10}}
+            </div>
+    {{/if}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="shading" title="FILRODENSWMB.UI.SectionShading" badge="FILRODENSWMB.UI.BadgeInstant" instant=true}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="contourInterval" label="FILRODENSWMB.UI.ContourInterval" value=(lookup uiState 'contourInterval') min=0.02 max=0.3 step=0.02}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="reliefShading" label="FILRODENSWMB.UI.ReliefShading" hint="FILRODENSWMB.UI.ReliefShadingHint" value=(lookup uiState 'reliefShading') min=0 max=1 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="seabedRelief" label="FILRODENSWMB.UI.SeabedRelief" hint="FILRODENSWMB.UI.SeabedReliefHint" value=(lookup uiState 'seabedRelief') min=0 max=1 step=0.05}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="water" title="FILRODENSWMB.UI.SettingsWater" badge="FILRODENSWMB.UI.BadgeInstant" instant=true closed=true}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="waterHue" label="FILRODENSWMB.UI.WaterHue" hint="FILRODENSWMB.UI.WaterHueHint" value=(lookup uiState 'waterHue') min=config.DISPLAY.WATER.HUE_MIN max=config.DISPLAY.WATER.HUE_MAX step=1}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="waterSaturation" label="FILRODENSWMB.UI.WaterSaturation" value=(lookup uiState 'waterSaturation') min=0 max=1.5 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="waterClarity" label="FILRODENSWMB.UI.WaterClarity" hint="FILRODENSWMB.UI.WaterClarityHint" value=(lookup uiState 'waterClarity') min=0.5 max=2 step=0.05}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

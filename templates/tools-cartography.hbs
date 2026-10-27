@@ -1,96 +1,112 @@
-<div class="fwmb-tool-content fwmb-fixed-lists">
-
-    <fieldset class="fwmb-fieldset">
-        <legend>
-            <div class="fwmb-setting-row">
-                <input type="checkbox" name="cartographyScaleEnable" class="fwmb-checkbox" {{#if uiState.cartographyScaleEnable}}checked{{/if}}>
-                {{localize "FILRODENSWMB.UI.CartographyScale"}}
-            </div>
-        </legend>
+{{!--
+    Cartography: the scale bar, the border, the grid (exported with a scene) and the decorations.
+    Cartography has no edit toggle: its decorations and scale bar can be moved on the map whenever
+    the tool is open, and Add decoration is on the bar.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="scaleBar" title="FILRODENSWMB.UI.SectionScaleBar" badge="FILRODENSWMB.UI.BadgeInstant" instant=true}}
+    <label class="fwmb-setting-row">
+        <input type="checkbox" name="cartographyScaleEnable" class="fwmb-checkbox" {{#if uiState.cartographyScaleEnable}}checked{{/if}}>
+        {{localize "FILRODENSWMB.UI.CartographyScale"}}
+    </label>
         
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.ScaleUnits"}}</label>
-            <input type="text" name="cartographyScaleUnits" value="{{uiState.cartographyScaleUnits}}" placeholder="e.g. Miles, km, Leagues">
-        </div>
-        
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.ScaleInterval"}}</label>
+    {{!-- The bar's unit is the map's (New map, Generation). Matching the world works out the value
+         per tick, so the value field then shows it and cannot be typed in (see MapUnit.scaleBarTick) --}}
+    <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.ScaleMatchWorldHint'}}">
+        <input type="checkbox" name="cartographyScaleMatchWorld" class="fwmb-checkbox" {{#if uiState.cartographyScaleMatchWorld}}checked{{/if}}>
+        {{localize "FILRODENSWMB.UI.ScaleMatchWorld"}}
+    </label>
+
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.ScaleInterval"}}</label>
+        <div class="fwmb-form-fields">
             <div class="fwmb-setting-row">
-                <input type="number" name="cartographyScaleInterval" value="{{uiState.cartographyScaleInterval}}" min="10" step="10">
-                <span class="fwmb-hint">px</span>
+                <input type="number" name="cartographyScaleInterval" value="{{uiState.cartographyScaleInterval}}" min="10" step="10" aria-describedby="fwmb-scale-interval-unit">
+                <span class="fwmb-unit" id="fwmb-scale-interval-unit"><span class="fwmb-unit-long">{{localize "FILRODENSWMB.UI.UnitPixels"}}</span><span class="fwmb-unit-short">{{localize "FILRODENSWMB.UI.UnitPixelsShort"}}</span></span>
             </div>
         </div>
+    </div>
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.ScaleValue"}}</label>
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.ScaleValue"}}</label>
+        <div class="fwmb-form-fields">
             <div class="fwmb-setting-row">
-                <input type="number" name="cartographyScaleValue" value="{{uiState.cartographyScaleValue}}" min="1" class="fwmb-input-short">
-                <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.ScaleValueHint"}}</span>
+                <input type="number" name="cartographyScaleValue" value="{{#if uiState.cartographyScaleMatchWorld}}{{scaleBarValue}}{{else}}{{uiState.cartographyScaleValue}}{{/if}}" min="0" step="any" class="fwmb-input-short" {{#if uiState.cartographyScaleMatchWorld}}disabled{{/if}}>
+                <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.ScaleValueHint" unit=mapUnit}}</span>
             </div>
         </div>
+    </div>
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.ScaleTicks"}}</label>
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.ScaleTicks"}}</label>
+        <div class="fwmb-form-fields">
             <div class="fwmb-setting-row">
-                <input type="number" name="cartographyScaleMajorTicks" value="{{uiState.cartographyScaleMajorTicks}}" min="1" max="10" title="Major Ticks" class="fwmb-input-short">
-                <input type="number" name="cartographyScaleMinorTicks" value="{{uiState.cartographyScaleMinorTicks}}" min="0" max="10" title="Minor Subdivisions" class="fwmb-input-short">
+                <input type="number" name="cartographyScaleMajorTicks" value="{{uiState.cartographyScaleMajorTicks}}" min="1" max="10" aria-label="{{localize 'FILRODENSWMB.UI.ScaleMajorTicks'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ScaleMajorTicks'}}" class="fwmb-input-short">
+                <input type="number" name="cartographyScaleMinorTicks" value="{{uiState.cartographyScaleMinorTicks}}" min="0" max="10" aria-label="{{localize 'FILRODENSWMB.UI.ScaleMinorTicks'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ScaleMinorTicks'}}" class="fwmb-input-short">
             </div>
         </div>
-    </fieldset>
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
-    <fieldset class="fwmb-fieldset">
-        <legend>
-            <div class="fwmb-setting-row">
-                <input type="checkbox" name="cartographyBorderEnable" class="fwmb-checkbox" {{#if uiState.cartographyBorderEnable}}checked{{/if}}>
-                {{localize "FILRODENSWMB.UI.CartographyBorder"}}
-            </div>
-        </legend>
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="border" title="FILRODENSWMB.UI.SectionBorder" badge="FILRODENSWMB.UI.BadgeInstant" instant=true}}
+    <label class="fwmb-setting-row">
+        <input type="checkbox" name="cartographyBorderEnable" class="fwmb-checkbox" {{#if uiState.cartographyBorderEnable}}checked{{/if}}>
+        {{localize "FILRODENSWMB.UI.CartographyBorder"}}
+    </label>
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.BorderStyle"}}</label>
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.BorderStyle"}}</label>
+        <div class="fwmb-form-fields">
             <select name="cartographyBorderStyle" class="fwmb-flex-1">
                 <option value="solid" {{#if (eq uiState.cartographyBorderStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.BorderSolid"}}</option>
                 <option value="double" {{#if (eq uiState.cartographyBorderStyle "double")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.BorderDouble"}}</option>
                 <option value="ornate" {{#if (eq uiState.cartographyBorderStyle "ornate")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.BorderOrnate"}}</option>
             </select>
         </div>
+    </div>
 
-        <div class="form-group">
-            <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
+        <div class="fwmb-form-fields">
             <input type="color" class="fwmb-swatch fwmb-wide" name="cartographyBorderColor" value="{{uiState.cartographyBorderColor}}" />
         </div>
-    </fieldset>
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
-    <details class="fwmb-fieldset fwmb-list-section" data-section="decorations" {{#unless collapsedSections.decorations}}open{{/unless}}>
-        <summary>{{localize "FILRODENSWMB.UI.CartographyDecorations"}}</summary>
-
-        <div class="fwmb-list-container fwmb-scrollable stable" style="margin-top: var(--fwmb-space-10);">
-            {{#each mapDecorations}}
-            <div class="fwmb-list-item" data-id="{{this.id}}" data-type="decoration">
-                <button type="button" class="fwmb-btn small" data-action="toggleVisibility" data-target="feature" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
-                    <i class="fwmb-icon {{#if (eq this.visibility 'none')}}visibility-off{{else if (eq this.visibility 'gm')}}security{{else}}visibility{{/if}}"></i>
-                </button>
-                <span class="fwmb-name fwmb-flex-1 fwmb-truncate">{{this.name}}</span>
-                <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                    <i class="fwmb-icon center-focus"></i>
-                </button>
-                <button type="button" class="fwmb-btn small" data-action="editDecoration" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                    <i class="fwmb-icon edit"></i>
-                </button>
-                <button type="button" class="fwmb-btn small muted danger" data-action="deleteDecoration" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                    <i class="fwmb-icon delete"></i>
-                </button>
-            </div>
-            {{else}}
-            <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoDecorations"}}</div>
-            {{/each}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="grid" title="FILRODENSWMB.UI.SectionGrid" badge="FILRODENSWMB.UI.BadgeInstant" instant=true}}
+    <div class="fwmb-form-group">
+        <label for="fwmb-grid-type">{{localize "FILRODENSWMB.UI.GridType"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-grid-type" name="gridType">
+                <option value="none" {{#if (eq uiState.gridType "none")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridNone"}}</option>
+                <option value="square" {{#if (eq uiState.gridType "square")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridSquare"}}</option>
+                <option value="hexR" {{#if (eq uiState.gridType "hexR")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridHexRows"}}</option>
+                <option value="hexC" {{#if (eq uiState.gridType "hexC")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.GridHexCols"}}</option>
+            </select>
         </div>
-    </details>
+    </div>
 
-    <div class="fwmb-divider"></div>
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="gridSize" label="FILRODENSWMB.UI.GridSize" value=(lookup uiState 'gridSize') min=20 max=300 step=5 unit="FILRODENSWMB.UI.UnitPixels" unitShort="FILRODENSWMB.UI.UnitPixelsShort"}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
-    <button type="button" class="fwmb-btn primary" data-action="toggleEditMode">
-        <i class="fwmb-icon brush"></i>
-        {{localize "FILRODENSWMB.UI.EditCartography"}}
-    </button>
-</div>
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="decorations" title="FILRODENSWMB.UI.CartographyDecorations" count=mapDecorations.length}}
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.CartographyDecorations'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-space-before">
+        {{#each mapDecorations}}
+        <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.decoration)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="decoration" data-action="editDecoration">
+            <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+                <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
+            </button>
+            <span class="fwmb-name fwmb-flex-1 fwmb-truncate" title="{{this.name}}">{{this.name}}</span>
+            <span class="fwmb-actions">
+                <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                    <i class="fwmb-icon fwmb-icon--center-focus"></i>
+                </button>
+                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteDecoration" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                    <i class="fwmb-icon fwmb-icon--delete"></i>
+                </button>
+            </span>
+        </div>
+        {{else}}
+        <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoDecorations"}}</div>
+        {{/each}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

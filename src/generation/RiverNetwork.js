@@ -273,6 +273,21 @@ export class RiverNetwork {
     }
 
     /**
+     * Whether a pixel lies in a drawn river channel or within `margin` pixels of its edge (as far
+     * as the image records, FIELD_RANGE either side of the edge).
+     *
+     * @param {Uint8Array} image - The river image (RGBA per pixel).
+     * @param {number} index - The pixel's index (y * width + x).
+     * @param {number} margin - Pixels beyond the edge, at most FIELD_RANGE.
+     * @returns {boolean}
+     */
+    static isNearChannel(image, index, margin) {
+        const range = RiverNetwork.FIELD_RANGE;
+        const distance = Math.min(margin, range);
+        return image[index * 4] > ((range - distance) / (2 * range)) * MAX_BYTE;
+    }
+
+    /**
      * Whether a pixel is on or around a pool, where a river is drawn over the water (the river
      * image's pool byte, see rasterise).
      *

@@ -1,0 +1,46 @@
+{{!--
+    The inspector's label (see LabelEditor). A standalone label shows its text and visibility, then
+    its look; a pin's, route's or region's label shows what it belongs to, with a link to that
+    object's own inspector, then its look (its visibility among the look's fields, since it can be
+    hidden apart from its owner). Every field applies when committed, one undo step each.
+--}}
+<datalist id="fwmb-inspector-colors">
+    {{#each palette}}
+    <option value="{{this}}"></option>
+    {{/each}}
+</datalist>
+<div class="fwmb-group">
+    {{#if standalone}}
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.InspectorText"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-name" name="labelName" maxlength="{{fwmbTextLimit 'label'}}" value="{{text}}" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-visibility">{{localize "FILRODENSWMB.UI.Visibility"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-visibility" name="labelVisibility">
+                {{#each visibilities}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+    {{else}}
+    <p class="fwmb-inspector-owner">{{localize "FILRODENSWMB.UI.InspectorLabelOf" kind=ownerKind name=text}}</p>
+    <div class="fwmb-btn-row">
+        <button type="button" class="fwmb-btn" data-inspector-action="goToOwner"><i class="fwmb-icon fwmb-icon--{{ownerIcon}}" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.InspectorGoTo" name=text}}</button>
+    </div>
+    {{/if}}
+</div>
+
+{{> "modules/filrodens-world-map-builder/templates/parts/label-fields.hbs" label=label choices=labelChoices styleName=labelStyleName visibilities=ownedVisibilities sectionId="inspectorLabelLook" sectionTitle="FILRODENSWMB.UI.InspectorLabelLook" closed=false}}
+
+<div class="fwmb-inspector-actions">
+    <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="zoom"><i class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ZoomTo"}}</button>
+    {{#if standalone}}
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-inspector-delete" data-inspector-action="delete"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Delete"}}</button>
+    {{/if}}
+</div>
+<p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorApplyHint"}}</p>

@@ -1,41 +1,57 @@
 <div class="fwmb-dialog-content">
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         <label>{{localize "FILRODENSWMB.UI.SceneName"}}</label>
-        <input type="text" name="sceneName" value="{{defaultName}}" />
+        <div class="fwmb-form-fields">
+            <input type="text" name="sceneName" maxlength="{{fwmbTextLimit 'name'}}" value="{{defaultName}}" />
+        </div>
         <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.SceneNameHint"}}</p>
     </div>
 
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         <label>{{localize "FILRODENSWMB.UI.ExportFolder"}}</label>
-        <file-picker type="folder" name="exportFolder" value="{{defaultFolder}}"></file-picker>
+        <div class="fwmb-form-fields">
+            <file-picker type="folder" name="exportFolder" value="{{defaultFolder}}"></file-picker>
+        </div>
         <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.ExportFolderHint"}}</p>
+    </div>
+
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label for="fwmb-export-scene-scale">{{localize "FILRODENSWMB.UI.ExportPngScale"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-export-scene-scale" name="exportScale">
+                {{#each options}}
+                <option value="{{this.scale}}" {{#if this.recommended}}selected{{/if}} {{#unless this.allowed}}disabled{{/unless}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+        <p class="fwmb-hint">{{reason}} {{localize "FILRODENSWMB.UI.ExportSceneScaleHint"}}</p>
     </div>
 
     <div class="fwmb-divider"></div>
 
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         <label class="fwmb-setting-row">
             <input type="checkbox" name="generateJournals" class="fwmb-checkbox" checked />
             <strong>{{localize "FILRODENSWMB.UI.GenerateJournals"}}</strong>
         </label>
-        <p class="fwmb-hint indent">{{localize "FILRODENSWMB.UI.GenerateJournalsHint"}}</p>
+        <p class="fwmb-hint fwmb-hint--indent">{{localize "FILRODENSWMB.UI.GenerateJournalsHint"}}</p>
     </div>
 
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         <label class="fwmb-setting-row">
             <input type="checkbox" name="overwriteJournals" class="fwmb-checkbox" />
             <strong>{{localize "FILRODENSWMB.UI.OverwriteJournals"}}</strong>
         </label>
-        <p class="fwmb-hint indent danger">
+        <p class="fwmb-hint fwmb-hint--indent fwmb-hint--danger">
             {{localize "FILRODENSWMB.UI.OverwriteJournalsHint"}}
         </p>
     </div>
 
-    <div class="form-group stacked">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
         <label class="fwmb-setting-row">
             <input type="checkbox" name="createGmOverlay" class="fwmb-checkbox" checked />
             <strong>{{localize "FILRODENSWMB.UI.CreateGMOverlay"}}</strong>
         </label>
-        <p class="fwmb-hint indent">{{localize "FILRODENSWMB.UI.CreateGMOverlayHint"}}</p>
+        <p class="fwmb-hint fwmb-hint--indent">{{localize "FILRODENSWMB.UI.CreateGMOverlayHint"}}</p>
     </div>
 </div>

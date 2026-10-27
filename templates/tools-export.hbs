@@ -1,0 +1,17 @@
+{{!--
+    The Export tool (Finish): the map as a PNG image and, in Foundry, as a scene with its grid data.
+    The explanations are the buttons' tooltips, as the interface's writing rules ask.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="exportPng" title="FILRODENSWMB.UI.ExportPngTitle"}}
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="exportPng" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportPngHint'}}">
+        <i class="fwmb-icon fwmb-icon--png" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.ExportPNG"}}
+    </button>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#if sceneExport}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="exportScene" title="FILRODENSWMB.UI.ExportSceneTitle"}}
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="exportScene" data-tooltip="{{localize 'FILRODENSWMB.UI.ExportSceneHint'}}">
+        <i class="fwmb-icon fwmb-icon--map" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.ExportScene"}}
+    </button>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}

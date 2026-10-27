@@ -2,8 +2,8 @@ import { FILRODENSWMB } from "../config.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
-import { loadMapData, updateMapDataFields } from "../data/compendium.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
+import { platform } from "../platform/index.js";
 
 /**
  * Offers a map built with an older revision of the terrain generation rules the chance to be
@@ -48,7 +48,7 @@ export class TerrainUpgrade {
             if (known) return known;
             if (!current.parentId) return null;
 
-            current = await loadMapData(current.parentId);
+            current = await platform.store.loadMapData(current.parentId);
             if (!current) return null;
         }
 
@@ -117,7 +117,7 @@ export class TerrainUpgrade {
      * a current map draws (`convertsFaults`; see TectonicFeatureEngine.convertLegacyFault), and
      * slip faults, which have no equivalent, are removed (`removesSlip`).
      *
-     * @param {object} app - The MapStudioApp instance, with a legacy map open.
+     * @param {object} app - The MapStudio instance, with a legacy map open.
      * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean, changesRivers: boolean, changesChannels: boolean}|null}
      *   What the update would apply and change, or null if it would change nothing visible.
      */
@@ -251,7 +251,7 @@ export class TerrainUpgrade {
      * the panel's inputs first (see MapStateManager.getMapParameters), so a slider still showing
      * the old Coastline Fracture would otherwise put it straight back.
      *
-     * @param {object} app - The MapStudioApp instance.
+     * @param {object} app - The MapStudio instance.
      * @param {object} plan - The settings to apply, from assess().
      */
     static async apply(app, plan) {
@@ -263,7 +263,7 @@ export class TerrainUpgrade {
         this.#convertFaults(app);
         app.uiState.terrainUpgradeDismissed = false;
 
-        await app.render({ parts: ["context"] });
+        await app.view?.render(["context"]);
         await app.generateTerrain();
         app.markDirty();
     }
@@ -297,12 +297,12 @@ export class TerrainUpgrade {
      * It is also kept on the open map's state, so a later save writes it back rather than
      * dropping it.
      *
-     * @param {object} app - The MapStudioApp instance, with a saved map open.
+     * @param {object} app - The MapStudio instance, with a saved map open.
      */
     static async dismiss(app) {
         app.uiState.terrainUpgradeDismissed = true;
         if (!app.currentSaveId) return;
 
-        await updateMapDataFields(app.currentSaveId, { terrainUpgradeDismissed: true });
+        await platform.store.updateMapDataFields(app.currentSaveId, { terrainUpgradeDismissed: true });
     }
 }

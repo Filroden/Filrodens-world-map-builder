@@ -1,0 +1,10 @@
+{{!-- The Next footer: the tool that follows in the order of work, and why (STUDIO.NEXT) --}}
+{{#if panel.next}}
+<div class="fwmb-next">
+    <div class="fwmb-row">
+        <span class="fwmb-hint">{{localize "FILRODENSWMB.UI.Next"}}</span>
+        <button type="button" class="fwmb-btn fwmb-next-btn" data-action="nextTool" data-tool="{{panel.next.tool}}">{{panel.next.name}} <span aria-hidden="true">▸</span></button>
+    </div>
+    <p class="fwmb-hint">{{panel.next.reason}}</p>
+</div>
+{{/if}}

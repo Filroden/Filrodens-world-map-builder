@@ -1,0 +1,13 @@
+{{!-- The state block: while the tool is editing, what the pointer does now and the one button that
+     stops it; otherwise the button that starts it. The bar above the canvas carries the modes.
+     See MapStudio's #panelContext. --}}
+{{#if panel.state}}
+<div class="fwmb-section fwmb-section--state{{#if panel.state.on}} fwmb-is-on{{/if}}" role="group" aria-label="{{panel.state.word}}">
+    {{#if panel.state.on}}
+    <div class="fwmb-section-title">{{panel.state.word}} <span class="fwmb-badge fwmb-badge--instant">{{panel.state.badge}}</span></div>
+    <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-action="toggleEditMode">{{panel.state.stop}}</button>
+    {{else}}
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="toggleEditMode">{{panel.state.start}}</button>
+    {{/if}}
+</div>
+{{/if}}

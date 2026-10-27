@@ -1,0 +1,65 @@
+{{!--
+    Travel (tool id "travel"; see TravelView): how long a journey takes from a start clicked on the
+    map. The way of travel over land, the map's speeds (rivers and the sea at their own, whichever
+    way over land), the start with the place nearest it, and the journey exported as an image.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="travelStart" title="FILRODENSWMB.UI.SectionTravelStart"}}
+    {{#unless travel.ready}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelBuilding"}}</p>{{/unless}}
+    {{#if travel.start}}
+    <div class="fwmb-travel-start">
+        <span class="fwmb-flex-1">{{#if travel.start.near}}{{localize "FILRODENSWMB.UI.TravelStartNear" place=travel.start.near}}{{else}}{{localize "FILRODENSWMB.UI.TravelStartSet"}}{{/if}}</span>
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="clearTravelStart">{{localize "FILRODENSWMB.UI.TravelStartClear"}}</button>
+    </div>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelStartMove"}}</p>
+    {{else}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelStartHint"}}</p>
+    {{/if}}
+    {{#if travel.noRoads}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelNoRoads"}}</p>{{/if}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="travelMode" title="FILRODENSWMB.UI.SectionTravelMode"}}
+    <div role="radiogroup" aria-label="{{localize 'FILRODENSWMB.UI.SectionTravelMode'}}" class="fwmb-list-container fwmb-history-ages fwmb-travel-modes">
+        {{#each travel.modes}}
+        <button type="button" role="radio" aria-checked="{{#if this.chosen}}true{{else}}false{{/if}}" class="fwmb-list-item fwmb-history-age" data-action="chooseTravelMode" data-mode="{{this.id}}">
+            <span class="fwmb-history-age-name">{{localize this.label}}</span>
+        </button>
+        {{/each}}
+    </div>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelModeHint"}}</p>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="travelBands" title="FILRODENSWMB.UI.SectionTravelBands"}}
+    <div class="fwmb-form-group">
+        <label for="fwmb-travel-interval">{{localize "FILRODENSWMB.UI.TravelInterval"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-travel-interval" name="travel.interval" class="fwmb-flex-1">
+                {{#each travel.intervals}}
+                <option value="{{this.value}}" {{#if this.chosen}}selected{{/if}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelIntervalHint"}}</p>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="travelSpeeds" title="FILRODENSWMB.UI.SectionTravelSpeeds"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.TravelSpeedsHint"}}</p>
+    <div class="fwmb-travel-speeds">
+        {{#each travel.speeds}}
+        <label class="fwmb-travel-speed">
+            <span>{{localize this.label}}</span>
+            <input type="number" class="fwmb-input" name="{{this.name}}" value="{{this.value}}" min="{{this.min}}" max="{{this.max}}" step="1" />
+            <span class="fwmb-meta">{{this.unit}}</span>
+        </label>
+        {{/each}}
+    </div>
+    <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="resetTravelSpeeds">{{localize "FILRODENSWMB.UI.TravelSpeedsReset"}}</button>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#if travel.canExport}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="travelExport" title="FILRODENSWMB.UI.SectionTravelExport"}}
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="exportPng" data-tooltip="{{localize 'FILRODENSWMB.UI.TravelExportHint'}}">
+        <i class="fwmb-icon fwmb-icon--png" aria-hidden="true"></i> {{localize "FILRODENSWMB.UI.ExportPNG"}}
+    </button>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}

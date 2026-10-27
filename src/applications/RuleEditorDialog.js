@@ -1,9 +1,11 @@
 import { FILRODENSWMB } from "../config.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 import { ColorMath } from "../tools/ColorMath.js";
+import { platform } from "../platform/index.js";
+import { RangeTrack } from "../ui/RangeTrack.js";
 
 /**
- * The "Biome Rule Stacker" - a dedicated, large DialogV2 window (not one of the module's
+ * The "Biome Rule Stacker" - a dedicated, large dialogue window (not one of the module's
  * usual small single-purpose dialogues) where a GM builds up auto-generation rules for their
  * custom biomes against the built-in defaults. Fully interactive: dragging a segment's
  * ends, adding/removing a range on one axis, adding/removing a whole rule row, reordering
@@ -18,7 +20,7 @@ import { ColorMath } from "../tools/ColorMath.js";
  * Kept in its own file (rather than folded into MapDialogManager.js, already the module's
  * largest file) because this is the single largest piece of interactive UI in the module,
  * matching how RegionalExtractor.js and SceneExporter.js already carve substantial
- * single-feature logic out of MapStudioApp.js.
+ * single-feature logic out of MapStudio.js.
  */
 export class RuleEditorDialog {
     /** How close a dragged handle has to get to 0 or 1 before it's treated as touching that true edge (see RuleSegment's openMin/openMax). */
@@ -41,9 +43,9 @@ export class RuleEditorDialog {
     }
 
     /**
-     * DialogV2's content is one static HTML blob, not an ApplicationV2 subclass with its own
-     * `PARTS`/`scrollable: [...]` declarations, so none of ApplicationV2's built-in scroll-
-     * position restoration applies here - every full or partial rebuild below (`renderCustom`,
+     * The dialogue's content is one static HTML blob, not an application with its own
+     * `PARTS`/`scrollable: [...]` declarations, so no built-in scroll-position restoration
+     * applies here - every full or partial rebuild below (`renderCustom`,
      * `renderAxisBody`) tears down and recreates DOM nodes, which on its own leaves the
      * `.fwmb-rule-editor` scroll container's `scrollTop` untouched, but a rebuild that changes
      * the *content above the viewport*'s height (a row/segment being added or removed) shifts
@@ -61,30 +63,32 @@ export class RuleEditorDialog {
     }
 
     /**
-     * Opens the Rule Editor for the given MapStudioApp instance.
-     * @param {object} app - The MapStudioApp instance.
+     * Opens the Rule Editor for the given MapStudio instance.
+     * @param {object} app - The MapStudio instance.
      */
     static async open(app) {
-        const customBiomes = foundry.utils.deepClone(app.uiState.customBiomes || []);
+        const customBiomes = platform.utils.deepClone(app.uiState.customBiomes || []);
         const seaLevel = app.uiState.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
         const defaultBiomes = BiomeRuleEngine.getDefaultBiomeReferenceRows(seaLevel);
 
-        const content = await foundry.applications.handlebars.renderTemplate("modules/filrodens-world-map-builder/templates/dialogs/biome-rule-editor.hbs", {});
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/biome-rule-editor.hbs", {});
 
-        // A formal two-button Accept/Cancel pair (DialogV2.wait, not the single-button
-        // .prompt) rather than one ambiguous "Close" - matching promptUnsavedChanges's own
+        // A formal two-button Accept/Cancel pair (a choice, not the single-button prompt)
+        // rather than one ambiguous "Close" - matching promptUnsavedChanges's own
         // multi-button pattern above. The window's own close (X) button is treated the same
         // as Cancel. See below for what each resolved action actually does.
-        const action = await foundry.applications.api.DialogV2.wait({
+        const action = await platform.dialogs.choose({
             classes: ["fwmb", "fwmb-rule-editor-dialog"],
-            window: { title: game.i18n.localize("FILRODENSWMB.UI.RuleEditorTitle"), icon: "fwmb-icon tune", resizable: true },
+            title: platform.i18n.localize("FILRODENSWMB.UI.RuleEditorTitle"),
+            icon: "fwmb-icon fwmb-icon--tune",
+            resizable: true,
             content,
             buttons: [
-                { action: "cancel", label: game.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon cancel" },
-                { action: "accept", label: game.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon accept", default: true },
+                { action: "cancel", label: platform.i18n.localize("FILRODENSWMB.UI.Cancel"), icon: "fwmb-icon fwmb-icon--cancel", tone: "negative" },
+                { action: "accept", label: platform.i18n.localize("FILRODENSWMB.UI.Accept"), icon: "fwmb-icon fwmb-icon--accept", tone: "positive", default: true },
             ],
-            close: () => "cancel",
-            render: (event) => RuleEditorDialog.#renderContent(event.target.element, customBiomes, defaultBiomes, seaLevel),
+            dismissed: "cancel",
+            onRender: (element) => RuleEditorDialog.#renderContent(element, customBiomes, defaultBiomes, seaLevel),
         });
 
         if (action !== "accept") return; // Cancel (or the window's X) - discard the working copy, touch nothing.
@@ -101,7 +105,7 @@ export class RuleEditorDialog {
         // save is still needed), they just don't occupy an undo slot.
         app.uiState.customBiomes = customBiomes;
         app._repaintCanvas(); // customBiomeRules is recompiled fresh from uiState.customBiomes on every repaint (see MapStateManager.getDerivedMapParameters) - no separate cache to invalidate.
-        app.render({ parts: ["context"] });
+        app.view?.render(["context"]);
         app.markDirty();
     }
 
@@ -120,7 +124,7 @@ export class RuleEditorDialog {
             defaultHost.appendChild(
                 RuleEditorDialog.#buildDefaultGroup({
                     color: ColorMath.rgbToHex(biome.color),
-                    name: game.i18n.localize(`FILRODENSWMB.BIOMES.${biome.key}`),
+                    name: platform.i18n.localize(`FILRODENSWMB.BIOMES.${biome.key}`),
                     rows: biome.rows,
                     seaLevel,
                 }),
@@ -145,7 +149,7 @@ export class RuleEditorDialog {
         customHost.replaceChildren();
 
         const totalCustomRules = customBiomes.reduce((sum, biome) => sum + (biome.rules?.length || 0), 0);
-        countEl.textContent = game.i18n.format("FILRODENSWMB.UI.RuleEditorCustomCount", {
+        countEl.textContent = platform.i18n.format("FILRODENSWMB.UI.RuleEditorCustomCount", {
             biomes: customBiomes.length,
             rules: totalCustomRules,
         });
@@ -215,7 +219,7 @@ export class RuleEditorDialog {
         up.className = "fwmb-rule-step-btn";
         up.textContent = "▲";
         up.disabled = index === 0;
-        up.title = game.i18n.localize("FILRODENSWMB.UI.RuleEditorPriorityUp");
+        up.title = platform.i18n.localize("FILRODENSWMB.UI.RuleEditorPriorityUp");
         up.addEventListener("click", () => {
             [customBiomes[index - 1], customBiomes[index]] = [customBiomes[index], customBiomes[index - 1]];
             rerender();
@@ -226,7 +230,7 @@ export class RuleEditorDialog {
         down.className = "fwmb-rule-step-btn";
         down.textContent = "▼";
         down.disabled = index === customBiomes.length - 1;
-        down.title = game.i18n.localize("FILRODENSWMB.UI.RuleEditorPriorityDown");
+        down.title = platform.i18n.localize("FILRODENSWMB.UI.RuleEditorPriorityDown");
         down.addEventListener("click", () => {
             [customBiomes[index], customBiomes[index + 1]] = [customBiomes[index + 1], customBiomes[index]];
             rerender();
@@ -250,13 +254,13 @@ export class RuleEditorDialog {
 
         const hint = document.createElement("span");
         hint.className = "fwmb-rule-row-empty-hint";
-        hint.textContent = game.i18n.localize("FILRODENSWMB.UI.RuleEditorNoRulesYet");
+        hint.textContent = platform.i18n.localize("FILRODENSWMB.UI.RuleEditorNoRulesYet");
         body.appendChild(hint);
 
         const addBtn = document.createElement("button");
         addBtn.type = "button";
         addBtn.className = "fwmb-rule-add-row-btn";
-        addBtn.textContent = "+ " + game.i18n.localize("FILRODENSWMB.UI.RuleEditorAddRule");
+        addBtn.textContent = "+ " + platform.i18n.localize("FILRODENSWMB.UI.RuleEditorAddRule");
         addBtn.addEventListener("click", onAddFirstRule);
         body.appendChild(addBtn);
 
@@ -295,7 +299,7 @@ export class RuleEditorDialog {
         btn.type = "button";
         btn.className = "fwmb-rule-remove-row";
         btn.innerHTML = "&times;";
-        btn.title = game.i18n.localize("FILRODENSWMB.UI.RuleEditorRemoveRule");
+        btn.title = platform.i18n.localize("FILRODENSWMB.UI.RuleEditorRemoveRule");
         btn.addEventListener("click", onClick);
         return btn;
     }
@@ -307,8 +311,8 @@ export class RuleEditorDialog {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "fwmb-rule-add-row-btn";
-        btn.textContent = "+ " + game.i18n.localize(labelKey);
-        btn.title = game.i18n.localize(hintKey);
+        btn.textContent = "+ " + platform.i18n.localize(labelKey);
+        btn.title = platform.i18n.localize(hintKey);
         btn.addEventListener("click", onClick);
 
         strip.appendChild(btn);
@@ -394,7 +398,7 @@ export class RuleEditorDialog {
             const remove = document.createElement("span");
             remove.className = "fwmb-rule-chip-remove";
             remove.textContent = "×";
-            remove.title = game.i18n.localize("FILRODENSWMB.UI.RuleEditorRemoveRange");
+            remove.title = platform.i18n.localize("FILRODENSWMB.UI.RuleEditorRemoveRange");
             remove.addEventListener("click", onRemoveSegment);
             chip.appendChild(remove);
         }
@@ -428,41 +432,37 @@ export class RuleEditorDialog {
     }
 
     /**
-     * Wires one handle's pointer drag. `edgeIndex` is 0 for the min end, 1 for the max end -
-     * each end is clamped so it can never cross the other. Updates `segment` in place and
-     * calls `syncVisual()` on every move; deliberately never calls the full `rerender`,
-     * since that would destroy this very handle mid-drag (its pointer capture included).
+     * Wires one handle: dragged with the pointer or moved with the keys (see RangeTrack). `edgeIndex`
+     * is 0 for the min end, 1 for the max end; each end is clamped so it never crosses the other.
+     * Updates `segment` in place and calls `syncVisual()` on every move; deliberately never calls
+     * the full `rerender`, since that would destroy this very handle mid-drag (its pointer capture
+     * included).
      */
     static #wireDragHandle(handle, track, segment, edgeIndex, syncVisual) {
-        handle.addEventListener("pointerdown", (event) => {
+        handle.setAttribute("role", "slider");
+        handle.setAttribute("aria-valuemin", "0");
+        handle.setAttribute("aria-valuemax", "1");
+        const set = (value) => {
+            let pct = RuleEditorDialog.#round2(Math.max(0, Math.min(1, value)));
+            if (edgeIndex === 0) {
+                pct = Math.min(pct, segment[1]);
+                segment[0] = pct;
+                segment[2] = pct <= RuleEditorDialog.#EPS;
+            } else {
+                pct = Math.max(pct, segment[0]);
+                segment[1] = pct;
+                segment[3] = pct >= 1 - RuleEditorDialog.#EPS;
+            }
+            handle.setAttribute("aria-valuenow", String(segment[edgeIndex]));
+            syncVisual();
+        };
+        handle.setAttribute("aria-valuenow", String(segment[edgeIndex]));
+        handle.addEventListener("pointerdown", (event) => RangeTrack.dragEdge(event, handle, track, { set }));
+        handle.addEventListener("keydown", (event) => {
+            const value = RangeTrack.stepKey(event, segment[edgeIndex], { min: 0, max: 1, step: 0.01 });
+            if (value === null) return;
             event.preventDefault();
-            handle.setPointerCapture(event.pointerId);
-
-            const onMove = (moveEvent) => {
-                const rect = track.getBoundingClientRect();
-                let pct = rect.width > 0 ? (moveEvent.clientX - rect.left) / rect.width : segment[edgeIndex];
-                pct = RuleEditorDialog.#round2(Math.max(0, Math.min(1, pct)));
-
-                if (edgeIndex === 0) {
-                    pct = Math.min(pct, segment[1]);
-                    segment[0] = pct;
-                    segment[2] = pct <= RuleEditorDialog.#EPS;
-                } else {
-                    pct = Math.max(pct, segment[0]);
-                    segment[1] = pct;
-                    segment[3] = pct >= 1 - RuleEditorDialog.#EPS;
-                }
-                syncVisual();
-            };
-
-            const onUp = (upEvent) => {
-                handle.releasePointerCapture(upEvent.pointerId);
-                window.removeEventListener("pointermove", onMove);
-                window.removeEventListener("pointerup", onUp);
-            };
-
-            window.addEventListener("pointermove", onMove);
-            window.addEventListener("pointerup", onUp);
+            set(value);
         });
     }
 
@@ -471,7 +471,7 @@ export class RuleEditorDialog {
         btn.type = "button";
         btn.className = "fwmb-rule-seg-add";
         btn.textContent = "+";
-        btn.title = game.i18n.format("FILRODENSWMB.UI.RuleEditorAddRange", { axis: axisDef.label });
+        btn.title = platform.i18n.format("FILRODENSWMB.UI.RuleEditorAddRange", { axis: axisDef.label });
         btn.addEventListener("click", onClick);
         return btn;
     }
@@ -488,12 +488,12 @@ export class RuleEditorDialog {
         const picker = document.createElement("div");
         picker.className = "fwmb-rule-zone-picker";
 
-        for (const zone of RuleEditorDialog.#elevationZones(seaLevel)) {
+        for (const zone of RuleEditorDialog.elevationZones(seaLevel)) {
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "fwmb-rule-zone-chip";
             btn.textContent = zone.label;
-            btn.title = game.i18n.format("FILRODENSWMB.UI.RuleEditorZoneTooltip", { zone: zone.label, from: zone.from.toFixed(2), to: zone.to.toFixed(2) });
+            btn.title = platform.i18n.format("FILRODENSWMB.UI.RuleEditorZoneTooltip", { zone: zone.label, from: zone.from.toFixed(2), to: zone.to.toFixed(2) });
             btn.addEventListener("click", () => {
                 const openMin = zone.from <= RuleEditorDialog.#EPS;
                 const openMax = zone.to >= 1 - RuleEditorDialog.#EPS;
@@ -519,7 +519,7 @@ export class RuleEditorDialog {
      * bands only, not tuned thresholds - expected to be revisited once sea-level rebasing
      * lands as its own feature.
      */
-    static #elevationZones(seaLevel) {
+    static elevationZones(seaLevel) {
         const span = (1 - seaLevel) / 4;
         // Rounded for the same reason a dragged handle is (see #round2): a quarter-of-the-
         // land-band boundary like seaLevel + span rarely lands on a clean two-decimal value
@@ -529,7 +529,7 @@ export class RuleEditorDialog {
 
         return keys.map((key, i) => ({
             key,
-            label: game.i18n.localize(`FILRODENSWMB.UI.RuleEditorZone${key}`),
+            label: platform.i18n.localize(`FILRODENSWMB.UI.RuleEditorZone${key}`),
             from: bounds[i],
             to: bounds[i + 1],
         }));
@@ -545,13 +545,13 @@ export class RuleEditorDialog {
     }
 
     // =========================================================================================
-    // DEFAULT (read-only) section - unchanged since 4b-i: no listeners, never re-rendered.
+    // DEFAULT (read-only) section: no listeners, never re-rendered.
     // =========================================================================================
 
     /** Builds one default biome's card: its label plus one row per (always ≥1) reference row. */
     static #buildDefaultGroup({ color, name, rows, seaLevel }) {
         const group = document.createElement("div");
-        group.className = "fwmb-rule-group locked";
+        group.className = "fwmb-rule-group fwmb-is-locked";
 
         rows.forEach((row, index) => {
             group.appendChild(
@@ -707,7 +707,7 @@ export class RuleEditorDialog {
         const seaLine = document.createElement("div");
         seaLine.className = "fwmb-rule-sea-level-line";
         seaLine.style.left = seaLevel * 100 + "%";
-        seaLine.title = game.i18n.localize("FILRODENSWMB.UI.RuleEditorSeaLevelTooltip");
+        seaLine.title = platform.i18n.localize("FILRODENSWMB.UI.RuleEditorSeaLevelTooltip");
         return seaLine;
     }
 
@@ -720,9 +720,9 @@ export class RuleEditorDialog {
      */
     static get #AXES() {
         return [
-            { key: "elevation", label: game.i18n.localize("FILRODENSWMB.UI.RuleEditorElevation") },
-            { key: "moisture", label: game.i18n.localize("FILRODENSWMB.UI.RuleEditorMoisture") },
-            { key: "temperature", label: game.i18n.localize("FILRODENSWMB.UI.RuleEditorTemperature") },
+            { key: "elevation", label: platform.i18n.localize("FILRODENSWMB.UI.RuleEditorElevation") },
+            { key: "moisture", label: platform.i18n.localize("FILRODENSWMB.UI.RuleEditorMoisture") },
+            { key: "temperature", label: platform.i18n.localize("FILRODENSWMB.UI.RuleEditorTemperature") },
         ];
     }
 }

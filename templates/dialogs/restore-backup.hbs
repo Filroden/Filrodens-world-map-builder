@@ -1,0 +1,32 @@
+{{!--
+    Restore from backup (MapTransfer.restore): the backup's maps as a tree, regional maps under the
+    map they were cut from, each ticked. Unticking a map unticks the maps under it. A map already
+    saved here (by id or name) is marked, since it is restored as a copy.
+--}}
+<div class="fwmb-dialog-content fwmb-restore">
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.RestoreIntro"}}</p>
+    {{#if madeOn}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.RestoreMadeOn" date=madeOn}}</p>{{/if}}
+
+    {{#*inline "restoreNode"}}
+        <li>
+            <label class="fwmb-checkbox-label">
+                <input type="checkbox" name="restoreMap" class="fwmb-checkbox" value="{{this.id}}" checked />
+                <span class="fwmb-restore-name">{{this.name}}</span>
+                {{#if this.already}}<span class="fwmb-badge">{{localize "FILRODENSWMB.UI.RestoreAlreadySaved"}}</span>{{/if}}
+            </label>
+            {{#if this.children.length}}
+                <ul class="fwmb-restore-list fwmb-restore-list--nested">
+                    {{#each this.children}}
+                        {{> restoreNode this}}
+                    {{/each}}
+                </ul>
+            {{/if}}
+        </li>
+    {{/inline}}
+
+    <ul class="fwmb-restore-list fwmb-scrollable">
+        {{#each maps}}
+            {{> restoreNode this}}
+        {{/each}}
+    </ul>
+</div>

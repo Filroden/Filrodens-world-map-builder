@@ -1,0 +1,28 @@
+{{!--
+    The inspector's land mask (see LandMaskEditor): its name and whether it marks land or an
+    ocean, and Focus view and Delete. Every field applies when committed, one undo step each (see
+    Inspector); a new type shapes the land again.
+--}}
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-name" name="maskName" maxlength="{{fwmbTextLimit 'name'}}" value="{{mask.name}}" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-mask-type">{{localize "FILRODENSWMB.UI.LandMaskType"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-mask-type" name="maskOperation">
+                <option value="add" {{#unless ocean}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.LandMaskTypeLand"}}</option>
+                <option value="subtract" {{#if ocean}}selected{{/if}}>{{localize "FILRODENSWMB.UI.LandMaskTypeOcean"}}</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="fwmb-inspector-actions">
+    <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="zoom"><i class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ZoomTo"}}</button>
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-inspector-delete" data-inspector-action="delete"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Delete"}}</button>
+</div>
+<p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorApplyHint"}}</p>

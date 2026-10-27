@@ -1,0 +1,71 @@
+{{!--
+    Help, in the inspector's column (see HelpPanel): About, Help and Acknowledgements, each a fold.
+    Every link opens in a new tab, marked with the external-link icon.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="helpAbout" title="FILRODENSWMB.UI.HelpAbout"}}
+<p class="fwmb-help-name">{{localize "FILRODENSWMB.UI.ControlTitle"}} <span class="fwmb-help-version">{{version}}</span></p>
+<p class="fwmb-help-line">{{localize "FILRODENSWMB.UI.HelpAuthor"}} {{> helpLink url=links.sponsor label="FILRODENSWMB.UI.HelpSponsor"}}</p>
+<ul class="fwmb-help-links">
+    <li>{{> helpLink url=links.repository label="FILRODENSWMB.UI.HelpRepository"}}</li>
+    <li>{{> helpLink url=links.licence label="FILRODENSWMB.UI.HelpLicence"}}</li>
+    <li>{{> helpLink url=links.otherHost.url label=links.otherHost.label}}</li>
+</ul>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="helpHelp" title="FILRODENSWMB.UI.HelpHelp"}}
+<ul class="fwmb-help-links">
+    <li>{{> helpLink url=links.changelog label="FILRODENSWMB.UI.HelpChangelog"}}</li>
+    <li>{{> helpLink url=links.wiki label="FILRODENSWMB.UI.HelpWiki"}}</li>
+    {{#if links.tutorial}}<li>{{> helpLink url=links.tutorial label="FILRODENSWMB.UI.HelpTutorial"}}</li>{{/if}}
+    <li>{{> helpLink url=links.issue label="FILRODENSWMB.UI.HelpIssue"}}</li>
+</ul>
+<div class="fwmb-btn-row">
+    <button type="button" class="fwmb-btn" data-inspector-action="copyVersion" data-tooltip="{{localize 'FILRODENSWMB.UI.HelpCopyVersionHint'}}"><i class="fwmb-icon fwmb-icon--content-copy" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.HelpCopyVersion"}}</button>
+</div>
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="helpShortcuts" title="FILRODENSWMB.UI.HelpShortcuts" closed=true class="fwmb-section--nested"}}
+{{#each shortcuts}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id=this.id title=this.title closed=true class="fwmb-section--nested"}}
+<div class="fwmb-shortcuts">
+    {{#each this.tables}}
+    <table class="fwmb-shortcuts-table">
+        {{#if this.caption}}<caption>{{this.caption}}</caption>{{/if}}
+        <tbody>
+            {{#each this.rows}}
+            <tr><td>{{this}}</td></tr>
+            {{/each}}
+        </tbody>
+    </table>
+    {{/each}}
+</div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/each}}
+<div class="fwmb-btn-row">
+    <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="showShortcuts">{{localize "FILRODENSWMB.UI.HelpAllShortcuts"}}</button>
+</div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="helpCredits" title="FILRODENSWMB.UI.HelpAcknowledgements" closed=true}}
+<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.HelpCreditsIntro"}}</p>
+<ul class="fwmb-help-credits">
+    {{#each libraries}}
+    <li>
+        {{> helpLink url=this.link text=this.name}}{{#if this.version}} <span class="fwmb-help-version">{{this.version}}</span>{{/if}}
+        <span class="fwmb-help-what">{{localize this.what}}</span>
+        <span class="fwmb-help-licence">{{this.licence}}</span>
+    </li>
+    {{/each}}
+</ul>
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="helpFonts" title="FILRODENSWMB.UI.HelpFonts" count=fonts.length closed=true class="fwmb-section--nested"}}
+<ul class="fwmb-help-credits">
+    {{#each fonts}}
+    <li>
+        {{> helpLink url=this.url text=this.name}}
+        <span class="fwmb-help-licence">{{this.licence}}</span>
+    </li>
+    {{/each}}
+</ul>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#*inline "helpLink"}}<a class="fwmb-help-link" href="{{url}}" target="_blank" rel="noopener">{{#if text}}{{text}}{{else}}{{localize label}}{{/if}}<i class="fwmb-icon fwmb-icon--open-in-new" aria-hidden="true"></i><span class="fwmb-visually-hidden">{{localize "FILRODENSWMB.UI.HelpNewTab"}}</span></a>{{/inline}}

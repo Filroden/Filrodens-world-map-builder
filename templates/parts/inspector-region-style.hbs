@@ -1,0 +1,43 @@
+{{!--
+    The inspector's region fill (see StyleEditors): its name, and its fill (colour, or none, and
+    pattern). A region's border belongs to its level, so a fill style holds none. Every field
+    applies when committed, to the style and every region that follows it, one undo step each.
+--}}
+<datalist id="fwmb-inspector-colors">
+    {{#each palette}}
+    <option value="{{this}}"></option>
+    {{/each}}
+</datalist>
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-name" name="styleName" maxlength="{{fwmbTextLimit 'name'}}" value="{{style.name}}" />
+        </div>
+    </div>
+</div>
+
+<div class="fwmb-group">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.InspectorFill"}}</div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-fill-color">{{localize "FILRODENSWMB.UI.InspectorColor"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="color" id="fwmb-inspector-fill-color" class="fwmb-swatch" name="styleFillColor" value="{{fillHex}}" list="fwmb-inspector-colors" {{#if noFill}}disabled{{/if}} />
+            <label class="fwmb-checkbox-label">
+                <input type="checkbox" class="fwmb-checkbox" name="styleFillTransparent" {{#if noFill}}checked{{/if}} />
+                {{localize "FILRODENSWMB.UI.InspectorNoFill"}}
+            </label>
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-pattern">{{localize "FILRODENSWMB.UI.InspectorPattern"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-pattern" name="styleFillStyle">
+                {{#each patterns}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+</div>
+<p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorStyleApplyHint"}}</p>

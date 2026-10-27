@@ -1,53 +1,51 @@
-<div class="fwmb-tool-content fwmb-scrollable">
-    <fieldset class="fwmb-fieldset">
-        <legend>{{localize "FILRODENSWMB.UI.ReferenceImage"}}</legend>
-
-        <div class="form-group stacked">
-            <label>{{localize "FILRODENSWMB.UI.ImageSource"}}</label>
-            <div class="fwmb-flex-row" style="gap: 8px; align-items: center;">
-                <file-picker name="referenceImage" type="image" value="{{uiState.referenceImage}}" style="flex: 1;"></file-picker>
-                <button type="button" class="fwmb-btn muted danger" data-action="removeReferenceImage" data-tooltip="{{localize 'FILRODENSWMB.UI.RemoveImage'}}">
-                    <i class="fwmb-icon delete"></i>
+{{!--
+    Reference image: an image shown under the map to trace from (never exported), its opacity, and
+    its position and scale. It can also be dragged and resized on the map while this tool is open.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="referenceImage" title="FILRODENSWMB.UI.SectionImage" badge="FILRODENSWMB.UI.BadgeInstant" instant=true}}
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label>{{localize "FILRODENSWMB.UI.ImageSource"}}</label>
+        <div class="fwmb-form-fields">
+            <div class="fwmb-flex-row fwmb-flex-row--centred">
+                <file-picker class="fwmb-flex-1" name="referenceImage" type="image" value="{{uiState.referenceImage}}"></file-picker>
+                <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeReferenceImage" aria-label="{{localize 'FILRODENSWMB.UI.RemoveImage'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.RemoveImage'}}">
+                    <i class="fwmb-icon fwmb-icon--delete"></i>
                 </button>
             </div>
         </div>
+    </div>
 
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="referenceAlpha" label="FILRODENSWMB.UI.Opacity" value=(lookup uiState 'referenceAlpha') min=0 max=1 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="referenceAlpha" label="FILRODENSWMB.UI.Opacity" value=(lookup uiState 'referenceAlpha') min=0 max=1 step=0.05}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
-        <div class="form-group stacked" style="margin-top: var(--fwmb-space-10);">
-            <label>{{localize "FILRODENSWMB.UI.MapTransform"}}</label>
-            <div class="fwmb-transform-controls">
-
-                <div class="fwmb-transform-zoom">
-                    <button type="button" class="fwmb-btn" data-action="adjustReferenceScale" data-dir="1" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}">
-                        <i class="fwmb-icon zoom-in"></i>
-                    </button>
-                    <button type="button" class="fwmb-btn" data-action="resetReferenceScale" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetScale'}}">
-                        <i class="fwmb-icon center-focus"></i>
-                    </button>
-                    <button type="button" class="fwmb-btn" data-action="adjustReferenceScale" data-dir="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}">
-                        <i class="fwmb-icon zoom-out"></i>
-                    </button>
-                </div>
-
-                <div class="fwmb-transform-dpad">
-                    <button type="button" class="dpad-up" data-action="nudgeReference" data-dx="0" data-dy="-1" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
-                            class="fwmb-icon edit-arrow-up"
-                        ></i></button>
-                    <button type="button" class="dpad-left" data-action="nudgeReference" data-dx="-1" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
-                            class="fwmb-icon edit-arrow-up fwmb-rotate-270"
-                        ></i></button>
-                    <button type="button" class="dpad-center" data-action="resetReferencePan" data-tooltip="{{localize 'FILRODENSWMB.UI.CenterImage'}}"><i class="fwmb-icon center-focus"></i></button>
-                    <button type="button" class="dpad-right" data-action="nudgeReference" data-dx="1" data-dy="0" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
-                            class="fwmb-icon edit-arrow-up fwmb-rotate-90"
-                        ></i></button>
-                    <button type="button" class="dpad-down" data-action="nudgeReference" data-dx="0" data-dy="1" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
-                            class="fwmb-icon edit-arrow-down"
-                        ></i></button>
-                </div>
-
-            </div>
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="referencePosition" title="FILRODENSWMB.UI.SectionImagePosition" badge="FILRODENSWMB.UI.BadgeInstant" instant=true}}
+    <div class="fwmb-transform-controls">
+        <div class="fwmb-transform-zoom">
+            <button type="button" class="fwmb-btn" data-action="adjustReferenceScale" data-dir="1" aria-label="{{localize 'FILRODENSWMB.UI.ZoomIn'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}">
+                <i class="fwmb-icon fwmb-icon--zoom-in"></i>
+            </button>
+            <button type="button" class="fwmb-btn" data-action="resetReferenceScale" aria-label="{{localize 'FILRODENSWMB.UI.ResetScale'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetScale'}}">
+                <i class="fwmb-icon fwmb-icon--center-focus"></i>
+            </button>
+            <button type="button" class="fwmb-btn" data-action="adjustReferenceScale" data-dir="-1" aria-label="{{localize 'FILRODENSWMB.UI.ZoomOut'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}">
+                <i class="fwmb-icon fwmb-icon--zoom-out"></i>
+            </button>
         </div>
 
-    </fieldset>
-</div>
+        <div class="fwmb-transform-dpad">
+            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-up" data-action="nudgeReference" data-dx="0" data-dy="-1" aria-label="{{localize 'FILRODENSWMB.UI.PanNorth'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PanNorth'}}"><i
+                    class="fwmb-icon fwmb-icon--edit-arrow-up"
+                ></i></button>
+            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-left" data-action="nudgeReference" data-dx="-1" data-dy="0" aria-label="{{localize 'FILRODENSWMB.UI.PanWest'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PanWest'}}"><i
+                    class="fwmb-icon fwmb-icon--edit-arrow-up fwmb-rotate-270"
+                ></i></button>
+            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-center" data-action="resetReferencePan" aria-label="{{localize 'FILRODENSWMB.UI.CenterImage'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.CenterImage'}}"><i class="fwmb-icon fwmb-icon--center-focus"></i></button>
+            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-right" data-action="nudgeReference" data-dx="1" data-dy="0" aria-label="{{localize 'FILRODENSWMB.UI.PanEast'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PanEast'}}"><i
+                    class="fwmb-icon fwmb-icon--edit-arrow-up fwmb-rotate-90"
+                ></i></button>
+            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-dpad-down" data-action="nudgeReference" data-dx="0" data-dy="1" aria-label="{{localize 'FILRODENSWMB.UI.PanSouth'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.PanSouth'}}"><i
+                    class="fwmb-icon fwmb-icon--edit-arrow-down"
+                ></i></button>
+        </div>
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

@@ -1,0 +1,57 @@
+{{!--
+    The inspector's route style (see StyleEditors): its name, the transport it is offered for, and
+    its line (colour, stroke, thickness, outline and smoothing). Every field applies when
+    committed, to the style and every route that follows it, one undo step each (see Inspector).
+--}}
+<datalist id="fwmb-inspector-colors">
+    {{#each palette}}
+    <option value="{{this}}"></option>
+    {{/each}}
+</datalist>
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-name" name="styleName" maxlength="{{fwmbTextLimit 'name'}}" value="{{style.name}}" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-style-transport">{{localize "FILRODENSWMB.UI.InspectorTransport"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-style-transport" name="styleTransport">
+                {{#each transports}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.StyleTransportHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.StyleTransportHint'}}"></i>
+        </div>
+    </div>
+</div>
+
+<div class="fwmb-group">
+    <div class="fwmb-section-title">{{localize "FILRODENSWMB.UI.InspectorLine"}}</div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-line-color">{{localize "FILRODENSWMB.UI.InspectorColor"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="color" id="fwmb-inspector-line-color" class="fwmb-swatch" name="styleColor" value="{{style.color}}" list="fwmb-inspector-colors" />
+            <label class="fwmb-label fwmb-label--inline" for="fwmb-inspector-stroke">{{localize "FILRODENSWMB.UI.InspectorStroke"}}</label>
+            <select id="fwmb-inspector-stroke" name="styleStroke">
+                {{#each strokes}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="styleThickness" label="FILRODENSWMB.UI.InspectorThickness" value=style.thickness min=thicknessStep max=10 step=thicknessStep}}
+    <div class="fwmb-row">
+        <label class="fwmb-checkbox-label" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteOutlineHint'}}">
+            <input type="checkbox" class="fwmb-checkbox" name="styleOutline" {{#if style.outline}}checked{{/if}} />
+            {{localize "FILRODENSWMB.UI.InspectorOutline"}}
+        </label>
+        <label class="fwmb-checkbox-label" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteSmoothingHint'}}">
+            <input type="checkbox" class="fwmb-checkbox" name="styleSmoothing" {{#if style.smoothing}}checked{{/if}} />
+            {{localize "FILRODENSWMB.UI.InspectorSmoothing"}}
+        </label>
+    </div>
+</div>
+<p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorStyleApplyHint"}}</p>

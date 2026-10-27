@@ -1,0 +1,24 @@
+{{!--
+    A label font picker: the fonts grouped by category (see labelFontGroups in src/data/fonts.js),
+    the vendored ones first and the host's own (a Foundry world's fonts) last, each shown in its
+    own face. A face is downloaded the first time its name is drawn, so opening the list fetches
+    one small file per family. A family the map names but the host lacks is kept as the selected
+    choice, marked as missing, so choosing nothing else leaves the label's own font alone.
+
+    Parameters:
+      id, name: the select's id and name
+      groups: [{ label, fonts: [{ name }] }]
+      selected: the font the object names
+--}}
+<select id="{{id}}" name="{{name}}" class="fwmb-font-picker">
+    {{#each groups}}
+    <optgroup label="{{localize this.label}}">
+        {{#each this.fonts}}
+        <option value="{{this.name}}" style="font-family: &quot;{{this.name}}&quot;" {{#if (eq ../../selected this.name)}}selected{{/if}}>{{this.name}}</option>
+        {{/each}}
+    </optgroup>
+    {{/each}}
+    {{#if missing}}
+    <option value="{{selected}}" selected>{{localize "FILRODENSWMB.UI.FontMissing" name=selected}}</option>
+    {{/if}}
+</select>

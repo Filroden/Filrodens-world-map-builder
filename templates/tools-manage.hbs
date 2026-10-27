@@ -8,33 +8,36 @@
 
                 <div class="fwmb-map-card-actions">
                     <button type="button" data-action="manageMap" data-action-type="load" data-tooltip="{{localize 'FILRODENSWMB.UI.Load'}}">
-                        <i class="fwmb-icon file-open"></i>
+                        <i class="fwmb-icon fwmb-icon--file-open"></i>
                     </button>
 
                     <div class="fwmb-dropdown" tabindex="0">
-                        <button type="button" data-tooltip="Options">
-                            <i class="fwmb-icon more-vert"></i>
+                        <button type="button" aria-label="{{localize 'FILRODENSWMB.UI.MapActions'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.MapActions'}}">
+                            <i class="fwmb-icon fwmb-icon--more-vert"></i>
                         </button>
 
                         <div class="fwmb-dropdown-menu">
                             <button type="button" data-action="manageMap" data-action-type="rename">
-                                <i class="fwmb-icon edit"></i>
+                                <i class="fwmb-icon fwmb-icon--edit"></i>
                                 {{localize "FILRODENSWMB.UI.Rename"}}
                             </button>
                             <button type="button" data-action="manageMap" data-action-type="duplicate">
-                                <i class="fwmb-icon content-copy"></i>
+                                <i class="fwmb-icon fwmb-icon--content-copy"></i>
                                 {{localize "FILRODENSWMB.UI.Duplicate"}}
                             </button>
+                            {{!-- Only a regional map has a parent to leave; a top map's copy is Duplicate --}}
+                            {{#if this.parentId}}
                             <button type="button" data-action="manageMap" data-action-type="promote">
-                                <i class="fwmb-icon upgrade"></i>
+                                <i class="fwmb-icon fwmb-icon--upgrade"></i>
                                 {{localize "FILRODENSWMB.UI.Promote"}}
                             </button>
+                            {{/if}}
                             <button type="button" data-action="manageMap" data-action-type="export">
-                                <i class="fwmb-icon file-export"></i>
+                                <i class="fwmb-icon fwmb-icon--file-export"></i>
                                 {{localize "FILRODENSWMB.UI.Export"}}
                             </button>
-                            <button type="button" data-action="manageMap" data-action-type="delete" class="fwmb-danger" style="border-block-start: 1px solid var(--fwmb-border-subtle);">
-                                <i class="fwmb-icon delete"></i>
+                            <button type="button" data-action="manageMap" data-action-type="delete" class="fwmb-danger fwmb-menu-item--separated">
+                                <i class="fwmb-icon fwmb-icon--delete"></i>
                                 {{localize "FILRODENSWMB.UI.Delete"}}
                             </button>
                         </div>
@@ -43,7 +46,7 @@
             </div>
 
             {{#if this.children.length}}
-                <div class="fwmb-accordion-content" style="margin-left: 12px; padding-left: 8px; border-left: 2px solid var(--fwmb-border-subtle);">
+                <div class="fwmb-accordion-content fwmb-accordion-content--nested">
                     {{#each this.children}}
                         {{> mapNode this}}
                     {{/each}}
@@ -56,7 +59,7 @@
         <h3>{{localize "FILRODENSWMB.UI.SavedMaps"}}</h3>
     </div>
 
-    <div class="fwmb-map-list fwmb-scrollable stable">
+    <div class="fwmb-map-list fwmb-scrollable fwmb-scrollable--stable">
         {{#each savedMaps}}
             {{> mapNode this}}
         {{else}}
@@ -68,8 +71,21 @@
 
     <div class="fwmb-divider"></div>
 
-    <button type="button" data-action="importMapJson" style="width: auto; padding: 0 8px;">
-        <i class="fwmb-icon upload-file"></i>
+    <button type="button" class="fwmb-btn" data-action="importMapJson">
+        <i class="fwmb-icon fwmb-icon--upload-file"></i>
         {{localize "FILRODENSWMB.UI.ImportJSON"}}
     </button>
+
+    {{!-- Every saved map in one file (MapTransfer): the web's safeguard against cleared browser storage, a world's backup in Foundry --}}
+    <div class="fwmb-backup">
+        <h4 class="fwmb-backup-heading">{{localize "FILRODENSWMB.UI.BackupHeading"}}</h4>
+        <button type="button" class="fwmb-btn" data-action="backUpMaps" data-tooltip="{{localize 'FILRODENSWMB.UI.BackUpAllMapsHint'}}">
+            <i class="fwmb-icon fwmb-icon--file-export"></i>
+            {{localize "FILRODENSWMB.UI.BackUpAllMaps"}}
+        </button>
+        <button type="button" class="fwmb-btn" data-action="restoreBackup" data-tooltip="{{localize 'FILRODENSWMB.UI.RestoreFromBackupHint'}}">
+            <i class="fwmb-icon fwmb-icon--upload-file"></i>
+            {{localize "FILRODENSWMB.UI.RestoreFromBackup"}}
+        </button>
+    </div>
 </div>

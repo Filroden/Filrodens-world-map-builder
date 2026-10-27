@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Filroden's World Map Builder</title>
+    <meta name="description" content="Generate, edit and export fantasy world maps in your browser." />
+    <link rel="icon" href="assets/icons/map.svg" type="image/svg+xml" />
+    <!-- The page's base sheet stands in for Foundry's core styles, so it comes first -->
+    <link rel="stylesheet" href="web/web-base.css" />
+    <link rel="stylesheet" href="styles/fwmb-theme.css" />
+    <link rel="stylesheet" href="styles/filrodens-world-map-builder.css" />
+    <script src="vendor/handlebars/handlebars.min.js"></script>
+    <script type="module" src="web/main.js"></script>
+</head>
+<!-- The module's colour tokens are scoped to a theme class on <body> (main.js sets light or dark
+     from the reader's system preference) unless a theme is chosen in the studio -->
+<body class="theme-dark">
+    <div id="fwmb-app" class="fwmb fwmb-layout fwmb-web">
+        <p class="fwmb-web-status">Loading the map builder&hellip;</p>
+    </div>
+    <noscript><p class="fwmb-web-status">The map builder needs JavaScript to run.</p></noscript>
+</body>
+</html>

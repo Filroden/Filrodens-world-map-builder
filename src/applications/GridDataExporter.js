@@ -3,6 +3,7 @@ import { GridAggregator, VoteTally } from "../generation/GridAggregator.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { RiverNetwork } from "../generation/RiverNetwork.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { platform } from "../platform/index.js";
 
 /**
  * Builds the per-grid-cell exploration data layer written to
@@ -24,13 +25,18 @@ export class GridDataExporter {
     static #GRIDLESS_TYPE = "none";
 
     /**
-     * @param {MapStudioApp} app - the live Studio application, read for its generated buffers
-     * (`currentElevationData` etc.), vector entities (`regionLayers`, `mapPins`, `mapRoutes`,
-     * `manualRivers`) and `uiState`.
+     * @param {MapStudio} app - the live Studio application, read for its generated buffers
+     * (`currentElevationData` etc.), its mesh session (the regions), vector entities (`mapPins`,
+     * `mapRoutes`, `manualRivers`) and `uiState`.
+     * @param {object} [options]
+     * @param {Array|null} [options.regions] - The regions to test cells against, each
+     *     `{ id, name, visibility, layer: {id, name}, contains(px, py), bounds }`, in place of the
+     *     mesh session's (for comparing another description of the same regions, such as the
+     *     polygons a map's regions were migrated from).
      * @returns {object|null} The full `gridData` payload, or `null` for a gridless map - there is
      * no cell geometry to aggregate into, so the feature does not run.
      */
-    static build(app) {
+    static build(app, { regions = null } = {}) {
         if (app.uiState.gridType === GridDataExporter.#GRIDLESS_TYPE) return null;
 
         const grid = GridDataExporter.#buildGrid(app.uiState);
@@ -38,9 +44,10 @@ export class GridDataExporter {
 
         const { params } = MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors);
         const biomeIdToKey = GridDataExporter.#buildBiomeIdToKeyMap();
-        const visibleRegions = GridDataExporter.#collectVisibleRegions(app.regionLayers);
-        const visiblePins = (app.mapPins || []).filter((pin) => pin.visibility !== "none" && pin.icon);
-        const visibleRoutes = (app.mapRoutes || []).filter((route) => route.visibility !== "none" && route.points?.length >= 2);
+        const visibleRegions = regions ?? (app.meshSession ? GridDataExporter.#collectMeshRegions(app.meshSession) : []);
+        const pinStyles = GridDataExporter.#stylesById(app.uiState.customPinStyles);
+        const visiblePins = (app.mapPins || []).filter((pin) => pin.visibility !== "none" && pin.icon).map((pin) => GridDataExporter.#pinEntry(pin, pinStyles));
+        const visibleRoutes = GridDataExporter.#collectVisibleRoutes(app);
         const namedRivers = (app.manualRivers || []).filter((river) => river.points?.length >= 2);
 
         const cells = {};
@@ -84,15 +91,9 @@ export class GridDataExporter {
      * live Scene document - the export needs the grid's cell geometry, not a placed canvas.
      */
     static #buildGrid(uiState) {
-        if (uiState.gridType === "square") {
-            return new foundry.grid.SquareGrid({ size: MapStateManager.gridSizeOf(uiState.gridSize) });
-        }
-
-        // FWMB only ever exports the odd-offset hex variants (HEXODDR for hexR, HEXODDQ for hexC -
-        // see FILRODENSWMB.GRID_TYPES), so `even` is always false here. `columns` selects the
-        // orientation: true for flat-top/column-offset hexes (hexC), false for pointy-top/
-        // row-offset hexes (hexR).
-        return new foundry.grid.HexagonalGrid({ size: MapStateManager.gridSizeOf(uiState.gridSize), columns: uiState.gridType === "hexC", even: false });
+        // The host supplies the grid geometry (in Foundry, its own grid classes; FWMB only uses
+        // the odd-offset hex variants, see FILRODENSWMB.GRID_TYPES and platform.grid)
+        return platform.grid.create({ type: uiState.gridType, size: MapStateManager.gridSizeOf(uiState.gridSize) });
     }
 
     /** Reverse lookup from a built-in biome's numeric id (FILRODENSWMB.BIOME_IDS) back to its string key. */
@@ -105,36 +106,108 @@ export class GridDataExporter {
     }
 
     /**
-     * Flattens every region across every layer into a single list, pre-computing what stays
-     * constant per region for the rest of the export (its bounding box, and its *effective*
-     * visibility) so the per-cell pass below doesn't repeat that work for every cell.
+     * Every visible region of every level as one list, with what stays constant per region for the
+     * rest of the export (its bounding box and effective visibility) worked out once: a region
+     * holds a pixel when the cell under
+     * the pixel is one of its own (read from the cell raster, so membership is exact and costs one
+     * lookup per pixel). Its level stands in for the region layer in the exported `layer` field,
+     * and a GM-only layer set or level makes its regions GM-only, as on the canvas.
      */
-    static #collectVisibleRegions(regionLayers) {
+    static #collectMeshRegions(session) {
         const visible = [];
-        for (const layer of regionLayers || []) {
-            if (layer.visibility === "none") continue;
-
-            for (const region of layer.regions || []) {
-                if (!region.points || region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) continue;
-
-                const regionVisibility = region.visibility || "all";
-                if (regionVisibility === "none") continue;
-
-                visible.push({
-                    id: region.id,
-                    name: region.name,
-                    // A region under a GM-only layer is never shown to players even if the region
-                    // itself is marked "all" - matching the same elevation rule StudioCanvas
-                    // already applies when rendering regions on-canvas (see its region visibility
-                    // pass), so the exported flag agrees with what a GM actually sees toggled.
-                    visibility: layer.visibility === "gm" ? "gm" : regionVisibility,
-                    layer: { id: layer.id, name: layer.name },
-                    polygon: region.points,
-                    bounds: GridAggregator.getPolygonPixelBounds(region.points),
-                });
+        const { cellRaster, width } = session.mesh;
+        for (const set of session.layerSets) {
+            if (set.visibility === "none") continue;
+            for (const level of set.levels) {
+                if (level.visibility === "none") continue;
+                const gmOnly = set.visibility === "gm" || level.visibility === "gm";
+                const owners = session.layer(level.id).owners;
+                for (const region of level.regions) {
+                    const regionVisibility = region.visibility || "all";
+                    const bounds = session.regionBounds(level.id, region.key);
+                    if (regionVisibility === "none" || !bounds) continue;
+                    visible.push({
+                        id: region.id,
+                        name: region.name,
+                        visibility: gmOnly ? "gm" : regionVisibility,
+                        layer: { id: level.id, name: level.name },
+                        contains: (px, py) => owners[cellRaster[Math.floor(py) * width + Math.floor(px)]] === region.key,
+                        bounds,
+                    });
+                }
             }
         }
         return visible;
+    }
+
+    /**
+     * Routes with a line to test cells against: their own points, or for routes on the display mesh
+     * the line drawn through their cells (see MeshSession.routeLine).
+     */
+    static #collectVisibleRoutes(app) {
+        const styles = GridDataExporter.#stylesById(app.uiState.customRouteStyles);
+        const routes = [];
+        for (const route of app.mapRoutes || []) {
+            if (route.visibility === "none") continue;
+            const points = route.points ?? GridDataExporter.#meshRoutePoints(app.meshSession, route);
+            if (points.length < 2) continue;
+            routes.push({
+                entry: {
+                    id: route.id,
+                    name: route.name,
+                    visibility: route.visibility,
+                    // What kind of way it is: generated routes have no name, so these tell a
+                    // consumer a trade road from a lane or a sea lane
+                    transport: route.transport ?? "road",
+                    class: route.class ?? null,
+                    style: GridDataExporter.#styleOf(route.quickStyle, styles),
+                },
+                points,
+            });
+        }
+        return routes;
+    }
+
+    /** A map's style list by id. */
+    static #stylesById(styles) {
+        return new Map((styles ?? []).map((style) => [style.id, style]));
+    }
+
+    /** The `{id, name}` of the map style an item uses, or null for one styled by hand. */
+    static #styleOf(id, styles) {
+        const style = id ? styles.get(id) : null;
+        return style ? { id: style.id, name: style.name ?? "" } : null;
+    }
+
+    /**
+     * A pin as the cell data lists it. A generated place also says what it is (`kind`, such as
+     * town or castle; `tier`, such as city or village) and its population where it has one, so a
+     * consumer can tell a city from a hamlet; a pin placed by hand has null for all three.
+     */
+    static #pinEntry(pin, styles) {
+        const generated = pin.generated ?? null;
+        return {
+            x: pin.x,
+            y: pin.y,
+            entry: {
+                id: pin.id,
+                name: pin.name,
+                icon: pin.icon,
+                visibility: pin.visibility,
+                style: GridDataExporter.#styleOf(pin.pinStyle, styles),
+                kind: generated?.kind ?? null,
+                tier: generated?.tier ?? null,
+                population: Number.isFinite(generated?.population) ? generated.population : null,
+            },
+        };
+    }
+
+    static #meshRoutePoints(session, route) {
+        if (!session || !route.legs) return [];
+        const line = session.routeLine(route);
+        const points = [];
+        for (let i = 0; i < line.length; i += 2) points.push({ x: line[i], y: line[i + 1] });
+        return points;
     }
 
     /** Builds every field for a single grid cell, sampling the map's raster buffers across the cell's polygon. */
@@ -249,7 +322,7 @@ export class GridDataExporter {
         tallies.temperature.add(GridDataExporter.#classifyTemperatureBand(temperature));
 
         for (let r = 0; r < candidateRegions.length; r++) {
-            if (GridAggregator.pointInPolygon(px, py, candidateRegions[r].polygon)) regionInsideCounts[r]++;
+            if (candidateRegions[r].contains(px, py)) regionInsideCounts[r]++;
         }
 
         stats.sampleCount++;
@@ -317,7 +390,7 @@ export class GridDataExporter {
         const pins = [];
         for (const pin of visiblePins) {
             if (!GridAggregator.pointInPolygon(pin.x, pin.y, polygon)) continue;
-            pins.push({ id: pin.id, name: pin.name, icon: pin.icon, visibility: pin.visibility });
+            pins.push(pin.entry);
         }
         return pins;
     }
@@ -326,7 +399,7 @@ export class GridDataExporter {
         const routes = [];
         for (const route of visibleRoutes) {
             if (!GridDataExporter.#linestringCrossesCell(route.points, cellPolygon, cellBounds)) continue;
-            routes.push({ id: route.id, name: route.name, visibility: route.visibility });
+            routes.push(route.entry);
         }
         return routes;
     }
@@ -425,7 +498,7 @@ export class GridDataExporter {
         }
 
         if (typeof lookupKey === "string") {
-            return { id: lookupKey, name: game.i18n.localize(`FILRODENSWMB.BIOMES.${lookupKey}`), code: null };
+            return { id: lookupKey, name: platform.i18n.localize(`FILRODENSWMB.BIOMES.${lookupKey}`), code: null };
         }
 
         // Built-in and custom biome ids never collide: built-in ids run 0-13 (FILRODENSWMB.BIOME_IDS)
@@ -434,7 +507,7 @@ export class GridDataExporter {
             const builtInKey = biomeIdToKey.get(lookupKey) ?? null;
             return {
                 id: builtInKey ?? String(lookupKey),
-                name: builtInKey ? game.i18n.localize(`FILRODENSWMB.BIOMES.${builtInKey}`) : "",
+                name: builtInKey ? platform.i18n.localize(`FILRODENSWMB.BIOMES.${builtInKey}`) : "",
                 code: null,
             };
         }

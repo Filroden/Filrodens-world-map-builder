@@ -1,0 +1,14 @@
+<div class="fwmb-dialog-content">
+    {{!-- Merge Into (see RegionPanel.mergeRegion): the region whose cells the merged region joins. --}}
+    <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.MergeRegionHint" name=region.name}}</div>
+    <div class="fwmb-form-group">
+        <label>{{localize "FILRODENSWMB.UI.MergeInto"}}</label>
+        <div class="fwmb-form-fields">
+            <select name="mergeInto" autofocus>
+                {{#each others}}
+                    <option value="{{this.id}}">{{this.name}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,47 @@
+name: Tutorial
+
+# Plays every tutorial page in the web studio (headless Chromium), so a change to the interface
+# that breaks a tutorial step fails here, naming the step. The twelve pages take well over an hour
+# of runner time, so this does not run on every push: start it by hand (Actions › Tutorial › Run
+# workflow) before a release, or after a change to the interface. Pages can be named to play only
+# those.
+on:
+    workflow_dispatch:
+        inputs:
+            pages:
+                description: "Pages to play, by number (for example: 7 8); empty for all"
+                required: false
+                default: ""
+
+concurrency:
+    group: tutorial-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    tutorial:
+        runs-on: ubuntu-latest
+        timeout-minutes: 180
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
+
+            - name: Install dependencies
+              run: npm ci --ignore-scripts
+
+            - name: Install Chromium for Playwright
+              run: npx playwright install --with-deps chromium
+
+            # The page numbers come in through the environment, not pasted into the command
+            - name: Run the tutorial pages
+              env:
+                  PAGES: ${{ inputs.pages }}
+              run: node tests/tutorial/run.mjs $(echo "$PAGES" | tr -cd '0-9 ')

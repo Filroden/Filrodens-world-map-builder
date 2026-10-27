@@ -1,0 +1,33 @@
+{{!--
+    The inspector's layer set (see LayerSetEditor): its name and visibility, its opacity and
+    whether its fill covers water, and Delete. Every field applies when committed, one undo step
+    each (see Inspector).
+--}}
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-name" name="setName" maxlength="{{fwmbTextLimit 'name'}}" value="{{set.name}}" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-visibility">{{localize "FILRODENSWMB.UI.Visibility"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-visibility" name="setVisibility">
+                {{#each visibilities}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="setOpacity" label="FILRODENSWMB.UI.LayerSetOpacity" hint="FILRODENSWMB.UI.LayerSetOpacityHint" value=set.opacity min=0 max=1 step=0.05}}
+    <label class="fwmb-checkbox-label" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerSetWaterTintHint'}}">
+        <input type="checkbox" class="fwmb-checkbox" name="setWaterTint" {{#if set.waterTint}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.LayerSetWaterTint"}}
+    </label>
+</div>
+
+<div class="fwmb-inspector-actions">
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-inspector-delete" data-inspector-action="delete"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Delete"}}</button>
+</div>
+<p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorApplyHint"}}</p>

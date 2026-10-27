@@ -2,6 +2,7 @@ import * as THREE from "../../vendor/three/three.module.js";
 import { OrbitControls } from "../../vendor/three/OrbitControls.js";
 import { FILRODENSWMB } from "../config.js";
 import { TerrainShading } from "../tools/TerrainShading.js";
+import { LightingNormals } from "./LightingNormals.js";
 
 export class Scene3D {
     constructor(containerElement) {
@@ -30,19 +31,24 @@ export class Scene3D {
         this.controls.dampingFactor = 0.05;
         this.controls.maxPolarAngle = Math.PI / 2 - 0.05;
 
-        // 5. Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-        this.scene.add(ambientLight);
-
-        this.sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        this.sunLight.position.set(-1000, 2000, 1000);
+        // 5. Lighting: a weak ambient and a low sun from the flat map's bearing, placed and sized
+        // to the map in render3DMap. The sun is made just strong enough that flat ground keeps the
+        // brightness it had, so the lighting normals (see LightingNormals) add contrast on slopes
+        // without darkening or brightening the map.
+        const config = FILRODENSWMB.DISPLAY.THREE_D;
+        this.scene.add(new THREE.AmbientLight(0xffffff, config.AMBIENT));
+        const altitude = (config.SUN_ALTITUDE * Math.PI) / 180;
+        this.sunLight = new THREE.DirectionalLight(0xffffff, (config.FLAT_BRIGHTNESS - config.AMBIENT) / Math.sin(altitude));
         this.sunLight.castShadow = true;
-        this.sunLight.shadow.camera.left = -2000;
-        this.sunLight.shadow.camera.right = 2000;
-        this.sunLight.shadow.camera.top = 2000;
-        this.sunLight.shadow.camera.bottom = -2000;
+        this.sunLight.shadow.mapSize.set(2048, 2048);
         this.sunLight.shadow.bias = -0.001;
         this.scene.add(this.sunLight);
+
+        // The terrain's grid, kept so Relief Emphasis can light it again without rebuilding it
+        this.grid = null;
+        this.reliefEmphasis = config.RELIEF.EMPHASIS;
+        this.radiusPx = 0;
+        this.reliefFrame = null;
 
         // State trackers
         this.animationFrameId = null;
@@ -64,7 +70,9 @@ export class Scene3D {
      * The drape is made from the same images and settings as the flat map (see
      * TerrainShading.drape), so the layers, the biomes on the sea bed, the water's colour by
      * depth and the map's tint all match; only relief shading is left out, since the scene's
-     * light shades the real slopes. Rivers (procedural and custom alike) come with it, from the
+     * light shades the slopes. It lights them through lighting normals (see LightingNormals): each
+     * vertex's own slope plus its broad slope, exaggerated by the map's Relief Emphasis, so land
+     * that rises gently over large areas reads as relief while the mesh keeps its true heights. Rivers (procedural and custom alike) come with it, from the
      * same river image the flat map draws them from, so they lie on the ground like any other
      * colour.
      *
@@ -79,8 +87,11 @@ export class Scene3D {
      * @param {Float32Array} map.waterMask - Each lake pixel's surface elevation, 0 elsewhere.
      * @param {{aux: Uint8Array, surface: Uint8Array, underwater: Uint8Array, rivers: Uint8Array}} map.terrain - The images the flat map is painted from.
      * @param {object} map.settings - The flat map's shading settings (see TerrainShading.defaultSettings).
+     * @param {number} [map.reliefEmphasis] - How strongly the broad slope is lit (the map's Relief Emphasis).
+     * @param {number} [map.pixelsPerBaseline] - The map's pixels per baseline pixel, which the
+     *   broad slope's radius is scaled by, so it covers the same ground at any resolution.
      */
-    render3DMap({ elevation, width, height, seaLevel, waterMask, terrain, settings }) {
+    render3DMap({ elevation, width, height, seaLevel, waterMask, terrain, settings, reliefEmphasis = FILRODENSWMB.DISPLAY.THREE_D.RELIEF.EMPHASIS, pixelsPerBaseline = 1 }) {
         this.#disposeTerrain();
         const config = FILRODENSWMB.DISPLAY.THREE_D;
 
@@ -114,19 +125,31 @@ export class Scene3D {
 
         const surfaceOn = settings.landBiomes;
         const pos = geometry.attributes.position;
+        const heights = new Float32Array(pos.count);
+        // Vertices raised onto a lake's surface or lifted as sea ice: lit by their own slope only
+        const mask = new Uint8Array(pos.count);
         for (let i = 0; i < pos.count; i++) {
             const mapX = Math.max(0, Math.min(Math.round(pos.getX(i) + width / 2), width - 1));
             const mapY = Math.max(0, Math.min(Math.round(pos.getZ(i) + height / 2), height - 1));
             const index = mapY * width + mapX;
 
             const lakeSurface = waterMask?.[index] > 0 ? waterMask[index] : -Infinity;
+            if (lakeSurface > elevation[index]) mask[i] = 1;
             let y = (Math.max(elevation[index], lakeSurface) - seaLevel) * config.ALTITUDE_SCALE;
             const onTheSea = y < 0 && terrain.aux[index * 4 + 1] > 0;
-            if (onTheSea && surfaceOn && terrain.surface[index * 4 + 3] > 0) y = config.SURFACE_LIFT;
+            if (onTheSea && surfaceOn && terrain.surface[index * 4 + 3] > 0) {
+                y = config.SURFACE_LIFT;
+                mask[i] = 1;
+            }
             pos.setY(i, y);
+            heights[i] = y;
         }
 
-        geometry.computeVertexNormals();
+        // The vertices run row by row from the map's top, geoWidth + 1 to a row
+        this.grid = { heights, cols: geoWidth + 1, rows: geoHeight + 1, spacingX: width / geoWidth, spacingZ: height / geoHeight, mask };
+        this.radiusPx = config.RELIEF.RADIUS * pixelsPerBaseline;
+        this.reliefEmphasis = reliefEmphasis;
+        geometry.setAttribute("normal", new THREE.BufferAttribute(this.#normals(), 3));
         this.mesh = new THREE.Mesh(geometry, material);
         this.mesh.castShadow = true;
         this.mesh.receiveShadow = true;
@@ -154,10 +177,56 @@ export class Scene3D {
             this.scene.add(this.water);
         }
 
-        // 4. Position Camera
+        // 4. The sun, from the flat map's bearing (0 from the north, the map's top, -z; 90 from the
+        // east, +x) and SUN_ALTITUDE above the horizon, far enough out to clear the map, with a
+        // shadow camera that covers the whole map
+        this.#placeSun(width, height);
+
+        // 5. Position Camera
         this.camera.position.set(0, Math.max(width, height) * 0.8, Math.max(width, height) * 0.8);
         this.controls.target.set(0, 0, 0);
         this.controls.update();
+    }
+
+    /**
+     * Lights the terrain with a new Relief Emphasis (its slider in the 3D view). The normals are
+     * worked out again in place, at most once a frame however fast the slider moves.
+     * @param {number} value
+     */
+    setReliefEmphasis(value) {
+        this.reliefEmphasis = Number(value);
+        if (!this.mesh || this.reliefFrame !== null) return;
+        this.reliefFrame = requestAnimationFrame(() => {
+            this.reliefFrame = null;
+            const normal = this.mesh?.geometry.attributes.normal;
+            if (!normal) return;
+            this.#normals(normal.array);
+            normal.needsUpdate = true;
+        });
+    }
+
+    /** The terrain's lighting normals at the current Relief Emphasis (written into `out` when given). */
+    #normals(out) {
+        const relief = FILRODENSWMB.DISPLAY.THREE_D.RELIEF;
+        return LightingNormals.compute(this.grid, { emphasis: this.reliefEmphasis, radiusPx: this.radiusPx, tiltLimit: relief.TILT_LIMIT, fineGain: relief.FINE_GAIN, seabedShare: relief.SEABED_SHARE }, out);
+    }
+
+    #placeSun(width, height) {
+        const config = FILRODENSWMB.DISPLAY.THREE_D;
+        const bearing = (FILRODENSWMB.DISPLAY.LIGHT_DIRECTION * Math.PI) / 180;
+        const altitude = (config.SUN_ALTITUDE * Math.PI) / 180;
+        const reach = Math.hypot(width, height);
+        const distance = reach * 1.5;
+        this.sunLight.position.set(Math.sin(bearing) * Math.cos(altitude) * distance, Math.sin(altitude) * distance, -Math.cos(bearing) * Math.cos(altitude) * distance);
+        this.sunLight.target.position.set(0, 0, 0);
+        const shadow = this.sunLight.shadow.camera;
+        shadow.left = -reach / 2;
+        shadow.right = reach / 2;
+        shadow.top = reach / 2;
+        shadow.bottom = -reach / 2;
+        shadow.near = 1;
+        shadow.far = distance + reach;
+        shadow.updateProjectionMatrix();
     }
 
     /** Removes the terrain and sea, freeing their GPU memory. */
@@ -195,11 +264,15 @@ export class Scene3D {
     destroy() {
         window.removeEventListener("resize", this.resizeHandler);
         if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+        if (this.reliefFrame !== null) cancelAnimationFrame(this.reliefFrame);
 
         this.#disposeTerrain();
 
         if (this.renderer) {
             this.renderer.dispose();
+            // Gives the WebGL context back at once rather than when it is collected: a browser
+            // keeps only a few, and the flat map's canvas needs its own
+            this.renderer.forceContextLoss();
             this.renderer.domElement.remove();
         }
     }

@@ -5,7 +5,22 @@ import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { getRegionUploadResource } from "./RegionUploadResource.js";
 import { TerrainCompositor } from "./TerrainCompositor.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
+import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
+import { SymbolScale } from "../tools/SymbolScale.js";
+import { ExportScale } from "../tools/ExportScale.js";
+import { LabelLayout } from "./LabelLayout.js";
+import { borderLines } from "./MapBorder.js";
+import { RegionLevelLayers } from "./RegionLevelLayers.js";
+import { ThematicLayer } from "./ThematicLayer.js";
+import { TradeFlowLayer } from "./TradeFlowLayer.js";
+import { TravelLayer } from "./TravelLayer.js";
+import { RegionOverlays } from "./RegionOverlays.js";
+import { RouteOverlays } from "./RouteOverlays.js";
+import { HomelandMarkers } from "./HomelandMarkers.js";
+import { TouchGestures } from "./TouchGestures.js";
+import { platform } from "../platform/index.js";
+import { cleanUnit, formatDistance, scaleBarTick } from "../data/MapUnit.js";
 
 /** The cursor over each part of the crop box (see #getCropHitZone); anywhere else shows the crosshair. */
 const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br: "nwse-resize", tr: "nesw-resize", bl: "nesw-resize" });
@@ -14,9 +29,9 @@ const CROP_ZONE_CURSORS = Object.freeze({ center: "move", tl: "nwse-resize", br:
  * Entities whose nodes may be dragged into the buffer around the map, so lines and outlines can
  * span well outside the visible map. Single-point markers (pins, labels, decorations) and manual
  * river nodes stay confined to the map itself, the same rule applied when these nodes are first
- * created (see MapStudioApp's click handlers).
+ * created (see MapStudio's click handlers).
  */
-const BUFFERED_NODE_TYPES = Object.freeze(["route", "region", "landMask", "fault"]);
+const BUFFERED_NODE_TYPES = Object.freeze(["landMask", "fault"]);
 
 // Shortest time between two brush stamps sent to the app while the pointer moves with the button
 // held, however often the browser reports pointer moves
@@ -27,6 +42,8 @@ const BRUSH_MOVE_INTERVAL_MS = 100;
 const RIGHT_CLICK_MAX_TRAVEL_PX = 5;
 
 const POINTER_BUTTON = Object.freeze({ PRIMARY: 0, MIDDLE: 1, SECONDARY: 2 });
+// The texture side every WebGL implementation must support, assumed when the real limit cannot be read
+const MIN_GUARANTEED_TEXTURE_SIZE = 4096;
 
 // Hex grid geometry: a hexagon's six corners lie 60 degrees apart, and a row grid's hexes are
 // turned a further 30 degrees so they stand pointy-topped. Staggered rows (or columns) of hexes
@@ -36,16 +53,57 @@ const HEX_CORNER_ANGLE_DEG = 60;
 const POINTY_TOP_TURN_DEG = 30;
 const HEX_STAGGERED_SPACING = 1.5;
 
+/** The smallest distance (map pixels) from a decoration's centre that still picks it up, however small its image. */
+const DECORATION_MIN_HIT_RADIUS = 16;
+
+/** How long (milliseconds) after a touch the browser's own double-click is ignored: touch double-taps are recognised by TouchGestures. */
+const TOUCH_DOUBLE_CLICK_GRACE_MS = 800;
+
+/** The width and height of the box round a w by h box turned by an angle (radians). */
+function turnedBox(w, h, angle) {
+    if (!angle) return { w, h };
+    const cos = Math.abs(Math.cos(angle));
+    const sin = Math.abs(Math.sin(angle));
+    return { w: w * cos + h * sin, h: w * sin + h * cos };
+}
+
 export class StudioCanvas {
+    /** Turns touch input into the mouse's actions (see TouchGestures). */
+    #touch = null;
+
+    /** When a finger last touched the canvas (see TOUCH_DOUBLE_CLICK_GRACE_MS). */
+    #lastTouchAt = -Infinity;
+
+    /** The camera when a touch gesture started: { scale, x, y }. */
+    #touchCameraStart = null;
+
+    /** The touch press under way, for a release that comes without an event of its own. */
+    #touchPress = null;
+
     /** Whether destroy() has run (see destroy). */
     #destroyed = false;
+
+    /** Whether the map's detail level shows a set's level (see setDetailFilter). */
+    #showsLevel = () => true;
+
+    /** Whether the map's detail level shows a pin's name (see setNameFilter). */
+    #showsName = () => true;
+
+    /** The map's symbol size, which multiplies every pin and label (see setSymbolScale). */
+    #symbolScale = 1;
+
+    /** How far in from the map's edges names keep (see setNameInset). */
+    #nameInset = 0;
 
     constructor(htmlContainer) {
         this.container = htmlContainer;
 
         this.app = new PIXI.Application({
             autoDensity: true,
-            backgroundColor: 0x1a4b84,
+            // Transparent, so the space around the map is the studio's own canvas surround colour
+            // (the map preview's background in the stylesheet), which follows the colour theme.
+            // Exports render into their own textures, which start transparent either way.
+            backgroundAlpha: 0,
             antialias: true,
             resolution: window.devicePixelRatio || 1,
             sharedTicker: false,
@@ -69,10 +127,19 @@ export class StudioCanvas {
             // alongside `biomes` on every repaint, but hidden until hovered.
             biomeFallback: new PIXI.Container(),
             contours: new PIXI.Container(),
+            // The thematic layer (see renderThematic): over the terrain, under everything drawn on it
+            thematic: new PIXI.Container(),
             landMasks: new PIXI.Container(),
             features: new PIXI.Container(),
             infrastructure: new PIXI.Container(),
             regions: new PIXI.Container(),
+            // The trade layer (see renderTrade): held in infrastructure, over the routes it follows
+            // (under them it would be hidden, as most trade runs along a route) and under the nodes
+            // and pins
+            trade: new PIXI.Container(),
+            // The Travel tool's day rings and way (see renderTravel): over the routes and pins,
+            // under the names
+            travel: new PIXI.Container(),
             labels: new PIXI.Container(),
             reference: new PIXI.Container(),
             cartography: new PIXI.Container(),
@@ -80,6 +147,19 @@ export class StudioCanvas {
 
         this.terrainCompositor = new TerrainCompositor(PIXI);
         this.layers.biomeFallback.visible = false;
+
+        // Region levels drawn from the display mesh (see renderRegionLevels): fills read their land
+        // mask from the terrain's packed texture
+        this.regionLevels = new RegionLevelLayers(PIXI, this.layers.regions, {
+            auxProvider: () => this.terrainCompositor.auxTexture,
+            maxTextureSize: () => {
+                const gl = this.app.renderer.gl;
+                return gl ? gl.getParameter(gl.MAX_TEXTURE_SIZE) : MIN_GUARANTEED_TEXTURE_SIZE;
+            },
+        });
+        // Optional (x, y, radius) => hit lookup for things picked without edit nodes (regions and
+        // routes drawn from the mesh), consulted when no node or marker is under the pointer
+        this.meshHitTest = null;
 
         // Vector Graphics Engine for non-pixel entities (custom river and fault guides, spring pins).
         // Rivers themselves are drawn by the terrain shader (see TerrainCompositor).
@@ -102,6 +182,7 @@ export class StudioCanvas {
         this.pinContainer = new PIXI.Container();
 
         this.layers.infrastructure.addChild(this.routeGraphics);
+        this.layers.infrastructure.addChild(this.layers.trade);
         this.layers.infrastructure.addChild(this.nodeContainer); // Render nodes above lines
         this.layers.infrastructure.addChild(this.pinContainer); // Render pins above nodes
 
@@ -112,8 +193,8 @@ export class StudioCanvas {
 
         // --- Global Drag Handling ---
         this.activeDrag = null;
-        // What the pointer holds, for the canvas hint: null, "label", "decoration", "pin",
-        // "region" or "mask" (see #heldItemKind)
+        // What the pointer holds, for the canvas hint: null, "label", "decoration", "pin" or
+        // "mask" (see #heldItemKind)
         this.heldItem = null;
         // The highlight box around a shape being dragged with Shift (see #drawShapeDragBox)
         this.shapeDragBox = null;
@@ -128,6 +209,20 @@ export class StudioCanvas {
         // Setup the Brush Cursor overlay
         this.brushCursor = new PIXI.Graphics();
         this.brushCursor.visible = false;
+
+        // The Regions tool's outline of the region being edited, and its Fill preview
+        this.regionOverlays = new RegionOverlays(PIXI);
+        // The Routes tool's route being placed, trace stroke and waypoint handles
+        this.routeOverlays = new RouteOverlays(PIXI);
+        this.homelandMarkers = new HomelandMarkers(PIXI);
+
+        // A tool that takes the primary button's presses, moves and releases itself while editing
+        // (see #pointerTool), or null; read on every event, so it follows the tool in use
+        this.pointerToolProvider = null;
+        this.pointerToolPressed = false;
+        // A tool that takes the primary button whether or not the map is being edited, for a
+        // moment's task (a culture's homeland picked on the map; see CultureMarkers), or null
+        this.pickPointerTool = null;
 
         // Setup the Crop Tool overlay
         this.cropGraphics = new PIXI.Graphics();
@@ -144,15 +239,20 @@ export class StudioCanvas {
             this.layers.terrain,
             this.layers.biomeFallback,
             this.layers.contours,
+            this.layers.thematic,
             this.layers.landMasks,
             this.layers.features,
             this.layers.regions,
             this.layers.infrastructure,
+            this.layers.travel,
             this.layers.reference,
             this.gridLayer,
             this.layers.labels,
             this.layers.cartography,
             this.cropGraphics,
+            ...this.regionOverlays.displayObjects,
+            ...this.routeOverlays.displayObjects,
+            ...this.homelandMarkers.displayObjects,
             this.brushCursor,
         );
 
@@ -231,21 +331,145 @@ export class StudioCanvas {
                 closest = item;
             }
         }
+        // Regions and routes drawn from the mesh have no nodes; they are found by what lies under
+        // the pointer instead (see meshHitTest). Such a hit can be picked (double-clicked) but not
+        // dragged: it carries selectOnly.
+        if (!closest && this.isEditMode && this.meshHitTest) {
+            closest = this.meshHitTest(x, y, FILRODENSWMB.MESH.ROUTE_HIT_PX / (this.stage.scale.x || 1));
+        }
+        return closest;
+    }
+
+    /**
+     * The nearest of the interactive items of one type (a pin, a label) whose reach covers a map
+     * point, or null: what a Select mode picks (see PickTool).
+     *
+     * @param {number} x
+     * @param {number} y
+     * @param {string} entityType
+     * @returns {object|null} The item's hit data (entityType, entityId, and for a label its parentType and layerId).
+     */
+    hitTest(x, y, entityType) {
+        let closest = null;
+        let minDist = Infinity;
+        for (const item of this.interactiveTargets) {
+            if (item.entityType !== entityType) continue;
+            const dist = Math.hypot(item.x - x, item.y - y);
+            if (dist <= item.radius && dist < minDist) {
+                minDist = dist;
+                closest = item;
+            }
+        }
         return closest;
     }
 
     #setupInteractions(canvasElement) {
+        // Focusable from script only (not by Tab), and focused by a press, so the keys a tool
+        // listens for (Escape, Enter, undo) reach the studio after working on the map
+        canvasElement.tabIndex = -1;
+
+        // Fingers go to TouchGestures, which calls the mouse's handlers back (see #createTouchGestures);
+        // the mouse and a pen come straight here
+        this.#touch = this.#createTouchGestures(canvasElement);
+        const isTouch = (e) => {
+            if (e.pointerType !== "touch") return false;
+            this.#lastTouchAt = performance.now();
+            return true;
+        };
+
         canvasElement.addEventListener("wheel", (e) => this.#handleWheel(e, canvasElement));
         canvasElement.addEventListener("contextmenu", (e) => e.preventDefault());
-        canvasElement.addEventListener("pointerdown", (e) => this.#handlePointerDown(e, canvasElement));
-        canvasElement.addEventListener("pointermove", (e) => this.#handlePointerMove(e, canvasElement));
+        canvasElement.addEventListener("pointerdown", (e) => (isTouch(e) ? this.#touch.down(e) : this.#handlePointerDown(e, canvasElement)));
+        canvasElement.addEventListener("pointermove", (e) => (isTouch(e) ? this.#touch.move(e) : this.#handlePointerMove(e, canvasElement)));
         canvasElement.addEventListener("dblclick", (e) => this.#handleDoubleClick(e, canvasElement));
 
         // Unified completion events prevent duplicate listener binds
-        const endInteraction = (e) => this.#handlePointerUp(e, canvasElement);
-        canvasElement.addEventListener("pointerup", endInteraction);
-        canvasElement.addEventListener("pointercancel", endInteraction);
-        canvasElement.addEventListener("pointerleave", (e) => this.#handlePointerLeave(e, canvasElement));
+        canvasElement.addEventListener("pointerup", (e) => (isTouch(e) ? this.#touch.up(e) : this.#handlePointerUp(e, canvasElement)));
+        canvasElement.addEventListener("pointercancel", (e) => (isTouch(e) ? this.#touch.up(e, true) : this.#handlePointerUp(e, canvasElement)));
+        // A lifted finger also leaves the canvas; the information bar keeps the point last touched,
+        // since a finger has no hover to show another
+        canvasElement.addEventListener("pointerleave", (e) => {
+            if (!isTouch(e)) this.#handlePointerLeave(e, canvasElement);
+        });
+    }
+
+    /** Touch input, turned into the canvas's own mouse handling (see TouchGestures). */
+    #createTouchGestures(canvasElement) {
+        return new TouchGestures({
+            press: (e) => {
+                this.#touchPress = e;
+                // A finger has no hover, so the information bar shows the point it pressed
+                const { x, y } = this.#getMapCoordinates(e, canvasElement);
+                if (this.onCanvasHover) this.onCanvasHover(x, y);
+                this.#handlePointerDown(e, canvasElement);
+            },
+            move: (e) => this.#handlePointerMove(e, canvasElement),
+            release: (e) => {
+                this.#releasePrimary(e ?? this.#touchPress, canvasElement);
+                this.#touchPress = null;
+            },
+            rightClick: () => this.onRightClick?.(),
+            doubleClick: (e) => this.#doubleClickAt(e, canvasElement),
+            isTurnableAt: (e) => this.#isTurnableAt(e, canvasElement),
+            isHoldingTurnable: () => StudioCanvas.#isWheelTransformable(this.#heldWrapper()),
+            panByDefault: () => !this.isEditMode && !this.isCropMode && !this.isReferenceMode && !this.pickPointerTool,
+            cameraStart: () => {
+                this.#touchCameraStart = { scale: this.stage.scale.x, x: this.stage.position.x, y: this.stage.position.y };
+            },
+            camera: (from, to, ratio) => this.#moveCameraByTouch(canvasElement, from, to, ratio),
+            turnHeld: (degrees, steps) => this.#turnHeldByTouch(degrees, steps),
+        });
+    }
+
+    /**
+     * Whether a press at the event's place, while editing, would pick up an item the wheel turns
+     * and resizes. A tool taking the press (a Select mode, a route or region tool) picks nothing up.
+     */
+    #isTurnableAt(e, canvasElement) {
+        if (!this.isEditMode || this.isCropMode || this.isReferenceMode || this.#pointerTool()) return false;
+        const { x, y } = this.#getMapCoordinates(e, canvasElement);
+        return StudioCanvas.#isWheelTransformable(this.#getHitTarget(x, y));
+    }
+
+    /** The interactive target the pointer holds, if any. */
+    #heldWrapper() {
+        return this.activeDrag ? this.interactiveTargets.find((t) => t.target === this.activeDrag.target) : null;
+    }
+
+    /** The highest zoom the camera allows for this map's size. */
+    #maxZoom() {
+        return Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+    }
+
+    /**
+     * Moves the camera for a touch gesture: zoomed by `ratio` since the gesture started, and placed
+     * so the map point that was under screen point `from` when it started is now under `to`.
+     */
+    #moveCameraByTouch(canvasElement, from, to, ratio) {
+        const start = this.#touchCameraStart;
+        if (!start) return;
+        const rect = canvasElement.getBoundingClientRect();
+        const scale = Math.max(0.1, Math.min(start.scale * ratio, this.#maxZoom()));
+        const localX = (from.x - rect.left - start.x) / start.scale;
+        const localY = (from.y - rect.top - start.y) / start.scale;
+
+        this.stage.scale.set(scale);
+        this.stage.position.set(to.x - rect.left - localX * scale, to.y - rect.top - localY * scale);
+        this.#updateNodeScales();
+        if (this.isCropMode) this.#drawCropOverlay();
+    }
+
+    /**
+     * Turns and resizes the held label, decoration or pin for a two-finger twist and pinch, as the
+     * wheel and Shift+wheel do (pins only resize).
+     */
+    #turnHeldByTouch(degrees, steps) {
+        const wrapper = this.#heldWrapper();
+        if (!StudioCanvas.#isWheelTransformable(wrapper)) return;
+        this.#beginDragOnce();
+        if (degrees && !wrapper.isIconPin) wrapper.target.rotation = CanvasTransforms.normalizeAngle((wrapper.target.rotation || 0) + degrees);
+        for (let step = 0; step < Math.abs(steps); step++) this.#resizeHeldItem(wrapper, steps > 0);
+        if (this.onInfraDrag) this.onInfraDrag();
     }
 
     #handleWheel(e, canvasElement) {
@@ -262,7 +486,7 @@ export class StudioCanvas {
         // --- Held Item Transformation Intercept ---
         // While a label, decoration or pin is held with the left button, the wheel changes that
         // item instead of the camera, so a slip of the wheel mid-drag never moves the view.
-        const dragWrapper = this.activeDrag ? this.interactiveTargets.find((t) => t.target === this.activeDrag.target) : null;
+        const dragWrapper = this.#heldWrapper();
 
         if (StudioCanvas.#isWheelTransformable(dragWrapper)) {
             e.preventDefault();
@@ -274,7 +498,7 @@ export class StudioCanvas {
         e.preventDefault();
 
         const scaleDirection = isZoomIn ? config.CAMERA_FACTOR : 1 / config.CAMERA_FACTOR;
-        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+        const maxZoom = this.#maxZoom();
 
         const rect = canvasElement.getBoundingClientRect();
         const localX = (e.clientX - rect.left - this.stage.x) / this.stage.scale.x;
@@ -330,7 +554,7 @@ export class StudioCanvas {
         const { LABEL_FONT_SIZE, PIN_SCALE, DECORATION_SCALE } = FILRODENSWMB.UI.WHEEL_RESIZE;
 
         if (wrapper.isLabel) {
-            target.fontSize = CanvasTransforms.stepValue(target.fontSize || 1, steps, LABEL_FONT_SIZE);
+            target.fontSize = CanvasTransforms.stepValue(target.fontSize || FILRODENSWMB.LABELS.UNSET_SIZE, steps, LABEL_FONT_SIZE);
         } else if (wrapper.isIconPin) {
             target.scale = CanvasTransforms.stepValue(target.scale || FILRODENSWMB.PINS.DEFAULT_SCALE, steps, PIN_SCALE);
         } else {
@@ -338,8 +562,20 @@ export class StudioCanvas {
         }
     }
 
+    /**
+     * The tool taking the primary button while editing, or null: an object with down, move, up,
+     * hover, doubleClick and leave, each given the map point and the event (see pointerToolProvider).
+     */
+    #pointerTool() {
+        if (this.pickPointerTool) return this.pickPointerTool;
+        return this.isEditMode ? (this.pointerToolProvider?.() ?? null) : null;
+    }
+
     #handlePointerDown(e, canvasElement) {
-        canvasElement.setPointerCapture(e.pointerId);
+        // A finger is captured by the element it lands on without asking (and a touch press is
+        // passed on here after a delay, when the finger may already have lifted)
+        if (e.pointerType !== "touch") canvasElement.setPointerCapture(e.pointerId);
+        canvasElement.focus({ preventScroll: true });
 
         // Right/Middle Click Drag Pan
         if (e.button === 2 || e.button === 1) {
@@ -363,10 +599,18 @@ export class StudioCanvas {
             return;
         }
 
-        const hit = this.#getHitTarget(coords.x, coords.y);
-        const grabbedTarget = hit ? hit.target : null;
+        const tool = this.#pointerTool();
+        if (tool) {
+            e.preventDefault();
+            this.pointerToolPressed = true;
+            tool.down(coords.x, coords.y, e);
+            return;
+        }
 
-        // Shift pressed on a node of a region or land mask picks up the whole shape (see
+        const hit = this.#getHitTarget(coords.x, coords.y);
+        const grabbedTarget = hit && !hit.selectOnly ? hit.target : null;
+
+        // Shift pressed on a node of a land mask picks up the whole shape (see
         // #beginShapeDrag); Shift pressed anywhere else inserts a node on the nearest line or
         // outline. Inserting a node on top of an existing node is never useful, so giving that
         // press to the shape drag takes nothing away.
@@ -445,6 +689,13 @@ export class StudioCanvas {
         }
         if (this.isDragging) {
             this.#panMap(e);
+            return;
+        }
+        const tool = this.#pointerTool();
+        if (tool) {
+            if (this.onCanvasHover) this.onCanvasHover(coords.x, coords.y);
+            if (this.pointerToolPressed) tool.move(coords.x, coords.y, e);
+            else tool.hover(coords.x, coords.y, e);
             return;
         }
         if (this.activeDrag) {
@@ -545,17 +796,18 @@ export class StudioCanvas {
      */
     static #hoverCursor(hit, isShiftHeld) {
         if (!hit) return "crosshair";
+        if (hit.selectOnly) return "pointer";
         return isShiftHeld && hit.shape ? "move" : "grab";
     }
 
     /**
-     * What the pointer is holding, for the canvas hint (see CanvasHints): a region or land mask
+     * What the pointer is holding, for the canvas hint (see CanvasHints): a land mask
      * ("mask") dragged whole with Shift, or a label, decoration or pin, whose wheel gestures
      * differ from the tool's own. Nodes and anything else give null, since the tool's hint
      * already covers them.
      */
     static #heldItemKind(hit, activeDrag) {
-        if (activeDrag?.shapeDrag) return hit.entityType === "landMask" ? "mask" : "region";
+        if (activeDrag?.shapeDrag) return "mask";
         if (hit.isLabel) return "label";
         if (hit.isDecoration) return "decoration";
         if (hit.isIconPin) return "pin";
@@ -570,7 +822,7 @@ export class StudioCanvas {
     }
 
     /**
-     * Starts moving a whole region or land mask: records where its points start (see
+     * Starts moving a whole land mask: records where its points start (see
      * CanvasTransforms.beginShapeDrag) and shows the highlight box around it straight away, so
      * pressing with Shift shows what will move before anything does.
      */
@@ -710,9 +962,23 @@ export class StudioCanvas {
     }
 
     #handleDoubleClick(e, canvasElement) {
+        // A double-tap is recognised by TouchGestures; the browser's own may follow it
+        if (performance.now() - this.#lastTouchAt < TOUCH_DOUBLE_CLICK_GRACE_MS) return;
+        this.#doubleClickAt(e, canvasElement);
+    }
+
+    /** Opens what lies under a double-click or double-tap, while editing (or hands it to the tool taking the pointer). */
+    #doubleClickAt(e, canvasElement) {
         if (!this.isEditMode) return;
 
         const coords = this.#getMapCoordinates(e, canvasElement);
+        const tool = this.#pointerTool();
+        if (tool) {
+            e.preventDefault();
+            tool.doubleClick(coords.x, coords.y, e);
+            return;
+        }
+
         const hit = this.#getHitTarget(coords.x, coords.y);
 
         if (hit && this.onDoubleClick) {
@@ -736,7 +1002,19 @@ export class StudioCanvas {
             this.#endPan(e, canvasElement);
             return;
         }
-        if (e.button === POINTER_BUTTON.PRIMARY) this.#endPrimaryAction(canvasElement);
+        if (e.button !== POINTER_BUTTON.PRIMARY) return;
+        this.#releasePrimary(e, canvasElement);
+    }
+
+    /** Ends a primary-button press: the tool taking the pointer gets its release, or the action under way ends. */
+    #releasePrimary(e, canvasElement) {
+        if (this.pointerToolPressed) {
+            this.pointerToolPressed = false;
+            const coords = this.#getMapCoordinates(e, canvasElement);
+            this.#pointerTool()?.up(coords.x, coords.y, e);
+            return;
+        }
+        this.#endPrimaryAction(canvasElement);
     }
 
     /** Ends a map pan, treating a right-button release close to where it was pressed as a right-click. */
@@ -769,17 +1047,19 @@ export class StudioCanvas {
         if (this.isEditMode && this.onBrushEnd) this.onBrushEnd();
     }
 
-    /** Lets go of the node or shape being dragged, telling the app only if it actually moved. */
+    /** Lets go of the node or shape being dragged, telling the app (and what moved) only if it actually moved. */
     #endDrag(canvasElement) {
-        const wasDragged = this.activeDrag.started;
+        const drag = this.activeDrag;
         this.activeDrag = null;
         this.#releaseShapeDragBox();
         this.#setHeldItem(null);
         canvasElement.style.cursor = "crosshair";
-        if (wasDragged && this.onInfraDragEnd) this.onInfraDragEnd();
+        // The app is told what moved (its target and entity type), so it can mark it the reader's own
+        if (drag.started && this.onInfraDragEnd) this.onInfraDragEnd({ target: drag.target, entityType: drag.entityType });
     }
 
     #handlePointerLeave(_e, _canvasElement) {
+        if (!this.pointerToolPressed) this.#pointerTool()?.leave();
         if (!this.isDragging && !this.activeDrag && this.onCanvasHover) {
             this.onCanvasHover(null, null);
         }
@@ -792,7 +1072,7 @@ export class StudioCanvas {
         const localX = (center.x - this.stage.x) / this.stage.scale.x;
         const localY = (center.y - this.stage.y) / this.stage.scale.y;
 
-        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+        const maxZoom = this.#maxZoom();
 
         this.stage.scale.x = Math.max(0.1, Math.min(this.stage.scale.x * factor, maxZoom));
         this.stage.scale.y = Math.max(0.1, Math.min(this.stage.scale.y * factor, maxZoom));
@@ -811,7 +1091,7 @@ export class StudioCanvas {
         const scaleY = this.app.screen.height / paddedHeight;
         const optimalScale = Math.min(scaleX, scaleY);
 
-        const maxZoom = Math.max(FILRODENSWMB.UI.ZOOM.MIN_ZOOM_FLOOR, this.mapWidth / FILRODENSWMB.UI.ZOOM.MAX_ZOOM_DIVISOR);
+        const maxZoom = this.#maxZoom();
         const finalScale = Math.max(0.1, Math.min(optimalScale, maxZoom));
 
         this.stage.scale.set(finalScale);
@@ -830,9 +1110,14 @@ export class StudioCanvas {
         // Destroying a PIXI application twice fails part-way (its resize plugin has already been
         // torn down), so it is only ever destroyed once
         if (this.app && !this.#destroyed) {
-            // The terrain's mesh and textures go first: destroying them again after the stage
-            // has already destroyed its children would fail on the mesh's released geometry
+            // The terrain's and the regions' meshes and textures go first: destroying them again
+            // after the stage has already destroyed its children would fail on the meshes'
+            // released geometry
             this.terrainCompositor.destroy();
+            this.#dropThematic();
+            this.#trade?.destroy();
+            this.#travel?.destroy();
+            this.regionLevels.clear();
             this.app.destroy(true, { children: true, texture: true, baseTexture: true });
         }
         this.#destroyed = true;
@@ -1141,67 +1426,131 @@ export class StudioCanvas {
     }
 
     /**
-     * Extracts the current PIXI stage and converts it synchronously to a binary Blob.
-     * Triggers a detached link click to bypass Electron's DOM navigation interceptors.
+     * The height of the smallest name drawn now, in map pixels (null when none is): what the PNG
+     * export's recommended scale is worked out from (see ExportScale). A name with no room, drawn
+     * faintly while labels are edited, does not count.
+     * @returns {number|null}
      */
-    exportToPNG(filename = "world-map") {
+    smallestLabelPx() {
+        let smallest = null;
+        for (const child of this.layers.labels.children) {
+            if (!(child instanceof PIXI.Text) || !child.visible || child.alpha < 1) continue;
+            const size = Number(child.style?.fontSize);
+            if (size > 0 && (smallest === null || size < smallest)) smallest = size;
+        }
+        return smallest;
+    }
+
+    /**
+     * Draws the stage for an export at a scale (see ExportScale), onto one canvas of the map's
+     * size times the scale: in tiles of at most EXPORT_PNG.TILE_PX (and the graphics card's
+     * texture limit), with every name and other text redrawn at the scale so it is sharp rather
+     * than enlarged. The terrain is enlarged from the map's own resolution. The PNG export and
+     * both scene images are drawn here, so they are always made the same way. The camera and the
+     * texts' resolutions are put back afterwards, whatever happens.
+     * @param {number} scale - 1 draws the map at its own size.
+     * @returns {HTMLCanvasElement}
+     */
+    #renderForExport(scale) {
+        const factor = Number(scale) > 0 ? scale : 1;
+        const origX = this.stage.position.x;
+        const origY = this.stage.position.y;
+        const origScaleX = this.stage.scale.x;
+        const origScaleY = this.stage.scale.y;
+        const texts = [];
         try {
-            this.layers.reference.visible = false;
+            const width = Math.round(this.mapWidth * factor);
+            const height = Math.round(this.mapHeight * factor);
 
-            const optimalRes = 2000 / this.mapWidth;
-            const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
-
-            const renderTexture = PIXI.RenderTexture.create({
-                width: Math.round(this.mapWidth * dynamicRes),
-                height: Math.round(this.mapHeight * dynamicRes),
-                resolution: 1,
+            // Text is drawn into its own texture at its resolution: raised to the scale, so names
+            // are drawn afresh at the size they take in the image
+            this.stage.children.forEach(function collect(child) {
+                if (child instanceof PIXI.Text) {
+                    texts.push({ text: child, resolution: child.resolution, auto: child._autoResolution });
+                    child.resolution = Math.max(child.resolution, factor);
+                }
+                child.children?.forEach(collect);
             });
 
-            // Temporarily strip the camera transform for a clean, 0-offset export
-            const origX = this.stage.position.x;
-            const origY = this.stage.position.y;
-            const origScaleX = this.stage.scale.x;
-            const origScaleY = this.stage.scale.y;
-
-            this.stage.position.set(0, 0);
-            this.stage.scale.set(dynamicRes);
-
-            // Render to texture (instead of relying on the live monitor output)
-            this.app.renderer.render(this.stage, { renderTexture: renderTexture });
-            const canvas = this.app.renderer.extract.canvas(renderTexture);
-
-            // Restore camera
+            const output = document.createElement("canvas");
+            output.width = width;
+            output.height = height;
+            const context = output.getContext("2d");
+            this.stage.scale.set(factor);
+            for (const tile of ExportScale.tiles(width, height, this.#exportTileLimit())) {
+                const renderTexture = PIXI.RenderTexture.create({ width: tile.width, height: tile.height, resolution: 1 });
+                this.stage.position.set(-tile.x, -tile.y);
+                this.app.renderer.render(this.stage, { renderTexture });
+                context.drawImage(this.app.renderer.extract.canvas(renderTexture), tile.x, tile.y);
+                renderTexture.destroy(true);
+            }
+            return output;
+        } finally {
             this.stage.position.set(origX, origY);
             this.stage.scale.set(origScaleX, origScaleY);
+            for (const { text, resolution, auto } of texts) {
+                if (text.destroyed) continue;
+                text.resolution = resolution;
+                // PIXI's own flag: the text follows the screen's pixel ratio again
+                text._autoResolution = auto;
+            }
+        }
+    }
 
-            this.layers.reference.visible = true;
+    /** The largest tile an export draws at once: EXPORT_PNG.TILE_PX, or less if the graphics card's textures are smaller. */
+    #exportTileLimit() {
+        return Math.min(FILRODENSWMB.EXPORT_PNG.TILE_PX, this.maxTextureSize());
+    }
 
-            const dataUrl = canvas.toDataURL("image/png");
-            const byteString = atob(dataUrl.split(",")[1]);
-            const arrayBuffer = new ArrayBuffer(byteString.length);
-            const uintArray = new Uint8Array(arrayBuffer);
+    /**
+     * The largest texture side this graphics card takes (MIN_GUARANTEED_TEXTURE_SIZE when it
+     * cannot be read). A scene's background must fit it to be shown, so the scene export offers
+     * no scale beyond it (see ExportScale.plan).
+     * @returns {number}
+     */
+    maxTextureSize() {
+        const gl = this.app?.renderer?.gl;
+        const size = gl ? Number(gl.getParameter(gl.MAX_TEXTURE_SIZE)) : 0;
+        return size > 0 ? size : MIN_GUARANTEED_TEXTURE_SIZE;
+    }
 
-            for (let i = 0; i < byteString.length; i++) {
-                uintArray[i] = byteString.codePointAt(i);
+    /**
+     * Exports the map as a PNG at a scale (see #renderForExport). The reference image and the
+     * land masks' outlines are working aids, never exported. The file is downloaded through a
+     * detached link, which Electron's navigation interceptors leave alone.
+     * @param {string} [filename]
+     * @param {number} [scale] - 1 draws the map at its own size.
+     * @returns {Promise<boolean>} Whether the image was made.
+     */
+    async exportToPNG(filename = "world-map", scale = 1) {
+        const referenceVisible = this.layers.reference.visible;
+        const landMasksVisible = this.layers.landMasks.visible;
+        try {
+            this.layers.reference.visible = false;
+            this.layers.landMasks.visible = false;
+            let output;
+            try {
+                output = this.#renderForExport(scale);
+            } finally {
+                this.layers.reference.visible = referenceVisible;
+                this.layers.landMasks.visible = landMasksVisible;
             }
 
-            const blob = new Blob([arrayBuffer], { type: "image/png" });
+            const blob = await new Promise((resolve) => output.toBlob(resolve, "image/png"));
+            if (!blob) throw new Error("The image could not be encoded");
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = blobUrl;
-
             const safeName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
             a.download = `fwmb_${safeName}.png`;
-
             a.click();
-
-            URL.revokeObjectURL(blobUrl);
-
-            // Clean up the temporary texture from VRAM
-            renderTexture.destroy(true);
+            // Revoked once the download has had time to start
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            return true;
         } catch (err) {
             console.error("FWMB | Failed to export PNG:", err);
-            ui.notifications.error("Failed to generate PNG. The map resolution may exceed GPU extraction limits.");
+            platform.notify.error(platform.i18n.localize("FILRODENSWMB.UI.ExportPngFailed"));
+            return false;
         }
     }
 
@@ -1245,81 +1594,6 @@ export class StudioCanvas {
     }
 
     /**
-     * Programmatically generates seamless diagonal and crosshatch textures for polygon fills.
-     */
-    #getHatchTexture(colorHex, style) {
-        const key = `${colorHex}_${style}`;
-        if (this.layerSprites[key]) return this.layerSprites[key];
-
-        const canvas = document.createElement("canvas");
-        canvas.width = 16;
-        canvas.height = 16;
-        const ctx = canvas.getContext("2d");
-
-        // Convert strict hex integer back to #RRGGBB string for the canvas context
-        ctx.strokeStyle = ColorMath.packedIntToHex(colorHex);
-        ctx.lineWidth = 2;
-
-        if (style === "diagonal" || style === "crosshatch") {
-            ctx.beginPath();
-            ctx.moveTo(-4, 12);
-            ctx.lineTo(12, -4);
-            ctx.moveTo(4, 20);
-            ctx.lineTo(20, 4);
-            ctx.stroke();
-        }
-        if (style === "crosshatch") {
-            ctx.beginPath();
-            ctx.moveTo(20, 12);
-            ctx.lineTo(4, -4);
-            ctx.moveTo(12, 20);
-            ctx.lineTo(-4, 4);
-            ctx.stroke();
-        }
-
-        const texture = PIXI.Texture.from(canvas);
-        this.layerSprites[key] = texture;
-        return texture;
-    }
-
-    /**
-     * A variation of the spline generator that wraps the array to create a perfectly closed, seamless loop.
-     */
-    #getClosedSplinePoints(points, resolution = 20) {
-        // This 3 is a geometric requirement, not the polygon rule (FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES):
-        // a wrapped Catmull-Rom loop needs at least three control points, because with two the
-        // neighbour points either side of each segment coincide and the "loop" collapses onto a
-        // straight line. It must not follow that constant if the polygon minimum is ever changed.
-        if (!points || points.length < 3) return points;
-        const curve = [];
-
-        // Wrap the array: [Last, First, Second, ..., Last, First, Second]
-        const p = [points[points.length - 1], ...points, points[0], points[1]];
-
-        for (let i = 1; i < p.length - 2; i++) {
-            const p0 = p[i - 1];
-            const p1 = p[i];
-            const p2 = p[i + 1];
-            const p3 = p[i + 2];
-
-            for (let t = 0; t <= 1; t += 1 / resolution) {
-                const t2 = t * t;
-                const t3 = t2 * t;
-
-                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
-                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
-
-                if (curve.length > 0) {
-                    const last = curve.at(-1);
-                    if (Math.abs(last.x - x) < 0.1 && Math.abs(last.y - y) < 0.1) continue;
-                }
-                curve.push({ x, y });
-            }
-        }
-        return curve;
-    }
-
-    /**
      * Safety router to clear the spatial node cache before a render pass.
      */
     clearInteractiveTargets() {
@@ -1329,7 +1603,7 @@ export class StudioCanvas {
     /**
      * Renders vector routes and POI pins to the infrastructure layer.
      */
-    renderInfrastructure(pins = [], routes = [], isEditMode = false, activeRouteId = null) {
+    renderInfrastructure(pins = [], routes = [], isEditMode = false, meshSession = null) {
         // Clone and sort the routes by thickness so major highways always draw on top
         const sortedRoutes = [...routes].sort((a, b) => a.thickness - b.thickness);
 
@@ -1340,50 +1614,23 @@ export class StudioCanvas {
         this.pinContainer.removeChildren().forEach((c) => c.destroy());
         this.nodeContainer.removeChildren().forEach((c) => c.destroy(true));
 
-        // 1. Render Routes (Bottom Layer)
-        sortedRoutes.forEach((route) => {
-            if (!this.#isVisibleInCurrentPass(route.visibility, "all", false) || !route.points || route.points.length === 0) return;
-
-            // 1a. Draw Edit Nodes FIRST (Guarantees the initial single click is visible)
-            if (isEditMode) {
-                const isActive = route.id === activeRouteId;
-                this.#renderEditNodes(route.points, this.nodeContainer, isActive, route, "route");
-            }
-
-            // 1b. Abort line geometry if there is no second point to connect to
-            if (route.points.length < 2) return;
-
-            const colorHex = ColorMath.hexToPackedInt(route.color);
-            const splinePoints = this.#getSplinePoints(route.points);
-
-            // Pass 1: Draw the 1px black outline shadow
-            this.routeGraphics.lineStyle({
-                width: route.thickness + 1,
-                color: 0x000000,
-                alpha: 1,
-                cap: PIXI.LINE_CAP.ROUND,
-                join: PIXI.LINE_JOIN.ROUND,
-            });
-            this.#drawVectorPath(this.routeGraphics, splinePoints, route.style, route.thickness);
-
-            // Pass 2: Draw the coloured foreground line
-            this.routeGraphics.lineStyle({
-                width: route.thickness,
-                color: colorHex,
-                alpha: 1,
-                cap: PIXI.LINE_CAP.ROUND,
-                join: PIXI.LINE_JOIN.ROUND,
-            });
-            this.#drawVectorPath(this.routeGraphics, splinePoints, route.style, route.thickness);
-        });
+        // 1. Render Routes (Bottom Layer), from their legs on the display mesh (see #drawMeshRoute),
+        // with the stretches several visible routes share drawn once (see MeshSession.routeDrawLines)
+        if (meshSession) {
+            const visible = sortedRoutes.filter((route) => this.#isVisibleInCurrentPass(route.visibility, "all", false));
+            const lines = meshSession.routeDrawLines(visible);
+            for (const route of visible) for (const flat of lines.get(route.id) ?? []) this.#drawMeshRoute(route, flat);
+        }
 
         // 2. Render Pins (Top Layer)
-        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        const resScale = this.#symbolSizeScale();
 
         pins.forEach((pin) => {
             if (!this.#isVisibleInCurrentPass(pin.visibility, "all", false)) return;
 
-            const texturePath = resolvePinIconPath(pin.icon);
+            // Icon paths are stored as the host names them (a built-in icon by its module path);
+            // the host turns them into a URL the page can load (see platform.assets)
+            const texturePath = platform.assets.url(resolvePinIconPath(pin.icon));
             const sprite = new PIXI.Sprite(PIXI.Texture.from(texturePath));
 
             // Apply multiplicative tinting (defaults to white if missing)
@@ -1392,9 +1639,10 @@ export class StudioCanvas {
             }
 
             // Apply resolution scaling * user override scale
-            const baseSize = 24 * resScale;
-            sprite.width = baseSize * (pin.scale || 1);
-            sprite.height = baseSize * (pin.scale || 1);
+            const { PIN_PX, UNIT } = FILRODENSWMB.SYMBOLS;
+            const size = PIN_PX * UNIT * resScale * (pin.scale || FILRODENSWMB.PINS.DEFAULT_SCALE);
+            sprite.width = size;
+            sprite.height = size;
 
             sprite.anchor.set(0.5);
             sprite.x = pin.x;
@@ -1409,6 +1657,28 @@ export class StudioCanvas {
 
             this.pinContainer.addChild(sprite);
         });
+    }
+
+    /**
+     * Draws one line of a route (the whole route, or a stretch no higher route draws): through its
+     * cells' sites, corner cut when the route is smoothed, with a black outline one pixel wider
+     * underneath unless the route turns its outline off.
+     * @param {object} route
+     * @param {Float64Array} flat - The line, flat [x0, y0, ...].
+     */
+    #drawMeshRoute(route, flat) {
+        if (flat.length < 4) return;
+
+        const points = [];
+        for (let i = 0; i < flat.length; i += 2) points.push({ x: flat[i], y: flat[i + 1] });
+        const lineStyle = (width, color) => ({ width, color, alpha: 1, cap: PIXI.LINE_CAP.ROUND, join: PIXI.LINE_JOIN.ROUND });
+
+        if (route.outline !== false) {
+            this.routeGraphics.lineStyle(lineStyle(route.thickness + 1, 0x000000));
+            this.#drawVectorPath(this.routeGraphics, points, route.style, route.thickness);
+        }
+        this.routeGraphics.lineStyle(lineStyle(route.thickness, ColorMath.hexToPackedInt(route.color)));
+        this.#drawVectorPath(this.routeGraphics, points, route.style, route.thickness);
     }
 
     renderLandMasks(masks = [], isEditMode = false, activeMaskId = null, isVisible = true) {
@@ -1458,66 +1728,92 @@ export class StudioCanvas {
         }
     }
 
-    renderRegions(regionLayers = [], isEditMode = false, activeRegionId = null, globalOpacity = 0.5) {
-        this.layers.regions.removeChildren().forEach((c) => c.destroy({ children: true }));
-
-        regionLayers.forEach((layer) => {
-            if (!this.#isVisibleInCurrentPass(layer.visibility, "all", true)) return;
-
-            const layerContainer = new PIXI.Container();
-            layerContainer.alpha = globalOpacity;
-            this.layers.regions.addChild(layerContainer);
-
-            layer.regions.forEach((region) => {
-                if (!this.#isVisibleInCurrentPass(region.visibility, layer.visibility, false) || !region.points || region.points.length === 0) return;
-
-                const g = new PIXI.Graphics();
-                layerContainer.addChild(g);
-
-                const fillColorHex = region.fillColor === "transparent" ? null : ColorMath.hexToPackedInt(region.fillColor);
-                const lineColorHex = ColorMath.hexToPackedInt(region.lineColor);
-
-                // A polygon is "closed" if it has 3+ points and the user isn't actively currently drawing it
-                const isClosed = region.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && region.id !== activeRegionId;
-                const pts = region.smoothing && isClosed ? this.#getClosedSplinePoints(region.points) : region.points;
-
-                // 1. Draw Fill
-                if (fillColorHex !== null) {
-                    if (region.fillStyle === "solid") {
-                        g.beginFill(fillColorHex, 1);
-                    } else {
-                        const tex = this.#getHatchTexture(fillColorHex, region.fillStyle);
-
-                        // Shift the texture origin to the region's first node.
-                        // This creates a clean, deterministic phase offset between different regions.
-                        const matrix = new PIXI.Matrix();
-                        matrix.translate(pts[0].x, pts[0].y);
-
-                        g.beginTextureFill({ texture: tex, matrix: matrix });
-                    }
-
-                    g.lineStyle(0); // Fills don't have lines
-                    g.moveTo(pts[0].x, pts[0].y);
-                    for (let i = 1; i < pts.length; i++) {
-                        g.lineTo(pts[i].x, pts[i].y);
-                    }
-                    if (isClosed) g.closePath();
-                    g.endFill();
-                }
-
-                // 2. Draw Border
-                if (region.lineThickness > 0) {
-                    g.lineStyle({ width: region.lineThickness, color: lineColorHex, alpha: 1, cap: PIXI.LINE_CAP.ROUND, join: PIXI.LINE_JOIN.ROUND });
-                    this.#drawVectorPath(g, pts, region.lineStyle, region.lineThickness, isClosed);
-                }
-
-                // 3. Draw Edit Nodes
-                if (isEditMode) {
-                    const isActive = region.id === activeRegionId;
-                    this.#renderEditNodes(region.points, layerContainer, isActive, region, "region", layer.id);
-                }
-            });
+    /**
+     * Draws the map's region levels from its mesh session (see RegionLevelLayers), with the
+     * visibility rules of the current render pass. Without a session (while a map is still being
+     * opened) nothing is drawn.
+     *
+     * @param {import("../mesh/MeshSession.js").MeshSession|null} meshSession
+     * @param {{focusLevelId?: string|null, fills?: boolean}} [options] - fills: false draws the
+     *     levels as borders alone (the Regions menu's Fills).
+     */
+    renderRegionLevels(meshSession, { focusLevelId = null, fills = true } = {}) {
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        this.regionLevels.render(meshSession, {
+            isVisible: (visibility, parentVisibility, isContainer) => this.#isVisibleInCurrentPass(visibility, parentVisibility, isContainer),
+            showsLevel: this.#showsLevel,
+            resScale,
+            focusLevelId,
+            fills,
         });
+    }
+
+    /**
+     * Draws the shown thematic layer (see ThematicLayer), or nothing. The layer's GPU objects are
+     * kept while the map's mesh is the same and replaced with it, since they are sized to its
+     * cells and read its cell-id texture. A map larger than the GPU's largest texture has no
+     * cell-id texture, and no thematic layer either, as it has no region fills.
+     *
+     * @param {import("../mesh/MeshSession.js").MeshSession|null} meshSession
+     * @param {{values: Uint8Array, lookup: Uint8Array, opacity: number}|null} display - The layer
+     *     to show (see ThematicView), or null for none.
+     */
+    renderThematic(meshSession, display) {
+        const mesh = meshSession?.mesh ?? null;
+        const cellIdTexture = display && mesh ? this.regionLevels.cellIdTextureFor(mesh) : null;
+        if (!cellIdTexture) {
+            this.layers.thematic.visible = false;
+            return;
+        }
+        if (this.#thematic?.mesh !== mesh || this.#thematic.cellIdTexture !== cellIdTexture) {
+            this.#dropThematic();
+            const layer = new ThematicLayer(PIXI, { width: mesh.width, height: mesh.height, cellCount: mesh.cellCount, cellIdTexture, auxProvider: () => this.terrainCompositor.auxTexture });
+            this.layers.thematic.addChild(layer.displayObject);
+            this.#thematic = { mesh, cellIdTexture, layer };
+        }
+        this.#thematic.layer.show(display.values, display.lookup, display.opacity);
+        this.layers.thematic.visible = true;
+    }
+
+    /**
+     * Draws the trade lines (see TradeFlowLayer), or none.
+     * @param {object[]|null} lines - From ThematicData.tradeLines, or null.
+     */
+    renderTrade(lines) {
+        this.#trade ??= new TradeFlowLayer(PIXI, this.layers.trade);
+        this.#trade.show(lines, Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION);
+    }
+
+    /** The trade layer, made when first drawn (see renderTrade). */
+    #trade = null;
+
+    /**
+     * Draws the Travel tool's day rings, the way to the pointer and the start (see TravelLayer),
+     * or none.
+     * @param {object[]|null} rings - From TravelTime.dayRings, or null for none.
+     * @param {{points: number[], kinds: string[]}|null} [way]
+     * @param {{x: number, y: number}|null} [start]
+     */
+    renderTravel(rings, way = null, start = null) {
+        if (!rings && !this.#travel) return;
+        this.#travel ??= new TravelLayer(PIXI, this.layers.travel);
+        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        this.#travel.showRings(rings, resScale, start);
+        this.#travel.showWay(rings ? way : null, resScale);
+        this.#travel.showStart(rings ? start : null, resScale);
+    }
+
+    /** The Travel tool's layer, made when first drawn (see renderTravel). */
+    #travel = null;
+
+    /** The thematic layer's GPU objects, with the mesh they were made for (see renderThematic). */
+    #thematic = null;
+
+    #dropThematic() {
+        if (!this.#thematic) return;
+        this.layers.thematic.removeChildren();
+        this.#thematic.layer.destroy();
+        this.#thematic = null;
     }
 
     /**
@@ -1570,11 +1866,12 @@ export class StudioCanvas {
         this.#fadeOutHighlight(highlight);
     }
 
-    async updateReferenceImage(url, x, y, scale, alpha) {
-        if (!url) {
+    async updateReferenceImage(path, x, y, scale, alpha) {
+        if (!path) {
             this.referenceSprite.texture = PIXI.Texture.EMPTY;
             return;
         }
+        const url = platform.assets.url(path);
 
         try {
             if (!this.referenceSprite.texture.textureCacheIds.includes(url)) {
@@ -1617,128 +1914,234 @@ export class StudioCanvas {
         this.brushCursor.drawCircle(x, y, radius);
     }
 
-    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], regionLayers = [], isEditMode = false) {
+    /**
+     * Draws the map's names: standalone labels, and those of the pins, routes and regions. Every
+     * label is measured first, then LabelLayout decides where each goes so names do not cover
+     * each other or the pins (unless Avoid overlaps is off); a name with no room is not drawn,
+     * except faintly while labels are edited, so it can be dragged into place.
+     */
+    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], isEditMode = false, meshSession = null) {
         this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
+        const args = [mapLabels, mapPins, mapRoutes, isEditMode, meshSession];
+        this.#labelArgs = args;
+        // The faces the labels are drawn in, so any still loading are drawn again once they arrive
+        const drawn = [];
 
         // Extract native OS root font size to mimic CSS 'rem' behaviour
         const rootFontSize = LabelWidth.rootFontSize();
 
-        // Dynamically scale vectors based on the canvas dimensions
-        const resScale = Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION;
+        // Names grow with the map's pixel size and its symbol size, as pins do
+        const resScale = this.#symbolSizeScale();
 
         const ensureLabelData = (obj) => {
             if (!obj.label) obj.label = {};
             return obj.label;
         };
 
-        const drawLabel = (name, labelData, defaultX, defaultY, parentVis = "all", parentId = null, parentType = "custom", layerId = null) => {
-            if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name) return;
-
-            const x = labelData.x ?? defaultX;
-            const y = labelData.y ?? defaultY;
-            const rotation = labelData.rotation ?? 0;
-
-            const font = labelData.fontFamily || "Signika";
-            const size = (labelData.fontSize || 1) * rootFontSize * resScale;
-            const fill = labelData.fillColor || "#ffffff";
-            const stroke = ColorMath.getContrastColor(fill);
-
-            // 1. Setup Base Style
-            const styleConfig = {
-                fontFamily: font,
-                fontSize: size,
-                fill: fill,
-                fontWeight: "bold",
-                stroke: stroke,
-                strokeThickness: 3,
-                dropShadow: true,
-                dropShadowColor: stroke,
-                dropShadowBlur: 2,
-                dropShadowDistance: 2,
-            };
-
-            // 2. Apply Word Wrapping & Justification. The maximum width is a number of characters
-            // of this label's own font and size (see LabelWidth), so resizing the label or changing
-            // its font keeps its line breaks.
-            const wrapWidth = LabelWidth.wrapWidth(labelData, size, resScale);
-            if (wrapWidth > 0) {
-                styleConfig.wordWrap = true;
-                styleConfig.wordWrapWidth = wrapWidth;
-                styleConfig.align = labelData.justify || "left";
-            }
-
-            const style = new PIXI.TextStyle(styleConfig);
-
-            const text = new PIXI.Text(name, style);
-            text.anchor.set(0.5);
-            text.x = x;
-            text.y = y;
-            text.rotation = rotation * (Math.PI / 180);
-
-            this.layers.labels.addChild(text);
-
-            if (isEditMode) {
-                labelData.x = x;
-                labelData.y = y;
-
-                const hitRadius = Math.max(text.width, text.height) / 2;
-                this.interactiveTargets.push({
-                    target: labelData,
-                    x: x,
-                    y: y,
-                    radius: hitRadius,
-                    isLabel: true,
-                    entityType: "label",
-                    entityId: parentId || labelData.id,
-                    parentType: parentType,
-                    layerId: layerId,
-                });
-            }
+        // 1. Every label to draw, made and measured
+        const items = [];
+        const collect = (name, labelData, defaultX, defaultY, parentVis = "all", parentId = null, parentType = "custom", layerId = null, extra = {}) => {
+            if (!this.#isVisibleInCurrentPass(labelData?.visibility, parentVis, false) || !name || !this.#labelShown(labelData)) return;
+            drawn.push(labelData);
+            const text = this.#labelText(name, labelData, rootFontSize, resScale);
+            const { w, h } = turnedBox(text.width, text.height, text.rotation);
+            items.push({ id: `${parentType}:${parentId ?? labelData.id}`, type: parentType, labelData, text, w, h, defaultX, defaultY, parentId, layerId, ...extra });
         };
 
         // Custom Labels
-        mapLabels.forEach((label) => drawLabel(label.name, label, label.x, label.y, "all", label.id, "custom"));
+        mapLabels.forEach((label) => collect(label.name, label, label.x, label.y, "all", label.id, "custom"));
 
-        // Auto-Labels: Pins (Offset Top Right)
+        // Pins' labels: beside the pin, starting just past its right edge (PINS.LABEL_OFFSET) and
+        // centred on it vertically, so the gap grows only with the pin
+        const pinWidth = (pin) => FILRODENSWMB.SYMBOLS.PIN_PX * FILRODENSWMB.SYMBOLS.UNIT * resScale * (pin.scale || FILRODENSWMB.PINS.DEFAULT_SCALE);
         mapPins.forEach((pin) => {
-            if (!pin.icon) return;
-            drawLabel(pin.name, ensureLabelData(pin), pin.x + 20, pin.y - 20, pin.visibility, pin.id, "pin");
+            if (!pin.icon || !this.#showsName(pin)) return;
+            collect(pin.name, ensureLabelData(pin), pin.x + pinWidth(pin) * FILRODENSWMB.PINS.LABEL_OFFSET, pin.y, pin.visibility, pin.id, "pin", null, { pin, pinWidth: pinWidth(pin) });
         });
 
-        // Auto-Labels: Routes (Spline Midpoint)
-        mapRoutes.forEach((route) => {
-            if (route.visibility === "none" || !route.points || route.points.length < 2) return;
-            if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) return; // Check container rules
+        this.#collectMeshLabels(collect, ensureLabelData, mapRoutes, meshSession);
 
-            const spline = this.#getSplinePoints(route.points);
-            const mid = spline[Math.floor(spline.length / 2)];
-            drawLabel(route.name, ensureLabelData(route), mid.x, mid.y - 15, route.visibility, route.id, "route");
+        // 2. Where each goes
+        const shownPins = mapPins.filter((pin) => pin.icon && this.#isVisibleInCurrentPass(pin.visibility, "all", false));
+        const layout = this.#labelLayout.layout(items, { pins: shownPins, pinWidth, meshSession, pass: this.renderPassMode, avoid: this.#avoidLabelOverlaps, bounds: { width: this.mapWidth, height: this.mapHeight, inset: this.#nameInset } });
+
+        // 3. Drawn there; a name with no room only while labels are edited, faintly
+        for (const item of items) {
+            let position = layout.position(item);
+            if (!position && isEditMode) {
+                position = { x: item.type === "pin" ? item.defaultX + item.w / 2 : item.defaultX, y: item.defaultY };
+                item.text.alpha = FILRODENSWMB.LABELS.PLACEMENT.DROPPED_ALPHA;
+            }
+            if (!position) {
+                item.text.destroy({ texture: true, baseTexture: true });
+                continue;
+            }
+            item.text.x = position.x;
+            item.text.y = position.y;
+            this.layers.labels.addChild(item.text);
+            if (isEditMode) this.#addLabelTarget(item, position);
+        }
+        this.labelPlacementStats = layout.stats;
+        if (this.renderPassMode === "normal") {
+            this.labelsWithoutRoom = layout.dropped;
+            this.onLabelsPlaced?.(layout.dropped);
+        }
+
+        // A face still loading was drawn in the fallback: once it arrives the labels are drawn
+        // again, unless they have been drawn since (see LabelFonts)
+        LabelFonts.load(drawn).then((asked) => {
+            if (asked && this.#labelArgs === args && !this.#destroyed) this.renderLabels(...args);
         });
+    }
 
-        // Auto-Labels: Regions (Polygon Centroid)
-        regionLayers.forEach((layer) => {
-            if (!this.#isVisibleInCurrentPass(layer.visibility, "all", true)) return;
+    /** Where the names go (see LabelLayout); kept between draws, so each starts from the last. */
+    #labelLayout = new LabelLayout();
 
-            layer.regions.forEach((region) => {
-                let regionVis = region.visibility || "all";
-                if (regionVis !== "none" && layer.visibility === "gm") regionVis = "gm";
+    /** Whether names avoid each other (the Detail menu's Avoid overlaps). */
+    #avoidLabelOverlaps = true;
 
-                if (!this.#isVisibleInCurrentPass(regionVis, layer.visibility, true) || !region.points || region.points.length < FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) return;
+    /** The labels with no room at the last draw, by "<type>:<owner id>" (see LabelLayout). */
+    labelsWithoutRoom = new Set();
 
-                let minX = Infinity,
-                    maxX = -Infinity,
-                    minY = Infinity,
-                    maxY = -Infinity;
-                region.points.forEach((p) => {
-                    if (p.x < minX) minX = p.x;
-                    if (p.x > maxX) maxX = p.x;
-                    if (p.y < minY) minY = p.y;
-                    if (p.y > maxY) maxY = p.y;
-                });
+    /** How the last placement went (labels, placed, moves, ms; see LabelPlacement), for checking its cost. */
+    labelPlacementStats = null;
 
-                drawLabel(region.name, ensureLabelData(region), minX + (maxX - minX) / 2, minY + (maxY - minY) / 2, regionVis, region.id, "region", layer.id);
-            });
+    /** Called after each studio draw of the labels with those that had no room. */
+    onLabelsPlaced = null;
+
+    /** Whether a label's style is on in the Labels menu (see ContentRows). */
+    #labelShown = () => true;
+
+    /** Which labels' styles are on in the Labels menu (see ContentRows). */
+    setLabelFilter(shown) {
+        this.#labelShown = shown ?? (() => true);
+    }
+
+    /** The map's symbol size (see SymbolScale): every pin and label is drawn this much bigger. */
+    setSymbolScale(scale) {
+        this.#symbolScale = Number(scale) > 0 ? scale : 1;
+    }
+
+    /** How far in from the map's edges names keep, in map pixels (see MapBorder.nameInset). */
+    setNameInset(px) {
+        this.#nameInset = Number(px) > 0 ? px : 0;
+    }
+
+    /**
+     * How big a pin or label of size 1 is drawn, beyond its own size: it grows with the map's
+     * pixel size (SYMBOLS) and with the map's symbol size.
+     */
+    #symbolSizeScale() {
+        return (Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION) * this.#symbolScale;
+    }
+
+    /** Which pins' names the map's detail level shows (see DetailLevel.ofName). */
+    setNameFilter(showsName) {
+        this.#showsName = showsName ?? (() => true);
+    }
+
+    /** Names avoid each other, or are drawn at their first place whatever they cover. */
+    setLabelOverlapAvoidance(avoid) {
+        this.#avoidLabelOverlaps = avoid !== false;
+    }
+
+    /** A label's text, styled and rotated, not yet placed. */
+    #labelText(name, labelData, rootFontSize, resScale) {
+        const size = (labelData.fontSize || FILRODENSWMB.LABELS.UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontSize * resScale;
+        const fill = labelData.fillColor || "#ffffff";
+        const stroke = ColorMath.getContrastColor(fill);
+        // The outline and shadow in proportion to the name, so a small one keeps its letters
+        const halo = SymbolScale.labelHalo(size);
+
+        // 1. Setup Base Style
+        const styleConfig = {
+            fontFamily: LabelFonts.family(labelData),
+            fontSize: size,
+            fill: fill,
+            fontWeight: LabelFonts.weight(labelData),
+            fontStyle: LabelFonts.style(labelData),
+            stroke: stroke,
+            strokeThickness: halo.stroke,
+            dropShadow: true,
+            dropShadowColor: stroke,
+            dropShadowBlur: halo.shadow,
+            dropShadowDistance: halo.shadow,
+        };
+
+        // 2. Apply Word Wrapping & Justification. The maximum width is a number of characters
+        // of this label's own font and size (see LabelWidth), so resizing the label or changing
+        // its font keeps its line breaks.
+        const wrapWidth = LabelWidth.wrapWidth(labelData, size, resScale);
+        if (wrapWidth > 0) {
+            styleConfig.wordWrap = true;
+            styleConfig.wordWrapWidth = wrapWidth;
+            styleConfig.align = labelData.justify || "left";
+        }
+
+        const text = new PIXI.Text(name, new PIXI.TextStyle(styleConfig));
+        text.anchor.set(0.5);
+        text.rotation = (labelData.rotation ?? 0) * (Math.PI / 180);
+        return text;
+    }
+
+    /**
+     * A drawn label can be picked and dragged while labels are edited. Its own position is written
+     * only when it is dragged (see #dragHeldItem): until then it follows its pin, route or region.
+     */
+    #addLabelTarget(item, position) {
+        this.interactiveTargets.push({
+            target: item.labelData,
+            x: position.x,
+            y: position.y,
+            radius: Math.max(item.text.width, item.text.height) / 2,
+            isLabel: true,
+            entityType: "label",
+            entityId: item.parentId || item.labelData.id,
+            parentType: item.type,
+            layerId: item.layerId,
         });
+    }
+
+    /** What the labels were last drawn from, so they can be drawn again when a face loads. */
+    #labelArgs = null;
+
+    /**
+     * Route and region labels on the display mesh. A route's label sits above the middle point of
+     * its line; a region's at one of its deep places (see LabelLayout). A label the user has moved
+     * keeps its own position either way.
+     */
+    #collectMeshLabels(collect, ensureLabelData, mapRoutes, meshSession) {
+        if (!meshSession) return;
+        const ROUTE_LABEL_RISE = 15;
+
+        for (const route of mapRoutes) {
+            if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) continue;
+            const point = meshSession.routeMidpoint(route);
+            if (!point) continue;
+            collect(route.name, ensureLabelData(route), point.x, point.y - ROUTE_LABEL_RISE, route.visibility, route.id, "route");
+        }
+
+        for (const set of meshSession.layerSets) {
+            if (!this.#isVisibleInCurrentPass(set.visibility, "all", true)) continue;
+            for (const level of set.levels) this.#collectLevelLabels(collect, ensureLabelData, meshSession, set, level);
+        }
+    }
+
+    #collectLevelLabels(collect, ensureLabelData, meshSession, set, level) {
+        if (!this.#showsLevel(set, level)) return;
+        const levelVisibility = level.visibility !== "none" && set.visibility === "gm" ? "gm" : level.visibility || "all";
+        if (!this.#isVisibleInCurrentPass(levelVisibility, "all", true)) return;
+        const depth = set.levels.indexOf(level);
+
+        for (const region of level.regions) {
+            let regionVisibility = region.visibility || "all";
+            if (regionVisibility !== "none" && levelVisibility === "gm") regionVisibility = "gm";
+            if (!this.#isVisibleInCurrentPass(regionVisibility, levelVisibility, true)) continue;
+
+            const anchor = meshSession.labelAnchor(level.id, region.key);
+            if (!anchor) continue;
+            collect(region.name, ensureLabelData(region), anchor.x, anchor.y, regionVisibility, region.id, "region", level.id, { region: { levelId: level.id, key: region.key, depth } });
+        }
     }
 
     renderCartography(uiState, mapWidth, mapHeight, isEditMode = false, decorations = []) {
@@ -1755,32 +2158,27 @@ export class StudioCanvas {
         if (!uiState.cartographyBorderEnable) return;
 
         const vectorLayer = new PIXI.Graphics();
+        // Over everything on the map, pins and names included, so the frame stays clean (names
+        // keep clear of it, see MapBorder.nameInset; a pin at the very edge goes under it)
         this.layers.cartography.addChild(vectorLayer);
 
         const borderColorHex = ColorMath.hexToPackedInt(uiState.cartographyBorderColor || "#000000");
-        const style = uiState.cartographyBorderStyle;
-        const margin = 20;
+        const { outer, inner, corner, innerMargin: margin } = borderLines(uiState.cartographyBorderStyle);
 
-        if (style === "solid") {
-            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
-            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-        } else if (style === "double") {
-            vectorLayer.lineStyle(10, borderColorHex, 1, 0);
-            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-            vectorLayer.lineStyle(3, borderColorHex, 1, 0);
+        // Each line's width runs inwards from its rectangle (alignment 0)
+        vectorLayer.lineStyle(outer, borderColorHex, 1, 0);
+        vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
+        if (inner > 0) {
+            vectorLayer.lineStyle(inner, borderColorHex, 1, 0);
             vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
-        } else if (style === "ornate") {
-            vectorLayer.lineStyle(12, borderColorHex, 1, 0);
-            vectorLayer.drawRect(0, 0, mapWidth, mapHeight);
-            vectorLayer.lineStyle(4, borderColorHex, 1, 0);
-            vectorLayer.drawRect(margin, margin, mapWidth - margin * 2, mapHeight - margin * 2);
-
-            const boxSize = 40;
+        }
+        if (corner > 0) {
+            vectorLayer.lineStyle(0);
             vectorLayer.beginFill(borderColorHex);
-            vectorLayer.drawRect(0, 0, boxSize, boxSize);
-            vectorLayer.drawRect(mapWidth - boxSize, 0, boxSize, boxSize);
-            vectorLayer.drawRect(0, mapHeight - boxSize, boxSize, boxSize);
-            vectorLayer.drawRect(mapWidth - boxSize, mapHeight - boxSize, boxSize, boxSize);
+            vectorLayer.drawRect(0, 0, corner, corner);
+            vectorLayer.drawRect(mapWidth - corner, 0, corner, corner);
+            vectorLayer.drawRect(0, mapHeight - corner, corner, corner);
+            vectorLayer.drawRect(mapWidth - corner, mapHeight - corner, corner, corner);
             vectorLayer.endFill();
         }
     }
@@ -1794,11 +2192,13 @@ export class StudioCanvas {
         scaleContainer.x = uiState.cartographyScaleX ?? 50;
         scaleContainer.y = uiState.cartographyScaleY ?? mapHeight - 50;
 
-        const interval = uiState.cartographyScaleInterval || 100;
+        // The tick's length and the distance it stands for: the bar's own, or worked out from the
+        // world's scale when it matches it (see MapUnit.scaleBarTick); labelled with the map's unit
+        const { value: scaleValue, intervalPx: interval } = scaleBarTick(uiState, mapHeight);
+        // 0 minor subdivisions is a choice (no minor ticks), so only a missing value takes the default
         const majorTicks = uiState.cartographyScaleMajorTicks || 4;
-        const minorTicks = uiState.cartographyScaleMinorTicks || 4;
-        const scaleValue = uiState.cartographyScaleValue || 1;
-        const units = uiState.cartographyScaleUnits || "Miles";
+        const minorTicks = uiState.cartographyScaleMinorTicks ?? 4;
+        const units = cleanUnit(uiState.mapUnit);
 
         const height = 10;
         const totalWidth = interval * majorTicks;
@@ -1839,7 +2239,7 @@ export class StudioCanvas {
         scaleContainer.addChild(text0);
 
         // Apply the multiplier mathematically
-        const textMax = new PIXI.Text(`${majorTicks * scaleValue} ${units}`, textStyle);
+        const textMax = new PIXI.Text(`${formatDistance(majorTicks * scaleValue)} ${units}`, textStyle);
         textMax.anchor.set(0.5, 1);
         textMax.x = totalWidth;
         textMax.y = -5;
@@ -1877,7 +2277,7 @@ export class StudioCanvas {
         decorations.forEach((dec) => {
             if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false) || !dec.src) return;
 
-            const sprite = new PIXI.Sprite(PIXI.Texture.from(dec.src));
+            const sprite = new PIXI.Sprite(PIXI.Texture.from(platform.assets.url(dec.src)));
             sprite.anchor.set(0.5);
             sprite.x = dec.x;
             sprite.y = dec.y;
@@ -1888,87 +2288,56 @@ export class StudioCanvas {
             this.layers.cartography.addChild(sprite);
 
             if (isEditMode) {
-                const hitRadius = Math.max(sprite.width, sprite.height, 32) / 2;
                 this.interactiveTargets.push({
                     target: dec,
                     x: dec.x,
                     y: dec.y,
-                    radius: hitRadius,
+                    // Read when the pointer is tested rather than now: an image still loading has no
+                    // size yet, so the whole decoration only becomes a handle once it has loaded
+                    get radius() {
+                        return sprite.destroyed ? 0 : Math.max(sprite.width / 2, sprite.height / 2, DECORATION_MIN_HIT_RADIUS);
+                    },
                     isDecoration: true,
                     entityType: "decoration",
                     entityId: dec.id,
                 });
+                // A marker on its centre, the point it is held by and turns around; where two
+                // decorations overlap, a press picks the one whose centre is nearer
+                this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
             }
         });
     }
 
     /**
-     * Extracts the canvas to a binary Blob, manipulating heavy background layers based on the pass type.
+     * One of a scene export's images as a PNG blob, drawn exactly as the PNG export draws (see
+     * #renderForExport) at the scale chosen: the player image (no grid, which Foundry draws), or
+     * the GM overlay (only what players must not see: no terrain, contours, thematic layers,
+     * rivers and faults, grid or cartography). The reference image and the land masks' outlines
+     * are never exported. Every layer goes back to how it was.
+     * @param {"player"|"gm"} [passType]
+     * @param {number} [scale] - 1 draws the map at its own size.
+     * @returns {Promise<Blob|null>}
      */
-    async extractCanvasBlob(passType = "player") {
-        const originalVisibility = {
-            grid: this.gridLayer.visible,
-            reference: this.layers.reference.visible,
-            cartography: this.layers.cartography.visible,
-            landMasks: this.layers.landMasks.visible,
-            terrain: this.layers.terrain.visible,
-            contours: this.layers.contours.visible,
-            features: this.layers.features.visible,
-        };
-
-        this.layers.reference.visible = false;
-        // Guided mode's land mask editing polygons are an in-Studio authoring aid only, never
-        // part of the finished map, so they're kept out of every export pass regardless of
-        // whether they happened to be left visible from the Scene tool.
-        this.layers.landMasks.visible = false;
-
-        if (passType === "player") {
-            this.gridLayer.visible = false;
-        } else if (passType === "gm") {
-            this.layers.terrain.visible = false;
-            this.layers.contours.visible = false;
-            this.layers.features.visible = false;
-            this.gridLayer.visible = false;
-            this.layers.cartography.visible = false;
+    async extractCanvasBlob(passType = "player", scale = 1) {
+        const hidden = [this.gridLayer, this.layers.reference, this.layers.landMasks];
+        if (passType === "gm") {
+            // The GM overlay holds only what players must not see; a thematic layer is in the
+            // player image already
+            const { terrain, contours, thematic, trade, travel, features, cartography } = this.layers;
+            hidden.push(terrain, contours, thematic, trade, travel, features, cartography);
         }
-
-        // Dynamically oversample small maps for vector crispness, capped at 2x.
-        const optimalRes = 2000 / this.mapWidth;
-        const dynamicRes = Math.max(1, Math.min(optimalRes, 2));
-
-        // Physically multiply the pixel bounds rather than relying on PIXI's resolution flag
-        const renderTexture = PIXI.RenderTexture.create({
-            width: Math.round(this.mapWidth * dynamicRes),
-            height: Math.round(this.mapHeight * dynamicRes),
-            resolution: 1,
-        });
-
-        // Temporarily scale the stage up to draw into the larger texture
-        const origScaleX = this.stage.scale.x;
-        const origScaleY = this.stage.scale.y;
-        this.stage.scale.set(dynamicRes);
-
-        this.app.renderer.render(this.stage, { renderTexture: renderTexture });
-        const canvas = this.app.renderer.extract.canvas(renderTexture);
-
-        // Restore the original scale
-        this.stage.scale.set(origScaleX, origScaleY);
-
-        this.gridLayer.visible = originalVisibility.grid;
-        this.layers.reference.visible = originalVisibility.reference;
-        this.layers.cartography.visible = originalVisibility.cartography;
-        this.layers.landMasks.visible = originalVisibility.landMasks;
-        // Each layer goes back to how the person had it, rather than always to visible
-        this.layers.terrain.visible = originalVisibility.terrain;
-        this.layers.contours.visible = originalVisibility.contours;
-        this.layers.features.visible = originalVisibility.features;
-
-        return new Promise((resolve) => {
-            canvas.toBlob((blob) => {
-                renderTexture.destroy(true);
-                resolve(blob);
-            }, "image/png");
-        });
+        const visibility = hidden.map((layer) => layer.visible);
+        let canvas;
+        try {
+            for (const layer of hidden) layer.visible = false;
+            canvas = this.#renderForExport(scale);
+        } finally {
+            // Each layer goes back to how the person had it, rather than always to visible
+            hidden.forEach((layer, index) => {
+                layer.visible = visibility[index];
+            });
+        }
+        return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
     }
 
     setRenderPass(mode) {
@@ -1977,6 +2346,15 @@ export class StudioCanvas {
 
     setViewFilters(filters) {
         this.viewFilters = { ...this.viewFilters, ...filters };
+    }
+
+    /**
+     * Whether the map's detail level shows a set's level (see DetailLevel), for the region levels
+     * and their labels; the pins and routes are given already filtered.
+     * @param {function(object, object): boolean} showsLevel
+     */
+    setDetailFilter(showsLevel) {
+        this.#showsLevel = showsLevel;
     }
 
     /**
@@ -1993,7 +2371,9 @@ export class StudioCanvas {
             vis = "gm";
         }
 
-        if (vis === "none") return false;
+        // A hidden item is drawn only on the map being worked on, and only while the Hidden view
+        // filter is on; an export never includes it
+        if (vis === "none") return this.renderPassMode === "normal" && this.viewFilters.none === true;
 
         // Strict Export Overrides
         if (this.renderPassMode === "player") {
@@ -2116,7 +2496,12 @@ export class StudioCanvas {
         this.stage.hitArea = new PIXI.Rectangle(-buffer, -buffer, this.mapWidth + buffer * 2, this.mapHeight + buffer * 2);
     }
 
-    renderFaultLines(faults = [], isEditMode = false, activeFaultId = null) {
+    /**
+     * Draws the fault lines and tectonic features while Rivers and faults is in use (`isEditMode`:
+     * the map takes its clicks), with their points as handles only while they are being edited
+     * (`showNodes`; not in its Select mode, which picks whole lines).
+     */
+    renderFaultLines(faults = [], isEditMode = false, activeFaultId = null, showNodes = isEditMode) {
         if (this.haloGraphics) this.haloGraphics.clear();
 
         if (this.faultGraphics) {
@@ -2178,7 +2563,7 @@ export class StudioCanvas {
             }
 
             // 2. Draw Edit Nodes LAST so they always render on top of the geometry
-            if (isEditMode) {
+            if (showNodes) {
                 const isActive = fault.id === activeFaultId;
                 this.#renderEditNodes(fault.points, this.faultGraphics, isActive, fault, "fault");
             }
@@ -2270,7 +2655,8 @@ export class StudioCanvas {
         graphics.endFill();
     }
 
-    renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null) {
+    /** Draws the river guides, as renderFaultLines draws the faults. */
+    renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null, showNodes = isEditMode) {
         if (!this.manualRiverGraphics) return;
 
         // Aggressively purge memory and nested nodes to prevent WebGL leaks
@@ -2296,7 +2682,7 @@ export class StudioCanvas {
             }
 
             // Draw edit nodes
-            if (isEditMode) {
+            if (showNodes) {
                 const isActive = river.id === activeRiverId;
                 this.#renderEditNodes(points, this.manualRiverGraphics, isActive, river, "river");
             }
@@ -2441,6 +2827,9 @@ export class StudioCanvas {
         };
 
         scaleNodes(this.stage);
+        this.regionOverlays.redraw(this.stage.scale.x);
+        this.routeOverlays.redraw(this.stage.scale.x);
+        this.homelandMarkers.redraw(this.stage.scale.x);
     }
 
     /**

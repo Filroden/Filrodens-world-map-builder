@@ -1,75 +1,72 @@
-<div class="fwmb-toolbar-content">
-    <div class="fwmb-brush-tools">
-        <button type="button" data-action="setInfraMode" data-mode="pin" class="fwmb-btn {{#if (eq uiState.activeInfraMode 'pin')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ModePin'}}">
-            <i class="fwmb-icon place"></i>
-        </button>
-        <button type="button" data-action="setInfraMode" data-mode="route" class="fwmb-btn {{#if (eq uiState.activeInfraMode 'route')}}active{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ModeRoute'}}">
-            <i class="fwmb-icon timeline"></i>
-        </button>
+{{!-- Routes and pins' bar (tool id "infrastructure"): Pin or Route; for pins, Select (which does
+     not edit) and Place, and the style or icon the next pin gets; for routes, Select (which does not
+     edit), Draw and Waypoints, how a new route's legs are found, its transport and the style it
+     gets. A placed object's own fields are its inspector's. The route being edited is named in the
+     readout. --}}
+{{#each bar.modeGroups}}
+    {{#unless @first}}<span class="fwmb-sep"></span>{{/unless}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}
+{{/each}}
+<span class="fwmb-sep"></span>
+
+{{#if (eq uiState.activeInfraMode 'pin')}}
+    <label class="fwmb-bar-field" data-tooltip="{{localize 'FILRODENSWMB.UI.PinStyleHint'}}">
+        <span class="fwmb-label">{{localize "FILRODENSWMB.UI.PinStyle"}}</span>
+        <select name="activePinStyle">
+            <option value="custom" {{#if (eq uiState.activePinStyle "custom")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleNone"}}</option>
+            {{#each pinStyles}}
+                <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
+            {{/each}}
+        </select>
+    </label>
+    <div class="fwmb-bar-field">
+        <span class="fwmb-label">{{localize "FILRODENSWMB.UI.SelectIcon"}}</span>
+        <div class="fwmb-custom-select" id="fwmb-pin-select">
+            <div class="fwmb-select-trigger" data-action="togglePinDropdown">
+                <i class="fwmb-icon {{#unless activeIconIsCustom}}fwmb-icon--{{uiState.activeIcon}}{{/unless}}" {{#if activeIconIsCustom}}style="--fwmb-mask: url('{{activeIconPath}}');"{{/if}}></i>
+                <i class="fwmb-icon fwmb-icon--arrow-drop-down"></i>
+            </div>
+            <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable" popover="manual">
+                {{#each infrastructureIcons}}
+                    <button type="button" class="fwmb-btn" aria-pressed="{{#if (eq ../uiState.activeIcon this.key)}}true{{else}}false{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.key}}" aria-label="{{this.label}}" data-tooltip-text="{{this.label}}">
+                        <i class="fwmb-icon {{#unless this.isCustom}}fwmb-icon--{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}}></i>
+                    </button>
+                {{/each}}
+            </div>
+        </div>
     </div>
+{{/if}}
 
-    {{#if (eq uiState.activeInfraMode 'pin')}}
-        <div class="fwmb-brush-settings">
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.SelectIcon"}}</label>
-                <div class="fwmb-custom-select" id="fwmb-pin-select">
-                    <div class="fwmb-select-trigger" data-action="togglePinDropdown">
-                        <i class="fwmb-icon {{#unless activeIconIsCustom}}{{uiState.activeIcon}}{{/unless}}" {{#if activeIconIsCustom}}style="--fwmb-mask: url('{{activeIconPath}}');"{{/if}}></i>
-                        <i class="fwmb-icon arrow-drop-down"></i>
-                    </div>
-                    <div class="fwmb-select-options fwmb-icon-grid fwmb-scrollable fwmb-hidden">
-                        {{#each infrastructureIcons}}
-                            <button type="button" class="fwmb-btn {{#if (eq ../uiState.activeIcon this.key)}}active{{/if}}" data-action="setInfrastructureIcon" data-icon="{{this.key}}" data-tooltip="{{this.label}}">
-                                <i class="fwmb-icon {{#unless this.isCustom}}{{this.key}}{{/unless}}" {{#if this.isCustom}}style="--fwmb-mask: url('{{this.path}}');"{{/if}} alt="{{this.label}}"></i>
-                            </button>
-                        {{/each}}
-                    </div>
-                </div>
-            </div>
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.PinColor"}}</label>
-                <input type="color" class="fwmb-swatch fwmb-wide" name="pinColor" value="{{lookup uiState 'pinColor'}}" list="fwmb-standard-colors" />
-            </div>
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.IconScale"}}</label>
-                <div class="fwmb-slider-group">
-                    <input type="range" name="pinScale" value="{{lookup uiState 'pinScale'}}" min="0.2" max="4" step="0.1" />
-                    <output>{{lookup uiState 'pinScale'}}</output>
-                </div>
-            </div>
-        </div>
-    {{/if}}
-
-    {{#if (eq uiState.activeInfraMode 'route')}}
-        <div class="fwmb-brush-settings">
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.QuickStyles"}}</label>
-                <select name="activeRouteQuickStyle">
-                    <option value="custom" {{#if (eq uiState.activeRouteQuickStyle "custom")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.Custom"}}</option>
-                    {{#each routeStyles}}
-                        <option value="{{this.id}}" {{#if (eq ../uiState.activeRouteQuickStyle this.id)}}selected{{/if}}>{{this.label}}</option>
-                    {{/each}}
-                </select>
-            </div>
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.LineColor"}}</label>
-                <input type="color" class="fwmb-swatch fwmb-wide" name="routeColor" value="{{lookup uiState 'routeColor'}}" style="height: 24px; padding: 0;" list="fwmb-standard-colors" />
-            </div>
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.LineThickness"}}</label>
-                <div class="fwmb-slider-group">
-                    <input type="range" name="routeThickness" value="{{lookup uiState 'routeThickness'}}" min="1" max="10" step="1" />
-                    <output>{{lookup uiState "routeThickness"}}</output>
-                </div>
-            </div>
-            <div class="fwmb-brush-setting">
-                <label>{{localize "FILRODENSWMB.UI.LineStyle"}}</label>
-                <select name="routeStyle">
-                    <option value="solid" {{#if (eq uiState.routeStyle "solid")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleSolid"}}</option>
-                    <option value="dashed" {{#if (eq uiState.routeStyle "dashed")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDashed"}}</option>
-                    <option value="dotted" {{#if (eq uiState.routeStyle "dotted")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleDotted"}}</option>
-                </select>
-            </div>
-        </div>
-    {{/if}}
-</div>
+{{#if (eq uiState.activeInfraMode 'route')}}
+    <label class="fwmb-bar-field" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteLegModeHint'}}">
+        <span class="fwmb-label">{{localize "FILRODENSWMB.UI.RouteLegMode"}}</span>
+        <select name="routeMode">
+            {{#each routeToolbar.legModes}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+    </label>
+    <label class="fwmb-bar-field" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteTransportHint'}}">
+        <span class="fwmb-label">{{localize "FILRODENSWMB.UI.RouteTransport"}}</span>
+        <select name="routeTransport">
+            {{#each routeToolbar.transports}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+            {{/each}}
+        </select>
+    </label>
+    <label class="fwmb-bar-field fwmb-checkbox-label" data-tooltip="{{localize 'FILRODENSWMB.UI.RouteSpanWaterHint'}}">
+        <input type="checkbox" class="fwmb-checkbox" name="routeSpanWater" {{#if uiState.routeSpanWater}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.RouteSpanWater"}}
+    </label>
+    {{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="routeDetail" label="FILRODENSWMB.UI.RouteDetail" hint="FILRODENSWMB.UI.RouteDetailHint" icon="gesture" value=routeToolbar.detail.value min=routeToolbar.detail.MIN max=routeToolbar.detail.MAX step=1 unit="FILRODENSWMB.UI.UnitCells"}}
+    <span class="fwmb-sep"></span>
+    <label class="fwmb-bar-field" data-tooltip="{{localize 'FILRODENSWMB.UI.NextRouteStyleHint'}}">
+        <span class="fwmb-label">{{localize "FILRODENSWMB.UI.InspectorStyle"}}</span>
+        <select name="activeRouteQuickStyle">
+            <option value="custom" {{#if (eq uiState.activeRouteQuickStyle "custom")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StyleNone"}}</option>
+            {{#each routeStyles}}
+                <option value="{{this.id}}" {{#if (eq ../uiState.activeRouteQuickStyle this.id)}}selected{{/if}}>{{this.label}}</option>
+            {{/each}}
+        </select>
+    </label>
+{{/if}}

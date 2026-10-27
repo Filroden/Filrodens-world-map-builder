@@ -3,9 +3,35 @@
   "type": "module",
   "scripts": {
     "pack": "node scripts/pack.mjs",
-    "foundry-id": "node scripts/foundry-id.mjs"
+    "pack:web": "node scripts/pack.mjs --web",
+    "serve:web": "node scripts/serve-web.mjs",
+    "foundry-id": "node scripts/foundry-id.mjs",
+    "fixtures": "node tests/mesh/fixtures/build-p0jbva.mjs",
+    "pretest": "node tests/mesh/fixtures/build-p0jbva.mjs --if-missing",
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "tutorial:build": "node tests/tutorial/run.mjs --build",
+    "tutorial:texts": "node tests/tutorial/texts.mjs",
+    "tutorial:shots": "node tests/tutorial/shots.mjs",
+    "lint": "eslint main.js src tests scripts web"
   },
   "devDependencies": {
-    "@foundryvtt/foundryvtt-cli": "3.0.0"
+    "@eslint/js": "^10.0.1",
+    "@foundryvtt/foundryvtt-cli": "3.0.0",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "handlebars": "^4.7.8",
+    "happy-dom": "^20.14.6"
+  },
+  "dependencies": {
+    "pixi.js": "^7.4.2",
+    "playwright": "^1.64.0"
+  },
+  "allowScripts": {
+    "pixi.js@7.4.2": true,
+    "playwright@1.64.0": true,
+    "classic-level@1.4.1": true
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

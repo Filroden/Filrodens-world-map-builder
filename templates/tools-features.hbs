@@ -1,60 +1,54 @@
-<div class="fwmb-tool-content fwmb-fixed-lists">
-
-    <details class="fwmb-fieldset fwmb-list-section" data-section="rivers" {{#unless collapsedSections.rivers}}open{{/unless}}>
-        <summary>{{localize "FILRODENSWMB.UI.ManualRivers"}}</summary>
-
-        <div id="fwmb-scroll-rivers" class="fwmb-list-container fwmb-scrollable stable">
-            {{#each manualRivers}}
-                <div class="fwmb-list-item" data-id="{{this.id}}" data-type="river">
-                    <div class="fwmb-route-swatch" style="background-color: #78aad2; height: 3px; border-style: solid;"></div>
-                    <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
-                    <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                        <i class="fwmb-icon center-focus"></i>
+{{!--
+    Rivers and faults (tool id "features"): the rivers and fault lines drawn by hand, and the
+    hydrology settings the generated rivers follow (which rebuild the rivers). Drawing and placing
+    river sources are the bar's modes.
+--}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="rivers" title="FILRODENSWMB.UI.ManualRivers" count=manualRivers.length}}
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.ManualRivers'}}" data-list-nav id="fwmb-scroll-rivers" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
+        {{#each manualRivers}}
+            <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.river)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="river" data-action="editRiver">
+                <div class="fwmb-route-swatch fwmb-route-swatch--river"></div>
+                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
+                <span class="fwmb-actions">
+                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                        <i class="fwmb-icon fwmb-icon--center-focus"></i>
                     </button>
-                    <button type="button" class="fwmb-btn small" data-action="editRiver" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                        <i class="fwmb-icon edit"></i>
+                    <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteRiver" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <i class="fwmb-icon fwmb-icon--delete"></i>
                     </button>
-                    <button type="button" class="fwmb-btn small muted danger" data-action="deleteRiver" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                        <i class="fwmb-icon delete"></i>
+                </span>
+            </div>
+        {{else}}
+            <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoManualRivers"}}</div>
+        {{/each}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="faults" title="FILRODENSWMB.UI.TectonicFaults" count=tectonicFaults.length}}
+    <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.TectonicFaults'}}" data-list-nav id="fwmb-scroll-faults" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
+        {{#each tectonicFaults}}
+            <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.fault)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="fault" data-action="editFault">
+                <div class="fwmb-route-swatch fwmb-route-swatch--solid" style="background-color: {{this.color}};"></div>
+
+                <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
+                <span class="fwmb-actions">
+                    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+                        <i class="fwmb-icon fwmb-icon--center-focus"></i>
                     </button>
-                </div>
-            {{else}}
-                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoManualRivers"}}</div>
-            {{/each}}
-        </div>
-    </details>
-
-    <details class="fwmb-fieldset fwmb-list-section" data-section="faults" {{#unless collapsedSections.faults}}open{{/unless}}>
-        <summary>{{localize "FILRODENSWMB.UI.TectonicFaults"}}</summary>
-
-        <div id="fwmb-scroll-faults" class="fwmb-list-container fwmb-scrollable stable">
-            {{#each tectonicFaults}}
-                <div class="fwmb-list-item" data-id="{{this.id}}" data-type="fault">
-                    <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: 5px; border-style: solid;"></div>
-
-                    <span class="fwmb-name fwmb-flex-1">{{this.name}}</span>
-
-                    <button type="button" class="fwmb-btn small" data-action="zoomToFeature" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
-                        <i class="fwmb-icon center-focus"></i>
+                    <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteFault" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+                        <i class="fwmb-icon fwmb-icon--delete"></i>
                     </button>
-                    <button type="button" class="fwmb-btn small" data-action="editFault" data-tooltip="{{localize 'FILRODENSWMB.UI.Edit'}}">
-                        <i class="fwmb-icon edit"></i>
-                    </button>
-                    <button type="button" class="fwmb-btn small muted danger" data-action="deleteFault" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
-                        <i class="fwmb-icon delete"></i>
-                    </button>
-                </div>
-            {{else}}
-                <div class="fwmb-empty-state">{{localize "FILRODENSWMB.UI.NoFaultLines"}}</div>
-            {{/each}}
-        </div>
-    </details>
+                </span>
+            </div>
+        {{else}}
+            <div class="fwmb-list-empty" role="none">{{localize "FILRODENSWMB.UI.NoFaultLines"}}</div>
+        {{/each}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
-    <div class="fwmb-divider"></div>
-
-    <button type="button" class="fwmb-btn primary" data-action="toggleEditMode">
-        <i class="fwmb-icon brush"></i>
-        {{localize "FILRODENSWMB.UI.EditFeatures"}}
-    </button>
-
-</div>
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="hydrology" title="FILRODENSWMB.UI.SettingsHydrology" badge="FILRODENSWMB.UI.BadgeRebuildsRivers" closed=true}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="springAltOffset" label="FILRODENSWMB.UI.SpringAltMin" value=(lookup uiState 'springAltOffset') min=0 max=0.8 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="springMoistMin" label="FILRODENSWMB.UI.SpringMoistMin" value=(lookup uiState 'springMoistMin') min=0 max=1 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="riverWidthScale" label="FILRODENSWMB.UI.RiverWidthScale" hint="FILRODENSWMB.UI.RiverWidthHint" value=(lookup uiState 'riverWidthScale') min=0.25 max=3 step=0.05}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="riverMeander" label="FILRODENSWMB.UI.RiverMeander" hint="FILRODENSWMB.UI.RiverMeanderHint" value=(lookup uiState 'riverMeander') min=0 max=2 step=0.05}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

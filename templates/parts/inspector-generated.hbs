@@ -1,0 +1,21 @@
+{{!--
+    The Generated section of the pin, route and region inspectors: what a run of Generate recorded
+    about the item, read only (see GeneratedDetails), what Generate again will do with it, and Lock
+    (see GeneratedEdits.toggleLock). Closed until opened. Context: generated (rows of label and
+    value), or nothing for an item no run made; locked.
+--}}
+{{#if generated}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorGenerated" title="FILRODENSWMB.UI.InspectorGenerated" closed=true}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.InspectorGeneratedHint"}}</p>
+    <dl class="fwmb-generate-results">
+        {{#each generated}}
+        <dt>{{this.label}}</dt>
+        <dd class="fwmb-readout">{{this.value}}</dd>
+        {{/each}}
+    </dl>
+    <label class="fwmb-checkbox-label" data-tooltip="{{localize 'FILRODENSWMB.UI.GeneratedLockHint'}}">
+        <input type="checkbox" class="fwmb-checkbox" data-inspector-action="lock" {{#if locked}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.GeneratedLock"}}
+    </label>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}

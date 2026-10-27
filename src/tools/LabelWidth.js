@@ -1,3 +1,6 @@
+import { FILRODENSWMB } from "../config.js";
+import { LabelFonts } from "./LabelFonts.js";
+
 /**
  * A label's maximum width, measured in characters.
  *
@@ -24,12 +27,13 @@ export class LabelWidth {
     // Allows for floating point noise, so an exact whole number of characters is not rounded
     // up to the next one
     static #ROUNDING_TOLERANCE = 1e-6;
-    // Labels are drawn bold (see StudioCanvas#renderLabels), which is wider than regular
-    static #FONT_WEIGHT = "bold";
+    // Labels were always drawn bold until they could choose (see LabelFonts), so a width set in
+    // pixels then is measured in bold
+    static #LEGACY_FACE = "normal bold";
     // The browser's usual root font size, used when the page cannot be read
     static #DEFAULT_ROOT_FONT_PX = 16;
 
-    /** Width of "0" as a share of the font size, by font family. */
+    /** Width of "0" as a share of the font size, by face and family. */
     static #ratios = new Map();
     static #measurer = null;
 
@@ -37,7 +41,7 @@ export class LabelWidth {
      * Replaces how a font's "0" is measured. Used by checks outside Foundry.
      *
      * @param {((fontFamily: string, fontSizePx: number) => number)|null} measurer  Returns the
-     *   width in pixels of "0" in bold at the given size, or null to use PIXI again.
+     *   width in pixels of "0" at the given size, or null to use PIXI again.
      */
     static setMeasurer(measurer) {
         LabelWidth.#measurer = measurer;
@@ -45,28 +49,31 @@ export class LabelWidth {
     }
 
     /**
-     * The width of one character (a bold "0") in a font, as a share of the font size. The same
-     * for every size of that font, so it is measured once per font and remembered.
+     * The width of one character (a "0") in a face of a font, as a share of the font size. The
+     * same for every size of that face, so it is measured once per face and remembered.
      *
      * @param {string} fontFamily
+     * @param {string} [face] - The face as the start of a CSS font shorthand ("italic bold"; see
+     *     LabelFonts.face). Bold and upright when left out.
      * @returns {number}
      */
-    static charRatio(fontFamily) {
-        const cached = LabelWidth.#ratios.get(fontFamily);
+    static charRatio(fontFamily, face = LabelWidth.#LEGACY_FACE) {
+        const key = `${face}|${fontFamily}`;
+        const cached = LabelWidth.#ratios.get(key);
         if (cached) return cached;
 
-        const width = (LabelWidth.#measurer ?? LabelWidth.#measureWithPixi)(fontFamily, LabelWidth.#SAMPLE_SIZE_PX);
+        const width = (LabelWidth.#measurer ?? LabelWidth.#measureWithPixi)(fontFamily, LabelWidth.#SAMPLE_SIZE_PX, face);
         const ratio = width / LabelWidth.#SAMPLE_SIZE_PX;
         // A web font still loading is measured in its fallback font. That result is used for now
         // (the label is drawn in the fallback too) but not remembered, so the real font is
         // measured once it has loaded.
-        if (LabelWidth.#measurer || LabelWidth.#isFontReady(fontFamily)) LabelWidth.#ratios.set(fontFamily, ratio);
+        if (LabelWidth.#measurer || LabelWidth.#isFontReady(fontFamily, face)) LabelWidth.#ratios.set(key, ratio);
         return ratio;
     }
 
-    static #isFontReady(fontFamily) {
+    static #isFontReady(fontFamily, face) {
         try {
-            return globalThis.document?.fonts?.check?.(`${LabelWidth.#FONT_WEIGHT} ${LabelWidth.#SAMPLE_SIZE_PX}px "${fontFamily}"`) ?? true;
+            return globalThis.document?.fonts?.check?.(`${face} ${LabelWidth.#SAMPLE_SIZE_PX}px "${fontFamily}"`) ?? true;
         } catch {
             return true;
         }
@@ -84,8 +91,9 @@ export class LabelWidth {
         return Number.parseFloat(getComputedStyle(element).fontSize) || LabelWidth.#DEFAULT_ROOT_FONT_PX;
     }
 
-    static #measureWithPixi(fontFamily, fontSizePx) {
-        const style = new PIXI.TextStyle({ fontFamily, fontSize: fontSizePx, fontWeight: LabelWidth.#FONT_WEIGHT });
+    static #measureWithPixi(fontFamily, fontSizePx, face) {
+        const [fontStyle, fontWeight] = face.split(" ");
+        const style = new PIXI.TextStyle({ fontFamily, fontSize: fontSizePx, fontWeight, fontStyle });
         return PIXI.TextMetrics.measureText(LabelWidth.#SAMPLE, style).width;
     }
 
@@ -94,14 +102,14 @@ export class LabelWidth {
      * A label still holding only a legacy pixel width (not yet converted) keeps wrapping at that
      * width, scaled with the map.
      *
-     * @param {{maxChars?: number, maxWidth?: number, fontFamily?: string}} label
+     * @param {{maxChars?: number, maxWidth?: number, fontFamily?: string, bold?: boolean, italic?: boolean}} label
      * @param {number} fontSizePx  The size the label is drawn at.
      * @param {number} resScale  The map's size scale (1 on a 1000 pixel map).
      * @returns {number}
      */
     static wrapWidth(label, fontSizePx, resScale) {
         const maxChars = Number(label.maxChars) || 0;
-        if (maxChars > 0) return maxChars * LabelWidth.charRatio(LabelWidth.#fontOf(label)) * fontSizePx;
+        if (maxChars > 0) return maxChars * LabelWidth.charRatio(LabelFonts.family(label), LabelFonts.face(label)) * fontSizePx;
 
         const legacyPx = label.maxChars === undefined ? Number(label.maxWidth) || 0 : 0;
         return legacyPx > 0 ? legacyPx * resScale : 0;
@@ -115,14 +123,14 @@ export class LabelWidth {
      * @param {number} legacyPx  The old width, in pixels on a 1000 pixel map.
      * @param {string} fontFamily
      * @param {number} fontSizeRem  The label's font size setting.
-     * @param {number} rootFontPx  The page's root font size, which labels' font sizes multiply.
+     * @param {number} rootFontPx  The page's root font size, which labels' font sizes (in SYMBOLS.UNIT steps) multiply.
      * @returns {number}
      */
     static pixelsToChars(legacyPx, fontFamily, fontSizeRem, rootFontPx) {
         // Both checks are written as !(value > 0) on purpose: a missing or NaN value also fails
         // them, whereas the equivalent-looking value <= 0 would let it through
         if (!(legacyPx > 0)) return 0; // NOSONAR
-        const charPx = LabelWidth.charRatio(fontFamily) * (fontSizeRem || 1) * rootFontPx;
+        const charPx = LabelWidth.charRatio(fontFamily) * (fontSizeRem || FILRODENSWMB.LABELS.UNSET_SIZE) * FILRODENSWMB.SYMBOLS.UNIT * rootFontPx;
         if (!(charPx > 0)) return 0; // NOSONAR
         return Math.max(1, Math.ceil(legacyPx / charPx - LabelWidth.#ROUNDING_TOLERANCE));
     }
@@ -139,7 +147,7 @@ export class LabelWidth {
         if (!label || typeof label !== "object" || label.maxChars !== undefined) return false;
         if (label.maxWidth === undefined) return false;
 
-        label.maxChars = LabelWidth.pixelsToChars(Number(label.maxWidth) || 0, LabelWidth.#fontOf(label), Number(label.fontSize) || 1, rootFontPx);
+        label.maxChars = LabelWidth.pixelsToChars(Number(label.maxWidth) || 0, LabelFonts.family(label), Number(label.fontSize) || FILRODENSWMB.LABELS.UNSET_SIZE, rootFontPx);
         delete label.maxWidth;
         return true;
     }
@@ -161,9 +169,5 @@ export class LabelWidth {
             ...[...(data.mapPins ?? []), ...(data.mapRoutes ?? []), ...regions].map((owner) => owner.label),
         ];
         return labels.filter((label) => LabelWidth.migrateLabel(label, rootFontPx)).length;
-    }
-
-    static #fontOf(label) {
-        return label.fontFamily || "Signika";
     }
 }

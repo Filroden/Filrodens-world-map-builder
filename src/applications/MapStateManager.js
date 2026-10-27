@@ -1,12 +1,15 @@
+import { panelSettings } from "../generator/GeneratorSettings.js";
 import { FILRODENSWMB } from "../config.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { platform } from "../platform/index.js";
+import { VectorHistory } from "./VectorHistory.js";
 
 export class MapStateManager {
     /**
      * Allocates the memory buffers required for procedural generation.
-     * @param {Object} app - The MapStudioApp instance.
+     * @param {Object} app - The MapStudio instance.
      */
     static allocateBuffers(app) {
         const totalPixels = app.mapWidth * app.mapHeight;
@@ -30,7 +33,7 @@ export class MapStateManager {
         app.bufferUnderwaterBiomes = new Uint8Array(totalPixels * 4);
         app.bufferTerrainAux = new Uint8Array(totalPixels * 4);
         app.bufferContours = new Uint8Array(totalPixels * 4);
-        // Kept in sync alongside the biome buffers on every biome repaint (see MapStudioApp's
+        // Kept in sync alongside the biome buffers on every biome repaint (see MapStudio's
         // _repaintCanvas/#applyBrushStroke), but its own canvas layer stays hidden until the
         // "Preview Rule Coverage" button is hovered - see ProceduralEngine.createBiomesMap's
         // outFallbackBuffer parameter for what actually gets written into it.
@@ -104,6 +107,12 @@ export class MapStateManager {
             // a regional map until RegionalExtractor makes one (see TerrainVersion).
             terrainVersion: FILRODENSWMB.TERRAIN_VERSION.CURRENT,
             world: null,
+            // Whether the generator's outputs were made with a different km scale than the map has now (see MapStudio's area factor setting)
+            generatorStale: false,
+            // The Generate panel's settings: the run's seed (empty for the map's), name style,
+            // world multipliers and output switches (see GeneratePanel)
+            generatorSettings: panelSettings(),
+            cultures: [],
             // Set when the owner of a legacy map declined updating it and asked not to be asked
             // again (see TerrainUpgrade.dismiss); never true for a map built at the current revision.
             terrainUpgradeDismissed: false,
@@ -113,6 +122,13 @@ export class MapStateManager {
             gridType: "square",
             gridSize: 50,
             gridVisible: false,
+            detailLevel: FILRODENSWMB.DETAIL.EVERYTHING,
+            avoidLabelOverlaps: true,
+            // The symbol size (see SymbolScale): null for Auto
+            symbolSize: null,
+            hiddenLabelStyles: [],
+            hiddenLevels: [],
+            hideRegionFills: false,
 
             terrainBrushTool: "raise",
             biomesBrushTool: "paint",
@@ -165,6 +181,8 @@ export class MapStateManager {
 
             contourInterval: FILRODENSWMB.DISPLAY.CONTOUR_INTERVAL,
             reliefShading: FILRODENSWMB.DISPLAY.RELIEF_SHADING,
+            // The 3D view's Relief Emphasis (see Scene3D), set from its slider there
+            reliefEmphasis: FILRODENSWMB.DISPLAY.THREE_D.RELIEF.EMPHASIS,
             seabedRelief: FILRODENSWMB.DISPLAY.WATER.SEABED_RELIEF,
             waterClarity: FILRODENSWMB.DISPLAY.WATER.CLARITY,
             waterHue: FILRODENSWMB.DISPLAY.WATER.HUE,
@@ -182,13 +200,32 @@ export class MapStateManager {
 
             activeIcon: "map_pin",
             activeInfraMode: "pin",
+            // The pin style new pins take (see PinStyles), or "custom" for the icon, colour and scale below
+            activePinStyle: "custom",
+            // The map's pin styles: null until PinStyles.ensure gives a map its default set
+            customPinStyles: null,
             pinColor: "#ffffff",
-            pinScale: 1,
+            pinScale: FILRODENSWMB.PINS.DEFAULT_SCALE,
+            // The modes of pins and labels: select or place (see PickTool). Every tool with a
+            // Select mode is in it while nothing is being edited (see MapStudio#returnToSelect)
+            pinToolMode: "select",
+            labelToolMode: "select",
+            // The Routes tool's edit mode: select, draw or edit (see RouteTool)
+            routeToolMode: "select",
+            // How closely a traced stroke is kept, in mesh cells (see RouteTool)
+            routeDetail: FILRODENSWMB.MESH.ROUTE_DRAW.DETAIL.DEFAULT,
+            // The line and leg mode a new route starts with, which also show and edit the picked route, and the transport it is made for
             routeColor: "#ffffff",
-            routeThickness: 3,
+            routeThickness: 2,
             routeStyle: "solid",
+            routeOutline: true,
+            routeSmoothing: false,
+            routeMode: "terrain",
+            routeSpanWater: false,
+            routeTransport: "road",
             activeRouteQuickStyle: "custom",
-            customRouteStyles: [],
+            // A new map starts with the route styles for roads and sea lanes; a saved map keeps its own
+            customRouteStyles: FILRODENSWMB.ROUTES.DEFAULT_STYLES.map(({ nameKey, ...style }) => ({ ...style, name: platform.i18n.localize(nameKey) })),
 
             referenceImage: "",
             referenceAlpha: 0.5,
@@ -196,14 +233,11 @@ export class MapStateManager {
             referenceX: width / 2,
             referenceY: height / 2,
 
-            regionMode: "draw",
             regionPresets: FILRODENSWMB.REGIONS.PRESETS,
-            regionFillColor: "#c6af53",
-            regionFillStyle: "solid",
-            regionLineColor: "#ffffff",
-            regionLineThickness: 2,
-            regionLineStyle: "solid",
-            regionSmoothing: true,
+            // The Regions tool's edit mode: select, paint, erase, fill, lasso or claim (see RegionPainter)
+            regionPaintMode: "select",
+            // Whether every level is drawn while painting, rather than only the one being painted (see MeshIntegration.renderRegions)
+            regionShowAll: false,
             regionOpacity: FILRODENSWMB.DISPLAY.REGION_OPACITY,
             activeRegionQuickStyle: "custom",
             customRegionStyles: [],
@@ -213,12 +247,28 @@ export class MapStateManager {
             labelFillColor: FILRODENSWMB.LABELS?.DEFAULT_COLOR,
             labelMaxChars: 0,
             labelJustify: "left",
+            // Labels were always bold before they could choose (see LabelFonts), and new ones still start so
+            labelBold: true,
+            labelItalic: false,
             activeLabelQuickStyle: "custom",
-            nextLabelText: game.i18n.localize(FILRODENSWMB.LABELS?.DEFAULT_TEXT) || "New Label",
-            customLabelStyles: [],
+            nextLabelText: platform.i18n.localize(FILRODENSWMB.LABELS.DEFAULT_TEXT),
+            // A new map starts with a few label styles in the vendored faces, so it can look like an
+            // atlas without choosing any; a saved map keeps its own (see MapStudio's load)
+            customLabelStyles: FILRODENSWMB.LABELS.DEFAULT_STYLES.map(({ nameKey, ...style }) => ({ ...style, name: platform.i18n.localize(nameKey) })),
 
+            // The thematic layers shown over the map (one colour layer, any line layers) and the colour
+            // layer's opacity (see ThematicView)
+            thematic: { fill: null, lines: [], opacity: FILRODENSWMB.THEMATIC.OPACITY },
+            // The age the History tool shows (see HistoryView): null for the age before the present
+            historyAge: null,
+            // The Travel tool's way of travel, speeds (km a day), band width (null for automatic) and
+            // start (see TravelView)
+            travel: { mode: "foot", speeds: { ...FILRODENSWMB.TRAVEL_TIME.SPEEDS }, interval: null, start: null },
+            // The map's unit (see MapUnit): the name every distance shown is labelled with
+            mapUnit: FILRODENSWMB.MAP_UNIT.DEFAULT,
             cartographyScaleEnable: false,
-            cartographyScaleUnits: "Miles",
+            // A new map's scale bar measures the world as it is (see MapUnit.scaleBarTick)
+            cartographyScaleMatchWorld: true,
             cartographyScaleValue: 1,
             cartographyScaleInterval: 100,
             cartographyScaleMajorTicks: 4,
@@ -231,6 +281,7 @@ export class MapStateManager {
 
             regionalTargetWidth: 1000,
             regionalTargetHeight: 1000,
+            regionalInfill: false,
         };
     }
 
@@ -238,51 +289,48 @@ export class MapStateManager {
      * Generates a deep-cloned snapshot of the current vector state.
      *
      * Custom Biomes (`uiState.customBiomes` - name/code/colour/rules) are included here too,
-     * even though they're `uiState` rather than a `MapStudioApp` vector array like the rest of
+     * even though they're `uiState` rather than a `MapStudio` vector array like the rest of
      * this snapshot - every biome-add/edit/delete action calls `pushVectorState` before
      * applying its change (see MapDialogManager), which only works if a biome change is part of
      * what gets undone. Leaving `customBiomes` out would make Ctrl+Z after renaming, recolouring
      * or editing the auto-generation rules of a custom biome have no effect on it at all.
+     *
+     * The layer sets are included (their levels, regions and styles), but not the owner arrays
+     * of the levels: those are far larger and change by patches, which have history entries of
+     * their own (see VectorHistory).
+     *
+     * The map's styles (`uiState.custom{Route,Region,Label,Pin}Styles`) are included as well: a
+     * style edited in the inspector changes every object that follows it, so one undo step puts
+     * the style and its objects back together, and undoing a Save as… takes away the style it made.
      */
     static getVectorStateSnapshot(app) {
         return {
-            tectonicFaults: foundry.utils.deepClone(app.tectonicFaults),
+            tectonicFaults: platform.utils.deepClone(app.tectonicFaults),
             activeFaultId: app.activeFaultId,
-            manualRivers: foundry.utils.deepClone(app.manualRivers),
+            manualRivers: platform.utils.deepClone(app.manualRivers),
             activeRiverId: app.activeRiverId,
-            landMasks: foundry.utils.deepClone(app.landMasks || []),
+            landMasks: platform.utils.deepClone(app.landMasks || []),
             activeLandMaskId: app.activeLandMaskId,
-            pins: foundry.utils.deepClone(app.mapPins),
-            routes: foundry.utils.deepClone(app.mapRoutes),
-            regionLayers: foundry.utils.deepClone(app.regionLayers),
-            mapLabels: foundry.utils.deepClone(app.mapLabels),
-            mapDecorations: foundry.utils.deepClone(app.mapDecorations),
+            pins: platform.utils.deepClone(app.mapPins),
+            routes: platform.utils.deepClone(app.mapRoutes),
+            layerSets: platform.utils.deepClone(app.layerSets ?? []),
+            mapLabels: platform.utils.deepClone(app.mapLabels),
+            mapDecorations: platform.utils.deepClone(app.mapDecorations),
             activeRouteId: app.activeRouteId,
             activeRegionId: app.activeRegionId,
-            customBiomes: foundry.utils.deepClone(app.uiState?.customBiomes || []),
+            customBiomes: platform.utils.deepClone(app.uiState?.customBiomes || []),
+            // The Generate panel's cultures, edited as the styles are (see CultureLists)
+            cultures: platform.utils.deepClone(app.uiState?.cultures ?? []),
+            styles: Object.fromEntries(MapStateManager.STYLE_LISTS.map((key) => [key, platform.utils.deepClone(app.uiState?.[key] ?? null)])),
         };
     }
 
     /**
-     * Captures the current state of all non-destructive vector arrays and pushes them to the history stack.
+     * Records the vector state as it is now as an undo step (see VectorHistory), before an edit
+     * changes it.
      */
     static pushVectorState(app) {
-        app.pinHistory.push(this.getVectorStateSnapshot(app));
-
-        if (app.pinHistory.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
-            app.pinHistory.shift();
-        }
-
-        app.pinRedoStack = [];
-
-        // Push to the Global Ledger and clear forward redos
-        if (!app.globalHistoryLedger) app.globalHistoryLedger = [];
-        app.globalHistoryLedger.push("vector");
-        app.globalRedoLedger = [];
-
-        if (app.globalHistoryLedger.length > FILRODENSWMB.LIMITS.HISTORY_MAX) {
-            app.globalHistoryLedger.shift();
-        }
+        VectorHistory.push(app, VectorHistory.snapshot(app));
     }
 
     /**
@@ -297,21 +345,28 @@ export class MapStateManager {
         app.activeLandMaskId = state.activeLandMaskId || null;
         app.mapPins = state.pins || app.mapPins;
         app.mapRoutes = state.routes || app.mapRoutes;
-        app.regionLayers = state.regionLayers || app.regionLayers;
+        app.layerSets = state.layerSets || app.layerSets;
+        // The session draws from the layer sets it was given, so it is given the restored ones
+        app.meshSession?.setLayerSets(app.layerSets);
         app.mapLabels = state.mapLabels || app.mapLabels;
         app.mapDecorations = state.mapDecorations || app.mapDecorations;
         app.activeRouteId = state.activeRouteId || null;
         app.activeRegionId = state.activeRegionId || null;
         app.uiState.customBiomes = state.customBiomes || app.uiState.customBiomes;
+        if (Array.isArray(state.cultures)) app.uiState.cultures = state.cultures;
+        for (const key of MapStateManager.STYLE_LISTS) if (state.styles && key in state.styles) app.uiState[key] = state.styles[key];
     }
+
+    /** The map's style lists in uiState, which the undo history keeps (see getVectorStateSnapshot). */
+    static STYLE_LISTS = Object.freeze(["customRouteStyles", "customRegionStyles", "customLabelStyles", "customPinStyles"]);
 
     /**
      * Syncs the active UI state from the DOM, then gets derived map parameters.
      */
     static getMapParameters(app) {
-        // After the window has closed (a save still under way, say) there are no inputs to read,
+        // After the studio has closed (a save still under way, say) there are no inputs to read,
         // and the state already holds every value they last showed
-        const element = app.element;
+        const element = app.root;
         for (const key of element ? Object.keys(app.uiState) : []) {
             const input = element.querySelector(`[name="${key}"]`);
             if (!input) continue;
@@ -422,6 +477,7 @@ export class MapStateManager {
             display: {
                 contourInterval: state.contourInterval,
                 reliefShading: state.reliefShading,
+                reliefEmphasis: state.reliefEmphasis,
                 seabedRelief: state.seabedRelief,
                 waterClarity: state.waterClarity,
                 waterHue: state.waterHue,
@@ -432,7 +488,7 @@ export class MapStateManager {
             },
             cartography: {
                 scaleEnable: state.cartographyScaleEnable,
-                scaleUnits: state.cartographyScaleUnits,
+                scaleMatchWorld: state.cartographyScaleMatchWorld === true,
                 scaleInterval: state.cartographyScaleInterval,
                 scaleValue: state.cartographyScaleValue,
                 scaleMajorTicks: state.cartographyScaleMajorTicks,

@@ -1,3 +1,5 @@
+import { formatDistance } from "../data/MapUnit.js";
+
 /**
  * Keeps a range slider's value display and its filled portion in step with the slider.
  *
@@ -7,11 +9,11 @@
  * .fwmb-slider-group. Either way the <output> is found through the nearest of those two wrappers,
  * so neither layout depends on the other's element order.
  *
- * main.js calls this for every slider inside an FWMB window or dialogue, so no template needs its
- * own inline handler to keep its value display current.
+ * The studio's view (StudioView) calls this for every slider inside the studio, its dialogues
+ * included, so no template needs its own inline handler to keep its value display current.
  *
  * The filled portion of the track (from the minimum up to the thumb) is drawn in CSS from a
- * custom property, --fwmb-range-fill, holding the thumb's position as a percentage. Only Firefox
+ * custom property, --fwmb-range-percent, holding the thumb's position as a percentage. Only Firefox
  * can colour that portion of a native range input by itself (::-moz-range-progress); Chromium,
  * which Foundry's desktop app runs on, cannot, so the percentage has to be supplied from here
  * and refreshed whenever the value changes.
@@ -20,7 +22,7 @@
  */
 export class RangeDisplay {
     static #WRAPPER_SELECTOR = ".fwmb-range, .fwmb-slider-group";
-    static #FILL_PROPERTY = "--fwmb-range-fill";
+    static #FILL_PROPERTY = "--fwmb-range-percent";
     static #FULL_PERCENT = 100;
     // What a range input uses as its maximum when none is set (the HTML default)
     static #DEFAULT_MAX = 100;
@@ -32,7 +34,7 @@ export class RangeDisplay {
      */
     static sync(input) {
         const output = input.closest(RangeDisplay.#WRAPPER_SELECTOR)?.querySelector("output");
-        if (output) output.value = input.value;
+        if (output) output.value = RangeDisplay.#shown(input);
 
         input.style.setProperty(RangeDisplay.#FILL_PROPERTY, `${RangeDisplay.#fillPercent(input)}%`);
     }
@@ -47,6 +49,17 @@ export class RangeDisplay {
         for (const input of root.querySelectorAll('input[type="range"]')) {
             input.style.setProperty(RangeDisplay.#FILL_PROPERTY, `${RangeDisplay.#fillPercent(input)}%`);
         }
+    }
+
+    /**
+     * The value a slider shows: its own, or, for a setting stored in one measure and shown in
+     * another (data-display-scale, see the shared-range partial), its value times that factor,
+     * formatted as a distance.
+     */
+    static #shown(input) {
+        const scale = Number.parseFloat(input.dataset?.displayScale);
+        if (!Number.isFinite(scale)) return input.value;
+        return formatDistance(Number.parseFloat(input.value) * scale);
     }
 
     /**

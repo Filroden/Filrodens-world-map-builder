@@ -133,6 +133,15 @@ export class TerrainCompositor {
         this.#applySettings();
     }
 
+    /**
+     * The packed texture (relief, water depth, height; see TerrainShading), or null before the
+     * first update. Region fills read their land mask from its G byte. It is replaced when the
+     * map changes size, so readers ask for it each time they draw rather than keeping it.
+     */
+    get auxTexture() {
+        return this.#textures.aux ?? null;
+    }
+
     /** The current settings (a copy). */
     get settings() {
         return { ...this.#settings };

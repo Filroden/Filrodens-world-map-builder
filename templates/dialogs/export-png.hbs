@@ -1,0 +1,18 @@
+{{!--
+    Export to PNG (see MapStudio#onExportPng and ExportScale): the scale, each with the image's
+    size, the recommended one chosen and marked, scales too large for the map disabled; and why
+    that scale is recommended.
+--}}
+<div class="fwmb-dialog-content">
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label for="fwmb-export-png-scale">{{localize "FILRODENSWMB.UI.ExportPngScale"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-export-png-scale" name="exportScale">
+                {{#each options}}
+                <option value="{{this.scale}}" {{#if this.recommended}}selected{{/if}} {{#unless this.allowed}}disabled{{/unless}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+        <p class="fwmb-hint">{{reason}}</p>
+    </div>
+</div>

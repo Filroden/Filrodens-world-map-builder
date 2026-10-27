@@ -1,0 +1,34 @@
+{{!--
+    The Routes list's rows (see ListQuery.html), rendered on their own and cached, so the panel is
+    drawn again without them while the list has not changed. The row in the inspector and the
+    ticks are marked after each draw (ListQuery.settle). A generated row has a Lock (see
+    GeneratedEdits.toggleLock). Context: rows, massEdit (Mass Edit
+    is choosing routes), noMatches.
+--}}
+{{#each rows}}
+<div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="false" data-id="{{this.id}}" data-type="route" data-action="editRoute">
+    {{#if @root.massEdit}}
+        <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="route" data-panel-ui {{#if this.massEditSelected}}checked{{/if}} />
+    {{/if}}
+    <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
+        <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
+    </button>
+    <div class="fwmb-route-swatch" style="background-color: {{this.color}}; height: calc({{this.thickness}} * 0.0625rem); border-style: {{this.style}};"></div>
+    <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
+    <span class="fwmb-actions">
+        {{#if this.generated}}
+        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-lock-toggle" data-action="toggleLock" aria-pressed="{{#if this.locked}}true{{else}}false{{/if}}" aria-label="{{localize 'FILRODENSWMB.UI.GeneratedLock'}}" data-tooltip="{{#if this.locked}}{{localize 'FILRODENSWMB.UI.ListLockedHint'}}{{else if this.edited}}{{localize 'FILRODENSWMB.UI.ListEditedHint'}}{{else}}{{localize 'FILRODENSWMB.UI.ListUnlockedHint'}}{{/if}}">
+            <i class="fwmb-icon {{#if this.locked}}fwmb-icon--lock{{else}}fwmb-icon--lock-open{{/if}}"></i>
+        </button>
+        {{/if}}
+        <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
+            <i class="fwmb-icon fwmb-icon--center-focus"></i>
+        </button>
+        <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="deleteRoute" aria-label="{{localize 'FILRODENSWMB.UI.Delete'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Delete'}}">
+            <i class="fwmb-icon fwmb-icon--delete"></i>
+        </button>
+    </span>
+</div>
+{{else}}
+<div class="fwmb-list-empty" role="none">{{#if @root.noMatches}}{{localize "FILRODENSWMB.UI.ListNoMatches"}}{{else}}{{localize "FILRODENSWMB.UI.NoRoutes"}}{{/if}}</div>
+{{/each}}

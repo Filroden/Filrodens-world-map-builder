@@ -1,112 +1,234 @@
 <div class="fwmb-map-container">
 
+    {{!--
+        The canvas and its four overlays, in the corners they had before v4 (the corners mirror in
+        a right-to-left language):
+        - top start: the information bar (values under the pointer, and the thematic layers' legends);
+        - top end: undo and redo;
+        - bottom start: the hint, one item per action, growing upward (filled by CanvasHints);
+        - bottom end: the map controls (their menus open upward).
+        They are always shown while the flat map is. The 3D view hides them all but the hint, which
+        shows the 3D view's own gestures there. A fifth overlay is the reverse: the 3D view's
+        settings (Relief Emphasis), shown only in the 3D view, in the top-start corner the
+        information bar leaves free. This region is drawn once (the PIXI canvas lives in it), so
+        their state is written in place afterwards: the readout by the pointer handler, the hint by
+        #updateCanvasHint, the map controls by #syncMapControls, the 3D view's slider when the view
+        opens (see _onThreeDView).
+    --}}
     <div class="fwmb-map-preview">
-        <!-- The PIXI Canvas renders in here -->
+        <!-- The PIXI canvas is drawn in here -->
 
-        <!-- ALL Overlays now live inside the preview container -->
-        <div class="fwmb-canvas-readout fwmb-hidden">
-            <div class="fwmb-readout-item"><i class="fwmb-icon elevation"></i> <span id="fwmb-readout-elev">--</span></div>
-            <div class="fwmb-readout-item"><i class="fwmb-icon water-drop"></i> <span id="fwmb-readout-mois">--</span></div>
-            <div class="fwmb-readout-item"><i class="fwmb-icon temperature"></i> <span id="fwmb-readout-temp">--</span></div>
-            <div class="fwmb-divider-vertical"></div>
-            <div class="fwmb-readout-biome" id="fwmb-readout-biome">--</div>
+        <div class="fwmb-map-overlay fwmb-canvas-readout" role="group" aria-label="{{localize 'FILRODENSWMB.UI.ReadoutLabel'}}">
+            <div class="fwmb-values">
+                <span><span class="fwmb-k">{{localize "FILRODENSWMB.UI.ReadoutElevation"}}</span><span id="fwmb-readout-elev">–</span></span>
+                <span><span class="fwmb-k">{{localize "FILRODENSWMB.UI.ReadoutMoisture"}}</span><span id="fwmb-readout-mois">–</span></span>
+                <span><span class="fwmb-k">{{localize "FILRODENSWMB.UI.ReadoutTemperature"}}</span><span id="fwmb-readout-temp">–</span></span>
+                <span><span class="fwmb-k">{{localize "FILRODENSWMB.UI.ReadoutBiome"}}</span><span id="fwmb-readout-biome">–</span></span>
+                {{!-- The shown thematic layer's value under the pointer, in the overlay accent (see ThematicView) --}}
+                <span class="fwmb-hidden" data-thematic-readout><span class="fwmb-k" data-thematic-key></span><span class="fwmb-thematic" data-thematic-value>–</span></span>
+                <span class="fwmb-hidden" data-thematic-trade-readout><span class="fwmb-k">{{localize "FILRODENSWMB.UI.ThematicTrade"}}</span><span class="fwmb-thematic" data-thematic-trade-value>–</span></span>
+                <span class="fwmb-hidden" data-history-readout><span class="fwmb-k">{{localize "FILRODENSWMB.UI.HistoryReadoutRealm"}}</span><span class="fwmb-thematic" data-history-value>–</span></span>
+                <span class="fwmb-hidden" data-travel-readout><span class="fwmb-k">{{localize "FILRODENSWMB.UI.TravelReadout"}}</span><span class="fwmb-thematic" data-travel-value>–</span></span>
+            </div>
+            {{!-- The thematic layers' legends go here --}}
+            <div class="fwmb-legends"></div>
         </div>
 
-        <!-- Top Right: History Controls -->
-        <div class="fwmb-map-history">
-            <button type="button" data-action="undoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}">
-                <i class="fwmb-icon undo"></i>
-            </button>
-            <button type="button" data-action="redoBrush" data-tooltip="{{localize 'FILRODENSWMB.UI.Redo'}}">
-                <i class="fwmb-icon redo"></i>
-            </button>
-        </div>
+        <div class="fwmb-map-overlay fwmb-map-hint" role="group" aria-label="{{localize 'FILRODENSWMB.UI.HintLabel'}}"></div>
 
         <div id="fwmb-3d-overlay" class="fwmb-3d-overlay fwmb-hidden"></div>
 
-        {{!-- Bottom edge: the canvas actions hint (filled by CanvasHints for the current tool) at the
-             start corner, and the map controls at the end corner. They share one row so the hint
-             can only grow as far as the gap before the controls, and wraps upwards from there. --}}
-        <div class="fwmb-map-footer">
-            <div class="fwmb-map-hint"></div>
+        {{!-- Not inside #fwmb-3d-overlay: Scene3D adds and removes its canvas there --}}
+        <div class="fwmb-map-overlay fwmb-map-overlay-3d fwmb-3d-controls" role="group" aria-label="{{localize 'FILRODENSWMB.UI.ThreeDControlsLabel'}}">
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="reliefEmphasis" label="FILRODENSWMB.UI.ReliefEmphasis" hint="FILRODENSWMB.UI.ReliefEmphasisHint" value=(lookup uiState 'reliefEmphasis') min=0 max=30 step=1}}
+        </div>
 
-            <div class="fwmb-map-controls">
-                <div class="fwmb-map-control-group">
-                    <button type="button" class="active" data-action="toggleViewFilter" data-filter="all" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityPlayer'}}">
-                        <i class="fwmb-icon visibility"></i>
+        <div class="fwmb-map-overlay fwmb-map-controls" role="toolbar" aria-label="{{localize 'FILRODENSWMB.UI.MapControlsLabel'}}">
+            {{!-- View filters: who the map is shown for --}}
+            <div class="fwmb-map-control-group">
+                <button type="button" class="fwmb-map-btn" aria-pressed="true" data-action="toggleViewFilter" data-filter="all" aria-label="{{localize 'FILRODENSWMB.UI.VisibilityPlayer'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityPlayer'}}">
+                    <span class="fwmb-icon fwmb-icon--visibility" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="fwmb-map-btn" aria-pressed="true" data-action="toggleViewFilter" data-filter="gm" aria-label="{{localize 'FILRODENSWMB.UI.VisibilityGM'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityGM'}}">
+                    <span class="fwmb-icon fwmb-icon--security" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="fwmb-map-btn" aria-pressed="false" data-action="toggleViewFilter" data-filter="none" aria-label="{{localize 'FILRODENSWMB.UI.VisibilityNone'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityNone'}}">
+                    <span class="fwmb-icon fwmb-icon--visibility-off" aria-hidden="true"></span>
+                </button>
+            </div>
+
+            {{!-- Detail: how much of the generated content is shown (see DetailLevel), one choice; whether names avoid each other (see LabelLayout); and the symbol size (see SymbolScale). Then the thematic layers. --}}
+            <div class="fwmb-map-control-group">
+                <div class="fwmb-layer-group" data-layer-group="detail">
+                    <button type="button" class="fwmb-map-btn" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize 'FILRODENSWMB.UI.DetailMenu'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.DetailMenu'}}">
+                        <span class="fwmb-icon fwmb-icon--detail" aria-hidden="true"></span>
                     </button>
-                    <button type="button" class="active" data-action="toggleViewFilter" data-filter="gm" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityGM'}}">
-                        <i class="fwmb-icon security"></i>
-                    </button>
-                    <button type="button" data-action="toggleViewFilter" data-filter="none" data-tooltip="{{localize 'FILRODENSWMB.UI.VisibilityNone'}}">
-                        <i class="fwmb-icon visibility-off"></i>
-                    </button>
+                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.DetailMenu'}}">
+                        {{#each detailLevels}}
+                        <button type="button" role="menuitemradio" aria-checked="false" data-action="setDetailLevel" data-detail-level="{{this.value}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+                        </button>
+                        {{/each}}
+                        <div class="fwmb-layer-menu-sep" role="separator"></div>
+                        <button type="button" role="menuitemcheckbox" aria-checked="true" data-action="toggleLabelOverlaps">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.DetailAvoidOverlaps"}}
+                        </button>
+                        <div class="fwmb-layer-menu-sep" role="separator"></div>
+                        {{!-- Symbol size (see SymbolScale): Auto, named with its value by MapControls, or a size --}}
+                        <div class="fwmb-layer-menu-label" role="presentation">{{localize "FILRODENSWMB.UI.SymbolSize"}}</div>
+                        <button type="button" role="menuitemradio" aria-checked="false" data-action="setSymbolSize" data-symbol-size="auto" data-tooltip="{{localize 'FILRODENSWMB.UI.SymbolSizeAutoHint'}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span><span data-symbol-auto>{{localize "FILRODENSWMB.UI.SymbolSizeAuto"}}</span>
+                        </button>
+                        {{#each symbolSizes}}
+                        <button type="button" role="menuitemradio" aria-checked="false" data-action="setSymbolSize" data-symbol-size="{{this.value}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.SymbolSizePercent" percent=this.percent}}
+                        </button>
+                        {{/each}}
+                    </div>
                 </div>
-                <div class="fwmb-map-control-group">
-                    {{!-- Terrain and Biomes each open a list of their layers (terrain shader settings, see
-                         MapStudioApp.#TERRAIN_LAYER_GROUPS). The list opens upwards, ending in line with
-                         its button, since the controls sit at the map's bottom end corner. --}}
-                    {{#each layerGroups}}
-                        <div class="fwmb-layer-group" data-layer-group="{{this.id}}">
-                            <button type="button" class="{{#if (eq this.state 'on')}}active{{/if}} {{#if (eq this.state 'partial')}}partial{{/if}}" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" data-tooltip="{{localize this.tooltip}}">
-                                <i class="fwmb-icon {{this.icon}}"></i>
-                            </button>
-                            <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize this.tooltip}}">
-                                <button type="button" class="fwmb-layer-menu-all" role="menuitemcheckbox" aria-checked="{{this.allChecked}}" data-action="toggleTerrainLayer" data-layer-group="{{this.id}}" data-terrain-layer="all">
-                                    <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.LayerAll"}}
-                                </button>
-                                {{#each this.items}}
-                                    <button type="button" role="menuitemcheckbox" aria-checked="{{this.checked}}" data-action="toggleTerrainLayer" data-layer-group="{{../id}}" data-terrain-layer="{{this.key}}">
-                                        <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
-                                    </button>
-                                {{/each}}
-                            </div>
-                        </div>
-                    {{/each}}
-                    <button type="button" class="active" data-action="toggleLayer" data-layer="infrastructure" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerInfrastructure'}}">
-                        <i class="fwmb-icon location-city"></i>
+                {{!-- The thematic layers (see ThematicView): what the generator's last run left on the
+                     map, one colour layer at a time and the line layers. Beside Detail, since both
+                     choose how the map's content is shown, and shown while the controls are folded. --}}
+                <div class="fwmb-layer-group" data-layer-group="thematic">
+                    <button type="button" class="fwmb-map-btn" aria-pressed="false" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize 'FILRODENSWMB.UI.ThematicLayers'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ThematicLayers'}}">
+                        <span class="fwmb-icon fwmb-icon--gradient" aria-hidden="true"></span>
                     </button>
-                    <button type="button" class="active" data-action="toggleLayer" data-layer="regions" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerRegions'}}">
-                        <i class="fwmb-icon layers"></i>
-                    </button>
-                    <button type="button" class="active" data-action="toggleLayer" data-layer="labels" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerLabels'}}">
-                        <i class="fwmb-icon insert-text"></i>
-                    </button>
-                    <button type="button" class="active" data-action="toggleLayer" data-layer="cartography" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerCartography'}}">
-                        <i class="fwmb-icon explore"></i>
-                    </button>
+                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.ThematicLayers'}}">
+                        {{> "modules/filrodens-world-map-builder/templates/parts/thematic-menu.hbs" thematic=thematic}}
+                    </div>
                 </div>
-                <div class="fwmb-map-control-group">
-                    <button type="button" class="active" data-action="toggleLayer" data-layer="contours" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerContours'}}">
-                        <i class="fwmb-icon scatter-plot"></i>
+            </div>
+
+            {{!-- Layer toggles. Terrain and Biomes each open the list of their layers (see
+                 MapStudio.#TERRAIN_LAYER_GROUPS), Regions and Labels the list of their levels and
+                 label styles (see ContentRows). Hidden while the controls are folded. --}}
+            <div class="fwmb-map-control-group fwmb-map-controls-wide">
+                {{#each layerGroups}}
+                <div class="fwmb-layer-group" data-layer-group="{{this.id}}">
+                    <button type="button" class="fwmb-map-btn" aria-pressed="false" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize this.tooltip}}" data-tooltip="{{localize this.tooltip}}">
+                        <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
                     </button>
-                    <button type="button" data-action="toggleGrid" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleGrid'}}">
-                        <i class="fwmb-icon grid-on"></i>
-                    </button>
-                    <button type="button" class="active" data-action="toggleLayer" data-layer="reference" data-tooltip="{{localize 'FILRODENSWMB.UI.LayerReference'}}">
-                        <i class="fwmb-icon image"></i>
-                    </button>
+                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize this.tooltip}}">
+                        <button type="button" class="fwmb-layer-menu-all" role="menuitemcheckbox" aria-checked="false" data-action="toggleTerrainLayer" data-layer-group="{{this.id}}" data-terrain-layer="all">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.LayerAll"}}
+                        </button>
+                        {{#each this.items}}
+                        <button type="button" role="menuitemcheckbox" aria-checked="false" data-action="toggleTerrainLayer" data-layer-group="{{../id}}" data-terrain-layer="{{this.key}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+                        </button>
+                        {{/each}}
+                    </div>
                 </div>
-                <div class="fwmb-map-control-group">
-                    <button type="button" data-action="zoomOut" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}">
-                        <i class="fwmb-icon zoom-out"></i>
+                {{/each}}
+                {{#each viewLayers}}
+                {{#if this.rows}}
+                {{!-- Regions and Labels: a list of their levels and label styles, written by MapControls --}}
+                <div class="fwmb-layer-group" data-layer-group="{{this.id}}">
+                    <button type="button" class="fwmb-map-btn" aria-pressed="false" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize this.label}}" data-tooltip="{{localize this.label}}">
+                        <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
                     </button>
-                    <button type="button" data-action="resetZoom" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetView'}}">
-                        <i class="fwmb-icon center-focus"></i>
-                    </button>
-                    <button type="button" data-action="zoomIn" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}">
-                        <i class="fwmb-icon zoom-in"></i>
-                    </button>
+                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize this.label}}">
+                        <button type="button" class="fwmb-layer-menu-all" role="menuitemcheckbox" aria-checked="false" data-action="toggleContentRow" data-content-group="{{this.id}}" data-content-kind="all">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize "FILRODENSWMB.UI.LayerAll"}}
+                        </button>
+                        <div class="fwmb-content-rows" role="none" data-content-rows="{{this.id}}"></div>
+                    </div>
                 </div>
+                {{else}}
+                <button type="button" class="fwmb-map-btn" aria-pressed="false" data-action="toggleLayer" data-layer="{{this.id}}" aria-label="{{localize this.label}}" data-tooltip="{{localize this.label}}">
+                    <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+                </button>
+                {{/if}}
+                {{/each}}
+            </div>
+
+            {{!-- What is drawn over the map: contours, grid, reference image. Hidden while folded. --}}
+            <div class="fwmb-map-control-group fwmb-map-controls-wide">
+                {{#each overlayLayers}}
+                <button type="button" class="fwmb-map-btn" aria-pressed="false" data-action="{{this.action}}" {{#if this.id}}data-layer="{{this.id}}"{{/if}} aria-label="{{localize this.label}}" data-tooltip="{{localize this.label}}">
+                    <span class="fwmb-icon fwmb-icon--{{this.icon}}" aria-hidden="true"></span>
+                </button>
+                {{/each}}
+            </div>
+
+            {{!-- Folded: every layer toggle above in one menu, in the same order. Group rows tick
+                 or untick their whole group; their layers sit indented below them. --}}
+            <div class="fwmb-map-control-group fwmb-map-controls-folded">
+                <div class="fwmb-layer-group" data-layer-group="layers">
+                    <button type="button" class="fwmb-map-btn" aria-pressed="true" data-action="toggleLayerMenu" aria-haspopup="menu" aria-expanded="false" aria-label="{{localize 'FILRODENSWMB.UI.LayersMenu'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.LayersMenu'}}">
+                        <span class="fwmb-icon fwmb-icon--layers" aria-hidden="true"></span>
+                    </button>
+                    <div class="fwmb-layer-menu fwmb-hidden" role="menu" aria-label="{{localize 'FILRODENSWMB.UI.LayersMenu'}}">
+                        {{#each layerGroups}}
+                        <button type="button" class="fwmb-layer-menu-group" role="menuitemcheckbox" aria-checked="false" data-action="toggleTerrainLayer" data-layer-group="{{this.id}}" data-terrain-layer="all">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.tooltip}}
+                        </button>
+                        {{#each this.items}}
+                        <button type="button" class="fwmb-layer-menu-sub" role="menuitemcheckbox" aria-checked="false" data-action="toggleTerrainLayer" data-layer-group="{{../id}}" data-terrain-layer="{{this.key}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+                        </button>
+                        {{/each}}
+                        {{/each}}
+                        {{#each viewLayers}}
+                        {{#if this.rows}}
+                        <button type="button" class="fwmb-layer-menu-group" role="menuitemcheckbox" aria-checked="false" data-action="toggleContentRow" data-content-group="{{this.id}}" data-content-kind="all">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+                        </button>
+                        <div class="fwmb-content-rows" role="none" data-content-rows="{{this.id}}" data-content-indent="1"></div>
+                        {{else}}
+                        <button type="button" role="menuitemcheckbox" aria-checked="false" data-action="toggleLayer" data-layer="{{this.id}}">
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+                        </button>
+                        {{/if}}
+                        {{/each}}
+                        <div class="fwmb-layer-menu-sep" role="separator"></div>
+                        {{#each overlayLayers}}
+                        <button type="button" role="menuitemcheckbox" aria-checked="false" data-action="{{this.action}}" {{#if this.id}}data-layer="{{this.id}}"{{/if}}>
+                            <span class="fwmb-layer-check" aria-hidden="true"></span>{{localize this.label}}
+                        </button>
+                        {{/each}}
+                    </div>
+                </div>
+            </div>
+
+            <div class="fwmb-map-control-group">
+                <button type="button" class="fwmb-map-btn" data-action="zoomOut" aria-label="{{localize 'FILRODENSWMB.UI.ZoomOut'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomOut'}}">
+                    <span class="fwmb-icon fwmb-icon--zoom-out" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="fwmb-map-btn" data-action="resetZoom" aria-label="{{localize 'FILRODENSWMB.UI.ResetView'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ResetView'}}">
+                    <span class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></span>
+                </button>
+                <button type="button" class="fwmb-map-btn" data-action="zoomIn" aria-label="{{localize 'FILRODENSWMB.UI.ZoomIn'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomIn'}}">
+                    <span class="fwmb-icon fwmb-icon--zoom-in" aria-hidden="true"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="fwmb-map-overlay fwmb-map-history" role="group" aria-label="{{localize 'FILRODENSWMB.UI.HistoryLabel'}}">
+            <button type="button" class="fwmb-map-btn" data-action="undoBrush" aria-label="{{localize 'FILRODENSWMB.UI.Undo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Undo'}}">
+                <span class="fwmb-icon fwmb-icon--undo" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="fwmb-map-btn" data-action="redoBrush" aria-label="{{localize 'FILRODENSWMB.UI.Redo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.Redo'}}">
+                <span class="fwmb-icon fwmb-icon--redo" aria-hidden="true"></span>
+            </button>
+        </div>
+    </div>
+
+    <!-- The processing overlay: shown over the map while long work runs -->
+    <div class="fwmb-processing-overlay fwmb-hidden">
+        <div class="fwmb-processing" role="status">
+            <div class="fwmb-processing-title">
+                <span class="fwmb-icon fwmb-icon--sync fwmb-spin" aria-hidden="true"></span>
+                <b class="fwmb-processing-text"></b>
+            </div>
+            <!-- Shown only while work reports how far it has come (see MapStudio.runCancellable) -->
+            <div class="fwmb-progress fwmb-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+            <p class="fwmb-processing-detail fwmb-hidden"></p>
+            <!-- Shown only while work that can stop part-way is running (see MapStudio.runCancellable) -->
+            <div class="fwmb-processing-actions fwmb-processing-cancel fwmb-hidden">
+                <button type="button" class="fwmb-btn fwmb-hidden" data-action="keepProcessing"></button>
+                <button type="button" class="fwmb-btn" data-tone="negative" data-action="cancelProcessing">{{localize "FILRODENSWMB.UI.Cancel"}}</button>
             </div>
         </div>
     </div>
-
-    <!-- Permanent Processing Overlay -->
-    <div class="fwmb-processing-overlay fwmb-hidden">
-        <div class="fwmb-processing-content">
-            <i class="fwmb-icon sync fwmb-spin"></i>
-            <span class="fwmb-processing-text"></span>
-        </div>
-    </div>
-</div>
+</div>

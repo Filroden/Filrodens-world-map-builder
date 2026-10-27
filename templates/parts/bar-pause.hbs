@@ -1,0 +1,8 @@
+{{!-- Pausing the regeneration that follows each change, and applying the changes made while it is
+     paused (Rivers and faults, and a guided map's land masks) --}}
+<button type="button" class="fwmb-btn fwmb-btn--square" aria-pressed="{{#if uiState.liveFeatureUpdates}}false{{else}}true{{/if}}" data-action="toggleLiveFeatureUpdates" aria-label="{{localize 'FILRODENSWMB.UI.PauseRegeneration'}}" data-tooltip="{{#if uiState.liveFeatureUpdates}}{{localize 'FILRODENSWMB.UI.PauseTerrainGeneration'}}{{else}}{{localize 'FILRODENSWMB.UI.ResumeTerrainGeneration'}}{{/if}}">
+    <i class="fwmb-icon {{#if uiState.liveFeatureUpdates}}fwmb-icon--sync{{else}}fwmb-icon--sync_disabled{{/if}}" aria-hidden="true"></i>
+</button>
+<button type="button" class="fwmb-btn" data-action="applyFeatureMath" {{#unless hasPendingFeatureMath}}disabled{{/unless}}>
+    {{localize "FILRODENSWMB.UI.ApplyChanges"}}
+</button>
