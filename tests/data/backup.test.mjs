@@ -25,7 +25,7 @@ const dataUrl = (bytes) => ImageCheck.toDataUrl(bytes, "png");
 
 /** A small saved map with a decoration, a reference image and pins on a custom icon. */
 function savedMap({ id = "mapAAAAAAAAAAAAA", decoration = "worlds/w/deco.png", reference = "worlds/w/ref.png" } = {}) {
-    const base = JSON.parse(readFileSync(new URL("../../samples/fwmb_eldoria.json", import.meta.url), "utf8"));
+    const base = JSON.parse(readFileSync(new URL("./fixtures/fwmb_eldoria.json", import.meta.url), "utf8"));
     return {
         ...base,
         mapDecorations: [{ id: "decoAAAAAAAAAAAA", type: "decoration", name: "Rose", src: decoration, x: 1, y: 1, rotation: 0, scale: 1, visibility: "all" }],

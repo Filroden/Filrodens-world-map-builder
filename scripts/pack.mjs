@@ -15,8 +15,9 @@ const isWeb = process.argv.includes('--web');
 const isRelease = Boolean(process.env.CI);
 
 // .wrangler is Cloudflare's local cache from deploying the web version by hand, and Claude outputs
-// is a local folder of files shared while working; neither belongs in a pack
-const excludedFolders = ['dist', 'dist-web', 'node_modules', '.git', '.github', '.wrangler', 'Claude outputs', 'scripts', 'tests', 'wiki'];
+// is a local folder of files shared while working; neither belongs in a pack. samples holds the
+// tutorial's map files, which the wiki links on GitHub and the module never reads
+const excludedFolders = ['dist', 'dist-web', 'node_modules', '.git', '.github', '.wrangler', 'Claude outputs', 'samples', 'scripts', 'tests', 'wiki'];
 if (isRelease) excludedFolders.push('design');
 
 // The web page, the web host's services and the libraries Foundry already provides (PixiJS and

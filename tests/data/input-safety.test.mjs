@@ -85,7 +85,7 @@ test("a complete v4 map, and the older sample maps, pass the importer with nothi
     assert.deepEqual(mapData, rest);
     assert.deepEqual(owners, fileOwners);
     for (const name of ["fwmb_eldoria.json", "fwmb_aethoria.json"]) {
-        const sample = JSON.parse(readFileSync(new URL(`../../samples/${name}`, import.meta.url), "utf8"));
+        const sample = JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8"));
         const result = MapImport.read(structuredClone(sample));
         assert.equal(result.corrected, 0, name);
         // The one value an import has always repaired rather than kept: the area factor
