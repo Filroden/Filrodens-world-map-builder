@@ -4,11 +4,11 @@
 
 **Goal:** Create the map the whole tutorial builds on: a Guided map with the seed P0JBVA, 2,000 by 1,600 pixels, from 60° north to 60° south, with one large continent, three islands and an inland sea.
 
-**Opening narration:** In this first video we create the map the whole tutorial builds on: a Guided map, where we draw where the land goes and the engine does the rest.
+**Opening narration:** In this first tutorial we're going to create the map the whole tutorial builds on: a Guided map, where we'll draw where the land goes and let the engine do the rest.
 
 ## 1. Open the studio
 
-**Narration:** Open the map builder: on the web at fwmb.filroden.com, or in Foundry from the Map builder button at the top of the Scenes sidebar. It opens on New map, the first tool on the rail.
+**Narration:** Open the map builder. You'll find it on the web at fwmb.filroden.com, or in Foundry from the Map builder button at the top of the Scenes sidebar. Both versions are identical so both will open on New map, the first tool on the rail.
 
 **Camera:** the whole studio
 
@@ -30,7 +30,7 @@
 
 ## 3. The size
 
-**Narration:** Set the size to two thousand by sixteen hundred pixels.
+**Narration:** Set the size to two thousand by one thousand six hundred pixels.
 
 **On screen:**
 
@@ -43,7 +43,7 @@
 
 ## 4. The latitudes
 
-**Narration:** Set the latitudes to sixty north and sixty south. They shape the climate, and so the biomes. Leave the area factor and the unit as they are.
+**Narration:** Set the latitudes to positive sixty north and negative sixty south. They shape the climate, and from that the biomes. Leave the area factor and the unit as they are.
 
 **On screen:**
 
@@ -58,7 +58,7 @@
 
 ## 5. Choose Guided
 
-**Narration:** Now choose Guided in the generation engine list. A new map is made straight away, so the studio asks about the open one. We don't need it.
+**Narration:** Now choose Guided in the generation engine list. A new map is made straight away, so the studio asks what it should do with the open one. We don't need it.
 
 **On screen:**
 
@@ -73,7 +73,7 @@
 
 ## 6. Discard the open map
 
-**Narration:** Discard it. The new map is all ocean, and the bar is ready to draw land.
+**Narration:** Discard it. The new guided map is all ocean, and the bar is ready to draw land.
 
 **On screen:**
 
@@ -87,7 +87,7 @@
 
 ## 7. Draw the continent
 
-**Narration:** Now draw the continent. Click round its outline; you can go a little past the edge of the map. Right-click to finish, and the engine fills the shape with land.
+**Narration:** Now draw the continent. Click around its outline; you can go a little past the edge of the map. Right-click to finish, and the engine fills the shape with land.
 
 **On screen:**
 
@@ -102,7 +102,7 @@
 
 ## 8. Draw the islands
 
-**Narration:** Add the three islands to the east the same way, finishing each one with a right-click.
+**Narration:** Add the three islands to the east of the continent in the same way, finishing each one with a right-click.
 
 **On screen:**
 
@@ -121,7 +121,7 @@
 
 ## 9. Cut the inland sea
 
-**Narration:** Choose Ocean on the bar and draw the inland sea. An ocean mask cuts water out of the land.
+**Narration:** Next choose Ocean on the bar and draw the inland sea. An ocean mask cuts water out of the land.
 
 **On screen:**
 
@@ -136,7 +136,7 @@
 
 ## 10. Stop drawing
 
-**Narration:** Stop drawing, and there is our world.
+**Narration:** Stop drawing, and after a short pause while it works you'll see our world.
 
 **On screen:**
 
@@ -152,7 +152,7 @@
 
 ## 11. Save the map
 
-**Narration:** Finally, save the map, and call it Tutorial world. Next, we shape the land.
+**Narration:** Finally, save the map, and call it Tutorial world. Next, we're going to shape the land.
 
 **On screen:**
 

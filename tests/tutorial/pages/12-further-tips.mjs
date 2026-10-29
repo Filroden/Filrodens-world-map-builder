@@ -47,7 +47,7 @@ export default {
     start: "11-a-regional-map",
     goal: "Find and change many items at once, control what your players see, and trace a map of your own from an existing image.",
     intro: `This last page answers the questions asked most often. Its first part carries on with the regional map from page 11: finding items in the long lists, changing many at once, and deciding what your players see. Its second part starts a new map, traced over an image of an existing map with the **Reference image** tool.`,
-    narration: "In this last video: finding and changing many places at once, keeping secrets from your players, and tracing a map from an existing image.",
+    narration: "In this last tutorial we're going to look at finding and changing many places at once, keeping secrets from your players, and tracing a map from an existing image.",
 
     steps: [
         {
@@ -60,7 +60,7 @@ export default {
             ],
             screenshot: { name: "search", region: "panel" },
             caption: "The Pins list searched for \"ford\".",
-            narration: "Open Routes and pins. The pins list is long, so search it: type ford, and only the matching places are left.",
+            narration: "Open Routes and pins. The pins list is long, so search it: type ford, and only the matching places are shown.",
             pause: 3,
         },
         {
@@ -72,7 +72,7 @@ export default {
                 { do: "set", field: PIN_LIST("origin"), value: "generated", valueLabel: "Generated", label: "Made by" },
                 { do: "set", field: PIN_LIST("kind"), value: "ruinedTown", valueLabel: "Ruined town", label: "Kind of pin" },
             ],
-            narration: "Clear the search, and filter instead: generated pins of the kind Ruined town.",
+            narration: "Clear the search, and filter instead: select generated pins of the kind Ruined town.",
         },
         {
             id: "mass-edit",
@@ -89,7 +89,7 @@ export default {
             screenshot: { name: "mass-edit", region: "dialog", pad: 8 },
             caption: "Mass edit for the thirteen ruined towns, with Visibility changed to GM only.",
             note: "Only the fields you change are written; the rest stay as each pin has them. **Delete** beside **Mass edit** deletes the ticked items instead, after asking.",
-            narration: "Select items for mass edit, select all, and open Mass edit. Set the visibility to GM only.",
+            narration: "Now we will select items for mass edit. So select all, and open Mass edit. Set the visibility to GM only.",
         },
         {
             id: "mass-done",
@@ -99,7 +99,7 @@ export default {
                 { do: "dialog", button: "ok", label: "Confirm" },
                 { do: "expect", check: (studio) => studio.mapPins.filter((pin) => pin.generated?.tier === "ruinedTown").every((pin) => pin.visibility === "gm") || "the ruined towns are not all GM only", within: 30000 },
             ],
-            narration: "Confirm, and all thirteen change at once.",
+            narration: "Confirm, and all thirteen pins that were filtered will change at once.",
         },
         {
             id: "views",
@@ -108,7 +108,7 @@ export default {
             action: [{ do: "frame", rect: WEST_HILLS, label: "Zoom in on the west of the Red Hills." }],
             screenshot: { name: "gm-view", region: { map: WEST_HILLS }, mapOnly: true },
             caption: "Player view and GM view on: Redwatch, and the ruined towns Draxted and Pereter.",
-            narration: "Everything on the map is visible to everyone, to the GM only, or hidden. The first three buttons of the map controls choose which you see. Here, with the GM view on, the ruins show.",
+            narration: "Everything on the map can either be visible to everyone, to the GM only, or hidden from everyone. The first three buttons of the map controls choose which you see. Here, with the GM view on, the ruins show.",
             pause: 3,
         },
         {
@@ -169,7 +169,7 @@ export default {
                 { do: "expect", check: (studio) => studio.landMasks.length === 0 || "the land masks are still there", within: 60000 },
             ],
             note: "The engine matters: **Guided**, used here, makes terrain inside the outlines you draw. **Flat** makes a flat land a little above the sea, to sculpt by hand with the terrain brushes. See [[New map]].",
-            narration: "Now a new map, the same size as the sketch we'll trace. Create it, and delete the land masks it kept, so it starts as open sea.",
+            narration: "Now a new map, the same size as the sketch we'll trace. Create it, and delete the land masks it kept from our first map, so it starts as open sea.",
         },
         {
             id: "reference",
@@ -184,7 +184,7 @@ export default {
             screenshot: { name: "reference", region: "studio" },
             caption: "The sketch as the reference image over the new map.",
             note: "Drag the image to move it, and Shift+Scroll to resize it; the **Image position** buttons nudge it a pixel at a time. The image is saved with the map, and never exported.",
-            narration: "Open the Reference image tool and choose the sketch. It lies over the map as a guide.",
+            narration: "Open the Reference image tool and choose the sketch. It sits over the map as a guide.",
             pause: 3,
         },
         {
@@ -195,7 +195,7 @@ export default {
             screenshot: { name: "traced", region: "studio" },
             caption: "The island, the isle and the lake traced as land masks.",
             note: "Pause regeneration on the bar (as on page 1) lets you place many points without waiting for the map after each.",
-            narration: "Back in New map, click round the island's coast and the isle, and draw the lake as ocean. The engine fills in the land.",
+            narration: "Back in New map, click around the island's coast and the isle, and draw the lake as ocean. The engine fills in the land and creates the lake inside it.",
             pause: 4,
         },
         {
@@ -228,7 +228,7 @@ export default {
             ],
             screenshot: { name: "coast", region: { map: [0, 0, SKETCH_SIZE[0], SKETCH_SIZE[1]] }, mapOnly: true },
             caption: "The island with the new seed and a smoother coast.",
-            narration: "In Terrain, lower the coastal fracture for a smoother coast, closer to the sketch, and hide the reference image.",
+            narration: "In Terrain, lower the coastal fracture for a smoother coast, closer to the sketch, and then hide the reference image.",
             pause: 4,
         },
         {

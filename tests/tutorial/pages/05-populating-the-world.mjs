@@ -28,7 +28,7 @@ export default {
     start: "04-rivers-and-faults",
     goal: "Give the world two peoples and a history, and let Generate settle it: towns, castles, roads, sea lanes, realms, duchies and counties, all named.",
     intro: `With the land finished, the **Generate** tool works out where people would live on it and populates the whole map in one run. It reads the land you have shaped (the height and ruggedness of the ground, the climate, the biomes, the rivers and the coast), founds towns where the land can feed them, traces the trade between them, and divides the land into realms. Everything it makes is ordinary map content, which the next pages edit and add to by hand.`,
-    narration: "In this video we populate the world: two peoples, a short history, and one run of the generator.",
+    narration: "In this tutorial we're going to populate the world: give it two cultures, a short history, and one run of the generator.",
 
     steps: [
         {
@@ -53,7 +53,7 @@ export default {
             action: culture({ name: "Hillfolk", nameStyle: "Nordic", colour: "#5b7fa6", band: "Upland", upToTop: true, homeland: HILLFOLK_HOME }),
             screenshot: { name: "hillfolk", region: "studio" },
             caption: "The Hillfolk in the culture inspector, with their homeland marked on the map.",
-            narration: "This world has two peoples. Add a culture called Hillfolk: Nordic names, a slate-blue colour, the uplands and above, and a homeland in the northern uplands.",
+            narration: "This world has two cultures. Add a culture called Hillfolk with these settings: Nordic names, a slate-blue colour, the uplands and above, and place a homeland in the northern uplands.",
             pause: 4,
         },
         {
@@ -65,7 +65,7 @@ export default {
                 { do: "click", target: "dialog.fwmb-inspector[open] .fwmb-overlay-close", label: "Close on the inspector" },
                 { do: "expect", check: (studio) => (studio.uiState.cultures ?? []).map((each) => each.name).join(", ") === "Hillfolk, Valefolk" || `the cultures are ${(studio.uiState.cultures ?? []).map((each) => each.name).join(", ")}` },
             ],
-            narration: "Add a second people, the Valefolk: English names, a golden colour, the lowlands, and a homeland in the southern forests.",
+            narration: "Add a second culture, the Valefolk with these settings: English names, a golden colour, the lowlands, and a homeland in the southern forests.",
         },
         {
             id: "ages",
@@ -80,7 +80,7 @@ export default {
             screenshot: { name: "ages", region: { selector: '[data-region="context"] details[data-section="generateAges"]' }, pad: 8 },
             caption: "Two ages: a peaceful early medieval age, then the present, with the Hillfolk invading.",
             note: "Each age starts from the one before: towns tend to grow where towns stood, and roads and realms carry on where they can. What the age before leaves behind (ruins, abandoned castles and old roads) appears on the map, and page 9 looks back at it.",
-            narration: "Now give the world a history. Add a second age. Make the first age early medieval and peaceful, and in the present, the Hillfolk invade.",
+            narration: "Now give the world a history. Add a second age. Make the first age early medieval and peaceful, and in the present, add an event where the Hillfolk invade.",
             pause: 4,
         },
         {
@@ -94,7 +94,7 @@ export default {
             ],
             screenshot: { name: "generated", region: "studio" },
             caption: "The world after its run: realms coloured, duchies and counties outlined, towns, castles and roads named.",
-            narration: "Click Generate. The run works through its stages, age by age, and the world is settled: realms, towns, castles and roads, all named.",
+            narration: "Click Generate. The run works through its stages, age by age, and the world is settled: realms, towns, castles and roads are all created and all except roads are named.",
             pause: 5,
         },
         {
@@ -104,11 +104,10 @@ export default {
             action: [
                 { do: "click", target: '[data-layer-group="detail"] > [data-action="toggleLayerMenu"]', label: "Detail" },
                 { do: "click", target: '[data-action="setDetailLevel"][data-detail-level="1"]', label: "Province" },
-                { do: "key", key: "Escape", label: "Close the menu." },
             ],
             screenshot: { name: "province", region: { map: [0, 0, 2000, 1600] }, mapOnly: true },
             caption: "The map at the Province detail level.",
-            narration: "A world map holds a lot, so choose how much to show. The Detail menu in the map controls goes from World to Everything; Province shows the realms, their duchies, and the larger towns.",
+            narration: "A world map holds a lot of information, so choose how much you want to show. The Detail menu in the map controls goes from World to Everything; pick Province which shows the realms, their duchies, and the larger towns.",
             pause: 4,
         },
         {
@@ -118,7 +117,7 @@ export default {
             action: { do: "openSection", section: "generateResults", label: "Results" },
             screenshot: { name: "results", region: { selector: '[data-region="context"] details[data-section="generateResults"]' }, pad: 8 },
             caption: "The run's results.",
-            narration: "The Results section counts everything the run made, and how the people are shared between the cultures.",
+            narration: "The Results section counts everything the run made, and how the population is shared between the cultures.",
             pause: 4,
         },
         {
@@ -129,7 +128,7 @@ export default {
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "expect", check: (studio) => !studio.isDirty || "the map was not saved", within: 30000 },
             ],
-            narration: "Save the map. Next, we make the realms our own.",
+            narration: "Save the map. Next, we're going to customise the realms.",
         },
     ],
 

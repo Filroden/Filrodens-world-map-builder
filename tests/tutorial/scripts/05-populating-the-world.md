@@ -4,7 +4,7 @@
 
 **Goal:** Give the world two peoples and a history, and let Generate settle it: towns, castles, roads, sea lanes, realms, duchies and counties, all named.
 
-**Opening narration:** In this video we populate the world: two peoples, a short history, and one run of the generator.
+**Opening narration:** In this tutorial we're going to populate the world: give it two cultures, a short history, and one run of the generator.
 
 ## 1. Open Generate
 
@@ -22,7 +22,7 @@
 
 ## 2. The Hillfolk
 
-**Narration:** This world has two peoples. Add a culture called Hillfolk: Nordic names, a slate-blue colour, the uplands and above, and a homeland in the northern uplands.
+**Narration:** This world has two cultures. Add a culture called Hillfolk with these settings: Nordic names, a slate-blue colour, the uplands and above, and place a homeland in the northern uplands.
 
 **On screen:**
 
@@ -43,7 +43,7 @@
 
 ## 3. The Valefolk
 
-**Narration:** Add a second people, the Valefolk: English names, a golden colour, the lowlands, and a homeland in the southern forests.
+**Narration:** Add a second culture, the Valefolk with these settings: English names, a golden colour, the lowlands, and a homeland in the southern forests.
 
 **On screen:**
 
@@ -62,7 +62,7 @@
 
 ## 4. Two ages
 
-**Narration:** Now give the world a history. Add a second age. Make the first age early medieval and peaceful, and in the present, the Hillfolk invade.
+**Narration:** Now give the world a history. Add a second age. Make the first age early medieval and peaceful, and in the present, add an event where the Hillfolk invade.
 
 **On screen:**
 
@@ -79,7 +79,7 @@
 
 ## 5. Generate
 
-**Narration:** Click Generate. The run works through its stages, age by age, and the world is settled: realms, towns, castles and roads, all named.
+**Narration:** Click Generate. The run works through its stages, age by age, and the world is settled: realms, towns, castles and roads are all created and all except roads are named.
 
 **On screen:**
 
@@ -94,7 +94,7 @@
 
 ## 6. Choose the detail
 
-**Narration:** A world map holds a lot, so choose how much to show. The Detail menu in the map controls goes from World to Everything; Province shows the realms, their duchies, and the larger towns.
+**Narration:** A world map holds a lot of information, so choose how much you want to show. The Detail menu in the map controls goes from World to Everything; pick Province which shows the realms, their duchies, and the larger towns.
 
 **On screen:**
 
@@ -110,7 +110,7 @@
 
 ## 7. Read the results
 
-**Narration:** The Results section counts everything the run made, and how the people are shared between the cultures.
+**Narration:** The Results section counts everything the run made, and how the population is shared between the cultures.
 
 **On screen:**
 
@@ -124,7 +124,7 @@
 
 ## 8. Save
 
-**Narration:** Save the map. Next, we make the realms our own.
+**Narration:** Save the map. Next, we're going to customise the realms.
 
 **On screen:**
 

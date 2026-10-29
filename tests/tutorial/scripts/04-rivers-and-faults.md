@@ -4,11 +4,11 @@
 
 **Goal:** Add and remove river sources, draw a river of your own, and open a rift valley with a tectonic feature, reshaping it by its points and with Undo.
 
-**Opening narration:** In this video we finish shaping the land: we add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.
+**Opening narration:** In this tutorial we're going to finish shaping the land: we'll add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.
 
 ## 1. Open Rivers and faults
 
-**Narration:** Open Rivers and faults, the last tool in the Shape group, and choose Source on the bar. A ring marks each place a river rises.
+**Narration:** Open Rivers and faults, the last tool in the Shape group on the rail, and choose Source on the bar. A ring marks each place a river rises from the ground.
 
 **On screen:**
 
@@ -23,7 +23,7 @@
 
 ## 2. Add a river source
 
-**Narration:** The desert in the east has no rivers. Click its high ground to add a river source, and a river runs west across the desert.
+**Narration:** The desert in the east has no rivers. Click its high ground to add a river source, and a river will automatically be drawn that follows the terrain and runs west across the desert.
 
 **On screen:**
 
@@ -38,7 +38,7 @@
 
 ## 3. Remove a river source
 
-**Narration:** In the crowded north-west, Ctrl-click a ring to remove that river source. Its river is gone, and a marker remembers where it was.
+**Narration:** In the crowded north-west, Ctrl-click a ring to remove a river source. Its river is now gone, and a marker remembers where it was.
 
 **On screen:**
 
@@ -72,7 +72,7 @@
 
 ## 5. Open a rift
 
-**Narration:** Now a tectonic feature. Choose Fault, set the type to Rift, the thickness to ninety and the strength to point one five, and draw a line across the south of the continent, from sea to sea. The land is pulled apart into a rift valley.
+**Narration:** Now let's add a tectonic feature. Choose Fault, set the type to Rift, the thickness to ninety and the strength to nought point one five, and draw a line across the south of the continent, from sea to sea. The land is pulled apart into a rift valley.
 
 **On screen:**
 
@@ -92,7 +92,7 @@
 
 ## 6. Move a waypoint
 
-**Narration:** Lines keep their points, so you can reshape them. Drag the rift's middle point south, and the rift follows.
+**Narration:** Lines show their points, so you can reshape them. Drag the rift's middle point south, and the rift will follow.
 
 **On screen:**
 
@@ -106,7 +106,7 @@
 
 ## 7. Undo
 
-**Narration:** Changed your mind? Click Undo, and the point and the rift go back. Every change is one step of undo, and Redo puts it back again.
+**Narration:** Changed your mind? Click Undo, and the point and the rift go back. Every change is one step of undo, and Redo puts it back again. Both will show you the area of the map where the change will happen.
 
 **On screen:**
 
@@ -120,7 +120,7 @@
 
 ## 8. Stop and save
 
-**Narration:** Stop drawing and save. The land is finished; next, we populate it.
+**Narration:** Stop drawing and save. The land is finished; next, we're going to populate it.
 
 **On screen:**
 

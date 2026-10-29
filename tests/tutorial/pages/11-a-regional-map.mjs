@@ -27,7 +27,7 @@ export default {
     intro: `A world map shows a realm in a few hundred pixels. A **regional map** is a new map cut from part of another, at a higher resolution: the coastlines, terrain and biome borders gain finer detail, and everything on the parent comes with it (the realms, places, routes and names, your own and the run's). It keeps a copy of the parent's run over its area, so it can be **filled in** with the villages and market towns that lie between the parent's towns, joined to its roads by lanes.
 
 Once made, a regional map is a map of its own: changing it doesn't change the world map, or the other way round.`,
-    narration: "In this video we cut a regional map of the Red Hills from the world, and fill it in with villages and market towns.",
+    narration: "In this tutorial we're going to crop a regional map of the Red Hills from the world map, and fill it in with additional villages and market towns.",
 
     steps: [
         {
@@ -45,7 +45,7 @@ Once made, a regional map is a map of its own: changing it doesn't change the wo
             screenshot: { name: "crop", region: "studio" },
             caption: "The crop round the Red Hills, and the Regional map section.",
             note: "Drag inside the crop to move it, and drag a corner to resize it. **Fill in villages and market towns** can be ticked once the map has a run and the crop is small enough for the new map to show the world closely.",
-            narration: "Open New map and set the new map's width. Choose Crop and drag round the Red Hills: the crop fits itself to the grid at four times the detail. Tick Fill in villages and market towns.",
+            narration: "Open New map and set the new map's width. Choose Crop and drag around the Red Hills: the crop fits itself to the grid at four times the detail. Tick Fill in villages and market towns.",
             pause: 4,
         },
         {
@@ -71,7 +71,7 @@ Once made, a regional map is a map of its own: changing it doesn't change the wo
             ],
             screenshot: { name: "region", region: "studio" },
             caption: "The Red Hills, a regional map at four times the world map's detail.",
-            narration: "Open it from Maps, where it's listed under the world it came from. The terrain is drawn in far more detail.",
+            narration: "Open it from Maps, where it's listed under the world it came from. The terrain is the same as the world map but is now drawn in far more detail.",
             pause: 4,
         },
         {
@@ -81,14 +81,13 @@ Once made, a regional map is a map of its own: changing it doesn't change the wo
             action: [
                 { do: "click", target: '[data-layer-group="detail"] > .fwmb-map-btn', label: "Detail in the map controls" },
                 { do: "click", target: '[data-action="setDetailLevel"][data-detail-level="3"]', label: "Local" },
-                { do: "key", key: "Escape", label: "Press Escape to close the menu." },
                 { do: "settle" },
                 { do: "frame", rect: MOSTADRA_VIEW, label: "Zoom in round Mostadra." },
             ],
             screenshot: { name: "villages", region: { map: MOSTADRA_VIEW }, mapOnly: true },
             caption: "Villages, market towns and lanes round Mostadra at the Local detail level.",
             note: "Each map keeps its own Detail level, so the world map is still at Province.",
-            narration: "Set the Detail level to Local. The villages and market towns of the fill-in appear, joined to the roads by lanes.",
+            narration: "Set the Detail level to Local. The villages and market towns that were filled-in will appear, joined to the roads by lanes.",
             pause: 4,
         },
         {

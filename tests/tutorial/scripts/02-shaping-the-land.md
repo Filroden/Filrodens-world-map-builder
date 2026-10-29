@@ -4,7 +4,7 @@
 
 **Goal:** Use the Terrain tool to set how the engine shapes the coast, the land and the sea, then sculpt the ground by hand with the terrain brushes.
 
-**Opening narration:** In this video we use the Terrain tool to give the tutorial map its shape: a gentler coast, broad lowlands and wide shallow seas. Then we sculpt a ridge by hand.
+**Opening narration:** In this tutorial we're going to use the Terrain tool to give our Tutorial world its final shape: a gentler coastline, broad lowlands and wide shallow seas. And then we'll sculpt a ridge by hand.
 
 ## 1. Open Terrain
 
@@ -22,7 +22,7 @@
 
 ## 2. A smoother coast
 
-**Narration:** Lower Coastal fracture to point one, for a smoother coast with fewer small islands.
+**Narration:** Lower Coastal fracture to nought point one, for a smoother coast with fewer small islands.
 
 **On screen:**
 
@@ -34,7 +34,7 @@
 
 ## 3. Broad lowlands
 
-**Narration:** In the Land group, widen the coastal plains to point two and raise the continent scale to four hundred. The land now rises slowly from broad lowlands.
+**Narration:** In the Land group, widen the coastal plains to zero point two and raise the continent scale to four hundred. The land now rises slowly from broad lowlands.
 
 **On screen:**
 
@@ -49,7 +49,7 @@
 
 ## 4. Shallow seas
 
-**Narration:** In the Sea group, widen the continental shelf to point two and set the ocean scale to two hundred, for broad shallow seas along the coasts.
+**Narration:** In the Sea group, widen the continental shelf to zero point two and set the ocean scale to two hundred, for broad shallow seas along the coasts.
 
 **On screen:**
 
@@ -62,7 +62,7 @@
 
 ## 5. More detail
 
-**Narration:** Finally, raise Detail to eight, for finer, rockier ground. That is the tutorial map's terrain.
+**Narration:** Finally, raise Detail to eight, for finer, rockier ground. That is the Tutorial world's terrain. Next we'll make some fine adjustments by hand.
 
 **On screen:**
 
@@ -77,7 +77,7 @@
 
 ## 6. Start terraforming
 
-**Narration:** Click Start terraforming. The brushes come into use on the bar, with Raise chosen. Make the brush wide, gentle and soft: size forty, strength point zero one, feather point eight.
+**Narration:** Click Start terraforming. Terrain brushes come into use on the bar, with Raise chosen. Make the brush wide, gentle and soft: size forty, strength nought point zero one, feather nought point eight.
 
 **On screen:**
 
@@ -95,7 +95,7 @@
 
 ## 7. Raise a ridge
 
-**Narration:** Zoom in on the big island to the east, and drag along its spine. One gentle stroke raises a low ridge that blends into the hills. Brush strokes are kept separately from the generated terrain, so you can still change the settings later.
+**Narration:** Zoom in on the island to the east, and drag along its spine. One gentle stroke raises a low ridge that blends into the hills. Brush strokes are kept separately from the generated terrain, so you can undo them if you make a mistake.
 
 **On screen:**
 
@@ -110,7 +110,7 @@
 
 ## 8. Wear down the mountains
 
-**Narration:** The northern island has a sharp range of mountains. Choose Smooth from More on the bar, and drag along the range a few times. The peaks come down, but the ground is left far too smooth.
+**Narration:** The northern island has a sharp range of mountains. Choose Smooth from the bar. It could be inside the More button if your screen is not wide enough. Once you have it selected, drag along the range a few times. You'll see the peaks reduce in height, but the ground is left far too smooth.
 
 **On screen:**
 
@@ -131,7 +131,7 @@
 
 ## 9. Bring back the texture
 
-**Narration:** Then choose Roughen and drag along the island once. The texture comes back without the height, and the range becomes rolling hills.
+**Narration:** To bring back some of the detail choose Roughen and drag along the island once. The texture comes back without the height, and the range becomes rolling hills. Unlike Smooth which gets stronger the more times you use it, you only need to use Roughen once over an area.
 
 **On screen:**
 
@@ -146,7 +146,7 @@
 
 ## 10. Stop terraforming
 
-**Narration:** Stop terraforming.
+**Narration:** Now stop terraforming.
 
 **On screen:**
 
@@ -158,7 +158,7 @@
 
 ## 11. Save
 
-**Narration:** And save the map. Next, the climate and the biomes.
+**Narration:** And save the map. Next, we're going to look at the climate and the biomes.
 
 **On screen:**
 

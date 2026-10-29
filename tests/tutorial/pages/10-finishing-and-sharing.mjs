@@ -19,7 +19,7 @@ export default {
     start: "09-exploring-the-world",
     goal: "Give the map its finishing touches, export it as an image, and keep a backup of your maps.",
     intro: `The **Finish** stage of the rail has two tools. **Cartography** adds what is drawn over the map: a scale bar, a border, the grid and decorations such as a compass rose. **Export** turns the map into a PNG image, and in Foundry into a scene. An export shows the map as the map controls show it, so choosing what to include is part of exporting.`,
-    narration: "In this video we finish the map with a scale bar and a border, set its grid, export it as an image, and back it up.",
+    narration: "In this tutorial we're going to finish the map with a scale bar and a border, set its grid, export it as an image, and back it up.",
 
     steps: [
         {
@@ -38,7 +38,7 @@ export default {
             screenshot: { name: "scale-bar", region: { map: CORNER }, mapOnly: true },
             caption: "The scale bar and the ornate border in the map's bottom left corner.",
             note: "Choose **Move** on the bar to drag the scale bar elsewhere. **Add decoration** adds an image of your own over the map, such as a compass rose or a title cartouche; while you hold one in Move mode, scroll to turn it and Shift+Scroll to resize it.",
-            narration: "Open Cartography. Turn on the scale bar, which matches the world's own scale, and an ornate border.",
+            narration: "Open Cartography. Turn on the scale bar, which matches the world's own scale, and choose an ornate border.",
             pause: 4,
         },
         {
@@ -68,7 +68,7 @@ export default {
             screenshot: { name: "clean", region: "studio" },
             caption: "The finished map, with the grid and contours hidden.",
             note: "Items set to **GM only** are left out of a player image. In Foundry, a scene export puts them on a hidden overlay tile that only the GM sees.",
-            narration: "Hide the grid and the contour lines for a clean map. What the map controls show is what an export shows.",
+            narration: "Hide the grid and the contour lines for a clean map. What the map controls show on screen is what an export shows.",
             pause: 3,
         },
         {
@@ -83,7 +83,7 @@ export default {
             settle: false,
             screenshot: { name: "png", region: "dialog", pad: 8 },
             caption: "The Export to PNG dialogue, with the recommended scale chosen.",
-            narration: "Open Export and click Export to PNG. The dialogue recommends a scale at which the smallest names can be read.",
+            narration: "Open Export and click Export to PNG. The dialogue recommends a scale where the smallest names can be read.",
             pause: 3,
         },
         {
@@ -91,7 +91,7 @@ export default {
             title: "Save the image",
             instruction: "Click **Confirm**. The studio draws the image at that scale and saves it to your browser's downloads, named after the map (`fwmb_tutorial_world.png`).",
             action: [{ do: "dialog", button: "ok", label: "Confirm" }],
-            narration: "Confirm, and the image is saved to your downloads.",
+            narration: "Click Confirm and, depending on your browser, you'll either be prompted where to save the image or it will be saved in your downloads.",
         },
         {
             id: "save",
@@ -104,7 +104,7 @@ export default {
                 { do: "click", target: '[data-region="context"] [data-action="backUpMaps"]', label: "Back up all maps" },
                 { do: "settle" },
             ],
-            narration: "Save the map, then back up all your maps in one file from the Maps tool. Next, a regional map.",
+            narration: "Save the map, then back up all your maps in one file from the Maps tool. Next, we're going to make a regional map.",
         },
     ],
 

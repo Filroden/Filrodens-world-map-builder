@@ -4,11 +4,11 @@
 
 **Goal:** Give the map its finishing touches, export it as an image, and keep a backup of your maps.
 
-**Opening narration:** In this video we finish the map with a scale bar and a border, set its grid, export it as an image, and back it up.
+**Opening narration:** In this tutorial we're going to finish the map with a scale bar and a border, set its grid, export it as an image, and back it up.
 
 ## 1. Add a scale bar and a border
 
-**Narration:** Open Cartography. Turn on the scale bar, which matches the world's own scale, and an ornate border.
+**Narration:** Open Cartography. Turn on the scale bar, which matches the world's own scale, and choose an ornate border.
 
 **On screen:**
 
@@ -43,7 +43,7 @@
 
 ## 3. Choose what to export
 
-**Narration:** Hide the grid and the contour lines for a clean map. What the map controls show is what an export shows.
+**Narration:** Hide the grid and the contour lines for a clean map. What the map controls show on screen is what an export shows.
 
 **On screen:**
 
@@ -59,7 +59,7 @@
 
 ## 4. Export a PNG
 
-**Narration:** Open Export and click Export to PNG. The dialogue recommends a scale at which the smallest names can be read.
+**Narration:** Open Export and click Export to PNG. The dialogue recommends a scale where the smallest names can be read.
 
 **On screen:**
 
@@ -75,7 +75,7 @@
 
 ## 5. Save the image
 
-**Narration:** Confirm, and the image is saved to your downloads.
+**Narration:** Click Confirm and, depending on your browser, you'll either be prompted where to save the image or it will be saved in your downloads.
 
 **On screen:**
 
@@ -87,7 +87,7 @@
 
 ## 6. Save and back up
 
-**Narration:** Save the map, then back up all your maps in one file from the Maps tool. Next, a regional map.
+**Narration:** Save the map, then back up all your maps in one file from the Maps tool. Next, we're going to make a regional map.
 
 **On screen:**
 

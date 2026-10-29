@@ -4,7 +4,7 @@
 
 **Goal:** Make the generated realms your own, merging, renaming and recolouring them, and paint a region of your own in a set of its own.
 
-**Opening narration:** In this video we make the generated realms our own, and paint a region of our own.
+**Opening narration:** In this tutorial we're going to make the generated realms our own, and paint a region of our own.
 
 ## 1. Open Regions
 
@@ -57,7 +57,7 @@
 
 ## 4. Confirm
 
-**Narration:** Confirm, and the island is one realm, its duchies and counties unchanged.
+**Narration:** Click Confirm, and the island becomes one realm, its duchies and counties are unchanged but all are reassigned to the single realm.
 
 **On screen:**
 
@@ -105,7 +105,7 @@
 
 ## 7. Paint the Red Hills
 
-**Narration:** Add a region called The Red Hills, choose Paint, and paint over the eastern desert. While you paint, only this layer is drawn.
+**Narration:** Add a region called The Red Hills. Choose Paint, and paint over the eastern desert. While you paint, only this layer is drawn.
 
 **On screen:**
 
@@ -128,7 +128,7 @@
 
 ## 8. Stop and save
 
-**Narration:** Stop painting and save. Next, the roads.
+**Narration:** Stop painting and save. Next, we're going to draw some roads.
 
 **On screen:**
 

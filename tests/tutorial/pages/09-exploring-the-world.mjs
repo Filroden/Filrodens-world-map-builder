@@ -31,7 +31,7 @@ export default {
     start: "08-places-and-labels",
     goal: "Read what the generator worked out about your world, see it as it was in an earlier age, and time a journey across it.",
     intro: `A run of **Generate** works out more than it places on the map: how many people live on every part of the land, which people they are, how much trade passes along each route, and what the world was like in each of its ages. The **thematic layers**, in the map controls, draw those figures over the map. The **History** and **Travel** tools, in the **Explore** stage of the rail, are for looking at a finished world: History shows it as it was in an earlier age, and Travel shows how long journeys take. None of them changes the map.`,
-    narration: "In this video we explore the world the generator made: its people and trade, its history, and how long it takes to cross.",
+    narration: "In this tutorial we're going to explore the world the generator made: its people and trade, its history, and how long it takes to travel.",
 
     steps: [
         {
@@ -50,7 +50,7 @@ export default {
             screenshot: { name: "population", region: "studio", pointer: MOSTADRA_LAND },
             caption: "Population, with the information bar and the legend reading the land near Mostadra.",
             note: "**Capacity** shows how many people the land could feed, on the same scale, so where Capacity is darker than Population there is room for more. **Cleared land** and **Danger** show the farmland and the toll of raiding and strife. **Opacity**, at the foot of the menu, sets how strongly a layer covers the map.",
-            narration: "Turn off the region fills, and show the Population layer. The darker the red, the more people live there. The information bar and the legend read the value under the pointer.",
+            narration: "Turn off the region fills, and show the Population layer. The darker the red, the more people live there. The information bar and the legend show the value under your mouse pointer.",
             pause: 4,
         },
         {
@@ -98,7 +98,7 @@ export default {
             ],
             screenshot: { name: "age-1", region: "studio" },
             caption: "The world in Age 1, with its realms, places and peoples.",
-            narration: "Open History. It shows the world in its first age: its own realms, towns and roads, and its peoples. In this age the whole land is Valefolk; the Hillfolk haven't arrived yet.",
+            narration: "Open History. It shows the world in its first age: its original realms, towns and roads, and its peoples. In this age the whole land is Valefolk; the Hillfolk don't arrive until the second age.",
             pause: 4,
         },
         {
@@ -109,7 +109,7 @@ export default {
             screenshot: { name: "what-changed", region: { union: ["map", { selector: 'details.fwmb-section:has(summary:has-text("What changed"))' }] } },
             caption: "The present, with what changed since Age 1.",
             note: "**Export to PNG** at the foot of the panel saves the map of the age shown, named with the age, so a set of images can tell your world's story.",
-            narration: "Choose the present age and compare. The Hillfolk invaded and now hold most of the land. What changed lists the realms that fell and rose, and how each people's share of the land grew or shrank.",
+            narration: "Choose the present age and compare it. The Hillfolk invaded and now hold most of the land. What changed lists the realms that fell and rose, and how each people's share of the land grew or shrank.",
             pause: 4,
         },
         {
@@ -126,7 +126,7 @@ export default {
             screenshot: { name: "journey", region: "studio", pointer: NEWCESTED },
             caption: "By wagon from Kansmarda: the day bands, and the way to Newcested.",
             note: "Try **On foot**: a wagon is quick on the roads and slow off them, so its bands stretch along the roads, while a walker's spread more evenly. While Travel is open, its day bands take the colour layer's place, and **Opacity** in the Thematic layers menu sets how strongly they cover the map.",
-            narration: "Open Travel, choose By wagon, and click Kansmarda to start. The bands show the days to reach every part of the land. Point at Newcested, and the way is drawn: by road to the coast, then by ship.",
+            narration: "Open Travel, choose By wagon, and click Kansmarda to start. The bands show the days to reach every part of the land. Point at Newcested, and the way is drawn: by road to the coast, and then by ship.",
             pause: 5,
         },
         {
@@ -143,7 +143,7 @@ export default {
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "expect", check: (studio) => !studio.isDirty || "the map was not saved", within: 30000 },
             ],
-            narration: "Set the layers back, and save. Next, finishing the map and exporting it.",
+            narration: "Turn the layers off and the region fills back on, and save. Next, we're going to finish the map and export it.",
         },
     ],
 
