@@ -48,7 +48,7 @@ export default {
     fixture: "tests/mesh/fixtures/p0jbva.json",
     goal: "Add and remove river sources, draw a river of your own, and open a rift valley with a tectonic feature, reshaping it by its points and with Undo.",
     intro: `Rivers are worked out by themselves: they rise where the land is high and wet enough, and run downhill to the sea or into another river, pooling into lakes in hollows on the way. The **Rivers and faults** tool lets you move where they rise, draw rivers of your own, and draw tectonic features that reshape the land around a line.`,
-    narration: "In this video we finish shaping the land: we add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.",
+    narration: "In this tutorial we're going to finish shaping the land: we'll add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.",
 
     steps: [
         {
@@ -61,7 +61,7 @@ export default {
             ],
             screenshot: { name: "sources", region: "studio" },
             caption: "Source mode: a ring marks every river source.",
-            narration: "Open Rivers and faults, the last tool in the Shape group, and choose Source on the bar. A ring marks each place a river rises.",
+            narration: "Open Rivers and faults, the last tool in the Shape group on the rail, and choose Source on the bar. A ring marks each place a river rises from the ground.",
             pause: 3,
         },
         {
@@ -75,7 +75,7 @@ export default {
             screenshot: { name: "desert-river", region: { map: [930, 380, 1370, 760] }, mapOnly: true },
             caption: "The new river crossing the desert.",
             note: "A river source you add makes a river whatever the land and climate are like there. Drag a source to move it.",
-            narration: "The desert in the east has no rivers. Click its high ground to add a river source, and a river runs west across the desert.",
+            narration: "The desert in the east has no rivers. Click its high ground to add a river source, and a river will automatically be drawn that follows the terrain and runs west across the desert.",
             pause: 4,
         },
         {
@@ -89,7 +89,7 @@ export default {
             ],
             screenshot: { name: "removed", region: { map: [340, 290, 600, 480] }, mapOnly: true },
             caption: "A removed river source, marked in black.",
-            narration: "In the crowded north-west, Ctrl-click a ring to remove that river source. Its river is gone, and a marker remembers where it was.",
+            narration: "In the crowded north-west, Ctrl-click a ring to remove a river source. Its river is now gone, and a marker remembers where it was.",
             pause: 3,
         },
         {
@@ -127,7 +127,7 @@ export default {
             screenshot: { name: "rift", region: { map: SOUTH }, mapOnly: true },
             caption: "The rift across the south of the continent, open to the sea at both ends.",
             note: "> **Tip:** draw a tectonic feature where the land or seabed suits it: a rift across a continent, a mountain range along high ground, a subduction zone along a coast facing the ocean, a hotspot chain across open sea. See [[Rivers and faults]] for each feature's settings, which open in the inspector.",
-            narration: "Now a tectonic feature. Choose Fault, set the type to Rift, the thickness to ninety and the strength to point one five, and draw a line across the south of the continent, from sea to sea. The land is pulled apart into a rift valley.",
+            narration: "Now let's add a tectonic feature. Choose Fault, set the type to Rift, the thickness to ninety and the strength to nought point one five, and draw a line across the south of the continent, from sea to sea. The land is pulled apart into a rift valley.",
             pause: 5,
         },
         {
@@ -141,7 +141,7 @@ export default {
             screenshot: { name: "rift-moved", region: { map: SOUTH }, mapOnly: true },
             caption: "The rift with its middle point dragged south.",
             note: "While drawing, Shift+Click the line to add a point and Ctrl+Click a point to delete it.",
-            narration: "Lines keep their points, so you can reshape them. Drag the rift's middle point south, and the rift follows.",
+            narration: "Lines show their points, so you can reshape them. Drag the rift's middle point south, and the rift will follow.",
             pause: 3,
         },
         {
@@ -154,7 +154,7 @@ export default {
             ],
             screenshot: { name: "rift-undone", region: { map: SOUTH }, mapOnly: true },
             caption: "After Undo: the rift is back on its first line.",
-            narration: "Changed your mind? Click Undo, and the point and the rift go back. Every change is one step of undo, and Redo puts it back again.",
+            narration: "Changed your mind? Click Undo, and the point and the rift go back. Every change is one step of undo, and Redo puts it back again. Both will show you the area of the map where the change will happen.",
             pause: 3,
         },
         {
@@ -168,7 +168,7 @@ export default {
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "expect", check: (studio) => !studio.isDirty || "the map was not saved", within: 30000 },
             ],
-            narration: "Stop drawing and save. The land is finished; next, we populate it.",
+            narration: "Stop drawing and save. The land is finished; next, we're going to populate it.",
             pause: 4,
         },
     ],

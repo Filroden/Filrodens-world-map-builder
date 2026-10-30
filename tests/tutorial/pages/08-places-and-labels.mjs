@@ -35,7 +35,7 @@ export default {
     intro: `Places are **pins**: a point on the map with an icon, a name and a description. The run on page 5 placed nearly two thousand, from capitals to villages, each on a **pin style** (Capital, City, Town, Castle and so on) that sets its look and the **detail levels** at which it and its name are shown.
 
 Every name on the map is a **label**: the labels of pins, routes and regions follow their owner's name, and **standalone** labels name anything else, such as a sea or a mountain range. Names are placed so they don't cover each other; a name with no room is left out until you place it yourself.`,
-    narration: "In this video we work with the map's places and names: we keep a generated city, add a castle of our own, name a sea, and place a name the map had no room for.",
+    narration: "In this tutorial we're going to work with the map's places and names: we'll lock a generated city so it is kept, add a castle of our own, name a sea, and move a name the map had no room for.",
 
     steps: [
         {
@@ -97,7 +97,7 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
             screenshot: { name: "castles", region: { map: HILLS }, mapOnly: true },
             caption: "Redwatch, west of the King's Road, with the names of the run's castles now shown.",
             note: "A style changes every pin that follows it, so making every town larger, or every ruin red, is one edit. **Save as…** in a pin's inspector makes a new style from a pin you have tuned.",
-            narration: "Open Styles and icons, choose the Castle style, and show its names from the Province level. Every castle follows the style, Redwatch with them.",
+            narration: "Open Styles and icons, choose the Castle style, and show its names from the Province level. Every castle follows the style, Redwatch with them, so you should see their names appear.",
             pause: 4,
         },
         {
@@ -143,7 +143,7 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
             ],
             screenshot: { name: "placed", region: { map: HILLS }, mapOnly: true },
             caption: "Southamney, dragged into a place of its own.",
-            narration: "Drag it a little south, below the town names. A name you've placed yourself stays where you put it.",
+            narration: "Drag it a little south, below the town names. A name you've placed yourself stays where you put it and other names will move to make space.",
             pause: 4,
         },
         {
@@ -170,7 +170,7 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "expect", check: (studio) => !studio.isDirty || "the map was not saved", within: 30000 },
             ],
-            narration: "Stop placing and save. Next, the world's history.",
+            narration: "Stop placing and save. Next, we're going to explore the world's history.",
         },
     ],
 

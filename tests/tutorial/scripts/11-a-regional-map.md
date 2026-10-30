@@ -4,11 +4,11 @@
 
 **Goal:** Cut a regional map of the Red Hills from the world map, fill it in with villages and market towns, and read it closely.
 
-**Opening narration:** In this video we cut a regional map of the Red Hills from the world, and fill it in with villages and market towns.
+**Opening narration:** In this tutorial we're going to crop a regional map of the Red Hills from the world map, and fill it in with additional villages and market towns.
 
 ## 1. Draw the crop
 
-**Narration:** Open New map and set the new map's width. Choose Crop and drag round the Red Hills: the crop fits itself to the grid at four times the detail. Tick Fill in villages and market towns.
+**Narration:** Open New map and set the new map's width. Choose Crop and drag around the Red Hills: the crop fits itself to the grid at four times the detail. Tick Fill in villages and market towns.
 
 **On screen:**
 
@@ -40,7 +40,7 @@
 
 ## 3. Open it
 
-**Narration:** Open it from Maps, where it's listed under the world it came from. The terrain is drawn in far more detail.
+**Narration:** Open it from Maps, where it's listed under the world it came from. The terrain is the same as the world map but is now drawn in far more detail.
 
 **On screen:**
 
@@ -56,7 +56,7 @@
 
 ## 4. See the villages
 
-**Narration:** Set the Detail level to Local. The villages and market towns of the fill-in appear, joined to the roads by lanes.
+**Narration:** Set the Detail level to Local. The villages and market towns that were filled-in will appear, joined to the roads by lanes.
 
 **On screen:**
 

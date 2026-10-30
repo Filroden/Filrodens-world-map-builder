@@ -31,7 +31,7 @@ export default {
     start: "06-realms-and-provinces",
     goal: "Draw a road and a sea lane of your own by their waypoints, and reshape a route by moving a waypoint.",
     intro: `The **Routes and pins** tool places the lines and points of the map: **routes** (roads, sea lanes and the river trade the run made) and **pins** (places). A route is a chain of **waypoints**, and the module finds the way between each pair for you over the map's cells: a road keeps to land and winds round steep ground, a sea lane keeps to water.`,
-    narration: "In this video we draw routes of our own: a road through the Red Hills, and a sea lane to the island realm.",
+    narration: "In this tutorial we're going to draw routes of our own: a road through the Red Hills, and a sea lane to the island realm.",
 
     steps: [
         {
@@ -62,7 +62,7 @@ export default {
             screenshot: { name: "road", region: { map: HILLS }, mapOnly: true },
             caption: "The new road, found over the terrain between its three waypoints.",
             note: "Drag instead of clicking to trace a stretch: when you let go, the stroke's bends become waypoints. Backspace, Ctrl+Z or **Undo** takes the last click back while you draw.",
-            narration: "Choose Draw, set the style to Trunk road, and click three towns through the Red Hills. The road between them is found over the terrain. Press Enter to finish.",
+            narration: "Choose Draw, set the style to Trunk road, and click three towns through the Red Hills. The road between them is drawn based on the terrain, finding the easiest way between them. Press Enter to finish.",
             pause: 4,
         },
         {
@@ -75,7 +75,7 @@ export default {
             ],
             screenshot: { name: "inspector", region: "inspector" },
             caption: "The King's Road in the route inspector.",
-            narration: "Name it The King's Road.",
+            narration: "Now let's name it The King's Road.",
         },
         {
             id: "waypoint",
@@ -110,7 +110,7 @@ export default {
             ],
             screenshot: { name: "sea-lane", region: { map: [1300, 700, 1560, 1060] }, mapOnly: true },
             caption: "The Islemark Crossing, from the continent to Islemark.",
-            narration: "Now a sea lane. Set the transport to Sea and the style to Sea lane, and click the water off the coast, then off Islemark's capital. The lane keeps to the water. Name it The Islemark Crossing.",
+            narration: "Now we're going to add a sea lane. Set the transport to Sea and the style to Sea lane, and click the water off the coast, then off Islemark's capital. The lane keeps to the water. Name it The Islemark Crossing.",
             pause: 4,
         },
         {
@@ -123,7 +123,7 @@ export default {
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "expect", check: (studio) => !studio.isDirty || "the map was not saved", within: 30000 },
             ],
-            narration: "Stop drawing and save. Next, places and their names.",
+            narration: "Stop drawing and save. Next, we're going to look at places and their names.",
         },
     ],
 

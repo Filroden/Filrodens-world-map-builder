@@ -25,7 +25,7 @@ export default {
     intro: `The **Regions** tool shows the map's areas: kingdoms and their duchies, but also climate bands, trade zones or a campaign's explored land. Regions are painted onto the map's cells, so neighbouring regions always share their border exactly. They are organised in **layer sets** (one way of dividing the map), each holding **layers** (Realms, then Duchies below them, then Counties), each holding its **regions**.
 
 The run on page 5 made a set called **Political**. Anything you change in it is kept when you generate again.`,
-    narration: "In this video we make the generated realms our own, and paint a region of our own.",
+    narration: "In this tutorial we're going to make the generated realms our own, and paint a region of our own.",
 
     steps: [
         {
@@ -79,7 +79,7 @@ The run on page 5 made a set called **Political**. Anything you change in it is 
                 { do: "dialog", button: "ok", label: "Confirm" },
                 { do: "expect", check: (studio) => !studio.layerSets.find((set) => set.name === "Political").levels[0].regions.some((region) => region.name === "Chisted") || "Chisted is still a realm", within: 30000 },
             ],
-            narration: "Confirm, and the island is one realm, its duchies and counties unchanged.",
+            narration: "Click Confirm, and the island becomes one realm, its duchies and counties are unchanged but all are reassigned to the single realm.",
         },
         {
             id: "rename",
@@ -131,7 +131,7 @@ The run on page 5 made a set called **Political**. Anything you change in it is 
             screenshot: { name: "red-hills", region: { map: [960, 330, 1400, 720] }, mapOnly: true },
             caption: "The Red Hills painted over the eastern desert.",
             note: "**Fill** on the bar gives a whole connected area to the region in one click, and **Erase** takes cells away. On a layer below another, a region paints only inside its parent region.",
-            narration: "Add a region called The Red Hills, choose Paint, and paint over the eastern desert. While you paint, only this layer is drawn.",
+            narration: "Add a region called The Red Hills. Choose Paint, and paint over the eastern desert. While you paint, only this layer is drawn.",
             pause: 4,
         },
         {
@@ -144,7 +144,7 @@ The run on page 5 made a set called **Political**. Anything you change in it is 
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "expect", check: (studio) => !studio.isDirty || "the map was not saved", within: 30000 },
             ],
-            narration: "Stop painting and save. Next, the roads.",
+            narration: "Stop painting and save. Next, we're going to draw some roads.",
         },
     ],
 

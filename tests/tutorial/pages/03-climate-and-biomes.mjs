@@ -39,7 +39,7 @@ export default {
     start: "02-shaping-the-land",
     goal: "See how the biomes are worked out from the climate, add a biome of your own with a rule for where it grows, and paint it by hand.",
     intro: `The module works out a biome for every point of the map from four things: its height, how wet it is, how warm it is, and the latitude. Moisture follows the prevailing winds, so mountains cast rain shadows; temperature falls with latitude and with height. The **Biomes** tool sets the climate these come from, and lets you add biomes of your own.`,
-    narration: "In this video we look at how biomes are worked out, add a biome of our own, give it a rule so it appears by itself, and paint it by hand.",
+    narration: "In this tutorial we're going to look at how biomes are worked out, add a biome of our own, give it a rule so it appears automatically, and paint it by hand in an area it would not normally appear.",
 
     steps: [
         {
@@ -49,7 +49,7 @@ export default {
             action: { do: "tool", tool: "biomes", label: "Biomes" },
             screenshot: { name: "biomes", region: "studio" },
             caption: "The Biomes tool, with the Climate and Moisture sections.",
-            narration: "Open the Biomes tool, the third on the rail. Climate and Moisture set the world's temperature and rainfall. We keep them as they are.",
+            narration: "Open the Biomes tool, the third on the rail. Climate and Moisture set the world's temperature and rainfall. We'll keep those as they are.",
             pause: 3,
         },
         {
@@ -59,7 +59,7 @@ export default {
             action: { do: "hover", at: UPLAND_POINT, label: "Point at the north-east of the continent." },
             screenshot: { name: "read", region: { selector: ".fwmb-canvas-readout" }, pointer: UPLAND_POINT, pad: 6 },
             caption: "The information bar reads the point under the pointer.",
-            narration: "Point at the map, and the information bar reads that point: its elevation, moisture, temperature and biome.",
+            narration: "Hover your mouse over the map. The information bar reads that point and shows you its elevation, moisture, temperature and biome.",
         },
         {
             id: "add-biome",
@@ -76,7 +76,7 @@ export default {
             screenshot: { name: "custom-biome", region: "dialog", pad: 8 },
             caption: "The custom biome dialogue for Moorland.",
             note: "**Behaves like** tells [[Generate]] how to treat the biome's land, for farming, travel and cover. **The biome beneath** treats moorland as whatever the climate would give there.",
-            narration: "Open Edit biomes and add a custom biome. Call it Moorland and give it a heather colour.",
+            narration: "Open the Edit biomes section and add a custom biome. Call it Moorland and give it a heather colour.",
         },
         {
             id: "confirm-biome",
@@ -86,7 +86,7 @@ export default {
                 { do: "dialog", button: "ok", label: "Confirm" },
                 { do: "expect", check: (studio) => (studio.uiState.customBiomes ?? []).some((biome) => biome.name === "Moorland") || "no Moorland biome" },
             ],
-            narration: "Confirm. Moorland has no rules yet, so it only appears where we paint it.",
+            narration: "Click Confirm. Moorland has no rules yet, so it only appears where we paint it.",
         },
         {
             id: "rule",
@@ -111,7 +111,7 @@ export default {
             screenshot: { name: "rule", region: "dialog", pad: 8 },
             caption: "Moorland's rule: uplands, moisture up to 0.45, temperature up to 0.50.",
             note: "Rules run from the top: the first whose ranges all match a point wins, and the built-in biomes, listed below yours, catch every point no rule matches.",
-            narration: "Open the rule editor and add a rule for Moorland. Choose the Upland band for elevation, then drag moisture and temperature down to cool, fairly dry ground.",
+            narration: "Open the Biome rule editor and add a rule for Moorland. Choose the Upland band for elevation, then drag moisture and temperature down to cool, fairly dry ground.",
             pause: 4,
         },
         {
@@ -121,7 +121,7 @@ export default {
             action: { do: "dialog", button: "Accept" },
             screenshot: { name: "moorland", region: { map: [400, 0, 1500, 800] }, mapOnly: true },
             caption: "Moorland on the northern uplands.",
-            narration: "Accept, and moorland appears across the cool northern uplands.",
+            narration: "Now click Accept, and moorland appears across the cool uplands.",
             pause: 4,
         },
         {
@@ -138,7 +138,7 @@ export default {
             screenshot: { name: "painted", region: { map: ISLAND }, mapOnly: true },
             caption: "Moorland painted on the crest of the island's ridge.",
             note: "The biome brush paints its whole circle at once and only where a biome's placement allows: a land biome only on land. **Erase** on the bar takes a painted biome away again.",
-            narration: "Then paint it by hand. Start painting, choose Moorland, and paint a few short strokes along the top of the ridge on the eastern island.",
+            narration: "Next we'll paint the biome by hand. Click Start painting and choose Moorland from the bar. Paint a few short strokes along the top of the ridge on the eastern island.",
             camera: { zoom: 3, centre: [1560, 1100] },
             pause: 4,
         },
@@ -151,7 +151,7 @@ export default {
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "expect", check: (studio) => !studio.isDirty || "the map was not saved", within: 30000 },
             ],
-            narration: "Stop painting and save. Next, the rivers.",
+            narration: "Stop painting and save. Next, we're going to add some rivers.",
         },
     ],
 

@@ -37,7 +37,7 @@ export default {
     intro: `On a Guided map your land masks decide where the land is; the **Terrain** tool decides what it looks like. Its **Generation** settings shape the coast and the rise of the land and sea floor across the whole map, and its brushes let you sculpt the ground in one place.
 
 Each **Generation** setting rebuilds the whole map, which takes a few seconds at this size: wait for the map to update before changing the next one.`,
-    narration: "In this video we use the Terrain tool to give the tutorial map its shape: a gentler coast, broad lowlands and wide shallow seas. Then we sculpt a ridge by hand.",
+    narration: "In this tutorial we're going to use the Terrain tool to give our Tutorial world its final shape: a gentler coastline, broad lowlands and wide shallow seas. And then we'll sculpt a ridge by hand.",
 
     steps: [
         {
@@ -55,7 +55,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
             title: "A smoother coast",
             instruction: "Set **Coastal fracture** to `0.1`. It bends the edges of the land: higher values break the coast into bays, inlets and small islands; lower values keep it rounder. It is the only setting here that moves the coastline itself.",
             action: slider("coastlineFracture", 0.1, "Coastal fracture"),
-            narration: "Lower Coastal fracture to point one, for a smoother coast with fewer small islands.",
+            narration: "Lower Coastal fracture to nought point one, for a smoother coast with fewer small islands.",
         },
         {
             id: "land",
@@ -64,7 +64,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
             action: [slider("coastalPlain", 0.2, "Coastal plains"), slider("continentScale", 400, "Continent scale")],
             screenshot: { name: "land", region: "studio" },
             caption: "Wider coastal plains and a larger continent scale: the land rises slowly from broad lowlands.",
-            narration: "In the Land group, widen the coastal plains to point two and raise the continent scale to four hundred. The land now rises slowly from broad lowlands.",
+            narration: "In the Land group, widen the coastal plains to zero point two and raise the continent scale to four hundred. The land now rises slowly from broad lowlands.",
             pause: 3,
         },
         {
@@ -72,7 +72,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
             title: "Shallow seas",
             instruction: "In **Sea**, set **Continental shelf** to `0.2` and **Ocean scale** to `200`. The continental shelf is a band of shallow sea along the coast; ocean scale is how far out the seabed then takes to fall to the deep ocean floor. Leave **Mid-ocean ridges** at 0.5.",
             action: [slider("shelfRange", 0.2, "Continental shelf"), slider("oceanScale", 200, "Ocean scale")],
-            narration: "In the Sea group, widen the continental shelf to point two and set the ocean scale to two hundred, for broad shallow seas along the coasts.",
+            narration: "In the Sea group, widen the continental shelf to zero point two and set the ocean scale to two hundred, for broad shallow seas along the coasts.",
         },
         {
             id: "detail",
@@ -93,7 +93,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
             screenshot: { name: "detail", region: "studio" },
             caption: "The tutorial map with all its terrain settings.",
             note: "> **Tip:** a higher **Detail** takes longer to generate. On your own maps, keep it at the default while you try things out and raise it before you export.",
-            narration: "Finally, raise Detail to eight, for finer, rockier ground. That is the tutorial map's terrain.",
+            narration: "Finally, raise Detail to eight, for finer, rockier ground. That is the Tutorial world's terrain. Next we'll make some fine adjustments by hand.",
             pause: 4,
         },
         {
@@ -110,7 +110,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
             ],
             screenshot: { name: "brushes", region: { union: ["bar", "panel"] } },
             caption: "Terraforming: the brushes and their settings on the bar, and the paused Generation section.",
-            narration: "Click Start terraforming. The brushes come into use on the bar, with Raise chosen. Make the brush wide, gentle and soft: size forty, strength point zero one, feather point eight.",
+            narration: "Click Start terraforming. Terrain brushes come into use on the bar, with Raise chosen. Make the brush wide, gentle and soft: size forty, strength nought point zero one, feather nought point eight.",
             pause: 3,
         },
         {
@@ -124,7 +124,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
             screenshot: { name: "ridge", region: { map: ISLAND }, mapOnly: true },
             caption: "The island with its new ridge.",
             note: "Brush strokes are kept as strokes, laid over the generated terrain, so you can still change the **Generation** settings afterwards and the ridge stays.",
-            narration: "Zoom in on the big island to the east, and drag along its spine. One gentle stroke raises a low ridge that blends into the hills. Brush strokes are kept separately from the generated terrain, so you can still change the settings later.",
+            narration: "Zoom in on the island to the east, and drag along its spine. One gentle stroke raises a low ridge that blends into the hills. Brush strokes are kept separately from the generated terrain, so you can undo them if you make a mistake.",
             camera: { zoom: 3, centre: [1560, 1100] },
             pause: 4,
         },
@@ -145,7 +145,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
             screenshot: { name: "smoothed", region: { map: NORTH_ISLAND }, mapOnly: true },
             caption: "The island's mountains after Smooth: lower, but too smooth.",
             note: "Smooth never moves the coastline, so you can smooth right up to and across a coast.",
-            narration: "The northern island has a sharp range of mountains. Choose Smooth from More on the bar, and drag along the range a few times. The peaks come down, but the ground is left far too smooth.",
+            narration: "The northern island has a sharp range of mountains. Choose Smooth from the bar. It could be inside the More button if your screen is not wide enough. Once you have it selected, drag along the range a few times. You'll see the peaks reduce in height, but the ground is left far too smooth.",
             camera: { zoom: 2, centre: [1850, 630] },
             pause: 4,
         },
@@ -160,7 +160,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
             screenshot: { name: "roughened", region: { map: NORTH_ISLAND }, mapOnly: true },
             caption: "After Roughen: the range has become textured hills.",
             note: "**Strength** and **Feather** are hidden while Roughen is chosen, since it always lays the same texture.",
-            narration: "Then choose Roughen and drag along the island once. The texture comes back without the height, and the range becomes rolling hills.",
+            narration: "To bring back some of the detail choose Roughen and drag along the island once. The texture comes back without the height, and the range becomes rolling hills. Unlike Smooth which gets stronger the more times you use it, you only need to use Roughen once over an area.",
             camera: { zoom: 2, centre: [1850, 630] },
             pause: 4,
         },
@@ -172,7 +172,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
                 { do: "click", target: { role: "button", name: "Stop terraforming" }, label: "Stop terraforming" },
                 { do: "expect", check: (studio) => studio.brushEngine.history.length === 5 || `${studio.brushEngine.history.length} strokes on the map` },
             ],
-            narration: "Stop terraforming.",
+            narration: "Now stop terraforming.",
         },
         {
             id: "save",
@@ -182,7 +182,7 @@ Each **Generation** setting rebuilds the whole map, which takes a few seconds at
                 { do: "click", target: '.fwmb-rail-btn[data-action="saveMap"]', label: "Save map" },
                 { do: "expect", check: (studio) => !studio.isDirty || "the map was not saved", within: 30000 },
             ],
-            narration: "And save the map. Next, the climate and the biomes.",
+            narration: "And save the map. Next, we're going to look at the climate and the biomes.",
         },
     ],
 

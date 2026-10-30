@@ -4,7 +4,7 @@
 
 **Goal:** Keep a generated place, add a place of your own, change a pin style, name a sea, and place a name that had no room.
 
-**Opening narration:** In this video we work with the map's places and names: we keep a generated city, add a castle of our own, name a sea, and place a name the map had no room for.
+**Opening narration:** In this tutorial we're going to work with the map's places and names: we'll lock a generated city so it is kept, add a castle of our own, name a sea, and move a name the map had no room for.
 
 ## 1. Find a place
 
@@ -56,7 +56,7 @@
 
 ## 4. Change the Castle style
 
-**Narration:** Open Styles and icons, choose the Castle style, and show its names from the Province level. Every castle follows the style, Redwatch with them.
+**Narration:** Open Styles and icons, choose the Castle style, and show its names from the Province level. Every castle follows the style, Redwatch with them, so you should see their names appear.
 
 **On screen:**
 
@@ -109,7 +109,7 @@
 
 ## 7. Place it yourself
 
-**Narration:** Drag it a little south, below the town names. A name you've placed yourself stays where you put it.
+**Narration:** Drag it a little south, below the town names. A name you've placed yourself stays where you put it and other names will move to make space.
 
 **On screen:**
 
@@ -138,7 +138,7 @@
 
 ## 9. Stop and save
 
-**Narration:** Stop placing and save. Next, the world's history.
+**Narration:** Stop placing and save. Next, we're going to explore the world's history.
 
 **On screen:**
 

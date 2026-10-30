@@ -4,11 +4,11 @@
 
 **Goal:** See how the biomes are worked out from the climate, add a biome of your own with a rule for where it grows, and paint it by hand.
 
-**Opening narration:** In this video we look at how biomes are worked out, add a biome of our own, give it a rule so it appears by itself, and paint it by hand.
+**Opening narration:** In this tutorial we're going to look at how biomes are worked out, add a biome of our own, give it a rule so it appears automatically, and paint it by hand in an area it would not normally appear.
 
 ## 1. Open Biomes
 
-**Narration:** Open the Biomes tool, the third on the rail. Climate and Moisture set the world's temperature and rainfall. We keep them as they are.
+**Narration:** Open the Biomes tool, the third on the rail. Climate and Moisture set the world's temperature and rainfall. We'll keep those as they are.
 
 **On screen:**
 
@@ -22,7 +22,7 @@
 
 ## 2. Read the climate
 
-**Narration:** Point at the map, and the information bar reads that point: its elevation, moisture, temperature and biome.
+**Narration:** Hover your mouse over the map. The information bar reads that point and shows you its elevation, moisture, temperature and biome.
 
 **On screen:**
 
@@ -36,7 +36,7 @@
 
 ## 3. Add a custom biome
 
-**Narration:** Open Edit biomes and add a custom biome. Call it Moorland and give it a heather colour.
+**Narration:** Open the Edit biomes section and add a custom biome. Call it Moorland and give it a heather colour.
 
 **On screen:**
 
@@ -54,7 +54,7 @@
 
 ## 4. Confirm
 
-**Narration:** Confirm. Moorland has no rules yet, so it only appears where we paint it.
+**Narration:** Click Confirm. Moorland has no rules yet, so it only appears where we paint it.
 
 **On screen:**
 
@@ -66,7 +66,7 @@
 
 ## 5. Give it a rule
 
-**Narration:** Open the rule editor and add a rule for Moorland. Choose the Upland band for elevation, then drag moisture and temperature down to cool, fairly dry ground.
+**Narration:** Open the Biome rule editor and add a rule for Moorland. Choose the Upland band for elevation, then drag moisture and temperature down to cool, fairly dry ground.
 
 **On screen:**
 
@@ -85,7 +85,7 @@
 
 ## 6. Accept
 
-**Narration:** Accept, and moorland appears across the cool northern uplands.
+**Narration:** Now click Accept, and moorland appears across the cool uplands.
 
 **On screen:**
 
@@ -99,7 +99,7 @@
 
 ## 7. Paint moorland
 
-**Narration:** Then paint it by hand. Start painting, choose Moorland, and paint a few short strokes along the top of the ridge on the eastern island.
+**Narration:** Next we'll paint the biome by hand. Click Start painting and choose Moorland from the bar. Paint a few short strokes along the top of the ridge on the eastern island.
 
 **On screen:**
 
@@ -119,7 +119,7 @@
 
 ## 8. Stop painting
 
-**Narration:** Stop painting and save. Next, the rivers.
+**Narration:** Stop painting and save. Next, we're going to add some rivers.
 
 **On screen:**
 

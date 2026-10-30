@@ -4,11 +4,11 @@
 
 **Goal:** Find and change many items at once, control what your players see, and trace a map of your own from an existing image.
 
-**Opening narration:** In this last video: finding and changing many places at once, keeping secrets from your players, and tracing a map from an existing image.
+**Opening narration:** In this last tutorial we're going to look at finding and changing many places at once, keeping secrets from your players, and tracing a map from an existing image.
 
 ## 1. Search the lists
 
-**Narration:** Open Routes and pins. The pins list is long, so search it: type ford, and only the matching places are left.
+**Narration:** Open Routes and pins. The pins list is long, so search it: type ford, and only the matching places are shown.
 
 **On screen:**
 
@@ -23,7 +23,7 @@
 
 ## 2. Filter the lists
 
-**Narration:** Clear the search, and filter instead: generated pins of the kind Ruined town.
+**Narration:** Clear the search, and filter instead: select generated pins of the kind Ruined town.
 
 **On screen:**
 
@@ -37,7 +37,7 @@
 
 ## 3. Change them all at once
 
-**Narration:** Select items for mass edit, select all, and open Mass edit. Set the visibility to GM only.
+**Narration:** Now we will select items for mass edit. So select all, and open Mass edit. Set the visibility to GM only.
 
 **On screen:**
 
@@ -55,7 +55,7 @@
 
 ## 4. Confirm
 
-**Narration:** Confirm, and all thirteen change at once.
+**Narration:** Confirm, and all thirteen pins that were filtered will change at once.
 
 **On screen:**
 
@@ -67,7 +67,7 @@
 
 ## 5. Visibility and the views
 
-**Narration:** Everything on the map is visible to everyone, to the GM only, or hidden. The first three buttons of the map controls choose which you see. Here, with the GM view on, the ruins show.
+**Narration:** Everything on the map can either be visible to everyone, to the GM only, or hidden from everyone. The first three buttons of the map controls choose which you see. Here, with the GM view on, the ruins show.
 
 **On screen:**
 
@@ -129,7 +129,7 @@
 
 ## 9. Start a map to trace
 
-**Narration:** Now a new map, the same size as the sketch we'll trace. Create it, and delete the land masks it kept, so it starts as open sea.
+**Narration:** Now a new map, the same size as the sketch we'll trace. Create it, and delete the land masks it kept from our first map, so it starts as open sea.
 
 **On screen:**
 
@@ -147,7 +147,7 @@
 
 ## 10. Show the sketch
 
-**Narration:** Open the Reference image tool and choose the sketch. It lies over the map as a guide.
+**Narration:** Open the Reference image tool and choose the sketch. It sits over the map as a guide.
 
 **On screen:**
 
@@ -163,7 +163,7 @@
 
 ## 11. Trace it
 
-**Narration:** Back in New map, click round the island's coast and the isle, and draw the lake as ocean. The engine fills in the land.
+**Narration:** Back in New map, click around the island's coast and the isle, and draw the lake as ocean. The engine fills in the land and creates the lake inside it.
 
 **On screen:**
 
@@ -201,7 +201,7 @@
 
 ## 13. Smooth the coast
 
-**Narration:** In Terrain, lower the coastal fracture for a smoother coast, closer to the sketch, and hide the reference image.
+**Narration:** In Terrain, lower the coastal fracture for a smoother coast, closer to the sketch, and then hide the reference image.
 
 **On screen:**
 

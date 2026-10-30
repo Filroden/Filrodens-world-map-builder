@@ -27,7 +27,7 @@ export default {
     intro: `Over these twelve pages you build one complete map, using nearly every tool in the studio. Each page ends with the map saved, and the next page starts from it, so you can follow the whole tutorial on one map. If you skip a page, or your map has drifted from the pictures, each page links the map as it should be at its start.
 
 The tutorial's map uses the **Guided** engine: you draw where the land goes and the engine makes the terrain inside your shapes. Your shapes will not match the pictures exactly, and that is fine. To have exactly the tutorial's map, import the file in **Start from** at the top of the next page.`,
-    narration: "In this first video we create the map the whole tutorial builds on: a Guided map, where we draw where the land goes and the engine does the rest.",
+    narration: "In this first tutorial we're going to create the map the whole tutorial builds on: a Guided map, where we'll draw where the land goes and let the engine do the rest.",
 
     steps: [
         {
@@ -36,7 +36,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             instruction: "Open the map builder. On the web, go to [fwmb.filroden.com](https://fwmb.filroden.com). In Foundry, open the **Scenes** sidebar and click **Map builder** at its top. The studio opens on **New map**, the first tool on the rail, with a random map to start from.",
             screenshot: { name: "studio", region: "studio" },
             caption: "The studio as it opens: the rail on the left, the New map panel beside it, and the map.",
-            narration: "Open the map builder: on the web at fwmb.filroden.com, or in Foundry from the Map builder button at the top of the Scenes sidebar. It opens on New map, the first tool on the rail.",
+            narration: "Open the map builder. You'll find it on the web at fwmb.filroden.com, or in Foundry from the Map builder button at the top of the Scenes sidebar. Both versions are identical so both will open on New map, the first tool on the rail.",
             pause: 3,
         },
         {
@@ -54,7 +54,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
                 { do: "set", field: 'input[name="mapWidth"]', value: 2000, label: "the map's width" },
                 { do: "set", field: 'input[name="mapHeight"]', value: 1600, label: "the map's height" },
             ],
-            narration: "Set the size to two thousand by sixteen hundred pixels.",
+            narration: "Set the size to two thousand by one thousand six hundred pixels.",
         },
         {
             id: "latitude",
@@ -67,7 +67,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             screenshot: { name: "generation", region: { selector: '[data-region="context"] details[data-section="generation"]' }, pad: 8 },
             caption: "The Generation section with the tutorial map's seed, size and latitudes.",
             camera: "panel's Generation section",
-            narration: "Set the latitudes to sixty north and sixty south. They shape the climate, and so the biomes. Leave the area factor and the unit as they are.",
+            narration: "Set the latitudes to positive sixty north and negative sixty south. They shape the climate, and from that the biomes. Leave the area factor and the unit as they are.",
             pause: 3,
         },
         {
@@ -81,7 +81,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             settle: false,
             screenshot: { name: "discard", region: "studio" },
             caption: "Choosing an engine asks about the open map's unsaved changes.",
-            narration: "Now choose Guided in the generation engine list. A new map is made straight away, so the studio asks about the open one. We don't need it.",
+            narration: "Now choose Guided in the generation engine list. A new map is made straight away, so the studio asks what it should do with the open one. We don't need it.",
         },
         {
             id: "discard",
@@ -98,7 +98,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             ],
             screenshot: { name: "empty", region: "studio" },
             caption: "A new Guided map before any land is drawn, with Land chosen on the bar.",
-            narration: "Discard it. The new map is all ocean, and the bar is ready to draw land.",
+            narration: "Discard it. The new guided map is all ocean, and the bar is ready to draw land.",
         },
         {
             id: "continent",
@@ -108,7 +108,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             screenshot: { name: "continent", region: "studio" },
             caption: "The continent's land mask, with the terrain the engine made inside it.",
             note: "Your outline does not need to match. Drag a point to move it, Shift+Click the outline to add a point, and Ctrl+Click a point to delete it; Undo takes back the last point.",
-            narration: "Now draw the continent. Click round its outline; you can go a little past the edge of the map. Right-click to finish, and the engine fills the shape with land.",
+            narration: "Now draw the continent. Click around its outline; you can go a little past the edge of the map. Right-click to finish, and the engine fills the shape with land.",
             pause: 4,
         },
         {
@@ -126,7 +126,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             screenshot: { name: "islands", region: "studio" },
             caption: "The continent and the three islands, listed under Land masks.",
             note: "> **Tip:** each point you place makes the engine build the whole map again, which takes a few seconds at this size. To place several points without waiting, click **Pause regeneration** on the bar (the toggle beside **Random map**) before you draw; your changes are collected, and applied when you click **Apply changes**, turn the toggle back on, or stop drawing.",
-            narration: "Add the three islands to the east the same way, finishing each one with a right-click.",
+            narration: "Add the three islands to the east of the continent in the same way, finishing each one with a right-click.",
             pause: 3,
         },
         {
@@ -136,7 +136,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             action: drawMask(inlandSea),
             screenshot: { name: "inland-sea", region: "studio" },
             caption: "The ocean mask cuts an inland sea out of the continent.",
-            narration: "Choose Ocean on the bar and draw the inland sea. An ocean mask cuts water out of the land.",
+            narration: "Next choose Ocean on the bar and draw the inland sea. An ocean mask cuts water out of the land.",
             pause: 3,
         },
         {
@@ -159,7 +159,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
             ],
             screenshot: { name: "map", region: { map: [0, 0, 2000, 1600] }, mapOnly: true },
             caption: "The tutorial's map at the end of this page.",
-            narration: "Stop drawing, and there is our world.",
+            narration: "Stop drawing, and after a short pause while it works you'll see our world.",
             pause: 4,
         },
         {
@@ -171,7 +171,7 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
                 { do: "dialog", button: "ok", input: "Tutorial world", label: "Confirm" },
                 { do: "expect", check: (studio) => (!!studio.currentSaveId && !studio.isDirty) || "the map was not saved", within: 30000 },
             ],
-            narration: "Finally, save the map, and call it Tutorial world. Next, we shape the land.",
+            narration: "Finally, save the map, and call it Tutorial world. Next, we're going to shape the land.",
         },
     ],
 

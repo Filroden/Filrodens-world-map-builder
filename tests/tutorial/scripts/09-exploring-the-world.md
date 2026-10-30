@@ -4,11 +4,11 @@
 
 **Goal:** Read what the generator worked out about your world, see it as it was in an earlier age, and time a journey across it.
 
-**Opening narration:** In this video we explore the world the generator made: its people and trade, its history, and how long it takes to cross.
+**Opening narration:** In this tutorial we're going to explore the world the generator made: its people and trade, its history, and how long it takes to travel.
 
 ## 1. Show the population
 
-**Narration:** Turn off the region fills, and show the Population layer. The darker the red, the more people live there. The information bar and the legend read the value under the pointer.
+**Narration:** Turn off the region fills, and show the Population layer. The darker the red, the more people live there. The information bar and the legend show the value under your mouse pointer.
 
 **On screen:**
 
@@ -62,7 +62,7 @@
 
 ## 4. Step back an age
 
-**Narration:** Open History. It shows the world in its first age: its own realms, towns and roads, and its peoples. In this age the whole land is Valefolk; the Hillfolk haven't arrived yet.
+**Narration:** Open History. It shows the world in its first age: its original realms, towns and roads, and its peoples. In this age the whole land is Valefolk; the Hillfolk don't arrive until the second age.
 
 **On screen:**
 
@@ -81,7 +81,7 @@
 
 ## 5. Back to the present
 
-**Narration:** Choose the present age and compare. The Hillfolk invaded and now hold most of the land. What changed lists the realms that fell and rose, and how each people's share of the land grew or shrank.
+**Narration:** Choose the present age and compare it. The Hillfolk invaded and now hold most of the land. What changed lists the realms that fell and rose, and how each people's share of the land grew or shrank.
 
 **On screen:**
 
@@ -95,7 +95,7 @@
 
 ## 6. Time a journey
 
-**Narration:** Open Travel, choose By wagon, and click Kansmarda to start. The bands show the days to reach every part of the land. Point at Newcested, and the way is drawn: by road to the coast, then by ship.
+**Narration:** Open Travel, choose By wagon, and click Kansmarda to start. The bands show the days to reach every part of the land. Point at Newcested, and the way is drawn: by road to the coast, and then by ship.
 
 **On screen:**
 
@@ -112,7 +112,7 @@
 
 ## 7. Tidy up and save
 
-**Narration:** Set the layers back, and save. Next, finishing the map and exporting it.
+**Narration:** Turn the layers off and the region fills back on, and save. Next, we're going to finish the map and export it.
 
 **On screen:**
 
