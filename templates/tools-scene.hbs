@@ -14,10 +14,10 @@
         <label for="fwmb-generation-engine">{{localize "FILRODENSWMB.UI.GenerationEngine"}}</label>
         <div class="fwmb-form-fields">
             <select id="fwmb-generation-engine" name="generationEngine">
-                <option value="standard" {{#if (eq uiState.generationEngine "standard")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.StandardGeneration"}}</option>
-                <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.FlatCanvas"}}</option>
                 <option value="advanced" {{#if (eq uiState.generationEngine "advanced")}}selected{{/if}}>{{engineLabels.advanced}}</option>
                 <option value="guided" {{#if (eq uiState.generationEngine "guided")}}selected{{/if}}>{{engineLabels.guided}}</option>
+                <option value="flat" {{#if (eq uiState.generationEngine "flat")}}selected{{/if}}>{{engineLabels.flat}}</option>
+                <option value="standard" {{#if (eq uiState.generationEngine "standard")}}selected{{/if}}>{{engineLabels.standard}}</option>
             </select>
             <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{#if (eq uiState.generationEngine 'flat')}}{{localize 'FILRODENSWMB.UI.EngineFlatHint'}}{{else if (eq uiState.generationEngine 'advanced')}}{{localize 'FILRODENSWMB.UI.EngineAdvancedHint'}}{{else if (eq uiState.generationEngine 'guided')}}{{localize 'FILRODENSWMB.UI.EngineGuidedHint'}}{{else}}{{localize 'FILRODENSWMB.UI.EngineStandardHint'}}{{/if}}"></i>
         </div>

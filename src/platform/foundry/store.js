@@ -188,18 +188,9 @@ function countFeatures(payload) {
  * @returns {string}
  */
 function getEngineLabel(state) {
-    const nameKeys = {
-        standard: "FILRODENSWMB.UI.StandardGeneration",
-        flat: "FILRODENSWMB.UI.FlatCanvas",
-        advanced: "FILRODENSWMB.UI.EngineNameTectonics",
-        guided: "FILRODENSWMB.UI.EngineNameGuided",
-    };
-    const nameKey = nameKeys[state.generationEngine];
+    const nameKey = TerrainVersion.ENGINE_NAMES[state.generationEngine];
     if (!nameKey) return state.generationEngine ?? "";
-
-    const name = game.i18n.localize(nameKey);
-    const version = TerrainVersion.getDisplayVersion(state);
-    return version === null ? name : game.i18n.format("FILRODENSWMB.UI.EngineVersion", { name, version });
+    return game.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: game.i18n.localize(nameKey), version: TerrainVersion.getDisplayVersion(state) });
 }
 
 /**

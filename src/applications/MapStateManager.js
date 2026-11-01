@@ -101,7 +101,7 @@ export class MapStateManager {
         const ratio = maxDim / baseline;
 
         return {
-            generationEngine: "standard",
+            generationEngine: FILRODENSWMB.DEFAULTS.ENGINE,
 
             // A new map is always built with the current terrain generation rules, and is never
             // a regional map until RegionalExtractor makes one (see TerrainVersion).

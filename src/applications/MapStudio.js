@@ -5126,7 +5126,7 @@ export class MapStudio {
         let newSeed = formData.mapSeed?.trim();
 
         // Extract the dropdown choice
-        const newEngine = formData.generationEngine || "standard";
+        const newEngine = formData.generationEngine || FILRODENSWMB.DEFAULTS.ENGINE;
 
         // If the user left the seed blank, generate a random one automatically
         if (!newSeed) {
@@ -6451,22 +6451,18 @@ export class MapStudio {
      * Toggles visibility of the WebGL layers.
      */
     /**
-     * The names shown in the engine list for the engines that have had more than one version,
-     * with their version (for example "Guided v2"). The open map's own engine shows the version
-     * the map was made with; any other engine shows the version a new map would get, since
-     * choosing it creates a new map.
+     * The names shown in the engine list, each with its terrain version (for example "Guided v2";
+     * see TerrainVersion.getDisplayVersion). The open map's own engine shows the version the map
+     * was made with; any other engine shows the version a new map would get, since choosing it
+     * creates a new map.
      */
     #getEngineLabels() {
         const current = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
-        const labelFor = (engine, nameKey) => {
-            const version = this.uiState.generationEngine === engine ? (TerrainVersion.getDisplayVersion(this.uiState) ?? current) : current;
-            return platform.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: platform.i18n.localize(nameKey), version });
+        const labelFor = (engine) => {
+            const version = this.uiState.generationEngine === engine ? TerrainVersion.getDisplayVersion(this.uiState) : current;
+            return platform.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: platform.i18n.localize(TerrainVersion.ENGINE_NAMES[engine]), version });
         };
-
-        return {
-            advanced: labelFor("advanced", "FILRODENSWMB.UI.EngineNameTectonics"),
-            guided: labelFor("guided", "FILRODENSWMB.UI.EngineNameGuided"),
-        };
+        return Object.fromEntries(Object.keys(TerrainVersion.ENGINE_NAMES).map((engine) => [engine, labelFor(engine)]));
     }
 
     _onToggleLayer(_event, target) {

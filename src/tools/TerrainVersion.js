@@ -252,17 +252,25 @@ export class TerrainVersion {
     }
 
     /**
-     * The version number to show beside a map's engine name (for example "Guided v2"), or null
-     * for an engine that has only ever had one version. Engines with more than one version are
-     * the coastline engines, whose version is the map's terrain revision.
+     * The version number to show beside a map's engine name, on every engine ("Guided v2", "Flat
+     * v2", "Legacy generation v1"): the map's terrain version, the rules its terrain is made with.
+     * A version changes how maps look with every engine (tectonic features and rivers apply to all
+     * of them), so every engine shows it, Legacy generation included.
      *
-     * @param {object} state - A uiState object (reads generationEngine and terrainVersion).
-     * @returns {number|null}
+     * @param {object} state - A uiState object (reads terrainVersion).
+     * @returns {number}
      */
     static getDisplayVersion(state) {
-        if (!FILRODENSWMB.TERRAIN_VERSION.COASTLINE_ENGINES.includes(state.generationEngine)) return null;
         return this.getVersion(state);
     }
+
+    /** Each engine's name in the engine list, in the list's order (the default first). */
+    static ENGINE_NAMES = Object.freeze({
+        advanced: "FILRODENSWMB.UI.EngineNameTectonics",
+        guided: "FILRODENSWMB.UI.EngineNameGuided",
+        flat: "FILRODENSWMB.UI.EngineNameFlat",
+        standard: "FILRODENSWMB.UI.EngineNameLegacy",
+    });
 
     /**
      * Whether a map uses the current river rules (from the current revision on): rivers that follow

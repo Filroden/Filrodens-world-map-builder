@@ -17,7 +17,6 @@
     "FILRODENSWMB.UI.BiomeColor": "Colour",
     "FILRODENSWMB.UI.FaultSpacingHint": "The typical distance between volcanoes, in island sizes. Low values merge neighbouring volcanoes into larger islands.",
     "FILRODENSWMB.UI.JustifyCenter": "Centre",
-    "FILRODENSWMB.UI.EngineStandardHint": "Uses standard noise generation to create quick, randomised terrain.",
     "FILRODENSWMB.UI.GenerateUrbanization": "Urbanisation",
     "FILRODENSWMB.UI.MapUnitHint": "The name of the unit every distance on this map is shown in: the scale bar, territorial waters, the thematic layers and the line below. The module measures distances in kilometres and shows the number with this name, so the figures are true kilometres whatever the unit is called. Change it to give the unit your world's own name.",
     "FILRODENSWMB.UI.MapUnitConverted": "This map's scale bar used the old default unit, Miles, for distances the module measures in kilometres. Its map unit is now km (in New map, under Generation). Save the map to keep the change.",
