@@ -1780,7 +1780,7 @@ export class StudioCanvas {
      * @param {object[]|null} lines - From ThematicData.tradeLines, or null.
      */
     renderTrade(lines) {
-        this.#trade ??= new TradeFlowLayer(PIXI, this.layers.trade);
+        this.#trade ??= new TradeFlowLayer(PIXI, this.layers.trade, this.routeGraphics);
         this.#trade.show(lines, Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION);
     }
 

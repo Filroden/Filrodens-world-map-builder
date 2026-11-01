@@ -1033,6 +1033,12 @@ export const FILRODENSWMB = {
                 Object.freeze({ id: "sea", label: "FILRODENSWMB.UI.ThematicTradeSea", value: "FILRODENSWMB.UI.ThematicTradeSeaValue", color: "#7570b3" }),
             ]),
             ALPHA: 0.85,
+            // The routes' strength while the trade is shown. Trade is drawn only along the
+            // generated routes it was worked out on, so a hand-placed route has no trade line over
+            // it; drawn at full strength it would stand out above the trade as if it were the
+            // busiest road on the map. Every route is drawn fainter, so the trade reads first and
+            // the routes stay as the context it runs along.
+            ROUTE_ALPHA: 0.4,
             HIT_PX: 6,
         }),
         // The culture layer's fading: a cell whose dominant culture holds SHARE_FULL of its people
