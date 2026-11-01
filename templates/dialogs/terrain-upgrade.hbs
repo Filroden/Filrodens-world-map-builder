@@ -25,6 +25,17 @@
                 <li>{{localize "FILRODENSWMB.UI.TerrainUpdateChannels"}}</li>
             {{/if}}
         </ul>
+    {{else if isRevision3}}
+        <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroRevision3"}}</p>
+
+        <ul class="fwmb-terrain-update-list">
+            {{#if rebuildsHotspots}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateHotspots"}}</li>
+            {{/if}}
+            {{#if guidesRivers}}
+                <li>{{localize "FILRODENSWMB.UI.TerrainUpdateGuidedRivers"}}</li>
+            {{/if}}
+        </ul>
     {{else if isRivers}}
         <p>{{localize "FILRODENSWMB.UI.TerrainUpdateIntroRivers"}}</p>
 

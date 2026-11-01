@@ -43,7 +43,7 @@ export class TerrainVersion {
      * @returns {number} A whole number of extra octaves, 0 or more.
      */
     static getExtraOctaves(state) {
-        if (this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.CURRENT) return 0;
+        if (this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.REVISION_2) return 0;
 
         const zoom = state.world?.zoom ?? 1;
         if (zoom <= 1) return 0;
@@ -55,14 +55,14 @@ export class TerrainVersion {
      * Whether a map uses the current coastline rules (see
      * FILRODENSWMB.TERRAIN_VERSION.COASTLINE_ENGINES): coastline settings measured relative to
      * the map's size, and the current coastal profile, with Continental Shelf and Coastal Plains
-     * as bands of set width along the coast. Only from the current revision on; a legacy map
+     * as bands of set width along the coast. Only from revision 2 on; a legacy map
      * keeps the fixed pixel sizes and the coastal profile it was made with.
      *
      * @param {object} state - A uiState object (reads terrainVersion and generationEngine).
      * @returns {boolean}
      */
     static usesCurrentCoastline(state) {
-        if (this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.CURRENT) return false;
+        if (this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.REVISION_2) return false;
         return FILRODENSWMB.TERRAIN_VERSION.COASTLINE_ENGINES.includes(state.generationEngine);
     }
 
@@ -100,7 +100,7 @@ export class TerrainVersion {
      * @returns {number} A whole number of extra octaves, 0 or more.
      */
     static getDetailOctaves(state) {
-        if (this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.CURRENT) return 0;
+        if (this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.REVISION_2) return 0;
 
         const density = this.resolveWorld(state).zoom * this.getResolutionScale(state);
         if (density <= 1) return 0;
@@ -127,7 +127,7 @@ export class TerrainVersion {
      * FILRODENSWMB.GENERATION.COASTAL_PROFILE) rather than the legacy one.
      *
      * `faultFrame` is where fault lines read their noise and space their hotspot volcanoes (see
-     * TectonicEngine.applyTectonicFaults). From the current revision on it is the map's place in
+     * TectonicEngine.applyTectonicFaults). From revision 2 on it is the map's place in
      * the top map, so a regional map's faults match its parent's. A legacy map keeps its own
      * pixels, so its faults stay exactly as they were; for a map that was never cropped the two
      * are the same anyway.
@@ -135,7 +135,7 @@ export class TerrainVersion {
      * `currentRivers` selects the current river rules (see usesCurrentRivers).
      *
      * `exactDistances` finds each point's nearest coastline (and ridge line) exactly, from the
-     * current revision on; a legacy map keeps the jump flood, whose rare near misses are part of
+     * revision 2 on; a legacy map keeps the jump flood, whose rare near misses are part of
      * its terrain.
      *
      * @param {object} state - A uiState object.
@@ -144,7 +144,7 @@ export class TerrainVersion {
     static getTerrainParams(state) {
         const world = this.resolveWorld(state);
         const zoom = world.zoom;
-        const isCurrent = this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        const isCurrent = this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2;
 
         return {
             extraOctaves: this.getExtraOctaves(state),
@@ -174,7 +174,7 @@ export class TerrainVersion {
      * @returns {boolean}
      */
     static isLegacyCoastline(state) {
-        if (this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT) return false;
+        if (this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2) return false;
         if (this.isLegacyRegional(state)) return false;
 
         return FILRODENSWMB.TERRAIN_VERSION.COASTLINE_ENGINES.includes(state.generationEngine);
@@ -197,18 +197,84 @@ export class TerrainVersion {
      * isLegacyCoastline), a legacy map with fault lines, which the update replaces with
      * tectonic features (see hasLegacyFaults), or a map made before the current river rules
      * (see isLegacyRivers; whether it actually has rivers to change is measured on the open map,
-     * see TerrainUpgrade.assess). No other map can change, so no other map is offered an update.
+     * see TerrainUpgrade.assess), or a revision 2 map with a hotspot chain or a custom river (see
+     * hasRevision3Changes). No other map can change, so no other map is offered an update.
      *
      * @param {object} state - A uiState object.
-     * @param {object[]} [faults] - The map's fault lines.
+     * @param {object[]} [faults] - The map's fault lines and tectonic features.
+     * @param {object[]} [rivers] - The map's custom rivers.
      * @returns {boolean}
      */
-    static isUpgradeCandidate(state, faults = []) {
-        return this.isLegacyRegional(state) || this.isLegacyCoastline(state) || this.hasLegacyFaults(state, faults) || this.isLegacyRivers(state);
+    static isUpgradeCandidate(state, faults = [], rivers = []) {
+        return this.isLegacyRegional(state) || this.isLegacyCoastline(state) || this.hasLegacyFaults(state, faults) || this.isLegacyRivers(state) || this.hasRevision3Changes(state, faults, rivers);
     }
 
     /**
-     * Whether a legacy map has any fault line of an original type. Maps at the current revision
+     * What revision 3 changes on a revision 2 map: its hotspot chains (`hotspots`) and its
+     * custom rivers (`rivers`), the only things revision 3 builds differently (see
+     * usesCurrentHotspots and usesGuidedRivers). Both false on a map at any other revision: a
+     * revision 1 map's update reports its own changes, which take in these (see
+     * TerrainUpgrade.assess).
+     *
+     * @param {object} state - A uiState object.
+     * @param {object[]} [faults] - The map's tectonic features.
+     * @param {object[]} [rivers] - The map's custom rivers.
+     * @returns {{hotspots: boolean, rivers: boolean}}
+     */
+    static revision3Changes(state, faults = [], rivers = []) {
+        if (this.getVersion(state) !== FILRODENSWMB.TERRAIN_VERSION.REVISION_2) return { hotspots: false, rivers: false };
+        return {
+            hotspots: (faults ?? []).some((fault) => fault.type === FILRODENSWMB.TECTONICS.FEATURES.TYPES.HOTSPOT),
+            rivers: (rivers ?? []).length > 0,
+        };
+    }
+
+    /**
+     * Whether updating a revision 2 map to revision 3 changes it (see revision3Changes).
+     *
+     * @param {object} state - A uiState object.
+     * @param {object[]} [faults] - The map's tectonic features.
+     * @param {object[]} [rivers] - The map's custom rivers.
+     * @returns {boolean}
+     */
+    static hasRevision3Changes(state, faults = [], rivers = []) {
+        const changes = this.revision3Changes(state, faults, rivers);
+        return changes.hotspots || changes.rivers;
+    }
+
+    /**
+     * The revision a regional map cut from this map is made with: from revision 2 on, its
+     * parent's, so its hotspot chains and custom rivers are built as its parent's are. A legacy
+     * parent's regional map gets the current revision, since revision 1's rules cannot make a
+     * regional map match its parent anyway (see canCreateRegionalMap). A parent still at revision 2 has a hotspot chain or a custom river (any other moved to
+     * revision 3 as it opened, see settlesOnLoad), so its regional map is offered the update too,
+     * or moves to revision 3 as it opens if the crop leaves neither in it.
+     *
+     * @param {object} parentState - The parent map's uiState.
+     * @returns {number}
+     */
+    static getRegionalVersion(parentState) {
+        const version = this.getVersion(parentState);
+        return version >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2 ? version : FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+    }
+
+    /**
+     * Whether a map moves to revision 3 as it opens, without being asked: a revision 2 map that
+     * revision 3 does not change (see hasRevision3Changes), so it looks exactly as it did. The
+     * move is kept with the map's next save, and from then on a hotspot chain or a custom river
+     * added to it is built by the revision 3 rules.
+     *
+     * @param {object} state - A uiState object.
+     * @param {object[]} [faults] - The map's tectonic features.
+     * @param {object[]} [rivers] - The map's custom rivers.
+     * @returns {boolean}
+     */
+    static settlesOnLoad(state, faults = [], rivers = []) {
+        return this.getVersion(state) === FILRODENSWMB.TERRAIN_VERSION.REVISION_2 && !this.hasRevision3Changes(state, faults, rivers);
+    }
+
+    /**
+     * Whether a legacy map has any fault line of an original type. Maps from revision 2 on
      * draw tectonic features instead (see TectonicFeatureEngine), so updating the map converts
      * them. A fault is an original one unless it was saved at the feature revision.
      *
@@ -217,17 +283,17 @@ export class TerrainVersion {
      * @returns {boolean}
      */
     static hasLegacyFaults(state, faults) {
-        if (this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT) return false;
+        if (this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2) return false;
         return (faults ?? []).some((fault) => (fault.revision ?? 0) < FILRODENSWMB.TECTONICS.FEATURES.REVISION);
     }
 
     /**
      * Whether a regional map can be cut from this map.
      *
-     * Standard and flat maps always can. A guided or tectonic map can from the current revision
+     * Standard and flat maps always can. A guided or tectonic map can from revision 2
      * on, since its terrain is then worked out in the top map's pixels, which is what lets a
-     * regional map match it. A legacy one has to be updated first: a regional map always uses the
-     * current rules, so it would not match a map still using the legacy ones.
+     * regional map match it. A legacy one has to be updated first: a regional map uses at least
+     * revision 2's rules, so it would not match a map still using the legacy ones.
      *
      * @param {object} state - A uiState object.
      * @returns {boolean}
@@ -241,7 +307,7 @@ export class TerrainVersion {
     }
 
     /**
-     * Whether a legacy map uses an engine the current revision replaced outright (see
+     * Whether a legacy map uses an engine revision 2 replaced outright (see
      * FILRODENSWMB.TERRAIN_VERSION.REPLACED_ENGINES), so an update gives it new terrain.
      *
      * @param {object} state - A uiState object.
@@ -273,7 +339,7 @@ export class TerrainVersion {
     });
 
     /**
-     * Whether a map uses the current river rules (from the current revision on): rivers that follow
+     * Whether a map uses the current river rules (from revision 2 on): rivers that follow
      * the slope's own direction and join a river they run beside, and custom rivers carved with
      * wide, gentle banks. A map from an earlier revision keeps the routes, lakes and carved
      * channels it was made with, and the River Meander value it saved still nudges its rivers'
@@ -283,7 +349,7 @@ export class TerrainVersion {
      * @returns {boolean}
      */
     static usesCurrentRivers(state) {
-        return this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        return this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2;
     }
 
     /**
@@ -294,6 +360,30 @@ export class TerrainVersion {
      */
     static isLegacyRivers(state) {
         return !this.usesCurrentRivers(state);
+    }
+
+    /**
+     * Whether a map builds its hotspot chains by the revision 3 rules, which match each chain's
+     * islands and seamounts to the terrain around them. A map from an earlier revision keeps the
+     * chains it was made with.
+     *
+     * @param {object} state - A uiState object.
+     * @returns {boolean}
+     */
+    static usesCurrentHotspots(state) {
+        return this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_3;
+    }
+
+    /**
+     * Whether a map's custom rivers follow the land within a corridor round the line drawn (from
+     * revision 3 on), rather than running exactly along it. A map from an earlier revision keeps
+     * the custom rivers it was made with.
+     *
+     * @param {object} state - A uiState object.
+     * @returns {boolean}
+     */
+    static usesGuidedRivers(state) {
+        return this.getVersion(state) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_3;
     }
 
     /**
@@ -321,14 +411,14 @@ export class TerrainVersion {
     /**
      * Whether a map was built with the legacy terrain revision and is a regional map (a crop of
      * another map). Apart from maps whose engine's coastline rules changed (see
-     * isLegacyCoastline), these are the only maps the current revision changes; any other legacy
+     * isLegacyCoastline), these are the only maps revision 2 changes; any other legacy
      * map that was never cropped regenerates identically under either revision.
      *
      * @param {object} state - A uiState object or saved payload's equivalent fields.
      * @returns {boolean}
      */
     static isLegacyRegional(state) {
-        return this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.CURRENT && this.getLegacyZoom(state) !== 1;
+        return this.getVersion(state) < FILRODENSWMB.TERRAIN_VERSION.REVISION_2 && this.getLegacyZoom(state) !== 1;
     }
 
     /**
@@ -408,7 +498,8 @@ export class TerrainVersion {
      * size (see isLegacyResized), its Coastline Fracture is lowered to match, so its coastline
      * keeps its familiar shape (see #equivalentFracture). A legacy map that is none of these
      * (a standard or flat map that was never cropped) only changes revision, which is what moves
-     * it to the current river rules (see usesCurrentRivers).
+     * it to the current river rules (see usesCurrentRivers). A revision 2 map also only changes
+     * revision, which is what moves its hotspot chains and custom rivers to the revision 3 rules.
      *
      * @param {object} state - The legacy map's uiState.
      * @param {{width: number, height: number}|null} [rootSize] - The top map's size, if found.

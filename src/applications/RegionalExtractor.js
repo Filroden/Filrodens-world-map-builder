@@ -39,11 +39,12 @@ export class RegionalExtractor {
         const windDistance = TerrainVersion.getRegionalWindDistance(state, cropBox, rootSize);
         this.#applyScaleToState(state, cropBox, zoomScale, targetWidth, targetHeight, app.mapHeight, gridSize);
 
-        // A regional map is always built with the current terrain rules, whatever revision its
-        // parent was made with, so it gets the corrected wind distance and the extra detail.
-        // Both the world description and the wind distance are worked out from the parent's
-        // unscaled state, since #applyScaleToState overwrites the size they are derived from.
-        state.terrainVersion = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        // A regional map is built with at least revision 2's terrain rules, whatever revision its
+        // parent was made with, so it gets the corrected wind distance and the extra detail (see
+        // TerrainVersion.getRegionalVersion). Both the world description and the wind distance
+        // are worked out from the parent's unscaled state, since #applyScaleToState overwrites the
+        // size they are derived from.
+        state.terrainVersion = TerrainVersion.getRegionalVersion(app.uiState);
         // The regional map shows the same world, so keeps its parent's area factor
         state.world = world ? { ...world, areaFactor: clampAreaFactor(app.uiState.world?.areaFactor) } : world;
         // With the regional map's scale known, the whole scale bar is brought onto it

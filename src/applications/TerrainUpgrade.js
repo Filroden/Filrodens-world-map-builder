@@ -12,9 +12,11 @@ import { platform } from "../platform/index.js";
  * Saved maps store settings, not pixels, so a map regenerates from its settings every time it is
  * opened. A map built with legacy rules keeps regenerating with them (see TerrainVersion) until
  * its owner chooses to update it. Only legacy regional maps, legacy guided and tectonic maps,
- * legacy maps with fault lines (which become tectonic features) and maps with rivers made before
- * the current river rules can change under the current rules; everything else regenerates
- * identically, so nothing is offered for it.
+ * legacy maps with fault lines (which become tectonic features), maps with rivers made before
+ * the current river rules, and revision 2 maps with hotspot chains or custom rivers can change
+ * under the current rules; everything else regenerates identically, so nothing is offered for it
+ * (a revision 2 map of that kind is simply moved to the current revision as it opens, see
+ * TerrainVersion.settlesOnLoad).
  *
  * The update is applied to the open map only. It becomes permanent when the map is saved, and
  * reloading the map without saving restores the original.
@@ -80,7 +82,7 @@ export class TerrainUpgrade {
 
     /**
      * Works out whether updating the open map to the current terrain rules would visibly change
-     * it, and how. Five kinds of map can change, for different reasons, and the update is
+     * it, and how. Six kinds of map can change, for different reasons, and the update is
      * described to the user differently for each (`kind`):
      *
      * - "tectonics": a legacy tectonic map. The current revision replaces its engine outright, so
@@ -112,16 +114,27 @@ export class TerrainUpgrade {
      * - "rivers": a legacy map whose only change is its rivers (see #riverChanges): a standard or
      *   flat map that was never cropped and has no fault lines, but has rivers. Under every other
      *   kind the rivers change as well, reported the same way (`changesRivers`, `changesChannels`).
+
+     * - "revision3": a revision 2 map with a hotspot chain or a custom river, the only things
+     *   revision 3 builds differently (see TerrainVersion.revision3Changes). Its hotspot chains
+     *   are rebuilt to match the terrain around them (`rebuildsHotspots`), and its custom rivers
+     *   follow the land within a corridor round the line drawn (`guidesRivers`); nothing else
+     *   changes. A revision 1 map moves to revision 3 too, but its other changes are what it is
+     *   told about: its fault lines become tectonic features and its custom rivers are recarved.
      *
      * Whatever the kind, a legacy map's original fault lines are replaced by the tectonic features
      * a current map draws (`convertsFaults`; see TectonicFeatureEngine.convertLegacyFault), and
      * slip faults, which have no equivalent, are removed (`removesSlip`).
      *
      * @param {object} app - The MapStudio instance, with a legacy map open.
-     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean, changesRivers: boolean, changesChannels: boolean}|null}
+     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean, changesRivers?: boolean, changesChannels?: boolean, rebuildsHotspots?: boolean, guidesRivers?: boolean}|null}
      *   What the update would apply and change, or null if it would change nothing visible.
      */
     static assess(app) {
+        const revision3 = TerrainVersion.revision3Changes(app.uiState, app.tectonicFaults, app.manualRivers);
+        if (revision3.hotspots || revision3.rivers) {
+            return { kind: "revision3", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, rebuildsHotspots: revision3.hotspots, guidesRivers: revision3.rivers };
+        }
         const faults = this.#faultConversion(app);
         const rivers = this.#riverChanges(app);
         const impact = this.#assessTerrain(app);

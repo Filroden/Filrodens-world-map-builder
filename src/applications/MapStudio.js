@@ -1953,7 +1953,7 @@ export class MapStudio {
 
     /** Whether the open map is at the current terrain version, which draws tectonic features. */
     #isCurrentTerrain() {
-        return TerrainVersion.getVersion(this.uiState) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        return TerrainVersion.getVersion(this.uiState) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2;
     }
 
     /**
@@ -4168,6 +4168,11 @@ export class MapStudio {
                 }
             });
         }
+        // A revision 2 map that revision 3 would not change (no hotspot chain, no custom river)
+        // moves to it now, so anything of either kind added from here on is built by the current
+        // rules. It looks exactly as it did, so the map is not marked as changed: the move is kept
+        // with its next save, and until then it is made again on every load.
+        if (TerrainVersion.settlesOnLoad(this.uiState, this.tectonicFaults, this.manualRivers)) this.uiState.terrainVersion = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
 
         // Guarantee every pin has a valid `color` property, defaulting to white for legacy maps
         this.mapPins = (payload.mapPins || []).map((pin) => {
@@ -5984,7 +5989,7 @@ export class MapStudio {
      * can change, so every other map is answered at once without measuring anything.
      */
     async #assessTerrainUpgrade() {
-        if (!TerrainVersion.isUpgradeCandidate(this.uiState, this.tectonicFaults)) return null;
+        if (!TerrainVersion.isUpgradeCandidate(this.uiState, this.tectonicFaults, this.manualRivers)) return null;
 
         await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.CheckingTerrainUpdate"));
         try {

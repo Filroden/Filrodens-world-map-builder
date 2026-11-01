@@ -121,7 +121,7 @@ export class FaultEditor {
     });
 
     static #currentMap(app) {
-        return TerrainVersion.getVersion(app.uiState) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        return TerrainVersion.getVersion(app.uiState) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2;
     }
 
     static #typeName(app, fault) {

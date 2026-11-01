@@ -290,18 +290,29 @@ export const FILRODENSWMB = {
     //       the same pipeline, with its land placed by tectonic plates. Fault lines read their
     //       noise, and space their hotspot volcanoes, in the top map's pixels, so a regional
     //       map's faults match its parent's (on a map that was never cropped this changes nothing).
+    //   3 - hotspot chains and custom rivers, on every engine: hotspot chains are rebuilt to
+    //       match the terrain around them (see TerrainVersion.usesCurrentHotspots), and a custom
+    //       river follows the land within a corridor round the line drawn, rather than the line
+    //       itself (see TerrainVersion.usesGuidedRivers). Nothing else differs from revision 2,
+    //       so a revision 2 map with neither is moved to revision 3 as it opens (see
+    //       TerrainVersion.settlesOnLoad); one with either is offered the update.
+    // Each rule is gated on the revision that brought it (REVISION_2, REVISION_3), never on
+    // CURRENT, so a later revision cannot move an older rule; CURRENT is only what a new map gets.
     TERRAIN_VERSION: {
         LEGACY: 1,
         // Revision 2 also brings the current river rules: rivers follow the slope's own direction
         // and join a river they run beside, and custom rivers carve a channel with wider, gentler
         // banks (see TerrainVersion.usesCurrentRivers)
-        CURRENT: 2,
+        REVISION_2: 2,
+        REVISION_3: 3,
+        // The revision a new map, or a regional map of a map at it, is made with
+        CURRENT: 3,
         // Engines that build their terrain outward from a coastline, and so use the coastline
-        // rules of the current revision: settings measured in pixels of a map BASELINE_DIMENSION
+        // rules of revision 2 on: settings measured in pixels of a map BASELINE_DIMENSION
         // pixels across and scaled to the actual map (before, they were fixed pixel counts, so
         // the same values gave smoother, straighter coastlines on bigger maps), and the coastal
         // profile described in GENERATION.COASTAL_PROFILE. For the tectonic engine ("advanced")
-        // the current revision is a different engine altogether: the guided pipeline with land
+        // revision 2 is a different engine altogether: the guided pipeline with land
         // placed by tectonic plates (ProceduralEngine.generateTectonicV2Topography), where
         // revision 1 kept the original tectonic engine (generateTectonicTopography).
         COASTLINE_ENGINES: ["guided", "advanced"],
