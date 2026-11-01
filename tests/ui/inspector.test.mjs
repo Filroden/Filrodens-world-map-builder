@@ -30,7 +30,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/face-fields.hbs", "parts/label-fields.hbs", "parts/inspector-generated.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs", "parts/inspector-river.hbs", "parts/inspector-fault.hbs", "parts/inspector-decoration.hbs", "parts/inspector-land-mask.hbs", "parts/inspector-level.hbs", "parts/inspector-set.hbs"]);
+await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/face-fields.hbs", "parts/label-fields.hbs", "parts/inspector-generated.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs", "parts/inspector-river.hbs", "parts/inspector-fault.hbs", "parts/inspector-decoration.hbs", "parts/inspector-land-mask.hbs", "parts/inspector-level.hbs", "parts/inspector-set.hbs", "parts/inspector-biome.hbs"]);
 
 /** What the next prompt (Save as…'s name) answers. */
 const answers = { prompt: null };
@@ -63,6 +63,7 @@ const { LabelEditor } = await import("../../src/applications/LabelEditor.js");
 const { PickTool } = await import("../../src/applications/PickTool.js");
 const { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } = await import("../../src/applications/FeatureEditors.js");
 const { LayerSetEditor, LevelEditor } = await import("../../src/applications/LayerEditors.js");
+const { BiomeEditor } = await import("../../src/applications/BiomeEditor.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
 const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
 const { allLevels } = await import("../../src/mesh/LayerTree.js");
@@ -691,4 +692,90 @@ test("Lock, in the Generated section, keeps an item on Generate again; one undo 
     await undo(app);
     assert.equal(app.mapPins.find((each) => each.id === pin.id).generated.locked, false);
     assert.equal(form(app).querySelector('[data-inspector-action="lock"]').checked, false, "the box follows the pin, not the click");
+});
+
+// ------------------------------------------------------------------ custom biomes
+
+/** The studio with a custom biome, Moor, behaving like Taiga, and counts of what a change redraws. */
+async function biomeStudio(biome = {}) {
+    const { app } = await studio();
+    app.uiState.customBiomes = [{ id: 14, name: "Moor", code: null, color: [90, 80, 70], placement: "land", behavesLike: "TAIGA", rules: [], ...biome }];
+    app.uiState.brushBiome = 14;
+    app.repaints = 0;
+    app.stale = 0;
+    app._repaintCanvas = () => app.repaints++;
+    app.markGeneratorStale = () => app.stale++;
+    return app;
+}
+
+test("a custom biome opens in the inspector; each field applies as one undo step, repainting the map and redrawing the bar", async () => {
+    const app = await biomeStudio();
+    await BiomeEditor.open(app, 14);
+    assert.deepEqual(Inspector.inspected(app), { biome: 14 }, "its row is marked");
+    assert.equal(field(app, "biomeName").value, "Moor");
+
+    await commit(app, "biomeColor", "#123456");
+    assert.deepEqual(app.uiState.customBiomes[0].color, [0x12, 0x34, 0x56]);
+    assert.equal(steps(app), 1);
+    assert.equal(app.repaints, 1, "the map is repainted in the biome's new colour");
+    assert.ok(app.rendered.includes("editToolbar"), "the bar's biome choices are drawn again");
+    assert.equal(app.stale, 0, "Generate does not read a biome's colour");
+
+    await commit(app, "biomeColor", "#123456");
+    assert.equal(steps(app), 1, "the same value again records nothing");
+
+    await commit(app, "biomePlacement", "landUnderwater");
+    assert.equal(app.uiState.customBiomes[0].placement, "landUnderwater");
+    assert.equal(steps(app), 2);
+});
+
+test("Own numbers: hidden until ticked, its sliders starting from Behaves like; ticking and changing them is what Generate reads", async () => {
+    const app = await biomeStudio();
+    await BiomeEditor.open(app, 14);
+    const numbers = form(app).querySelector("[data-biome-numbers]");
+    assert.equal(numbers.hidden, true);
+    const taiga = FILRODENSWMB.GENERATOR.BIOMES.TAIGA;
+    assert.equal(Number(field(app, "biomeProperty.travel").value), taiga.travel, "the sliders hold Behaves like's numbers");
+    assert.equal(field(app, "biomeProperty.travel").type, "range", "each property a slider, kept within its range");
+    assert.equal(Number(field(app, "biomeProperty.travel").max), FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.find((property) => property.key === "travel").max);
+
+    await commit(app, "biomeBehavesLike", "TROPICAL_RAINFOREST");
+    assert.equal(app.stale, 1, "Behaves like is read by Generate");
+    assert.equal(Number(field(app, "biomeProperty.travel").value), FILRODENSWMB.GENERATOR.BIOMES.TROPICAL_RAINFOREST.travel, "until ticked, the sliders follow Behaves like");
+
+    await commit(app, "biomeOwnNumbers", true);
+    const rainforest = FILRODENSWMB.GENERATOR.BIOMES.TROPICAL_RAINFOREST;
+    assert.deepEqual(app.uiState.customBiomes[0].properties, { farming: rainforest.farming, cover: rainforest.cover, travel: rainforest.travel, raiders: rainforest.raiders });
+    assert.equal(form(app).querySelector("[data-biome-numbers]").hidden, false);
+    assert.equal(app.stale, 2);
+
+    await commit(app, "biomeProperty.farming", "0");
+    assert.equal(app.uiState.customBiomes[0].properties.farming, 0);
+    assert.equal(app.stale, 3);
+
+    await commit(app, "biomeOwnNumbers", false);
+    assert.equal(app.uiState.customBiomes[0].properties, null, "cleared: none of its own");
+    assert.equal(app.stale, 4);
+    assert.equal(steps(app), 4);
+});
+
+test("Add makes a custom biome and opens it; Delete asks, removes it, closes the inspector and leaves the bar on Grassland", async () => {
+    const app = await biomeStudio();
+    const id = await BiomeEditor.add(app);
+    assert.equal(id, 15);
+    assert.equal(app.uiState.customBiomes.at(-1).name, "FILRODENSWMB.UI.NewCustomBiomeName {\"number\":2}");
+    assert.ok(Inspector.shows(app, "biome", 15));
+    assert.ok(app.rendered.includes("editToolbar"), "the bar's biome choices list it at once");
+    assert.equal(steps(app), 1);
+
+    await BiomeEditor.open(app, 14);
+    form(app).querySelector('[data-inspector-action="delete"]').click();
+    await settle();
+    await settle();
+    assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [15]);
+    assert.equal(Inspector.current(app), null);
+    assert.equal(app.uiState.brushBiome, FILRODENSWMB.BIOME_IDS.GRASSLAND);
+    assert.equal(app.stale, 1, "it behaved like Taiga, so a run made with it is out of date");
+    VectorHistory.step(app, true);
+    assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [14, 15], "undo brings it back");
 });

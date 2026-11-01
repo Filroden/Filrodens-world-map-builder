@@ -2188,11 +2188,13 @@ export const FILRODENSWMB = {
             realmSpacing: Object.freeze({ min: 0.4, max: 2.5, default: 1 }),
             fragmentation: Object.freeze({ min: 0.5, max: 2, default: 1 }),
         }),
-        // What each built-in land biome means to the model. farming multiplies the climate's yield;
-        // cover is the share of farmland left after clearing effort (forest below 1, so land near
-        // towns and roads gains when it is cleared); travel the cost of crossing it off-road; and
-        // raiders how well it feeds raiders when no realm holds it. A custom biome behaves as one of
-        // these (its "behaves like" choice, or the built-in biome the climate would give there).
+        // What each built-in land biome means to the model. farming multiplies the climate's yield
+        // of crops and herds (0: it feeds no one); cover is the share of farmland left after
+        // clearing effort (forest below 1, so land near towns and roads gains when it is cleared);
+        // travel the cost of crossing it off-road; and raiders how readily the people of land no
+        // realm holds turn to raiding (land that feeds no one breeds no raiders). A custom biome
+        // behaves as one of these (its "behaves like" choice, or the built-in biome the climate
+        // would give there), or gives its own numbers (see BIOME_PROPERTIES).
         BIOMES: Object.freeze({
             SNOW: Object.freeze({ farming: 1, cover: 1, travel: 4, raiders: 1 }),
             TUNDRA: Object.freeze({ farming: 1, cover: 1, travel: 1.5, raiders: 1 }),
@@ -2205,6 +2207,19 @@ export const FILRODENSWMB = {
             SAVANNA: Object.freeze({ farming: 1, cover: 1, travel: 1, raiders: 1 }),
             SUBTROPICAL_DESERT: Object.freeze({ farming: 1, cover: 1, travel: 2, raiders: 1 }),
         }),
+        // The properties a biome has for the model, in the order the custom biome dialogue lists
+        // them: each built-in biome's are in BIOMES, and a custom biome may give its own numbers
+        // (its `properties`, see ModelBiomes). `default` is the neutral value, used for a property
+        // a custom biome's numbers leave out when it behaves like no built-in biome (a property
+        // added after the biome was saved). min, max and step are the dialogue's fields'; cover is
+        // never 0, since clearing divides by it. Later properties (an underground biome's food, a
+        // biome's unfarmed land mix) are added to this list.
+        BIOME_PROPERTIES: Object.freeze([
+            Object.freeze({ key: "farming", min: 0, max: 3, step: 0.05, default: 1, label: "FILRODENSWMB.UI.BiomePropertyFarming", hint: "FILRODENSWMB.UI.BiomePropertyFarmingHint" }),
+            Object.freeze({ key: "cover", min: 0.1, max: 1, step: 0.05, default: 1, label: "FILRODENSWMB.UI.BiomePropertyCover", hint: "FILRODENSWMB.UI.BiomePropertyCoverHint" }),
+            Object.freeze({ key: "travel", min: 0.5, max: 6, step: 0.1, default: 1, label: "FILRODENSWMB.UI.BiomePropertyTravel", hint: "FILRODENSWMB.UI.BiomePropertyTravelHint" }),
+            Object.freeze({ key: "raiders", min: 0, max: 3, step: 0.1, default: 1, label: "FILRODENSWMB.UI.BiomePropertyRaiders", hint: "FILRODENSWMB.UI.BiomePropertyRaidersHint" }),
+        ]),
         // Stage 1, the base layer: what each model cell holds.
         VALUES: Object.freeze({
             // Rural people per km² on the best farmland; pasture feeds this share of it; fishing adds

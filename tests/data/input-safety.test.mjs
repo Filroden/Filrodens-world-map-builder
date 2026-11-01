@@ -404,6 +404,7 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     file.mapRoutes = [{ id: "routeAAAAAAAAAAA", style: "constructor", mode: "__proto__", waypoints: [1, -1, 2.5, "x", 3], legs: [[1, "x", 3]], transport: "road" }];
     file.history = [{ layer: "terrain", tool: "raise;", size: "huge", points: [{ x: 1, y: 2 }, { x: "a" }, [3, 4], 5] }];
     file.customBiomes[0].behavesLike = "DEEP_OCEAN";
+    file.customBiomes[0].properties = { farming: 0.5, cover: 0, travel: "slow", raiders: 2, __proto__: { polluted: true }, food: 9 };
     file.cultures[0].habitat.temperature = [0.6, 0.2];
     file.cultures[0].habitat.relief = ["low", 1];
     file.cultures[0].openness = 7;
@@ -424,6 +425,8 @@ test("enums, numbers, font names and image sources are checked by their rules", 
     assert.deepEqual(mapData.cultures[0].homelands, [{ x: 12, y: 30 }, { x: 80, y: 44.5 }]);
     assert.ok(!("src" in mapData.mapDecorations[0]));
     assert.ok(!("behavesLike" in mapData.customBiomes[0]), "Behaves like names only a land biome the generator knows");
+    assert.deepEqual(mapData.customBiomes[0].properties, { farming: 0.5, cover: 0.1, raiders: 2 }, "a biome's own numbers keep only known properties, in range: cover 0 is raised to its least (clearing divides by it); a word and an unknown key are dropped");
+    assert.equal({}.polluted, undefined);
     assert.deepEqual(mapData.mapRoutes[0], { id: "routeAAAAAAAAAAA", waypoints: [1, 3], legs: [[1, 3]], transport: "road" });
     assert.deepEqual(mapData.history[0], { layer: "terrain", points: [{ x: 1, y: 2 }, [3, 4], 5] });
 });

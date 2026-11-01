@@ -2,7 +2,6 @@ import { FILRODENSWMB } from "../config.js";
 import { CELL_KIND, smooth } from "./CellValues.js";
 import { portCost, travelCost } from "./CellGraph.js";
 import { SearchSpace, searchAll } from "./Search.js";
-import { biomeProperties } from "./ModelBiomes.js";
 
 /**
  * Stage 2: population and central places.
@@ -74,11 +73,10 @@ function scaledTiers(urbanisation = 1) {
 /** People per cell and in all (land cleared in the age before farming as the feedback pass's does). */
 function population(cells, cultures, era, cleared) {
     const cellPop = new Float64Array(cells.count);
-    const cover = cleared ? biomeProperties().cover : null;
     let totalPop = 0;
     for (let cell = 0; cell < cells.count; cell++) {
         if (!cells.landKm2[cell]) continue;
-        const boost = cleared ? 1 + (1 / cover[cells.biome[cell]] - 1) * cleared[cell] : 1;
+        const boost = cleared ? 1 + (1 / cells.cover[cell] - 1) * cleared[cell] : 1;
         cellPop[cell] = cells.food[cell] * era.development * health(cells, cell) * cultures.popMult[cell] * (1 - era.plague) * boost;
         totalPop += cellPop[cell];
     }

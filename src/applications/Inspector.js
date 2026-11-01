@@ -93,6 +93,9 @@ export class Inspector {
         const state = { kind, ref, overlay, defaults: new Map() };
         this.#open.set(app, state);
         this.#rememberDefaults(state);
+        // Each option is told whether it is chosen, as after a redraw (see refresh), so a select
+        // reads as the object says however the document parsed its options
+        for (const option of overlay.body.querySelectorAll("option")) option.selected = option.hasAttribute("selected");
         RangeDisplay.syncAllFills(overlay.body);
         RangeTrack.syncAll(overlay.body);
         this.#bind(app, state);

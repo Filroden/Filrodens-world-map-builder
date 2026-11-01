@@ -48,6 +48,7 @@ import { RegionLists } from "./RegionLists.js";
 import { StyleEditors } from "./StyleEditors.js";
 import { StyleLists } from "./StyleLists.js";
 import { CultureEditor } from "./CultureEditor.js";
+import { BiomeEditor } from "./BiomeEditor.js";
 import { CultureLists } from "./CultureLists.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 import { RegionPainter } from "./RegionPainter.js";
@@ -179,10 +180,10 @@ export class MapStudio {
         editRiver(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RiverEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
         editRoute(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RouteEditor.open(this, t.closest(".fwmb-list-item").dataset.id, MapStudio.#FROM_LIST); },
 
-        // --- DIALOG MANAGER: Custom Biomes & Misc ---
-        addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
-        editCustomBiome(e, t)   { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditCustomBiome(this, e, t); },
-        deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
+        // --- Custom biomes, in the inspector (see BiomeEditor), and the dialogues ---
+        addCustomBiome()        { BiomeEditor.add(this); },
+        editCustomBiome(e, t)   { if (!MapStudio.#fromRowControl(e, t)) BiomeEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
+        deleteCustomBiome(_e, t) { BiomeEditor.delete(this, MapStudio.#rowId(t)); },
         openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
         addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
 

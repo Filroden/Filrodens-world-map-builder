@@ -47,7 +47,6 @@ Hooks.once("init", async () => {
 
         "modules/filrodens-world-map-builder/templates/dialogs/add-decoration.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/biome-rule-editor.hbs",
-        "modules/filrodens-world-map-builder/templates/dialogs/edit-biome.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/edit-pin-icon.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs",
@@ -71,6 +70,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/parts/inspector-label.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-land-mask.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-level.hbs",
+        "modules/filrodens-world-map-builder/templates/parts/inspector-biome.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-pin-style.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-pin.hbs",
         "modules/filrodens-world-map-builder/templates/parts/inspector-generated.hbs",

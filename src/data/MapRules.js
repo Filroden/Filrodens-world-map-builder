@@ -409,6 +409,8 @@ const CUSTOM_BIOME = obj({
     solidOverWater: bool,
     // The built-in biome the generator treats it as (GENERATOR.BIOMES); null: the biome the climate gives
     behavesLike: enumOf(Object.keys(FILRODENSWMB.GENERATOR.BIOMES), { nullable: true }),
+    // Numbers of its own for the generator (see ModelBiomes); null: those of behavesLike
+    properties: obj(Object.fromEntries(FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.map((property) => [property.key, num({ min: property.min, max: property.max })])), { nullable: true }),
     rules: list(obj({ elevation: list({ t: "segment" }), moisture: list({ t: "segment" }), temperature: list({ t: "segment" }) })),
 });
 

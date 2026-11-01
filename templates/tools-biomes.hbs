@@ -35,7 +35,7 @@
     </div>
     <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SettingsCustomBiomes'}}" data-list-nav class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
         {{#each customBiomes}}
-            <div role="option" aria-selected="false" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editCustomBiome">
+            <div role="option" aria-selected="{{#if (eq @root.inspected.biome this.id)}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item" data-id="{{this.id}}" data-action="editCustomBiome">
                 <div class="fwmb-swatch" style="background-color: {{this.hex}};"></div>
                 {{#if this.hasRules}}<i class="fwmb-icon fwmb-icon--tune fwmb-rule-indicator" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeHasRulesTooltip'}}"></i>{{/if}}
                 <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
