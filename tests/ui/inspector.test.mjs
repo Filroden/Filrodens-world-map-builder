@@ -273,6 +273,29 @@ test("Save as… makes a style from the object's fields and connects the object 
     assert.equal(app.uiState.customRegionStyles.length, count);
 });
 
+test("clearing No fill gives the region back the colour it had, not black", async () => {
+    const { app } = await studio();
+    await RegionEditor.open(app, "realms", "west");
+    const region = () => app.regionLevels[0].regions[0];
+    await commit(app, "regionFillColor", "#336699");
+
+    await commit(app, "regionFillTransparent", true);
+    assert.equal(region().fillColor, "transparent");
+    assert.equal(field(app, "regionFillColor").value, "#336699", "the colour box keeps showing the colour while No fill is ticked");
+
+    await commit(app, "regionFillTransparent", false);
+    assert.equal(region().fillColor, "#336699", "the colour comes back");
+});
+
+test("a region with No fill and no colour seen this session shows its preset, never black", async () => {
+    const { app } = await studio();
+    app.regionLevels[0].regions[1].fillColor = "transparent";
+    await RegionEditor.open(app, "realms", "east");
+    const value = field(app, "regionFillColor").value;
+    assert.notEqual(value, "#000000");
+    assert.ok(FILRODENSWMB.REGIONS.PRESETS.map((colour) => colour.toLowerCase()).includes(value.toLowerCase()), "the region's preset colour");
+});
+
 test("the inspector closes when its object goes, and when anything else is docked (a tool switch)", async () => {
     const { app } = await studio();
     await RegionEditor.open(app, "realms", "west");

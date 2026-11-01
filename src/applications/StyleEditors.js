@@ -5,6 +5,7 @@ import { Inspector } from "./Inspector.js";
 import { InspectorFields } from "./InspectorFields.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { FillMemory } from "./FillMemory.js";
 import { PinStyles } from "./PinStyles.js";
 import { ROUTE_THICKNESS_STEP, roundRouteThickness } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
@@ -162,14 +163,17 @@ export class StyleEditors {
         context: (_app, style) => ({
             style,
             noFill: style.fillColor === "transparent",
-            fillHex: style.fillColor && style.fillColor !== "transparent" ? style.fillColor : "#000000",
+            fillHex: FillMemory.shown(style),
             patterns: StyleEditors.#choices(PATTERN_LABELS, style.fillStyle ?? "solid"),
         }),
-        read: (_app, _style, elements) => ({
-            name: elements.styleName.value,
-            fillColor: elements.styleFillTransparent.checked ? "transparent" : elements.styleFillColor.value,
-            fillStyle: elements.styleFillStyle.value,
-        }),
+        read: (_app, style, elements) => {
+            if (elements.styleFillTransparent.checked) FillMemory.remember(style.id, elements.styleFillColor.value);
+            return {
+                name: elements.styleName.value,
+                fillColor: elements.styleFillTransparent.checked ? "transparent" : elements.styleFillColor.value,
+                fillStyle: elements.styleFillStyle.value,
+            };
+        },
     });
 
     static LABEL = StyleEditors.#kind("Label", {

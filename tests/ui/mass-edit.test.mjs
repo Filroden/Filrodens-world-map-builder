@@ -239,3 +239,26 @@ test("a style picked fills its rows and writes its fields; a styled field change
     await MassEdit.open(app, "region");
     assert.deepEqual(app.regionLevels[0].regions.map((region) => region.fillColor), ["transparent", "transparent"]);
 });
+
+test("No fill on every region, then cleared: the regions get their colours from before, not black", async () => {
+    const app = studio();
+    dialogue.drive = (form) => {
+        const none = row(form, "item.fillColor").querySelector('[name="item.fillColor.none"]');
+        none.checked = true;
+        none.dispatchEvent(new window.Event("change", { bubbles: true }));
+    };
+    await MassEdit.open(app, "region");
+    assert.deepEqual(app.regionLevels[0].regions.map((region) => region.fillColor), ["transparent", "transparent"]);
+
+    let shown = null;
+    app.massEditSelection.region = new Set(app.regionLevels[0].regions.map((region) => region.id));
+    dialogue.drive = (form) => {
+        shown = control(form, "item.fillColor").value;
+        const none = row(form, "item.fillColor").querySelector('[name="item.fillColor.none"]');
+        none.checked = false;
+        none.dispatchEvent(new window.Event("change", { bubbles: true }));
+    };
+    await MassEdit.open(app, "region");
+    assert.equal(shown, "#aa0000", "the colour box shows the first region's colour from before");
+    assert.deepEqual(app.regionLevels[0].regions.map((region) => region.fillColor), ["#aa0000", "#aa0000"], "clearing No fill applies it to all, as one colour for the items chosen");
+});
