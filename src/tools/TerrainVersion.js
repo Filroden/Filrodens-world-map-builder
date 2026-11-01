@@ -471,7 +471,7 @@ export class TerrainVersion {
 
         const rounded = Math.round(current / scale / step) * step;
         const floored = current > 0 ? Math.max(step, rounded) : 0;
-        return Math.min(1, Number(floored.toFixed(2)));
+        return Math.min(1, Number(floored.toFixed(3)));
     }
 
     /**

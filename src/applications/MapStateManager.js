@@ -1,5 +1,6 @@
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { FILRODENSWMB } from "../config.js";
+import { RangeCurve } from "../tools/RangeCurve.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
@@ -374,7 +375,8 @@ export class MapStateManager {
             if (key === "mapSeed" || key === "gridType" || key === "generationEngine") {
                 app.uiState[key] = input.value;
             } else {
-                const parsed = Number.parseFloat(input.value);
+                // A slider on a power curve holds its value apart from its position (see RangeCurve)
+                const parsed = Number.parseFloat(RangeCurve.read(input));
                 if (!Number.isNaN(parsed)) {
                     app.uiState[key] = parsed;
                 }

@@ -4,6 +4,7 @@ import { CanvasHints } from "../canvas/CanvasHints.js";
 import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
+import { RangeCurve } from "../tools/RangeCurve.js";
 import { ListNav } from "../ui/ListNav.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
@@ -1220,6 +1221,9 @@ export class MapStudio {
         context.regionalInfillOffered = this.#regionalInfillOffered(this.canvasEngine?.cropBox);
         context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
         context.engineLabels = this.#getEngineLabels();
+        // The Coastline Fracture slider's position on its power curve (see RangeCurve)
+        context.fractureCurve = FILRODENSWMB.GENERATION.COASTLINE_FRACTURE_CURVE;
+        context.fracturePosition = RangeCurve.positionOf(this.uiState.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE, context.fractureCurve);
 
         // The object the inspector shows, whose row the lists mark as selected
         context.inspected = Inspector.inspected(this);
@@ -1557,9 +1561,10 @@ export class MapStudio {
         if (target.tagName !== "INPUT" || target.type !== "range" || target.closest("dialog")) return;
 
         const defaultVal = this.defaultUiState[target.name];
-        if (defaultVal === undefined || target.value === String(defaultVal)) return;
+        if (defaultVal === undefined || RangeCurve.read(target) === String(defaultVal)) return;
 
-        target.value = defaultVal;
+        if (RangeCurve.isCurved(target)) RangeCurve.setValue(target, defaultVal);
+        else target.value = defaultVal;
         target.dispatchEvent(new Event("input", { bubbles: true }));
     }
 

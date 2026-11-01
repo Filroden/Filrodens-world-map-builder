@@ -82,10 +82,15 @@ export const FILRODENSWMB = {
         },
         TECTONIC_PLATES: 10,
         COASTLINE_FRACTURE: 0.2,
-        // The Coastline Fracture slider's step (tools-terrain.hbs uses the same value). Values
-        // worked out in code for the slider, such as the one a map is given when it is updated
-        // to the current terrain rules, are rounded to it so the slider can show them exactly.
-        COASTLINE_FRACTURE_STEP: 0.05,
+        // The Coastline Fracture slider is on a power curve (see RangeCurve): its value is its
+        // position, from 0 to 1 in steps of 0.01, to the power COASTLINE_FRACTURE_CURVE. The
+        // setting's visible effect (coastline length, islands) changes fastest near 0, and
+        // against the square of the position it grows by about the same amount per step, so each
+        // step of the slider looks like about as much change as the last. Values worked out in
+        // code, such as the one a map is given when it is updated to the current terrain rules,
+        // are rounded to COASTLINE_FRACTURE_STEP, the precision a curved slider keeps.
+        COASTLINE_FRACTURE_CURVE: 2,
+        COASTLINE_FRACTURE_STEP: 0.001,
         CONTINENTAL_GROUPING: 0.4,
         COASTAL_BAND: 30,
         CONTINENT_SCALE: 150,

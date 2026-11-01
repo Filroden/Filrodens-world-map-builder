@@ -183,8 +183,16 @@ export const ACTIONS = Object.freeze({
                 // A slider is dragged to its value: one input as the handle lands, then the
                 // change a release sends
                 await element.evaluate((input, next) => {
-                    input.value = next;
-                    if (Number(input.value) !== Number(next)) throw new Error(`slider ${input.name} cannot take ${next} (from ${input.min} to ${input.max} in steps of ${input.step})`);
+                    // A slider on a power curve is dragged to the position of its value, which it
+                    // keeps exactly (see RangeCurve)
+                    const curve = Number.parseFloat(input.dataset.curve);
+                    if (curve > 0) {
+                        input.dataset.value = next;
+                        input.value = String(Number(next) ** (1 / curve));
+                    } else {
+                        input.value = next;
+                        if (Number(input.value) !== Number(next)) throw new Error(`slider ${input.name} cannot take ${next} (from ${input.min} to ${input.max} in steps of ${input.step})`);
+                    }
                     input.dispatchEvent(new Event("input", { bubbles: true }));
                     input.dispatchEvent(new Event("change", { bubbles: true }));
                 }, String(value));
