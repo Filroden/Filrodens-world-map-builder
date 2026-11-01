@@ -1302,7 +1302,7 @@
     "FILRODENSWMB.UI.BiomePropertyTravel": "Travel cost",
     "FILRODENSWMB.UI.BiomePropertyTravelHint": "How hard the land is to cross away from roads: 1 for open grassland, 2 for twice as slow (dense forest, desert), 4 for snowfields.",
     "FILRODENSWMB.UI.BiomePropertyRaiders": "Raider risk",
-    "FILRODENSWMB.UI.BiomePropertyRaidersHint": "How readily the people of land no realm holds turn to raiding: 0 for never and higher where outlaws thrive up to a maximum of 1 for most of the land. Land that feeds no one will also not support any raiders, whatever this value is.",
+    "FILRODENSWMB.UI.BiomePropertyRaidersHint": "How readily the people of land no realm holds turn to raiding: 0 for never, 1 for a normal level of risk, and higher where outlaws thrive. Land that feeds no one will also not support any raiders, whatever this value is.",
     "FILRODENSWMB.UI.BiomePlacement": "Placement",
     "FILRODENSWMB.UI.BiomePlacementHint": "Where this biome can appear. Painting and auto-generation rules only place it there, and it is never shown anywhere else. Underwater biomes lie on the bed of the sea or a lake, seen through the water. Overwater biomes sit on top of the water, such as pack ice.",
     "FILRODENSWMB.UI.BiomePlacementLand": "Land only",
