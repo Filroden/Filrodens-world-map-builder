@@ -6,6 +6,7 @@ import { RegionPanel } from "./RegionPanel.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { FaultThickness } from "../tools/FaultThickness.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 
@@ -111,6 +112,7 @@ export class FaultEditor {
             tectonicTypes: TectonicFeatureEngine.typeOptions(FaultEditor.#currentMap(app), fault.type),
             rangeStyles: Object.entries(FILRODENSWMB.TECTONICS.FEATURES.RANGE_STYLES).map(([id, label]) => ({ id, label })),
             settings: FaultEditor.settings(fault),
+            thickness: FaultThickness.limits(app.mapWidth, fault.thickness),
             isFeature: TectonicFeatureEngine.isFeatureType(fault.type),
         }),
         apply: (app, fault, _ref, form) => FaultEditor.#apply(app, fault, form),

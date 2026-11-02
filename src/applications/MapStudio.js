@@ -28,6 +28,7 @@ import { RunCells } from "./RunCells.js";
 import { Infilling } from "./Infilling.js";
 import { InfillInput } from "./InfillInput.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { FaultThickness } from "../tools/FaultThickness.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
 import { cleanUnit, formatDistance, kmPerPxOf, scaleBarOnMap, scaleBarTick, unitFromSaved } from "../data/MapUnit.js";
 import { ThematicView } from "./ThematicView.js";
@@ -1152,6 +1153,8 @@ export class MapStudio {
         context.pausedLine = context.isLocked && word ? platform.i18n.localize(`FILRODENSWMB.UI.StatePaused${word}`) : null;
         if (regionId === "context") context.panel = this.#panelContext();
         if (regionId === "editToolbar") context.bar = this.#barContext();
+        // Fault line thickness's range on this map (see FaultThickness), holding the bar's value
+        if (regionId === "editToolbar") context.faultThickness = FaultThickness.limits(this.mapWidth, this.uiState.faultThickness);
 
         if (regionId === "editToolbar") {
             const editableTools = FILRODENSWMB.UI.EDITABLE_TOOLS;
@@ -3992,6 +3995,8 @@ export class MapStudio {
 
         this.uiState.mapWidth = this.mapWidth;
         this.uiState.mapHeight = this.mapHeight;
+        // New faults on this map start at its own default thickness (see FaultThickness)
+        this.uiState.faultThickness = FaultThickness.limits(this.mapWidth).default;
         this.uiState.gridType = payload.gridType || "square";
         // Raised to the smallest grid Foundry allows: a map saved with a smaller grid (the slider
         // used to go down to 10) would otherwise export a scene whose grid Foundry enlarges, while

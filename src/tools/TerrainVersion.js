@@ -134,12 +134,14 @@ export class TerrainVersion {
      *
      * `currentRivers` selects the current river rules (see usesCurrentRivers).
      *
-     * `exactDistances` finds each point's nearest coastline (and ridge line) exactly, from the
+     * `currentHotspots` gives hotspot islands the look of the map's land (see usesCurrentHotspots).
+     *
+     * `exactDistances` finds each point's nearest coastline (and ridge line) exactly, from
      * revision 2 on; a legacy map keeps the jump flood, whose rare near misses are part of
      * its terrain.
      *
      * @param {object} state - A uiState object.
-     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object, currentRivers: boolean, exactDistances: boolean}}
+     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object, currentRivers: boolean, currentHotspots: boolean, exactDistances: boolean}}
      */
     static getTerrainParams(state) {
         const world = this.resolveWorld(state);
@@ -161,6 +163,7 @@ export class TerrainVersion {
             },
             faultFrame: isCurrent ? { zoom, originX: world.originX ?? 0, originY: world.originY ?? 0 } : { zoom: 1, originX: 0, originY: 0 },
             currentRivers: this.usesCurrentRivers(state),
+            currentHotspots: this.usesCurrentHotspots(state),
             exactDistances: isCurrent,
         };
     }
@@ -363,9 +366,11 @@ export class TerrainVersion {
     }
 
     /**
-     * Whether a map builds its hotspot chains by the revision 3 rules, which match each chain's
-     * islands and seamounts to the terrain around them. A map from an earlier revision keeps the
-     * chains it was made with.
+     * Whether a map builds its hotspot chains by the revision 3 rules: each island stays where
+     * the chain puts it, but takes the look of the map's own land above the sea (a coastal plain,
+     * the engine's detail noise, a coast that wanders with Coastline Fracture), keeps a smooth
+     * seabed with only a narrow shelf, and no summit rises far above the map's land (see
+     * IslandLook). A map from an earlier revision keeps the chains it was made with.
      *
      * @param {object} state - A uiState object.
      * @returns {boolean}

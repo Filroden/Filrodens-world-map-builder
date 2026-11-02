@@ -1757,7 +1757,11 @@ export const FILRODENSWMB = {
         LABEL_OFFSET: 0.6,
     },
     TECTONICS: {
+        // The thickness a fault without one is drawn with (faults saved before thickness existed)
         DEFAULT_THICKNESS: 40,
+        // Fault line thickness's range on a map: from MIN pixels up to MAX_SHARE of the map's
+        // width, in steps of STEP, with DEFAULT_SHARE of the width for a new fault (FaultThickness)
+        THICKNESS: { MIN: 10, MAX_SHARE: 0.15, DEFAULT_SHARE: 0.05, STEP: 5 },
         DEFAULT_STRENGTH: 0.25,
         HOTSPOT_SPACING: 35,
         HOTSPOT_DECAY: 0.85,

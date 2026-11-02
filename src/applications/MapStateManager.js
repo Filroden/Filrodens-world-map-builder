@@ -4,6 +4,7 @@ import { RangeCurve } from "../tools/RangeCurve.js";
 import { BiomeRuleEngine } from "../generation/BiomeRuleEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { FaultThickness } from "../tools/FaultThickness.js";
 import { platform } from "../platform/index.js";
 import { VectorHistory } from "./VectorHistory.js";
 
@@ -174,7 +175,7 @@ export class MapStateManager {
             riverDensity: FILRODENSWMB.HYDROLOGY.RIVER_DENSITY,
             springsBaked: false,
             faultType: "convergent",
-            faultThickness: FILRODENSWMB.TECTONICS.DEFAULT_THICKNESS,
+            faultThickness: FaultThickness.limits(width).default,
             faultStrength: FILRODENSWMB.TECTONICS.DEFAULT_STRENGTH,
             faultStyle: FILRODENSWMB.TECTONICS.FEATURES.RANGE.DEFAULT_STYLE,
             riverWidth: 4,

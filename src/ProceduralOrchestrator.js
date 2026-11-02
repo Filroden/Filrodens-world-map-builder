@@ -691,6 +691,7 @@ export class ProceduralOrchestrator {
             height: app.mapHeight,
             simplex: engine.simplex,
             seaLevel: params.seaLevel,
+            params,
             frame: { ...(terrain.faultFrame ?? { zoom: 1, originX: 0, originY: 0 }), rootSize: Math.max(world.rootW ?? app.mapWidth, world.rootH ?? app.mapHeight) },
             bounds,
             cache: app.tectonicFeatureCache,
