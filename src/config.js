@@ -1295,6 +1295,12 @@ export const FILRODENSWMB = {
             6: 0.035,
             8: 0.05,
         },
+        // Custom rivers from terrain revision 3 on (see RiverCorridor): the corridor reaches
+        // CORRIDOR river widths either side of the line drawn (a river's own `corridor`, from
+        // CORRIDOR_MIN to CORRIDOR_MAX)
+        CORRIDOR: 10,
+        CORRIDOR_MIN: 3,
+        CORRIDOR_MAX: 15,
         // A river running downhill follows the slope measured STREAM_GRADIENT_REACH pixels either
         // side of it, and may lag up to STREAM_SLACK pixels behind (see ProceduralEngine#followSlope)
         STREAM_GRADIENT_REACH: 1.5,

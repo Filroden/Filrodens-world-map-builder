@@ -136,12 +136,15 @@ export class TerrainVersion {
      *
      * `currentHotspots` gives hotspot islands the look of the map's land (see usesCurrentHotspots).
      *
+     * `guidedRivers` traces custom rivers within a corridor round the line drawn (see
+     * usesGuidedRivers).
+     *
      * `exactDistances` finds each point's nearest coastline (and ridge line) exactly, from
      * revision 2 on; a legacy map keeps the jump flood, whose rare near misses are part of
      * its terrain.
      *
      * @param {object} state - A uiState object.
-     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object, currentRivers: boolean, currentHotspots: boolean, exactDistances: boolean}}
+     * @returns {{extraOctaves: number, detailOctaves: number, resolutionScale: number, fillEnclosedCoast: boolean, coastalBuffers: boolean, world: object, faultFrame: object, currentRivers: boolean, currentHotspots: boolean, guidedRivers: boolean, exactDistances: boolean}}
      */
     static getTerrainParams(state) {
         const world = this.resolveWorld(state);
@@ -164,6 +167,7 @@ export class TerrainVersion {
             faultFrame: isCurrent ? { zoom, originX: world.originX ?? 0, originY: world.originY ?? 0 } : { zoom: 1, originX: 0, originY: 0 },
             currentRivers: this.usesCurrentRivers(state),
             currentHotspots: this.usesCurrentHotspots(state),
+            guidedRivers: this.usesGuidedRivers(state),
             exactDistances: isCurrent,
         };
     }

@@ -26,6 +26,19 @@ const DETAIL_BAND_MARGIN_CELLS = 2;
 // ProceduralEngine#executeJFAPass): the row above left to right, the two sides, the row below
 const JFA_ORDER_COL = Int8Array.of(-1, 0, 1, -1, 1, -1, 0, 1);
 const JFA_ORDER_ROW = Int8Array.of(-1, -1, -1, 0, 0, 1, 1, 1);
+// A guided custom river (see ProceduralEngine#traceGuided): how many pixels of its line it may
+// turn back up, how far ahead of itself it rejoins the line (times its distance from it), and
+// over how many pixels its own direction, and the line's, are measured where it rejoins
+const GUIDED_BACK_STEPS = 2;
+const GUIDED_REJOIN_AHEAD = 1.5;
+const GUIDED_HEADING_STEPS = 4;
+// How far the curve a guided river rejoins its line on keeps to the way it was running, and to
+// the line's, as a share of the join
+const GUIDED_JOIN_BEND = 0.35;
+// How far a guided river may climb over the rim of a hollow in its corridor (of the height range)
+const GUIDED_RIM = 0.006;
+// How much longer than its line a guided river's course may wind
+const GUIDED_LENGTH_SHARE = 3;
 
 export class ProceduralEngine {
     constructor(seed = null) {
@@ -408,7 +421,8 @@ export class ProceduralEngine {
     #traceRiver(startX, startY, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params, record, resume = false) {
         const map = { elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params };
         const freezeLimit = params?.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
-        const maxLength = width * FILRODENSWMB.HYDROLOGY.MAX_RIVER_LENGTH_MULT;
+        // A guided custom river may run longer (see #traceGuided)
+        const maxLength = record.maxLength ?? width * FILRODENSWMB.HYDROLOGY.MAX_RIVER_LENGTH_MULT;
 
         // Where the river is, and where it would be if it could run in any direction rather
         // than only to a neighbour (see #followSlope)
@@ -528,8 +542,12 @@ export class ProceduralEngine {
      *
      * Custom rivers are laid down before any spring is traced, so procedural rivers that reach
      * one join it. `record.authored` is how many steps of the path follow the user's line.
+     *
+     * From terrain revision 3 on, a custom river comes with its corridor and is traced within it
+     * instead (see #traceGuided).
      */
     #traceAuthored(authored, record, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params) {
+        if (authored.corridor) return this.#traceGuided(authored, record, { elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params });
         const freezeLimit = params?.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
         const endsAt = (length) => {
             record.authored = length;
@@ -554,6 +572,244 @@ export class ProceduralEngine {
         const last = record.path.at(-1);
         if (!last) return false;
         return !!this.#traceRiver(last.x, last.y, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params, record, true);
+    }
+
+    /**
+     * A custom river from terrain revision 3 on (see RiverCorridor): traced as any river is, from
+     * its corridor's higher end, but held within the corridor. Where its next step would leave the
+     * corridor or turn back up it, it takes the lowest way down that keeps within it, so it runs
+     * along the corridor's edge where the land falls across it (see #stepWithin). Where it is
+     * hemmed in, or the land would make it climb (it has no lower neighbour), it rejoins the
+     * corridor's line ahead of itself and follows the line for a stretch, then is traced again
+     * from there. Past the line's lower end it is traced on freely, to the sea or another
+     * river.
+     *
+     * It may turn back up the line by GUIDED_BACK_STEPS at most, and rejoins the line ahead of
+     * itself by GUIDED_REJOIN_AHEAD times its distance from it, so it never doubles back alongside
+     * its own course (which draws as a loop or braid). It rejoins on a curve that leaves the way it
+     * was running and meets the line running along it, so the join draws no straight stub.
+     *
+     * `record.guided` is how many steps of the path lie within the corridor, along which the
+     * river gathers `record.lateral` flow per baseline pixel (see RiverNetwork).
+     */
+    #traceGuided(guide, record, map) {
+        const { elevationData, temperatureData, width, height, params } = map;
+        const freezeLimit = params?.climate?.freezingThreshold ?? FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
+        const { pixels, corridor } = guide;
+        // As long as any river may be, beyond the course it winds along its line
+        record.maxLength = width * FILRODENSWMB.HYDROLOGY.MAX_RIVER_LENGTH_MULT + pixels.length * GUIDED_LENGTH_SHARE;
+        const maxLength = record.maxLength;
+        const lastIndex = pixels.length - 1;
+        const field = (x, y) => {
+            const { box, boxWidth } = corridor;
+            if (x < box.minX || x > box.maxX || y < box.minY || y > box.maxY) return { distance: Infinity, nearest: -1 };
+            const at = (y - box.minY) * boxWidth + (x - box.minX);
+            return { distance: corridor.distance[at], nearest: corridor.nearest[at] };
+        };
+        const within = (spot) => spot.nearest >= 0 && spot.distance <= corridor.limits[spot.nearest];
+        const ends = () => {
+            record.guided = record.path.length;
+            return record.path.length > FILRODENSWMB.HYDROLOGY.MAX_PATH_LENGTH;
+        };
+        record.authored = 0;
+        record.lateral = guide.lateral ?? 0;
+
+        const at = { x: pixels[0].x, y: pixels[0].y, elevation: elevationData[pixels[0].y * width + pixels[0].x] };
+        const ideal = { x: at.x, y: at.y };
+        // How far down the line it has come
+        let progress = 0;
+        // The floor of the hollow it is climbing out of, if any
+        let hollow = Infinity;
+        let recorded = false;
+        while (record.path.length < maxLength) {
+            const index = at.y * width + at.x;
+            const isFrozen = temperatureData[index] < freezeLimit;
+            if (!recorded) this.#recordRiverStep(record, at.x, at.y, isFrozen, width, map.riverMap);
+            recorded = false;
+
+            const here = field(at.x, at.y);
+            progress = Math.max(progress, here.nearest);
+            // Past the line's lower end it runs on as any river does
+            if (progress >= lastIndex - 1) {
+                record.guided = record.path.length;
+                return !!this.#traceRiver(at.x, at.y, elevationData, temperatureData, width, height, map.seaLevel, map.riverMap, map.waterMask, params, record, true);
+            }
+
+            const lowest = this.#getLowestNeighbor(at.x, at.y, elevationData, width, height, params);
+            if (lowest && lowest.elevation < at.elevation) {
+                const next = this.#nextRiverStep(record, at, ideal, isFrozen, map);
+                // It reached the sea or joined another river
+                if (!next) return ends();
+                const ahead = field(next.x, next.y);
+                if (within(ahead) && ahead.nearest >= progress - GUIDED_BACK_STEPS) {
+                    if (next.elevation < hollow) hollow = Infinity;
+                    at.x = next.x;
+                    at.y = next.y;
+                    at.elevation = next.elevation;
+                    if (next.resetsIdeal) {
+                        ideal.x = next.x;
+                        ideal.y = next.y;
+                    }
+                    continue;
+                }
+            }
+
+            // Where the land would take it out of the corridor or back up it, it runs on along the
+            // lowest way down that keeps within it; in a hollow, over the lowest rim ahead of it,
+            // no more than GUIDED_RIM above the hollow's floor
+            const climbs = !lowest || lowest.elevation >= at.elevation;
+            if (climbs) hollow = Math.min(hollow, at.elevation);
+            const aside = climbs
+                ? this.#stepWithin(record, at, field, (spot) => within(spot) && spot.nearest >= progress, map, hollow + GUIDED_RIM)
+                : this.#stepWithin(record, at, field, (spot) => within(spot) && spot.nearest >= progress - GUIDED_BACK_STEPS, map, null);
+            if (aside === "ended") return ends();
+            if (aside) {
+                at.x = aside.x;
+                at.y = aside.y;
+                at.elevation = aside.elevation;
+                ideal.x = aside.x;
+                ideal.y = aside.y;
+                continue;
+            }
+
+            // Hemmed in, or the rise is too high: rejoin the line ahead and follow it for a stretch
+            const from = Math.min(lastIndex, Math.max(progress, here.nearest) + 1 + Math.ceil(Math.min(here.distance, corridor.limits[Math.max(0, here.nearest)]) * GUIDED_REJOIN_AHEAD));
+            const to = Math.min(lastIndex, from + corridor.follow);
+            const outcome = this.#followLine(record, at, pixels, from, to, map, freezeLimit);
+            if (outcome !== "moved") return ends();
+            hollow = Infinity;
+            ideal.x = at.x;
+            ideal.y = at.y;
+            recorded = true;
+        }
+        return ends();
+    }
+
+    /**
+     * A guided river's next step where the land's own way would take it out of its corridor (see
+     * #traceGuided): the lowest neighbour it has not run through that `allowed` keeps, if it lies
+     * lower than where it is, or (climbing out of a hollow) no higher than `ceiling`, and never
+     * alongside its own course. Stepping onto the sea or another river ends it there.
+     * @returns {{x: number, y: number, elevation: number}|"ended"|null}
+     */
+    #stepWithin(record, at, field, allowed, { elevationData, width, height, seaLevel, riverMap }, ceiling) {
+        let best = null;
+        for (const { dx, dy } of ProceduralEngine.ADJACENT_OFFSETS) {
+            const x = at.x + dx;
+            const y = at.y + dy;
+            if (x < 0 || y < 0 || x >= width || y >= height) continue;
+            const index = y * width + x;
+            if (this.riverVisitedBuffer[index] === this.riverTraceId || !allowed(field(x, y))) continue;
+            // Over a rim, never alongside its own course, which would coil round the hollow
+            if (ceiling !== null && this.#besideOwnCourse(record, x, y, at, width, height)) continue;
+            if (!best || elevationData[index] < best.elevation) best = { x, y, elevation: elevationData[index] };
+        }
+        if (!best || (ceiling === null ? best.elevation >= at.elevation : best.elevation > ceiling)) return null;
+        const index = best.y * width + best.x;
+        if (best.elevation <= seaLevel && this.#isSea(best.x, best.y, elevationData, width, height, seaLevel)) {
+            record.path.push({ x: best.x, y: best.y });
+            return "ended";
+        }
+        if (riverMap[index] && this.riverOwnerBuffer[index] !== record.ownerId) {
+            this.#mergeRiverAt(record, best.x, best.y, width);
+            return "ended";
+        }
+        return best;
+    }
+
+    /** Whether a pixel touches a river's own course anywhere but where it now is and the step before. */
+    #besideOwnCourse(record, x, y, at, width, height) {
+        const before = record.path.at(-2);
+        for (const { dx, dy } of ProceduralEngine.ADJACENT_OFFSETS) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height || (nx === at.x && ny === at.y) || (nx === before?.x && ny === before?.y)) continue;
+            if (this.riverVisitedBuffer[ny * width + nx] === this.riverTraceId) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Moves a guided river (see #traceGuided) from where it is onto its line's pixel `from`, on a
+     * curve that leaves the way it was running and meets the line running along it, then along
+     * the line to `to`, recording
+     * each step. Ends it where it meets the sea or another river.
+     * @returns {"moved"|"ended"|"stuck"} Whether it moved on, ended, or found nowhere to go.
+     */
+    #followLine(record, at, pixels, from, to, map, freezeLimit) {
+        const { elevationData, temperatureData, width, height, seaLevel, riverMap } = map;
+        // Each step onto a pixel: null to go on, or how the river ends there
+        const step = (x, y) => {
+            const index = y * width + x;
+            if (elevationData[index] <= seaLevel && this.#isSea(x, y, elevationData, width, height, seaLevel)) {
+                record.path.push({ x, y });
+                return "ended";
+            }
+            if (riverMap[index] && this.riverOwnerBuffer[index] !== record.ownerId) {
+                this.#mergeRiverAt(record, x, y, width);
+                return "ended";
+            }
+            // Running alongside another river, it joins it, as a traced river does
+            const alongside = this.#findAdjacentRiver(x, y, Infinity, elevationData, width, height, riverMap, record.ownerId);
+            if (alongside) {
+                if (this.riverVisitedBuffer[index] !== this.riverTraceId) this.#recordRiverStep(record, x, y, temperatureData[index] < freezeLimit, width, riverMap);
+                this.#mergeRiverAt(record, alongside.x, alongside.y, width);
+                return "ended";
+            }
+            if (this.riverVisitedBuffer[index] !== this.riverTraceId) this.#recordRiverStep(record, x, y, temperatureData[index] < freezeLimit, width, riverMap);
+            at.x = x;
+            at.y = y;
+            at.elevation = elevationData[index];
+            return null;
+        };
+
+        // It joins the line on a curve that leaves the way it was running (unless that faces away
+        // from where it joins) and meets the line running along it
+        const target = pixels[from];
+        const dx = target.x - at.x;
+        const dy = target.y - at.y;
+        const reach = Math.hypot(dx, dy);
+        const unit = (x, y) => {
+            const length = Math.hypot(x, y);
+            return length > 0 ? { x: x / length, y: y / length } : { x: 0, y: 0 };
+        };
+        const before = record.path[Math.max(0, record.path.length - 1 - GUIDED_HEADING_STEPS)];
+        let leaving = unit(at.x - before.x, at.y - before.y);
+        if (leaving.x * dx + leaving.y * dy <= 0) leaving = { x: 0, y: 0 };
+        const back = pixels[Math.max(0, from - GUIDED_HEADING_STEPS)];
+        const meeting = unit(target.x - back.x, target.y - back.y);
+        const bend = reach * GUIDED_JOIN_BEND;
+        const sx = at.x + 0.5;
+        const sy = at.y + 0.5;
+        const ex = target.x + 0.5;
+        const ey = target.y + 0.5;
+        const ax = sx + leaving.x * bend;
+        const ay = sy + leaving.y * bend;
+        const bx = ex - meeting.x * bend;
+        const by = ey - meeting.y * bend;
+        const samples = Math.max(1, Math.ceil(reach * 3));
+        let moved = false;
+        for (let k = 1; k <= samples; k++) {
+            const t = k / samples;
+            const u = 1 - t;
+            const x = Math.floor(u * u * u * sx + 3 * u * u * t * ax + 3 * u * t * t * bx + t * t * t * ex);
+            const y = Math.floor(u * u * u * sy + 3 * u * u * t * ay + 3 * u * t * t * by + t * t * t * ey);
+            // Step by step, so its course has no gap
+            while (at.x !== x || at.y !== y) {
+                const ended = step(at.x + Math.sign(x - at.x), at.y + Math.sign(y - at.y));
+                if (ended) return ended;
+                moved = true;
+            }
+        }
+        for (let i = from + 1; i <= to; i++) {
+            const p = pixels[i];
+            while (at.x !== p.x || at.y !== p.y) {
+                const ended = step(at.x + Math.sign(p.x - at.x), at.y + Math.sign(p.y - at.y));
+                if (ended) return ended;
+                moved = true;
+            }
+        }
+        return moved ? "moved" : "stuck";
     }
 
     /** Marks a pixel as the river's and remembers the step of its path it is (the first time only). */
@@ -750,7 +1006,7 @@ export class ProceduralEngine {
             TectonicEngine.applyTectonicFaults(elevationData, width, height, tectonicFaults, this.simplex, activeBounds, params.terrain?.faultFrame);
         }
         if (manualRivers.length > 0) {
-            HydrologyEngine.carveManualRivers(elevationData, width, height, manualRivers, this.simplex, params.seaLevel, activeBounds, params.terrain?.currentRivers === true);
+            HydrologyEngine.carveManualRivers(elevationData, width, height, manualRivers, this.simplex, params.seaLevel, activeBounds, params.terrain?.currentRivers === true, params.terrain);
         }
 
         // 3. Apply Elevation Exponent & Pivot Map to Land/Sea Boundaries
@@ -3345,10 +3601,12 @@ export class ProceduralEngine {
      * Traces every river: first the custom rivers drawn under the current river rules
      * (`authoredRivers`, see #traceAuthored), then one from every spring pin.
      *
-     * @param {object[]} [authoredRivers] - From HydrologyEngine.authoredRivers: `{ pixels, inflow }`.
+     * @param {object[]} [authoredRivers] - From HydrologyEngine.authoredRivers: `{ pixels, inflow }`,
+     *   with `corridor` and `lateral` for a guided river (see RiverCorridor.forTrace).
      * @returns {{vectors: object[], waterMask: Float32Array}} The rivers (`{ id, path, mergeInto,
-     *   inflow, authored }`, where `authored` is how many steps follow a custom river's line) and
-     *   the water mask.
+     *   inflow, authored }`, where `authored` is how many steps follow a custom river's line; a
+     *   guided custom river also has `customId`, the custom river's id, `guided`, how many steps
+     *   lie within its corridor, and `lateral`, see #traceGuided) and the water mask.
      */
     generateRivers(elevationData, moistureData, temperatureData, mapPins, width, height, params, outRiverMap, outWaterMask, authoredRivers = []) {
         const seaLevel = params.seaLevel ?? FILRODENSWMB.DEFAULTS.SEA_LEVEL;
@@ -3388,6 +3646,7 @@ export class ProceduralEngine {
             this.riverTracePrng = ProceduralEngine.#mulberry32(ProceduralEngine.#riverSeed(this.seedNumber, first.y * width + first.x));
             this.riverTraceId++;
             const record = { ownerId: this.riverRecords.length + 1, path: [], indexOf: new Map(), mergeInto: null, inflow: authored.inflow ?? 0 };
+            if (authored.corridor) record.customId = authored.id;
             this.riverRecords.push(record);
             record.kept = this.#traceAuthored(authored, record, elevationData, temperatureData, width, height, seaLevel, riverMap, waterMask, params);
         }
@@ -3422,7 +3681,15 @@ export class ProceduralEngine {
         const vectors = rivers.map((record) => {
             const target = record.mergeInto?.record;
             const mergeInto = target?.kept ? { id: target.id, index: record.mergeInto.index } : null;
-            return { id: record.id, path: record.path, mergeInto, inflow: record.inflow, authored: record.authored ?? 0 };
+            const vector = { id: record.id, path: record.path, mergeInto, inflow: record.inflow, authored: record.authored ?? 0 };
+            // A guided custom river (see #traceGuided): which it is, how far it runs within its
+            // corridor, and the flow it gathers there
+            if (record.customId !== undefined) {
+                vector.customId = record.customId;
+                vector.guided = record.guided ?? 0;
+                vector.lateral = record.lateral ?? 0;
+            }
+            return vector;
         });
         this.riverRecords = null;
 

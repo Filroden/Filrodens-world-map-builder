@@ -6,8 +6,8 @@
 // waits only on promises (the inspector's redraw, from a cached template); a scripted click in
 // happy-dom puts it back first, so happy-dom cannot tell a box that keeps its tick from one that
 // loses it. The page is the tutorial's regional map (samples/tutorial/11-a-regional-map.json),
-// which has generated pins, routes and regions; a fault, a region style and a label style are
-// added to it.
+// which has generated pins, routes and regions; a fault, a custom river, a region style and a
+// label style are added to it.
 //
 // Needs Chromium for Playwright (npx playwright install chromium, or FWMB_CHROMIUM); skipped,
 // saying so, without it. It takes about fifteen minutes (every click waits for the regional map to
@@ -44,6 +44,9 @@ before(async () => {
         }
         // A fault and a region style of the test's own, which the regional map has none of
         app.tectonicFaults.push({ id: "testFaultChecks01", name: "Fault", description: "", points: [{ x: 100, y: 100 }, { x: 300, y: 200 }], type: "range", style: "simple", thickness: 40, strength: 0.25, color: "#ef4444", visibility: "all", revision: 2 });
+        // A custom river of the test's own, on terrain revision 3, where it has Cut through high ground
+        app.uiState.terrainVersion = Math.max(app.uiState.terrainVersion ?? 0, 3);
+        app.manualRivers.push({ id: "testRiverChecks01", name: "River", points: [{ x: 100, y: 300 }, { x: 300, y: 420 }], width: 4, visibility: "all" });
         (app.uiState.customRegionStyles ??= []).push({ id: "testRegionStyle01", name: "Test fill", fillColor: "#3366aa", fillStyle: "solid" });
         // A label style in a family with both Bold and Italic, so neither box is disabled
         const labelStyle = structuredClone(app.uiState.customLabelStyles[0]);
@@ -54,6 +57,7 @@ before(async () => {
             route: app.mapRoutes.find((route) => route.generated)?.id,
             region,
             fault: "testFaultChecks01",
+            river: "testRiverChecks01",
             set: set?.id,
             level: set?.levels[0]?.id,
             routeStyle: app.uiState.customRouteStyles?.[0]?.id,
@@ -77,6 +81,7 @@ const KINDS = {
         object: "app.regionLevels.find((level) => level.id === ids.region.levelId).regions.find((each) => each.id === ids.region.id)",
     },
     fault: { tool: "features", open: "(await import('/src/applications/FeatureEditors.js')).FaultEditor.open(app, ids.fault)", object: "app.tectonicFaults.find((each) => each.id === ids.fault)" },
+    river: { tool: "features", open: "(await import('/src/applications/FeatureEditors.js')).RiverEditor.open(app, ids.river)", object: "app.manualRivers.find((each) => each.id === ids.river)" },
     set: { tool: "regions", open: "(await import('/src/applications/LayerEditors.js')).LayerSetEditor.open(app, ids.set)", object: "app.layerSets.find((each) => each.id === ids.set)" },
     level: { tool: "regions", open: "(await import('/src/applications/LayerEditors.js')).LevelEditor.open(app, ids.level)", object: "app.layerSets.flatMap((set) => set.levels).find((each) => each.id === ids.level)" },
     routeStyle: { tool: "library", open: "(await import('/src/applications/StyleEditors.js')).StyleEditors.open(app, 'Route', ids.routeStyle)", object: "app.uiState.customRouteStyles.find((each) => each.id === ids.routeStyle)" },
@@ -97,6 +102,7 @@ const BOXES = [
     ["route", "Smoothing", '[name="routeSmoothing"]', "object.smoothing === true"],
     ["region", "No fill", '[name="regionFillTransparent"]', "object.fillColor === 'transparent'"],
     ["fault", "Reversed", '[name="faultReverse"]', "object.reversed === true"],
+    ["river", "Cut through high ground", '[name="riverCutThrough"]', "object.cutThrough === true"],
     ["set", "Water tint", '[name="setWaterTint"]', "object.waterTint === true"],
     ["level", "Scale with map", '[name="levelScaleWithMap"]', "object.style?.scaleWithMap === true"],
     ["routeStyle", "Outline", '[name="styleOutline"]', "object.outline !== false"],

@@ -1,7 +1,8 @@
 {{!--
-    The inspector's river (see RiverEditor): its name and width, and Focus view and Delete. Every
-    field applies when committed, one undo step each (see Inspector); a new width carves the river
-    again.
+    The inspector's river (see RiverEditor): its name and width, on a map from terrain revision 3
+    on its corridor width and whether it cuts through high ground, and Focus view and Delete. Every
+    field applies when committed, one undo step each (see Inspector); all but the name carve the
+    river again.
 --}}
 <div class="fwmb-group">
     <div class="fwmb-form-group">
@@ -20,6 +21,13 @@
             </select>
         </div>
     </div>
+    {{#if guided}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="riverCorridor" label="FILRODENSWMB.UI.RiverCorridor" hint="FILRODENSWMB.UI.RiverCorridorHint" value=corridor.value min=corridor.min max=corridor.max step=1 unit="FILRODENSWMB.UI.RiverCorridorUnit" unitShort="FILRODENSWMB.UI.RiverCorridorUnitShort"}}
+    <label class="fwmb-checkbox-label" data-tooltip="{{localize 'FILRODENSWMB.UI.RiverCutThroughHint'}}">
+        <input type="checkbox" class="fwmb-checkbox" name="riverCutThrough" {{#if river.cutThrough}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.RiverCutThrough"}}
+    </label>
+    {{/if}}
 </div>
 
 <div class="fwmb-inspector-actions">

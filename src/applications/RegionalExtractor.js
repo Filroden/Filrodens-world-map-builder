@@ -86,7 +86,7 @@ export class RegionalExtractor {
             cultures: this.#translateCultures(state.cultures ?? [], cropBox, zoomScale, targetWidth, targetHeight),
             history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
             tectonicFaults: this.#translateFaults(app.tectonicFaults ?? [], cropBox, zoomScale, targetWidth, targetHeight),
-            manualRivers: this.#scaleRiverWidths(translate(app.manualRivers), zoomScale),
+            manualRivers: this.guideRivers(app, this.#scaleRiverWidths(translate(app.manualRivers), zoomScale), cropBox),
             mapPins: [...translate(app.mapPins), ...this.#riverInflows(app, cropBox, zoomScale, targetWidth, targetHeight)],
             mapRoutes: translate(app.mapRoutes),
             mapLabels: translate(app.mapLabels),
@@ -396,6 +396,38 @@ export class RegionalExtractor {
     }
 
     /**
+     * On a map whose custom rivers are guided (see TerrainVersion.usesGuidedRivers), each custom
+     * river carries over the way it runs on this map (`reversed`), so the regional map's river
+     * runs the same way whatever the land at the crop's edges, and, where it flows into the crop
+     * along its corridor, the flow it has gathered by then (`inflow`), so it enters as wide as it
+     * is here.
+     *
+     * @param {object} app - The studio, with the map's traced rivers.
+     * @param {object[]} rivers - The custom rivers as the regional map gets them (changed in place).
+     * @param {{x: number, y: number, width: number, height: number}} cropBox - The crop, in this map's pixels.
+     * @returns {object[]} `rivers`.
+     */
+    static guideRivers(app, rivers, cropBox) {
+        if (!TerrainVersion.usesGuidedRivers(app.uiState)) return rivers;
+        const vectors = app.currentRiverData?.vectors ?? [];
+        const flows = app.currentRiverData?.network?.flows;
+        const inside = (point) => point.x >= cropBox.x && point.x < cropBox.x + cropBox.width && point.y >= cropBox.y && point.y < cropBox.y + cropBox.height;
+        for (const river of rivers) {
+            const original = app.manualRivers.find((each) => each.id === river.id);
+            const vector = vectors.find((each) => each.customId === river.id);
+            if (!original?.points?.length || !vector?.path.length) continue;
+            const first = original.points[0];
+            const last = original.points.at(-1);
+            const rises = vector.path[0];
+            river.reversed = Math.hypot(rises.x - last.x, rises.y - last.y) < Math.hypot(rises.x - first.x, rises.y - first.y);
+            delete river.inflow;
+            const entry = vector.path.findIndex((point, i) => i > 0 && inside(point) && !inside(vector.path[i - 1]));
+            if (entry > 0 && entry < (vector.guided ?? 0) && flows?.get(vector.id)) river.inflow = flows.get(vector.id)[entry];
+        }
+        return rivers;
+    }
+
+    /**
      * A spring for every river that flows into the crop from outside it, placed where the river
      * crosses the crop's edge and carrying the flow the river has gathered by then (`inflow`, in
      * baseline pixels of river upstream, see RiverNetwork). Without these, the regional map would
@@ -417,8 +449,9 @@ export class RegionalExtractor {
         const pins = [];
         for (const river of rivers) {
             const entry = river.path.findIndex((point, i) => i > 0 && inside(point) && !inside(river.path[i - 1]));
-            // A custom river entering along its own line is carried over as a custom river
-            if (entry < 0 || entry < (river.authored ?? 0)) continue;
+            // A custom river entering along its own line (or its corridor) is carried over as a
+            // custom river
+            if (entry < 0 || entry < (river.authored || river.guided || 0)) continue;
 
             const point = river.path[entry];
             pins.push({

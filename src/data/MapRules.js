@@ -373,6 +373,13 @@ const RIVER = obj({
     // string is read as its number
     width: num(RANGE.SIZE, { fromText: true }),
     widthScale: num(RANGE.SIZE),
+    // From terrain revision 3 on (see RiverCorridor): the corridor's half-width in river widths,
+    // and whether the river cuts through high ground; a regional map's river also carries the way
+    // its parent's runs and the flow it enters the crop with
+    corridor: num({ min: 1, max: 100 }),
+    cutThrough: bool,
+    reversed: bool,
+    inflow: num(RANGE.SIZE),
     visibility,
     hidden,
 });

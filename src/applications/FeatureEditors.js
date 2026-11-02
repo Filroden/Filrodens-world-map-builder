@@ -56,9 +56,10 @@ function zoomTo(app, points) {
 }
 
 /**
- * A river guide (Rivers and faults) in the inspector: its name and width, and Focus view and
- * Delete. A new width carves the river again. When the river is the one being drawn, the bar's
- * width follows it, so the rest of the line is drawn at the same width.
+ * A river guide (Rivers and faults) in the inspector: its name and width, from terrain revision 3
+ * on its corridor width and whether it cuts through high ground (see RiverCorridor), and Focus
+ * view and Delete. All but the name carve the river again. When the river is the one being
+ * drawn, the bar's width follows it, so the rest of the line is drawn at the same width.
  */
 export class RiverEditor {
     /** @returns {Promise<boolean>} */
@@ -66,15 +67,32 @@ export class RiverEditor {
         return Inspector.open(app, this.KIND, { id }, options);
     }
 
+    /** A river's corridor width, in river widths: its own, or the default. */
+    static corridorOf(river) {
+        return river.corridor ?? FILRODENSWMB.HYDROLOGY.CORRIDOR;
+    }
+
     static KIND = Object.freeze({
         id: "river",
         template: `${TEMPLATES}inspector-river.hbs`,
         find: (app, { id }) => app.manualRivers?.find((river) => river.id === id) ?? null,
         header: (_app, river) => ({ title: river.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitleRiver") }),
-        context: (_app, river) => ({ river, widths: RIVER_WIDTHS.map(([value, label]) => ({ value, label, selected: value === Number(river.width) })) }),
+        context: (app, river) => ({
+            river,
+            widths: RIVER_WIDTHS.map(([value, label]) => ({ value, label, selected: value === Number(river.width) })),
+            guided: TerrainVersion.usesGuidedRivers(app.uiState),
+            corridor: { value: RiverEditor.corridorOf(river), min: FILRODENSWMB.HYDROLOGY.CORRIDOR_MIN, max: FILRODENSWMB.HYDROLOGY.CORRIDOR_MAX },
+        }),
         apply: (app, river, _ref, form) => {
-            const values = typed("river", { name: form.elements.riverName.value.trim() || river.name, width: Number(form.elements.riverWidth.value) }, river);
-            const applied = applyValues(app, river, values, ["width"]);
+            const elements = form.elements;
+            const fields = { name: elements.riverName.value.trim() || river.name, width: Number(elements.riverWidth.value) };
+            // The corridor's settings, shown from terrain revision 3 on
+            if (elements.riverCorridor) fields.corridor = Number(elements.riverCorridor.value);
+            if (elements.riverCutThrough) fields.cutThrough = elements.riverCutThrough.checked;
+            const values = typed("river", fields, river);
+            const current = { ...river, corridor: RiverEditor.corridorOf(river), cutThrough: river.cutThrough === true };
+            const applied = applyValues(app, river, values, ["width", "corridor", "cutThrough"], current);
+            if (applied && river.cutThrough === false) delete river.cutThrough;
             if (applied && app.activeRiverId === river.id) app.uiState.riverWidth = river.width;
             return applied;
         },
