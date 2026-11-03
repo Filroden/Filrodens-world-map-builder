@@ -27,7 +27,7 @@ const { smoothstep, bump } = FeatureMath;
 export class SubductionFeature {
     static plan(fault, context) {
         const settings = FILRODENSWMB.TECTONICS.FEATURES.SUBDUCTION;
-        const field = new LineField(fault.points, fault.thickness * settings.REACH, context.width, context.height);
+        const field = new LineField(fault.points, fault.thickness * settings.REACH, context.width, context.height, context.centripetal);
         return { field, bounds: field.bounds };
     }
 

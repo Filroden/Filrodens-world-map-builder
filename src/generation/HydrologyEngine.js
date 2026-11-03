@@ -2,6 +2,7 @@ import { SpatialMath } from "../tools/SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
 import { RiverNetwork } from "./RiverNetwork.js";
 import { RiverCorridor } from "./RiverCorridor.js";
+import { CatmullRom } from "../tools/CatmullRom.js";
 
 /** Spacing, in map pixels, of the points a custom river's spline is sampled at. */
 const SPLINE_STEP = 0.25;
@@ -365,36 +366,11 @@ export class HydrologyEngine {
     }
 
     /**
-     * Generates a Catmull-Rom spline array from sparse points.
+     * The uniform Catmull-Rom curve through a custom river's points (see CatmullRom), sampled every
+     * `stepSize` pixels: the curve revisions 1 and 2 carve and trace along. From revision 3 on the
+     * river corridor follows the centripetal curve instead (see RiverCorridor).
      */
     static #getSplinePoints(points, stepSize) {
-        if (points.length < 2) return [];
-
-        const curve = [];
-        const padded = [points[0], ...points, points[points.length - 1]];
-
-        for (let i = 1; i < padded.length - 2; i++) {
-            const p0 = padded[i - 1];
-            const p1 = padded[i];
-            const p2 = padded[i + 1];
-            const p3 = padded[i + 2];
-
-            const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-            const steps = Math.max(1, Math.floor(dist / stepSize));
-
-            for (let t = 0; t < 1; t += 1 / steps) {
-                const t2 = t * t;
-                const t3 = t2 * t;
-
-                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
-
-                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
-
-                curve.push({ x, y });
-            }
-        }
-
-        curve.push(points[points.length - 1]);
-        return curve;
+        return CatmullRom.open(points, { step: stepSize }).map((p) => ({ x: p.x, y: p.y }));
     }
 }

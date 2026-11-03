@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { RiverNetwork } from "./RiverNetwork.js";
+import { CatmullRom } from "../tools/CatmullRom.js";
 
 /**
  * Custom rivers from terrain revision 3 on (see TerrainVersion.usesGuidedRivers): a river that
@@ -199,39 +200,14 @@ export class RiverCorridor {
     // ----------------------------------------------------------------- the line
 
     /**
-     * The line drawn through a river's points, sampled about every SPLINE_STEP map pixels: a
-     * centripetal Catmull-Rom curve, which never loops or overshoots however unevenly the points
-     * are spaced (the uniform curve can, where two points lie close beside long stretches). Its
-     * ends run on in the direction of their first and last stretches.
+     * The line drawn through a river's points, sampled every SPLINE_STEP map pixels: the
+     * centripetal Catmull-Rom curve (see CatmullRom), which never loops or overshoots however
+     * unevenly the points are spaced, and which the canvas draws for the river.
      * @param {{x: number, y: number}[]} points
      * @returns {{x: number, y: number}[]}
      */
     static spline(points) {
-        // Points on top of each other add nothing and would make a stretch of no length
-        const kept = points.filter((p, i) => i === 0 || Math.hypot(p.x - points[i - 1].x, p.y - points[i - 1].y) > 1e-6);
-        if (kept.length < 2) return [];
-        const first = kept[0];
-        const last = kept.at(-1);
-        const padded = [{ x: 2 * first.x - kept[1].x, y: 2 * first.y - kept[1].y }, ...kept, { x: 2 * last.x - kept.at(-2).x, y: 2 * last.y - kept.at(-2).y }];
-        const curve = [];
-        for (let i = 1; i < padded.length - 2; i++) {
-            const [p0, p1, p2, p3] = [padded[i - 1], padded[i], padded[i + 1], padded[i + 2]];
-            // Knots spaced by the square root of each stretch's length
-            const t1 = Math.sqrt(Math.hypot(p1.x - p0.x, p1.y - p0.y));
-            const t2 = t1 + Math.sqrt(Math.hypot(p2.x - p1.x, p2.y - p1.y));
-            const t3 = t2 + Math.sqrt(Math.hypot(p3.x - p2.x, p3.y - p2.y));
-            const steps = Math.max(1, Math.floor(Math.hypot(p2.x - p1.x, p2.y - p1.y) / SPLINE_STEP));
-            for (let k = 0; k < steps; k++) {
-                const t = t1 + ((t2 - t1) * k) / steps;
-                const lerp = (a, b, ta, tb) => ({ x: ((tb - t) * a.x + (t - ta) * b.x) / (tb - ta), y: ((tb - t) * a.y + (t - ta) * b.y) / (tb - ta) });
-                const a1 = lerp(p0, p1, 0, t1);
-                const a2 = lerp(p1, p2, t1, t2);
-                const a3 = lerp(p2, p3, t2, t3);
-                curve.push(lerp(lerp(a1, a2, 0, t2), lerp(a2, a3, t1, t3), t1, t2));
-            }
-        }
-        curve.push({ x: last.x, y: last.y });
-        return curve;
+        return CatmullRom.open(points ?? [], { centripetal: true, step: SPLINE_STEP }).map((p) => ({ x: p.x, y: p.y }));
     }
 
     /** A river's width on this map, in map pixels. */

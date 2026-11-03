@@ -1,7 +1,8 @@
-// Terrain revision 3, which changes only hotspot chains and custom rivers: every rule revision 2
-// brought stays gated at 2, so a revision 2 map regenerates as it did; a revision 2 map with
-// neither a hotspot chain nor a custom river moves to revision 3 as it opens, and one with either
-// is offered the update; a regional map takes its parent's revision from revision 2 on.
+// Terrain revision 3, which changes only tectonic features and custom rivers: every rule revision
+// 2 brought stays gated at 2, so a revision 2 map regenerates as it did; a revision 2 map with
+// neither a tectonic feature it would rebuild nor a custom river moves to revision 3 as it opens,
+// and one with either is offered the update; a regional map takes its parent's revision from
+// revision 2 on.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { installPlatform, platform } from "../../src/platform/index.js";
@@ -15,6 +16,9 @@ const { LEGACY, REVISION_2, REVISION_3, CURRENT } = FILRODENSWMB.TERRAIN_VERSION
 const HOTSPOT = { id: 1, type: FILRODENSWMB.TECTONICS.FEATURES.TYPES.HOTSPOT, revision: FILRODENSWMB.TECTONICS.FEATURES.REVISION, points: [] };
 const RANGE = { id: 2, type: FILRODENSWMB.TECTONICS.FEATURES.TYPES.RANGE, revision: FILRODENSWMB.TECTONICS.FEATURES.REVISION, points: [] };
 const RIVER = { id: 3, points: [] };
+// A range of three points is built along a different curve from revision 3 on; one of two is a straight line either way
+const BENT_RANGE = { ...RANGE, id: 4, points: [{ x: 0, y: 0 }, { x: 50, y: 20 }, { x: 100, y: 0 }] };
+const STRAIGHT_RANGE = { ...RANGE, id: 5, points: [{ x: 0, y: 0 }, { x: 100, y: 0 }] };
 const map = (terrainVersion, engine = "guided") => ({ terrainVersion, generationEngine: engine, mapWidth: 1000, mapHeight: 1000, windDistance: FILRODENSWMB.CLIMATE.WIND_DISTANCE, world: null });
 
 test("a new map is made at revision 3", () => {
@@ -39,9 +43,10 @@ test("revision 2's rules hold at revisions 2 and 3, and revision 3's only at 3",
     }
 });
 
-test("a revision 2 map with neither a hotspot chain nor a custom river settles at revision 3 as it opens", () => {
-    assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_2), [RANGE], []), true);
-    assert.equal(TerrainVersion.isUpgradeCandidate(map(REVISION_2), [RANGE], []), false);
+test("a revision 2 map with no tectonic feature to rebuild and no custom river settles at revision 3 as it opens", () => {
+    assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_2), [RANGE, STRAIGHT_RANGE], []), true);
+    assert.equal(TerrainVersion.isUpgradeCandidate(map(REVISION_2), [RANGE, STRAIGHT_RANGE], []), false);
+    assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_2), [BENT_RANGE], []), false);
     assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_2), [HOTSPOT], []), false);
     assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_2), [], [RIVER]), false);
     // Only revision 2 settles: a legacy map is offered its own update, a current one has none to make
@@ -49,19 +54,22 @@ test("a revision 2 map with neither a hotspot chain nor a custom river settles a
     assert.equal(TerrainVersion.settlesOnLoad(map(REVISION_3), [], []), false);
 });
 
-test("a revision 2 map with a hotspot chain or a custom river is offered the update", () => {
-    assert.deepEqual(TerrainVersion.revision3Changes(map(REVISION_2), [RANGE, HOTSPOT], []), { hotspots: true, rivers: false });
-    assert.deepEqual(TerrainVersion.revision3Changes(map(REVISION_2), [], [RIVER]), { hotspots: false, rivers: true });
+test("a revision 2 map with a tectonic feature or a custom river is offered the update", () => {
+    assert.deepEqual(TerrainVersion.revision3Changes(map(REVISION_2), [RANGE, HOTSPOT], []), { hotspots: true, features: false, rivers: false });
+    assert.deepEqual(TerrainVersion.revision3Changes(map(REVISION_2), [BENT_RANGE], []), { hotspots: false, features: true, rivers: false });
+    assert.deepEqual(TerrainVersion.revision3Changes(map(REVISION_2), [], [RIVER]), { hotspots: false, features: false, rivers: true });
+    assert.equal(TerrainVersion.isUpgradeCandidate(map(REVISION_2), [BENT_RANGE], []), true);
     assert.equal(TerrainVersion.isUpgradeCandidate(map(REVISION_2), [HOTSPOT], []), true);
     assert.equal(TerrainVersion.isUpgradeCandidate(map(REVISION_2), [], [RIVER]), true);
     assert.equal(TerrainVersion.isUpgradeCandidate(map(REVISION_3), [HOTSPOT], [RIVER]), false);
     // A legacy map's own update covers these, reported in its own terms
-    assert.deepEqual(TerrainVersion.revision3Changes(map(LEGACY), [HOTSPOT], [RIVER]), { hotspots: false, rivers: false });
+    assert.deepEqual(TerrainVersion.revision3Changes(map(LEGACY), [HOTSPOT, BENT_RANGE], [RIVER]), { hotspots: false, features: false, rivers: false });
 
-    const app = { uiState: map(REVISION_2), tectonicFaults: [HOTSPOT], manualRivers: [RIVER] };
+    const app = { uiState: map(REVISION_2), tectonicFaults: [HOTSPOT, BENT_RANGE], manualRivers: [RIVER] };
     const impact = TerrainUpgrade.assess(app);
     assert.equal(impact.kind, "revision3");
     assert.equal(impact.rebuildsHotspots, true);
+    assert.equal(impact.tightensLines, true);
     assert.equal(impact.guidesRivers, true);
     assert.equal(impact.changesTerrain, false);
     assert.equal(impact.plan.terrainVersion, REVISION_3);

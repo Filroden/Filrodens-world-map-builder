@@ -115,11 +115,12 @@ export class TerrainUpgrade {
      *   flat map that was never cropped and has no fault lines, but has rivers. Under every other
      *   kind the rivers change as well, reported the same way (`changesRivers`, `changesChannels`).
 
-     * - "revision3": a revision 2 map with a hotspot chain or a custom river, the only things
+     * - "revision3": a revision 2 map with a tectonic feature or a custom river, the only things
      *   revision 3 builds differently (see TerrainVersion.revision3Changes). Its hotspot chains
-     *   are rebuilt to match the terrain around them (`rebuildsHotspots`), and its custom rivers
-     *   follow the land within a corridor round the line drawn (`guidesRivers`); nothing else
-     *   changes. A revision 1 map moves to revision 3 too, but its other changes are what it is
+     *   are rebuilt to match the terrain around them (`rebuildsHotspots`), its other tectonic
+     *   features follow the points drawn a little more tightly (`tightensLines`), and its custom
+     *   rivers follow the land within a corridor round the line drawn (`guidesRivers`); nothing
+     *   else changes. A revision 1 map moves to revision 3 too, but its other changes are what it is
      *   told about: its fault lines become tectonic features and its custom rivers are recarved.
      *
      * Whatever the kind, a legacy map's original fault lines are replaced by the tectonic features
@@ -127,13 +128,13 @@ export class TerrainUpgrade {
      * slip faults, which have no equivalent, are removed (`removesSlip`).
      *
      * @param {object} app - The MapStudio instance, with a legacy map open.
-     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean, changesRivers?: boolean, changesChannels?: boolean, rebuildsHotspots?: boolean, guidesRivers?: boolean}|null}
+     * @returns {{kind: string, plan: object, resized?: boolean, fracture?: {before: number, after: number}, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults: boolean, removesSlip: boolean, changesRivers?: boolean, changesChannels?: boolean, rebuildsHotspots?: boolean, tightensLines?: boolean, guidesRivers?: boolean}|null}
      *   What the update would apply and change, or null if it would change nothing visible.
      */
     static assess(app) {
         const revision3 = TerrainVersion.revision3Changes(app.uiState, app.tectonicFaults, app.manualRivers);
-        if (revision3.hotspots || revision3.rivers) {
-            return { kind: "revision3", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, rebuildsHotspots: revision3.hotspots, guidesRivers: revision3.rivers };
+        if (revision3.hotspots || revision3.features || revision3.rivers) {
+            return { kind: "revision3", plan: TerrainVersion.planUpgrade(app.uiState), changesTerrain: false, changesBiomes: false, rebuildsHotspots: revision3.hotspots, tightensLines: revision3.features, guidesRivers: revision3.rivers };
         }
         const faults = this.#faultConversion(app);
         const rivers = this.#riverChanges(app);

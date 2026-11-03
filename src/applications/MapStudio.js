@@ -2739,11 +2739,11 @@ export class MapStudio {
             this.canvasEngine.renderFeaturePins(this.mapPins, isEdit, this.proceduralSprings);
 
             if (this.canvasEngine.renderFaultLines) {
-                this.canvasEngine.renderFaultLines(this.tectonicFaults, isEdit, this.activeFaultId);
+                this.canvasEngine.renderFaultLines(this.tectonicFaults, isEdit, this.activeFaultId, isEdit, TerrainVersion.usesCentripetalLines(this.uiState));
             }
 
             if (this.canvasEngine.renderManualRivers) {
-                this.canvasEngine.renderManualRivers(this.manualRivers, isEdit, this.activeRiverId);
+                this.canvasEngine.renderManualRivers(this.manualRivers, isEdit, this.activeRiverId, isEdit, TerrainVersion.usesCentripetalLines(this.uiState));
             }
         }
 
@@ -2849,7 +2849,7 @@ export class MapStudio {
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             if (config.toolCategory !== this.activeTool) continue;
 
-            const segment = SpatialMath.getClosestVectorSegment(this[config.stateKey], x, y, this.currentSnapThreshold, !!config.smoothed);
+            const segment = SpatialMath.getClosestVectorSegment(this[config.stateKey], x, y, this.currentSnapThreshold, !!config.smoothed, TerrainVersion.usesCentripetalLines(this.uiState));
             if (segment && (!bestMatch || segment.dist < bestMatch.dist)) {
                 bestMatch = {
                     vector: segment.vector,
@@ -3614,12 +3614,12 @@ export class MapStudio {
 
         if (this.canvasEngine.renderFaultLines) {
             const isFaultEdit = this.activeTool === "features" && isEditModeActive;
-            this.canvasEngine.renderFaultLines(this.tectonicFaults, isFaultEdit, this.activeFaultId, isFaultEdit && !picking);
+            this.canvasEngine.renderFaultLines(this.tectonicFaults, isFaultEdit, this.activeFaultId, isFaultEdit && !picking, TerrainVersion.usesCentripetalLines(this.uiState));
         }
 
         if (this.canvasEngine.renderManualRivers) {
             const isRiverEdit = this.activeTool === "features" && isEditModeActive;
-            this.canvasEngine.renderManualRivers(this.manualRivers, isRiverEdit, this.activeRiverId, isRiverEdit && !picking);
+            this.canvasEngine.renderManualRivers(this.manualRivers, isRiverEdit, this.activeRiverId, isRiverEdit && !picking, TerrainVersion.usesCentripetalLines(this.uiState));
         }
 
         // 2. Render Infrastructure, at the map's detail level (as are the regions and labels). While

@@ -60,7 +60,8 @@ export class TectonicFeatureEngine {
      *   its top map and that map's longer side), optional `bounds` (only pixels inside change),
      *   `cache` (an object kept between calls for the same map, see above) and `params` (the
      *   map's derived generation settings: from terrain revision 3 on, hotspot islands take the
-     *   look of the map's land from them, see IslandLook).
+     *   look of the map's land from them, see IslandLook, and every feature is built along the
+     *   centripetal curve, see CatmullRom).
      */
     static apply(elevation, ground, faults, options) {
         const features = (faults ?? []).filter((fault) => TectonicFeatureEngine.isFeature(fault) && fault.points?.length >= 2);
@@ -76,10 +77,12 @@ export class TectonicFeatureEngine {
             seaLevel: options.seaLevel,
             noise,
             island: TectonicFeatureEngine.#needsIslandLook(features, options) ? IslandLook.of(options.params, options.seaLevel, noise) : null,
+            // From revision 3 on, every feature is built along the centripetal curve (see CatmullRom)
+            centripetal: options.params?.terrain?.centripetalLines === true,
         };
-        // The island look depends on the map's settings, so it is part of every feature's key
-        // (it is null, and the key unchanged, before revision 3)
-        const frameKey = JSON.stringify(context.island ? [options.seaLevel, options.frame, context.island.key] : [options.seaLevel, options.frame]);
+        // The island look and the curve depend on the map's settings, so they are part of every
+        // feature's key (both unset, and the key unchanged, before revision 3)
+        const frameKey = JSON.stringify([options.seaLevel, options.frame, ...(context.island ? [context.island.key] : []), ...(context.centripetal ? ["centripetal"] : [])]);
 
         // Every change is worked out before any is added, so `ground` may be `elevation` itself
         const deltas = features.map((fault) => TectonicFeatureEngine.#deltaFor(fault, context, frameKey, cache));

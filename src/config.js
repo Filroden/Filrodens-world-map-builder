@@ -290,11 +290,13 @@ export const FILRODENSWMB = {
     //       the same pipeline, with its land placed by tectonic plates. Fault lines read their
     //       noise, and space their hotspot volcanoes, in the top map's pixels, so a regional
     //       map's faults match its parent's (on a map that was never cropped this changes nothing).
-    //   3 - hotspot chains and custom rivers, on every engine: hotspot chains are rebuilt to
-    //       match the terrain around them (see TerrainVersion.usesCurrentHotspots), and a custom
+    //   3 - tectonic features and custom rivers, on every engine: hotspot chains are rebuilt to
+    //       match the terrain around them (see TerrainVersion.usesCurrentHotspots), a custom
     //       river follows the land within a corridor round the line drawn, rather than the line
-    //       itself (see TerrainVersion.usesGuidedRivers). Nothing else differs from revision 2,
-    //       so a revision 2 map with neither is moved to revision 3 as it opens (see
+    //       itself (see TerrainVersion.usesGuidedRivers), and both follow, and are drawn along,
+    //       the centripetal Catmull-Rom curve through their points (see
+    //       TerrainVersion.usesCentripetalLines). Nothing else differs from revision 2, so a
+    //       revision 2 map with neither is moved to revision 3 as it opens (see
     //       TerrainVersion.settlesOnLoad); one with either is offered the update.
     // Each rule is gated on the revision that brought it (REVISION_2, REVISION_3), never on
     // CURRENT, so a later revision cannot move an older rule; CURRENT is only what a new map gets.
@@ -2480,15 +2482,14 @@ export const FILRODENSWMB = {
     ENTITY_CONFIG: {
         decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },
         // `smoothed: true` marks entities StudioCanvas always renders as a Catmull-Rom curve
-        // (see #getSplinePoints), so node-insertion hit-testing must test against that curve too
-        // rather than the straight chords between control points. Manual rivers render as a plain
-        // straight polyline despite their name, so they are deliberately left un-smoothed here.
+        // (see #getSplinePoints and CatmullRom), so node-insertion hit-testing must test against
+        // that curve too rather than the straight chords between control points.
         // Entities with a `toolCategory` are edited node by node in that tool; routes and regions
         // live on the display mesh and have no nodes (routes keep an entry for deletion only).
         fault: { stateKey: "tectonicFaults", activeKey: "activeFaultId", triggersTerrain: true, toolCategory: "features", smoothed: true },
         label: { stateKey: "mapLabels", activeKey: null, triggersTerrain: false },
         pin: { stateKey: "mapPins", activeKey: null, triggersTerrain: false },
-        river: { stateKey: "manualRivers", activeKey: "activeRiverId", triggersTerrain: true, toolCategory: "features" },
+        river: { stateKey: "manualRivers", activeKey: "activeRiverId", triggersTerrain: true, toolCategory: "features", smoothed: true },
         route: { stateKey: "mapRoutes", activeKey: "activeRouteId", triggersTerrain: false },
     },
 };

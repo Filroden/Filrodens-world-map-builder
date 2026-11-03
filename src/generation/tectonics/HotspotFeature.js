@@ -56,7 +56,7 @@ export class HotspotFeature {
     static #volcanoes(fault, context) {
         const options = HotspotFeature.#settings(fault);
         const radius = fault.thickness * FILRODENSWMB.TECTONICS.FEATURES.HOTSPOT.ISLAND_SHARE;
-        const curve = LineField.splinePoints(fault.points);
+        const curve = LineField.splinePoints(fault.points, context.centripetal);
         const length = curve.reduce((sum, point, i) => (i === 0 ? 0 : sum + Math.hypot(point.x - curve[i - 1].x, point.y - curve[i - 1].y)), 0);
         const stations = Volcanoes.walkStations(
             curve,
