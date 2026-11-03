@@ -58,6 +58,7 @@ const { Inspector } = await import("../../src/applications/Inspector.js");
 const { RegionEditor } = await import("../../src/applications/RegionEditor.js");
 const { RouteEditor } = await import("../../src/applications/RouteEditor.js");
 const { RouteTool } = await import("../../src/applications/RouteTool.js");
+const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
 const { PinEditor } = await import("../../src/applications/PinEditor.js");
 const { LabelEditor } = await import("../../src/applications/LabelEditor.js");
 const { PickTool } = await import("../../src/applications/PickTool.js");
@@ -558,6 +559,50 @@ test("a decoration's look applies one step each; a land mask's type shapes the l
     assert.equal(app.terrainUpdates, 0);
     await commit(app, "maskOperation", "subtract");
     assert.deepEqual([app.landMasks[0].name, app.landMasks[0].operation, app.terrainUpdates, steps(app)], ["Isle of Mist", "subtract", 1, 4]);
+});
+
+test("a land mask on a guided map has its own coast settings: each follows the map until ticked, Sharp edge once one is, and Coast only shapes no land", async () => {
+    const { app } = await studio();
+    Object.assign(app.uiState, { generationEngine: "guided", terrainVersion: 3, coastlineFracture: 0.2, coastalPlain: 0.05, shelfRange: 0.15 });
+    const mask = app.landMasks[0];
+    await LandMaskEditor.open(app, "isle");
+    const section = form(app).querySelector('[data-section="inspectorMaskCoast"]');
+    assert.ok(section?.open, "the Coast section, open");
+    assert.equal(field(app, "maskCoastlineFractureOwn").checked, false);
+    assert.equal(field(app, "maskCoastlineFracture"), undefined, "no slider while the setting follows the map");
+    assert.match(section.textContent, /FILRODENSWMB.UI.LandMaskMapValue/);
+    assert.equal(field(app, "maskSharpEdge").disabled, true, "Sharp edge waits for a setting");
+
+    await commit(app, "maskCoastlineFractureOwn", true);
+    assert.deepEqual([mask.coastlineFracture, app.terrainUpdates, steps(app)], [0.2, 1, 1], "ticked, it starts from the map's value");
+    const slider = field(app, "maskCoastlineFracture");
+    assert.ok(slider, "and its slider appears");
+    slider.dataset.value = "0.6";
+    await commit(app, "maskCoastlineFracture", String(Math.sqrt(0.6)));
+    await commit(app, "maskSharpEdge", true);
+    await commit(app, "maskCoastalPlainOwn", true);
+    assert.deepEqual([mask.coastlineFracture, mask.sharpEdge, mask.coastalPlain, mask.shelfRange, app.terrainUpdates], [0.6, true, 0.05, undefined, 4]);
+
+    await commit(app, "maskCoastalPlainOwn", false);
+    assert.equal("coastalPlain" in mask, false, "unticked, the setting is left out of the mask");
+    await commit(app, "maskOperation", "subtract");
+    assert.equal(form(app).querySelector('[data-section="inspectorMaskCoast"]'), null, "an Ocean mask has no Coast section");
+    assert.deepEqual([mask.coastlineFracture, mask.sharpEdge], [0.6, true], "but keeps its settings");
+    await commit(app, "maskOperation", "settings");
+    assert.equal(mask.operation, "settings");
+    assert.match(app.root.querySelector("dialog.fwmb-inspector .fwmb-overlay-header").textContent, /FILRODENSWMB.UI.InspectorSubtitleLandMask/);
+    assert.equal(field(app, "maskCoastlineFractureOwn").checked, true, "a Coast only mask shows them again");
+    const coastSection = form(app).querySelector('[data-section="inspectorMaskCoast"]');
+    assert.match(coastSection.textContent, /LandMaskCoastHintCoastOnly/, "where unticked settings are left to what lies beneath");
+    assert.match(coastSection.textContent, /LandMaskBeneathValue/);
+    assert.doesNotMatch(coastSection.textContent, /LandMaskMapValue/);
+    await commit(app, "maskName", "Rugged coast");
+    assert.equal(app.terrainUpdates, 7, "renaming does not shape the land again");
+    assert.deepEqual([app.uiState.coastlineFracture, app.uiState.coastalPlain, app.uiState.shelfRange], [0.2, 0.05, 0.15], "the map's own settings are untouched");
+    // The studio writes any field named after one of the map's settings into them: no field of the inspector may share a name with one
+    const mapSettings = Object.keys(MapStateManager.buildDefaultUiState(400, 300));
+    const clashes = [...form(app).elements].map((element) => element.name).filter((name) => name && mapSettings.includes(name));
+    assert.deepEqual(clashes, []);
 });
 
 test("a set and a level open as the active ones; their fields apply one step each, and Copy style fills a level's borders", async () => {

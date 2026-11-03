@@ -1673,26 +1673,33 @@ export class StudioCanvas {
 
             const isActive = mask.id === activeMaskId;
             const isSubtract = mask.operation === "subtract";
+            // A Coast only mask shapes no land: a dashed outline in its own colour
+            const isCoastOnly = mask.operation === "settings";
 
-            // Green for Add Land, Red for Subtract Land (Add Ocean). The same hex values drive the
-            // swatch on the Land Masks list, so the two stay in step.
-            const { ADD, SUBTRACT } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
-            const baseColor = ColorMath.hexToPackedInt(isSubtract ? SUBTRACT : ADD);
+            // Green for Add Land, Red for Subtract Land (Add Ocean), amber for Coast only. The same
+            // hex values drive the swatch on the Land Masks list, so the two stay in step.
+            const { ADD, SUBTRACT, COAST } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
+            const baseColor = ColorMath.hexToPackedInt(isCoastOnly ? COAST : isSubtract ? SUBTRACT : ADD);
+            // Close the visual outline when the polygon has finished drawing
+            const isClosed = mask.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && !isActive;
 
-            g.lineStyle(2, baseColor, isActive ? 0.9 : 0.4);
-            g.beginFill(baseColor, isActive ? 0.3 : 0.1);
+            g.lineStyle(isCoastOnly ? 0 : 2, baseColor, isActive ? 0.9 : 0.4);
+            g.beginFill(baseColor, isCoastOnly ? (isActive ? 0.15 : 0.05) : isActive ? 0.3 : 0.1);
 
             g.moveTo(mask.points[0].x, mask.points[0].y);
             for (let i = 1; i < mask.points.length; i++) {
                 g.lineTo(mask.points[i].x, mask.points[i].y);
             }
 
-            // Close the visual outline when the polygon has finished drawing
-            const isClosed = mask.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && !isActive;
             if (isClosed) {
                 g.closePath();
             }
             g.endFill();
+
+            if (isCoastOnly) {
+                g.lineStyle(2, baseColor, isActive ? 0.9 : 0.6);
+                this.#drawVectorPath(g, mask.points, "dashed", 3, isClosed);
+            }
 
             // Render edit nodes and hit targets for ALL masks whenever edit mode is active
             if (isEditMode) {

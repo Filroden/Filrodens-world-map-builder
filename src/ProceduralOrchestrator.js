@@ -12,6 +12,7 @@ import { TerrainVersion } from "./tools/TerrainVersion.js";
 import { GenerationWorkers } from "./tools/GenerationWorkers.js";
 import { BrushEngine } from "./tools/BrushEngine.js";
 import { platform } from "./platform/index.js";
+import { MaskSettings } from "./generation/MaskSettings.js";
 
 export class ProceduralOrchestrator {
     /**
@@ -85,7 +86,7 @@ export class ProceduralOrchestrator {
         if (app.uiState.generationEngine !== "guided") return [];
 
         const minVertices = FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES;
-        return (app.landMasks ?? []).filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points]);
+        return (app.landMasks ?? []).filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points, ...MaskSettings.inputsOf(mask)]);
     }
 
     /**

@@ -6,6 +6,7 @@ import { LabelWidth } from "../tools/LabelWidth.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
 import { RangeCurve } from "../tools/RangeCurve.js";
 import { ListNav } from "../ui/ListNav.js";
+import { ListReorder } from "../ui/ListReorder.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
@@ -78,6 +79,7 @@ import { HelpPanel } from "./HelpPanel.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
+import { MaskSettings } from "../generation/MaskSettings.js";
 import { rebaseMap } from "../data/SymbolSizes.js";
 import { addLocalLevelOnce } from "../data/LocalLevel.js";
 import { refreshWaterRoutesOnce } from "../data/WaterRouteStyles.js";
@@ -801,7 +803,7 @@ export class MapStudio {
      * crop alone for any other map that can make regional maps; null when there is nothing to do.
      */
     #sceneModeKey() {
-        if (this.uiState.generationEngine === "guided") return ["addMask", "subtractMask", "crop"].includes(this.uiState.sceneMode) ? this.uiState.sceneMode : "addMask";
+        if (this.uiState.generationEngine === "guided") return ["addMask", "subtractMask", "coastMask", "crop"].includes(this.uiState.sceneMode) ? this.uiState.sceneMode : "addMask";
         return TerrainVersion.canCreateRegionalMap(this.uiState) ? "crop" : null;
     }
 
@@ -945,6 +947,8 @@ export class MapStudio {
                             mode("setSceneMode", "mode", "select", ui("ModeSelect"), ui("MaskModeSelect"), "select", current === "select"),
                             mode("setSceneMode", "mode", "addMask", ui("ModeLand"), ui("DrawLandMaskHint"), "add", current === "addMask"),
                             mode("setSceneMode", "mode", "subtractMask", ui("ModeOcean"), ui("DrawOceanMaskHint"), "remove", current === "subtractMask"),
+                            // Coast only masks exist only where masks have coast settings (see MaskSettings)
+                            ...(TerrainVersion.usesCurrentCoastline(s) ? [mode("setSceneMode", "mode", "coastMask", ui("ModeCoast"), ui("DrawCoastMaskHint"), "tune", current === "coastMask")] : []),
                             mode("setSceneMode", "mode", "crop", ui("ModeCrop"), cropTip, "crop", current === "crop", { disabled: !canCrop }),
                         ]),
                     ];
@@ -1291,10 +1295,14 @@ export class MapStudio {
             }
             if (this.activeTool === "labels") context.labelList = await this.#listContext("label", context);
             context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
-            const { ADD: landColor, SUBTRACT: oceanColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
-            context.landMasks = [...(this.landMasks || [])]
-                .sort(alphaSort)
-                .map((m) => ({ ...m, swatchColor: m.operation === "subtract" ? oceanColor : landColor, isActive: m.id === this.activeLandMaskId }));
+            const { ADD: landColor, SUBTRACT: oceanColor, COAST: coastColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
+            // In their own order, not by name: later masks lie on top (see ListReorder)
+            context.landMasks = [...(this.landMasks || [])].map((m) => {
+                const operation = LandMaskEditor.operationOf(m);
+                const swatchColor = { subtract: oceanColor, settings: coastColor }[operation] ?? landColor;
+                return { ...m, swatchColor, typeLabel: LandMaskEditor.typeLabel(m), coastOnly: operation === "settings", isActive: m.id === this.activeLandMaskId };
+            });
+            context.landMasksReorderable = context.landMasks.length > 1;
 
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
@@ -1549,6 +1557,7 @@ export class MapStudio {
         root.addEventListener("change", (event) => this.#routeFieldEvent(event));
         root.addEventListener("pointerover", (event) => this.#togglePreviewFallback(event, true));
         root.addEventListener("pointerout", (event) => this.#togglePreviewFallback(event, false));
+        ListReorder.bind(root, (list, id, to) => this.#moveListItem(list, id, to));
         bindDropdownMenus(root);
     }
 
@@ -1594,7 +1603,14 @@ export class MapStudio {
         // would otherwise reach the window and pan the scene behind it
         if (MapStudio.#isMovementKey(event)) event.stopPropagation();
         // The Regions lists' keys: moving through a list, Unassigned, and naming
-        if (AppearanceMenu.handleKey(this.root, event) || RegionLists.handleKey(this, event) || StyleLists.handleKey(this, event) || CultureLists.handleKey(this, event) || ListNav.handleKey(event)) {
+        if (
+            AppearanceMenu.handleKey(this.root, event) ||
+            RegionLists.handleKey(this, event) ||
+            StyleLists.handleKey(this, event) ||
+            CultureLists.handleKey(this, event) ||
+            ListReorder.handleKey(event, (list, id, to) => this.#moveListItem(list, id, to)) ||
+            ListNav.handleKey(event)
+        ) {
             event.preventDefault();
             return;
         }
@@ -3052,23 +3068,23 @@ export class MapStudio {
         }
     }
 
-    /** The land mask operation the Add Land / Remove Land toggle currently selects. */
+    /** The land mask operation the bar's Land, Ocean or Coast only mode selects. */
     #selectedMaskOperation() {
-        return this.uiState.sceneMode === "subtractMask" ? "subtract" : "add";
+        return { subtractMask: "subtract", coastMask: MaskSettings.COAST_ONLY }[this.uiState.sceneMode] ?? "add";
     }
 
     /**
-     * Builds a new land mask with the default name for its operation ("Landmass n" or
-     * "Ocean Hole n", numbered by the masks already on the map). It is not added to the map.
+     * Builds a new land mask with the default name for its operation ("Landmass n", "Ocean
+     * Hole n" or "Coast n", numbered by the masks already on the map). It is not added to the map.
      *
-     * @param {"add"|"subtract"} operation
+     * @param {"add"|"subtract"|"settings"} operation
      * @param {Array<{x: number, y: number}>} points
      */
     #createLandMask(operation, points) {
         const number = this.landMasks.length + 1;
         return {
             id: platform.utils.randomID(),
-            name: operation === "subtract" ? `Ocean Hole ${number}` : `Landmass ${number}`,
+            name: { subtract: `Ocean Hole ${number}`, settings: `Coast ${number}` }[operation] ?? `Landmass ${number}`,
             operation,
             points,
         };
@@ -3132,9 +3148,23 @@ export class MapStudio {
         this.#refreshAfterLandMaskChange(true);
     }
 
-    /** Whether the Add Land or Remove Land toggle is selected (rather than the crop tool). */
+    /** Whether a mask drawing mode (Land, Ocean or Coast only) is selected, rather than Select or Crop. */
     #isMaskDrawingMode() {
-        return this.uiState.sceneMode === "addMask" || this.uiState.sceneMode === "subtractMask";
+        return ["addMask", "subtractMask", "coastMask"].includes(this.uiState.sceneMode);
+    }
+
+    /**
+     * Moves an item of a list in order (see ListReorder) to its new place, as one undo step. Only
+     * the land masks are put in order: later masks lie on top, so a move shapes the land again.
+     */
+    #moveListItem(list, id, to) {
+        if (list !== "landMasks") return;
+        const from = this.landMasks.findIndex((mask) => mask.id === id);
+        if (from < 0 || from === to || to < 0 || to >= this.landMasks.length) return;
+        MapStateManager.pushVectorState(this);
+        const [mask] = this.landMasks.splice(from, 1);
+        this.landMasks.splice(to, 0, mask);
+        this.#refreshAfterLandMaskChange(true);
     }
 
     /** Redraws the land masks and their list, and regenerates the terrain when asked to. */
@@ -4924,9 +4954,10 @@ export class MapStudio {
      * regenerated rather than merely repainted.
      *
      * Land masks are only read by the guided engine, and there only masks that enclose an area
-     * (see FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) contribute. Just each mask's operation
-     * and vertices are captured: renaming a mask, or undoing the first two nodes of a shape that
-     * is still being drawn, does not alter the terrain and must not trigger a regeneration.
+     * (see FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) contribute. Just each mask's operation,
+     * vertices and coast settings (see MaskSettings.inputsOf) are captured: renaming a mask, or
+     * undoing the first two nodes of a shape that is still being drawn, does not alter the
+     * terrain and must not trigger a regeneration.
      *
      * @returns {string} A string that differs between two states exactly when their terrain differs.
      */
@@ -4934,7 +4965,7 @@ export class MapStudio {
         const minVertices = FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES;
         const guidedMasks =
             this.uiState.generationEngine === "guided"
-                ? this.landMasks.filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points])
+                ? this.landMasks.filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points, ...MaskSettings.inputsOf(mask)])
                 : [];
 
         return JSON.stringify([this.tectonicFaults, this.manualRivers, guidedMasks]);
@@ -6363,7 +6394,7 @@ export class MapStudio {
 
         if (on) {
             // A guided map's New map tool draws land masks unless its Crop mode was chosen
-            if (this.uiState.generationEngine === "guided" && !["addMask", "subtractMask", "crop"].includes(this.uiState.sceneMode)) {
+            if (this.uiState.generationEngine === "guided" && !["addMask", "subtractMask", "coastMask", "crop"].includes(this.uiState.sceneMode)) {
                 this.uiState.sceneMode = "addMask";
             }
 

@@ -268,6 +268,20 @@ export const FILRODENSWMB = {
                 },
             },
         },
+        // A land mask's own coast settings on a guided map (see MaskSettings). Lengths are in
+        // pixels of a BASELINE_DIMENSION map.
+        MASK_SETTINGS: {
+            // How far beyond a mask's edge its settings fade into what lies beneath. A change of
+            // Coastline Fracture fades over at least its size times WARP.AMPLITUDE (the furthest
+            // the change moves the coastline warp): any shorter, and the warp folds the coastline
+            // into a seam along the mask's edge.
+            FADE: 40,
+            // The fade of a mask with Sharp edge on, whatever the change
+            SHARP_FADE: 4,
+            // How far values blend at sea, so the sea between two coasts that are about equally
+            // near takes a mix of their settings
+            SEA_BLEND: 30,
+        },
     },
     // Which revision of the terrain generation rules a saved map was built with. Generation is
     // re-run from the saved settings every time a map is opened (no terrain pixels are stored),
@@ -793,7 +807,7 @@ export const FILRODENSWMB = {
         // no edit toggle (its decorations can always be moved), so its word stands for the tool.
         // Tools with null have no editing at all.
         STATE_WORD: {
-            scene: { addMask: "drawing", subtractMask: "drawing", crop: "cropping" },
+            scene: { addMask: "drawing", subtractMask: "drawing", coastMask: "drawing", crop: "cropping" },
             terrain: "terraforming",
             biomes: "painting",
             // Select starts editing in River (see PickTool.settleForEditing)
@@ -1253,10 +1267,12 @@ export const FILRODENSWMB = {
         FALLBACK_HIGHLIGHT_COLOR: [255, 32, 200],
         FALLBACK_HIGHLIGHT_ALPHA: 0.55,
         // Guided-mode land mask colours, shared by the canvas outline and the Land Masks list swatch
-        // so the two always agree: "add" shapes mark land, "subtract" shapes mark ocean holes.
+        // so the two always agree: "add" shapes mark land, "subtract" shapes mark ocean holes,
+        // and "settings" (Coast only) shapes carry coast settings without shaping land.
         LAND_MASK_COLORS: {
             ADD: "#4ade80",
             SUBTRACT: "#f87171",
+            COAST: "#fbbf24",
         },
     },
     HYDROLOGY: {

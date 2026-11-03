@@ -1,7 +1,14 @@
 {{!--
-    The inspector's land mask (see LandMaskEditor): its name and whether it marks land or an
-    ocean, and Focus view and Delete. Every field applies when committed, one undo step each (see
-    Inspector); a new type shapes the land again.
+    The inspector's land mask (see LandMaskEditor): its name and type (Land, Ocean, or, where masks
+    have coast settings, Coast only, which shapes no land), then, where `coast` is given (a Land or
+    Coast only mask on a guided map on the current coastline rules), the Coast section: each of the
+    map's coast settings follows the map, its value shown beside it, unless ticked, when its own
+    slider appears below it (on a Coast only mask, an unticked setting is left to what lies
+    beneath, see MaskSettings); Sharp edge, once a setting is ticked, applies them right up to the
+    mask's edge. The section always starts open, so it is seen to be there. Then Focus view and
+    Delete. Every field applies when committed, one undo step each (see Inspector); a new type or
+    setting shapes the land again. The settings' inputs are named apart from the map's own
+    settings (see LandMaskEditor).
 --}}
 <div class="fwmb-group">
     <div class="fwmb-form-group">
@@ -14,12 +21,39 @@
         <label class="fwmb-label" for="fwmb-inspector-mask-type">{{localize "FILRODENSWMB.UI.LandMaskType"}}</label>
         <div class="fwmb-form-fields">
             <select id="fwmb-inspector-mask-type" name="maskOperation">
-                <option value="add" {{#unless ocean}}selected{{/unless}}>{{localize "FILRODENSWMB.UI.LandMaskTypeLand"}}</option>
-                <option value="subtract" {{#if ocean}}selected{{/if}}>{{localize "FILRODENSWMB.UI.LandMaskTypeOcean"}}</option>
+                <option value="add" {{#if (eq operation "add")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.LandMaskTypeLand"}}</option>
+                <option value="subtract" {{#if (eq operation "subtract")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.LandMaskTypeOcean"}}</option>
+                {{#if coastOnly}}<option value="settings" {{#if (eq operation "settings")}}selected{{/if}}>{{localize "FILRODENSWMB.UI.LandMaskTypeCoast"}}</option>{{/if}}
             </select>
         </div>
     </div>
+    {{#if (eq operation "settings")}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.LandMaskTypeCoastHint"}}</p>{{/if}}
 </div>
+
+{{#if coast}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorMaskCoast" title="FILRODENSWMB.UI.LandMaskCoast" count=coast.count}}
+<p class="fwmb-hint">{{#if coast.seeThrough}}{{localize "FILRODENSWMB.UI.LandMaskCoastHintCoastOnly"}}{{else}}{{localize "FILRODENSWMB.UI.LandMaskCoastHint"}}{{/if}}</p>
+{{#each coast.settings}}
+<div class="fwmb-row fwmb-mask-setting">
+    <label class="fwmb-checkbox-label">
+        <input type="checkbox" class="fwmb-checkbox" name="{{this.name}}Own" {{#if this.own}}checked{{/if}} />
+        {{localize this.label}}
+    </label>
+    {{#unless this.own}}<span class="fwmb-hint fwmb-mask-setting-map">{{#if @root.coast.seeThrough}}{{localize "FILRODENSWMB.UI.LandMaskBeneathValue"}}{{else}}{{localize "FILRODENSWMB.UI.LandMaskMapValue" value=this.mapValue}}{{/if}}</span>{{/unless}}
+</div>
+{{#if this.own}}
+{{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name=this.name label="FILRODENSWMB.UI.LandMaskOwnValue" hint=this.hint value=this.value curve=this.curve position=this.position min=0 max=1 step=this.step class="fwmb-mask-setting-range"}}
+{{/if}}
+{{/each}}
+<div class="fwmb-row">
+    <label class="fwmb-checkbox-label">
+        <input type="checkbox" class="fwmb-checkbox" name="maskSharpEdge" {{#if coast.sharpEdge}}checked{{/if}} {{#unless coast.count}}disabled{{/unless}} />
+        {{localize "FILRODENSWMB.UI.LandMaskSharpEdge"}}
+    </label>
+    <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.LandMaskSharpEdgeHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.LandMaskSharpEdgeHint'}}"></i>
+</div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}
 
 <div class="fwmb-inspector-actions">
     <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="zoom"><i class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ZoomTo"}}</button>

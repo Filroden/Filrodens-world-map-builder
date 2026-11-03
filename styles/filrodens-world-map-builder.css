@@ -224,6 +224,9 @@
 .fwmb-icon--add {
     --fwmb-mask: url("../assets/icons/add.svg");
 }
+.fwmb-icon--drag-indicator {
+    --fwmb-mask: url("../assets/icons/drag_indicator.svg");
+}
 .fwmb-icon--arrow-upward {
     --fwmb-mask: url("../assets/icons/arrow_upward.svg");
 }
@@ -5870,6 +5873,56 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
 .fwmb .fwmb-route-swatch.fwmb-route-swatch--solid {
     height: 0.3125rem;
     border-style: solid;
+}
+
+/* A list put in order by its rows' grab handles (see ListReorder): the handle, the row being
+   dragged, which follows the pointer above the others, and the line where it would land */
+.fwmb .fwmb-reorder-list {
+    position: relative;
+}
+.fwmb .fwmb-reorder-handle {
+    flex: 0 0 auto;
+    cursor: grab;
+    touch-action: none;
+}
+.fwmb .fwmb-list-item.fwmb-is-dragged {
+    position: relative;
+    z-index: 1;
+    background: var(--fwmb-bg-raised);
+    box-shadow: var(--fwmb-shadow-popout);
+}
+.fwmb .fwmb-list-item.fwmb-is-dragged .fwmb-reorder-handle {
+    cursor: grabbing;
+}
+.fwmb .fwmb-reorder-marker {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 0.125rem;
+    background: var(--fwmb-accent-main);
+    pointer-events: none;
+}
+
+/* A note after a list item's name: a Coast only land mask's type */
+.fwmb .fwmb-list-item-note {
+    flex: 0 0 auto;
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* A land mask's coast setting in the inspector: its tick, with the map's value beside it when it
+   follows the map, and its own slider below, indented under the tick, when it does not */
+.fwmb .fwmb-mask-setting {
+    justify-content: space-between;
+    min-height: 1.75rem;
+}
+.fwmb .fwmb-mask-setting-map {
+    margin: 0;
+    white-space: nowrap;
+}
+.fwmb .fwmb-mask-setting-range {
+    margin-left: 1.5rem;
 }
 
 .fwmb .fwmb-route-swatch.fwmb-route-swatch--river {

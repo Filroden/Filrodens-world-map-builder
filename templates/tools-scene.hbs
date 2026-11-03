@@ -92,12 +92,14 @@
 
 {{#if (eq uiState.generationEngine "guided")}}
     {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="landMasks" title="FILRODENSWMB.UI.LandMasks" badge="FILRODENSWMB.UI.BadgeRebuildsMap"}}
-        <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.LandMasks'}}" data-list-nav id="fwmb-scroll-landMasks" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
+        <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.LandMasks'}}" data-list-nav data-reorder="landMasks" id="fwmb-scroll-landMasks" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable fwmb-reorder-list">
             {{#each landMasks}}
-                <div role="option" tabindex="-1" data-list-item class="fwmb-list-item{{#if this.isActive}} fwmb-is-working{{/if}}" aria-selected="{{#if (eq this.id @root.inspected.landMask)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="landMask" data-action="editLandMask">
-                    <div class="fwmb-route-swatch fwmb-route-swatch--solid" style="background-color: {{this.swatchColor}};" data-tooltip="{{#if (eq this.operation 'subtract')}}{{localize 'FILRODENSWMB.UI.LandMaskTypeOcean'}}{{else}}{{localize 'FILRODENSWMB.UI.LandMaskTypeLand'}}{{/if}}"></div>
+                <div role="option" tabindex="-1" data-list-item data-reorder-item class="fwmb-list-item{{#if this.isActive}} fwmb-is-working{{/if}}" aria-selected="{{#if (eq this.id @root.inspected.landMask)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="landMask" data-action="editLandMask">
+                    {{#if @root.landMasksReorderable}}<button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square fwmb-reorder-handle" data-reorder-handle aria-label="{{localize 'FILRODENSWMB.UI.LandMaskMove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.LandMaskMove'}}"><i class="fwmb-icon fwmb-icon--drag-indicator" aria-hidden="true"></i></button>{{/if}}
+                    <div class="fwmb-route-swatch fwmb-route-swatch--solid" style="background-color: {{this.swatchColor}};" data-tooltip="{{localize this.typeLabel}}"></div>
 
                     <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
+                    {{#if this.coastOnly}}<span class="fwmb-list-item-note">{{localize "FILRODENSWMB.UI.LandMaskTypeCoast"}}</span>{{/if}}
                     <span class="fwmb-actions">
                         <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">
                             <i class="fwmb-icon fwmb-icon--center-focus"></i>

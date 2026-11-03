@@ -387,8 +387,14 @@ const RIVER = obj({
 const LAND_MASK = obj({
     id,
     name: name("FILRODENSWMB.UI.LimitKindLandMask"),
-    operation: enumOf(["add", "subtract"]),
+    // "settings": a Coast only mask, which shapes no land (see MaskSettings)
+    operation: enumOf(["add", "subtract", "settings"]),
     points,
+    // A mask's own coast settings (absent: the map's), and whether they stop sharply at its edge
+    coastlineFracture: num(RANGE.SIGNED, { nullable: true }),
+    coastalPlain: num(RANGE.SIGNED, { nullable: true }),
+    shelfRange: num(RANGE.SIGNED, { nullable: true }),
+    sharpEdge: bool,
 });
 
 const HISTORY_ENTRY = obj({

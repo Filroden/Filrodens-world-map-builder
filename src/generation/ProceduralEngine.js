@@ -7,6 +7,7 @@ import { TerrainShading } from "../tools/TerrainShading.js";
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { UpwindMargin } from "../tools/UpwindMargin.js";
 import { FILRODENSWMB } from "../config.js";
+import { MaskSettings } from "./MaskSettings.js";
 
 /**
  * Rows of every input and output a band of the layer painters needs beyond the band itself, above
@@ -1302,14 +1303,50 @@ export class ProceduralEngine {
      * under the current coastal profile, the mid-ocean ridges) that the per-pixel pass reads (see
      * generateDetailRows). Plain data only, so it can be handed to workers.
      *
+     * Under the current coastal profile, masks with coast settings of their own add a field for
+     * each setting they override (`field.settings`, see MaskSettings), and the coastline field
+     * reaches as far as the largest of them needs (`field.settingsReach`). With no mask
+     * overriding anything, neither is set and the job is exactly as it was before masks had
+     * settings.
+     *
      * @returns {{frame: object, field: object, plates: null}} A detail job.
      */
     prepareGuidedDetail(width, height, params, landMasks) {
         const validMasks = (landMasks ?? []).filter((m) => m.points && m.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES);
         const frame = ProceduralEngine.#resolveTerrainFrame(width, height, params);
-        const land = validMasks.length > 0 ? this.#maskLand(validMasks, frame) : null;
-        const field = this.#buildCoastDistanceField(width, height, params, frame, land, { findRidges: true });
+        // Coast only masks shape no land
+        const shaping = validMasks.filter(MaskSettings.shapesLand);
+        const land = shaping.length > 0 ? this.#maskLand(shaping, frame) : null;
+        const ownSettings = frame.coastalBuffers && land !== null && MaskSettings.anyOverride(validMasks);
+        const reach = ownSettings ? MaskSettings.widest(validMasks, params) : params;
+        const field = this.#buildCoastDistanceField(width, height, reach, frame, land, { findRidges: true });
+        if (ownSettings) {
+            field.settings = MaskSettings.build({
+                grid: field,
+                masks: ProceduralEngine.#masksToWorld(validMasks, frame).map((world, index) => ({
+                    mask: world,
+                    bounds: ProceduralEngine.#boundsOf(world.points),
+                    inside: () => this.#generateOwnershipGrid(field, this.#maskLand([{ ...validMasks[index], operation: "add" }], frame)),
+                })),
+                ownership: this.#generateOwnershipGrid(field, land),
+                params,
+                scale: frame.resolutionScale,
+            });
+            field.settingsReach = reach.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
+        }
         return { frame, field, plates: null };
+    }
+
+    /** The bounding box of a list of points. */
+    static #boundsOf(points) {
+        const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+        for (const { x, y } of points) {
+            bounds.minX = Math.min(bounds.minX, x);
+            bounds.minY = Math.min(bounds.minY, y);
+            bounds.maxX = Math.max(bounds.maxX, x);
+            bounds.maxY = Math.max(bounds.maxY, y);
+        }
+        return bounds;
     }
 
     /**
@@ -1341,7 +1378,8 @@ export class ProceduralEngine {
      */
     static detailJobForRows(job, params, rowStart, rowEnd) {
         const { frame, field } = job;
-        const fracture = params.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
+        // As far as the largest fracture can warp (a mask's own, see prepareGuidedDetail)
+        const fracture = field.settingsReach ?? params.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE;
         const warpReach = FILRODENSWMB.GENERATION.WARP.AMPLITUDE * frame.resolutionScale * Math.abs(fracture);
         const firstY = frame.originY + rowStart / frame.zoom - warpReach;
         const lastY = frame.originY + (rowEnd - 1) / frame.zoom + warpReach;
@@ -1349,11 +1387,10 @@ export class ProceduralEngine {
         const firstRow = Math.max(offset, Math.floor((firstY - field.v0) * field.cellsPerPixel) - DETAIL_BAND_MARGIN_CELLS);
         const lastRow = Math.min(offset + field.distances.length / field.width - 1, Math.floor((lastY - field.v0) * field.cellsPerPixel) + DETAIL_BAND_MARGIN_CELLS);
         const rows = (array) => array?.slice((firstRow - offset) * field.width, (lastRow - offset + 1) * field.width) ?? null;
+        const band = { ...field, distances: rows(field.distances), landmassReach: rows(field.landmassReach), rowOffset: firstRow };
+        if (field.settings) band.settings = Object.fromEntries(Object.entries(field.settings).map(([key, values]) => [key, rows(values)]));
 
-        return {
-            ...job,
-            field: { ...field, distances: rows(field.distances), landmassReach: rows(field.landmassReach), rowOffset: firstRow },
-        };
+        return { ...job, field: band };
     }
 
     /**
@@ -2326,6 +2363,13 @@ export class ProceduralEngine {
      * Reads the coastline distance field at a world position, between cells where it falls
      * between them. Positions beyond the field read its nearest edge.
      */
+    /** A mask setting's field (its difference from the map's value, see MaskSettings), read at a world position as the coastline field is. */
+    #sampleSetting(field, values, worldX, worldY) {
+        const gridX = Math.max(0, Math.min(field.width - 1, (worldX - field.u0) * field.cellsPerPixel));
+        const gridY = Math.max(0, Math.min(field.height - 1, (worldY - field.v0) * field.cellsPerPixel));
+        return this.#bilinearSample(values, field.width, field.height, gridX, gridY, field.rowOffset ?? 0);
+    }
+
     #sampleCoastDistance(field, worldX, worldY) {
         const gridX = Math.max(0, Math.min(field.width - 1, (worldX - field.u0) * field.cellsPerPixel));
         const gridY = Math.max(0, Math.min(field.height - 1, (worldY - field.v0) * field.cellsPerPixel));
@@ -2610,6 +2654,16 @@ export class ProceduralEngine {
         const coastalProfile = frame.coastalBuffers ? ProceduralEngine.#resolveCoastalProfile(params, frame) : null;
         if (coastalProfile && field.ridges) coastalProfile.ridges = ProceduralEngine.#resolveRidges(params, frame, field.ridges);
         if (coastalProfile && plates) coastalProfile.tectonics = true;
+        // Masks' own coast settings (see MaskSettings): how far each differs from the map's value,
+        // read per pixel where a mask overrides that setting and added to the map's value (0 where
+        // no mask reaches, so the pixel is shaped exactly as the map's value shapes it); with no
+        // mask overriding anything, every pixel is shaped exactly as before
+        const own = coastalProfile && field.settings ? field.settings : null;
+        const amplitudePerFracture = coastlineNoiseScale * coastalVariance.AMPLITUDE_RATIO;
+        const bandPixelsPerUnit = generation.COASTAL_PROFILE.BUFFER_WIDTH * scale;
+        const mapPlain = params.coastalPlain ?? generation.COASTAL_PLAIN;
+        const mapShelf = params.shelfRange ?? generation.SHELF_RANGE;
+        if (own?.plain || own?.shelf) coastalProfile.variesWidth = true;
 
         // One reusable record of the point being shaped, filled in afresh for every pixel under
         // the current coastal profile, so the loop allocates nothing per pixel
@@ -2626,9 +2680,16 @@ export class ProceduralEngine {
                 // elevationData holds rows from rowStart on (see generateDetailRows)
                 const index = (y - rowStart) * width + x;
 
+                // A mask's own fracture, where the pixel lies (before the warp it sets)
+                let localFracture = fracture;
+                if (own?.fracture) {
+                    localFracture = fracture + this.#sampleSetting(field, own.fracture, fieldX, fieldY);
+                    boundary.amplitude = amplitudePerFracture * localFracture;
+                }
+
                 // 1. Apply Domain Warping
-                const warpX = (this.#fbm(worldX + warp.offsets.xx, worldY + warp.offsets.xy, generation.WARP.OCTAVES, warp.frequency) - 0.5) * fracture * warp.amplitude;
-                const warpY = (this.#fbm(worldX + warp.offsets.yx, worldY + warp.offsets.yy, generation.WARP.OCTAVES, warp.frequency) - 0.5) * fracture * warp.amplitude;
+                const warpX = (this.#fbm(worldX + warp.offsets.xx, worldY + warp.offsets.xy, generation.WARP.OCTAVES, warp.frequency) - 0.5) * localFracture * warp.amplitude;
+                const warpY = (this.#fbm(worldX + warp.offsets.yx, worldY + warp.offsets.yy, generation.WARP.OCTAVES, warp.frequency) - 0.5) * localFracture * warp.amplitude;
 
                 // 2. Sample the macro distance field at the warped position with true sub-pixel
                 // (bilinear) precision, rather than snapping to the nearest whole pixel - this
@@ -2658,6 +2719,9 @@ export class ProceduralEngine {
                     pixel.detailNoise = detailNoise;
                     pixel.landmassReach = this.#sampleLandmassReach(field, sampleX, sampleY);
                     pixel.tectonic = plates ? this.#samplePlateMesh(plates, plates.relief, frame, sampleX, sampleY) - ProceduralEngine.#PLATE_RELIEF_BASE : 0;
+                    // A mask's own band widths, where the warped point lies (beside its coast distance)
+                    if (own?.plain) coastalProfile.plainWidth = Math.max(0, mapPlain + this.#sampleSetting(field, own.plain, sampleX, sampleY)) * bandPixelsPerUnit;
+                    if (own?.shelf) coastalProfile.shelfWidth = Math.max(0, mapShelf + this.#sampleSetting(field, own.shelf, sampleX, sampleY)) * bandPixelsPerUnit;
                     // Not clamped to 0..1 (see #shapeCoastalProfile)
                     elevationData[index] = this.#shapeCoastalProfile(pixel, seaLevel, eStretch, coastalProfile);
                     continue;
