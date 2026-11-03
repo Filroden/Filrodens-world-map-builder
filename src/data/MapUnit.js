@@ -36,24 +36,18 @@ export function cleanUnit(value) {
 }
 
 /**
- * The unit a saved map uses, and whether it was changed on the way in.
- *
- * A map saved before it had a unit only has the scale bar's units text, which was free text
- * labelling a hand-set bar. That text becomes the unit, except the bar's old built-in "Miles",
- * which most maps carry untouched: kept, it would label kilometre figures as miles, so such a map
- * takes the default unit instead and the caller is told (`converted`), so it can say so and mark
- * the map as changed.
+ * The unit a saved map uses: its own, or, for a map saved before it had a unit, its scale bar's
+ * units text, whatever it says ("Miles", the bar's old built-in text, included). That text
+ * labelled a hand-set bar, and the map keeps that bar (its Match world scale stays off), so
+ * keeping the text keeps the bar reading as the user made it; whether "Miles" was chosen or left
+ * as it was cannot be told. Nothing is changed, so `converted` is always false.
  *
  * @param {object} payload - A map's data as saved.
  * @returns {{unit: string, converted: boolean}}
  */
 export function unitFromSaved(payload) {
     if (typeof payload?.mapUnit === "string" && payload.mapUnit.trim()) return { unit: payload.mapUnit.trim(), converted: false };
-
-    const legacy = payload?.params?.cartography?.scaleUnits;
-    const text = typeof legacy === "string" ? legacy.trim() : "";
-    if (text === UNIT.LEGACY_DEFAULT) return { unit: UNIT.DEFAULT, converted: true };
-    return { unit: cleanUnit(text), converted: false };
+    return { unit: cleanUnit(payload?.params?.cartography?.scaleUnits), converted: false };
 }
 
 /**

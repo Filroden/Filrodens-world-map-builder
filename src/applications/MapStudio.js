@@ -498,8 +498,6 @@ export class MapStudio {
         this.activeRegionId = null;
         // The generator's saved model-cell outputs (see ModelRun), or null for a map with no run
         this.modelRun = null;
-        // Whether the map last opened had its unit changed as it loaded (see MapUnit.unitFromSaved)
-        this.unitConvertedOnLoad = false;
         this.landMasks = [];
         this.activeLandMaskId = null;
         this.mapLabels = [];
@@ -4095,10 +4093,8 @@ export class MapStudio {
         this.uiState.regionOpacity = p.display?.regionOpacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY;
         this.uiState.cartographyScaleEnable = c.scaleEnable ?? this.defaultUiState.cartographyScaleEnable;
         // A map saved before it had a unit takes it from its scale bar's text, and keeps its
-        // hand-set bar (see MapUnit.unitFromSaved); the load reports a unit it had to change
-        const { unit, converted } = unitFromSaved(payload);
-        this.uiState.mapUnit = unit;
-        this.unitConvertedOnLoad = converted;
+        // hand-set bar (see MapUnit.unitFromSaved)
+        this.uiState.mapUnit = unitFromSaved(payload).unit;
         this.uiState.cartographyScaleMatchWorld = c.scaleMatchWorld === true;
         this.uiState.cartographyScaleInterval = c.scaleInterval ?? this.defaultUiState.cartographyScaleInterval;
         this.uiState.cartographyScaleValue = c.scaleValue ?? this.defaultUiState.cartographyScaleValue;
@@ -5942,13 +5938,10 @@ export class MapStudio {
             this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
             await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId), await platform.store.loadMapModelRun(mapId));
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
-            // Said as the map opens; the map is marked as changed, and once saved it holds its new
-            // unit, so a map that has been saved is not told again
-            if (this.unitConvertedOnLoad) platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.MapUnitConverted"));
 
             this.view?.render(["toolbar", "context"]);
-            // A map migrated, given a new mesh or a new unit as it opened has changes to save
-            this.isDirty = MeshIntegration.changedOnLoad(this) || this.unitConvertedOnLoad;
+            // A map migrated or given a new mesh as it opened has changes to save
+            this.isDirty = MeshIntegration.changedOnLoad(this);
             // A regional map cut before regional maps carried their parent's run reads it from its
             // parent, so its thematic layers and farmland have figures (kept with its next save)
             if (await ParentRunRecovery.recover(this)) this._repaintVectors();

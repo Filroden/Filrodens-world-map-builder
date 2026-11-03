@@ -704,7 +704,6 @@
     "FILRODENSWMB.UI.MapUnit": "Map unit",
     "FILRODENSWMB.UI.MapUnitHint": "The name of the unit every distance on this map is shown in: the scale bar, territorial waters, the thematic layers and the line below. The module measures distances in kilometers and shows the number with this name, so the figures are true kilometers whatever the unit is called. Change it to give the unit your world's own name.",
     "FILRODENSWMB.UI.PixelScale": "1 pixel is about {distance} {unit}",
-    "FILRODENSWMB.UI.MapUnitConverted": "This map's scale bar used the old default unit, Miles, for distances the module measures in kilometers. Its map unit is now km (in New map, under Generation). Save the map to keep the change.",
     "FILRODENSWMB.UI.AltitudeCooling": "Altitude cooling mod",
     "FILRODENSWMB.UI.FreezingThreshold": "Freezing threshold",
     "FILRODENSWMB.UI.ToolLibrary": "Styles and icons",

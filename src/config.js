@@ -847,13 +847,10 @@ export const FILRODENSWMB = {
     // The map's unit (see MapUnit): the name every distance the studio shows is labelled with. The
     // model measures in kilometres, and a figure is shown as that number of kilometres under the
     // map's own name for the unit, so the default is the name that makes the figure literally true.
-    // LEGACY_DEFAULT is the scale bar's built-in text before the map had a unit: a map saved with it
-    // untouched takes the default instead, since its figures would otherwise read as miles.
     // The scale bar's Match world scale rounds the distance per major tick to one of NICE_STEPS
     // times a power of ten.
     MAP_UNIT: Object.freeze({
         DEFAULT: "km",
-        LEGACY_DEFAULT: "Miles",
         NICE_STEPS: Object.freeze([1, 2, 5]),
     }),
     // The thematic layers (see ThematicData and ThematicView): what the generator's last run left in
