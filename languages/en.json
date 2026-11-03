@@ -1892,7 +1892,7 @@
     "FILRODENSWMB.UI.TerrainUpdateApplied": "Map updated. Save the map to keep the update, or reload it to return to the original.",
     "FILRODENSWMB.UI.UpdateMap": "Update map to latest engine(s)",
     "FILRODENSWMB.UI.UpdateMapHint": "This map was created with older terrain rules. Update it to use the latest terrain engine.",
-    "FILRODENSWMB.UI.TerrainUpdateIntroTectonics": "This map was created with the original tectonic engine (Advanced (tectonics) v1). Updating it to Advanced (tectonics) v2 builds the map's terrain with a new engine, so it will look completely different:",
+    "FILRODENSWMB.UI.TerrainUpdateIntroTectonics": "This map was created with the original tectonic engine (Advanced (tectonics) v1). Updating it to the latest Advanced (tectonics) engine builds the map's terrain with a new engine, so it will look completely different:",
     "FILRODENSWMB.UI.TerrainUpdateTectonicsLand": "The continents, coastlines, mountain ranges and oceans are built afresh from the same seed and settings. Nothing of the current layout is kept: land may become sea and sea may become land.",
     "FILRODENSWMB.UI.TerrainUpdateTectonicsFeatures": "Everything placed on the map (pins, routes, regions, labels, rivers and terrain brush strokes) stays exactly where it is, so it may no longer fit the new land. Only update a map you are happy to rework.",
     "FILRODENSWMB.UI.TerrainUpdateIntroCoastline": "This map was created with older terrain rules. Updating it to the latest guided terrain engine changes it as follows:",
