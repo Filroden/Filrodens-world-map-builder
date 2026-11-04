@@ -2,7 +2,7 @@
 // four times the detail, filled in with villages and market towns, opens it, and steps the Detail
 // level down to Local to see what the fill-in added.
 
-/** The crop: the Red Hills and the King's Road, from Stansto to Kansmarda. */
+/** The crop: the Red Hills and the King's Road, from Thatckerid to Kansmarda. */
 const CROP_FROM = [1040, 300];
 const CROP_TO = [1440, 740];
 
@@ -15,7 +15,7 @@ const REGION_NAME = "The Red Hills";
 /** The regional map's card in Maps. */
 const card = (name) => `.fwmb-map-card:has(> .fwmb-map-card-info:text-is("${name}"))`;
 
-/** A close-up on the regional map round Mostadra and the King's Road (in the regional map's own pixels). */
+/** A close-up on the regional map round Golenduos and the King's Road (in the regional map's own pixels). */
 const MOSTADRA_VIEW = [600, 900, 1200, 1400];
 
 export default {
@@ -33,7 +33,7 @@ Once made, a regional map is a map of its own: changing it doesn't change the wo
         {
             id: "crop",
             title: "Draw the crop",
-            instruction: "Click **New map** on the rail, open the panel's **Regional map** section and set **New resolution** to `1600` pixels wide. Choose **Crop** on the bar and drag on the map from north-west of Stansto to south-east of Kansmarda, round the Red Hills and the King's Road. When you let go, the crop is fitted to the map's grid at a whole zoom, here ×4: the new map shows the land four times as closely, and its height and latitudes follow from the crop. Tick **Fill in villages and market towns**.",
+            instruction: "Click **New map** on the rail, open the panel's **Regional map** section and set **New resolution** to `1600` pixels wide. Choose **Crop** on the bar and drag on the map from north-west of Thatckerid to south-east of Kansmarda, round the Red Hills and the King's Road. When you let go, the crop is fitted to the map's grid at a whole zoom, here ×4: the new map shows the land four times as closely, and its height and latitudes follow from the crop. Tick **Fill in villages and market towns**.",
             action: [
                 { do: "tool", tool: "scene", label: "New map" },
                 { do: "openSection", section: "regionalMap", label: "Regional map" },
@@ -77,15 +77,15 @@ Once made, a regional map is a map of its own: changing it doesn't change the wo
         {
             id: "local",
             title: "See the villages",
-            instruction: "Open the **Detail** menu in the map controls and choose **Local**. The market towns the fill-in added are shown, and its villages of 1,000 people or more, joined to the roads by lanes; the smaller villages show at **Everything**. Zoom in round Mostadra and the King's Road to see them.",
+            instruction: "Open the **Detail** menu in the map controls and choose **Local**. The market towns the fill-in added are shown, and its villages of 1,000 people or more, joined to the roads by lanes; the smaller villages show at **Everything**. Zoom in round Golenduos and the King's Road to see them.",
             action: [
                 { do: "click", target: '[data-layer-group="detail"] > .fwmb-map-btn', label: "Detail in the map controls" },
                 { do: "click", target: '[data-action="setDetailLevel"][data-detail-level="3"]', label: "Local" },
                 { do: "settle" },
-                { do: "frame", rect: MOSTADRA_VIEW, label: "Zoom in round Mostadra." },
+                { do: "frame", rect: MOSTADRA_VIEW, label: "Zoom in round Golenduos." },
             ],
             screenshot: { name: "villages", region: { map: MOSTADRA_VIEW }, mapOnly: true },
-            caption: "Villages, market towns and lanes round Mostadra at the Local detail level.",
+            caption: "Villages, market towns and lanes round Golenduos at the Local detail level.",
             note: "Each map keeps its own Detail level, so the world map is still at Province.",
             narration: "Set the Detail level to Local. The villages and market towns that were filled-in will appear, joined to the roads by lanes.",
             pause: 4,

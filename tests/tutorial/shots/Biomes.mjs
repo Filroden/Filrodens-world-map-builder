@@ -1,4 +1,5 @@
-// The Biomes page: the panel, Edit biomes with the tutorial's Moorland, and the rule editor.
+// The Biomes page: the panel, Edit biomes with the tutorial's Moorland, Moorland in the inspector,
+// and the rule editor.
 import { MAP } from "./_common.mjs";
 
 export default [
@@ -22,6 +23,14 @@ export default [
             { do: "openSection", section: "biomeColours" },
         ],
         screenshot: { region: { selector: 'details.fwmb-section[data-section="biomeColours"]' }, pad: 8 },
+    },
+    {
+        slug: "biomes-custom-biome",
+        start: MAP.terrain,
+        caption: "Moorland in the inspector: its name, code, colour and placement, then Behaves like and Own numbers for Generate.",
+        // Carries on from the shot before, with Edit biomes open
+        action: [{ do: "click", target: '.fwmb-list-item[data-action="editCustomBiome"]' }],
+        screenshot: { region: "inspector" },
     },
     {
         slug: "biomes-rule-editor",

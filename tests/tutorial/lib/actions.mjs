@@ -352,6 +352,32 @@ export const ACTIONS = Object.freeze({
     },
 
     /**
+     * Drags a name on the map by `by` map pixels, from wherever the map drew it (placed, or shown
+     * faintly while labels are placed): the label of the region (in `level`, if given), route or
+     * pin called `name`. Where a name lands depends on everything around it, so a fixed point
+     * could miss it.
+     */
+    dragLabel: {
+        async run(page, { name, owner = "region", level = null, by }) {
+            const from = await page.evaluate(
+                ({ name, owner, level }) => {
+                    const studio = globalThis.fwmbStudio;
+                    const ids = new Set();
+                    if (owner === "region") for (const each of studio.regionLevels) if (!level || each.name === level) for (const region of each.regions) if (region.name === name) ids.add(region.id);
+                    if (owner === "route") for (const route of studio.mapRoutes) if (route.name === name) ids.add(route.id);
+                    if (owner === "pin") for (const pin of studio.mapPins) if (pin.name === name) ids.add(pin.id);
+                    const target = studio.canvasEngine.interactiveTargets.find((each) => each.entityType === "label" && each.parentType === owner && ids.has(each.entityId));
+                    return target ? [target.x, target.y] : null;
+                },
+                { name, owner, level },
+            );
+            if (!from) throw new Error(`the ${owner} name "${name}" is not drawn on the map`);
+            await strokeMap(page, [from, [from[0] + by[0], from[1] + by[1]]]);
+        },
+        describe: ({ label, name }) => label ?? `Drag ${name} on the map.`,
+    },
+
+    /**
      * A brush stroke along map points. The studio paints at most one stamp every 100 ms, so the
      * pointer rests longer than that at each point: every point is one stamp, whatever the
      * machine's speed, and the stroke (and the terrain it makes) is the same on every run.

@@ -2,7 +2,7 @@
 // and styles it, moves one of its waypoints, and draws a sea lane from the continent's east coast
 // to Islemark.
 
-/** The road's waypoints, south to north: Kansmarda, Mostadra, Stansto. */
+/** The road's waypoints, south to north: Kansmarda, Golenduos, Thatckerid. */
 const ROAD = [
     [1222, 673],
     [1265, 602],
@@ -12,7 +12,7 @@ const ROAD = [
 /** Where the road's middle waypoint is dragged to. */
 const ROAD_MOVED = [1240, 540];
 
-/** The sea lane's waypoints, on the water off the east coast and off Newcested. */
+/** The sea lane's waypoints, on the water off the east coast and off Dudgeton. */
 const SEA_LANE = [
     [1395, 770],
     [1440, 1000],
@@ -50,7 +50,7 @@ export default {
         {
             id: "road",
             title: "Draw a road",
-            instruction: "Choose **Draw** on the bar. Leave **Path** at **Follow terrain** and **Transport** at **Road**, and set **Style** to **Trunk road**. Zoom in on the Red Hills, then click three waypoints through them, south to north: the capital **Kansmarda**, the city **Mostadra**, and the city **Stansto**. As you move, the leg the next click adds is previewed. Press Enter (or right-click) to finish the road; it opens in the inspector.",
+            instruction: "Choose **Draw** on the bar. Leave **Path** at **Follow terrain** and **Transport** at **Road**, and set **Style** to **Trunk road**. Zoom in on the Red Hills, then click three waypoints through them, south to north: the capital **Kansmarda**, the city **Golenduos**, and the city **Thatckerid**. As you move, the leg the next click adds is previewed. Press Enter (or right-click) to finish the road; it opens in the inspector.",
             action: [
                 { do: "mode", action: "setRouteMode", mode: "draw", label: "Draw" },
                 { do: "set", field: '[data-region="editToolbar"] select[name="activeRouteQuickStyle"]', value: "Trunk road", label: "Style" },
@@ -80,7 +80,7 @@ export default {
         {
             id: "waypoint",
             title: "Move a waypoint",
-            instruction: "Choose **Waypoints** on the bar (in **More** on a narrow bar). The road's waypoints show as handles. Drag the middle one, at Mostadra, a little west: its two legs are found again as you move it.",
+            instruction: "Choose **Waypoints** on the bar (in **More** on a narrow bar). The road's waypoints show as handles. Drag the middle one, at Golenduos, a little west: its two legs are found again as you move it.",
             action: [
                 { do: "mode", action: "setRouteMode", mode: "edit", label: "Waypoints" },
                 { do: "drag", from: ROAD[1], to: ROAD_MOVED, label: "Drag the middle waypoint west." },
@@ -94,7 +94,7 @@ export default {
         {
             id: "sea-lane",
             title: "Draw a sea lane",
-            instruction: "Click **Reset view**, choose **Draw**, set **Transport** to **Sea** and **Style** to **Sea lane**. Click the water off the east coast of the continent, south of the Red Hills, then the water off **Newcested**, Islemark's capital, and press Enter. A sea lane keeps to the water, rounding the coast. In the inspector, change **Name** to `The Islemark Crossing` and press Enter (a new route is called **Route** until you name it).",
+            instruction: "Click **Reset view**, choose **Draw**, set **Transport** to **Sea** and **Style** to **Sea lane**. Click the water off the east coast of the continent, south of the Red Hills, then the water off **Dudgeton**, Islemark's capital, and press Enter. A sea lane keeps to the water, rounding the coast. In the inspector, change **Name** to `The Islemark Crossing` and press Enter (a new route is called **Route** until you name it).",
             action: [
                 { do: "camera", view: "fit" },
                 { do: "mode", action: "setRouteMode", mode: "draw", label: "Draw" },
@@ -127,7 +127,7 @@ export default {
         },
     ],
 
-    whatYouSee: "A trunk road, The King's Road, from Kansmarda north through the Red Hills to Stansto, bending west where you moved its waypoint, and a sea lane, The Islemark Crossing, from the continent's east coast to Newcested on Islemark.",
+    whatYouSee: "A trunk road, The King's Road, from Kansmarda north through the Red Hills to Thatckerid, bending west where you moved its waypoint, and a sea lane, The Islemark Crossing, from the continent's east coast to Dudgeton on Islemark.",
     foundry: "Everything on this page is the same in Foundry.",
     onYourOwn: `Route names are placed after the names of places and regions, so on a crowded map a route's name may have no room and is left out; page 8 shows how to place one yourself. A road you draw near an existing road tends to join it rather than run beside it, which is usually what a road network wants; add a waypoint where it should keep its distance. **Span water** lets a road bridge a strait or river where going round would be longer. To restyle every road of a kind at once, change its route style in [[Styles and icons]]. The [[Travel]] tool times journeys along the map's routes, yours and the run's alike. See [[Routes and pins]] for every mode, the inspector and mass edit.`,
     related: ["Routes and pins", "Styles and icons", "Travel"],

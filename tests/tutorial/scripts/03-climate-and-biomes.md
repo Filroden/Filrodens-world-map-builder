@@ -36,40 +36,28 @@
 
 ## 3. Add a custom biome
 
-**Narration:** Open the Edit biomes section and add a custom biome. Call it Moorland and give it a heather colour.
+**Narration:** Open the Edit biomes section and add a custom biome. It opens in the inspector: call it Moorland and give it a heather colour. It has no rules yet, so it only appears where we paint it.
 
 **On screen:**
 
 - Open the Edit biomes section.
 - Click Add custom biome.
-- The dialogue opens.
 - Set Name to Moorland.
 - Set Colour to #8c7a8a.
 
-**Camera:** the dialog
+**Camera:** the inspector
 
 **Hold:** 2 s after the action
 
 **Matches the wiki's image:** `03-climate-and-biomes-custom-biome.png`
 
-## 4. Confirm
-
-**Narration:** Click Confirm. Moorland has no rules yet, so it only appears where we paint it.
-
-**On screen:**
-
-- Click Confirm in the dialogue.
-
-**Camera:** the whole studio
-
-**Hold:** 2 s after the action
-
-## 5. Give it a rule
+## 4. Give it a rule
 
 **Narration:** Open the Biome rule editor and add a rule for Moorland. Choose the Upland band for elevation, then drag moisture and temperature down to cool, fairly dry ground.
 
 **On screen:**
 
+- Click Close the inspector..
 - Click Biome rule editor.
 - The dialogue opens.
 - Click + Add rule.
@@ -83,7 +71,7 @@
 
 **Matches the wiki's image:** `03-climate-and-biomes-rule.png`
 
-## 6. Accept
+## 5. Accept
 
 **Narration:** Now click Accept, and moorland appears across the cool uplands.
 
@@ -97,7 +85,7 @@
 
 **Matches the wiki's image:** `03-climate-and-biomes-moorland.png`
 
-## 7. Paint moorland
+## 6. Paint moorland
 
 **Narration:** Next we'll paint the biome by hand. Click Start painting and choose Moorland from the bar. Paint a few short strokes along the top of the ridge on the eastern island.
 
@@ -117,7 +105,7 @@
 
 **Matches the wiki's image:** `03-climate-and-biomes-painted.png`
 
-## 8. Stop painting
+## 7. Stop painting
 
 **Narration:** Stop painting and save. Next, we're going to add some rivers.
 
@@ -132,4 +120,4 @@
 
 ---
 
-8 steps; at least 23 s of holds, plus the actions themselves.
+7 steps; at least 21 s of holds, plus the actions themselves.

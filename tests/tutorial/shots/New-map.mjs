@@ -1,12 +1,12 @@
-// The New map page: the panel on a Standard map, drawing land masks on a Guided map, and the
-// regional map crop.
+// The New map page: the panel on a new map (Advanced (tectonics), the default), drawing land masks
+// on a Guided map, a land mask's own coast settings, and the regional map crop.
 import { MAP } from "./_common.mjs";
 
 export default [
     {
         slug: "new-map-panel",
         start: null,
-        caption: "New map on a Standard map, with the Generation section open.",
+        caption: "New map on a new Advanced (tectonics) map, with the Generation section open.",
         screenshot: { region: "studio" },
     },
     {
@@ -20,6 +20,20 @@ export default [
             { do: "camera", view: "fit" },
         ],
         screenshot: { region: "studio" },
+    },
+    {
+        slug: "new-map-coast-settings",
+        start: MAP.masks,
+        caption: "The continent's land mask in the inspector, with its own Coastal fracture and Coastal plains ticked in the Coast section.",
+        action: [
+            { do: "tool", tool: "scene" },
+            { do: "click", target: '.fwmb-list-item[data-type="landMask"]' },
+            { do: "click", target: 'dialog.fwmb-inspector[open] input[name="maskCoastlineFractureOwn"]' },
+            { do: "settle" },
+            { do: "click", target: 'dialog.fwmb-inspector[open] input[name="maskCoastalPlainOwn"]' },
+            { do: "settle" },
+        ],
+        screenshot: { region: "inspector" },
     },
     {
         slug: "new-map-regional-crop",

@@ -95,7 +95,7 @@ export default {
         {
             id: "custom-river",
             title: "Draw a river",
-            instruction: "The southern forests have no rivers. Choose **River** on the bar and set **River width** to **Medium**. Then click from the hills in the south of the continent eastwards to the coast, and right-click to finish. A custom river runs exactly along your line, from its higher end to its lower, and the ground is lowered into a gentle valley around it.",
+            instruction: "The southern forests have no rivers. Choose **River** on the bar and set **River width** to **Medium**. Then click from the hills in the south of the continent eastwards to the coast, and right-click to finish. A custom river follows the land within a corridor around your line, from its higher end to its lower: it starts as a stream and widens to its width along the line, in a broad valley lowered into the land.",
             action: [
                 { do: "mode", action: "setFeatureMode", mode: "river", label: "River" },
                 { do: "set", field: '[data-region="editToolbar"] select[name="riverWidth"]', value: "Medium", label: "River width" },
@@ -106,8 +106,8 @@ export default {
             ],
             screenshot: { name: "custom-river", region: { map: [840, 1180, 1300, 1420] }, mapOnly: true },
             caption: "The custom river across the southern forests.",
-            note: "The new river opens in the inspector as you place its first point; **Reset view** in the map controls shows the whole map beside it. If your line ends on land, the river carries on downhill from its end by itself.",
-            narration: "The southern forests have no rivers either, so draw one. Choose River, set a medium width, and click from the hills east to the coast. Right-click to finish, and the river follows your line in a valley of its own.",
+            note: "The new river opens in the inspector as you place its first point; **Reset view** in the map controls shows the whole map beside it. In the inspector, **Corridor width** sets how far the river may wander from your line, and **Cut through high ground** lets it cut a gorge where your line crosses higher ground. If your line ends on land, the river carries on downhill from its end by itself.",
+            narration: "The southern forests have no rivers either, so draw one. Choose River, set a medium width, and click from the hills east to the coast. Right-click to finish, and the river follows the land close to your line, in a valley of its own.",
             pause: 4,
         },
         {

@@ -54,7 +54,7 @@
 
 ## 4. Draw a river
 
-**Narration:** The southern forests have no rivers either, so draw one. Choose River, set a medium width, and click from the hills east to the coast. Right-click to finish, and the river follows your line in a valley of its own.
+**Narration:** The southern forests have no rivers either, so draw one. Choose River, set a medium width, and click from the hills east to the coast. Right-click to finish, and the river follows the land close to your line, in a valley of its own.
 
 **On screen:**
 

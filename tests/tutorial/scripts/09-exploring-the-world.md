@@ -18,7 +18,7 @@
 - Click Thematic layers in the map controls.
 - Click Population.
 - Press Escape to close the menu.
-- Point at the land near Mostadra.
+- Point at the land near Golenduos.
 
 **Camera:** the whole studio
 
@@ -95,14 +95,14 @@
 
 ## 6. Time a journey
 
-**Narration:** Open Travel, choose By wagon, and click Kansmarda to start. The bands show the days to reach every part of the land. Point at Newcested, and the way is drawn: by road to the coast, and then by ship.
+**Narration:** Open Travel, choose By wagon, and click Kansmarda to start. The bands show the days to reach every part of the land. Point at Dudgeton, and the way is drawn: by road to the coast, and then by ship.
 
 **On screen:**
 
 - Click Travel on the rail.
 - Click By wagon.
 - Click Kansmarda to start the journey.
-- Point at Newcested.
+- Point at Dudgeton.
 
 **Camera:** the whole studio
 

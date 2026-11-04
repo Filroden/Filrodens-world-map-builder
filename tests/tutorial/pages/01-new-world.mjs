@@ -73,9 +73,9 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
         {
             id: "engine",
             title: "Choose Guided",
-            instruction: "Choose **Guided v2** in **Generation engine**. Choosing an engine creates a new map with it at once, so the studio asks what to do with the map that is open. It has never been saved, so there is nothing to keep.",
+            instruction: "Choose **Guided v3** in **Generation engine**. Choosing an engine creates a new map with it at once, so the studio asks what to do with the map that is open. It has never been saved, so there is nothing to keep.",
             action: [
-                { do: "set", field: "#fwmb-generation-engine", value: "guided", valueLabel: "Guided v2", label: "Generation engine" },
+                { do: "set", field: "#fwmb-generation-engine", value: "guided", valueLabel: "Guided v3", label: "Generation engine" },
                 { do: "waitForDialog" },
             ],
             settle: false,
@@ -177,6 +177,6 @@ The tutorial's map uses the **Guided** engine: you draw where the land goes and 
 
     whatYouSee: `A map of one large continent running from the north-west corner down to the south, three islands to the east and an inland sea, all with hills, mountains and coasts the engine made. The map is saved as **Tutorial world**. The colours come from the biomes the module has worked out from the terrain and climate; later pages change both.`,
     foundry: "Everything on this page is the same in Foundry, apart from opening the studio (from the **Scenes** sidebar) and where the map is saved (in the world, where every GM can open it).",
-    onYourOwn: `Choose the engine that fits what you have in mind (see [[New map]] for the four engines): **Guided** when you know the shape of your world, **Standard** or **Advanced (tectonics)** to browse random worlds by changing the seed. Set the latitudes before you go further, since they decide the climate. Leave the size modest while you experiment: you can make a larger regional map of any part later (page 11).`,
+    onYourOwn: `Choose the engine that fits what you have in mind (see [[New map]] for the four engines): **Guided** when you know the shape of your world, **Advanced (tectonics)** (the default) to browse random worlds by changing the seed. Set the latitudes before you go further, since they decide the climate. Leave the size modest while you experiment: you can make a larger regional map of any part later (page 11).`,
     related: ["New map", "Getting Started", "Maps"],
 };
