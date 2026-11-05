@@ -561,6 +561,22 @@ test("a decoration's look applies one step each; a land mask's type shapes the l
     assert.deepEqual([app.landMasks[0].name, app.landMasks[0].operation, app.terrainUpdates, steps(app)], ["Isle of Mist", "subtract", 1, 4]);
 });
 
+test("Add decoration's Compass rose adds a rose with its defaults near the bottom right, as one undo step, and opens it", async () => {
+    const { app } = await studio();
+    Object.assign(app, { mapWidth: 1000, mapHeight: 800 });
+    const id = await DecorationEditor.add(app, "compass");
+    const rose = app.mapDecorations.at(-1);
+    assert.equal(rose.id, id);
+    assert.deepEqual([rose.kind, rose.design, rose.size, rose.points, rose.letters, rose.backing, rose.halo, rose.upright], ["compass", "classic", 72, 8, "cardinal", true, true, false]);
+    assert.equal(rose.name, "FILRODENSWMB.UI.DecorationKindCompass");
+    assert.ok(rose.x > 500 && rose.x < 1000 && rose.y > 400 && rose.y < 800, "near the bottom right corner");
+    assert.ok(!("src" in rose));
+    assert.equal(steps(app), 1);
+    assert.ok(Inspector.shows(app, "decoration", id));
+    VectorHistory.step(app, true);
+    assert.equal(app.mapDecorations.length, 1, "undo takes it away");
+});
+
 test("a land mask on a guided map has its own coast settings: each follows the map until ticked, Sharp edge once one is, and Coast only shapes no land", async () => {
     const { app } = await studio();
     Object.assign(app.uiState, { generationEngine: "guided", terrainVersion: 3, coastlineFracture: 0.2, coastalPlain: 0.05, shelfRange: 0.15 });

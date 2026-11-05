@@ -523,3 +523,56 @@ test("an imported map keeps its name, numbered only when a saved map already has
     assert.equal(MapNames.unique("Harbour", ["Harbour", "Harbour (2)"], numbered), "Harbour (3)");
     assert.deepEqual(MapNames.namesIn([{ name: "A", children: [{ name: "B", children: [] }] }, { name: "C" }]), ["A", "B", "C"]);
 });
+
+test("a drawn decoration's fields are kept to their rules: unknown kinds, designs and colours go, numbers stay in range, titles are plain text within their limit", () => {
+    const file = v4Map();
+    file.mapDecorations.push({
+        id: "roseAAAAAAAAAAAA",
+        type: "decoration",
+        name: "Compass rose",
+        kind: "compass",
+        design: "classic",
+        size: 144,
+        x: 10,
+        y: 10,
+        colours: { light: "#f3e9cf", dark: HOSTILE_COLOUR, letter: "#123456", glow: "#ffffff" },
+        fontFamily: "Cinzel",
+        bold: true,
+        points: 12,
+        rings: 5,
+        north: "fleur",
+        letters: "every",
+        letterSize: 0.3,
+        upright: "yes",
+        backingOpacity: 0.85,
+        title: SCRIPT,
+        subtitle: "In the fourth age",
+        maxWidth: 4,
+    });
+    file.mapDecorations.push({ id: "oddAAAAAAAAAAAAA", type: "decoration", name: "Odd", kind: "sundial", design: "nonsense", size: -3, fontFamily: "Fell'); background: url(x", x: 1, y: 1 });
+    const { mapData } = MapImport.read(file);
+    const [, rose, odd] = mapData.mapDecorations;
+    assert.deepEqual(rose.colours, { light: "#f3e9cf", letter: "#123456" }, "a hostile colour and an unknown colour key are dropped");
+    assert.deepEqual([rose.kind, rose.design, rose.size, rose.fontFamily, rose.bold, rose.north, rose.letterSize, rose.backingOpacity], ["compass", "classic", 144, "Cinzel", true, "fleur", 0.3, 0.85]);
+    for (const dropped of ["points", "letters", "upright"]) assert.ok(!(dropped in rose), `${dropped} outside its rule is dropped`);
+    assert.deepEqual([rose.rings, rose.maxWidth], [2, 1], "numbers are kept in their ranges");
+    assert.equal(rose.title, SCRIPT, "markup in a title is kept as plain text");
+    assert.equal(rose.subtitle, "In the fourth age");
+    const long = v4Map();
+    long.mapDecorations.push({ id: "roseBBBBBBBBBBBB", type: "decoration", name: "Cartouche", kind: "cartouche", subtitle: "x".repeat(Sanitize.textLimit("name") + 1), x: 1, y: 1 });
+    let refusal;
+    assert.throws(
+        () => MapImport.read(long),
+        (error) => {
+            refusal = error;
+            return refusedFor("textTooLong")(error);
+        },
+        "an over-long subtitle refuses the import, as every over-long text does",
+    );
+    assert.match(Sanitize.refusalMessage(refusal, i18n), /the subtitle of the decoration/);
+    assert.equal(typed("decoration", { subtitle: "y".repeat(5000) }, {}).subtitle.length, Sanitize.textLimit("name"), "the inspector cuts it to the limit");
+    for (const dropped of ["kind", "design", "fontFamily"]) assert.ok(!(dropped in odd), `an unknown or unsafe ${dropped} is dropped`);
+    assert.equal(odd.size, 1, "a negative size is raised to the least");
+    const applied = typed("decoration", { design: "sundial", letters: "all", colours: { accent: "red;x", dark: "#000000" } }, rose);
+    assert.deepEqual([applied.design, applied.letters, applied.colours.accent, applied.colours.dark], ["classic", "all", undefined, "#000000"], "the inspector keeps the current value where a typed one fails");
+});

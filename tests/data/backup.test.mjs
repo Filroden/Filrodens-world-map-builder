@@ -116,6 +116,24 @@ test("an image that cannot be read or fails its check is left out and counted, a
     assert.equal(mapData.reference, null);
 });
 
+test("a decoration the module draws has no image: every mode carries it as it is, and bringing it in keeps it and counts nothing missing", async () => {
+    const compass = { id: "roseAAAAAAAAAAAA", type: "decoration", kind: "compass", name: "Compass rose", design: "classic", size: 144, x: 1700, y: 1250, rotation: 0, scale: 1, visibility: "all", colours: { ...FILRODENSWMB.DECORATIONS.SCHEMES.parchment }, fontFamily: "Cinzel", bold: true };
+    for (const mode of ["embed", "assets", "keep"]) {
+        const from = host();
+        const map = savedMap();
+        map.mapDecorations.push(structuredClone(compass));
+        const { file, missing } = await MapPackage.prepare({ mapData: map, icons: from.icons, mode, read: from.read });
+        assert.equal(missing, 0, `${mode}: nothing missing`);
+        assert.deepEqual(file.mapDecorations[1], compass, `${mode}: written as it is`);
+
+        const to = host();
+        const { mapData, pinIcons } = MapImport.read(JSON.parse(JSON.stringify(file)));
+        const result = await MapPackage.resolve({ mapData, pinIcons, assetBytes: () => png(1), keep: to.keep, icons: to.registry, check: CHECK });
+        assert.equal(result.missing, 0, `${mode}: the compass is not a missing image`);
+        assert.deepEqual(mapData.mapDecorations.find((decoration) => decoration.kind === "compass"), compass, `${mode}: brought in whole`);
+    }
+});
+
 test("keep (Maps only) carries no images: paths stay, embedded images go", async () => {
     const from = host();
     const map = savedMap({ decoration: dataUrl(png(9)) });

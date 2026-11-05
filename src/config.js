@@ -1733,6 +1733,51 @@ export const FILRODENSWMB = {
     // should reach for a scale to be recommended, the largest image (a side, and in all) a scale
     // may make, and the largest tile drawn at once
     EXPORT_PNG: Object.freeze({ SCALES: Object.freeze([1, 2, 3, 4]), MIN_LABEL_PX: 12, MAX_SIDE: 16384, MAX_PIXELS: 150_000_000, TILE_PX: 4096 }),
+    // Decorations drawn by the module (see DrawnDecoration): a compass rose or a cartouche, each
+    // a `kind` on a map decoration (a decoration with no kind is an image the user supplied).
+    DECORATIONS: Object.freeze({
+        KINDS: Object.freeze(["compass", "cartouche"]),
+        // Shapes are built this many times larger and scaled back, so curves keep enough
+        // segments when an export enlarges them
+        OVERSAMPLE: 2,
+        COMPASS: Object.freeze({
+            DESIGNS: Object.freeze(["classic", "mariner", "arrow"]),
+            POINTS: Object.freeze([4, 8, 16, 32]),
+            NORTH: Object.freeze(["letter", "fleur"]),
+            LETTERS: Object.freeze(["none", "cardinal", "all"]),
+            // A new rose's radius, as a share of the map's shorter side (at scale 1), so it looks
+            // the same on a small map and a large one
+            RADIUS_SHARE: 0.09,
+            LETTER_SIZE: Object.freeze({ MIN: 0.1, MAX: 0.5, DEFAULT: 0.22 }),
+            // A new rose sits near the map's bottom right corner, this many radii in from the
+            // border's inset
+            CORNER_RADII: 1.35,
+            DEFAULTS: Object.freeze({
+                classic: Object.freeze({ points: 8, rings: 2, degreeRing: false, north: "letter", letters: "cardinal", fontFamily: "Cinzel", bold: true }),
+                mariner: Object.freeze({ points: 32, rings: 2, degreeRing: true, north: "fleur", letters: "cardinal", fontFamily: "IM Fell English", bold: false }),
+                arrow: Object.freeze({ points: 4, rings: 1, degreeRing: false, north: "letter", letters: "cardinal", fontFamily: "Josefin Sans", bold: true }),
+            }),
+            BACKING_OPACITY: 0.85,
+        }),
+        CARTOUCHE: Object.freeze({
+            DESIGNS: Object.freeze(["plaque", "ribbon", "frame"]),
+            TITLE_SOURCES: Object.freeze(["map", "custom"]),
+            // A new cartouche's title size, as a share of the map's shorter side, and its widest,
+            // as a share of the map's width
+            TITLE_SHARE: 0.035,
+            MAX_WIDTH: Object.freeze({ MIN: 0.1, MAX: 1, DEFAULT: 0.4 }),
+            SUBTITLE_SIZE: Object.freeze({ MIN: 0.2, MAX: 1, DEFAULT: 0.45 }),
+        }),
+        // Colour schemes: every colour of a decoration at once (a one-off choice, not a link)
+        SCHEMES: Object.freeze({
+            parchment: Object.freeze({ light: "#f3e9cf", dark: "#5b4630", line: "#3b2c1c", accent: "#b8892e", letter: "#3b2c1c", backing: "#f3e9cf", fill: "#f3e9cf", shade: "#d8c69c", text: "#3b2c1c" }),
+            seaChart: Object.freeze({ light: "#eef4f7", dark: "#2e5f8a", line: "#1e3a52", accent: "#c9a227", letter: "#1e3a52", backing: "#eef4f7", fill: "#eef4f7", shade: "#b9cfdd", text: "#1e3a52" }),
+            ink: Object.freeze({ light: "#fbfaf6", dark: "#1a1a1a", line: "#1a1a1a", accent: "#7a7a7a", letter: "#1a1a1a", backing: "#fbfaf6", fill: "#fbfaf6", shade: "#d6d4cc", text: "#1a1a1a" }),
+            slate: Object.freeze({ light: "#d9dde3", dark: "#3f4a5a", line: "#20262f", accent: "#8a96a8", letter: "#eef1f5", backing: "#2b323d", fill: "#2b323d", shade: "#4a5566", text: "#eef1f5" }),
+            crimson: Object.freeze({ light: "#f4e6d4", dark: "#8c1c1c", line: "#3a1010", accent: "#c9a227", letter: "#3a1010", backing: "#f4e6d4", fill: "#f4e6d4", shade: "#c99a8a", text: "#3a1010" }),
+        }),
+        DEFAULT_SCHEME: "parchment",
+    }),
     PINS: {
         // The size new pins (and their labels) start with: small, so a map of many places stays readable
         DEFAULT_SCALE: 1.2,

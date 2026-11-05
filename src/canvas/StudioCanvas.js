@@ -19,6 +19,7 @@ import { TravelLayer } from "./TravelLayer.js";
 import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
 import { HomelandMarkers } from "./HomelandMarkers.js";
+import { DrawnDecoration } from "./decorations/DrawnDecoration.js";
 import { TouchGestures } from "./TouchGestures.js";
 import { platform } from "../platform/index.js";
 import { cleanUnit, formatDistance, scaleBarTick } from "../data/MapUnit.js";
@@ -2126,13 +2127,27 @@ export class StudioCanvas {
 
     renderCartography(uiState, mapWidth, mapHeight, isEditMode = false, decorations = []) {
         if (!this.layers.cartography) return;
+        const args = [uiState, mapWidth, mapHeight, isEditMode, decorations];
+        this.#cartographyArgs = args;
         this.layers.cartography.removeChildren().forEach((c) => c.destroy({ children: true }));
 
         // Delegate to isolated drawing pipelines
         this.#drawCartographyBorder(uiState, mapWidth, mapHeight);
         this.#drawScaleBar(uiState, mapHeight, isEditMode);
         this.#drawCartographyDecorations(decorations, isEditMode);
+
+        // A drawn decoration's letters in a face still loading were drawn in the fallback: once
+        // it arrives the layer is drawn again, unless it has been drawn since (see LabelFonts)
+        const faces = decorations.flatMap((decoration) => DrawnDecoration.faces(decoration));
+        if (faces.length) {
+            LabelFonts.load(faces).then((asked) => {
+                if (asked && this.#cartographyArgs === args && !this.#destroyed) this.renderCartography(...args);
+            });
+        }
     }
+
+    /** The last renderCartography call's arguments, so a face arriving late redraws only the latest. */
+    #cartographyArgs = null;
 
     #drawCartographyBorder(uiState, mapWidth, mapHeight) {
         if (!uiState.cartographyBorderEnable) return;
@@ -2255,7 +2270,12 @@ export class StudioCanvas {
 
     #drawCartographyDecorations(decorations, isEditMode) {
         decorations.forEach((dec) => {
-            if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false) || !dec.src) return;
+            if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false)) return;
+            if (DrawnDecoration.isDrawn(dec)) {
+                this.#drawDrawnDecoration(dec, isEditMode);
+                return;
+            }
+            if (!dec.src) return;
 
             const sprite = new PIXI.Sprite(PIXI.Texture.from(platform.assets.url(dec.src)));
             sprite.anchor.set(0.5);
@@ -2286,6 +2306,33 @@ export class StudioCanvas {
                 this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
             }
         });
+    }
+
+    /**
+     * A decoration the module draws (see DrawnDecoration): built afresh on each draw, which costs
+     * little (a rose is at most about 150 shapes), placed, turned and scaled as an image is.
+     */
+    #drawDrawnDecoration(dec, isEditMode) {
+        const { container, reach } = DrawnDecoration.build(PIXI, dec, { fonts: LabelFonts, localize: (key) => platform.i18n.localize(key) });
+        container.position.set(dec.x, dec.y);
+        container.rotation = (dec.rotation ?? 0) * (Math.PI / 180);
+        container.scale.set(dec.scale || 1);
+        container.alpha = dec.opacity ?? 1;
+        this.layers.cartography.addChild(container);
+        if (!isEditMode) return;
+        this.interactiveTargets.push({
+            target: dec,
+            x: dec.x,
+            y: dec.y,
+            // Read when the pointer is tested: the scale may change while it is held
+            get radius() {
+                return Math.max(reach * (dec.scale || 1), DECORATION_MIN_HIT_RADIUS);
+            },
+            isDecoration: true,
+            entityType: "decoration",
+            entityId: dec.id,
+        });
+        this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
     }
 
     /**

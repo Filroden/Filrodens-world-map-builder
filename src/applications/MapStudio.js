@@ -86,6 +86,7 @@ import { refreshWaterRoutesOnce } from "../data/WaterRouteStyles.js";
 import { showNamesOnce } from "../data/NameLevels.js";
 import { SymbolScale } from "../tools/SymbolScale.js";
 import { nameInset } from "../canvas/MapBorder.js";
+import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
 import { ExportScale } from "../tools/ExportScale.js";
 
 // Turns a fraction into a percentage for the timing summary
@@ -119,6 +120,10 @@ const TEMPLATE_ROOT = "modules/filrodens-world-map-builder/templates/";
  *   FEATURES        - generateFeatures: the rivers, then the canvas.
  */
 const REFRESH = Object.freeze({ TERRAIN: "terrain", CHANGED_TERRAIN: "changedTerrain", CLIMATE: "climate", FEATURES: "features" });
+
+/** The icon and name of each kind of decoration in the Decorations list (no kind: an image). */
+const DECORATION_ICONS = Object.freeze({ image: "image", compass: "explore", cartouche: "insert-text" });
+const DECORATION_LABELS = Object.freeze({ image: "FILRODENSWMB.UI.DecorationKindImage", compass: "FILRODENSWMB.UI.DecorationKindCompass", cartouche: "FILRODENSWMB.UI.DecorationKindCartouche" });
 
 /**
  * The map studio: its state, its regions (the toolbar, the context panel, the map and the edit
@@ -188,7 +193,8 @@ export class MapStudio {
         editCustomBiome(e, t)   { if (!MapStudio.#fromRowControl(e, t)) BiomeEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
         deleteCustomBiome(_e, t) { BiomeEditor.delete(this, MapStudio.#rowId(t)); },
         openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
-        addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
+        // Add decoration's menu: an image of the user's (a dialogue) or one the module draws
+        addDecoration(e, t)     { if (DrawnDecoration.canCreate(t.dataset.kind)) DecorationEditor.add(this, t.dataset.kind); else MapDialogManager.onAddDecoration(this, e, t); },
 
         // --- REGIONS PANEL: the cascading lists of sets and levels (see RegionPanel, RegionLists) ---
         // A row opens in the inspector when clicked anywhere but its own controls; every list ends
@@ -1294,7 +1300,8 @@ export class MapStudio {
                 context.routeList = await this.#listContext("route", context);
             }
             if (this.activeTool === "labels") context.labelList = await this.#listContext("label", context);
-            context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
+            // Each row shows what kind of decoration it is: an image of the user's, or one the module draws
+            context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort).map((decoration) => ({ ...decoration, kindIcon: DECORATION_ICONS[decoration.kind] ?? DECORATION_ICONS.image, kindLabel: DECORATION_LABELS[decoration.kind] ?? DECORATION_LABELS.image }));
             const { ADD: landColor, SUBTRACT: oceanColor, COAST: coastColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
             // In their own order, not by name: later masks lie on top (see ListReorder)
             context.landMasks = [...(this.landMasks || [])].map((m) => {
@@ -1483,10 +1490,14 @@ export class MapStudio {
         return !!control && control !== row && row.contains(control);
     }
 
-    /** The fields of every label on the map: standalone labels, and the labels of pins, routes and regions. */
+    /**
+     * The fields of every label on the map: standalone labels, the labels of pins, routes and
+     * regions, and the faces of the decorations the module draws (their letters and titles).
+     */
     #labelFields(levels = this.regionLevels) {
         const owned = [...this.mapPins, ...this.mapRoutes, ...(levels ?? []).flatMap((level) => level.regions ?? [])].map((owner) => owner.label ?? {});
-        return [...this.mapLabels, ...owned];
+        const decorations = (this.mapDecorations ?? []).flatMap((decoration) => DrawnDecoration.faces(decoration));
+        return [...this.mapLabels, ...owned, ...decorations];
     }
 
     /**

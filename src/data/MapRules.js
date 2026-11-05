@@ -154,6 +154,13 @@ const LABEL = obj({
     name: text("label", "FILRODENSWMB.UI.LimitKindLabel", "FILRODENSWMB.UI.LimitFieldText"),
 });
 
+const { COMPASS, CARTOUCHE } = FILRODENSWMB.DECORATIONS;
+
+/**
+ * A map decoration: an image the user supplied (`src`, no `kind`), or one the module draws (`kind`:
+ * a compass rose or a cartouche, see DrawnDecoration), with the fields its kind reads. A drawn
+ * kind's colours are one object, each a colour.
+ */
 const DECORATION = obj({
     id,
     type: enumOf(["decoration"]),
@@ -166,6 +173,32 @@ const DECORATION = obj({
     opacity: num(RANGE.UNIT),
     visibility,
     hidden,
+    kind: enumOf(FILRODENSWMB.DECORATIONS.KINDS),
+    design: enumOf([...COMPASS.DESIGNS, ...CARTOUCHE.DESIGNS]),
+    // A compass's radius, or a cartouche's title size, in map pixels at scale 1
+    size: num({ min: 1, max: 1e5 }),
+    colours: obj(Object.fromEntries(["light", "dark", "line", "accent", "letter", "backing", "fill", "shade", "text"].map((key) => [key, color]))),
+    fontFamily: { t: "font" },
+    bold: bool,
+    // Compass rose
+    points: enumOf(COMPASS.POINTS),
+    rings: int(0, 2),
+    degreeRing: bool,
+    north: enumOf(COMPASS.NORTH),
+    letters: enumOf(COMPASS.LETTERS),
+    letterSize: num({ min: COMPASS.LETTER_SIZE.MIN, max: COMPASS.LETTER_SIZE.MAX }),
+    upright: bool,
+    backing: bool,
+    backingOpacity: num(RANGE.UNIT),
+    halo: bool,
+    // Cartouche
+    titleSource: enumOf(CARTOUCHE.TITLE_SOURCES),
+    title: text("name", "FILRODENSWMB.UI.LimitKindDecoration", "FILRODENSWMB.UI.LimitFieldTitle"),
+    subtitle: text("name", "FILRODENSWMB.UI.LimitKindDecoration", "FILRODENSWMB.UI.LimitFieldSubtitle"),
+    subtitleSize: num({ min: CARTOUCHE.SUBTITLE_SIZE.MIN, max: CARTOUCHE.SUBTITLE_SIZE.MAX }),
+    subtitleItalic: bool,
+    capitals: bool,
+    maxWidth: num({ min: CARTOUCHE.MAX_WIDTH.MIN, max: CARTOUCHE.MAX_WIDTH.MAX }),
 });
 
 // ------------------------------------------------------------------ routes

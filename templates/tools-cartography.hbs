@@ -95,6 +95,7 @@
             <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="toggleVisibility" data-target="feature" aria-label="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ToggleVisibility'}}">
                 <i class="fwmb-icon {{#if (eq this.visibility 'none')}}fwmb-icon--visibility-off{{else if (eq this.visibility 'gm')}}fwmb-icon--security{{else}}fwmb-icon--visibility{{/if}}"></i>
             </button>
+            <i class="fwmb-icon fwmb-icon--{{this.kindIcon}}" role="img" aria-label="{{localize this.kindLabel}}" data-tooltip="{{localize this.kindLabel}}"></i>
             <span class="fwmb-name fwmb-flex-1 fwmb-truncate" title="{{this.name}}">{{this.name}}</span>
             <span class="fwmb-actions">
                 <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="zoomToFeature" aria-label="{{localize 'FILRODENSWMB.UI.ZoomTo'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.ZoomTo'}}">

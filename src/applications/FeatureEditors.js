@@ -11,6 +11,8 @@ import { MaskSettings } from "../generation/MaskSettings.js";
 import { FaultThickness } from "../tools/FaultThickness.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
+import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
+import { nameInset } from "../canvas/MapBorder.js";
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/parts/";
 
@@ -228,6 +230,9 @@ export class FaultEditor {
     }
 }
 
+/** The name a new drawn decoration starts with, by kind. */
+const DECORATION_NAMES = Object.freeze({ compass: "FILRODENSWMB.UI.DecorationKindCompass", cartouche: "FILRODENSWMB.UI.DecorationKindCartouche" });
+
 /**
  * A decoration (Cartography) in the inspector: its name and visibility, its opacity, scale and
  * rotation, and Focus view and Delete.
@@ -236,6 +241,30 @@ export class DecorationEditor {
     /** @returns {Promise<boolean>} */
     static open(app, id, options) {
         return Inspector.open(app, this.KIND, { id }, options);
+    }
+
+    /**
+     * Adds a decoration the module draws (see DrawnDecoration), with its defaults, and opens it in
+     * the inspector, as one undo step. It needs no dialogue: everything about it is changed
+     * afterwards in the inspector.
+     * @param {"compass"} kind
+     * @returns {Promise<string>} Its id.
+     */
+    static async add(app, kind) {
+        MapStateManager.pushVectorState(app);
+        const decoration = DrawnDecoration.create(kind, {
+            id: platform.utils.randomID(),
+            name: platform.i18n.localize(DECORATION_NAMES[kind]),
+            mapWidth: app.mapWidth,
+            mapHeight: app.mapHeight,
+            inset: nameInset(app.uiState),
+        });
+        app.mapDecorations.push(decoration);
+        app._repaintVectors();
+        app.view?.render(["context"]);
+        app.markDirty();
+        await DecorationEditor.open(app, decoration.id);
+        return decoration.id;
     }
 
     static KIND = Object.freeze({
