@@ -100,7 +100,6 @@
 
 - Click Detail.
 - Click Province.
-- Close the menu.
 
 **Camera:** the map from 0, 0 to 2000, 1600
 

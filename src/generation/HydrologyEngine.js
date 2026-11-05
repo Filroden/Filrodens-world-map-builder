@@ -1,6 +1,8 @@
 import { SpatialMath } from "../tools/SpatialMath.js";
 import { FILRODENSWMB } from "../config.js";
 import { RiverNetwork } from "./RiverNetwork.js";
+import { RiverCorridor } from "./RiverCorridor.js";
+import { CatmullRom } from "../tools/CatmullRom.js";
 
 /** Spacing, in map pixels, of the points a custom river's spline is sampled at. */
 const SPLINE_STEP = 0.25;
@@ -14,10 +16,12 @@ const SPLINE_STEP = 0.25;
  * - Legacy: a trench is carved along the line, down to a bed that never rises, and a spring is
  *   placed near its top (getRiverSources) so the procedural trace runs down the trench. The
  *   drawn river is wherever that trace goes.
- * - Current: the line itself is the river (authoredRivers, traced by ProceduralEngine before any
- *   spring), and the ground is shaped into a valley around it (#carveValley) that keeps the
- *   ground's own texture, so the river looks like any procedural river and sits where it was
- *   drawn.
+ * - Current (revision 2): the line itself is the river (authoredRivers, traced by
+ *   ProceduralEngine before any spring), and the ground is shaped into a valley around it
+ *   (#carveValley) that keeps the ground's own texture, so the river looks like any procedural
+ *   river and sits where it was drawn.
+ * - Guided (revision 3 on, see TerrainVersion.usesGuidedRivers): the river follows the land
+ *   within a corridor round the line, in a broad trough (see RiverCorridor).
  */
 export class HydrologyEngine {
     static MATH = {
@@ -30,11 +34,17 @@ export class HydrologyEngine {
      * @param {boolean} [valley] - Shape the current valley (see #carveValley) rather than the
      *   legacy trench. Maps made before the current river rules keep the trench, so their terrain
      *   stays as it was.
+     * @param {object|null} [terrain] - The map's terrain settings (params.terrain): with
+     *   `guidedRivers`, the guided trough (see RiverCorridor) in place of the valley.
      */
-    static carveManualRivers(elevationData, width, height, rivers, simplex, seaLevel, activeBounds = null, valley = false) {
+    static carveManualRivers(elevationData, width, height, rivers, simplex, seaLevel, activeBounds = null, valley = false, terrain = null) {
         if (!rivers || rivers.length === 0) return;
+        const guided = valley && terrain?.guidedRivers === true;
+        const scale = guided ? RiverNetwork.pixelsPerBaseline(width, height, terrain.world) : 1;
         for (const river of rivers) {
-            if (valley) this.#carveValley(elevationData, width, height, river, seaLevel, activeBounds);
+            if (guided) {
+                if (river.points?.length >= 2) RiverCorridor.carve(elevationData, width, height, river, seaLevel, activeBounds, scale);
+            } else if (valley) this.#carveValley(elevationData, width, height, river, seaLevel, activeBounds);
             else this.#carveSingleRiver(elevationData, width, height, river, simplex, seaLevel, activeBounds);
         }
     }
@@ -50,12 +60,21 @@ export class HydrologyEngine {
      * @param {number} height
      * @param {object[]} rivers - The custom rivers.
      * @param {number} pixelsPerBaseline - Map pixels per pixel of a BASELINE_DIMENSION map.
+     * @param {object|null} [terrain] - The map's terrain settings (params.terrain): with
+     *   `guidedRivers`, each river's corridor (see RiverCorridor.forTrace) in place of its line.
+     * @param {number} [seaLevel]
      * @returns {{id: string, pixels: {x: number, y: number}[], inflow: number}[]}
      */
-    static authoredRivers(elevationData, width, height, rivers, pixelsPerBaseline) {
+    static authoredRivers(elevationData, width, height, rivers, pixelsPerBaseline, terrain = null, seaLevel = 0) {
         const authored = [];
+        const guided = terrain?.guidedRivers === true;
         for (const river of rivers ?? []) {
             if (!river.points || river.points.length < 2) continue;
+            if (guided) {
+                const corridor = RiverCorridor.forTrace(elevationData, width, height, river, pixelsPerBaseline, seaLevel);
+                if (corridor) authored.push(corridor);
+                continue;
+            }
             const path = this.#getSplinePoints(river.points, SPLINE_STEP);
             this.#ensureDownhillFlow(elevationData, width, path);
             const pixels = this.#pixelPath(path, width, height);
@@ -347,36 +366,11 @@ export class HydrologyEngine {
     }
 
     /**
-     * Generates a Catmull-Rom spline array from sparse points.
+     * The uniform Catmull-Rom curve through a custom river's points (see CatmullRom), sampled every
+     * `stepSize` pixels: the curve revisions 1 and 2 carve and trace along. From revision 3 on the
+     * river corridor follows the centripetal curve instead (see RiverCorridor).
      */
     static #getSplinePoints(points, stepSize) {
-        if (points.length < 2) return [];
-
-        const curve = [];
-        const padded = [points[0], ...points, points[points.length - 1]];
-
-        for (let i = 1; i < padded.length - 2; i++) {
-            const p0 = padded[i - 1];
-            const p1 = padded[i];
-            const p2 = padded[i + 1];
-            const p3 = padded[i + 2];
-
-            const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-            const steps = Math.max(1, Math.floor(dist / stepSize));
-
-            for (let t = 0; t < 1; t += 1 / steps) {
-                const t2 = t * t;
-                const t3 = t2 * t;
-
-                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
-
-                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
-
-                curve.push({ x, y });
-            }
-        }
-
-        curve.push(points[points.length - 1]);
-        return curve;
+        return CatmullRom.open(points, { step: stepSize }).map((p) => ({ x: p.x, y: p.y }));
     }
 }

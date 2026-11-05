@@ -183,8 +183,16 @@ export const ACTIONS = Object.freeze({
                 // A slider is dragged to its value: one input as the handle lands, then the
                 // change a release sends
                 await element.evaluate((input, next) => {
-                    input.value = next;
-                    if (Number(input.value) !== Number(next)) throw new Error(`slider ${input.name} cannot take ${next} (from ${input.min} to ${input.max} in steps of ${input.step})`);
+                    // A slider on a power curve is dragged to the position of its value, which it
+                    // keeps exactly (see RangeCurve)
+                    const curve = Number.parseFloat(input.dataset.curve);
+                    if (curve > 0) {
+                        input.dataset.value = next;
+                        input.value = String(Number(next) ** (1 / curve));
+                    } else {
+                        input.value = next;
+                        if (Number(input.value) !== Number(next)) throw new Error(`slider ${input.name} cannot take ${next} (from ${input.min} to ${input.max} in steps of ${input.step})`);
+                    }
                     input.dispatchEvent(new Event("input", { bubbles: true }));
                     input.dispatchEvent(new Event("change", { bubbles: true }));
                 }, String(value));
@@ -341,6 +349,32 @@ export const ACTIONS = Object.freeze({
     drag: {
         run: (page, { from, to, button, modifiers }) => strokeMap(page, [from, to], { button, modifiers }),
         describe: ({ label }) => label ?? "Drag on the map.",
+    },
+
+    /**
+     * Drags a name on the map by `by` map pixels, from wherever the map drew it (placed, or shown
+     * faintly while labels are placed): the label of the region (in `level`, if given), route or
+     * pin called `name`. Where a name lands depends on everything around it, so a fixed point
+     * could miss it.
+     */
+    dragLabel: {
+        async run(page, { name, owner = "region", level = null, by }) {
+            const from = await page.evaluate(
+                ({ name, owner, level }) => {
+                    const studio = globalThis.fwmbStudio;
+                    const ids = new Set();
+                    if (owner === "region") for (const each of studio.regionLevels) if (!level || each.name === level) for (const region of each.regions) if (region.name === name) ids.add(region.id);
+                    if (owner === "route") for (const route of studio.mapRoutes) if (route.name === name) ids.add(route.id);
+                    if (owner === "pin") for (const pin of studio.mapPins) if (pin.name === name) ids.add(pin.id);
+                    const target = studio.canvasEngine.interactiveTargets.find((each) => each.entityType === "label" && each.parentType === owner && ids.has(each.entityId));
+                    return target ? [target.x, target.y] : null;
+                },
+                { name, owner, level },
+            );
+            if (!from) throw new Error(`the ${owner} name "${name}" is not drawn on the map`);
+            await strokeMap(page, [from, [from[0] + by[0], from[1] + by[1]]]);
+        },
+        describe: ({ label, name }) => label ?? `Drag ${name} on the map.`,
     },
 
     /**

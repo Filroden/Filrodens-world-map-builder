@@ -201,14 +201,16 @@ function pixelDensity(input, raster, pixel, properties, peakDensity) {
     const cropM = smooth(V.CROP_MOISTURE[0], V.CROP_MOISTURE[1], moisture) * (1 - V.WET_LOSS * smooth(V.CROP_WET[0], V.CROP_WET[1], moisture));
     const pasture = V.PASTURE_SHARE * smooth(V.PASTURE_TEMPERATURE[0], V.PASTURE_TEMPERATURE[1], temperature) * smooth(V.PASTURE_MOISTURE[0], V.PASTURE_MOISTURE[1], moisture);
     const biome = input.biome[pixel];
-    const crop = cropT * cropM * properties.cover[biome] * properties.farming[biome];
-    return peakDensity * Math.max(crop, pasture);
+    // Farming scales crops and herds alike (herds are fed from the land too), so land that farms
+    // nothing feeds no one; cover, the effort of clearing, holds back crops only
+    const crop = cropT * cropM * properties.cover[biome];
+    return peakDensity * properties.farming[biome] * Math.max(crop, pasture);
 }
 
 /** One pass over every pixel, summing into its model cell. */
 function sumPixels(input, raster, peakDensity) {
     const count = input.modelSites.length / 2;
-    const properties = biomeProperties();
+    const properties = biomeProperties(input.customBiomes);
     const biomeSlots = properties.slots;
     const sums = {
         pixels: new Float64Array(count),
@@ -256,7 +258,7 @@ function finishCells(input, raster, sums, neighbours) {
     const cells = allocateCells(count, input, neighbours);
     for (let cell = 0; cell < count; cell++) classifyCell(cells, sums, cell);
     const mouthAt = mouthsByCell(input, raster);
-    const properties = biomeProperties();
+    const properties = biomeProperties(input.customBiomes);
     for (let cell = 0; cell < count; cell++) finishCell(cells, sums, cell, raster, mouthAt, properties);
     return cells;
 }
@@ -283,6 +285,10 @@ function allocateCells(count, input, neighbours) {
         heightM: real().fill(Number.NaN),
         reliefM: real(),
         biome: flag(),
+        // The cell's biome's cover and raider habitability (see ModelBiomes), read by the later
+        // stages, which do not know the run's custom biomes
+        cover: real().fill(1),
+        raiders: real().fill(1),
         food: real(),
         density: real(),
         coastal: flag(),
@@ -335,6 +341,8 @@ function finishCell(cells, sums, cell, raster, mouthAt, properties) {
     cells.heightM[cell] = sums.height[cell] / land;
     cells.reliefM[cell] = relief;
     cells.biome[cell] = biome;
+    cells.cover[cell] = properties.cover[biome];
+    cells.raiders[cell] = properties.raiders[biome];
     cells.food[cell] = food;
     cells.density[cell] = food / landKm2;
     cells.coastal[cell] = coastal ? 1 : 0;

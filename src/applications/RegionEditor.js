@@ -9,6 +9,7 @@ import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
+import { FillMemory } from "./FillMemory.js";
 
 /** The fill patterns a region can have, with their names. */
 const PATTERNS = Object.freeze({ solid: "FILRODENSWMB.UI.StyleSolid", diagonal: "FILRODENSWMB.UI.StyleDiagonalHatch", crosshatch: "FILRODENSWMB.UI.StyleCrossHatch" });
@@ -66,7 +67,6 @@ export class RegionEditor {
     });
 
     static #context(app, region) {
-        const fill = regionFillColor(region);
         const noFill = region.fillColor === "transparent";
         const label = InspectorFields.label(app, region);
         return {
@@ -74,7 +74,7 @@ export class RegionEditor {
             visibilities: RegionPanel.visibilityChoices(region.visibility),
             fillStyles: InspectorFields.styleChoices(app.uiState.customRegionStyles, region.quickStyle),
             fillStyleName: InspectorFields.styleName(app.uiState.customRegionStyles, region.quickStyle),
-            fillHex: noFill || !fill ? "#000000" : fill,
+            fillHex: FillMemory.shown(region),
             noFill,
             patterns: Object.entries(PATTERNS).map(([value, labelKey]) => ({ value, label: labelKey, selected: value === (region.fillStyle ?? "solid") })),
             label,
@@ -90,6 +90,7 @@ export class RegionEditor {
     /** What the form holds, as region fields, once `field` has taken effect (see InspectorFields). */
     static read(app, region, form, field) {
         const elements = form.elements;
+        if (elements.regionFillTransparent.checked) FillMemory.remember(region.id, elements.regionFillColor.value);
         const values = {
             name: elements.regionName.value.trim() || region.name,
             description: elements.regionDesc.value,

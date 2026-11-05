@@ -24,7 +24,7 @@ const { smoothstep } = FeatureMath;
 export class RangeFeature {
     static plan(fault, context) {
         const settings = FILRODENSWMB.TECTONICS.FEATURES.RANGE;
-        const field = new LineField(fault.points, fault.thickness * settings.REACH, context.width, context.height);
+        const field = new LineField(fault.points, fault.thickness * settings.REACH, context.width, context.height, context.centripetal);
         return { field, bounds: field.bounds };
     }
 

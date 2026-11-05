@@ -30,7 +30,7 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/face-fields.hbs", "parts/label-fields.hbs", "parts/inspector-generated.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs", "parts/inspector-river.hbs", "parts/inspector-fault.hbs", "parts/inspector-decoration.hbs", "parts/inspector-land-mask.hbs", "parts/inspector-level.hbs", "parts/inspector-set.hbs"]);
+await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/style-picker.hbs", "parts/font-picker.hbs", "parts/face-fields.hbs", "parts/label-fields.hbs", "parts/inspector-generated.hbs", "parts/inspector-pin.hbs", "parts/inspector-label.hbs", "parts/inspector-region.hbs", "parts/inspector-route.hbs", "parts/inspector-river.hbs", "parts/inspector-fault.hbs", "parts/inspector-decoration.hbs", "parts/inspector-land-mask.hbs", "parts/inspector-level.hbs", "parts/inspector-set.hbs", "parts/inspector-biome.hbs"]);
 
 /** What the next prompt (Save as…'s name) answers. */
 const answers = { prompt: null };
@@ -58,11 +58,13 @@ const { Inspector } = await import("../../src/applications/Inspector.js");
 const { RegionEditor } = await import("../../src/applications/RegionEditor.js");
 const { RouteEditor } = await import("../../src/applications/RouteEditor.js");
 const { RouteTool } = await import("../../src/applications/RouteTool.js");
+const { MapStateManager } = await import("../../src/applications/MapStateManager.js");
 const { PinEditor } = await import("../../src/applications/PinEditor.js");
 const { LabelEditor } = await import("../../src/applications/LabelEditor.js");
 const { PickTool } = await import("../../src/applications/PickTool.js");
 const { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } = await import("../../src/applications/FeatureEditors.js");
 const { LayerSetEditor, LevelEditor } = await import("../../src/applications/LayerEditors.js");
+const { BiomeEditor } = await import("../../src/applications/BiomeEditor.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
 const { addRegion, createLayerSet, createLevel } = await import("../../src/mesh/Schema.js");
 const { allLevels } = await import("../../src/mesh/LayerTree.js");
@@ -271,6 +273,29 @@ test("Save as… makes a style from the object's fields and connects the object 
     form(app).querySelector('[data-inspector-action="saveStyle"][data-style-type="Region"]').click();
     await settle();
     assert.equal(app.uiState.customRegionStyles.length, count);
+});
+
+test("clearing No fill gives the region back the colour it had, not black", async () => {
+    const { app } = await studio();
+    await RegionEditor.open(app, "realms", "west");
+    const region = () => app.regionLevels[0].regions[0];
+    await commit(app, "regionFillColor", "#336699");
+
+    await commit(app, "regionFillTransparent", true);
+    assert.equal(region().fillColor, "transparent");
+    assert.equal(field(app, "regionFillColor").value, "#336699", "the colour box keeps showing the colour while No fill is ticked");
+
+    await commit(app, "regionFillTransparent", false);
+    assert.equal(region().fillColor, "#336699", "the colour comes back");
+});
+
+test("a region with No fill and no colour seen this session shows its preset, never black", async () => {
+    const { app } = await studio();
+    app.regionLevels[0].regions[1].fillColor = "transparent";
+    await RegionEditor.open(app, "realms", "east");
+    const value = field(app, "regionFillColor").value;
+    assert.notEqual(value, "#000000");
+    assert.ok(FILRODENSWMB.REGIONS.PRESETS.map((colour) => colour.toLowerCase()).includes(value.toLowerCase()), "the region's preset colour");
 });
 
 test("the inspector closes when its object goes, and when anything else is docked (a tool switch)", async () => {
@@ -536,6 +561,50 @@ test("a decoration's look applies one step each; a land mask's type shapes the l
     assert.deepEqual([app.landMasks[0].name, app.landMasks[0].operation, app.terrainUpdates, steps(app)], ["Isle of Mist", "subtract", 1, 4]);
 });
 
+test("a land mask on a guided map has its own coast settings: each follows the map until ticked, Sharp edge once one is, and Coast only shapes no land", async () => {
+    const { app } = await studio();
+    Object.assign(app.uiState, { generationEngine: "guided", terrainVersion: 3, coastlineFracture: 0.2, coastalPlain: 0.05, shelfRange: 0.15 });
+    const mask = app.landMasks[0];
+    await LandMaskEditor.open(app, "isle");
+    const section = form(app).querySelector('[data-section="inspectorMaskCoast"]');
+    assert.ok(section?.open, "the Coast section, open");
+    assert.equal(field(app, "maskCoastlineFractureOwn").checked, false);
+    assert.equal(field(app, "maskCoastlineFracture"), undefined, "no slider while the setting follows the map");
+    assert.match(section.textContent, /FILRODENSWMB.UI.LandMaskMapValue/);
+    assert.equal(field(app, "maskSharpEdge").disabled, true, "Sharp edge waits for a setting");
+
+    await commit(app, "maskCoastlineFractureOwn", true);
+    assert.deepEqual([mask.coastlineFracture, app.terrainUpdates, steps(app)], [0.2, 1, 1], "ticked, it starts from the map's value");
+    const slider = field(app, "maskCoastlineFracture");
+    assert.ok(slider, "and its slider appears");
+    slider.dataset.value = "0.6";
+    await commit(app, "maskCoastlineFracture", String(Math.sqrt(0.6)));
+    await commit(app, "maskSharpEdge", true);
+    await commit(app, "maskCoastalPlainOwn", true);
+    assert.deepEqual([mask.coastlineFracture, mask.sharpEdge, mask.coastalPlain, mask.shelfRange, app.terrainUpdates], [0.6, true, 0.05, undefined, 4]);
+
+    await commit(app, "maskCoastalPlainOwn", false);
+    assert.equal("coastalPlain" in mask, false, "unticked, the setting is left out of the mask");
+    await commit(app, "maskOperation", "subtract");
+    assert.equal(form(app).querySelector('[data-section="inspectorMaskCoast"]'), null, "an Ocean mask has no Coast section");
+    assert.deepEqual([mask.coastlineFracture, mask.sharpEdge], [0.6, true], "but keeps its settings");
+    await commit(app, "maskOperation", "settings");
+    assert.equal(mask.operation, "settings");
+    assert.match(app.root.querySelector("dialog.fwmb-inspector .fwmb-overlay-header").textContent, /FILRODENSWMB.UI.InspectorSubtitleLandMask/);
+    assert.equal(field(app, "maskCoastlineFractureOwn").checked, true, "a Coast only mask shows them again");
+    const coastSection = form(app).querySelector('[data-section="inspectorMaskCoast"]');
+    assert.match(coastSection.textContent, /LandMaskCoastHintCoastOnly/, "where unticked settings are left to what lies beneath");
+    assert.match(coastSection.textContent, /LandMaskBeneathValue/);
+    assert.doesNotMatch(coastSection.textContent, /LandMaskMapValue/);
+    await commit(app, "maskName", "Rugged coast");
+    assert.equal(app.terrainUpdates, 7, "renaming does not shape the land again");
+    assert.deepEqual([app.uiState.coastlineFracture, app.uiState.coastalPlain, app.uiState.shelfRange], [0.2, 0.05, 0.15], "the map's own settings are untouched");
+    // The studio writes any field named after one of the map's settings into them: no field of the inspector may share a name with one
+    const mapSettings = Object.keys(MapStateManager.buildDefaultUiState(400, 300));
+    const clashes = [...form(app).elements].map((element) => element.name).filter((name) => name && mapSettings.includes(name));
+    assert.deepEqual(clashes, []);
+});
+
 test("a set and a level open as the active ones; their fields apply one step each, and Copy style fills a level's borders", async () => {
     const { app } = await studio();
     const other = createLevel({ id: "duchies", name: "Duchies", style: { lineColor: "#123456", lineThickness: 3, lineStyle: "dotted" } });
@@ -668,4 +737,90 @@ test("Lock, in the Generated section, keeps an item on Generate again; one undo 
     await undo(app);
     assert.equal(app.mapPins.find((each) => each.id === pin.id).generated.locked, false);
     assert.equal(form(app).querySelector('[data-inspector-action="lock"]').checked, false, "the box follows the pin, not the click");
+});
+
+// ------------------------------------------------------------------ custom biomes
+
+/** The studio with a custom biome, Moor, behaving like Taiga, and counts of what a change redraws. */
+async function biomeStudio(biome = {}) {
+    const { app } = await studio();
+    app.uiState.customBiomes = [{ id: 14, name: "Moor", code: null, color: [90, 80, 70], placement: "land", behavesLike: "TAIGA", rules: [], ...biome }];
+    app.uiState.brushBiome = 14;
+    app.repaints = 0;
+    app.stale = 0;
+    app._repaintCanvas = () => app.repaints++;
+    app.markGeneratorStale = () => app.stale++;
+    return app;
+}
+
+test("a custom biome opens in the inspector; each field applies as one undo step, repainting the map and redrawing the bar", async () => {
+    const app = await biomeStudio();
+    await BiomeEditor.open(app, 14);
+    assert.deepEqual(Inspector.inspected(app), { biome: 14 }, "its row is marked");
+    assert.equal(field(app, "biomeName").value, "Moor");
+
+    await commit(app, "biomeColor", "#123456");
+    assert.deepEqual(app.uiState.customBiomes[0].color, [0x12, 0x34, 0x56]);
+    assert.equal(steps(app), 1);
+    assert.equal(app.repaints, 1, "the map is repainted in the biome's new colour");
+    assert.ok(app.rendered.includes("editToolbar"), "the bar's biome choices are drawn again");
+    assert.equal(app.stale, 0, "Generate does not read a biome's colour");
+
+    await commit(app, "biomeColor", "#123456");
+    assert.equal(steps(app), 1, "the same value again records nothing");
+
+    await commit(app, "biomePlacement", "landUnderwater");
+    assert.equal(app.uiState.customBiomes[0].placement, "landUnderwater");
+    assert.equal(steps(app), 2);
+});
+
+test("Own numbers: hidden until ticked, its sliders starting from Behaves like; ticking and changing them is what Generate reads", async () => {
+    const app = await biomeStudio();
+    await BiomeEditor.open(app, 14);
+    const numbers = form(app).querySelector("[data-biome-numbers]");
+    assert.equal(numbers.hidden, true);
+    const taiga = FILRODENSWMB.GENERATOR.BIOMES.TAIGA;
+    assert.equal(Number(field(app, "biomeProperty.travel").value), taiga.travel, "the sliders hold Behaves like's numbers");
+    assert.equal(field(app, "biomeProperty.travel").type, "range", "each property a slider, kept within its range");
+    assert.equal(Number(field(app, "biomeProperty.travel").max), FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.find((property) => property.key === "travel").max);
+
+    await commit(app, "biomeBehavesLike", "TROPICAL_RAINFOREST");
+    assert.equal(app.stale, 1, "Behaves like is read by Generate");
+    assert.equal(Number(field(app, "biomeProperty.travel").value), FILRODENSWMB.GENERATOR.BIOMES.TROPICAL_RAINFOREST.travel, "until ticked, the sliders follow Behaves like");
+
+    await commit(app, "biomeOwnNumbers", true);
+    const rainforest = FILRODENSWMB.GENERATOR.BIOMES.TROPICAL_RAINFOREST;
+    assert.deepEqual(app.uiState.customBiomes[0].properties, { farming: rainforest.farming, cover: rainforest.cover, travel: rainforest.travel, raiders: rainforest.raiders });
+    assert.equal(form(app).querySelector("[data-biome-numbers]").hidden, false);
+    assert.equal(app.stale, 2);
+
+    await commit(app, "biomeProperty.farming", "0");
+    assert.equal(app.uiState.customBiomes[0].properties.farming, 0);
+    assert.equal(app.stale, 3);
+
+    await commit(app, "biomeOwnNumbers", false);
+    assert.equal(app.uiState.customBiomes[0].properties, null, "cleared: none of its own");
+    assert.equal(app.stale, 4);
+    assert.equal(steps(app), 4);
+});
+
+test("Add makes a custom biome and opens it; Delete asks, removes it, closes the inspector and leaves the bar on Grassland", async () => {
+    const app = await biomeStudio();
+    const id = await BiomeEditor.add(app);
+    assert.equal(id, 15);
+    assert.equal(app.uiState.customBiomes.at(-1).name, "FILRODENSWMB.UI.NewCustomBiomeName {\"number\":2}");
+    assert.ok(Inspector.shows(app, "biome", 15));
+    assert.ok(app.rendered.includes("editToolbar"), "the bar's biome choices list it at once");
+    assert.equal(steps(app), 1);
+
+    await BiomeEditor.open(app, 14);
+    form(app).querySelector('[data-inspector-action="delete"]').click();
+    await settle();
+    await settle();
+    assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [15]);
+    assert.equal(Inspector.current(app), null);
+    assert.equal(app.uiState.brushBiome, FILRODENSWMB.BIOME_IDS.GRASSLAND);
+    assert.equal(app.stale, 1, "it behaved like Taiga, so a run made with it is out of date");
+    VectorHistory.step(app, true);
+    assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [14, 15], "undo brings it back");
 });

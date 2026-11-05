@@ -98,7 +98,8 @@ export class RiverNetwork {
     static FIELD_RANGE = FILRODENSWMB.DISPLAY.RIVER.FIELD_RANGE;
 
     /**
-     * @param {object[]} rivers - The traced rivers: `{ id, path, mergeInto: {id, index}|null, inflow }`.
+     * @param {object[]} rivers - The traced rivers: `{ id, path, mergeInto: {id, index}|null, inflow }`,
+     *   and for a guided custom river `guided` and `lateral` (see #flows).
      * @param {object} map
      * @param {Float32Array} map.elevation
      * @param {Float32Array} map.waterMask - Lake surface elevation per pixel, 0 elsewhere.
@@ -372,7 +373,9 @@ export class RiverNetwork {
     }
 
     /**
-     * The flow at every point of every river: river upstream of it, in baseline pixels.
+     * The flow at every point of every river: river upstream of it, in baseline pixels. A guided
+     * custom river (see ProceduralEngine#traceGuided) also gathers its `lateral` flow (in all) along
+     * its first `guided` steps, so it rises as a headwater and widens to its Width along its line.
      * @returns {Map<string, Float32Array>}
      */
     static #flows(rivers, byId, scale) {
@@ -386,8 +389,14 @@ export class RiverNetwork {
             const flow = new Float32Array(path.length);
             let total = river.inflow ?? 0;
             let next = 0;
+            // A guided custom river gathers its `lateral` flow evenly along its course within the
+            // corridor (its first `guided` steps)
+            const guided = Math.min(path.length, river.guided ?? 0);
+            let length = 0;
+            for (let i = 1; i < guided; i++) length += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y);
+            const lateral = length > 0 ? ((river.lateral ?? 0) * scale) / length : 0;
             for (let i = 0; i < path.length; i++) {
-                if (i > 0) total += Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y) / scale;
+                if (i > 0) total += (Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y) / scale) * (i < guided ? 1 + lateral : 1);
                 while (next < joins.length && joins[next].index <= i) total += joins[next++].flow;
                 flow[i] = total;
             }

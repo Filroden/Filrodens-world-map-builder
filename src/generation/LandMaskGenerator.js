@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { ProceduralEngine } from "./ProceduralEngine.js";
+import { MaskSettings } from "./MaskSettings.js";
 
 const TAU = Math.PI * 2;
 
@@ -28,22 +29,23 @@ export class LandMaskGenerator {
      * lie in the canvas buffer around the map, never beyond it.
      *
      * An "add" shape is placed anywhere on the map, some of them straddling an edge. A "subtract"
-     * shape is always centred on existing land, since a hole in open sea would change nothing;
-     * when there is no land to place it on, no shape is made.
+     * or "settings" (Coast only) shape is always centred on existing land, since a hole in open
+     * sea, or settings for a coast that is not there, would change nothing; when there is no land
+     * to place it on, no shape is made.
      *
      * @param {object} options
      * @param {number} options.mapWidth - Map width in pixels.
      * @param {number} options.mapHeight - Map height in pixels.
-     * @param {"add"|"subtract"} options.operation - The mask operation the shape is for.
+     * @param {"add"|"subtract"|"settings"} options.operation - The mask operation the shape is for.
      * @param {Array<{operation: string, points: Array<{x: number, y: number}>}>} [options.existingMasks]
-     *   The map's land masks, in order, used to find land for a "subtract" shape.
+     *   The map's land masks, in order, used to find land for a "subtract" or "settings" shape.
      * @param {function(): number} [options.random] - Uniform random numbers in [0, 1).
      * @returns {Array<{x: number, y: number}>|null} The polygon's nodes, or null when no shape could be placed.
      */
     static generatePolygon({ mapWidth, mapHeight, operation, existingMasks = [], random = Math.random }) {
         const map = { width: mapWidth, height: mapHeight, buffer: FILRODENSWMB.UI.CANVAS_BUFFER };
         const placement =
-            operation === "subtract" ? LandMaskGenerator.#placeOverLand(map, existingMasks, random) : LandMaskGenerator.#placeAnywhere(map, random);
+            operation === "subtract" || operation === "settings" ? LandMaskGenerator.#placeOverLand(map, existingMasks, random) : LandMaskGenerator.#placeAnywhere(map, random);
         if (!placement) return null;
 
         const outline = LandMaskGenerator.#bestTurningWalk(random, LandMaskGenerator.#nodeCount(map, placement.sizeRank));
@@ -55,13 +57,14 @@ export class LandMaskGenerator {
     /**
      * Whether the land masks make a point land: each mask is filled even-odd and the last mask
      * covering the point decides it, exactly as terrain generation reads them. Masks too small to
-     * enclose an area are ignored, as generation ignores them.
+     * enclose an area are ignored, as generation ignores them, and so are Coast only masks, which
+     * shape no land.
      */
     static isLandAt(masks, x, y) {
         let isLand = false;
 
         for (const mask of masks) {
-            if (!LandMaskGenerator.#isUsableMask(mask)) continue;
+            if (!LandMaskGenerator.#isUsableMask(mask) || !MaskSettings.shapesLand(mask)) continue;
             if (ProceduralEngine.isPointInPolygon(x, y, mask.points)) isLand = mask.operation !== "subtract";
         }
 
@@ -97,7 +100,7 @@ export class LandMaskGenerator {
     static #placeOverLand(map, masks, random) {
         const settings = FILRODENSWMB.RANDOM_LAND_MASK;
         const landBoxes = masks
-            .filter((mask) => mask.operation !== "subtract" && LandMaskGenerator.#isUsableMask(mask))
+            .filter((mask) => mask.operation !== "subtract" && MaskSettings.shapesLand(mask) && LandMaskGenerator.#isUsableMask(mask))
             .map((mask) => LandMaskGenerator.#clipToMap(LandMaskGenerator.#boundsOf(mask.points), map))
             .filter(Boolean);
         if (landBoxes.length === 0) return null;

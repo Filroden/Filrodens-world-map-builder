@@ -8,14 +8,14 @@
 
 ## 1. Find a place
 
-**Narration:** Search the pins for Mostadra, and focus the map on it. The Generated section shows what the run recorded: a city of about twenty-six thousand people, nearly all Hillfolk.
+**Narration:** Search the pins for Golenduos, and focus the map on it. The Generated section shows what the run recorded: a city of about twenty-seven thousand people, nearly all Hillfolk.
 
 **On screen:**
 
 - Click Routes and pins on the rail.
-- Set Search by name to Mostadra.
-- Click Mostadra.
-- Point at Mostadra's row.
+- Set Search by name to Golenduos.
+- Click Golenduos.
+- Point at Golenduos's row.
 - Click Focus view.
 - Click Generated.
 
@@ -94,7 +94,7 @@
 
 ## 6. Find the names with no room
 
-**Narration:** Filter the labels to those with no room. While you place labels, they show faintly where they would go, like the duchy name Southamney here.
+**Narration:** Filter the labels to those with no room. While you place labels, they show faintly where they would go, like the duchy name Golenduos here.
 
 **On screen:**
 
@@ -109,11 +109,11 @@
 
 ## 7. Place it yourself
 
-**Narration:** Drag it a little south, below the town names. A name you've placed yourself stays where you put it and other names will move to make space.
+**Narration:** Drag it a little north, above the names of the city and the castle. A name you've placed yourself stays where you put it and other names will move to make space.
 
 **On screen:**
 
-- Drag Southamney south.
+- Drag Golenduos north.
 
 **Camera:** the map from 1000, 300 to 1440, 760
 

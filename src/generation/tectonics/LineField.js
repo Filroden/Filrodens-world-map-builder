@@ -1,3 +1,4 @@
+import { CatmullRom } from "../../tools/CatmullRom.js";
 import { FILRODENSWMB } from "../../config.js";
 
 /**
@@ -5,7 +6,7 @@ import { FILRODENSWMB } from "../../config.js";
  * line to the nearest point on it) and `across` (the signed distance from the line: positive on
  * the side anticlockwise from the drawing direction, which on screen is the left-hand side).
  *
- * The line is the Catmull-Rom curve StudioCanvas draws through the points, so the terrain follows
+ * The line is the Catmull-Rom curve StudioCanvas draws through the points (see CatmullRom), so the terrain follows
  * exactly the curve the user sees, and every pixel is measured against its nearest point on the
  * whole curve (never against each segment separately, which would count pixels near a joint twice).
  *
@@ -28,9 +29,10 @@ export class LineField {
      * @param {number} reach - How far from the line (in map pixels) the field is needed.
      * @param {number} width - The map's width in pixels.
      * @param {number} height - The map's height in pixels.
+     * @param {boolean} [centripetal] - Build it along the centripetal curve (revision 3 on, see splinePoints).
      */
-    constructor(points, reach, width, height) {
-        this.curve = LineField.splinePoints(points);
+    constructor(points, reach, width, height, centripetal = false) {
+        this.curve = LineField.splinePoints(points, centripetal);
         this.reach = reach;
         this.length = LineField.#curveLength(this.curve);
         this.bounds = LineField.boundsOf(this.curve, reach, width, height);
@@ -47,24 +49,17 @@ export class LineField {
     }
 
     /**
-     * The Catmull-Rom points StudioCanvas#getSplinePoints draws through `points`: the ends are
-     * repeated as invisible anchors so the curve passes exactly through the first and last points,
-     * and points closer than 0.1 px to the previous one are dropped.
+     * The Catmull-Rom points the canvas draws through `points` (see CatmullRom): the uniform curve
+     * before terrain revision 3, the centripetal one from it on, 20 samples a stretch, with
+     * samples closer than 0.1 px to the previous one dropped. Two points make a straight line.
+     *
+     * @param {{x: number, y: number}[]} points
+     * @param {boolean} [centripetal] - The centripetal curve (revision 3 on, `params.terrain.centripetalLines`).
      */
-    static splinePoints(points) {
+    static splinePoints(points, centripetal = false) {
         if (!points || points.length < 3) return points ? points.map((p) => ({ x: p.x, y: p.y })) : [];
         const resolution = FILRODENSWMB.TECTONICS.FEATURES.LINE.SPLINE_RESOLUTION;
-        const anchored = [points[0], ...points, points.at(-1)];
-        const curve = [];
-        for (let i = 1; i < anchored.length - 2; i++) {
-            for (let t = 0; t <= 1; t += 1 / resolution) {
-                const point = LineField.#catmullRom(anchored[i - 1], anchored[i], anchored[i + 1], anchored[i + 2], t);
-                const last = curve.at(-1);
-                if (last && Math.abs(last.x - point.x) < MIN_POINT_GAP && Math.abs(last.y - point.y) < MIN_POINT_GAP) continue;
-                curve.push(point);
-            }
-        }
-        return curve;
+        return CatmullRom.open(points, { centripetal, resolution, dedupe: MIN_POINT_GAP }).map((p) => ({ x: p.x, y: p.y }));
     }
 
     /** The box around the curve widened by `reach`, clipped to the map. */
@@ -231,13 +226,6 @@ export class LineField {
     }
 
     // --- Helpers ---
-
-    static #catmullRom(p0, p1, p2, p3, t) {
-        const t2 = t * t;
-        const t3 = t2 * t;
-        const axis = (a, b, c, d) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
-        return { x: axis(p0.x, p1.x, p2.x, p3.x), y: axis(p0.y, p1.y, p2.y, p3.y) };
-    }
 
     static #curveLength(curve) {
         let length = 0;

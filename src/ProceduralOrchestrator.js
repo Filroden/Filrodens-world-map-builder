@@ -12,6 +12,7 @@ import { TerrainVersion } from "./tools/TerrainVersion.js";
 import { GenerationWorkers } from "./tools/GenerationWorkers.js";
 import { BrushEngine } from "./tools/BrushEngine.js";
 import { platform } from "./platform/index.js";
+import { MaskSettings } from "./generation/MaskSettings.js";
 
 export class ProceduralOrchestrator {
     /**
@@ -85,7 +86,7 @@ export class ProceduralOrchestrator {
         if (app.uiState.generationEngine !== "guided") return [];
 
         const minVertices = FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES;
-        return (app.landMasks ?? []).filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points]);
+        return (app.landMasks ?? []).filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points, ...MaskSettings.inputsOf(mask)]);
     }
 
     /**
@@ -667,7 +668,7 @@ export class ProceduralOrchestrator {
         }
 
         if (app.manualRivers?.length > 0) {
-            HydrologyEngine.carveManualRivers(elevationData, app.mapWidth, app.mapHeight, app.manualRivers, engine.simplex, params.seaLevel, bounds, params.terrain?.currentRivers === true);
+            HydrologyEngine.carveManualRivers(elevationData, app.mapWidth, app.mapHeight, app.manualRivers, engine.simplex, params.seaLevel, bounds, params.terrain?.currentRivers === true, params.terrain);
         }
     }
 
@@ -691,6 +692,7 @@ export class ProceduralOrchestrator {
             height: app.mapHeight,
             simplex: engine.simplex,
             seaLevel: params.seaLevel,
+            params,
             frame: { ...(terrain.faultFrame ?? { zoom: 1, originX: 0, originY: 0 }), rootSize: Math.max(world.rootW ?? app.mapWidth, world.rootH ?? app.mapHeight) },
             bounds,
             cache: app.tectonicFeatureCache,
@@ -844,7 +846,7 @@ export class ProceduralOrchestrator {
         const isCurrent = params.terrain?.currentRivers === true;
         const springPins = isCurrent ? this.#currentSprings(app, engine, params) : this.#legacySprings(app, engine, params);
         const pixelsPerBaseline = RiverNetwork.pixelsPerBaseline(app.mapWidth, app.mapHeight, params.terrain?.world);
-        const authored = isCurrent ? HydrologyEngine.authoredRivers(app.currentElevationData, app.mapWidth, app.mapHeight, app.manualRivers, pixelsPerBaseline) : [];
+        const authored = isCurrent ? HydrologyEngine.authoredRivers(app.currentElevationData, app.mapWidth, app.mapHeight, app.manualRivers, pixelsPerBaseline, params.terrain, params.seaLevel) : [];
 
         // generateRivers rewrites the water mask from scratch, so the previous one has to be
         // kept aside to compare with. It goes in the shared scratch buffer, which nothing else

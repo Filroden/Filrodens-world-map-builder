@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { CatmullRom } from "./CatmullRom.js";
 
 export class SpatialMath {
     /**
@@ -9,11 +10,13 @@ export class SpatialMath {
      * @param {number} y - The target Y coordinate on the canvas.
      * @param {number} threshold - The maximum distance (in pixels) to consider a valid snap.
      * @param {boolean} [smoothed=false] - When true, tests against the same Catmull-Rom curve
-     *   StudioCanvas renders (e.g. routes, fault lines) instead of the straight chords between
+     *   StudioCanvas renders (fault lines, custom rivers) instead of the straight chords between
      *   control points, so clicking on the visible curve actually registers as a hit.
+     * @param {boolean} [centripetal=false] - The centripetal curve rather than the uniform one,
+     *   as the map's terrain revision draws it (see TerrainVersion.usesCentripetalLines).
      * @returns {Object|null} An object containing the vector, insertion index, distance, and projected coordinates, or null if nothing is within threshold.
      */
-    static getClosestVectorSegment(vectorArray, x, y, threshold, smoothed = false) {
+    static getClosestVectorSegment(vectorArray, x, y, threshold, smoothed = false, centripetal = false) {
         if (!vectorArray || vectorArray.length === 0) return null;
 
         let closest = { vector: null, insertIndex: -1, dist: Infinity, projX: 0, projY: 0 };
@@ -22,7 +25,7 @@ export class SpatialMath {
             if (vector.visibility === "none" || !vector.points || vector.points.length < 2) continue;
 
             if (smoothed) {
-                const match = this.#closestPointOnTaggedPath(this.#buildOpenSpline(vector.points), x, y, threshold);
+                const match = this.#closestPointOnTaggedPath(this.#buildOpenSpline(vector.points, centripetal), x, y, threshold);
                 if (match && match.dist < closest.dist) {
                     closest = { vector, insertIndex: match.insertIndex, dist: match.dist, projX: match.projX, projY: match.projY };
                 }
@@ -50,10 +53,8 @@ export class SpatialMath {
     }
 
     /**
-     * Calculates the closest segment on a polygon region to a given coordinate.
-     * Regions drawn with `region.smoothing` enabled render as a closed Catmull-Rom curve
-     * (see StudioCanvas#getClosedSplinePoints) once they have 3+ points and are no longer the
-     * one actively being drawn, so this tests against that same curve in that case.
+     * Calculates the closest segment on a polygon region (a land mask, drawn with straight sides)
+     * to a given coordinate.
      *
      * @param {Array} regionLayers - The array of region layer objects.
      * @param {string|null} activeRegionId - The ID of the currently active region being drawn (to prevent closing the polygon prematurely).
@@ -73,14 +74,6 @@ export class SpatialMath {
 
                 // Closed polygons check the segment returning to the start node
                 const isClosed = region.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && region.id !== activeRegionId;
-
-                if (region.smoothing && isClosed) {
-                    const match = this.#closestPointOnTaggedPath(this.#buildClosedSpline(region.points), x, y, threshold);
-                    if (match && match.dist < closest.dist) {
-                        closest = { region, insertIndex: match.insertIndex, dist: match.dist, projX: match.projX, projY: match.projY };
-                    }
-                    continue;
-                }
 
                 const limit = isClosed ? region.points.length : region.points.length - 1;
 
@@ -106,16 +99,14 @@ export class SpatialMath {
     }
 
     // --- Spline Hit-Testing Helpers ---
-    // These mirror StudioCanvas's #getSplinePoints / #getClosedSplinePoints formulas exactly (same
-    // Catmull-Rom coefficients, same resolution) so the clickable curve always matches the drawn
-    // one. Each generated point is tagged with `insertIndex`: the position a new control point
-    // should be spliced into the original `points` array if the user clicks there, using the same
-    // convention as the straight-line loops above (segment starting at original index i splices at i+1).
 
     /**
-     * Builds a Catmull-Rom curve through an open (non-looping) path, tagged for hit-testing.
+     * The curve StudioCanvas draws through an open path (see CatmullRom), each sample tagged with
+     * `insertIndex`: where a new control point is spliced into `points` if the user clicks there,
+     * by the same convention as the straight-line loop above (the stretch starting at point i
+     * splices at i + 1). Two points make a straight line.
      */
-    static #buildOpenSpline(points, resolution = 20) {
+    static #buildOpenSpline(points, centripetal = false, resolution = 20) {
         if (!points || points.length < 2) return [];
         if (points.length === 2) {
             return [
@@ -123,58 +114,7 @@ export class SpatialMath {
                 { x: points[1].x, y: points[1].y, insertIndex: 1 },
             ];
         }
-
-        const tagged = [];
-        const p = [points[0], ...points, points[points.length - 1]];
-
-        for (let i = 1; i < p.length - 2; i++) {
-            const insertIndex = i; // Splices between original nodes (i - 1) and i
-            const p0 = p[i - 1];
-            const p1 = p[i];
-            const p2 = p[i + 1];
-            const p3 = p[i + 2];
-
-            for (let t = 0; t <= 1; t += 1 / resolution) {
-                const t2 = t * t;
-                const t3 = t2 * t;
-                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
-                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
-                tagged.push({ x, y, insertIndex });
-            }
-        }
-        return tagged;
-    }
-
-    /**
-     * Builds a seamless, wrapped Catmull-Rom loop through a closed polygon, tagged for hit-testing.
-     */
-    static #buildClosedSpline(points, resolution = 20) {
-        // This 3 is a geometric requirement, not the polygon rule (FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES):
-        // a wrapped Catmull-Rom loop needs at least three control points, because with two the
-        // neighbour points either side of each segment coincide and the "loop" collapses onto a
-        // straight line. It must not follow that constant if the polygon minimum is ever changed.
-        if (!points || points.length < 3) return [];
-
-        const tagged = [];
-        const n = points.length;
-        const p = [points[n - 1], ...points, points[0], points[1]];
-
-        for (let i = 1; i < p.length - 2; i++) {
-            const insertIndex = i; // 1..n, matching getClosestRegionSegment's `i + 1` for a closed loop
-            const p0 = p[i - 1];
-            const p1 = p[i];
-            const p2 = p[i + 1];
-            const p3 = p[i + 2];
-
-            for (let t = 0; t <= 1; t += 1 / resolution) {
-                const t2 = t * t;
-                const t3 = t2 * t;
-                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
-                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
-                tagged.push({ x, y, insertIndex });
-            }
-        }
-        return tagged;
+        return CatmullRom.open(points, { centripetal, resolution }).map((p) => ({ x: p.x, y: p.y, insertIndex: p.span + 1 }));
     }
 
     /**

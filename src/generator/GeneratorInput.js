@@ -21,7 +21,7 @@ import { FILRODENSWMB } from "../config.js";
  * @property {Float32Array} waterMask - Above 0 where a pixel is lake.
  * @property {Uint8Array|Uint16Array|null} biomeOverrides - Painted biome ids.
  * @property {object} biomeParams - { customBiomeRules, biomePalette, biomeSides } (see ModelBiomes).
- * @property {object[]} customBiomes - Each { id, behavesLike? }.
+ * @property {object[]} customBiomes - Each { id, behavesLike?, properties? } (see ModelBiomes).
  * @property {{pixelsPerBaseline: number, list: {merges: boolean, x: Int32Array, y: Int32Array, lake: Uint8Array, flow: Float32Array|null}[]}} rivers
  * @property {string} mapSeed
  * @property {object} settings - The user's settings (see GeneratorSettings).
@@ -55,7 +55,7 @@ export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverD
         waterMask: buffers.waterMask ? Float32Array.from(buffers.waterMask) : new Float32Array(mesh.width * mesh.height),
         biomeOverrides: buffers.biomeOverrides ? buffers.biomeOverrides.slice() : null,
         biomeParams: biomeParams ?? {},
-        customBiomes: customBiomes.map((biome) => ({ id: biome.id, behavesLike: biome.behavesLike ?? null })),
+        customBiomes: customBiomes.map((biome) => ({ id: biome.id, behavesLike: biome.behavesLike ?? null, properties: biome.properties ?? null })),
         rivers: riverList(riverData),
         mapSeed: String(mapSeed ?? ""),
         settings: structuredClone(settings ?? {}),

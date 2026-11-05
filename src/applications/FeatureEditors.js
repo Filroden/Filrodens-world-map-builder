@@ -6,6 +6,9 @@ import { RegionPanel } from "./RegionPanel.js";
 import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { RangeCurve } from "../tools/RangeCurve.js";
+import { MaskSettings } from "../generation/MaskSettings.js";
+import { FaultThickness } from "../tools/FaultThickness.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 
@@ -55,9 +58,10 @@ function zoomTo(app, points) {
 }
 
 /**
- * A river guide (Rivers and faults) in the inspector: its name and width, and Focus view and
- * Delete. A new width carves the river again. When the river is the one being drawn, the bar's
- * width follows it, so the rest of the line is drawn at the same width.
+ * A river guide (Rivers and faults) in the inspector: its name and width, from terrain revision 3
+ * on its corridor width and whether it cuts through high ground (see RiverCorridor), and Focus
+ * view and Delete. All but the name carve the river again. When the river is the one being
+ * drawn, the bar's width follows it, so the rest of the line is drawn at the same width.
  */
 export class RiverEditor {
     /** @returns {Promise<boolean>} */
@@ -65,15 +69,32 @@ export class RiverEditor {
         return Inspector.open(app, this.KIND, { id }, options);
     }
 
+    /** A river's corridor width, in river widths: its own, or the default. */
+    static corridorOf(river) {
+        return river.corridor ?? FILRODENSWMB.HYDROLOGY.CORRIDOR;
+    }
+
     static KIND = Object.freeze({
         id: "river",
         template: `${TEMPLATES}inspector-river.hbs`,
         find: (app, { id }) => app.manualRivers?.find((river) => river.id === id) ?? null,
         header: (_app, river) => ({ title: river.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitleRiver") }),
-        context: (_app, river) => ({ river, widths: RIVER_WIDTHS.map(([value, label]) => ({ value, label, selected: value === Number(river.width) })) }),
+        context: (app, river) => ({
+            river,
+            widths: RIVER_WIDTHS.map(([value, label]) => ({ value, label, selected: value === Number(river.width) })),
+            guided: TerrainVersion.usesGuidedRivers(app.uiState),
+            corridor: { value: RiverEditor.corridorOf(river), min: FILRODENSWMB.HYDROLOGY.CORRIDOR_MIN, max: FILRODENSWMB.HYDROLOGY.CORRIDOR_MAX },
+        }),
         apply: (app, river, _ref, form) => {
-            const values = typed("river", { name: form.elements.riverName.value.trim() || river.name, width: Number(form.elements.riverWidth.value) }, river);
-            const applied = applyValues(app, river, values, ["width"]);
+            const elements = form.elements;
+            const fields = { name: elements.riverName.value.trim() || river.name, width: Number(elements.riverWidth.value) };
+            // The corridor's settings, shown from terrain revision 3 on
+            if (elements.riverCorridor) fields.corridor = Number(elements.riverCorridor.value);
+            if (elements.riverCutThrough) fields.cutThrough = elements.riverCutThrough.checked;
+            const values = typed("river", fields, river);
+            const current = { ...river, corridor: RiverEditor.corridorOf(river), cutThrough: river.cutThrough === true };
+            const applied = applyValues(app, river, values, ["width", "corridor", "cutThrough"], current);
+            if (applied && river.cutThrough === false) delete river.cutThrough;
             if (applied && app.activeRiverId === river.id) app.uiState.riverWidth = river.width;
             return applied;
         },
@@ -111,6 +132,7 @@ export class FaultEditor {
             tectonicTypes: TectonicFeatureEngine.typeOptions(FaultEditor.#currentMap(app), fault.type),
             rangeStyles: Object.entries(FILRODENSWMB.TECTONICS.FEATURES.RANGE_STYLES).map(([id, label]) => ({ id, label })),
             settings: FaultEditor.settings(fault),
+            thickness: FaultThickness.limits(app.mapWidth, fault.thickness),
             isFeature: TectonicFeatureEngine.isFeatureType(fault.type),
         }),
         apply: (app, fault, _ref, form) => FaultEditor.#apply(app, fault, form),
@@ -121,7 +143,7 @@ export class FaultEditor {
     });
 
     static #currentMap(app) {
-        return TerrainVersion.getVersion(app.uiState) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        return TerrainVersion.getVersion(app.uiState) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2;
     }
 
     static #typeName(app, fault) {
@@ -254,8 +276,14 @@ export class DecorationEditor {
 }
 
 /**
- * A land mask (New map, Guided engine) in the inspector: its name and whether it marks land or an
- * ocean, and Focus view and Delete. A new type shapes the land again; the name is only a label.
+ * A land mask (New map, Guided engine) in the inspector: its name and type (Land, Ocean, or Coast
+ * only, which shapes no land and only carries coast settings), and Focus view and Delete. On a map
+ * on the current coastline rules, a Land or Coast only mask has a Coast section: each of the map's
+ * Coastline Fracture, Coastal Plains and Continental Shelf follows the map unless ticked, when the
+ * mask has its own value, and Sharp edge applies them right up to the mask's edge rather than
+ * blending them into the land around it (see MaskSettings). A new type or setting shapes the land
+ * again; the name is only a label. An Ocean mask keeps the settings it had, ignored, so making it
+ * Land again brings them back.
  */
 export class LandMaskEditor {
     /**
@@ -271,18 +299,89 @@ export class LandMaskEditor {
         return Inspector.open(app, this.KIND, { id }, options);
     }
 
+    /** A mask's type, as its Type field names it: "add" (Land), "subtract" (Ocean) or "settings" (Coast only). */
+    static operationOf(mask) {
+        return mask.operation === "subtract" || mask.operation === MaskSettings.COAST_ONLY ? mask.operation : "add";
+    }
+
+    /** The localisation key naming a mask's type. */
+    static typeLabel(mask) {
+        return { subtract: "FILRODENSWMB.UI.LandMaskTypeOcean", settings: "FILRODENSWMB.UI.LandMaskTypeCoast" }[LandMaskEditor.operationOf(mask)] ?? "FILRODENSWMB.UI.LandMaskTypeLand";
+    }
+
+    /**
+     * The Coast section's settings: each one's field on the mask, its input's name, label, hint
+     * and slider. The inputs are named apart from the map's own settings of the same fields: the
+     * studio writes any field named after one of its settings straight into the map's settings.
+     */
+    static #SETTINGS = Object.freeze([
+        { field: "coastlineFracture", input: "maskCoastlineFracture", label: "FILRODENSWMB.UI.CoastlineFracture", hint: "FILRODENSWMB.UI.CoastlineFractureHint", step: 0.01, curve: () => FILRODENSWMB.GENERATION.COASTLINE_FRACTURE_CURVE, fallback: () => FILRODENSWMB.GENERATION.COASTLINE_FRACTURE },
+        { field: "coastalPlain", input: "maskCoastalPlain", label: "FILRODENSWMB.UI.CoastalPlains", hint: "FILRODENSWMB.UI.CoastalPlainsHint", step: 0.05, curve: () => null, fallback: () => FILRODENSWMB.GENERATION.COASTAL_PLAIN },
+        { field: "shelfRange", input: "maskShelfRange", label: "FILRODENSWMB.UI.ContinentalShelf", hint: "FILRODENSWMB.UI.ShelfWidthHint", step: 0.05, curve: () => null, fallback: () => FILRODENSWMB.GENERATION.SHELF_RANGE },
+    ]);
+
+    /** Whether the map gives masks coast settings: a guided map on the current coastline rules. */
+    static #hasCoast(app) {
+        return app.uiState?.generationEngine === "guided" && TerrainVersion.usesCurrentCoastline(app.uiState);
+    }
+
+    /** The Coast section's context, or null where it is not shown. */
+    static #coast(app, mask) {
+        if (!LandMaskEditor.#hasCoast(app) || LandMaskEditor.operationOf(mask) === "subtract") return null;
+        const settings = LandMaskEditor.#SETTINGS.map((setting) => {
+            const own = MaskSettings.overrides(mask, setting.field);
+            const mapValue = app.uiState[setting.field] ?? setting.fallback();
+            const value = own ? mask[setting.field] : mapValue;
+            const curve = setting.curve();
+            return { name: setting.input, label: setting.label, hint: setting.hint, step: setting.step, own, value, mapValue: Number(mapValue).toFixed(2), curve: curve ?? undefined, position: curve ? RangeCurve.positionOf(value, curve) : undefined };
+        });
+        const count = settings.filter((setting) => setting.own).length;
+        // A Land mask covers what lies beneath with the map's value where a setting is unticked; a
+        // Coast only mask leaves it to what lies beneath (see MaskSettings)
+        return { settings, count: count || undefined, sharpEdge: mask.sharpEdge === true, seeThrough: LandMaskEditor.operationOf(mask) === MaskSettings.COAST_ONLY };
+    }
+
     static KIND = Object.freeze({
         id: "landMask",
         template: `${TEMPLATES}inspector-land-mask.hbs`,
         find: (app, { id }) => app.landMasks?.find((mask) => mask.id === id) ?? null,
         header: (_app, mask) => ({
             title: mask.name,
-            subtitle: platform.i18n.format("FILRODENSWMB.UI.InspectorSubtitleLandMask", { type: platform.i18n.localize(mask.operation === "subtract" ? "FILRODENSWMB.UI.LandMaskTypeOcean" : "FILRODENSWMB.UI.LandMaskTypeLand") }),
+            subtitle: platform.i18n.format("FILRODENSWMB.UI.InspectorSubtitleLandMask", { type: platform.i18n.localize(LandMaskEditor.typeLabel(mask)) }),
         }),
-        context: (_app, mask) => ({ mask, ocean: mask.operation === "subtract" }),
+        context: (app, mask) => {
+            const operation = LandMaskEditor.operationOf(mask);
+            // Coast only is offered where masks have coast settings (and kept for a mask that is one)
+            return { mask, operation, coastOnly: LandMaskEditor.#hasCoast(app) || operation === MaskSettings.COAST_ONLY, coast: LandMaskEditor.#coast(app, mask) };
+        },
         apply: (app, mask, _ref, form) => {
-            const values = typed("landMask", { name: form.elements.maskName.value.trim() || mask.name, operation: form.elements.maskOperation.value === "subtract" ? "subtract" : "add" }, mask);
-            return applyValues(app, mask, values, ["operation"], { ...mask, operation: mask.operation === "subtract" ? "subtract" : "add" });
+            const elements = form.elements;
+            const chosen = elements.maskOperation.value;
+            const operation = chosen === "subtract" || chosen === MaskSettings.COAST_ONLY ? chosen : "add";
+            const values = { name: elements.maskName.value.trim() || mask.name, operation };
+            // The Coast section is in the form only where it is shown; elsewhere the settings stay as they are
+            if (elements.maskSharpEdge) {
+                for (const setting of LandMaskEditor.#SETTINGS) {
+                    const own = elements[`${setting.input}Own`]?.checked === true;
+                    const slider = elements[setting.input];
+                    // Ticked: the slider's value, or (just ticked, so no slider yet) the map's, to start from
+                    values[setting.field] = own ? Number(slider ? RangeCurve.read(slider) : (app.uiState[setting.field] ?? setting.fallback())) : null;
+                }
+                values.sharpEdge = elements.maskSharpEdge.checked;
+            }
+            const next = typed("landMask", values, mask);
+            const current = { ...mask, operation: LandMaskEditor.operationOf(mask) };
+            for (const setting of LandMaskEditor.#SETTINGS) current[setting.field] ??= null;
+            current.sharpEdge ??= false;
+            const changed = Object.keys(next).filter((name) => current[name] !== next[name]);
+            if (!changed.length) return false;
+            MapStateManager.pushVectorState(app);
+            Object.assign(mask, next);
+            // A setting that follows the map, and a sharp edge that is off, are left out of the mask
+            for (const setting of LandMaskEditor.#SETTINGS) if (mask[setting.field] === null) delete mask[setting.field];
+            if (mask.sharpEdge === false) delete mask.sharpEdge;
+            redraw(app, changed.some((name) => name !== "name"));
+            return true;
         },
         actions: {
             zoom: (app, mask) => zoomTo(app, mask.points),

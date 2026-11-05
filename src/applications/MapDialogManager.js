@@ -1,8 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MassEdit } from "./MassEdit.js";
-import { ColorMath } from "../tools/ColorMath.js";
-import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { RuleEditorDialog } from "./RuleEditorDialog.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
 import {
@@ -19,7 +17,6 @@ import { PinStyles } from "./PinStyles.js";
 import { positionPopoverMenu } from "../ui/dropdowns.js";
 import { platform } from "../platform/index.js";
 import { Sanitize } from "../data/Sanitize.js";
-import { typed } from "../data/MapRules.js";
 
 /** How many over-limit texts the export's refusal lists before counting the rest. */
 const OVER_LIMIT_SHOWN = 20;
@@ -131,7 +128,7 @@ export class MapDialogManager {
      * until the map is, and (when opened automatically on load) lets the user stop being asked
      * for this map. Closing the dialog counts as keeping the original.
      *
-     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults?: boolean, removesSlip?: boolean, changesRivers?: boolean, changesChannels?: boolean}} impact - What the
+     * @param {{kind: string, resized?: boolean, changesTerrain: boolean, changesBiomes: boolean, changesFaults?: boolean, convertsFaults?: boolean, removesSlip?: boolean, changesRivers?: boolean, changesChannels?: boolean, rebuildsHotspots?: boolean, tightensLines?: boolean, guidesRivers?: boolean}} impact - What the
      *   update changes, and why (see TerrainUpgrade.assess).
      * @param {boolean} allowDismiss - Whether to show the "don't ask again" option.
      * @returns {Promise<{apply: boolean, dismiss: boolean}>} The user's choice.
@@ -142,6 +139,10 @@ export class MapDialogManager {
             isTectonics: impact.kind === "tectonics",
             isFaults: impact.kind === "faults",
             isRivers: impact.kind === "rivers",
+            isRevision3: impact.kind === "revision3",
+            rebuildsHotspots: impact.rebuildsHotspots === true,
+            tightensLines: impact.tightensLines === true,
+            guidesRivers: impact.guidesRivers === true,
             changesRivers: impact.changesRivers === true,
             changesChannels: impact.changesChannels === true,
             convertsFaults: impact.convertsFaults === true,
@@ -392,8 +393,7 @@ export class MapDialogManager {
      * next object, the fields a new style starts with, and how a style reaches the objects that
      * follow it: the cascade (a change written onto them), the disconnect (a deleted style leaves
      * them Custom, keeping their look) and the usage count. The styles are edited in the inspector
-     * (StyleEditors) and listed in Styles and icons (StyleLists). Custom biomes, edited in their
-     * dialogue, are the last entry.
+     * (StyleEditors) and listed in Styles and icons (StyleLists).
      */
     static get QUICK_STYLE_CONFIG() {
         const labelStyleFields = (style) => ({
@@ -519,103 +519,7 @@ export class MapDialogManager {
                 },
                 getUsageCount: (app, id) => app.regionLevels.reduce((sum, level) => sum + level.regions.filter((region) => region.quickStyle === id).length, 0),
             },
-            Biome: {
-                registryKey: "customBiomes",
-                template: "modules/filrodens-world-map-builder/templates/dialogs/edit-biome.hbs",
-                getDefaults: (app) => ({
-                    name: `Custom Biome ${app.uiState.customBiomes.length + 1}`,
-                    code: null,
-                    color: [128, 128, 128],
-                    placement: FILRODENSWMB.BIOME_PLACEMENT.LAND,
-                }),
-                getContext: (app, biome) => ({
-                    biome: { ...biome, hex: ColorMath.rgbToHex(biome.color) },
-                    palette: FILRODENSWMB.LABELS?.PRESETS || [],
-                    placements: this.#biomePlacementChoices(BiomePlacement.placementOfCustom(biome)),
-                    behaviours: this.#behavesLikeChoices(biome.behavesLike),
-                }),
-                // Checked as an import is (see MapRules.typed)
-                onExtract: (form, fallbackName) => ({
-                    ...typed("customBiome", {
-                        name: form.elements["biomeName"].value.trim() || fallbackName,
-                        code: form.elements["biomeCode"].value.trim() || null,
-                        color: ColorMath.hexToRgb(form.elements["biomeColor"].value),
-                        placement: form.elements["biomePlacement"].value,
-                        behavesLike: form.elements["biomeBehavesLike"].value || null,
-                    }),
-                    // Superseded by `placement`, which takes priority over it anyway (see
-                    // BiomePlacement.placementOfCustom); cleared so an older map's flag is not
-                    // carried forward once the biome has been edited
-                    solidOverWater: undefined,
-                }),
-            },
         };
-    }
-
-    /**
-     * The choices for a custom biome's Placement select, in the order they are offered, with the
-     * biome's current placement selected.
-     * @param {string} selected - One of FILRODENSWMB.BIOME_PLACEMENT.
-     * @returns {Array<{value: string, label: string, selected: boolean}>}
-     */
-    static #biomePlacementChoices(selected) {
-        return Object.values(FILRODENSWMB.BIOME_PLACEMENT).map((value) => ({ value, label: BiomePlacement.labelOf(value), selected: value === selected }));
-    }
-
-    /**
-     * The choices for a custom biome's Behaves like select: the biome the climate gives where it
-     * lies (the default), then each built-in land biome the generator knows, by name.
-     * @param {string|null|undefined} selected - A key of GENERATOR.BIOMES, or none.
-     * @returns {Array<{value: string, label: string, selected: boolean}>}
-     */
-    static #behavesLikeChoices(selected) {
-        const keys = Object.keys(FILRODENSWMB.GENERATOR.BIOMES);
-        const current = keys.includes(selected) ? selected : "";
-        return [{ value: "", label: "FILRODENSWMB.UI.BiomeBehavesLikeUnderlying", selected: current === "" }, ...keys.map((key) => ({ value: key, label: `FILRODENSWMB.BIOMES.${key}`, selected: key === current }))];
-    }
-
-    // --- ADD ACTIONS ---
-
-    static async onAddCustomBiome(app, _event, _target) {
-        const config = this.QUICK_STYLE_CONFIG.Biome;
-        const newBiome = config.getDefaults(app);
-
-        await this._processEditDialog(app, newBiome, {
-            titleKey: "FILRODENSWMB.UI.AddCustomBiome",
-            template: config.template,
-            context: config.getContext(app, newBiome),
-            repaintCanvas: true,
-            renderParts: ["context", "toolbar"],
-            onExtract: (form) => config.onExtract(form, newBiome.name),
-            onSave: (entity, result) => {
-                const id = MapStateManager.getNextCustomBiomeId(app.uiState);
-                // rules starts empty - a freshly created biome has no auto-generation rules
-                // yet, so it simply never matches and falls straight through to the built-in
-                // defaults until the rule editor is used to add some.
-                app.uiState.customBiomes.push({ id, ...result, rules: [] });
-            },
-        });
-    }
-
-    static async onEditCustomBiome(app, event, target) {
-        const config = this.QUICK_STYLE_CONFIG.Biome;
-        const id = Number(target.closest(".fwmb-list-item").dataset.id);
-        const biome = app.uiState.customBiomes.find((b) => b.id === id);
-        if (!biome) return;
-        const behavedLike = biome.behavesLike ?? null;
-
-        await this._processEditDialog(app, biome, {
-            titleKey: "FILRODENSWMB.UI.Edit",
-            template: config.template,
-            context: config.getContext(app, biome),
-            repaintCanvas: true,
-            renderParts: ["context", "toolbar"],
-            onExtract: (form) => config.onExtract(form, biome.name),
-            // What the generator reads of the biome changed: a run made before is out of date
-            onSave: (entity) => {
-                if ((entity.behavesLike ?? null) !== behavedLike) app.markGeneratorStale?.();
-            },
-        });
     }
 
     /**
@@ -705,45 +609,6 @@ export class MapDialogManager {
     }
 
     // --- DELETE ACTIONS ---
-
-    /**
-     * Deleting a custom biome only ever touches `uiState.customBiomes` - it deliberately does
-     * NOT zero out `currentBiomeOverrides` or scrub the biome's id out of `brushEngine.history`/
-     * `redoStack`, even though painted pixels and strokes referencing this id are left behind.
-     * An earlier version of this method did that scrubbing, but it was a direct, permanent
-     * mutation of raster data that the undo/redo system has no way to know about or reverse
-     * (see MapStateManager.getVectorStateSnapshot/restoreVectorStateSnapshot - only the vector
-     * `uiState.customBiomes` array is snapshotted, never the raster buffers or brush strokes),
-     * so undoing a delete brought the biome back in the list while its paint stayed lost, and a
-     * later redo could leave a stale, no-longer-existent id sitting in the raster data with
-     * nothing to render it. ProceduralEngine.resolveBiomeLookup now treats exactly that case -
-     * an override id that doesn't resolve to any current biome - as if the pixel had never been
-     * painted, so leaving the old id in place is safe: it just falls through to the map's normal
-     * auto-generated biome for as long as the id stays deleted, and paints itself back in for
-     * free (no restore code needed here) if the biome ever comes back, whether via undo or by
-     * being recreated. This also means the id itself must stay "spent" rather than being reused -
-     * see MapStateManager.getNextCustomBiomeId.
-     */
-    static async onDeleteCustomBiome(app, event, target) {
-        const id = Number(target.closest(".fwmb-list-item").dataset.id);
-
-        const confirmed = await this._confirmDialog(undefined, platform.i18n.localize("FILRODENSWMB.UI.DeleteBiomeConfirm"));
-        if (!confirmed) return;
-
-        MapStateManager.pushVectorState(app);
-        // Its land now behaves as the biome beneath, so a run made while it behaved as another is out of date
-        if (app.uiState.customBiomes.find((c) => c.id === id)?.behavesLike) app.markGeneratorStale?.();
-        app.uiState.customBiomes = app.uiState.customBiomes.filter((c) => c.id !== id);
-
-        if (Number(app.uiState.brushBiome) === id) {
-            app.uiState.brushBiome = FILRODENSWMB.BIOME_IDS.GRASSLAND;
-            app.view?.render(["toolbar"]);
-        }
-
-        app._repaintCanvas();
-        app.view?.render(["toolbar", "context"]);
-        app.markDirty();
-    }
 
     static async onRemoveCustomPinIcon(app, event, target) {
         const id = target.closest(".fwmb-list-item").dataset.id;

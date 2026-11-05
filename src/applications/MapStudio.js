@@ -4,7 +4,9 @@ import { CanvasHints } from "../canvas/CanvasHints.js";
 import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
+import { RangeCurve } from "../tools/RangeCurve.js";
 import { ListNav } from "../ui/ListNav.js";
+import { ListReorder } from "../ui/ListReorder.js";
 import { ProceduralEngine } from "../generation/ProceduralEngine.js";
 import { BiomePlacement } from "../generation/BiomePlacement.js";
 import { BrushEngine } from "../tools/BrushEngine.js";
@@ -27,6 +29,7 @@ import { RunCells } from "./RunCells.js";
 import { Infilling } from "./Infilling.js";
 import { InfillInput } from "./InfillInput.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
+import { FaultThickness } from "../tools/FaultThickness.js";
 import { clampAreaFactor } from "../mesh/Schema.js";
 import { cleanUnit, formatDistance, kmPerPxOf, scaleBarOnMap, scaleBarTick, unitFromSaved } from "../data/MapUnit.js";
 import { ThematicView } from "./ThematicView.js";
@@ -47,6 +50,7 @@ import { RegionLists } from "./RegionLists.js";
 import { StyleEditors } from "./StyleEditors.js";
 import { StyleLists } from "./StyleLists.js";
 import { CultureEditor } from "./CultureEditor.js";
+import { BiomeEditor } from "./BiomeEditor.js";
 import { CultureLists } from "./CultureLists.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 import { RegionPainter } from "./RegionPainter.js";
@@ -75,6 +79,7 @@ import { HelpPanel } from "./HelpPanel.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
+import { MaskSettings } from "../generation/MaskSettings.js";
 import { rebaseMap } from "../data/SymbolSizes.js";
 import { addLocalLevelOnce } from "../data/LocalLevel.js";
 import { refreshWaterRoutesOnce } from "../data/WaterRouteStyles.js";
@@ -178,10 +183,10 @@ export class MapStudio {
         editRiver(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RiverEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
         editRoute(e, t)       { if (!MapStudio.#fromRowControl(e, t)) RouteEditor.open(this, t.closest(".fwmb-list-item").dataset.id, MapStudio.#FROM_LIST); },
 
-        // --- DIALOG MANAGER: Custom Biomes & Misc ---
-        addCustomBiome(e, t)    { MapDialogManager.onAddCustomBiome(this, e, t); },
-        editCustomBiome(e, t)   { if (!MapStudio.#fromRowControl(e, t)) MapDialogManager.onEditCustomBiome(this, e, t); },
-        deleteCustomBiome(e, t) { MapDialogManager.onDeleteCustomBiome(this, e, t); },
+        // --- Custom biomes, in the inspector (see BiomeEditor), and the dialogues ---
+        addCustomBiome()        { BiomeEditor.add(this); },
+        editCustomBiome(e, t)   { if (!MapStudio.#fromRowControl(e, t)) BiomeEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
+        deleteCustomBiome(_e, t) { BiomeEditor.delete(this, MapStudio.#rowId(t)); },
         openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
         addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
 
@@ -495,8 +500,6 @@ export class MapStudio {
         this.activeRegionId = null;
         // The generator's saved model-cell outputs (see ModelRun), or null for a map with no run
         this.modelRun = null;
-        // Whether the map last opened had its unit changed as it loaded (see MapUnit.unitFromSaved)
-        this.unitConvertedOnLoad = false;
         this.landMasks = [];
         this.activeLandMaskId = null;
         this.mapLabels = [];
@@ -800,7 +803,7 @@ export class MapStudio {
      * crop alone for any other map that can make regional maps; null when there is nothing to do.
      */
     #sceneModeKey() {
-        if (this.uiState.generationEngine === "guided") return ["addMask", "subtractMask", "crop"].includes(this.uiState.sceneMode) ? this.uiState.sceneMode : "addMask";
+        if (this.uiState.generationEngine === "guided") return ["addMask", "subtractMask", "coastMask", "crop"].includes(this.uiState.sceneMode) ? this.uiState.sceneMode : "addMask";
         return TerrainVersion.canCreateRegionalMap(this.uiState) ? "crop" : null;
     }
 
@@ -944,6 +947,8 @@ export class MapStudio {
                             mode("setSceneMode", "mode", "select", ui("ModeSelect"), ui("MaskModeSelect"), "select", current === "select"),
                             mode("setSceneMode", "mode", "addMask", ui("ModeLand"), ui("DrawLandMaskHint"), "add", current === "addMask"),
                             mode("setSceneMode", "mode", "subtractMask", ui("ModeOcean"), ui("DrawOceanMaskHint"), "remove", current === "subtractMask"),
+                            // Coast only masks exist only where masks have coast settings (see MaskSettings)
+                            ...(TerrainVersion.usesCurrentCoastline(s) ? [mode("setSceneMode", "mode", "coastMask", ui("ModeCoast"), ui("DrawCoastMaskHint"), "tune", current === "coastMask")] : []),
                             mode("setSceneMode", "mode", "crop", ui("ModeCrop"), cropTip, "crop", current === "crop", { disabled: !canCrop }),
                         ]),
                     ];
@@ -1150,6 +1155,8 @@ export class MapStudio {
         context.pausedLine = context.isLocked && word ? platform.i18n.localize(`FILRODENSWMB.UI.StatePaused${word}`) : null;
         if (regionId === "context") context.panel = this.#panelContext();
         if (regionId === "editToolbar") context.bar = this.#barContext();
+        // Fault line thickness's range on this map (see FaultThickness), holding the bar's value
+        if (regionId === "editToolbar") context.faultThickness = FaultThickness.limits(this.mapWidth, this.uiState.faultThickness);
 
         if (regionId === "editToolbar") {
             const editableTools = FILRODENSWMB.UI.EDITABLE_TOOLS;
@@ -1220,6 +1227,9 @@ export class MapStudio {
         context.regionalInfillOffered = this.#regionalInfillOffered(this.canvasEngine?.cropBox);
         context.usesCurrentCoastline = TerrainVersion.usesCurrentCoastline(this.uiState);
         context.engineLabels = this.#getEngineLabels();
+        // The Coastline Fracture slider's position on its power curve (see RangeCurve)
+        context.fractureCurve = FILRODENSWMB.GENERATION.COASTLINE_FRACTURE_CURVE;
+        context.fracturePosition = RangeCurve.positionOf(this.uiState.coastlineFracture ?? FILRODENSWMB.GENERATION.COASTLINE_FRACTURE, context.fractureCurve);
 
         // The object the inspector shows, whose row the lists mark as selected
         context.inspected = Inspector.inspected(this);
@@ -1285,10 +1295,14 @@ export class MapStudio {
             }
             if (this.activeTool === "labels") context.labelList = await this.#listContext("label", context);
             context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
-            const { ADD: landColor, SUBTRACT: oceanColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
-            context.landMasks = [...(this.landMasks || [])]
-                .sort(alphaSort)
-                .map((m) => ({ ...m, swatchColor: m.operation === "subtract" ? oceanColor : landColor, isActive: m.id === this.activeLandMaskId }));
+            const { ADD: landColor, SUBTRACT: oceanColor, COAST: coastColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
+            // In their own order, not by name: later masks lie on top (see ListReorder)
+            context.landMasks = [...(this.landMasks || [])].map((m) => {
+                const operation = LandMaskEditor.operationOf(m);
+                const swatchColor = { subtract: oceanColor, settings: coastColor }[operation] ?? landColor;
+                return { ...m, swatchColor, typeLabel: LandMaskEditor.typeLabel(m), coastOnly: operation === "settings", isActive: m.id === this.activeLandMaskId };
+            });
+            context.landMasksReorderable = context.landMasks.length > 1;
 
             context.labelColorPalette = FILRODENSWMB.LABELS?.PRESETS || [];
 
@@ -1543,6 +1557,7 @@ export class MapStudio {
         root.addEventListener("change", (event) => this.#routeFieldEvent(event));
         root.addEventListener("pointerover", (event) => this.#togglePreviewFallback(event, true));
         root.addEventListener("pointerout", (event) => this.#togglePreviewFallback(event, false));
+        ListReorder.bind(root, (list, id, to) => this.#moveListItem(list, id, to));
         bindDropdownMenus(root);
     }
 
@@ -1557,9 +1572,10 @@ export class MapStudio {
         if (target.tagName !== "INPUT" || target.type !== "range" || target.closest("dialog")) return;
 
         const defaultVal = this.defaultUiState[target.name];
-        if (defaultVal === undefined || target.value === String(defaultVal)) return;
+        if (defaultVal === undefined || RangeCurve.read(target) === String(defaultVal)) return;
 
-        target.value = defaultVal;
+        if (RangeCurve.isCurved(target)) RangeCurve.setValue(target, defaultVal);
+        else target.value = defaultVal;
         target.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
@@ -1587,7 +1603,14 @@ export class MapStudio {
         // would otherwise reach the window and pan the scene behind it
         if (MapStudio.#isMovementKey(event)) event.stopPropagation();
         // The Regions lists' keys: moving through a list, Unassigned, and naming
-        if (AppearanceMenu.handleKey(this.root, event) || RegionLists.handleKey(this, event) || StyleLists.handleKey(this, event) || CultureLists.handleKey(this, event) || ListNav.handleKey(event)) {
+        if (
+            AppearanceMenu.handleKey(this.root, event) ||
+            RegionLists.handleKey(this, event) ||
+            StyleLists.handleKey(this, event) ||
+            CultureLists.handleKey(this, event) ||
+            ListReorder.handleKey(event, (list, id, to) => this.#moveListItem(list, id, to)) ||
+            ListNav.handleKey(event)
+        ) {
             event.preventDefault();
             return;
         }
@@ -1947,7 +1970,7 @@ export class MapStudio {
 
     /** Whether the open map is at the current terrain version, which draws tectonic features. */
     #isCurrentTerrain() {
-        return TerrainVersion.getVersion(this.uiState) >= FILRODENSWMB.TERRAIN_VERSION.CURRENT;
+        return TerrainVersion.getVersion(this.uiState) >= FILRODENSWMB.TERRAIN_VERSION.REVISION_2;
     }
 
     /**
@@ -2730,11 +2753,11 @@ export class MapStudio {
             this.canvasEngine.renderFeaturePins(this.mapPins, isEdit, this.proceduralSprings);
 
             if (this.canvasEngine.renderFaultLines) {
-                this.canvasEngine.renderFaultLines(this.tectonicFaults, isEdit, this.activeFaultId);
+                this.canvasEngine.renderFaultLines(this.tectonicFaults, isEdit, this.activeFaultId, isEdit, TerrainVersion.usesCentripetalLines(this.uiState));
             }
 
             if (this.canvasEngine.renderManualRivers) {
-                this.canvasEngine.renderManualRivers(this.manualRivers, isEdit, this.activeRiverId);
+                this.canvasEngine.renderManualRivers(this.manualRivers, isEdit, this.activeRiverId, isEdit, TerrainVersion.usesCentripetalLines(this.uiState));
             }
         }
 
@@ -2840,7 +2863,7 @@ export class MapStudio {
         for (const config of Object.values(FILRODENSWMB.ENTITY_CONFIG)) {
             if (config.toolCategory !== this.activeTool) continue;
 
-            const segment = SpatialMath.getClosestVectorSegment(this[config.stateKey], x, y, this.currentSnapThreshold, !!config.smoothed);
+            const segment = SpatialMath.getClosestVectorSegment(this[config.stateKey], x, y, this.currentSnapThreshold, !!config.smoothed, TerrainVersion.usesCentripetalLines(this.uiState));
             if (segment && (!bestMatch || segment.dist < bestMatch.dist)) {
                 bestMatch = {
                     vector: segment.vector,
@@ -3045,23 +3068,23 @@ export class MapStudio {
         }
     }
 
-    /** The land mask operation the Add Land / Remove Land toggle currently selects. */
+    /** The land mask operation the bar's Land, Ocean or Coast only mode selects. */
     #selectedMaskOperation() {
-        return this.uiState.sceneMode === "subtractMask" ? "subtract" : "add";
+        return { subtractMask: "subtract", coastMask: MaskSettings.COAST_ONLY }[this.uiState.sceneMode] ?? "add";
     }
 
     /**
-     * Builds a new land mask with the default name for its operation ("Landmass n" or
-     * "Ocean Hole n", numbered by the masks already on the map). It is not added to the map.
+     * Builds a new land mask with the default name for its operation ("Landmass n", "Ocean
+     * Hole n" or "Coast n", numbered by the masks already on the map). It is not added to the map.
      *
-     * @param {"add"|"subtract"} operation
+     * @param {"add"|"subtract"|"settings"} operation
      * @param {Array<{x: number, y: number}>} points
      */
     #createLandMask(operation, points) {
         const number = this.landMasks.length + 1;
         return {
             id: platform.utils.randomID(),
-            name: operation === "subtract" ? `Ocean Hole ${number}` : `Landmass ${number}`,
+            name: { subtract: `Ocean Hole ${number}`, settings: `Coast ${number}` }[operation] ?? `Landmass ${number}`,
             operation,
             points,
         };
@@ -3125,9 +3148,23 @@ export class MapStudio {
         this.#refreshAfterLandMaskChange(true);
     }
 
-    /** Whether the Add Land or Remove Land toggle is selected (rather than the crop tool). */
+    /** Whether a mask drawing mode (Land, Ocean or Coast only) is selected, rather than Select or Crop. */
     #isMaskDrawingMode() {
-        return this.uiState.sceneMode === "addMask" || this.uiState.sceneMode === "subtractMask";
+        return ["addMask", "subtractMask", "coastMask"].includes(this.uiState.sceneMode);
+    }
+
+    /**
+     * Moves an item of a list in order (see ListReorder) to its new place, as one undo step. Only
+     * the land masks are put in order: later masks lie on top, so a move shapes the land again.
+     */
+    #moveListItem(list, id, to) {
+        if (list !== "landMasks") return;
+        const from = this.landMasks.findIndex((mask) => mask.id === id);
+        if (from < 0 || from === to || to < 0 || to >= this.landMasks.length) return;
+        MapStateManager.pushVectorState(this);
+        const [mask] = this.landMasks.splice(from, 1);
+        this.landMasks.splice(to, 0, mask);
+        this.#refreshAfterLandMaskChange(true);
     }
 
     /** Redraws the land masks and their list, and regenerates the terrain when asked to. */
@@ -3605,12 +3642,12 @@ export class MapStudio {
 
         if (this.canvasEngine.renderFaultLines) {
             const isFaultEdit = this.activeTool === "features" && isEditModeActive;
-            this.canvasEngine.renderFaultLines(this.tectonicFaults, isFaultEdit, this.activeFaultId, isFaultEdit && !picking);
+            this.canvasEngine.renderFaultLines(this.tectonicFaults, isFaultEdit, this.activeFaultId, isFaultEdit && !picking, TerrainVersion.usesCentripetalLines(this.uiState));
         }
 
         if (this.canvasEngine.renderManualRivers) {
             const isRiverEdit = this.activeTool === "features" && isEditModeActive;
-            this.canvasEngine.renderManualRivers(this.manualRivers, isRiverEdit, this.activeRiverId, isRiverEdit && !picking);
+            this.canvasEngine.renderManualRivers(this.manualRivers, isRiverEdit, this.activeRiverId, isRiverEdit && !picking, TerrainVersion.usesCentripetalLines(this.uiState));
         }
 
         // 2. Render Infrastructure, at the map's detail level (as are the regions and labels). While
@@ -3986,6 +4023,8 @@ export class MapStudio {
 
         this.uiState.mapWidth = this.mapWidth;
         this.uiState.mapHeight = this.mapHeight;
+        // New faults on this map start at its own default thickness (see FaultThickness)
+        this.uiState.faultThickness = FaultThickness.limits(this.mapWidth).default;
         this.uiState.gridType = payload.gridType || "square";
         // Raised to the smallest grid Foundry allows: a map saved with a smaller grid (the slider
         // used to go down to 10) would otherwise export a scene whose grid Foundry enlarges, while
@@ -4084,10 +4123,8 @@ export class MapStudio {
         this.uiState.regionOpacity = p.display?.regionOpacity ?? FILRODENSWMB.DISPLAY.REGION_OPACITY;
         this.uiState.cartographyScaleEnable = c.scaleEnable ?? this.defaultUiState.cartographyScaleEnable;
         // A map saved before it had a unit takes it from its scale bar's text, and keeps its
-        // hand-set bar (see MapUnit.unitFromSaved); the load reports a unit it had to change
-        const { unit, converted } = unitFromSaved(payload);
-        this.uiState.mapUnit = unit;
-        this.unitConvertedOnLoad = converted;
+        // hand-set bar (see MapUnit.unitFromSaved)
+        this.uiState.mapUnit = unitFromSaved(payload).unit;
         this.uiState.cartographyScaleMatchWorld = c.scaleMatchWorld === true;
         this.uiState.cartographyScaleInterval = c.scaleInterval ?? this.defaultUiState.cartographyScaleInterval;
         this.uiState.cartographyScaleValue = c.scaleValue ?? this.defaultUiState.cartographyScaleValue;
@@ -4162,6 +4199,11 @@ export class MapStudio {
                 }
             });
         }
+        // A revision 2 map that revision 3 would not change (no hotspot chain, no custom river)
+        // moves to it now, so anything of either kind added from here on is built by the current
+        // rules. It looks exactly as it did, so the map is not marked as changed: the move is kept
+        // with its next save, and until then it is made again on every load.
+        if (TerrainVersion.settlesOnLoad(this.uiState, this.tectonicFaults, this.manualRivers)) this.uiState.terrainVersion = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
 
         // Guarantee every pin has a valid `color` property, defaulting to white for legacy maps
         this.mapPins = (payload.mapPins || []).map((pin) => {
@@ -4912,9 +4954,10 @@ export class MapStudio {
      * regenerated rather than merely repainted.
      *
      * Land masks are only read by the guided engine, and there only masks that enclose an area
-     * (see FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) contribute. Just each mask's operation
-     * and vertices are captured: renaming a mask, or undoing the first two nodes of a shape that
-     * is still being drawn, does not alter the terrain and must not trigger a regeneration.
+     * (see FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES) contribute. Just each mask's operation,
+     * vertices and coast settings (see MaskSettings.inputsOf) are captured: renaming a mask, or
+     * undoing the first two nodes of a shape that is still being drawn, does not alter the
+     * terrain and must not trigger a regeneration.
      *
      * @returns {string} A string that differs between two states exactly when their terrain differs.
      */
@@ -4922,7 +4965,7 @@ export class MapStudio {
         const minVertices = FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES;
         const guidedMasks =
             this.uiState.generationEngine === "guided"
-                ? this.landMasks.filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points])
+                ? this.landMasks.filter((mask) => mask.points?.length >= minVertices).map((mask) => [mask.operation, mask.points, ...MaskSettings.inputsOf(mask)])
                 : [];
 
         return JSON.stringify([this.tectonicFaults, this.manualRivers, guidedMasks]);
@@ -5126,7 +5169,7 @@ export class MapStudio {
         let newSeed = formData.mapSeed?.trim();
 
         // Extract the dropdown choice
-        const newEngine = formData.generationEngine || "standard";
+        const newEngine = formData.generationEngine || FILRODENSWMB.DEFAULTS.ENGINE;
 
         // If the user left the seed blank, generate a random one automatically
         if (!newSeed) {
@@ -5926,13 +5969,10 @@ export class MapStudio {
             this.currentSaveName = card.querySelector(".fwmb-map-card-info").textContent.trim();
             await this.#ingestMapPayload(payload, await platform.store.loadMapOwners(mapId), await platform.store.loadMapModelRun(mapId));
             platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.LoadSuccess"));
-            // Said as the map opens; the map is marked as changed, and once saved it holds its new
-            // unit, so a map that has been saved is not told again
-            if (this.unitConvertedOnLoad) platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.MapUnitConverted"));
 
             this.view?.render(["toolbar", "context"]);
-            // A map migrated, given a new mesh or a new unit as it opened has changes to save
-            this.isDirty = MeshIntegration.changedOnLoad(this) || this.unitConvertedOnLoad;
+            // A map migrated or given a new mesh as it opened has changes to save
+            this.isDirty = MeshIntegration.changedOnLoad(this);
             // A regional map cut before regional maps carried their parent's run reads it from its
             // parent, so its thematic layers and farmland have figures (kept with its next save)
             if (await ParentRunRecovery.recover(this)) this._repaintVectors();
@@ -5978,7 +6018,7 @@ export class MapStudio {
      * can change, so every other map is answered at once without measuring anything.
      */
     async #assessTerrainUpgrade() {
-        if (!TerrainVersion.isUpgradeCandidate(this.uiState, this.tectonicFaults)) return null;
+        if (!TerrainVersion.isUpgradeCandidate(this.uiState, this.tectonicFaults, this.manualRivers)) return null;
 
         await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.CheckingTerrainUpdate"));
         try {
@@ -6354,7 +6394,7 @@ export class MapStudio {
 
         if (on) {
             // A guided map's New map tool draws land masks unless its Crop mode was chosen
-            if (this.uiState.generationEngine === "guided" && !["addMask", "subtractMask", "crop"].includes(this.uiState.sceneMode)) {
+            if (this.uiState.generationEngine === "guided" && !["addMask", "subtractMask", "coastMask", "crop"].includes(this.uiState.sceneMode)) {
                 this.uiState.sceneMode = "addMask";
             }
 
@@ -6451,22 +6491,18 @@ export class MapStudio {
      * Toggles visibility of the WebGL layers.
      */
     /**
-     * The names shown in the engine list for the engines that have had more than one version,
-     * with their version (for example "Guided v2"). The open map's own engine shows the version
-     * the map was made with; any other engine shows the version a new map would get, since
-     * choosing it creates a new map.
+     * The names shown in the engine list, each with its terrain version (for example "Guided v2";
+     * see TerrainVersion.getDisplayVersion). The open map's own engine shows the version the map
+     * was made with; any other engine shows the version a new map would get, since choosing it
+     * creates a new map.
      */
     #getEngineLabels() {
         const current = FILRODENSWMB.TERRAIN_VERSION.CURRENT;
-        const labelFor = (engine, nameKey) => {
-            const version = this.uiState.generationEngine === engine ? (TerrainVersion.getDisplayVersion(this.uiState) ?? current) : current;
-            return platform.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: platform.i18n.localize(nameKey), version });
+        const labelFor = (engine) => {
+            const version = this.uiState.generationEngine === engine ? TerrainVersion.getDisplayVersion(this.uiState) : current;
+            return platform.i18n.format("FILRODENSWMB.UI.EngineVersion", { name: platform.i18n.localize(TerrainVersion.ENGINE_NAMES[engine]), version });
         };
-
-        return {
-            advanced: labelFor("advanced", "FILRODENSWMB.UI.EngineNameTectonics"),
-            guided: labelFor("guided", "FILRODENSWMB.UI.EngineNameGuided"),
-        };
+        return Object.fromEntries(Object.keys(TerrainVersion.ENGINE_NAMES).map((engine) => [engine, labelFor(engine)]));
     }
 
     _onToggleLayer(_event, target) {

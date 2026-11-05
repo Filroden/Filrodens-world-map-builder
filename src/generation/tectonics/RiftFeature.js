@@ -31,7 +31,7 @@ const { smoothstep } = FeatureMath;
 export class RiftFeature {
     static plan(fault, context) {
         const settings = FILRODENSWMB.TECTONICS.FEATURES.RIFT;
-        const field = new LineField(fault.points, fault.thickness * settings.REACH, context.width, context.height);
+        const field = new LineField(fault.points, fault.thickness * settings.REACH, context.width, context.height, context.centripetal);
         return { field, bounds: field.bounds };
     }
 

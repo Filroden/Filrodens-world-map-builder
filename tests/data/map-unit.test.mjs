@@ -1,5 +1,6 @@
-// The map's unit (MapUnit): the name every distance is shown with, how a saved map gets one, the
-// round distances a scale bar matching the world draws, and a slider shown in the unit.
+// The map's unit (MapUnit): the name every distance is shown with, how a saved map gets one (kept
+// as saved, never converted), the round distances a scale bar matching the world draws, and a
+// slider shown in the unit.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -16,17 +17,32 @@ test("a unit name is trimmed text, and an empty one is the default", () => {
     assert.equal(cleanUnit(42), "km");
 });
 
-test("a saved map's unit: its own, else its scale bar's text, with the old default Miles becoming km", () => {
+test("a saved map's unit: its own, else its scale bar's text kept as it was, Miles included", () => {
     assert.deepEqual(unitFromSaved({ mapUnit: "leagues", params: { cartography: { scaleUnits: "Miles" } } }), { unit: "leagues", converted: false });
-    assert.deepEqual(unitFromSaved({ params: { cartography: { scaleUnits: "Miles" } } }), { unit: "km", converted: true });
-    assert.deepEqual(unitFromSaved({ params: { cartography: { scaleUnits: " Miles " } } }), { unit: "km", converted: true });
-    // Only the untouched default is changed: any other text was the user's own
+    // The bar's old built-in text is kept like any other: a user's deliberate Miles cannot be told
+    // from one left as it was, and the map keeps its hand-set bar, whose numbers it labels
+    assert.deepEqual(unitFromSaved({ params: { cartography: { scaleUnits: "Miles" } } }), { unit: "Miles", converted: false });
+    assert.deepEqual(unitFromSaved({ params: { cartography: { scaleUnits: " Miles " } } }), { unit: "Miles", converted: false });
     assert.deepEqual(unitFromSaved({ params: { cartography: { scaleUnits: "miles" } } }), { unit: "miles", converted: false });
     assert.deepEqual(unitFromSaved({ params: { cartography: { scaleUnits: "Leagues" } } }), { unit: "Leagues", converted: false });
     assert.deepEqual(unitFromSaved({ params: { cartography: { scaleUnits: "" } } }), { unit: "km", converted: false });
     assert.deepEqual(unitFromSaved({ params: {} }), { unit: "km", converted: false });
-    assert.deepEqual(unitFromSaved({ mapUnit: "  ", params: { cartography: { scaleUnits: "Miles" } } }), { unit: "km", converted: true });
+    assert.deepEqual(unitFromSaved({ mapUnit: "  ", params: { cartography: { scaleUnits: "Miles" } } }), { unit: "Miles", converted: false });
     assert.deepEqual(unitFromSaved(null), { unit: "km", converted: false });
+});
+
+test("loading a map never changes its unit, so the unit never marks a loaded map as changed", async () => {
+    // The studio marks a loaded map as changed only when its mesh was migrated or rebuilt (see
+    // MapStudio#handleMapLoad); its unit, kept as saved, no longer takes part
+    const { readFile } = await import("node:fs/promises");
+    const studio = await readFile(new URL("../../src/applications/MapStudio.js", import.meta.url), "utf8");
+    assert.match(studio, /this\.isDirty = MeshIntegration\.changedOnLoad\(this\);/);
+    assert.doesNotMatch(studio, /unitConvertedOnLoad|MapUnitConverted/);
+    for (const language of ["en", "en-gb"]) {
+        const strings = JSON.parse(await readFile(new URL(`../../languages/${language}.json`, import.meta.url), "utf8"));
+        assert.equal(strings["FILRODENSWMB.UI.MapUnitConverted"], undefined, `${language} has no notice of a changed unit`);
+    }
+    assert.equal(FILRODENSWMB.MAP_UNIT.LEGACY_DEFAULT, undefined);
 });
 
 test("the round distance nearest to a distance is 1, 2 or 5 times a power of ten", () => {

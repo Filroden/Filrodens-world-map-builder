@@ -5,16 +5,8 @@
 /** Where the castle goes: in the Red Hills, west of the King's Road. */
 const CASTLE = [1130, 455];
 
-/** Where the sea's name goes: the open water between the continent's east coast and Thetfield. */
+/** Where the sea's name goes: the open water between the continent's east coast and Pilton. */
 const SEA = [1540, 800];
-
-/** Southamney's name: where it would go (its duchy's label point), and where it is dragged to. */
-const SOUTHAMNEY_FROM = [1349, 582];
-const SOUTHAMNEY_TO = [1345, 612];
-
-/** The Islemark Crossing's name: where it would go (above the middle of its line), and where it is dragged to. */
-const CROSSING_FROM = [1393, 873];
-const CROSSING_TO = [1460, 930];
 
 /** The Red Hills and the sea, for the close-ups. */
 const HILLS = [1000, 300, 1440, 760];
@@ -41,18 +33,18 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
         {
             id: "find",
             title: "Find a place",
-            instruction: "Click **Routes and pins** on the rail. **Pin** is chosen at the start of the bar. Type `Mostadra` in the Pins list's search field, click the row that is left, and click its **Focus view** button: the map zooms to the city on the King's Road, and it opens in the inspector. Open the inspector's **Generated** section to read what the run recorded about it: its place in the world, its population, its people and its history.",
+            instruction: "Click **Routes and pins** on the rail. **Pin** is chosen at the start of the bar. Type `Golenduos` in the Pins list's search field, click the row that is left, and click its **Focus view** button: the map zooms to the city on the King's Road, and it opens in the inspector. Open the inspector's **Generated** section to read what the run recorded about it: its place in the world, its population, its people and its history.",
             action: [
                 { do: "tool", tool: "infrastructure", label: "Routes and pins" },
-                { do: "set", field: 'input[name="listSearch-pin"]', value: "Mostadra", label: "Search by name" },
-                { do: "click", target: pinRow("Mostadra"), label: "Mostadra" },
-                { do: "point", target: pinRow("Mostadra"), label: "Mostadra's row" },
-                { do: "click", target: `${pinRow("Mostadra")} [data-action="zoomToFeature"]`, label: "Focus view" },
+                { do: "set", field: 'input[name="listSearch-pin"]', value: "Golenduos", label: "Search by name" },
+                { do: "click", target: pinRow("Golenduos"), label: "Golenduos" },
+                { do: "point", target: pinRow("Golenduos"), label: "Golenduos's row" },
+                { do: "click", target: `${pinRow("Golenduos")} [data-action="zoomToFeature"]`, label: "Focus view" },
                 { do: "click", target: `${INSPECTOR} summary:has-text("Generated")`, label: "Generated" },
             ],
             screenshot: { name: "generated", region: "inspector" },
-            caption: "Mostadra in the inspector, with what the run recorded about it.",
-            narration: "Search the pins for Mostadra, and focus the map on it. The Generated section shows what the run recorded: a city of about twenty-six thousand people, nearly all Hillfolk.",
+            caption: "Golenduos in the inspector, with what the run recorded about it.",
+            narration: "Search the pins for Golenduos, and focus the map on it. The Generated section shows what the run recorded: a city of about twenty-seven thousand people, nearly all Hillfolk.",
             pause: 4,
         },
         {
@@ -62,7 +54,7 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
             action: [
                 { do: "set", field: `${INSPECTOR} textarea[name="pinDesc"]`, value: "A walled city where the hill roads meet the King's Road.", label: "Description" },
                 { do: "click", target: `${INSPECTOR} input[data-inspector-action="lock"]`, label: "Lock" },
-                { do: "expect", check: (studio) => studio.mapPins.find((pin) => pin.name === "Mostadra")?.generated?.locked === true || "Mostadra is not locked", within: 30000 },
+                { do: "expect", check: (studio) => studio.mapPins.find((pin) => pin.name === "Golenduos")?.generated?.locked === true || "Golenduos is not locked", within: 30000 },
             ],
             note: "In Foundry, a pin's name and description become a page of the scene's journal when the map is exported to a scene (see [[Export]]).",
             narration: "Give it a description, and lock it, so generating again keeps it.",
@@ -103,7 +95,7 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
         {
             id: "sea",
             title: "Name a sea",
-            instruction: "Click **Labels** on the rail. Choose **Place** on the bar and set **Style** to **Water**. Zoom in on the sea east of the continent and click the open water between the continent and the island of Thetfield. The new label opens in the inspector: change **Text** to `The Morning Sea` and press Enter, then set **Rotation** to `-30` degrees so the name runs up the channel.",
+            instruction: "Click **Labels** on the rail. Choose **Place** on the bar and set **Style** to **Water**. Zoom in on the sea east of the continent and click the open water between the continent and the island of Pilton. The new label opens in the inspector: change **Text** to `The Morning Sea` and press Enter, then set **Rotation** to `-30` degrees so the name runs up the channel.",
             action: [
                 { do: "tool", tool: "labels", label: "Labels" },
                 { do: "mode", action: "setPickMode", mode: "place", label: "Place" },
@@ -123,27 +115,27 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
         {
             id: "no-room",
             title: "Find the names with no room",
-            instruction: "Set the Labels list's **Kind of label** filter to **With no room**: it lists the names the map has no room for, here a few duchies and the names of your two routes (route names are placed last). While you are placing labels, each shows faintly where it would go. Zoom in on the Red Hills: the duchy name **Southamney** lies faintly across the town names east of Mostadra.",
+            instruction: "Set the Labels list's **Kind of label** filter to **With no room**: it lists the names the map has no room for, here a few duchies and the names of your two routes (route names are placed last). While you are placing labels, each shows faintly where it would go. Zoom in on the Red Hills: the duchy name **Golenduos** lies faintly across the names of the city it is named after and the castle beside it.",
             action: [
                 { do: "set", field: 'select[data-list-query="label"][data-query-field="kind"]', value: "noRoom", valueLabel: "With no room", label: "Kind of label" },
                 { do: "frame", rect: HILLS, label: "Zoom in on the Red Hills." },
             ],
             screenshot: { name: "no-room", region: "studio" },
             caption: "The names with no room, listed, and shown faintly on the map while you place labels.",
-            narration: "Filter the labels to those with no room. While you place labels, they show faintly where they would go, like the duchy name Southamney here.",
+            narration: "Filter the labels to those with no room. While you place labels, they show faintly where they would go, like the duchy name Golenduos here.",
             pause: 3,
         },
         {
             id: "drag",
             title: "Place it yourself",
-            instruction: "Drag the faint **Southamney** a little south, below the town names, and let go. A name you have dragged keeps its place, and is always drawn; the smaller names around it make room.",
+            instruction: "Drag the faint **Golenduos** a little north, above the city's and the castle's names, and let go. A name you have dragged keeps its place, and is always drawn; the smaller names around it make room.",
             action: [
-                { do: "drag", from: SOUTHAMNEY_FROM, to: SOUTHAMNEY_TO, label: "Drag Southamney south." },
-                { do: "expect", check: (studio) => Number.isFinite(studio.regionLevels.flatMap((level) => level.regions).find((region) => region.name === "Southamney")?.label?.x) || "Southamney's name was not placed", within: 30000 },
+                { do: "dragLabel", name: "Golenduos", level: "Duchies", by: [-6, -30], label: "Drag Golenduos north." },
+                { do: "expect", check: (studio) => studio.regionLevels.flatMap((level) => level.regions).some((region) => region.name === "Golenduos" && Number.isFinite(region.label?.x)) || "Golenduos's name was not placed", within: 30000 },
             ],
             screenshot: { name: "placed", region: { map: HILLS }, mapOnly: true },
-            caption: "Southamney, dragged into a place of its own.",
-            narration: "Drag it a little south, below the town names. A name you've placed yourself stays where you put it and other names will move to make space.",
+            caption: "Golenduos, dragged into a place of its own.",
+            narration: "Drag it a little north, above the names of the city and the castle. A name you've placed yourself stays where you put it and other names will move to make space.",
             pause: 4,
         },
         {
@@ -152,7 +144,7 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
             instruction: "Your sea lane's name had no room either. Zoom in on the sea again: **The Islemark Crossing** shows faintly above the middle of its line, near the coast. Drag it out into the open water south of The Morning Sea.",
             action: [
                 { do: "frame", rect: SEA_VIEW, label: "Zoom in on the sea." },
-                { do: "drag", from: CROSSING_FROM, to: CROSSING_TO, label: "Drag The Islemark Crossing into the open water." },
+                { do: "dragLabel", owner: "route", name: "The Islemark Crossing", by: [67, 57], label: "Drag The Islemark Crossing into the open water." },
                 { do: "expect", check: (studio) => Number.isFinite(studio.mapRoutes.find((route) => route.name === "The Islemark Crossing")?.label?.x) || "the sea lane's name was not placed", within: 30000 },
             ],
             screenshot: { name: "crossing", region: { map: SEA_VIEW }, mapOnly: true },
@@ -174,8 +166,8 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
         },
     ],
 
-    whatYouSee: "Mostadra, locked, with its description. A castle of your own, Redwatch, in the Red Hills, its name shown with every castle's. The Morning Sea named in the water east of the continent, and the names of the duchy Southamney and The Islemark Crossing placed by hand.",
-    foundry: "Everything on this page is the same in Foundry. When the map is exported to a scene, Mostadra's name and description become a page of the scene's journal; give Redwatch a description and it gets one too.",
+    whatYouSee: "Golenduos, locked, with its description. A castle of your own, Redwatch, in the Red Hills, its name shown with every castle's. The Morning Sea named in the water east of the continent, and the names of the duchy Golenduos and The Islemark Crossing placed by hand.",
+    foundry: "Everything on this page is the same in Foundry. When the map is exported to a scene, Golenduos's name and description become a page of the scene's journal; give Redwatch a description and it gets one too.",
     onYourOwn: `Lock the generated places your story needs before you generate again, and describe them as you go: the description travels with the pin to Foundry's journal. Mark places the run doesn't make (a ruin, a shrine, a lair) with a style of your own, made with **Save as…** or in [[Styles and icons]], so you can change them all at once. Name the seas, forests and mountain ranges with standalone labels; a label style for each kind keeps them alike. If the map is crowded, check the **With no room** filter before you export, and place the names that matter. See [[Routes and pins]], [[Labels]] and [[Styles and icons]].`,
     related: ["Routes and pins", "Labels", "Styles and icons", "Map Canvas"],
 };

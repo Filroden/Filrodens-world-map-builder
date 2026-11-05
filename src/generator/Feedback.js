@@ -3,7 +3,6 @@ import { EDGE, politicalCost } from "./CellGraph.js";
 import { townMix } from "./Cultures.js";
 import { cellHostility } from "./Borders.js";
 import { cultureBarrier, roadsFrom } from "./Realms.js";
-import { biomeProperties } from "./ModelBiomes.js";
 import { SearchSpace, searchAll } from "./Search.js";
 
 /**
@@ -80,14 +79,13 @@ function securityField(state) {
 function threatSources(state) {
     const { graph, cells, context } = state;
     const realm = context.realms.realmOfCell;
-    const raiders = biomeProperties().raiders;
     const hosts = FILRODENSWMB.GENERATOR.FEEDBACK.WILD_HOSTS_PER_KM2;
     const border = [];
     const wild = [];
     for (let cell = 0; cell < cells.count; cell++) {
         if (cells.water[cell]) continue;
         if (realm[cell] < 0) {
-            if (cells.landKm2[cell] > 0 && (context.cellPop[cell] / cells.landKm2[cell]) * raiders[cells.biome[cell]] >= hosts) wild.push(cell);
+            if (cells.landKm2[cell] > 0 && (context.cellPop[cell] / cells.landKm2[cell]) * cells.raiders[cell] >= hosts) wild.push(cell);
         } else if (bordersOtherRealm(graph, realm, cell)) border.push(cell);
     }
     return { border, wild };
@@ -124,13 +122,12 @@ function clearing(state) {
 
 function newPopulation(state, security, cleared) {
     const { cells, context } = state;
-    const cover = biomeProperties().cover;
     const cellPop = new Float64Array(cells.count);
     let after = 0;
     for (let cell = 0; cell < cells.count; cell++) {
         const before = context.cellPop[cell];
         if (cells.water[cell] || !before) continue;
-        const boost = 1 + (1 / cover[cells.biome[cell]] - 1) * cleared[cell];
+        const boost = 1 + (1 / cells.cover[cell] - 1) * cleared[cell];
         cellPop[cell] = before * boost * security[cell];
         after += cellPop[cell];
     }

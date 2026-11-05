@@ -3,7 +3,7 @@
 // and the map controls' view filters decide what an export shows. Then a new map traced over a
 // sketch with the reference image, the usual way to bring in an existing map.
 
-/** The west of the Red Hills on the regional map: Redwatch and two ruined towns, Draxted and Pereter. */
+/** The west of the Red Hills on the regional map: Redwatch and two ruined towns, Winetonton and Wargton. */
 const WEST_HILLS = [300, 420, 760, 780];
 
 /** The sketch map (samples/tutorial/ashgrove-sketch.png) and the new map's size, the same as the sketch's. */
@@ -104,10 +104,10 @@ export default {
         {
             id: "views",
             title: "Visibility and the views",
-            instruction: "Everything on the map (pins, routes, regions, labels and decorations) is visible to **Everyone**, **GM only**, or **Hidden**. The first three buttons of the map controls, **Player view**, **GM view** and **Hidden**, choose which of them the map shows; at first the first two are on. Zoom in on the west of the Red Hills, where Redwatch stands with two of the ruins, Draxted and Pereter, marked in red.",
+            instruction: "Everything on the map (pins, routes, regions, labels and decorations) is visible to **Everyone**, **GM only**, or **Hidden**. The first three buttons of the map controls, **Player view**, **GM view** and **Hidden**, choose which of them the map shows; at first the first two are on. Zoom in on the west of the Red Hills, where Redwatch stands with two of the ruins, Winetonton and Wargton, marked in red.",
             action: [{ do: "frame", rect: WEST_HILLS, label: "Zoom in on the west of the Red Hills." }],
             screenshot: { name: "gm-view", region: { map: WEST_HILLS }, mapOnly: true },
-            caption: "Player view and GM view on: Redwatch, and the ruined towns Draxted and Pereter.",
+            caption: "Player view and GM view on: Redwatch, and the ruined towns Winetonton and Wargton.",
             narration: "Everything on the map can either be visible to everyone, to the GM only, or hidden from everyone. The first three buttons of the map controls choose which you see. Here, with the GM view on, the ruins show.",
             pause: 3,
         },
@@ -246,7 +246,7 @@ export default {
                 ]),
                 { do: "expect", check: (studio, names) => names.every((name) => studio.mapPins.some((pin) => pin.name === name)) || "not every town was placed", args: TOWNS.map(([name]) => name), within: 30000 },
             ],
-            note: "The sketch's river runs straight from the hills to the south coast; the engine's rivers follow the land instead. To have the sketch's river exactly, draw it as a custom river in **Rivers and faults** (page 4), though a river that ignores the lie of the land can look out of place.",
+            note: "The sketch's river runs straight from the hills to the south coast; the engine's rivers follow the land instead. To have a river close to the sketch's, draw it as a custom river in **Rivers and faults** (page 4) with a narrow **Corridor width**; it still follows the land within that corridor.",
             narration: "Place the sketch's four towns, each beside a river, and name them.",
         },
         {

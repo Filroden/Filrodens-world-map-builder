@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../../config.js";
 import { FeatureMath } from "./FeatureMath.js";
 import { LazyField } from "./FeatureDelta.js";
 import { DetailedField } from "./FeatureNoise.js";
+import { IslandLook } from "./IslandLook.js";
 
 const { smoothstep } = FeatureMath;
 
@@ -11,7 +12,9 @@ const { smoothstep } = FeatureMath;
  * Two kinds:
  *   - Shield volcanoes (hotspot chains): broad islands built from the seabed. Each is sized so
  *     its young coast lies a set distance from its summit, then subsides, erodes and finally
- *     drowns with age (see #shieldSurface).
+ *     drowns with age (see #shieldSurface). From terrain revision 3 on, an island takes the look
+ *     of the map's own land above the sea and keeps a smooth seabed below it (see IslandLook and
+ *     #islandSurface).
  *   - Stratovolcanoes (volcanic arcs, rifts): steep, concave cones that bury the ground they stand
  *     on (see stampStratos).
  *
@@ -153,8 +156,15 @@ export class Volcanoes {
     /**
      * Adds prepared shield volcanoes to `delta`: at each pixel, how far the smoothly highest
      * volcano surface stands above the ground (never below it: a shield only builds up).
+     *
+     * With `context.island` (terrain revision 3 on, see IslandLook) the islands take the look of
+     * the map's land; without it they keep the look of the revision they were made with.
      */
     static stampShields(delta, volcanoes, context) {
+        if (context.island) {
+            Volcanoes.#stampIslands(delta, volcanoes, context);
+            return;
+        }
         const settings = FILRODENSWMB.TECTONICS.FEATURES.VOLCANO;
         const lift = new Float32Array(delta.data.length);
         const textures = Volcanoes.#shieldTextures(delta, context.noise);
@@ -171,6 +181,100 @@ export class Volcanoes {
             });
         }
         for (let i = 0; i < lift.length; i++) delta.data[i] += lift[i];
+    }
+
+    /**
+     * Shield volcanoes with the look of the map's land (terrain revision 3 on, see IslandLook):
+     * each volcano's outline wanders with Coastline Fracture, its part above the sea is shaped
+     * as the engine shapes land, with the lava-flow texture only along its coast, and its seabed
+     * is smooth, with a narrow shelf round a large, young island.
+     */
+    static #stampIslands(delta, volcanoes, context) {
+        const settings = FILRODENSWMB.TECTONICS.FEATURES.VOLCANO;
+        const look = context.island;
+        const seaLevel = context.seaLevel;
+        const lift = new Float32Array(delta.data.length);
+        const textures = {
+            flows: Volcanoes.#detailed(delta, context.noise, settings.FLOW_NOISE_LENGTH, NOISE_OFFSETS.FLOWS),
+            land: new LazyField(delta, (x, y) => IslandLook.detailAt(context.noise.simplex, look, x, y)),
+            reef: Volcanoes.#reefField(delta, context.noise),
+        };
+        for (const volcano of volcanoes) {
+            const footprint = volcano.model.footprint;
+            const coast = Volcanoes.#coastShareNow(volcano, seaLevel);
+            const shelf = IslandLook.shelfExponent(volcano, look, context.noise, MIN_DROWN_AGE);
+            Volcanoes.#forEachPixel(delta, volcano, footprint * LOBE_REACH_MARGIN, (x, y) => {
+                // Where the pixel lies on the volcano once its outline has wandered
+                const { dx, dy } = IslandLook.warp(x, y, volcano, coast, look, context.noise);
+                const r = Math.hypot(dx, dy) / footprint;
+                if (r >= LOBE_REACH_MARGIN) return;
+                const angle = Math.atan2(dy, dx);
+                const q = r / (1 + (Volcanoes.#lobeAt(volcano, angle) - 1) * smoothstep(SHIELD_LOBE_START.FROM, SHIELD_LOBE_START.TO, r));
+                if (q >= 1) return;
+                const surface = IslandLook.shelf(Volcanoes.#islandSurface(q, x, y, volcano, coast, textures, look, seaLevel), shelf, look, seaLevel);
+                const above = surface - Volcanoes.#groundAt(context, x, y);
+                if (above <= 0) return;
+                const index = delta.indexOf(x, y);
+                lift[index] = lift[index] > 0 ? FeatureMath.smax(lift[index], above, settings.BLEND) : above;
+            });
+        }
+        for (let i = 0; i < lift.length; i++) delta.data[i] += lift[i];
+    }
+
+    /**
+     * A revision 3 shield's surface at map pixel (x, y), `q` along its footprint, with its coast
+     * `coast` (a share of the footprint) from its summit: the smooth shield, aged as before, its
+     * summit kept within the map's land heights, the lava-flow texture along its coast, and above
+     * the sea the engine's land shape and detail (see IslandLook), then planed into an atoll as it
+     * drowns.
+     */
+    static #islandSurface(q, x, y, volcano, coast, textures, look, seaLevel) {
+        const settings = FILRODENSWMB.TECTONICS.FEATURES.VOLCANO;
+        const model = volcano.model;
+        let surface = IslandLook.capSummit(Volcanoes.#smoothShield(q, volcano, true), look, seaLevel);
+        const reach = (coast - q) * model.footprint;
+        const alongCoast = IslandLook.coastTexture(reach, surface, look, seaLevel);
+        if (alongCoast > 0) {
+            const flowHeight = Math.max(settings.FLOW_NOISE_MIN, settings.FLOW_NOISE * (model.top - model.floor));
+            surface += flowHeight * textures.flows.at(x, y) * alongCoast;
+        }
+        if (surface > seaLevel && reach > 0) {
+            surface = IslandLook.capSummit(IslandLook.landRelief(surface - seaLevel, reach, coast * model.footprint, textures.land.at(x, y), look, seaLevel), look, seaLevel);
+        }
+        return Volcanoes.#atoll(surface, q, volcano.age, volcano, x, y, textures, seaLevel);
+    }
+
+    /**
+     * A shield's smooth surface (no texture) at `q` along its footprint, aged: worn to a dome and
+     * subsided, with its young summit cone and caldera if `summit` is set.
+     */
+    static #smoothShield(q, volcano, summit) {
+        const model = volcano.model;
+        const age = volcano.age;
+        const worn = DOME_SHARE * smoothstep(SHIELD_AGE.DOME_FROM, SHIELD_AGE.DOME_TO, age);
+        let p = Volcanoes.#shieldProfile(q) * (1 - worn) + Volcanoes.#domeProfile(q) * worn;
+        if (summit) {
+            const youth = 1 - smoothstep(0, SHIELD_AGE.YOUTH_END, age);
+            p += youth * SUMMIT_CONE.HEIGHT * Math.pow(Math.max(0, 1 - (q / SUMMIT_CONE.RADIUS) ** 2), 2);
+            p -= youth * CALDERA.DEPTH * (1 - smoothstep(CALDERA.INNER, CALDERA.OUTER, q));
+        }
+        return model.floor + (model.top - model.floor) * p - model.subsidence;
+    }
+
+    /**
+     * Where a shield's coast lies now, as a share of its footprint: found on its smooth profile
+     * once it has subsided with age (its summit cone aside). 0 for a volcano with no land.
+     */
+    static #coastShareNow(volcano, seaLevel) {
+        if (Volcanoes.#smoothShield(0, volcano, false) <= seaLevel) return 0;
+        let low = 0;
+        let high = 1;
+        for (let i = 0; i < INVERSE_ITERATIONS; i++) {
+            const middle = (low + high) / 2;
+            if (Volcanoes.#smoothShield(middle, volcano, false) > seaLevel) low = middle;
+            else high = middle;
+        }
+        return (low + high) / 2;
     }
 
     static #shieldModel(volcano, floor, seaLevel) {
@@ -317,8 +421,13 @@ export class Volcanoes {
         return {
             flows: Volcanoes.#detailed(delta, noise, settings.FLOW_NOISE_LENGTH, NOISE_OFFSETS.FLOWS),
             erosion: Volcanoes.#detailed(delta, noise, settings.EROSION_NOISE_LENGTH, NOISE_OFFSETS.EROSION),
-            reef: new LazyField(delta, (x, y) => noise.fbm(noise.bx(x) / REEF_NOISE_LENGTH + NOISE_OFFSETS.REEF, noise.by(y) / REEF_NOISE_LENGTH, 2)),
+            reef: Volcanoes.#reefField(delta, noise),
         };
+    }
+
+    /** The noise that breaks an atoll's reef into islets and gaps. */
+    static #reefField(delta, noise) {
+        return new LazyField(delta, (x, y) => noise.fbm(noise.bx(x) / REEF_NOISE_LENGTH + NOISE_OFFSETS.REEF, noise.by(y) / REEF_NOISE_LENGTH, 2));
     }
 
     // --- Stratovolcanoes ---

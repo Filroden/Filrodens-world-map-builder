@@ -1,4 +1,5 @@
 import { formatDistance } from "../data/MapUnit.js";
+import { RangeCurve } from "./RangeCurve.js";
 
 /**
  * Keeps a range slider's value display and its filled portion in step with the slider.
@@ -33,6 +34,8 @@ export class RangeDisplay {
      * @param {HTMLInputElement} input - A range input.
      */
     static sync(input) {
+        // A slider on a power curve works out its value from its new position first (see RangeCurve)
+        if (RangeCurve.isCurved(input)) RangeCurve.settle(input);
         const output = input.closest(RangeDisplay.#WRAPPER_SELECTOR)?.querySelector("output");
         if (output) output.value = RangeDisplay.#shown(input);
 
@@ -57,6 +60,7 @@ export class RangeDisplay {
      * formatted as a distance.
      */
     static #shown(input) {
+        if (RangeCurve.isCurved(input)) return input.dataset.value;
         const scale = Number.parseFloat(input.dataset?.displayScale);
         if (!Number.isFinite(scale)) return input.value;
         return formatDistance(Number.parseFloat(input.value) * scale);

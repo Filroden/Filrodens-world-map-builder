@@ -6,19 +6,26 @@ import { FILRODENSWMB } from "../config.js";
  * top. The Graphics is rebuilt only when what it shows changes (the run's lines, or the map's
  * size, which scales the widths), since a run has thousands of lines and redrawing them on every
  * repaint of the vectors would cost more than everything else drawn then.
+ *
+ * While the lines are shown the routes beneath are drawn fainter (TRADE.ROUTE_ALPHA), hand-placed
+ * and generated alike: trade follows only the generated routes, so a hand-placed route would
+ * otherwise be the one road on the map with nothing over it.
  */
 export class TradeFlowLayer {
     #pixi;
     #graphics;
+    #routes;
     #source = null;
     #scale = 0;
 
     /**
      * @param {object} pixi - The PIXI namespace.
      * @param {object} container - The canvas layer it is drawn in.
+     * @param {object} [routes] - The routes' display object, made fainter while the lines show.
      */
-    constructor(pixi, container) {
+    constructor(pixi, container, routes = null) {
         this.#pixi = pixi;
+        this.#routes = routes;
         this.#graphics = new pixi.Graphics();
         container.addChild(this.#graphics);
     }
@@ -30,6 +37,7 @@ export class TradeFlowLayer {
      */
     show(lines, resScale) {
         this.#graphics.visible = !!lines;
+        if (this.#routes) this.#routes.alpha = lines ? FILRODENSWMB.THEMATIC.TRADE.ROUTE_ALPHA : 1;
         if (!lines || (lines === this.#source && resScale === this.#scale)) return;
         this.#source = lines;
         this.#scale = resScale;

@@ -4,6 +4,7 @@ import { RangeFeature } from "./tectonics/RangeFeature.js";
 import { SubductionFeature } from "./tectonics/SubductionFeature.js";
 import { RiftFeature } from "./tectonics/RiftFeature.js";
 import { HotspotFeature } from "./tectonics/HotspotFeature.js";
+import { IslandLook } from "./tectonics/IslandLook.js";
 
 /**
  * Tectonic features: mountain ranges, subduction zones, rifts and hotspot chains drawn as lines
@@ -56,8 +57,11 @@ export class TectonicFeatureEngine {
      * @param {object[]} faults - The map's faults; only tectonic features are applied.
      * @param {object} options - `width` and `height` (the map's size), `simplex` (the map's noise
      *   generator), `seaLevel`, `frame` ({zoom, originX, originY, rootSize}: the map's place in
-     *   its top map and that map's longer side), optional `bounds` (only pixels inside change)
-     *   and `cache` (an object kept between calls for the same map, see above).
+     *   its top map and that map's longer side), optional `bounds` (only pixels inside change),
+     *   `cache` (an object kept between calls for the same map, see above) and `params` (the
+     *   map's derived generation settings: from terrain revision 3 on, hotspot islands take the
+     *   look of the map's land from them, see IslandLook, and every feature is built along the
+     *   centripetal curve, see CatmullRom).
      */
     static apply(elevation, ground, faults, options) {
         const features = (faults ?? []).filter((fault) => TectonicFeatureEngine.isFeature(fault) && fault.points?.length >= 2);
@@ -65,18 +69,29 @@ export class TectonicFeatureEngine {
         if (cache) TectonicFeatureEngine.#pruneCache(cache, features);
         if (features.length === 0) return;
 
+        const noise = new FeatureNoise(options.simplex, options.frame);
         const context = {
             ground,
             width: options.width,
             height: options.height,
             seaLevel: options.seaLevel,
-            noise: new FeatureNoise(options.simplex, options.frame),
+            noise,
+            island: TectonicFeatureEngine.#needsIslandLook(features, options) ? IslandLook.of(options.params, options.seaLevel, noise) : null,
+            // From revision 3 on, every feature is built along the centripetal curve (see CatmullRom)
+            centripetal: options.params?.terrain?.centripetalLines === true,
         };
-        const frameKey = JSON.stringify([options.seaLevel, options.frame]);
+        // The island look and the curve depend on the map's settings, so they are part of every
+        // feature's key (both unset, and the key unchanged, before revision 3)
+        const frameKey = JSON.stringify([options.seaLevel, options.frame, ...(context.island ? [context.island.key] : []), ...(context.centripetal ? ["centripetal"] : [])]);
 
         // Every change is worked out before any is added, so `ground` may be `elevation` itself
         const deltas = features.map((fault) => TectonicFeatureEngine.#deltaFor(fault, context, frameKey, cache));
         for (const delta of deltas) delta?.addTo(elevation, options.width, options.bounds ?? null);
+    }
+
+    /** Whether hotspot islands take the look of the map's land (revision 3 on) and any chain is drawn. */
+    static #needsIslandLook(features, options) {
+        return options.params?.terrain?.currentHotspots === true && features.some((fault) => fault.type === FILRODENSWMB.TECTONICS.FEATURES.TYPES.HOTSPOT);
     }
 
     /** Whether `type` is one of the tectonic feature types. */

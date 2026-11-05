@@ -1,0 +1,76 @@
+{{!--
+    The inspector's custom biome (see BiomeEditor): its name, code, colour and placement; what
+    Generate makes of it (Behaves like, and Own numbers with a slider per property, shown while
+    ticked); and Delete. Every field applies when committed, one undo step each
+    (see Inspector). Inside the section block the context is the section partial's, so the
+    biome's fields are read from @root.
+--}}
+<datalist id="fwmb-inspector-biome-colors">
+    {{#each palette}}
+    <option value="{{this}}"></option>
+    {{/each}}
+</datalist>
+<div class="fwmb-group">
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-name" name="biomeName" maxlength="{{fwmbTextLimit 'name'}}" value="{{biome.name}}" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-biome-code">{{localize "FILRODENSWMB.UI.BiomeCode"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="text" id="fwmb-inspector-biome-code" name="biomeCode" maxlength="{{fwmbTextLimit 'name'}}" value="{{biome.code}}" placeholder="{{localize 'FILRODENSWMB.UI.BiomeCodeHint'}}" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label" for="fwmb-inspector-biome-color">{{localize "FILRODENSWMB.UI.BiomeColor"}}</label>
+        <div class="fwmb-form-fields">
+            <input type="color" id="fwmb-inspector-biome-color" class="fwmb-swatch" name="biomeColor" value="{{biome.hex}}" list="fwmb-inspector-biome-colors" />
+        </div>
+    </div>
+    <div class="fwmb-form-group">
+        <label class="fwmb-label fwmb-info-label" for="fwmb-inspector-biome-placement">
+            {{localize "FILRODENSWMB.UI.BiomePlacement"}}
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomePlacementHint'}}"></i>
+        </label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-biome-placement" name="biomePlacement">
+                {{#each placements}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+</div>
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorBiomeGenerate" title="FILRODENSWMB.UI.InspectorBiomeGenerate"}}
+    <div class="fwmb-form-group">
+        <label class="fwmb-label fwmb-info-label" for="fwmb-inspector-biome-behaves">
+            {{localize "FILRODENSWMB.UI.BiomeBehavesLike"}}
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeBehavesLikeHint'}}"></i>
+        </label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-inspector-biome-behaves" name="biomeBehavesLike">
+                {{#each @root.behaviours}}
+                <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+    </div>
+    <label class="fwmb-checkbox-label" data-tooltip="{{localize 'FILRODENSWMB.UI.BiomeOwnNumbersHint'}}">
+        <input type="checkbox" class="fwmb-checkbox" name="biomeOwnNumbers" {{#if @root.ownNumbers}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.BiomeOwnNumbers"}}
+    </label>
+    {{!-- Hidden until Own numbers is ticked, holding Behaves like's numbers so ticking it starts from them --}}
+    <div class="fwmb-biome-numbers" data-biome-numbers {{#unless @root.ownNumbers}}hidden{{/unless}}>
+        {{#each @root.properties}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name=this.name label=this.label hint=this.hint value=this.value min=this.min max=this.max step=this.step}}
+        {{/each}}
+    </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+<div class="fwmb-inspector-actions">
+    <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-inspector-delete" data-inspector-action="delete"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Delete"}}</button>
+</div>
+<p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorApplyHint"}}</p>

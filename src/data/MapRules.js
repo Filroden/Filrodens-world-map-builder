@@ -373,6 +373,13 @@ const RIVER = obj({
     // string is read as its number
     width: num(RANGE.SIZE, { fromText: true }),
     widthScale: num(RANGE.SIZE),
+    // From terrain revision 3 on (see RiverCorridor): the corridor's half-width in river widths,
+    // and whether the river cuts through high ground; a regional map's river also carries the way
+    // its parent's runs and the flow it enters the crop with
+    corridor: num({ min: 1, max: 100 }),
+    cutThrough: bool,
+    reversed: bool,
+    inflow: num(RANGE.SIZE),
     visibility,
     hidden,
 });
@@ -380,8 +387,14 @@ const RIVER = obj({
 const LAND_MASK = obj({
     id,
     name: name("FILRODENSWMB.UI.LimitKindLandMask"),
-    operation: enumOf(["add", "subtract"]),
+    // "settings": a Coast only mask, which shapes no land (see MaskSettings)
+    operation: enumOf(["add", "subtract", "settings"]),
     points,
+    // A mask's own coast settings (absent: the map's), and whether they stop sharply at its edge
+    coastlineFracture: num(RANGE.SIGNED, { nullable: true }),
+    coastalPlain: num(RANGE.SIGNED, { nullable: true }),
+    shelfRange: num(RANGE.SIGNED, { nullable: true }),
+    sharpEdge: bool,
 });
 
 const HISTORY_ENTRY = obj({
@@ -409,6 +422,8 @@ const CUSTOM_BIOME = obj({
     solidOverWater: bool,
     // The built-in biome the generator treats it as (GENERATOR.BIOMES); null: the biome the climate gives
     behavesLike: enumOf(Object.keys(FILRODENSWMB.GENERATOR.BIOMES), { nullable: true }),
+    // Numbers of its own for the generator (see ModelBiomes); null: those of behavesLike
+    properties: obj(Object.fromEntries(FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.map((property) => [property.key, num({ min: property.min, max: property.max })])), { nullable: true }),
     rules: list(obj({ elevation: list({ t: "segment" }), moisture: list({ t: "segment" }), temperature: list({ t: "segment" }) })),
 });
 

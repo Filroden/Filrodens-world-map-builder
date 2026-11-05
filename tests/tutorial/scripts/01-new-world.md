@@ -62,7 +62,7 @@
 
 **On screen:**
 
-- Set Generation engine to Guided v2.
+- Set Generation engine to Guided v3.
 - The dialogue opens.
 
 **Camera:** the whole studio

@@ -2,7 +2,7 @@
   "name": "The Isle of Ashgrove",
   "seed": "51745D",
   "generationEngine": "guided",
-  "terrainVersion": 2,
+  "terrainVersion": 3,
   "sizeRevision": 2,
   "nameLevels": true,
   "localLevel": true,
@@ -111,6 +111,9 @@
         "originY": 0
       },
       "currentRivers": true,
+      "currentHotspots": true,
+      "guidedRivers": true,
+      "centripetalLines": true,
       "exactDistances": true
     },
     "noise": {
@@ -1407,4 +1410,4 @@
   "owners": {
     "ohLJKCW7tzGBebLw": "7bsCAe27Ag=="
   }
-}
+}

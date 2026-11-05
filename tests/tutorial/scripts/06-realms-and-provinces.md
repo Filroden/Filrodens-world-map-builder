@@ -23,12 +23,12 @@
 
 ## 2. Find the island realms
 
-**Narration:** The big island in the east is split between two realms. Choose Newcestedia, and Focus view zooms the map to it.
+**Narration:** The big island in the east is split between two realms. Choose Dudge, and Focus view zooms the map to it.
 
 **On screen:**
 
-- Click Newcestedia.
-- Point at Newcestedia's row.
+- Click Dudge.
+- Point at Dudge's row.
 - Click Focus view.
 
 **Camera:** the whole studio
@@ -39,15 +39,15 @@
 
 ## 3. Merge the realms
 
-**Narration:** Unite the island: merge Chisted into Newcestedia.
+**Narration:** Unite the island: merge Stansteria into Dudge.
 
 **On screen:**
 
-- Point at Chisted's row.
-- Click ⋮ on Chisted.
+- Point at Stansteria's row.
+- Click ⋮ on Stansteria.
 - Click Merge into.
 - The dialogue opens.
-- Set Merge into to Newcestedia.
+- Set Merge into to Dudge.
 
 **Camera:** the dialog
 

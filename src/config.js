@@ -29,6 +29,11 @@ export const FILRODENSWMB = {
         hexC: { value: 4, name: "HEXODDQ" },
     },
     DEFAULTS: {
+        // The engine of a new map: Advanced (tectonics), which gives the most natural worlds.
+        // Legacy generation ("standard", the original noise engine) stays for maps made with it
+        // and for anyone who chooses it, but is never the default. A saved map with no engine
+        // recorded is a Legacy generation map, since that was the only engine then.
+        ENGINE: "advanced",
         SEED: "FILRODEN",
         SEA_LEVEL: 0.35,
         LAT_TOP: 90,
@@ -77,10 +82,15 @@ export const FILRODENSWMB = {
         },
         TECTONIC_PLATES: 10,
         COASTLINE_FRACTURE: 0.2,
-        // The Coastline Fracture slider's step (tools-terrain.hbs uses the same value). Values
-        // worked out in code for the slider, such as the one a map is given when it is updated
-        // to the current terrain rules, are rounded to it so the slider can show them exactly.
-        COASTLINE_FRACTURE_STEP: 0.05,
+        // The Coastline Fracture slider is on a power curve (see RangeCurve): its value is its
+        // position, from 0 to 1 in steps of 0.01, to the power COASTLINE_FRACTURE_CURVE. The
+        // setting's visible effect (coastline length, islands) changes fastest near 0, and
+        // against the square of the position it grows by about the same amount per step, so each
+        // step of the slider looks like about as much change as the last. Values worked out in
+        // code, such as the one a map is given when it is updated to the current terrain rules,
+        // are rounded to COASTLINE_FRACTURE_STEP, the precision a curved slider keeps.
+        COASTLINE_FRACTURE_CURVE: 2,
+        COASTLINE_FRACTURE_STEP: 0.001,
         CONTINENTAL_GROUPING: 0.4,
         COASTAL_BAND: 30,
         CONTINENT_SCALE: 150,
@@ -258,6 +268,20 @@ export const FILRODENSWMB = {
                 },
             },
         },
+        // A land mask's own coast settings on a guided map (see MaskSettings). Lengths are in
+        // pixels of a BASELINE_DIMENSION map.
+        MASK_SETTINGS: {
+            // How far beyond a mask's edge its settings fade into what lies beneath. A change of
+            // Coastline Fracture fades over at least its size times WARP.AMPLITUDE (the furthest
+            // the change moves the coastline warp): any shorter, and the warp folds the coastline
+            // into a seam along the mask's edge.
+            FADE: 40,
+            // The fade of a mask with Sharp edge on, whatever the change
+            SHARP_FADE: 4,
+            // How far values blend at sea, so the sea between two coasts that are about equally
+            // near takes a mix of their settings
+            SEA_BLEND: 30,
+        },
     },
     // Which revision of the terrain generation rules a saved map was built with. Generation is
     // re-run from the saved settings every time a map is opened (no terrain pixels are stored),
@@ -280,18 +304,31 @@ export const FILRODENSWMB = {
     //       the same pipeline, with its land placed by tectonic plates. Fault lines read their
     //       noise, and space their hotspot volcanoes, in the top map's pixels, so a regional
     //       map's faults match its parent's (on a map that was never cropped this changes nothing).
+    //   3 - tectonic features and custom rivers, on every engine: hotspot chains are rebuilt to
+    //       match the terrain around them (see TerrainVersion.usesCurrentHotspots), a custom
+    //       river follows the land within a corridor round the line drawn, rather than the line
+    //       itself (see TerrainVersion.usesGuidedRivers), and both follow, and are drawn along,
+    //       the centripetal Catmull-Rom curve through their points (see
+    //       TerrainVersion.usesCentripetalLines). Nothing else differs from revision 2, so a
+    //       revision 2 map with neither is moved to revision 3 as it opens (see
+    //       TerrainVersion.settlesOnLoad); one with either is offered the update.
+    // Each rule is gated on the revision that brought it (REVISION_2, REVISION_3), never on
+    // CURRENT, so a later revision cannot move an older rule; CURRENT is only what a new map gets.
     TERRAIN_VERSION: {
         LEGACY: 1,
         // Revision 2 also brings the current river rules: rivers follow the slope's own direction
         // and join a river they run beside, and custom rivers carve a channel with wider, gentler
         // banks (see TerrainVersion.usesCurrentRivers)
-        CURRENT: 2,
+        REVISION_2: 2,
+        REVISION_3: 3,
+        // The revision a new map, or a regional map of a map at it, is made with
+        CURRENT: 3,
         // Engines that build their terrain outward from a coastline, and so use the coastline
-        // rules of the current revision: settings measured in pixels of a map BASELINE_DIMENSION
+        // rules of revision 2 on: settings measured in pixels of a map BASELINE_DIMENSION
         // pixels across and scaled to the actual map (before, they were fixed pixel counts, so
         // the same values gave smoother, straighter coastlines on bigger maps), and the coastal
         // profile described in GENERATION.COASTAL_PROFILE. For the tectonic engine ("advanced")
-        // the current revision is a different engine altogether: the guided pipeline with land
+        // revision 2 is a different engine altogether: the guided pipeline with land
         // placed by tectonic plates (ProceduralEngine.generateTectonicV2Topography), where
         // revision 1 kept the original tectonic engine (generateTectonicTopography).
         COASTLINE_ENGINES: ["guided", "advanced"],
@@ -770,7 +807,7 @@ export const FILRODENSWMB = {
         // no edit toggle (its decorations can always be moved), so its word stands for the tool.
         // Tools with null have no editing at all.
         STATE_WORD: {
-            scene: { addMask: "drawing", subtractMask: "drawing", crop: "cropping" },
+            scene: { addMask: "drawing", subtractMask: "drawing", coastMask: "drawing", crop: "cropping" },
             terrain: "terraforming",
             biomes: "painting",
             // Select starts editing in River (see PickTool.settleForEditing)
@@ -824,13 +861,10 @@ export const FILRODENSWMB = {
     // The map's unit (see MapUnit): the name every distance the studio shows is labelled with. The
     // model measures in kilometres, and a figure is shown as that number of kilometres under the
     // map's own name for the unit, so the default is the name that makes the figure literally true.
-    // LEGACY_DEFAULT is the scale bar's built-in text before the map had a unit: a map saved with it
-    // untouched takes the default instead, since its figures would otherwise read as miles.
     // The scale bar's Match world scale rounds the distance per major tick to one of NICE_STEPS
     // times a power of ten.
     MAP_UNIT: Object.freeze({
         DEFAULT: "km",
-        LEGACY_DEFAULT: "Miles",
         NICE_STEPS: Object.freeze([1, 2, 5]),
     }),
     // The thematic layers (see ThematicData and ThematicView): what the generator's last run left in
@@ -1033,6 +1067,12 @@ export const FILRODENSWMB = {
                 Object.freeze({ id: "sea", label: "FILRODENSWMB.UI.ThematicTradeSea", value: "FILRODENSWMB.UI.ThematicTradeSeaValue", color: "#7570b3" }),
             ]),
             ALPHA: 0.85,
+            // The routes' strength while the trade is shown. Trade is drawn only along the
+            // generated routes it was worked out on, so a hand-placed route has no trade line over
+            // it; drawn at full strength it would stand out above the trade as if it were the
+            // busiest road on the map. Every route is drawn fainter, so the trade reads first and
+            // the routes stay as the context it runs along.
+            ROUTE_ALPHA: 0.4,
             HIT_PX: 6,
         }),
         // The culture layer's fading: a cell whose dominant culture holds SHARE_FULL of its people
@@ -1227,10 +1267,12 @@ export const FILRODENSWMB = {
         FALLBACK_HIGHLIGHT_COLOR: [255, 32, 200],
         FALLBACK_HIGHLIGHT_ALPHA: 0.55,
         // Guided-mode land mask colours, shared by the canvas outline and the Land Masks list swatch
-        // so the two always agree: "add" shapes mark land, "subtract" shapes mark ocean holes.
+        // so the two always agree: "add" shapes mark land, "subtract" shapes mark ocean holes,
+        // and "settings" (Coast only) shapes carry coast settings without shaping land.
         LAND_MASK_COLORS: {
             ADD: "#4ade80",
             SUBTRACT: "#f87171",
+            COAST: "#fbbf24",
         },
     },
     HYDROLOGY: {
@@ -1268,6 +1310,12 @@ export const FILRODENSWMB = {
             6: 0.035,
             8: 0.05,
         },
+        // Custom rivers from terrain revision 3 on (see RiverCorridor): the corridor reaches
+        // CORRIDOR river widths either side of the line drawn (a river's own `corridor`, from
+        // CORRIDOR_MIN to CORRIDOR_MAX)
+        CORRIDOR: 10,
+        CORRIDOR_MIN: 3,
+        CORRIDOR_MAX: 15,
         // A river running downhill follows the slope measured STREAM_GRADIENT_REACH pixels either
         // side of it, and may lag up to STREAM_SLACK pixels behind (see ProceduralEngine#followSlope)
         STREAM_GRADIENT_REACH: 1.5,
@@ -1730,7 +1778,11 @@ export const FILRODENSWMB = {
         LABEL_OFFSET: 0.6,
     },
     TECTONICS: {
+        // The thickness a fault without one is drawn with (faults saved before thickness existed)
         DEFAULT_THICKNESS: 40,
+        // Fault line thickness's range on a map: from MIN pixels up to MAX_SHARE of the map's
+        // width, in steps of STEP, with DEFAULT_SHARE of the width for a new fault (FaultThickness)
+        THICKNESS: { MIN: 10, MAX_SHARE: 0.15, DEFAULT_SHARE: 0.05, STEP: 5 },
         DEFAULT_STRENGTH: 0.25,
         HOTSPOT_SPACING: 35,
         HOTSPOT_DECAY: 0.85,
@@ -2172,11 +2224,13 @@ export const FILRODENSWMB = {
             realmSpacing: Object.freeze({ min: 0.4, max: 2.5, default: 1 }),
             fragmentation: Object.freeze({ min: 0.5, max: 2, default: 1 }),
         }),
-        // What each built-in land biome means to the model. farming multiplies the climate's yield;
-        // cover is the share of farmland left after clearing effort (forest below 1, so land near
-        // towns and roads gains when it is cleared); travel the cost of crossing it off-road; and
-        // raiders how well it feeds raiders when no realm holds it. A custom biome behaves as one of
-        // these (its "behaves like" choice, or the built-in biome the climate would give there).
+        // What each built-in land biome means to the model. farming multiplies the climate's yield
+        // of crops and herds (0: it feeds no one); cover is the share of farmland left after
+        // clearing effort (forest below 1, so land near towns and roads gains when it is cleared);
+        // travel the cost of crossing it off-road; and raiders how readily the people of land no
+        // realm holds turn to raiding (land that feeds no one breeds no raiders). A custom biome
+        // behaves as one of these (its "behaves like" choice, or the built-in biome the climate
+        // would give there), or gives its own numbers (see BIOME_PROPERTIES).
         BIOMES: Object.freeze({
             SNOW: Object.freeze({ farming: 1, cover: 1, travel: 4, raiders: 1 }),
             TUNDRA: Object.freeze({ farming: 1, cover: 1, travel: 1.5, raiders: 1 }),
@@ -2189,6 +2243,19 @@ export const FILRODENSWMB = {
             SAVANNA: Object.freeze({ farming: 1, cover: 1, travel: 1, raiders: 1 }),
             SUBTROPICAL_DESERT: Object.freeze({ farming: 1, cover: 1, travel: 2, raiders: 1 }),
         }),
+        // The properties a biome has for the model, in the order the custom biome dialogue lists
+        // them: each built-in biome's are in BIOMES, and a custom biome may give its own numbers
+        // (its `properties`, see ModelBiomes). `default` is the neutral value, used for a property
+        // a custom biome's numbers leave out when it behaves like no built-in biome (a property
+        // added after the biome was saved). min, max and step are the dialogue's fields'; cover is
+        // never 0, since clearing divides by it. Later properties (an underground biome's food, a
+        // biome's unfarmed land mix) are added to this list.
+        BIOME_PROPERTIES: Object.freeze([
+            Object.freeze({ key: "farming", min: 0, max: 3, step: 0.05, default: 1, label: "FILRODENSWMB.UI.BiomePropertyFarming", hint: "FILRODENSWMB.UI.BiomePropertyFarmingHint" }),
+            Object.freeze({ key: "cover", min: 0.1, max: 1, step: 0.05, default: 1, label: "FILRODENSWMB.UI.BiomePropertyCover", hint: "FILRODENSWMB.UI.BiomePropertyCoverHint" }),
+            Object.freeze({ key: "travel", min: 0.5, max: 6, step: 0.1, default: 1, label: "FILRODENSWMB.UI.BiomePropertyTravel", hint: "FILRODENSWMB.UI.BiomePropertyTravelHint" }),
+            Object.freeze({ key: "raiders", min: 0, max: 3, step: 0.1, default: 1, label: "FILRODENSWMB.UI.BiomePropertyRaiders", hint: "FILRODENSWMB.UI.BiomePropertyRaidersHint" }),
+        ]),
         // Stage 1, the base layer: what each model cell holds.
         VALUES: Object.freeze({
             // Rural people per km² on the best farmland; pasture feeds this share of it; fishing adds
@@ -2428,15 +2495,14 @@ export const FILRODENSWMB = {
     ENTITY_CONFIG: {
         decoration: { stateKey: "mapDecorations", activeKey: null, triggersTerrain: false },
         // `smoothed: true` marks entities StudioCanvas always renders as a Catmull-Rom curve
-        // (see #getSplinePoints), so node-insertion hit-testing must test against that curve too
-        // rather than the straight chords between control points. Manual rivers render as a plain
-        // straight polyline despite their name, so they are deliberately left un-smoothed here.
+        // (see #getSplinePoints and CatmullRom), so node-insertion hit-testing must test against
+        // that curve too rather than the straight chords between control points.
         // Entities with a `toolCategory` are edited node by node in that tool; routes and regions
         // live on the display mesh and have no nodes (routes keep an entry for deletion only).
         fault: { stateKey: "tectonicFaults", activeKey: "activeFaultId", triggersTerrain: true, toolCategory: "features", smoothed: true },
         label: { stateKey: "mapLabels", activeKey: null, triggersTerrain: false },
         pin: { stateKey: "mapPins", activeKey: null, triggersTerrain: false },
-        river: { stateKey: "manualRivers", activeKey: "activeRiverId", triggersTerrain: true, toolCategory: "features" },
+        river: { stateKey: "manualRivers", activeKey: "activeRiverId", triggersTerrain: true, toolCategory: "features", smoothed: true },
         route: { stateKey: "mapRoutes", activeKey: "activeRouteId", triggersTerrain: false },
     },
 };

@@ -93,6 +93,9 @@ export class Inspector {
         const state = { kind, ref, overlay, defaults: new Map() };
         this.#open.set(app, state);
         this.#rememberDefaults(state);
+        // Each option is told whether it is chosen, as after a redraw (see refresh), so a select
+        // reads as the object says however the document parsed its options
+        for (const option of overlay.body.querySelectorAll("option")) option.selected = option.hasAttribute("selected");
         RangeDisplay.syncAllFills(overlay.body);
         RangeTrack.syncAll(overlay.body);
         this.#bind(app, state);
@@ -174,9 +177,8 @@ export class Inspector {
         // A select the reader has used keeps its own choice when its options' selected attributes
         // change, so each option is told whether it is chosen, as the object now says
         for (const option of state.overlay.body.querySelectorAll("option")) option.selected = option.hasAttribute("selected");
-        // So is a checkbox, as the object now says: one that runs an action (Lock) has its click's
-        // own toggle cancelled, which the browser puts back once the click is over, after the
-        // action has already changed the object
+        // So is a checkbox, as the object now says: one the reader has used ignores later changes
+        // to its checked attribute, as an option does
         for (const box of state.overlay.body.querySelectorAll('input[type="checkbox"]')) box.checked = box.hasAttribute("checked");
         state.overlay.setHeader(state.kind.header(app, object, state.ref));
         this.#rememberDefaults(state);
@@ -226,10 +228,14 @@ export class Inspector {
             if (event.target.name) this.#commit(app, state, event.target.name);
         });
         // Enter in a text field commits it, as leaving it does
-        dialog.addEventListener("keydown", (event) => {
-            const field = event.target;
-            if (event.key === "Enter" && field.localName === "input" && field.type !== "checkbox" && field.name) this.#commit(app, state, field.name);
-        }, true);
+        dialog.addEventListener(
+            "keydown",
+            (event) => {
+                const field = event.target;
+                if (event.key === "Enter" && field.localName === "input" && field.type !== "checkbox" && field.name) this.#commit(app, state, field.name);
+            },
+            true,
+        );
         // A double-click returns a slider to its default and commits it. The reset is made here, not
         // left to the studio's own handler (see StudioView), which runs later in the event: a
         // reader's double-click runs pending work between the two, so a commit queued here would
@@ -244,13 +250,21 @@ export class Inspector {
             this.#commit(app, state, field.name);
         });
         // A section's toggle does not bubble, so it is caught on its way down
-        dialog.addEventListener("toggle", (event) => {
-            if (event.target.localName === "details") this.#rememberSection(app, event.target);
-        }, true);
+        dialog.addEventListener(
+            "toggle",
+            (event) => {
+                if (event.target.localName === "details") this.#rememberSection(app, event.target);
+            },
+            true,
+        );
         dialog.addEventListener("click", (event) => {
             const button = event.target.closest?.("[data-inspector-action]");
             if (!button || !dialog.contains(button)) return;
-            event.preventDefault();
+            // A checkbox that runs an action (Lock) keeps its own toggle. Cancelling it would make
+            // the browser put the box back as it was once the click is over, and in a browser that
+            // comes after the action and the redraw have finished (they wait on nothing but
+            // promises), so the redrawn tick would be taken away again
+            if (!(button.localName === "input" && button.type === "checkbox")) event.preventDefault();
             this.#runAction(app, state, button);
         });
     }

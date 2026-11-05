@@ -62,9 +62,8 @@
 
 - Click Detail in the map controls.
 - Click Local.
-- Press Escape to close the menu.
 - Wait for the map to update.
-- Zoom in round Mostadra.
+- Zoom in round Golenduos.
 
 **Camera:** the map from 600, 900 to 1200, 1400
 

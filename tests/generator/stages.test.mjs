@@ -9,7 +9,7 @@ import { buildModelCells } from "../../src/generator/CellValues.js";
 import { CellGraph, EDGE, portCost, travelCost } from "../../src/generator/CellGraph.js";
 import { affinity, closedness, habitatFit, resolveCultures, sharesOf, spreadCultures } from "../../src/generator/Cultures.js";
 import { resolveSettings } from "../../src/generator/GeneratorSettings.js";
-import { behavesLikeTable, modelBiomeRaster } from "../../src/generator/ModelBiomes.js";
+import { behavesLikeTable, biomeProperties, modelBiomeRaster, ownNumbers, startingNumbers } from "../../src/generator/ModelBiomes.js";
 import { nameBaseNames, nameEverything } from "../../src/generator/Names.js";
 import { GenerationCancelled, runGenerator } from "../../src/generator/Pipeline.js";
 import { hashString, stageRandom } from "../../src/generator/Random.js";
@@ -170,6 +170,67 @@ test("a custom biome behaves as the biome beneath it until told otherwise", () =
     const desert = modelBiomeRaster({ ...painted, customBiomes: [{ id: 200, behavesLike: "SUBTROPICAL_DESERT" }] });
     for (let pixel = 0; pixel < size; pixel++) assert.equal(desert[pixel], plain[pixel] ? FILRODENSWMB.BIOME_IDS.SUBTROPICAL_DESERT : 0);
     assert.equal(behavesLikeTable([{ id: 5, behavesLike: "DEEP_OCEAN" }]).get(5), 0, "only land biomes the model knows");
+});
+
+test("a custom biome with numbers of its own is read as itself, with those numbers", () => {
+    const { buffers } = syntheticMap();
+    const size = buffers.elevation.length;
+    const base = { ...syntheticMap().makePayload(), biomeOverrides: null, biomeParams: {} };
+    const sides = new Uint8Array(256);
+    sides[200] = 0xff;
+    const painted = { ...base, biomeOverrides: new Uint8Array(size).fill(200), biomeParams: { biomePalette: { 200: [1, 2, 3] }, biomeSides: sides } };
+    const plain = buildModelCells({ ...painted, customBiomes: [{ id: 200 }], biome: modelBiomeRaster({ ...painted, customBiomes: [{ id: 200 }] }) });
+
+    // Half the farming everywhere it lies: the land feeds half as many people, and the cells read as the biome itself
+    const barren = [{ id: 200, behavesLike: null, properties: { farming: 0.5, cover: 1, travel: 3, raiders: 0 } }];
+    const raster = modelBiomeRaster({ ...painted, customBiomes: barren });
+    for (let pixel = 0; pixel < size; pixel++) if (raster[pixel]) assert.equal(raster[pixel], 200);
+    const cells = buildModelCells({ ...painted, customBiomes: barren, biome: raster });
+    let before = 0;
+    let after = 0;
+    for (let cell = 0; cell < cells.count; cell++) {
+        if (!cells.landKm2[cell]) continue;
+        assert.equal(cells.biome[cell], 200);
+        assert.equal(cells.raiders[cell], 0, "the cells carry the biome's raider number for the later stages");
+        before += plain.food[cell] - (cells.coastal[cell] ? FILRODENSWMB.GENERATOR.VALUES.FISHING_DENSITY * cells.landKm2[cell] : 0);
+        after += cells.food[cell] - (cells.coastal[cell] ? FILRODENSWMB.GENERATOR.VALUES.FISHING_DENSITY * cells.landKm2[cell] : 0);
+        assert.ok(cells.landCost[cell] > plain.landCost[cell], "harder to cross than the grassland beneath");
+    }
+    assert.ok(before > 0 && Math.abs(after / before - 0.5) < 0.2, `crops roughly halved (${(after / before).toFixed(2)})`);
+});
+
+test("a biome that farms nothing feeds no one from its land: only a coast's fishing is left", () => {
+    const { buffers } = syntheticMap();
+    const size = buffers.elevation.length;
+    const base = { ...syntheticMap().makePayload(), biomeOverrides: null, biomeParams: {} };
+    const sides = new Uint8Array(256);
+    sides[200] = 0xff;
+    const painted = { ...base, biomeOverrides: new Uint8Array(size).fill(200), biomeParams: { biomePalette: { 200: [1, 2, 3] }, biomeSides: sides } };
+    const desolation = [{ id: 200, behavesLike: null, properties: { farming: 0, cover: 1, travel: 2, raiders: 0 } }];
+    const cells = buildModelCells({ ...painted, customBiomes: desolation, biome: modelBiomeRaster({ ...painted, customBiomes: desolation }) });
+    let land = 0;
+    for (let cell = 0; cell < cells.count; cell++) {
+        if (!cells.landKm2[cell]) continue;
+        land++;
+        const fishing = cells.coastal[cell] ? FILRODENSWMB.GENERATOR.VALUES.FISHING_DENSITY * cells.landKm2[cell] : 0;
+        assert.ok(Math.abs(cells.food[cell] - fishing) < 1e-9, "no crops and no herds");
+    }
+    assert.ok(land > 0);
+});
+
+test("a biome's own numbers fill what they leave out from Behaves like, and keep within each property's range", () => {
+    const taiga = FILRODENSWMB.GENERATOR.BIOMES.TAIGA;
+    const own = ownNumbers([{ id: 20, behavesLike: "TAIGA", properties: { farming: 0.4 } }, { id: 21, properties: { cover: 0, travel: 99 } }, { id: 22, behavesLike: "TAIGA" }]);
+    assert.deepEqual(own.get(20), { farming: 0.4, cover: taiga.cover, travel: taiga.travel, raiders: taiga.raiders });
+    assert.deepEqual(own.get(21), { farming: 1, cover: 0.1, travel: 6, raiders: 1 }, "behaving like none: the defaults; out of range: kept in range");
+    assert.ok(!own.has(22), "no numbers of its own");
+    assert.deepEqual(startingNumbers({ behavesLike: "TAIGA" }), { farming: taiga.farming, cover: taiga.cover, travel: taiga.travel, raiders: taiga.raiders }, "the dialogue starts from Behaves like");
+    assert.deepEqual(Object.keys(startingNumbers({})), FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.map((property) => property.key));
+    const tables = biomeProperties([{ id: 20, behavesLike: "TAIGA", properties: { farming: 0.4 } }]);
+    assert.equal(tables.farming[20], 0.4);
+    assert.ok(tables.ids.includes(20));
+    assert.ok(!biomeProperties([]).ids.includes(20), "tables follow the run's custom biomes");
+    assert.equal(behavesLikeTable([{ id: 20, behavesLike: "TAIGA", properties: { farming: 0.4 } }]).get(20), 20);
 });
 
 // ------------------------------------------------------------------ cultures

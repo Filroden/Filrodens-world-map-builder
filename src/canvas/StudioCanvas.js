@@ -5,6 +5,7 @@ import { TectonicFeatureEngine } from "../generation/TectonicFeatureEngine.js";
 import { getRegionUploadResource } from "./RegionUploadResource.js";
 import { TerrainCompositor } from "./TerrainCompositor.js";
 import { CanvasTransforms } from "../tools/CanvasTransforms.js";
+import { CatmullRom } from "../tools/CatmullRom.js";
 import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { SymbolScale } from "../tools/SymbolScale.js";
@@ -1555,42 +1556,14 @@ export class StudioCanvas {
     }
 
     /**
-     * Generates a smooth array of coordinates through the provided points using a Catmull-Rom spline.
+     * The Catmull-Rom curve through a line's points (see CatmullRom), as its terrain follows it:
+     * the uniform curve before terrain revision 3, the centripetal one from it on. Samples closer
+     * than 0.1 px to the one before are dropped. Two points make a straight line.
      */
-    #getSplinePoints(points, resolution = 20) {
+    #getSplinePoints(points, resolution = 20, centripetal = false) {
         if (!points || points.length < 2) return points;
         if (points.length === 2) return points;
-
-        const curve = [];
-
-        // To make the spline pass exactly through the first and last points without snapping,
-        // we duplicate the start and end nodes to act as invisible control anchors.
-        const p = [points[0], ...points, points[points.length - 1]];
-
-        for (let i = 1; i < p.length - 2; i++) {
-            const p0 = p[i - 1];
-            const p1 = p[i];
-            const p2 = p[i + 1];
-            const p3 = p[i + 2];
-
-            for (let t = 0; t <= 1; t += 1 / resolution) {
-                const t2 = t * t;
-                const t3 = t2 * t;
-
-                const x = 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
-
-                const y = 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
-
-                // Prevent pushing microscopic overlapping coordinates
-                if (curve.length > 0) {
-                    const last = curve.at(-1);
-                    if (Math.abs(last.x - x) < 0.1 && Math.abs(last.y - y) < 0.1) continue;
-                }
-
-                curve.push({ x, y });
-            }
-        }
-        return curve;
+        return CatmullRom.open(points, { centripetal, resolution, dedupe: 0.1 }).map((p) => ({ x: p.x, y: p.y }));
     }
 
     /**
@@ -1700,26 +1673,33 @@ export class StudioCanvas {
 
             const isActive = mask.id === activeMaskId;
             const isSubtract = mask.operation === "subtract";
+            // A Coast only mask shapes no land: a dashed outline in its own colour
+            const isCoastOnly = mask.operation === "settings";
 
-            // Green for Add Land, Red for Subtract Land (Add Ocean). The same hex values drive the
-            // swatch on the Land Masks list, so the two stay in step.
-            const { ADD, SUBTRACT } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
-            const baseColor = ColorMath.hexToPackedInt(isSubtract ? SUBTRACT : ADD);
+            // Green for Add Land, Red for Subtract Land (Add Ocean), amber for Coast only. The same
+            // hex values drive the swatch on the Land Masks list, so the two stay in step.
+            const { ADD, SUBTRACT, COAST } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
+            const baseColor = ColorMath.hexToPackedInt(isCoastOnly ? COAST : isSubtract ? SUBTRACT : ADD);
+            // Close the visual outline when the polygon has finished drawing
+            const isClosed = mask.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && !isActive;
 
-            g.lineStyle(2, baseColor, isActive ? 0.9 : 0.4);
-            g.beginFill(baseColor, isActive ? 0.3 : 0.1);
+            g.lineStyle(isCoastOnly ? 0 : 2, baseColor, isActive ? 0.9 : 0.4);
+            g.beginFill(baseColor, isCoastOnly ? (isActive ? 0.15 : 0.05) : isActive ? 0.3 : 0.1);
 
             g.moveTo(mask.points[0].x, mask.points[0].y);
             for (let i = 1; i < mask.points.length; i++) {
                 g.lineTo(mask.points[i].x, mask.points[i].y);
             }
 
-            // Close the visual outline when the polygon has finished drawing
-            const isClosed = mask.points.length >= FILRODENSWMB.LIMITS.MIN_POLYGON_VERTICES && !isActive;
             if (isClosed) {
                 g.closePath();
             }
             g.endFill();
+
+            if (isCoastOnly) {
+                g.lineStyle(2, baseColor, isActive ? 0.9 : 0.6);
+                this.#drawVectorPath(g, mask.points, "dashed", 3, isClosed);
+            }
 
             // Render edit nodes and hit targets for ALL masks whenever edit mode is active
             if (isEditMode) {
@@ -1780,7 +1760,7 @@ export class StudioCanvas {
      * @param {object[]|null} lines - From ThematicData.tradeLines, or null.
      */
     renderTrade(lines) {
-        this.#trade ??= new TradeFlowLayer(PIXI, this.layers.trade);
+        this.#trade ??= new TradeFlowLayer(PIXI, this.layers.trade, this.routeGraphics);
         this.#trade.show(lines, Math.max(this.mapWidth, this.mapHeight) / FILRODENSWMB.LIMITS.BASELINE_DIMENSION);
     }
 
@@ -2499,9 +2479,10 @@ export class StudioCanvas {
     /**
      * Draws the fault lines and tectonic features while Rivers and faults is in use (`isEditMode`:
      * the map takes its clicks), with their points as handles only while they are being edited
-     * (`showNodes`; not in its Select mode, which picks whole lines).
+     * (`showNodes`; not in its Select mode, which picks whole lines). Each is drawn along the
+     * curve its terrain follows (`centripetal` from terrain revision 3 on, see CatmullRom).
      */
-    renderFaultLines(faults = [], isEditMode = false, activeFaultId = null, showNodes = isEditMode) {
+    renderFaultLines(faults = [], isEditMode = false, activeFaultId = null, showNodes = isEditMode, centripetal = false) {
         if (this.haloGraphics) this.haloGraphics.clear();
 
         if (this.faultGraphics) {
@@ -2516,7 +2497,7 @@ export class StudioCanvas {
 
             // 1. Draw Halo and Line ONLY if there are enough points to form a path
             if (fault.points.length >= 2) {
-                const rawSpline = this.#getSplinePoints(fault.points);
+                const rawSpline = this.#getSplinePoints(fault.points, 20, centripetal);
 
                 const spline = [rawSpline[0]];
                 for (let i = 1; i < rawSpline.length; i++) {
@@ -2655,8 +2636,12 @@ export class StudioCanvas {
         graphics.endFill();
     }
 
-    /** Draws the river guides, as renderFaultLines draws the faults. */
-    renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null, showNodes = isEditMode) {
+    /**
+     * Draws the river guides, as renderFaultLines draws the faults: each along the curve its
+     * terrain follows (`centripetal` from terrain revision 3 on, see CatmullRom), the points
+     * showing the line as drawn.
+     */
+    renderManualRivers(rivers = [], isEditMode = false, activeRiverId = null, showNodes = isEditMode, centripetal = false) {
         if (!this.manualRiverGraphics) return;
 
         // Aggressively purge memory and nested nodes to prevent WebGL leaks
@@ -2673,12 +2658,11 @@ export class StudioCanvas {
 
             this.manualRiverGraphics.lineStyle(FILRODENSWMB.DISPLAY.RIVER_WIDTH, lineColor, 0.8);
 
-            // Draw Catmull-Rom spline
             const points = river.points;
             if (points.length === 1) {
                 this.manualRiverGraphics.drawCircle(points[0].x, points[0].y, 2);
             } else {
-                this.#drawVectorPath(this.manualRiverGraphics, points, "solid", 2);
+                this.#drawVectorPath(this.manualRiverGraphics, this.#getSplinePoints(points, 20, centripetal), "solid", 2);
             }
 
             // Draw edit nodes

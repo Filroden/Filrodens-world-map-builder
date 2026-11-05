@@ -2,7 +2,7 @@
   "name": "Tutorial world",
   "seed": "P0JBVA",
   "generationEngine": "guided",
-  "terrainVersion": 2,
+  "terrainVersion": 3,
   "sizeRevision": 2,
   "nameLevels": true,
   "localLevel": true,
@@ -104,6 +104,9 @@
         "originY": 0
       },
       "currentRivers": true,
+      "currentHotspots": true,
+      "guidedRivers": true,
+      "centripetalLines": true,
       "exactDistances": true
     },
     "noise": {
@@ -679,6 +682,7 @@
     {
       "id": 14,
       "name": "Moorland",
+      "code": null,
       "color": [
         140,
         122,
@@ -686,6 +690,7 @@
       ],
       "placement": "land",
       "behavesLike": null,
+      "properties": null,
       "rules": [
         {
           "elevation": [
@@ -2045,4 +2050,4 @@
   "owners": {
     "mFIG6tmH96BRprtT": "7KcHAeynBw=="
   }
-}
+}

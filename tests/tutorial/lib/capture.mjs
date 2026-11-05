@@ -2,6 +2,9 @@
 // parked and no stray focus ring, so a rerun takes the same picture.
 import { mapToScreen, REGIONS, STUDIO_SIZE } from "./studio.mjs";
 
+/** How long to wait for a region to hold still before it is scrolled to and pictured. */
+const SCROLL_MS = 120000;
+
 /** How long a tooltip takes to go once the pointer leaves its control. */
 const TOOLTIP_CLEAR_MS = 400;
 
@@ -9,8 +12,10 @@ const TOOLTIP_CLEAR_MS = 400;
 async function elementBox(page, selector) {
     const element = page.locator(selector).filter({ visible: true }).first();
     if (!(await element.count())) throw new Error(`screenshot region "${selector}" is not on the screen`);
-    // A section further down a panel is scrolled into view, as a reader scrolls to it
-    await element.scrollIntoViewIfNeeded();
+    // A section further down a panel is scrolled into view, as a reader scrolls to it. Playwright
+    // waits for the element to hold still over two frames; just after a long run (Generate) the
+    // studio can be too busy to draw a frame for a while, so it waits longer than its default
+    await element.scrollIntoViewIfNeeded({ timeout: SCROLL_MS });
     return element.boundingBox();
 }
 

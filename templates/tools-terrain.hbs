@@ -62,7 +62,7 @@
             <!-- Plates and continent noise place the land; the coast is then shaped as in guided terrain -->
             {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="tectonicPlates" label="FILRODENSWMB.UI.TectonicPlates" hint="FILRODENSWMB.UI.TectonicPlatesHintV2" value=(lookup uiState 'tectonicPlates') min=5 max=50 step=1}}
             {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="continentalGrouping" label="FILRODENSWMB.UI.ContinentalGrouping" hint="FILRODENSWMB.UI.ContinentalGroupingHint" value=(lookup uiState 'continentalGrouping') min=0.1 max=0.9 step=0.05}}
-            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') min=0 max=1 step=0.05}}
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') curve=fractureCurve position=fracturePosition min=0 max=1 step=0.01}}
 
             <!-- Coastal shaping grouped by side of the coastline: on each side, the width of the band
                  along the coast and then how quickly the ground rises or the seabed falls beyond it -->
@@ -87,7 +87,7 @@
             <!-- Maps still on the original tectonic engine -->
             {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="tectonicPlates" label="FILRODENSWMB.UI.TectonicPlates" hint="FILRODENSWMB.UI.TectonicPlatesHint" value=(lookup uiState 'tectonicPlates') min=5 max=50 step=1}}
 
-            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') min=0 max=1 step=0.05}}
+            {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') curve=fractureCurve position=fracturePosition min=0 max=1 step=0.01}}
 
             {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="shelfRange" label="FILRODENSWMB.UI.ContinentalShelf" hint="FILRODENSWMB.UI.ShelfRangeHint" value=(lookup uiState 'shelfRange') min=0 max=0.5 step=0.05}}
 
@@ -102,7 +102,7 @@
     <!-- 4. Guided Engine Settings -->
     {{#if (eq uiState.generationEngine "guided")}}
 
-        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') min=0 max=1 step=0.05}}
+        {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="coastlineFracture" label="FILRODENSWMB.UI.CoastlineFracture" hint="FILRODENSWMB.UI.CoastlineFractureHint" value=(lookup uiState 'coastlineFracture') curve=fractureCurve position=fracturePosition min=0 max=1 step=0.01}}
 
         {{#if usesCurrentCoastline}}
             <!-- Coastal shaping grouped by side of the coastline: on each side, the width of the band

@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { FieldSpecs } from "./FieldSpecs.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { MapStateManager } from "./MapStateManager.js";
+import { FillMemory } from "./FillMemory.js";
 import { RangeDisplay } from "../tools/RangeDisplay.js";
 import { roundRouteThickness } from "../mesh/Schema.js";
 import { platform } from "../platform/index.js";
@@ -86,14 +87,14 @@ export class MassEdit {
     static context(app, type, items) {
         const kind = FieldSpecs.KINDS[type];
         const currents = items.map((item) => kind.current(app, item));
-        const rows = (store) => kind.fields.filter((field) => field.store === store).map((field) => this.#row(app, field, currents));
+        const rows = (store) => kind.fields.filter((field) => field.store === store).map((field) => this.#row(app, field, currents, items));
         const sections = [{ legend: kind.legend, rows: rows("item") }];
         if (kind.hasLabel) sections.push({ legend: "FILRODENSWMB.UI.InspectorLabel", rows: rows("label") });
         return { count: items.length, sections, palette: FILRODENSWMB.LABELS?.PRESETS || [] };
     }
 
     /** One field's row: its control's choices, and the value the items share (or Mixed). */
-    static #row(app, field, currents) {
+    static #row(app, field, currents, items) {
         const values = currents.map((current) => (field.store === "label" ? current.label?.[field.key] : current[field.key]));
         const first = values[0];
         const mixed = values.some((value) => JSON.stringify(value) !== JSON.stringify(first));
@@ -134,7 +135,9 @@ export class MassEdit {
             }
             case "fill":
                 row.none = !mixed && shared === "transparent";
-                row.value = shared && shared !== "transparent" ? shared : first && first !== "transparent" ? first : "#000000";
+                // With every item on No fill, the colour box shows the first item's colour from
+                // before (see FillMemory), which clearing No fill then applies
+                row.value = shared && shared !== "transparent" ? shared : first && first !== "transparent" ? first : FillMemory.shown(items[0]);
                 break;
             case "color":
                 row.value = first ?? "#000000";
@@ -348,6 +351,7 @@ export class MassEdit {
             const field = fields.get(`${store}.${change.key}`);
             if (!field) continue;
             const value = this.#parse(field, change.value);
+            if (field.type === "fill" && value === "transparent") FillMemory.remember(target.id, FillMemory.shown(target));
             target[change.key] = typed(ruleKind, { [change.key]: value }, target)[change.key];
             if (field.styled) styledByHand = true;
         }
