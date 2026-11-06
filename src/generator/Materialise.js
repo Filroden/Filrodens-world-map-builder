@@ -105,6 +105,7 @@ function buildPins(session, result, { runId, idFactory, names, pinStyleFor, appl
             pinStyle: null,
             label: { fontSize: FILRODENSWMB.PINS.DEFAULT_SCALE },
             cell: place.cell,
+            nameSource: "generated",
             generated: { run: runId, kind: place.kind, tier, sourceId: index, population: place.population ?? null, culture: cultureId(result, place.culture), ...cultureMix(result, place.mix), ...pastOf(place), edited: false, locked: false },
         };
         const style = pinStyleFor(tier);
@@ -161,6 +162,7 @@ function buildFormerPins(session, result, { runId, idFactory, names, pinStyleFor
             pinStyle: null,
             label: { fontSize: FILRODENSWMB.PINS.DEFAULT_SCALE },
             cell: place.cell,
+            nameSource: "generated",
             generated: { run: runId, kind, tier, sourceId: index, population: null, culture: null, formerAge: place.formerAge, ...extra, edited: false, locked: false },
         };
         const style = pinStyleFor(tier);

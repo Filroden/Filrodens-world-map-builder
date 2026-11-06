@@ -27,6 +27,7 @@ import { ParentRunRecovery } from "./ParentRunRecovery.js";
 import { RiverRelay } from "./RiverRelay.js";
 import { RunCells } from "./RunCells.js";
 import { Infilling } from "./Infilling.js";
+import { RandomNames } from "./RandomNames.js";
 import { InfillInput } from "./InfillInput.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { FaultThickness } from "../tools/FaultThickness.js";
@@ -298,6 +299,7 @@ export class MapStudio {
         resetTravelSpeeds()             { TravelView.resetSpeeds(this); },
         clearTravelStart()              { TravelView.clearStart(this); },
         fillIn()                        { Infilling.run(this); },
+        nameAll()                       { RandomNames.openNameAll(this); },
         toggleLabelOverlaps()           { this.#toggleLabelOverlaps(); },
         setSymbolSize(_e, t)            { this.#setSymbolSize(t.dataset.symbolSize); },
         toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
@@ -4403,6 +4405,7 @@ export class MapStudio {
         const pin = {
             id: platform.utils.randomID(),
             name: style?.name ?? getPinIconLabel(icon),
+            nameSource: "default",
             icon,
             x,
             y,

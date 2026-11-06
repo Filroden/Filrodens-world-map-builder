@@ -165,6 +165,7 @@ export class Infilling {
                 pinStyle: null,
                 label: { fontSize: FILRODENSWMB.PINS.DEFAULT_SCALE },
                 cell,
+                nameSource: "generated",
                 generated: { run: runId, kind: "town", tier: place.tier, sourceId: index, population: place.population, infill: true, edited: false, locked: false },
             };
             const style = pinStyleFor(place.tier);

@@ -70,6 +70,9 @@ const routeStroke = enumOf(["solid", "dashed", "dotted", "dashdot"]);
 const fillStyle = enumOf(["solid", "diagonal", "crosshatch", "hatch"], { nullable: true });
 const justify = enumOf(["left", "center", "right"]);
 const custom = ref({ also: ["custom"] });
+// Where an item's name came from and its reroll count (see RandomNames)
+const nameSource = enumOf(FILRODENSWMB.PLACE_NAMES.SOURCES);
+const nameRoll = int(0, 1e6);
 
 // ------------------------------------------------------------------ generated content
 
@@ -130,6 +133,8 @@ const OWNED_LABEL = obj({ ...LABEL_LOOK, text: text("label", "FILRODENSWMB.UI.Li
 const PIN = obj({
     id,
     name: name("FILRODENSWMB.UI.LimitKindPin"),
+    nameSource,
+    nameRoll,
     description: description("FILRODENSWMB.UI.LimitKindPin"),
     icon: key,
     x: num(RANGE.COORD),
@@ -207,6 +212,8 @@ const DECORATION = obj({
 const ROUTE = obj({
     id,
     name: name("FILRODENSWMB.UI.LimitKindRoute"),
+    nameSource,
+    nameRoll,
     description: description("FILRODENSWMB.UI.LimitKindRoute"),
     visibility,
     hidden,
@@ -238,6 +245,8 @@ const REGION = obj({
     id,
     key: int(0),
     name: name("FILRODENSWMB.UI.LimitKindRegion"),
+    nameSource,
+    nameRoll,
     description: description("FILRODENSWMB.UI.LimitKindRegion"),
     fillColor: { t: "color", transparent: true, nullable: true },
     fillStyle,

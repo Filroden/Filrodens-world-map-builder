@@ -579,3 +579,19 @@ test("a drawn decoration's fields are kept to their rules: unknown kinds, design
     const applied = typed("decoration", { design: "sundial", letters: "all", colors: { accent: "red;x", dark: "#000000" } }, rose);
     assert.deepEqual([applied.design, applied.letters, applied.colors.accent, applied.colors.dark], ["classic", "all", undefined, "#000000"], "the inspector keeps the current value where a typed one fails");
 });
+
+test("where a name came from and its roll are kept to their rules", () => {
+    const file = v4Map();
+    const [region] = file.layerSets[0].levels[0].regions;
+    Object.assign(region, { nameSource: "random", nameRoll: 4 });
+    Object.assign(file.mapPins[0], { nameSource: "<b>typed</b>", nameRoll: -1 });
+    const { mapData } = MapImport.read(file);
+    const kept = mapData.layerSets[0].levels[0].regions[0];
+    assert.deepEqual([kept.nameSource, kept.nameRoll], ["random", 4]);
+    assert.ok(!("nameSource" in mapData.mapPins[0]), "an unknown source is dropped");
+    assert.equal(mapData.mapPins[0].nameRoll, 0, "a roll is kept in its range, as every number is");
+    assert.equal(typed("route", { nameSource: "<i>random</i>" }, { nameSource: "typed" }).nameSource, "typed", "the inspector's check keeps the route's own source");
+    // A map saved before names had sources reads as it did: no field, nothing added
+    const older = MapImport.read(v4Map()).mapData;
+    assert.ok(!("nameSource" in older.mapPins[0]) && !("nameSource" in older.layerSets[0].levels[0].regions[0]));
+});

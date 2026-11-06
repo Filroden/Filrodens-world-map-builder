@@ -1804,6 +1804,71 @@ export const FILRODENSWMB = {
         }),
         DEFAULT_SCHEME: "parchment",
     }),
+    // Random names for regions, pins and routes (see PlaceNames and RandomNames). A suggestion is
+    // drawn from a stream seeded by the map's seed, the item's id and its reroll count, so it stays
+    // the same until rerolled. Some suggestions add a word that fits the item (FORMS).
+    PLACE_NAMES: Object.freeze({
+        // Where an item's name came from (its saved `nameSource`)
+        SOURCES: Object.freeze(["default", "random", "typed", "generated"]),
+        // The share of suggestions that add a word fitting the item, when one fits
+        FORM_SHARE: 1 / 3,
+        // How a name is written for each kind of land, place or route ({name} is the proper name).
+        // A kind with several forms takes one by the item's stream; a kind with none is the name alone
+        FORMS: Object.freeze({
+            island: Object.freeze(["FILRODENSWMB.UI.NameFormIsle"]),
+            mountains: Object.freeze(["FILRODENSWMB.UI.NameFormMountains", "FILRODENSWMB.UI.NameFormHighlands"]),
+            hills: Object.freeze(["FILRODENSWMB.UI.NameFormHills", "FILRODENSWMB.UI.NameFormDowns"]),
+            coast: Object.freeze(["FILRODENSWMB.UI.NameFormCoast"]),
+            forest: Object.freeze(["FILRODENSWMB.UI.NameFormForest", "FILRODENSWMB.UI.NameFormWeald"]),
+            plains: Object.freeze(["FILRODENSWMB.UI.NameFormVale", "FILRODENSWMB.UI.NameFormPlains"]),
+            desert: Object.freeze(["FILRODENSWMB.UI.NameFormWastes"]),
+            tundra: Object.freeze(["FILRODENSWMB.UI.NameFormBarrens"]),
+            castle: Object.freeze(["FILRODENSWMB.UI.GeneratedCastleName", "FILRODENSWMB.UI.GeneratedKeepName", "FILRODENSWMB.UI.GeneratedHoldName", "FILRODENSWMB.UI.GeneratedTowerName"]),
+            port: Object.freeze(["FILRODENSWMB.UI.NameFormPort", "FILRODENSWMB.UI.NameFormHaven"]),
+            market: Object.freeze(["FILRODENSWMB.UI.NameFormMarketBefore", "FILRODENSWMB.UI.NameFormMarketAfter"]),
+            ruin: Object.freeze(["FILRODENSWMB.UI.NameFormOld"]),
+            road: Object.freeze(["FILRODENSWMB.UI.NameFormRoad", "FILRODENSWMB.UI.NameFormWay"]),
+            river: Object.freeze(["FILRODENSWMB.UI.NameFormReach"]),
+            sea: Object.freeze(["FILRODENSWMB.UI.NameFormCrossing", "FILRODENSWMB.UI.NameFormPassage"]),
+        }),
+        // A pin's kind of place, by its style's tier (or its generated tier); tiers not listed
+        // (capital, city, town, village...) are the name alone
+        SETTLEMENT_TIERS: Object.freeze({
+            castle: "castle",
+            abandonedCastle: "castle",
+            port: "port",
+            marketTown: "market",
+            ruin: "ruin",
+            ruinedCapital: "ruin",
+            ruinedCity: "ruin",
+            ruinedLargeTown: "ruin",
+            ruinedTown: "ruin",
+        }),
+        // The same for a pin with no style, by its icon
+        SETTLEMENT_ICONS: Object.freeze({ castle: "castle", fortress: "castle", anchor: "port", classical_building: "ruin" }),
+        // How a region's land is read for Geographic: shares of its land cells. An island region
+        // (land with no land beside it outside the region) comes first, then mountains, hills,
+        // a mostly coastal region, and last the land's commonest kind of biome
+        GEOGRAPHIC: Object.freeze({ MOUNTAINS: 0.25, HILLS: 0.4, COAST: 0.5, BIOME: 0.4, MIN_ISLAND_CELLS: 1 }),
+        // The biomes each land kind counts (see BIOME_IDS)
+        BIOME_KINDS: Object.freeze({
+            DECIDUOUS_FOREST: "forest",
+            TEMPERATE_RAINFOREST: "forest",
+            TAIGA: "forest",
+            TROPICAL_RAINFOREST: "forest",
+            GRASSLAND: "plains",
+            SAVANNA: "plains",
+            TEMPERATE_DESERT: "desert",
+            SUBTROPICAL_DESERT: "desert",
+            TUNDRA: "tundra",
+            SNOW: "tundra",
+        }),
+        // Tries for a name not already used (Name all), as the generator does
+        RETRIES: 12,
+        // What Name all can name, and which names it can replace (a typed name never)
+        NAME_ALL_KINDS: Object.freeze({ region: "FILRODENSWMB.UI.NameAllRegions", pin: "FILRODENSWMB.UI.NameAllPins", route: "FILRODENSWMB.UI.NameAllRoutes" }),
+        NAME_ALL_SOURCES: Object.freeze({ unnamed: "FILRODENSWMB.UI.NameAllUnnamed", random: "FILRODENSWMB.UI.NameAllRandom", default: "FILRODENSWMB.UI.NameAllDefault", generated: "FILRODENSWMB.UI.NameAllGenerated" }),
+    }),
     PINS: {
         // The size new pins (and their labels) start with: small, so a map of many places stays readable
         DEFAULT_SCALE: 1.2,

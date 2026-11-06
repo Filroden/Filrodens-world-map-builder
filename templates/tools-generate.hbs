@@ -76,6 +76,13 @@
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 {{/if}}
 
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateNames" title="FILRODENSWMB.UI.SectionGenerateNames"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.NameAllSectionHint"}}</p>
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="nameAll" data-tooltip="{{localize 'FILRODENSWMB.UI.NameAllButtonHint'}}">
+        <i class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.NameAll"}}
+    </button>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateWorld" title="FILRODENSWMB.UI.SectionGenerateWorld" badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
     {{#each generate.world}}
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name=this.name label=this.label hint=this.hint value=this.value min=this.min max=this.max step=this.step resetTo=this.resetTo}}

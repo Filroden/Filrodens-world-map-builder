@@ -10,6 +10,7 @@ import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
+import { RandomNames } from "./RandomNames.js";
 
 /** The pin's own fields a pin style sets, by their names in the form (the label's size is set by it too). */
 const LOOK_FIELDS = Object.freeze({ pinColor: true, pinScale: true });
@@ -51,6 +52,7 @@ export class PinEditor {
             pickIcon: (app, pin, _ref, button) => PinEditor.#pickIcon(app, pin, button.dataset.icon),
             delete: (app, pin) => MapDialogManager.deleteEntityById(app, "pin", pin.id),
             lock: (app, pin) => GeneratedEdits.toggleLock(app, pin),
+            randomName: (app, pin) => RandomNames.press(app, "pin", pin),
             saveStyle: (app, pin, _ref, button) => PinEditor.#saveStyle(app, pin, button.dataset.styleType),
         },
     });
@@ -108,6 +110,7 @@ export class PinEditor {
         MapStateManager.pushVectorState(app);
         GeneratedEdits.markIfSubstantive(pin, field);
         const { label, ...fields } = values;
+        if (fields.name !== pin.name) RandomNames.markTyped(pin);
         Object.assign(pin, fields);
         pin.label = { ...pin.label, ...label };
         if (LOOK_FIELDS[field]) pin.pinStyle = null;

@@ -952,3 +952,125 @@ test("Add makes a custom biome and opens it; Delete asks, removes it, closes the
     VectorHistory.step(app, true);
     assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [14, 15], "undo brings it back");
 });
+
+// ------------------------------------------------------------------ random names
+
+const { RandomNames } = await import("../../src/applications/RandomNames.js");
+const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
+const { RegionLists } = await import("../../src/applications/RegionLists.js");
+const { placeName } = await import("../../src/names/PlaceNames.js");
+
+/** Presses an inspector button by its action. */
+async function press(app, action) {
+    form(app).querySelector(`[data-inspector-action="${action}"]`).click();
+    await settle();
+    await settle();
+}
+
+test("Random name gives a new name each press, one undo step each, and undo puts back the name and where it came from", async () => {
+    const { app } = await studio();
+    app.uiState.mapSeed = "P0JBVA";
+    await RegionEditor.open(app, "realms", "west");
+    const region = () => app.regionLevels[0].regions.find((each) => each.id === "west");
+
+    await press(app, "randomName");
+    const first = region().name;
+    assert.notEqual(first, "West");
+    assert.deepEqual([region().nameSource, region().nameRoll, steps(app)], ["random", 0, 1]);
+    assert.equal(first, placeName({ mapSeed: "P0JBVA", itemId: "west", roll: 0, nameBase: FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE }), "the map's Name style with no run, from the item's own stream");
+    assert.equal(field(app, "regionName").value, first, "the field shows it at once");
+
+    await press(app, "randomName");
+    assert.notEqual(region().name, first, "each press rerolls");
+    assert.deepEqual([region().nameSource, region().nameRoll, steps(app)], ["random", 1, 2]);
+
+    await undo(app);
+    assert.deepEqual([region().name, region().nameSource, region().nameRoll], [first, "random", 0]);
+    await undo(app);
+    assert.equal(region().name, "West");
+    assert.ok(!("nameSource" in region()) && !("nameRoll" in region()), "the region is as it was");
+});
+
+test("a name typed in the inspector or a list's row is recorded as typed; a new item starts as default", async () => {
+    const { app } = await studio();
+    app.uiState.mapSeed = "seed";
+    const pin = app.mapPins[0];
+    await PinEditor.open(app, "keep");
+    await press(app, "randomName");
+    assert.equal(pin.nameSource, "random");
+    await commit(app, "pinName", "Hightower");
+    assert.equal(pin.nameSource, "typed");
+    assert.ok(!("nameRoll" in pin), "a typed name has no roll");
+    await undo(app);
+    assert.equal(app.mapPins[0].nameSource, "random", "undo puts back the source with the name");
+
+    RegionPanel.rename(app, "region:east", "Eastmarch");
+    assert.equal(app.regionLevels[0].regions[1].nameSource, "typed");
+
+    // A region named in its row: the name offered is a default one, a name of the reader's typed
+    await RegionLists.startNaming(app, "region", { levelId: "realms" });
+    const offered = app.regionNaming.value;
+    await RegionLists.confirm(app, offered);
+    assert.equal(app.regionLevels[0].regions.at(-1).nameSource, "default");
+    await RegionLists.startNaming(app, "region", { levelId: "realms" });
+    await RegionLists.confirm(app, "Marchlands");
+    assert.equal(app.regionLevels[0].regions.at(-1).nameSource, "typed");
+
+    const road = placeRoad(app);
+    assert.equal(road.nameSource, "default");
+});
+
+test("Name all names the kinds and names ticked, with names not used in their group, never a typed name; one undo step", async () => {
+    const { app } = await studio();
+    app.uiState.mapSeed = "seed";
+    const level = app.regionLevels[0];
+    // West and East: older hand-made names (typed). Then a default name, an unnamed region, a
+    // random one, a generated one and a generated one the reader edited
+    addRegion(level, { id: "dflt", name: "FILRODENSWMB.UI.NewRegionName 2" });
+    addRegion(level, { id: "none", name: "" });
+    addRegion(level, { id: "rand", name: "Oldname", nameSource: "random", nameRoll: 3 });
+    addRegion(level, { id: "made", name: "Ashford", generated: made() });
+    addRegion(level, { id: "kept", name: "Brookby", generated: { ...made(), edited: true } });
+    addRegion(level, { id: "mine", name: "Mine", nameSource: "typed" });
+    app.mapPins.push({ id: "town", name: "Ashby", x: 200, y: 100, icon: "map_pin", generated: made() }, { id: "src", name: "River Source", type: "spring", x: 1, y: 1 });
+    app.mapRoutes.push({ id: "road", name: "", transport: "road", waypoints: [], legs: [], generated: made() }, { id: "lane", name: "FILRODENSWMB.UI.NewRouteName 3", transport: "road", waypoints: [], legs: [] });
+
+    const count = (kinds, sources) => RandomNames.nameAllCount(app, { kinds, sources });
+    assert.equal(count(["region"], ["unnamed", "random"]), 2);
+    assert.equal(count(["region"], ["unnamed", "random", "default"]), 3);
+    assert.equal(count(["region"], ["unnamed", "random", "default", "generated"]), 4);
+    assert.equal(count(["pin", "route"], ["unnamed", "default", "generated"]), 3, "the town, the generated road and Route 3; never a river source");
+    assert.equal(count(["region", "pin", "route"], ["typed"]), 0, "a typed name is never offered");
+
+    assert.equal(RandomNames.nameAll(app, { kinds: ["region", "route"], sources: ["unnamed", "random", "default"] }), 5);
+    const byId = Object.fromEntries(app.regionLevels[0].regions.map((region) => [region.id, region]));
+    assert.equal(steps(app), 1);
+    for (const id of ["dflt", "none", "rand"]) assert.equal(byId[id].nameSource, "random", `${id} is named`);
+    assert.ok(byId.rand.nameRoll >= 4, "a random name is rerolled");
+    assert.deepEqual([byId.west.name, byId.east.name, byId.made.name, byId.kept.name, byId.mine.name], ["West", "East", "Ashford", "Brookby", "Mine"], "the rest are kept");
+    assert.equal(app.mapPins.find((pin) => pin.id === "town").name, "Ashby", "pins were not ticked");
+    assert.ok(app.mapRoutes.every((route) => route.nameSource === "random" && route.name));
+    assert.equal(app.mapRoutes[0].generated.edited, false, "a random name leaves a generated item for Generate again");
+    const names = app.regionLevels[0].regions.map((region) => region.name);
+    assert.equal(new Set(names).size, names.length, "no name used twice in the level");
+
+    await undo(app);
+    assert.deepEqual(app.regionLevels[0].regions.map((region) => region.name), ["West", "East", "FILRODENSWMB.UI.NewRegionName 2", "", "Oldname", "Ashford", "Brookby", "Mine"]);
+    assert.equal(app.mapRoutes[0].name, "");
+    assert.equal(RandomNames.sourceOf(byId.made), "generated");
+    assert.equal(RandomNames.sourceOf(byId.kept), "kept");
+});
+
+test("Random name on a generated item does not mark it edited, so Generate again still replaces it; typing does", async () => {
+    const { app } = await studio();
+    app.uiState.mapSeed = "seed";
+    const pin = app.mapPins[0];
+    pin.generated = made();
+    await PinEditor.open(app, "keep");
+    await press(app, "randomName");
+    assert.equal(pin.nameSource, "random");
+    assert.equal(pin.generated.edited, false);
+    await commit(app, "pinName", "Hightower");
+    assert.equal(pin.generated.edited, true);
+    assert.ok(!form(app).querySelector('[name="namingContext"]'), "no naming context to choose");
+});

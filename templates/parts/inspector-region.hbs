@@ -13,6 +13,7 @@
         <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
         <div class="fwmb-form-fields">
             <input type="text" id="fwmb-inspector-name" name="regionName" maxlength="{{fwmbTextLimit 'name'}}" value="{{region.name}}" />
+            <button type="button" class="fwmb-btn fwmb-btn--square" data-inspector-action="randomName" aria-label="{{localize 'FILRODENSWMB.UI.RandomName'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.RandomNameHint'}}"><i class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></i></button>
         </div>
     </div>
     <div class="fwmb-form-group fwmb-form-group--stacked">

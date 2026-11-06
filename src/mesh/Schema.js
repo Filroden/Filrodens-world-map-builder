@@ -280,6 +280,7 @@ export function addRegion(level, fields = {}, idFactory = randomId) {
         generated: fields.generated ?? null,
     };
     if (fields.legacy) region.legacy = fields.legacy;
+    nameFields(region, fields);
     level.nextKey += 1;
     level.regions.push(region);
     return region;
@@ -318,7 +319,18 @@ export function createRoute(fields = {}, idFactory = randomId) {
         generated: fields.generated ?? null,
     };
     if (fields.legacy) route.legacy = fields.legacy;
+    nameFields(route, fields);
     return route;
+}
+
+/**
+ * Where an item's name came from (`nameSource`) and, for a random name, its reroll count
+ * (`nameRoll`; see RandomNames), copied when given. An item without them is an older one, whose
+ * source RandomNames.sourceOf works out.
+ */
+function nameFields(item, fields) {
+    if (fields.nameSource) item.nameSource = fields.nameSource;
+    if (Number.isInteger(fields.nameRoll)) item.nameRoll = fields.nameRoll;
 }
 
 // ------------------------------------------------------------------ validation

@@ -54,6 +54,7 @@ Hooks.once("init", async () => {
         "modules/filrodens-world-map-builder/templates/dialogs/export-settings.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/mass-edit.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/merge-region.hbs",
+        "modules/filrodens-world-map-builder/templates/dialogs/name-all.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/shortcuts.hbs",
         "modules/filrodens-world-map-builder/templates/dialogs/terrain-upgrade.hbs",
 

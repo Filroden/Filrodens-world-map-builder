@@ -138,15 +138,17 @@ const PROPER = new Set(
 );
 /**
  * Strings that are the pattern of a proper name rather than a label: the generator names a castle
- * "{name} Castle", and the keep word is part of the name, capital and all.
+ * "{name} Castle", and the keep word is part of the name, capital and all; so are Random name's
+ * forms ("{name} Coast", "Port {name}"; the NameForm keys).
  */
 const NAME_PATTERNS = new Set(["FILRODENSWMB.UI.GeneratedCastleName", "FILRODENSWMB.UI.GeneratedKeepName", "FILRODENSWMB.UI.GeneratedHoldName", "FILRODENSWMB.UI.GeneratedTowerName"]);
+const isNamePattern = (key) => NAME_PATTERNS.has(key) || key.startsWith("FILRODENSWMB.UI.NameForm");
 const isLabel = (text) => text.length <= 70 && !/[.?!]$/.test(text.trim()) && !/[.?!] [A-Z{]/.test(text);
 
 test("labels are in sentence case", () => {
     const titled = [];
     for (const [key, text] of Object.entries(EN)) {
-        if (!isLabel(text) || text === "Filroden's World Map Builder" || NAME_PATTERNS.has(key)) continue;
+        if (!isLabel(text) || text === "Filroden's World Map Builder" || isNamePattern(key)) continue;
         // A word may start a label, or follow a colon, a sentence's end or a "+" (Ctrl+Click)
         const words = [...text.matchAll(/(^|[\s(/,-])([A-Z][a-z][A-Za-z'’]*)/g)].filter((match) => match.index > 0 && !/[:+]\s*$/.test(text.slice(0, match.index + match[1].length)));
         // A word with a capital inside it is a name (OrbitControls, GitHub), not a title-cased one
