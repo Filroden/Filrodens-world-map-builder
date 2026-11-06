@@ -159,7 +159,7 @@ const { COMPASS, CARTOUCHE } = FILRODENSWMB.DECORATIONS;
 /**
  * A map decoration: an image the user supplied (`src`, no `kind`), or one the module draws (`kind`:
  * a compass rose or a cartouche, see DrawnDecoration), with the fields its kind reads. A drawn
- * kind's colours are one object, each a colour.
+ * kind's colours are one object (`colors`), each a colour.
  */
 const DECORATION = obj({
     id,
@@ -177,7 +177,7 @@ const DECORATION = obj({
     design: enumOf([...COMPASS.DESIGNS, ...CARTOUCHE.DESIGNS]),
     // A compass's radius, or a cartouche's title size, in map pixels at scale 1
     size: num({ min: 1, max: 1e5 }),
-    colours: obj(Object.fromEntries(["light", "dark", "line", "accent", "letter", "backing", "fill", "shade", "text"].map((key) => [key, color]))),
+    colors: obj(Object.fromEntries(["light", "dark", "line", "accent", "letter", "backing", "fill", "shade", "text"].map((key) => [key, color]))),
     fontFamily: { t: "font" },
     bold: bool,
     // Compass rose

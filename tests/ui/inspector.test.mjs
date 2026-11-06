@@ -172,6 +172,14 @@ async function commit(app, name, value) {
     await settle();
 }
 
+/** Picks a radio button of a group by its value and commits it, as the reader would. */
+async function choose(app, name, value) {
+    const radio = form(app).querySelector(`input[type="radio"][name="${name}"][value="${value}"]`);
+    radio.checked = true;
+    radio.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await settle();
+}
+
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const steps = (app) => app.pinHistory.length;
 
@@ -575,6 +583,62 @@ test("Add decoration's Compass rose adds a rose with its defaults near the botto
     assert.ok(Inspector.shows(app, "decoration", id));
     VectorHistory.step(app, true);
     assert.equal(app.mapDecorations.length, 1, "undo takes it away");
+});
+
+test("a compass rose's own fields apply one step each: a design brings its own shape and font, a scheme sets every colour at once, and a family without bold disables Bold", async () => {
+    const { app } = await studio();
+    Object.assign(app, { mapWidth: 1000, mapHeight: 800 });
+    // A host that also offers Marcellus SC, a family with no bold face
+    const list = platform.fonts.list;
+    platform.fonts.list = () => [...list(), "Marcellus SC"];
+    const id = await DecorationEditor.add(app, "compass");
+    const rose = () => app.mapDecorations.find((decoration) => decoration.id === id);
+    const form_ = form(app);
+    assert.equal(form_.querySelectorAll(".fwmb-design-thumb").length, 3, "a thumbnail of each design");
+    // The thumbnails hold numbers and checked colours only
+    for (const shape of form_.querySelectorAll(".fwmb-design-thumb circle, .fwmb-design-thumb path")) {
+        for (const attribute of shape.attributes) {
+            if (attribute.name === "d") assert.match(attribute.value, /^[MLCQZ0-9 .-]*$/);
+            else if (["fill", "stroke"].includes(attribute.name)) assert.match(attribute.value, /^(#[0-9a-f]{6}|none)$/i);
+            else if (attribute.name === "stroke-linejoin") assert.match(attribute.value, /^(round|miter)$/);
+            else assert.match(attribute.value, /^-?[0-9.]+$/, attribute.name);
+        }
+    }
+    let before = steps(app);
+
+    await choose(app, "compassDesign", "mariner");
+    assert.deepEqual([rose().design, rose().points, rose().north, rose().degreeRing, rose().fontFamily, rose().bold], ["mariner", 32, "fleur", true, "IM Fell English", false]);
+    assert.equal(steps(app), before + 1, "one step");
+
+    await commit(app, "compassPoints", "16");
+    await commit(app, "compassRings", "1");
+    await commit(app, "compassLetters", "all");
+    await commit(app, "compassUpright", true);
+    await commit(app, "compassLetterSize", "0.3");
+    assert.deepEqual([rose().points, rose().rings, rose().letters, rose().upright, rose().letterSize], [16, 1, "all", true, 0.3]);
+    assert.equal(steps(app), before + 6);
+
+    before = steps(app);
+    await commit(app, "compassScheme", "slate");
+    const slate = FILRODENSWMB.DECORATIONS.SCHEMES.slate;
+    assert.deepEqual(rose().colors, { light: slate.light, dark: slate.dark, line: slate.line, accent: slate.accent, letter: slate.letter, backing: slate.backing });
+    assert.equal(steps(app), before + 1, "a scheme is one step");
+    assert.equal(field(app, "compassScheme").value, "", "the scheme menu is ready for another choice");
+    await commit(app, "compassColorAccent", "#123456");
+    assert.equal(rose().colors.accent, "#123456");
+    await commit(app, "compassColorAccent", "#123456");
+    assert.equal(steps(app), before + 2, "the same colour again is no step");
+
+    await commit(app, "compassFont", "Marcellus SC");
+    assert.equal(rose().fontFamily, "Marcellus SC");
+    assert.equal(field(app, "compassBold").disabled, true, "a family without bold disables Bold");
+
+    await choose(app, "compassDesign", "arrow");
+    assert.ok(!field(app, "compassPoints") && !field(app, "compassDegreeRing"), "the north arrow has no points or degree ring");
+    assert.ok(!field(app, "compassColorAccent"), "nor an accent colour");
+    VectorHistory.step(app, true);
+    assert.equal(rose().design, "mariner", "undo brings the design back");
+    platform.fonts.list = list;
 });
 
 test("a land mask on a guided map has its own coast settings: each follows the map until ticked, Sharp edge once one is, and Coast only shapes no land", async () => {

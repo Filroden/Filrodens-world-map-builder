@@ -10,8 +10,8 @@ const { compassRose, reachOf } = await import("../../src/canvas/decorations/Comp
 const { DrawnDecoration } = await import("../../src/canvas/decorations/DrawnDecoration.js");
 const { RegionalExtractor } = await import("../../src/applications/RegionalExtractor.js");
 
-const COLOURS = FILRODENSWMB.DECORATIONS.SCHEMES.parchment;
-const rose = (fields = {}) => ({ radius: 100, design: "classic", points: 8, rings: 2, degreeRing: false, north: "letter", letters: "cardinal", letterSize: 0.22, backing: true, colours: COLOURS, ...fields });
+const COLORS = FILRODENSWMB.DECORATIONS.SCHEMES.parchment;
+const rose = (fields = {}) => ({ radius: 100, design: "classic", points: 8, rings: 2, degreeRing: false, north: "letter", letters: "cardinal", letterSize: 0.22, backing: true, colors: COLORS, ...fields });
 
 /** Every coordinate a shape list holds, as [x, y] pairs (circles by their reach). */
 function coordinates(shapes) {
@@ -50,11 +50,15 @@ test("the letters sit at their bearings in the interface's own letters, and the 
 
 test("the backing disc is drawn first, the fleur-de-lis replaces N, and the arrow is one two-toned point", () => {
     const backed = compassRose(rose());
-    assert.ok(backed.shapes[0].circle && backed.shapes[0].fill === COLOURS.backing, "the disc lies behind everything");
-    assert.ok(!compassRose(rose({ backing: false })).shapes.some((shape) => shape.fill === COLOURS.backing && shape.circle));
+    assert.ok(backed.shapes[0].circle && backed.shapes[0].fill === COLORS.backing, "the disc lies behind everything");
+    assert.ok(!compassRose(rose({ backing: false })).shapes.some((shape) => shape.fill === COLORS.backing && shape.circle));
     const fleur = compassRose(rose({ north: "fleur" }));
     assert.ok(!fleur.letters.some((l) => l.key === "N"));
     assert.equal(fleur.shapes.length, compassRose(rose()).shapes.length + 5, "a fleur-de-lis of five shapes");
+    assert.ok(fleur.shapes.slice(-5).every((shape) => shape.fill === COLORS.letter), "the fleur-de-lis takes the letters' colour, as the N would");
+    const haloed = compassRose(rose({ north: "fleur", halo: true }));
+    assert.equal(haloed.shapes.length, fleur.shapes.length + 5, "with a halo, the fleur-de-lis drawn first in the backing's colour");
+    assert.ok(haloed.shapes.slice(-10, -5).every((shape) => shape.fill === COLORS.backing && shape.stroke === COLORS.backing && shape.join === "round"));
     const ticks = compassRose(rose({ degreeRing: true }));
     assert.equal(ticks.shapes.length - backed.shapes.length, 1 + 72, "a degree ring: its circle and a tick every 5 degrees");
     const arrow = compassRose(rose({ design: "arrow", rings: 1 }));
@@ -74,7 +78,7 @@ test("a new compass is a classic rose sized to the map, near its bottom right in
     assert.equal(made.size, 144, "9% of the shorter side");
     assert.equal(made.x, Math.round(2000 - 30 - 144 * FILRODENSWMB.DECORATIONS.COMPASS.CORNER_RADII));
     assert.equal(made.y, Math.round(1600 - 30 - 144 * FILRODENSWMB.DECORATIONS.COMPASS.CORNER_RADII));
-    assert.deepEqual(made.colours, { ...COLOURS });
+    assert.deepEqual(made.colors, { ...COLORS });
     assert.equal(made.fontFamily, "Cinzel");
     assert.deepEqual(DrawnDecoration.faces(made), [{ fontFamily: "Cinzel", bold: true, italic: false }]);
     assert.deepEqual(DrawnDecoration.faces({ ...made, letters: "none" }), []);
@@ -87,7 +91,7 @@ test("a rose missing fields (an older or hand-edited map) takes its design's def
     const filled = DrawnDecoration.compassOf({ kind: "compass", design: "mariner", size: 90 });
     assert.deepEqual([filled.points, filled.north, filled.degreeRing, filled.fontFamily, filled.radius], [32, "fleur", true, "IM Fell English", 90]);
     assert.equal(DrawnDecoration.compassOf({ kind: "compass", design: "nonsense" }).design, "classic");
-    assert.equal(DrawnDecoration.compassOf({ kind: "compass", colours: { dark: "#000000" } }).colours.dark, "#000000", "its own colours over the scheme's");
+    assert.equal(DrawnDecoration.compassOf({ kind: "compass", colors: { dark: "#000000" } }).colors.dark, "#000000", "its own colours over the scheme's");
 });
 
 test("a regional map keeps a drawn decoration at the same place relative to the map and size relative to its shorter side, and crops images", () => {
@@ -104,4 +108,16 @@ test("a regional map keeps a drawn decoration at the same place relative to the 
     assert.ok(Math.abs(rose.x / target.width - 0.85) < 1e-9 && Math.abs(rose.y / target.height - 0.78) < 1e-9);
     assert.equal(rose.size, 144 * (900 / 1600));
     assert.equal(compass.x, 1700, "the parent's decoration is left as it was");
+});
+
+test("a thumbnail holds numbers and #rrggbb colours only, whatever the shapes carry", async () => {
+    const { svgShapes, compassThumbnail } = await import("../../src/canvas/decorations/DecorationSvg.js");
+    const data = svgShapes([{ path: [["M", 1.234, 2], ["L", 3, NaN], ["Z"]], fill: "red;background:url(x)", stroke: "#AbCdEf", width: 0.5 }, { circle: [0, 0, 5], fill: "#123456" }], 10);
+    assert.equal(data.viewBox, "-10 -10 20 20");
+    assert.deepEqual(data.shapes[0], { circle: null, d: "M1.23 2 L3 0 Z", fill: "none", stroke: "#AbCdEf", width: 0.5, join: "miter", opacity: 1 });
+    assert.deepEqual(data.shapes[1].circle, { cx: 0, cy: 0, r: 5 });
+    const rose = DrawnDecoration.compassOf({ kind: "compass", design: "mariner", size: 140 });
+    const thumbnail = compassThumbnail(rose);
+    assert.ok(thumbnail.shapes.length > 40);
+    assert.ok(thumbnail.shapes.every((shape) => (shape.d ?? "").match(/^[MLCQZ0-9 .-]*$/)), "paths are commands and numbers");
 });

@@ -51,12 +51,12 @@ const INTERCARDINALS = Object.freeze([
 ]);
 
 /** A point in two tones: the half on its clockwise side in the dark tone, as roses are shaded. */
-function twoTonePoint(bearing, tier, radius, colours, width) {
+function twoTonePoint(bearing, tier, radius, colors, width) {
     const tip = polar(tier.tip * radius, bearing);
     const left = polar(tier.side * radius, bearing - tier.spread);
     const right = polar(tier.side * radius, bearing + tier.spread);
-    const stroke = { stroke: colours.line, width };
-    return [polygon([[0, 0], tip, left], { fill: colours.light, ...stroke }), polygon([[0, 0], tip, right], { fill: colours.dark, ...stroke })];
+    const stroke = { stroke: colors.line, width };
+    return [polygon([[0, 0], tip, left], { fill: colors.light, ...stroke }), polygon([[0, 0], tip, right], { fill: colors.dark, ...stroke })];
 }
 
 /** A fleur-de-lis standing on (cx, cy), `size` tall, upright; drawn from scratch. */
@@ -104,13 +104,13 @@ function fleurDeLis(cx, cy, size, style) {
  * @param {number} [rose.letterSize] - The cardinal letters' height, in radii.
  * @param {boolean} [rose.backing] - A disc behind the rose, so it reads over a busy map.
  * @param {number} [rose.backingOpacity]
- * @param {{light: string, dark: string, line: string, accent: string, letter: string, backing: string}} rose.colours
+ * @param {{light: string, dark: string, line: string, accent: string, letter: string, backing: string}} rose.colors
  * @param {Object<string, string>} [letterText] - Each letter's text by its key (N, E, S, W, NE...).
  * @returns {{shapes: object[], letters: {key: string, text: string, x: number, y: number, size: number, bearing: number}[]}}
  */
 export function compassRose(rose, letterText = {}) {
     const radius = rose.radius;
-    const colours = rose.colours;
+    const colors = rose.colors;
     const width = Math.max(0.6, radius * 0.012);
     const size = (rose.letterSize ?? 0.22) * radius;
     const shapes = [];
@@ -123,10 +123,10 @@ export function compassRose(rose, letterText = {}) {
         const left = [-0.32 * radius, 0.42 * radius];
         const right = [0.32 * radius, 0.42 * radius];
         const notch = [0, 0.2 * radius];
-        if (rose.backing) shapes.push({ circle: [0, 0.05 * radius, 0.66 * radius], fill: colours.backing, alpha: rose.backingOpacity ?? 0.85 });
-        if (rose.rings >= 1) shapes.push({ circle: [0, 0.05 * radius, 0.62 * radius], stroke: colours.line, width: width * 1.5 });
-        shapes.push(polygon([tip, left, notch], { fill: colours.light, stroke: colours.line, width: width * 1.5 }));
-        shapes.push(polygon([tip, notch, right], { fill: colours.dark, stroke: colours.line, width: width * 1.5 }));
+        if (rose.backing) shapes.push({ circle: [0, 0.05 * radius, 0.66 * radius], fill: colors.backing, alpha: rose.backingOpacity ?? 0.85 });
+        if (rose.rings >= 1) shapes.push({ circle: [0, 0.05 * radius, 0.62 * radius], stroke: colors.line, width: width * 1.5 });
+        shapes.push(polygon([tip, left, notch], { fill: colors.light, stroke: colors.line, width: width * 1.5 }));
+        shapes.push(polygon([tip, notch, right], { fill: colors.dark, stroke: colors.line, width: width * 1.5 }));
         if (rose.letters !== "none") letter("N", 0, 1.24 * radius, size * 1.6);
         return { shapes, letters };
     }
@@ -135,16 +135,16 @@ export function compassRose(rose, letterText = {}) {
     const ring = 0.93 * radius;
     const outerRing = ring + 0.045 * radius;
 
-    if (rose.backing) shapes.push({ circle: [0, 0, rose.rings >= 2 ? outerRing : ring], fill: colours.backing, alpha: rose.backingOpacity ?? 0.85 });
+    if (rose.backing) shapes.push({ circle: [0, 0, rose.rings >= 2 ? outerRing : ring], fill: colors.backing, alpha: rose.backingOpacity ?? 0.85 });
     // Rings and the degree ring lie behind the points
-    if (rose.rings >= 1) shapes.push({ circle: [0, 0, ring], stroke: colours.line, width: width * 2 });
-    if (rose.rings >= 2) shapes.push({ circle: [0, 0, outerRing], stroke: colours.line, width });
+    if (rose.rings >= 1) shapes.push({ circle: [0, 0, ring], stroke: colors.line, width: width * 2 });
+    if (rose.rings >= 2) shapes.push({ circle: [0, 0, outerRing], stroke: colors.line, width });
     if (rose.degreeRing) {
         const inner = ring - 0.06 * radius;
-        shapes.push({ circle: [0, 0, inner], stroke: colours.line, width });
+        shapes.push({ circle: [0, 0, inner], stroke: colors.line, width });
         for (let bearing = 0; bearing < 360; bearing += 5) {
             const length = bearing % 45 === 0 ? 1 : bearing % 15 === 0 ? 0.7 : 0.45;
-            shapes.push({ path: [["M", ...polar(inner, bearing)], ["L", ...polar(inner + (ring - inner) * length, bearing)]], stroke: colours.line, width });
+            shapes.push({ path: [["M", ...polar(inner, bearing)], ["L", ...polar(inner + (ring - inner) * length, bearing)]], stroke: colors.line, width });
         }
     }
 
@@ -158,20 +158,26 @@ export function compassRose(rose, letterText = {}) {
                 const tip = polar(tier.tip * radius, bearing);
                 const left = polar(tier.side * radius, bearing - tier.spread);
                 const right = polar(tier.side * radius, bearing + tier.spread);
-                shapes.push(polygon([[0, 0], left, tip, right], { fill: colours.accent, stroke: colours.line, width: width * 0.6 }));
+                shapes.push(polygon([[0, 0], left, tip, right], { fill: colors.accent, stroke: colors.line, width: width * 0.6 }));
             } else {
                 // A mariner's rose alternates which tone leads, as old roses did
                 const swap = rose.design === "mariner" && t === 1;
-                shapes.push(...twoTonePoint(bearing, tier, radius, swap ? { ...colours, light: colours.dark, dark: colours.light } : colours, width));
+                shapes.push(...twoTonePoint(bearing, tier, radius, swap ? { ...colors, light: colors.dark, dark: colors.light } : colors, width));
             }
         }
     }
 
     // The hub
-    shapes.push({ circle: [0, 0, 0.07 * radius], fill: colours.accent, stroke: colours.line, width: width * 1.5 });
+    shapes.push({ circle: [0, 0, 0.07 * radius], fill: colors.accent, stroke: colors.line, width: width * 1.5 });
 
     const distance = (rose.degreeRing || rose.rings >= 2 ? 1.12 : 1.1) * radius;
-    if (rose.north === "fleur") shapes.push(...fleurDeLis(0, -0.985 * radius, 0.34 * radius, { fill: colours.dark, stroke: colours.line, width }));
+    if (rose.north === "fleur") {
+        // The fleur-de-lis stands in for the N, so it takes the letters' colour and, under it, the
+        // same halo in the backing's colour, to read over land or sea outside the disc
+        const fleur = (style) => fleurDeLis(0, -0.985 * radius, 0.34 * radius, style);
+        if (rose.halo) shapes.push(...fleur({ fill: colors.backing, stroke: colors.backing, width: Math.max(2, size * 0.16), join: "round" }));
+        shapes.push(...fleur({ fill: colors.letter, stroke: colors.line, width }));
+    }
     if (rose.letters !== "none") {
         for (const [key, bearing] of CARDINALS) {
             if (key === "N" && rose.north === "fleur") continue;

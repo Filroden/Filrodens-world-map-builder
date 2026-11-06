@@ -59,7 +59,7 @@ export class DrawnDecoration {
             backing: true,
             backingOpacity: COMPASS.BACKING_OPACITY,
             halo: true,
-            colours: { ...SCHEMES[DEFAULT_SCHEME] },
+            colors: { ...SCHEMES[DEFAULT_SCHEME] },
         };
     }
 
@@ -87,7 +87,7 @@ export class DrawnDecoration {
             backing: pick("backing", true),
             backingOpacity: pick("backingOpacity", COMPASS.BACKING_OPACITY),
             halo: pick("halo", true),
-            colours: { ...SCHEMES[DEFAULT_SCHEME], ...(decoration.colours ?? {}) },
+            colors: { ...SCHEMES[DEFAULT_SCHEME], ...(decoration.colors ?? {}) },
             fontFamily: pick("fontFamily", defaults.fontFamily),
             bold: pick("bold", defaults.bold),
         };
@@ -145,10 +145,10 @@ export class DrawnDecoration {
                 fontFamily: fonts.family(face),
                 fontWeight: fonts.weight(face),
                 fontSize: letter.size,
-                fill: rose.colours.letter,
+                fill: rose.colors.letter,
                 // A halo in the backing's colour, as names have, so letters outside the disc read
                 // over the map
-                ...(rose.halo ? { stroke: rose.colours.backing, strokeThickness: Math.max(2, letter.size * 0.16), lineJoin: "round" } : {}),
+                ...(rose.halo ? { stroke: rose.colors.backing, strokeThickness: Math.max(2, letter.size * 0.16), lineJoin: "round" } : {}),
             });
             text.anchor.set(0.5);
             text.position.set(letter.x, letter.y);
@@ -169,7 +169,7 @@ const packed = (colour) => Number.parseInt(String(colour).slice(1), 16) || 0;
  */
 export function drawShapes(graphics, shapes, k = 1) {
     for (const shape of shapes) {
-        if (shape.stroke) graphics.lineStyle(shape.width * k, packed(shape.stroke), 1, 0.5);
+        if (shape.stroke) graphics.lineStyle({ width: shape.width * k, color: packed(shape.stroke), alpha: 1, alignment: 0.5, join: shape.join === "round" ? "round" : "miter" });
         else graphics.lineStyle(0);
         if (shape.fill) graphics.beginFill(packed(shape.fill), shape.alpha ?? 1);
         if (shape.circle) {

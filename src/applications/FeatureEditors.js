@@ -12,6 +12,7 @@ import { FaultThickness } from "../tools/FaultThickness.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
+import { CompassFields } from "./CompassFields.js";
 import { nameInset } from "../canvas/MapBorder.js";
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/parts/";
@@ -235,7 +236,8 @@ const DECORATION_NAMES = Object.freeze({ compass: "FILRODENSWMB.UI.DecorationKin
 
 /**
  * A decoration (Cartography) in the inspector: its name and visibility, its opacity, scale and
- * rotation, and Focus view and Delete.
+ * rotation, a compass rose's own design, options, colours and letters (see CompassFields), and
+ * Focus view and Delete.
  */
 export class DecorationEditor {
     /** @returns {Promise<boolean>} */
@@ -283,6 +285,8 @@ export class DecorationEditor {
             visibilities: RegionPanel.visibilityChoices(decoration.visibility),
             scaleRange: FILRODENSWMB.UI.WHEEL_RESIZE.DECORATION_SCALE,
             rotationRange: FILRODENSWMB.UI.ROTATION,
+            compass: decoration.kind === "compass" ? CompassFields.context(decoration) : null,
+            palette: FILRODENSWMB.LABELS?.PRESETS || [],
         }),
         apply: (app, decoration, _ref, form, field) => {
             const elements = form.elements;
@@ -295,7 +299,12 @@ export class DecorationEditor {
             if (field === "decorationOpacity") values.opacity = Number(elements.decorationOpacity.value);
             if (field === "decorationScale") values.scale = Number(elements.decorationScale.value) || 1;
             if (field === "decorationRotation") values.rotation = CanvasTransforms.normalizeAngle(elements.decorationRotation.value);
-            return applyValues(app, decoration, typed("decoration", values, decoration), [], { ...decoration, visibility: decoration.visibility ?? "all" });
+            if (decoration.kind === "compass") Object.assign(values, CompassFields.read(decoration, elements, field));
+            const checked = typed("decoration", values, decoration);
+            const current = { ...decoration, visibility: decoration.visibility ?? "all" };
+            // Compared by value, so a colours object holding the same colours is no change
+            const changed = Object.fromEntries(Object.entries(checked).filter(([name, value]) => JSON.stringify(current[name]) !== JSON.stringify(value)));
+            return applyValues(app, decoration, changed, [], current);
         },
         actions: {
             zoom: (app, decoration) => zoomTo(app, [decoration]),

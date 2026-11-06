@@ -117,7 +117,7 @@ test("an image that cannot be read or fails its check is left out and counted, a
 });
 
 test("a decoration the module draws has no image: every mode carries it as it is, and bringing it in keeps it and counts nothing missing", async () => {
-    const compass = { id: "roseAAAAAAAAAAAA", type: "decoration", kind: "compass", name: "Compass rose", design: "classic", size: 144, x: 1700, y: 1250, rotation: 0, scale: 1, visibility: "all", colours: { ...FILRODENSWMB.DECORATIONS.SCHEMES.parchment }, fontFamily: "Cinzel", bold: true };
+    const compass = { id: "roseAAAAAAAAAAAA", type: "decoration", kind: "compass", name: "Compass rose", design: "classic", size: 144, x: 1700, y: 1250, rotation: 0, scale: 1, visibility: "all", colors: { ...FILRODENSWMB.DECORATIONS.SCHEMES.parchment }, fontFamily: "Cinzel", bold: true };
     for (const mode of ["embed", "assets", "keep"]) {
         const from = host();
         const map = savedMap();

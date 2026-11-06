@@ -1,8 +1,17 @@
 {{!--
     The inspector's decoration (see DecorationEditor): its name and visibility, its opacity, scale
-    and rotation, and Focus view and Delete. Every field applies when committed, one undo step
-    each (see Inspector).
+    and rotation; for a compass rose (see CompassFields) its design, picked from thumbnails, and
+    the design's options, its colours (one by one, or all at once from a colour scheme) and its
+    letters' font, bold and size; then Focus view and Delete. Every field applies when committed,
+    one undo step each (see Inspector).
 --}}
+{{#if compass}}
+<datalist id="fwmb-inspector-colors">
+    {{#each palette}}
+    <option value="{{this}}"></option>
+    {{/each}}
+</datalist>
+{{/if}}
 <div class="fwmb-group">
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-name">{{localize "FILRODENSWMB.UI.Name"}}</label>
@@ -27,6 +36,122 @@
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="decorationScale" label="FILRODENSWMB.UI.Scale" value=decoration.scale min=scaleRange.MIN max=scaleRange.MAX step=scaleRange.STEP}}
     {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="decorationRotation" label="FILRODENSWMB.UI.Rotation" value=decoration.rotation min=rotationRange.MIN max=rotationRange.MAX step=rotationRange.STEP unit="FILRODENSWMB.UI.UnitDegrees" unitShort="FILRODENSWMB.UI.UnitDegreesShort"}}
 </div>
+
+{{#if compass}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorCompassDesign" title="FILRODENSWMB.UI.CompassDesign"}}
+<div class="fwmb-design-picker" role="radiogroup" aria-label="{{localize 'FILRODENSWMB.UI.CompassDesign'}}">
+    {{#each compass.designs}}
+    <label class="fwmb-design-option">
+        <input type="radio" name="compassDesign" value="{{this.value}}" {{#if this.selected}}checked{{/if}} />
+        <svg class="fwmb-design-thumb" viewBox="{{this.thumbnail.viewBox}}" aria-hidden="true" focusable="false">
+            {{#each this.thumbnail.shapes}}
+            {{#if this.circle}}<circle cx="{{this.circle.cx}}" cy="{{this.circle.cy}}" r="{{this.circle.r}}" fill="{{this.fill}}" stroke="{{this.stroke}}" stroke-width="{{this.width}}" stroke-linejoin="{{this.join}}" fill-opacity="{{this.opacity}}" />{{else}}<path d="{{this.d}}" fill="{{this.fill}}" stroke="{{this.stroke}}" stroke-width="{{this.width}}" stroke-linejoin="{{this.join}}" fill-opacity="{{this.opacity}}" />{{/if}}
+            {{/each}}
+        </svg>
+        <span class="fwmb-design-name">{{localize this.label}}</span>
+    </label>
+    {{/each}}
+</div>
+{{#unless compass.arrow}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-compass-points">{{localize "FILRODENSWMB.UI.CompassPoints"}}</label>
+    <div class="fwmb-form-fields">
+        <select id="fwmb-inspector-compass-points" name="compassPoints">
+            {{#each compass.points}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>{{/each}}
+        </select>
+    </div>
+</div>
+{{/unless}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-compass-rings">{{localize "FILRODENSWMB.UI.CompassRings"}}</label>
+    <div class="fwmb-form-fields">
+        <select id="fwmb-inspector-compass-rings" name="compassRings">
+            {{#each compass.rings}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>{{/each}}
+        </select>
+    </div>
+</div>
+{{#unless compass.arrow}}
+<div class="fwmb-row">
+    <label class="fwmb-checkbox-label">
+        <input type="checkbox" class="fwmb-checkbox" name="compassDegreeRing" {{#if compass.degreeRing}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.CompassDegreeRing"}}
+    </label>
+</div>
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-compass-north">{{localize "FILRODENSWMB.UI.CompassNorth"}}</label>
+    <div class="fwmb-form-fields">
+        <select id="fwmb-inspector-compass-north" name="compassNorth">
+            {{#each compass.north}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>{{/each}}
+        </select>
+    </div>
+</div>
+{{/unless}}
+<div class="fwmb-row">
+    <label class="fwmb-checkbox-label">
+        <input type="checkbox" class="fwmb-checkbox" name="compassBacking" {{#if compass.backing}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.CompassBacking"}}
+    </label>
+    <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.CompassBackingHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.CompassBackingHint'}}"></i>
+</div>
+{{#if compass.backing}}
+{{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="compassBackingOpacity" label="FILRODENSWMB.UI.CompassBackingOpacity" value=compass.backingOpacity min=0.1 max=1 step=0.05}}
+{{/if}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorCompassColors" title="FILRODENSWMB.UI.CompassColors"}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-compass-scheme">{{localize "FILRODENSWMB.UI.ColorScheme"}}</label>
+    <div class="fwmb-form-fields">
+        <select id="fwmb-inspector-compass-scheme" name="compassScheme">
+            <option value="" selected>{{localize "FILRODENSWMB.UI.ColorSchemeChoose"}}</option>
+            {{#each compass.schemes}}<option value="{{this.value}}">{{localize this.label}}</option>{{/each}}
+        </select>
+        <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.ColorSchemeHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.ColorSchemeHint'}}"></i>
+    </div>
+</div>
+<div class="fwmb-swatch-grid">
+    {{#each compass.colors}}
+    <label class="fwmb-swatch-field">
+        <input type="color" class="fwmb-swatch" name="{{this.name}}" value="{{this.value}}" list="fwmb-inspector-colors" />
+        <span>{{localize this.label}}</span>
+    </label>
+    {{/each}}
+</div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorCompassLetters" title="FILRODENSWMB.UI.CompassLettersSection"}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-compass-letters">{{localize "FILRODENSWMB.UI.CompassLetters"}}</label>
+    <div class="fwmb-form-fields">
+        <select id="fwmb-inspector-compass-letters" name="compassLetters">
+            {{#each compass.letters}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>{{/each}}
+        </select>
+    </div>
+</div>
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-compass-font">{{localize "FILRODENSWMB.UI.InspectorFont"}}</label>
+    <div class="fwmb-form-fields">
+        {{> "modules/filrodens-world-map-builder/templates/parts/font-picker.hbs" id="fwmb-inspector-compass-font" name="compassFont" groups=compass.fontGroups selected=compass.fontFamily missing=compass.fontMissing}}
+    </div>
+</div>
+{{> "modules/filrodens-world-map-builder/templates/parts/face-fields.hbs" bold=compass.bold face=compass.face boldName="compassBold"}}
+{{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="compassLetterSize" label="FILRODENSWMB.UI.CompassLetterSize" value=compass.letterSize min=compass.letterSizeRange.min max=compass.letterSizeRange.max step=compass.letterSizeRange.step}}
+<div class="fwmb-row">
+    <label class="fwmb-checkbox-label">
+        <input type="checkbox" class="fwmb-checkbox" name="compassUpright" {{#if compass.upright}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.CompassUpright"}}
+    </label>
+    <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.CompassUprightHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.CompassUprightHint'}}"></i>
+</div>
+<div class="fwmb-row">
+    <label class="fwmb-checkbox-label">
+        <input type="checkbox" class="fwmb-checkbox" name="compassHalo" {{#if compass.halo}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.CompassHalo"}}
+    </label>
+    <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.CompassHaloHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.CompassHaloHint'}}"></i>
+</div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}
 
 <div class="fwmb-inspector-actions">
     <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="zoom"><i class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ZoomTo"}}</button>
