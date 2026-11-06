@@ -109,12 +109,14 @@ async function start() {
         onRefused: (error) => platform.notify.error(Sanitize.refusalMessage(error instanceof ImportRefusal ? error : new ImportRefusal("image"), platform.i18n)),
     });
 
-    const [{ registerPinIconSettings }, { MapStudio }, { attachTheme, registerThemeSettings }] = await Promise.all([
+    const [{ registerPinIconSettings }, { MapStudio }, { attachTheme, registerThemeSettings }, { registerExportFormatSettings }] = await Promise.all([
         import("../src/data/pinIcons.js"),
         import("../src/applications/MapStudio.js"),
         import("../src/ui/Theme.js"),
+        import("../src/tools/ImageFormat.js"),
     ]);
     registerPinIconSettings();
+    registerExportFormatSettings();
     registerThemeSettings();
     // The colour theme chosen in the studio, on the frame and on <body> (where the tooltip is)
     attachTheme(frame);

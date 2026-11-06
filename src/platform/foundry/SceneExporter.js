@@ -21,7 +21,21 @@ function journalHtml(description) {
 /** Significant figures kept in a scene's grid distance: enough for the ruler, without a long tail of digits. */
 const GRID_DISTANCE_FIGURES = 3;
 
+/** A scene image's file extension from its blob's type (see ImageFormat): webp or png. */
+const extensionOf = (blob) => (blob?.type === "image/webp" ? "webp" : "png");
+
 export class SceneExporter {
+    /**
+     * Whether a tile's image is a GM overlay an earlier export placed, in either format (a map
+     * may be exported again in another format), so a re-export replaces it rather than adding a
+     * second.
+     * @param {string|null|undefined} src
+     * @returns {boolean}
+     */
+    static isOverlayTile(src) {
+        return typeof src === "string" && /_gm\.(png|webp)(\?.*)?$/i.test(src);
+    }
+
     /**
      * Executes the full asynchronous export pipeline. A failure is not reported here: it reaches
      * the caller (MapStudio's scene export), which logs it and shows its own localised message,
@@ -36,8 +50,10 @@ export class SceneExporter {
 
         // 2. Extract and Upload Player Background
         ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepPlayer"));
-        const playerFilename = `${sceneName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_player.png`;
-        const playerFile = new File([playerBlob], playerFilename, { type: "image/png" });
+        // Each image is named and typed as what it is: PNG or WebP (see ImageFormat)
+        const stem = sceneName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+        const playerFilename = `${stem}_player.${extensionOf(playerBlob)}`;
+        const playerFile = new File([playerBlob], playerFilename, { type: playerBlob.type });
 
         await FilePickerV2.upload("data", targetPath, playerFile);
         const playerImgPath = `${targetPath}/${playerFilename}`;
@@ -47,8 +63,8 @@ export class SceneExporter {
         // 3. Extract and Upload GM Overlay (If requested)
         if (createGmOverlay && gmBlob) {
             ui.notifications.info(game.i18n.localize("FILRODENSWMB.UI.ExportStepGm"));
-            const gmFilename = `${sceneName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_gm.png`;
-            const gmFile = new File([gmBlob], gmFilename, { type: "image/png" });
+            const gmFilename = `${stem}_gm.${extensionOf(gmBlob)}`;
+            const gmFile = new File([gmBlob], gmFilename, { type: gmBlob.type });
 
             await FilePickerV2.upload("data", targetPath, gmFile);
             gmImgPath = `${targetPath}/${gmFilename}`;
@@ -297,7 +313,7 @@ export class SceneExporter {
         }
 
         // Clear old module-specific embedded documents to prevent infinite stacking
-        const oldTiles = scene.tiles.filter((t) => t.texture?.src?.includes("_gm.png")).map((t) => t.id);
+        const oldTiles = scene.tiles.filter((t) => SceneExporter.isOverlayTile(t.texture?.src)).map((t) => t.id);
         if (oldTiles.length > 0) await scene.deleteEmbeddedDocuments("Tile", oldTiles);
 
         // The scene gets no map notes (at map scale they cover the map, and a scene offers no

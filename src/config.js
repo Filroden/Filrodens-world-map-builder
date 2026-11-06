@@ -1733,6 +1733,21 @@ export const FILRODENSWMB = {
     // should reach for a scale to be recommended, the largest image (a side, and in all) a scale
     // may make, and the largest tile drawn at once
     EXPORT_PNG: Object.freeze({ SCALES: Object.freeze([1, 2, 3, 4]), MIN_LABEL_PX: 12, MAX_SIDE: 16384, MAX_PIXELS: 150_000_000, TILE_PX: 4096 }),
+    // The image formats an export can be saved in (see ImageFormat), in the order offered: PNG,
+    // WebP at quality 1 (lossless in the browsers that encode WebP) and WebP at 0.9 (lossy, about
+    // a fifth of a PNG with the line work intact). Their sizes are estimated from a few sample
+    // tiles drawn at the export's scale, which comes within about 15% of a full encode. The last
+    // choice is remembered per kind of export.
+    EXPORT_FORMATS: Object.freeze({
+        CHOICES: Object.freeze([
+            Object.freeze({ id: "png", type: "image/png", extension: "png", label: "FILRODENSWMB.UI.ExportFormatPng" }),
+            Object.freeze({ id: "webp", type: "image/webp", quality: 1, extension: "webp", label: "FILRODENSWMB.UI.ExportFormatWebpLossless" }),
+            Object.freeze({ id: "webp90", type: "image/webp", quality: 0.9, extension: "webp", label: "FILRODENSWMB.UI.ExportFormatWebp90" }),
+        ]),
+        DEFAULT: "png",
+        ESTIMATE: Object.freeze({ TILES: 4, TILE_PX: 512 }),
+        SETTINGS: Object.freeze({ PNG: "exportFormatPng", SCENE: "exportFormatScene" }),
+    }),
     // Decorations drawn by the module (see DrawnDecoration): a compass rose or a cartouche, each
     // a `kind` on a map decoration (a decoration with no kind is an image the user supplied).
     DECORATIONS: Object.freeze({

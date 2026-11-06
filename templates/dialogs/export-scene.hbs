@@ -27,6 +27,18 @@
         <p class="fwmb-hint">{{reason}} {{localize "FILRODENSWMB.UI.ExportSceneScaleHint"}}</p>
     </div>
 
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label for="fwmb-export-scene-format">{{localize "FILRODENSWMB.UI.ExportFormat"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-export-scene-format" name="exportFormat">
+                {{#each formats}}
+                <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+        <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.ExportFormatHint"}}</p>
+    </div>
+
     <div class="fwmb-divider"></div>
 
     <div class="fwmb-form-group fwmb-form-group--stacked">

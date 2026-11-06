@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "./src/config.js";
 import { registerSidebarInjection } from "./src/hooks/sidebar-injection.js";
 import { initializeCompendium } from "./src/platform/foundry/store.js";
 import { registerPinIconSettings } from "./src/data/pinIcons.js";
+import { registerExportFormatSettings } from "./src/tools/ImageFormat.js";
 import { attachTheme, registerThemeSettings } from "./src/ui/Theme.js";
 import { registerModuleHelpers } from "./src/ui/templateHelpers.js";
 
@@ -16,6 +17,7 @@ Hooks.once("init", async () => {
     attachTheme(document.body);
 
     registerPinIconSettings();
+    registerExportFormatSettings();
 
     // The module's own template helpers (a free-text field's maxlength), beside Foundry's
     registerModuleHelpers(Handlebars);

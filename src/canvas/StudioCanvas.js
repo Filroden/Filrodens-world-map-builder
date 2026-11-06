@@ -10,6 +10,7 @@ import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { SymbolScale } from "../tools/SymbolScale.js";
 import { ExportScale } from "../tools/ExportScale.js";
+import { ImageFormat } from "../tools/ImageFormat.js";
 import { LabelLayout } from "./LabelLayout.js";
 import { borderLines } from "./MapBorder.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
@@ -1453,7 +1454,7 @@ export class StudioCanvas {
      * @param {number} scale - 1 draws the map at its own size.
      * @returns {HTMLCanvasElement}
      */
-    #renderForExport(scale) {
+    #renderForExport(scale, samples = null) {
         const factor = Number(scale) > 0 ? scale : 1;
         const origX = this.stage.position.x;
         const origY = this.stage.position.y;
@@ -1474,11 +1475,22 @@ export class StudioCanvas {
                 child.children?.forEach(collect);
             });
 
+            this.stage.scale.set(factor);
+            // Sample tiles only (for an estimate of the file's size): each drawn on its own canvas
+            if (samples) {
+                return samples.map((tile) => {
+                    const renderTexture = PIXI.RenderTexture.create({ width: tile.width, height: tile.height, resolution: 1 });
+                    this.stage.position.set(-tile.x, -tile.y);
+                    this.app.renderer.render(this.stage, { renderTexture });
+                    const canvas = this.app.renderer.extract.canvas(renderTexture);
+                    renderTexture.destroy(true);
+                    return canvas;
+                });
+            }
             const output = document.createElement("canvas");
             output.width = width;
             output.height = height;
             const context = output.getContext("2d");
-            this.stage.scale.set(factor);
             for (const tile of ExportScale.tiles(width, height, this.#exportTileLimit())) {
                 const renderTexture = PIXI.RenderTexture.create({ width: tile.width, height: tile.height, resolution: 1 });
                 this.stage.position.set(-tile.x, -tile.y);
@@ -1517,14 +1529,16 @@ export class StudioCanvas {
     }
 
     /**
-     * Exports the map as a PNG at a scale (see #renderForExport). The reference image and the
-     * land masks' outlines are working aids, never exported. The file is downloaded through a
+     * Exports the map as an image at a scale (see #renderForExport), in a format (see
+     * ImageFormat; PNG where the browser cannot write the one asked for). The reference image and
+     * the land masks' outlines are working aids, never exported. The file is downloaded through a
      * detached link, which Electron's navigation interceptors leave alone.
      * @param {string} [filename]
      * @param {number} [scale] - 1 draws the map at its own size.
+     * @param {string} [format] - An EXPORT_FORMATS id.
      * @returns {Promise<boolean>} Whether the image was made.
      */
-    async exportToPNG(filename = "world-map", scale = 1) {
+    async exportToPNG(filename = "world-map", scale = 1, format = "png") {
         const referenceVisible = this.layers.reference.visible;
         const landMasksVisible = this.layers.landMasks.visible;
         try {
@@ -1538,13 +1552,12 @@ export class StudioCanvas {
                 this.layers.landMasks.visible = landMasksVisible;
             }
 
-            const blob = await new Promise((resolve) => output.toBlob(resolve, "image/png"));
-            if (!blob) throw new Error("The image could not be encoded");
+            const { blob, format: written } = await ImageFormat.encode(output, format);
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = blobUrl;
             const safeName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-            a.download = `fwmb_${safeName}.png`;
+            a.download = `fwmb_${safeName}.${written.extension}`;
             a.click();
             // Revoked once the download has had time to start
             setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
@@ -2336,16 +2349,17 @@ export class StudioCanvas {
     }
 
     /**
-     * One of a scene export's images as a PNG blob, drawn exactly as the PNG export draws (see
-     * #renderForExport) at the scale chosen: the player image (no grid, which Foundry draws), or
-     * the GM overlay (only what players must not see: no terrain, contours, thematic layers,
-     * rivers and faults, grid or cartography). The reference image and the land masks' outlines
-     * are never exported. Every layer goes back to how it was.
+     * One of a scene export's images as a blob in a format (see ImageFormat), drawn exactly as
+     * the image export draws (see #renderForExport) at the scale chosen: the player image (no
+     * grid, which Foundry draws), or the GM overlay (only what players must not see: no terrain,
+     * contours, thematic layers, rivers and faults, grid or cartography). The reference image and
+     * the land masks' outlines are never exported. Every layer goes back to how it was.
      * @param {"player"|"gm"} [passType]
      * @param {number} [scale] - 1 draws the map at its own size.
+     * @param {string} [format] - An EXPORT_FORMATS id.
      * @returns {Promise<Blob|null>}
      */
-    async extractCanvasBlob(passType = "player", scale = 1) {
+    async extractCanvasBlob(passType = "player", scale = 1, format = "png") {
         const hidden = [this.gridLayer, this.layers.reference, this.layers.landMasks];
         if (passType === "gm") {
             // The GM overlay holds only what players must not see; a thematic layer is in the
@@ -2364,7 +2378,45 @@ export class StudioCanvas {
                 layer.visible = visibility[index];
             });
         }
-        return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        const { blob } = await ImageFormat.encode(canvas, format);
+        return blob;
+    }
+
+    /**
+     * A few tiles of an export drawn at its scale (see ExportScale), spread over the map, for an
+     * estimate of the file's size in each format (see ImageFormat.estimate): drawn as the export
+     * of that kind would be, the reference image and the land masks' outlines (and for a scene,
+     * the grid) hidden.
+     * @param {number} scale
+     * @param {object} [options]
+     * @param {boolean} [options.forScene]
+     * @returns {{tiles: HTMLCanvasElement[], pixels: number}}
+     */
+    exportSamples(scale, { forScene = false } = {}) {
+        const { TILES, TILE_PX } = FILRODENSWMB.EXPORT_FORMATS.ESTIMATE;
+        const width = Math.round(this.mapWidth * scale);
+        const height = Math.round(this.mapHeight * scale);
+        const side = Math.min(TILE_PX, width, height);
+        // Spread over the map: at the middles of its four quarters
+        const across = Math.max(1, Math.round(Math.sqrt(TILES)));
+        const places = [];
+        for (let row = 0; row < across; row++) {
+            for (let column = 0; column < across && places.length < TILES; column++) {
+                const x = Math.round(((column + 0.5) / across) * width - side / 2);
+                const y = Math.round(((row + 0.5) / across) * height - side / 2);
+                places.push({ x: Math.max(0, Math.min(width - side, x)), y: Math.max(0, Math.min(height - side, y)), width: side, height: side });
+            }
+        }
+        const hidden = [this.layers.reference, this.layers.landMasks, ...(forScene ? [this.gridLayer] : [])];
+        const visibility = hidden.map((layer) => layer.visible);
+        try {
+            for (const layer of hidden) layer.visible = false;
+            return { tiles: this.#renderForExport(scale, places), pixels: width * height };
+        } finally {
+            hidden.forEach((layer, index) => {
+                layer.visible = visibility[index];
+            });
+        }
     }
 
     setRenderPass(mode) {

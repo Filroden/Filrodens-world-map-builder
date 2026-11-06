@@ -88,6 +88,7 @@ import { SymbolScale } from "../tools/SymbolScale.js";
 import { nameInset } from "../canvas/MapBorder.js";
 import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
 import { ExportScale } from "../tools/ExportScale.js";
+import { ImageFormat } from "../tools/ImageFormat.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -5461,34 +5462,96 @@ export class MapStudio {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.ExportNoMap"));
             return;
         }
-        const scale = await this.#chooseExportScale();
-        if (!scale) return;
+        const choice = await this.#chooseImageExport();
+        if (!choice) return;
+        const { scale, format } = choice;
 
         const mapName = TravelView.exportName(this, HistoryView.exportName(this, this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.UnsavedMapName")));
         platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ExportPngStarted", { name: mapName }));
         await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingPng"));
         try {
             await this.#labelFacesReady();
-            await this.canvasEngine.exportToPNG(mapName, scale);
+            await this.canvasEngine.exportToPNG(mapName, scale, format);
         } finally {
             this.#endProcessing();
         }
     }
 
     /**
-     * Asks for the PNG's scale (see #exportScales). Resolves with the scale, or null when cancelled.
-     * @returns {Promise<number|null>}
+     * Asks for the image's scale (see #exportScales) and format (see #exportFormats). Resolves
+     * with both, or null when cancelled. The format chosen is remembered for the next export.
+     * @returns {Promise<{scale: number, format: string}|null>}
      */
-    async #chooseExportScale() {
+    async #chooseImageExport() {
         const { plan, options, reason } = this.#exportScales();
-        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-png.hbs", { options, reason });
+        const formats = await this.#exportFormats("png");
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-png.hbs", { options, reason, formats });
         const chosen = await platform.dialogs.prompt({
             classes: ["fwmb"],
             title: platform.i18n.localize("FILRODENSWMB.UI.ExportPNG"),
             content,
-            onSubmit: (form) => Number(form.elements.exportScale.value),
+            onRender: (element) => this.#estimateFormatSizes(element),
+            onSubmit: (form) => ({ scale: Number(form.elements.exportScale.value), format: form.elements.exportFormat.value }),
         });
-        return MapStudio.#allowedScale(plan, chosen);
+        const scale = MapStudio.#allowedScale(plan, chosen?.scale);
+        if (!scale) return null;
+        const format = formats.some((each) => each.id === chosen.format) ? chosen.format : FILRODENSWMB.EXPORT_FORMATS.DEFAULT;
+        await ImageFormat.remember("png", format);
+        return { scale, format };
+    }
+
+    /**
+     * The image formats an export offers (see ImageFormat): those this browser can write, the
+     * one last chosen for this kind of export selected.
+     * @param {"png"|"scene"} kind
+     * @returns {Promise<{id: string, label: string, selected: boolean}[]>}
+     */
+    async #exportFormats(kind) {
+        const available = await ImageFormat.available();
+        const chosen = ImageFormat.remembered(kind, available);
+        return available.map((id) => ({ id, label: platform.i18n.localize(ImageFormat.byId(id).label), selected: id === chosen }));
+    }
+
+    /**
+     * Shows each format's estimated file size beside its name in an export dialogue, worked out
+     * again when the scale changes (see StudioCanvas.exportSamples and ImageFormat.estimate). Each
+     * scale's sizes are kept while the dialogue is open; a slower answer for a scale no longer
+     * chosen is ignored.
+     * @param {HTMLElement} element - The dialogue.
+     * @param {object} [options]
+     * @param {boolean} [options.forScene]
+     */
+    #estimateFormatSizes(element, { forScene = false } = {}) {
+        const scaleField = element.querySelector('[name="exportScale"]');
+        const formatField = element.querySelector('[name="exportFormat"]');
+        if (!scaleField || !formatField || !this.canvasEngine?.exportSamples) return;
+        const label = (option) => option.dataset.label ?? option.textContent;
+        for (const option of formatField.options) option.dataset.label = option.textContent.trim();
+        const known = new Map();
+        let asked = 0;
+        const show = (sizes) => {
+            for (const option of formatField.options) {
+                option.textContent = sizes ? platform.i18n.format("FILRODENSWMB.UI.ExportFormatOption", { format: label(option), size: ImageFormat.sizeText(sizes[option.value] ?? 0) }) : platform.i18n.format("FILRODENSWMB.UI.ExportFormatEstimating", { format: label(option) });
+            }
+        };
+        const update = async () => {
+            const turn = ++asked;
+            const scale = Number(scaleField.value);
+            show(known.get(scale) ?? null);
+            if (known.has(scale)) return;
+            // Drawn after the dialogue has shown, so opening it is never held up
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            try {
+                const { tiles, pixels } = this.canvasEngine.exportSamples(scale, { forScene });
+                known.set(scale, await ImageFormat.estimate(tiles, pixels, [...formatField.options].map((option) => option.value)));
+            } catch (error) {
+                console.warn("FWMB | Export size estimate failed", error);
+                return;
+            }
+            if (turn === asked && element.isConnected) show(known.get(scale));
+        };
+        scaleField.addEventListener("change", update);
+        update();
     }
 
     /** The scale chosen, if the plan allows it; null otherwise (a cancelled dialogue included). */
@@ -5537,13 +5600,16 @@ export class MapStudio {
         const defaultFolder = "fwmb-exports";
 
         const scales = this.#exportScales({ forScene: true });
-        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder, options: scales.options, reason: scales.reason });
+        const formats = await this.#exportFormats("scene");
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder, options: scales.options, reason: scales.reason, formats });
 
         const config = await platform.dialogs.prompt({
             classes: ["fwmb"],
             title: platform.i18n.localize("FILRODENSWMB.UI.ExportScene"),
             content: content,
+            onRender: (element) => this.#estimateFormatSizes(element, { forScene: true }),
             onSubmit: (form) => ({
+                format: formats.some((each) => each.id === form.elements.exportFormat?.value) ? form.elements.exportFormat.value : FILRODENSWMB.EXPORT_FORMATS.DEFAULT,
                 sceneName: form.elements["sceneName"].value.trim() || defaultName,
                 exportFolder: form.elements["exportFolder"].value.trim() || defaultFolder,
                 generateJournals: form.elements["generateJournals"].checked,
@@ -5554,6 +5620,7 @@ export class MapStudio {
         });
 
         if (!config) return; // User cancelled
+        await ImageFormat.remember("scene", config.format);
 
         // The user has confirmed. Hand off to the background processing pipeline.
         this.#executeSceneExportPipeline(config);
@@ -5588,7 +5655,7 @@ export class MapStudio {
             // YIELD to the browser so the newly created PIXI SVG Sprites can upload to the GPU
             await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
 
-            const playerBlob = await this.canvasEngine.extractCanvasBlob("player", config.scale);
+            const playerBlob = await this.canvasEngine.extractCanvasBlob("player", config.scale, config.format);
 
             // --- 2. GM OVERLAY PASS ---
             let gmBlob = null;
@@ -5601,7 +5668,7 @@ export class MapStudio {
                 // YIELD again for the new GM sprites
                 await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
 
-                gmBlob = await this.canvasEngine.extractCanvasBlob("gm", config.scale);
+                gmBlob = await this.canvasEngine.extractCanvasBlob("gm", config.scale, config.format);
             }
 
             if (textEl) textEl.textContent = platform.i18n.localize("FILRODENSWMB.UI.ExportStepScene");
