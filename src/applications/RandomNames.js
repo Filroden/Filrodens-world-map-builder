@@ -249,7 +249,8 @@ export class RandomNames {
 
     /**
      * The name base an item is named in: the commonest culture at it in the map's run (a region's
-     * cells, a pin's cell, a route's two ends), else the map's Name style.
+     * cells, a pin's cell, a route's two ends), in that culture's Name style as the map has it now,
+     * else the map's Name style.
      */
     static #nameBase(app, kind, item, region) {
         const fallback = app.uiState?.generatorSettings?.nameBase || FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE;
@@ -266,7 +267,13 @@ export class RandomNames {
         }
         let best = -1;
         for (const [index, count] of votes) if (best < 0 || count > votes.get(best) || (count === votes.get(best) && index < best)) best = index;
-        const base = best >= 0 ? culture.run.cultures?.[best]?.nameBase : null;
+        // The culture as the map has it now, so a Name style changed since the run is used at
+        // once: the run's own record only for a culture since deleted, and the map's Name style
+        // for the run's default culture (one with no id of the map's)
+        const recorded = best >= 0 ? culture.run.cultures?.[best] : null;
+        if (!recorded || recorded.id == null) return fallback;
+        const current = (app.uiState?.cultures ?? []).find((each) => each.id === recorded.id);
+        const base = current ? current.nameBase : recorded.nameBase;
         return typeof base === "string" && base ? base : fallback;
     }
 

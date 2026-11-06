@@ -1074,3 +1074,33 @@ test("Random name on a generated item does not mark it edited, so Generate again
     assert.equal(pin.generated.edited, true);
     assert.ok(!form(app).querySelector('[name="namingContext"]'), "no naming context to choose");
 });
+
+test("a random name is in the Name style its culture has now, not the one the run recorded", async () => {
+    const { encodeModelRun } = await import("../../src/generator/ModelRun.js");
+    const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
+    const { app, session } = await studio();
+    const mesh = session.mesh;
+    const count = mesh.modelCount;
+    const column = (fill) => new Float64Array(count).fill(fill);
+    // Every model cell held by the run's first culture, recorded in English
+    const run = encodeModelRun({
+        modelCells: { capacity: column(0), population: column(100), landArea: column(1), security: column(1), cleared: column(0), water: column(0), realm: column(-1), duchy: column(-1), county: column(-1), culture: column(0), shareStart: Int32Array.from({ length: count + 1 }, (_, index) => index), shareCulture: new Int32Array(count), shareValue: new Float32Array(count).fill(1) },
+        settings: resolveSettings({}, "SEED"),
+        cellCount: count,
+        cultures: [{ id: "cultureAAAAAAAAA", name: "Folk", nameBase: "English", homelands: [0] }],
+        stats: {},
+    }, "runAAAAAAAAAAAAA");
+    app.modelRun = JSON.parse(JSON.stringify(run));
+    app.uiState.mapSeed = "seed";
+    app.uiState.generatorSettings = { nameBase: "Nordic" };
+    const pin = { id: "plain", name: "Plain", x: 200, y: 150, icon: "map_pin", pinStyle: null };
+    const expect = (nameBase) => placeName({ mapSeed: "seed", itemId: "plain", roll: 2, nameBase });
+    const suggested = () => RandomNames.suggest(app, "pin", pin, {}, { roll: 2 });
+
+    app.uiState.cultures = [{ id: "cultureAAAAAAAAA", name: "Folk", nameBase: "Elven" }];
+    assert.equal(suggested(), expect("Elven"), "the culture's Name style as it is now");
+    app.uiState.cultures = [{ id: "cultureAAAAAAAAA", name: "Folk", nameBase: "Arabic" }];
+    assert.equal(suggested(), expect("Arabic"), "and again after it changes, with no Generate again");
+    app.uiState.cultures = [];
+    assert.equal(suggested(), expect("English"), "a culture since deleted keeps the run's record");
+});
