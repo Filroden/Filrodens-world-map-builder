@@ -2,10 +2,12 @@
     The inspector's decoration (see DecorationEditor): its name and visibility, its opacity, scale
     and rotation; for a compass rose (see CompassFields) its design, picked from thumbnails, and
     the design's options, its colours (one by one, or all at once from a colour scheme) and its
-    letters' font, bold and size; then Focus view and Delete. Every field applies when committed,
+    letters' font, bold and size; for a cartouche (see CartoucheFields) its design, its title (the
+    map's name or its own) and subtitle, its colours, and its lettering (the title's font, bold,
+    capitals and widest; the subtitle's font, italic and size); then Focus view and Delete. Every field applies when committed,
     one undo step each (see Inspector).
 --}}
-{{#if compass}}
+{{#if drawn}}
 <datalist id="fwmb-inspector-colors">
     {{#each palette}}
     <option value="{{this}}"></option>
@@ -150,6 +152,105 @@
     </label>
     <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.CompassHaloHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.CompassHaloHint'}}"></i>
 </div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/if}}
+
+{{#if cartouche}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorCartoucheDesign" title="FILRODENSWMB.UI.CompassDesign"}}
+<div class="fwmb-design-picker" role="radiogroup" aria-label="{{localize 'FILRODENSWMB.UI.CompassDesign'}}">
+    {{#each cartouche.designs}}
+    <label class="fwmb-design-option">
+        <input type="radio" name="cartoucheDesign" value="{{this.value}}" {{#if this.selected}}checked{{/if}} />
+        <svg class="fwmb-design-thumb fwmb-design-thumb--wide" viewBox="{{this.thumbnail.viewBox}}" aria-hidden="true" focusable="false">
+            {{#each this.thumbnail.shapes}}
+            {{#if this.circle}}<circle cx="{{this.circle.cx}}" cy="{{this.circle.cy}}" r="{{this.circle.r}}" fill="{{this.fill}}" stroke="{{this.stroke}}" stroke-width="{{this.width}}" stroke-linejoin="{{this.join}}" fill-opacity="{{this.opacity}}" />{{else}}<path d="{{this.d}}" fill="{{this.fill}}" stroke="{{this.stroke}}" stroke-width="{{this.width}}" stroke-linejoin="{{this.join}}" fill-opacity="{{this.opacity}}" />{{/if}}
+            {{/each}}
+        </svg>
+        <span class="fwmb-design-name">{{localize this.label}}</span>
+    </label>
+    {{/each}}
+</div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorCartoucheTitle" title="FILRODENSWMB.UI.CartoucheTitleSection"}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-cartouche-source">{{localize "FILRODENSWMB.UI.CartoucheTitleSource"}}</label>
+    <div class="fwmb-form-fields">
+        <select id="fwmb-inspector-cartouche-source" name="cartoucheTitleSource">
+            {{#each cartouche.sources}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>{{/each}}
+        </select>
+        <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.CartoucheTitleSourceHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.CartoucheTitleSourceHint'}}"></i>
+    </div>
+</div>
+{{#if cartouche.custom}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-cartouche-title">{{localize "FILRODENSWMB.UI.CartoucheTitle"}}</label>
+    <div class="fwmb-form-fields">
+        <input type="text" id="fwmb-inspector-cartouche-title" name="cartoucheTitle" maxlength="{{fwmbTextLimit 'name'}}" value="{{cartouche.title}}" />
+    </div>
+</div>
+{{/if}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-cartouche-subtitle">{{localize "FILRODENSWMB.UI.CartoucheSubtitle"}}</label>
+    <div class="fwmb-form-fields">
+        <input type="text" id="fwmb-inspector-cartouche-subtitle" name="cartoucheSubtitle" maxlength="{{fwmbTextLimit 'name'}}" value="{{cartouche.subtitle}}" placeholder="{{localize 'FILRODENSWMB.UI.CartoucheSubtitlePlaceholder'}}" />
+    </div>
+</div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorCartoucheColors" title="FILRODENSWMB.UI.CompassColors"}}
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-cartouche-scheme">{{localize "FILRODENSWMB.UI.ColorScheme"}}</label>
+    <div class="fwmb-form-fields">
+        <select id="fwmb-inspector-cartouche-scheme" name="cartoucheScheme">
+            <option value="" selected>{{localize "FILRODENSWMB.UI.ColorSchemeChoose"}}</option>
+            {{#each cartouche.schemes}}<option value="{{this.value}}">{{localize this.label}}</option>{{/each}}
+        </select>
+        <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.ColorSchemeHint'}}" aria-label="{{localize 'FILRODENSWMB.UI.ColorSchemeHint'}}"></i>
+    </div>
+</div>
+<div class="fwmb-swatch-grid">
+    {{#each cartouche.colors}}
+    <label class="fwmb-swatch-field">
+        <input type="color" class="fwmb-swatch" name="{{this.name}}" value="{{this.value}}" list="fwmb-inspector-colors" />
+        <span>{{localize this.label}}</span>
+    </label>
+    {{/each}}
+</div>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorCartoucheLettering" title="FILRODENSWMB.UI.CartoucheLettering"}}
+<div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CartoucheTitle"}}</div>
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-cartouche-font">{{localize "FILRODENSWMB.UI.InspectorFont"}}</label>
+    <div class="fwmb-form-fields">
+        {{> "modules/filrodens-world-map-builder/templates/parts/font-picker.hbs" id="fwmb-inspector-cartouche-font" name="cartoucheFont" groups=cartouche.fontGroups selected=cartouche.fontFamily missing=cartouche.fontMissing}}
+    </div>
+</div>
+{{> "modules/filrodens-world-map-builder/templates/parts/face-fields.hbs" bold=cartouche.bold face=cartouche.face boldName="cartoucheBold"}}
+<div class="fwmb-row">
+    <label class="fwmb-checkbox-label">
+        <input type="checkbox" class="fwmb-checkbox" name="cartoucheCapitals" {{#if cartouche.capitals}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.CartoucheCapitals"}}
+    </label>
+</div>
+{{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="cartoucheMaxWidth" label="FILRODENSWMB.UI.CartoucheMaxWidth" value=cartouche.maxWidth min=cartouche.maxWidthRange.min max=cartouche.maxWidthRange.max step=cartouche.maxWidthRange.step}}
+<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.CartoucheMaxWidthHint"}}</p>
+{{#if cartouche.overflow}}
+<p class="fwmb-hint fwmb-hint--warning" role="status">{{localize "FILRODENSWMB.UI.CartoucheOverflow"}}</p>
+{{/if}}
+{{#if cartouche.hasSubtitle}}
+<div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.CartoucheSubtitle"}}</div>
+<div class="fwmb-form-group">
+    <label class="fwmb-label" for="fwmb-inspector-cartouche-subtitle-font">{{localize "FILRODENSWMB.UI.InspectorFont"}}</label>
+    <div class="fwmb-form-fields">
+        {{> "modules/filrodens-world-map-builder/templates/parts/font-picker.hbs" id="fwmb-inspector-cartouche-subtitle-font" name="cartoucheSubtitleFont" groups=cartouche.fontGroups selected=cartouche.subtitleFontFamily missing=cartouche.subtitleFontMissing}}
+    </div>
+</div>
+{{> "modules/filrodens-world-map-builder/templates/parts/face-fields.hbs" italic=cartouche.subtitleItalic face=cartouche.subtitleFace italicName="cartoucheSubtitleItalic"}}
+{{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="cartoucheSubtitleSize" label="FILRODENSWMB.UI.CartoucheSubtitleSize" value=cartouche.subtitleSize min=cartouche.subtitleSizeRange.min max=cartouche.subtitleSizeRange.max step=cartouche.subtitleSizeRange.step}}
+<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.CartoucheSubtitleSizeHint"}}</p>
+{{/if}}
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 {{/if}}
 

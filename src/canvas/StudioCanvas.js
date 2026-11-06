@@ -2147,7 +2147,9 @@ export class StudioCanvas {
         // Delegate to isolated drawing pipelines
         this.#drawCartographyBorder(uiState, mapWidth, mapHeight);
         this.#drawScaleBar(uiState, mapHeight, isEditMode);
-        this.#drawCartographyDecorations(decorations, isEditMode);
+        // A decoration's handle (the point it is held by and turns around) shows only in Move, so
+        // in Select nothing covers it, such as a compass rose's hub
+        this.#drawCartographyDecorations(decorations, isEditMode, mapWidth, isEditMode && uiState.cartographyMode === "move");
 
         // A drawn decoration's letters in a face still loading were drawn in the fallback: once
         // it arrives the layer is drawn again, unless it has been drawn since (see LabelFonts)
@@ -2161,6 +2163,29 @@ export class StudioCanvas {
 
     /** The last renderCartography call's arguments, so a face arriving late redraws only the latest. */
     #cartographyArgs = null;
+
+    /** The open map's name, which a cartouche showing it draws (see setMapName). */
+    #mapName = null;
+
+    /** The ids of the cartouches whose text did not fit their widest when last drawn. */
+    #overflowing = new Set();
+
+    /**
+     * The open map's name has changed (saved, renamed, another map opened): a cartouche showing
+     * it is drawn again with the new name.
+     * @param {string|null} name - Null for a map never saved.
+     */
+    setMapName(name) {
+        if (name === this.#mapName) return;
+        this.#mapName = name;
+        const args = this.#cartographyArgs;
+        if (args && !this.#destroyed && args[4]?.some((decoration) => decoration.kind === "cartouche")) this.renderCartography(...args);
+    }
+
+    /** Whether a cartouche's text did not fit its widest when it was last drawn (for the inspector's hint). */
+    isOverflowing(id) {
+        return this.#overflowing.has(id);
+    }
 
     #drawCartographyBorder(uiState, mapWidth, mapHeight) {
         if (!uiState.cartographyBorderEnable) return;
@@ -2281,11 +2306,12 @@ export class StudioCanvas {
         }
     }
 
-    #drawCartographyDecorations(decorations, isEditMode) {
+    #drawCartographyDecorations(decorations, isEditMode, mapWidth, showHandles) {
+        this.#overflowing.clear();
         decorations.forEach((dec) => {
             if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false)) return;
             if (DrawnDecoration.isDrawn(dec)) {
-                this.#drawDrawnDecoration(dec, isEditMode);
+                this.#drawDrawnDecoration(dec, isEditMode, mapWidth, showHandles);
                 return;
             }
             if (!dec.src) return;
@@ -2316,7 +2342,7 @@ export class StudioCanvas {
                 });
                 // A marker on its centre, the point it is held by and turns around; where two
                 // decorations overlap, a press picks the one whose centre is nearer
-                this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
+                if (showHandles) this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
             }
         });
     }
@@ -2325,8 +2351,9 @@ export class StudioCanvas {
      * A decoration the module draws (see DrawnDecoration): built afresh on each draw, which costs
      * little (a rose is at most about 150 shapes), placed, turned and scaled as an image is.
      */
-    #drawDrawnDecoration(dec, isEditMode) {
-        const { container, reach } = DrawnDecoration.build(PIXI, dec, { fonts: LabelFonts, localize: (key) => platform.i18n.localize(key) });
+    #drawDrawnDecoration(dec, isEditMode, mapWidth, showHandles) {
+        const { container, reach, overflow } = DrawnDecoration.build(PIXI, dec, { fonts: LabelFonts, localize: (key) => platform.i18n.localize(key), mapWidth, mapName: this.#mapName });
+        if (overflow) this.#overflowing.add(dec.id);
         container.position.set(dec.x, dec.y);
         container.rotation = (dec.rotation ?? 0) * (Math.PI / 180);
         container.scale.set(dec.scale || 1);
@@ -2345,7 +2372,7 @@ export class StudioCanvas {
             entityType: "decoration",
             entityId: dec.id,
         });
-        this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
+        if (showHandles) this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
     }
 
     /**

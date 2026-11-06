@@ -688,6 +688,8 @@ export class MapStudio {
         if (name === this.#saveName) return;
         this.#saveName = name;
         this.#showTitle();
+        // A cartouche showing the map's name follows it
+        this.canvasEngine?.setMapName?.(name);
     }
 
     /** Whether the open map has changes that are not saved. */
@@ -1742,6 +1744,7 @@ export class MapStudio {
         this.canvasEngine.onCropRelease = (cropBox) => this.#snapCrop(cropBox);
         this.canvasEngine.onLabelsPlaced = (withoutRoom) => this.#labelsPlaced(withoutRoom);
         this.canvasEngine.setLabelOverlapAvoidance(this.uiState.avoidLabelOverlaps);
+        this.canvasEngine.setMapName(this.#saveName);
     }
 
     /** The names with no room at the last draw (see LabelLayout), as a key that changes when they do. */

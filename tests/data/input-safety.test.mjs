@@ -549,9 +549,12 @@ test("a drawn decoration's fields are kept to their rules: unknown kinds, design
         subtitle: "In the fourth age",
         maxWidth: 4,
     });
+    file.mapDecorations.push({ id: "plateAAAAAAAAAAA", type: "decoration", name: "Cartouche", kind: "cartouche", design: "ribbon", titleSource: "elsewhere", subtitleFontFamily: "EB Garamond", subtitleItalic: "no", capitals: true, x: 5, y: 5 });
     file.mapDecorations.push({ id: "oddAAAAAAAAAAAAA", type: "decoration", name: "Odd", kind: "sundial", design: "nonsense", size: -3, fontFamily: "Fell'); background: url(x", x: 1, y: 1 });
     const { mapData } = MapImport.read(file);
-    const [, rose, odd] = mapData.mapDecorations;
+    const [, rose, plate, odd] = mapData.mapDecorations;
+    assert.deepEqual([plate.kind, plate.design, plate.subtitleFontFamily, plate.capitals], ["cartouche", "ribbon", "EB Garamond", true]);
+    assert.ok(!("titleSource" in plate) && !("subtitleItalic" in plate), "an unknown title source and a non-boolean italic are dropped");
     assert.deepEqual(rose.colors, { light: "#f3e9cf", letter: "#123456" }, "a hostile colour and an unknown colour key are dropped");
     assert.deepEqual([rose.kind, rose.design, rose.size, rose.fontFamily, rose.bold, rose.north, rose.letterSize, rose.backingOpacity], ["compass", "classic", 144, "Cinzel", true, "fleur", 0.3, 0.85]);
     for (const dropped of ["points", "letters", "upright"]) assert.ok(!(dropped in rose), `${dropped} outside its rule is dropped`);

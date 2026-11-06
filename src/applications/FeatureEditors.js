@@ -12,6 +12,7 @@ import { FaultThickness } from "../tools/FaultThickness.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
+import { CartoucheFields } from "./CartoucheFields.js";
 import { CompassFields } from "./CompassFields.js";
 import { nameInset } from "../canvas/MapBorder.js";
 
@@ -236,8 +237,9 @@ const DECORATION_NAMES = Object.freeze({ compass: "FILRODENSWMB.UI.DecorationKin
 
 /**
  * A decoration (Cartography) in the inspector: its name and visibility, its opacity, scale and
- * rotation, a compass rose's own design, options, colours and letters (see CompassFields), and
- * Focus view and Delete.
+ * rotation, a compass rose's own design, options, colours and letters (see CompassFields), a
+ * cartouche's own design, title, colours and lettering (see CartoucheFields), and Focus view and
+ * Delete.
  */
 export class DecorationEditor {
     /** @returns {Promise<boolean>} */
@@ -249,7 +251,7 @@ export class DecorationEditor {
      * Adds a decoration the module draws (see DrawnDecoration), with its defaults, and opens it in
      * the inspector, as one undo step. It needs no dialogue: everything about it is changed
      * afterwards in the inspector.
-     * @param {"compass"} kind
+     * @param {"compass"|"cartouche"} kind
      * @returns {Promise<string>} Its id.
      */
     static async add(app, kind) {
@@ -274,7 +276,7 @@ export class DecorationEditor {
         template: `${TEMPLATES}inspector-decoration.hbs`,
         find: (app, { id }) => app.mapDecorations?.find((decoration) => decoration.id === id) ?? null,
         header: (_app, decoration) => ({ title: decoration.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitleDecoration") }),
-        context: (_app, decoration) => ({
+        context: (app, decoration) => ({
             decoration: {
                 name: decoration.name,
                 opacity: decoration.opacity ?? 1,
@@ -286,6 +288,8 @@ export class DecorationEditor {
             scaleRange: FILRODENSWMB.UI.WHEEL_RESIZE.DECORATION_SCALE,
             rotationRange: FILRODENSWMB.UI.ROTATION,
             compass: decoration.kind === "compass" ? CompassFields.context(decoration) : null,
+            cartouche: decoration.kind === "cartouche" ? CartoucheFields.context(decoration, { overflow: app.canvasEngine?.isOverflowing?.(decoration.id) ?? false }) : null,
+            drawn: DrawnDecoration.isDrawn(decoration),
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
         }),
         apply: (app, decoration, _ref, form, field) => {
@@ -300,6 +304,7 @@ export class DecorationEditor {
             if (field === "decorationScale") values.scale = Number(elements.decorationScale.value) || 1;
             if (field === "decorationRotation") values.rotation = CanvasTransforms.normalizeAngle(elements.decorationRotation.value);
             if (decoration.kind === "compass") Object.assign(values, CompassFields.read(decoration, elements, field));
+            if (decoration.kind === "cartouche") Object.assign(values, CartoucheFields.read(decoration, elements, field));
             const checked = typed("decoration", values, decoration);
             const current = { ...decoration, visibility: decoration.visibility ?? "all" };
             // Compared by value, so a colours object holding the same colours is no change

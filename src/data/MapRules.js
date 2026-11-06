@@ -197,6 +197,7 @@ const DECORATION = obj({
     subtitle: text("name", "FILRODENSWMB.UI.LimitKindDecoration", "FILRODENSWMB.UI.LimitFieldSubtitle"),
     subtitleSize: num({ min: CARTOUCHE.SUBTITLE_SIZE.MIN, max: CARTOUCHE.SUBTITLE_SIZE.MAX }),
     subtitleItalic: bool,
+    subtitleFontFamily: { t: "font" },
     capitals: bool,
     maxWidth: num({ min: CARTOUCHE.MAX_WIDTH.MIN, max: CARTOUCHE.MAX_WIDTH.MAX }),
 });

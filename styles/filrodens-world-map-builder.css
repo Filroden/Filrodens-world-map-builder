@@ -3825,6 +3825,17 @@
     height: 3.5rem;
 }
 
+/* A cartouche is wider than it is tall: its thumbnail fills the option's width */
+.fwmb .fwmb-design-thumb.fwmb-design-thumb--wide {
+    width: 100%;
+    height: 2.5rem;
+}
+
+/* A cartouche whose text does not fit its widest */
+.fwmb .fwmb-hint.fwmb-hint--warning {
+    color: var(--fwmb-color-warning);
+}
+
 /* A drawn decoration's colours, two to a row, each a swatch and its name */
 .fwmb .fwmb-swatch-grid {
     display: grid;

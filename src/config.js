@@ -1782,6 +1782,17 @@ export const FILRODENSWMB = {
             TITLE_SHARE: 0.035,
             MAX_WIDTH: Object.freeze({ MIN: 0.1, MAX: 1, DEFAULT: 0.4 }),
             SUBTITLE_SIZE: Object.freeze({ MIN: 0.2, MAX: 1, DEFAULT: 0.45 }),
+            // A new cartouche sits at the top centre, this many title sizes in from the border's
+            // inset
+            TOP_TITLES: 1.6,
+            // Each design's title face; the subtitle is in a book face, in italic (an engraved
+            // face has no lower case or italic, so a subtitle in it would read as capitals)
+            DEFAULTS: Object.freeze({
+                plaque: Object.freeze({ fontFamily: "Cinzel", bold: true }),
+                ribbon: Object.freeze({ fontFamily: "IM Fell English", bold: false }),
+                frame: Object.freeze({ fontFamily: "Cinzel Decorative", bold: false }),
+            }),
+            SUBTITLE_FONT: "EB Garamond",
         }),
         // Colour schemes: every colour of a decoration at once (a one-off choice, not a link)
         SCHEMES: Object.freeze({

@@ -641,6 +641,54 @@ test("a compass rose's own fields apply one step each: a design brings its own s
     platform.fonts.list = list;
 });
 
+test("Add decoration's Cartouche adds a plaque at the top centre showing the map's name; its fields apply one step each, and a title too long to fit is reported", async () => {
+    const { app } = await studio();
+    Object.assign(app, { mapWidth: 1000, mapHeight: 800 });
+    const id = await DecorationEditor.add(app, "cartouche");
+    const panel = () => app.mapDecorations.find((decoration) => decoration.id === id);
+    assert.deepEqual([panel().kind, panel().design, panel().size, panel().titleSource, panel().fontFamily, panel().subtitleFontFamily, panel().subtitleItalic], ["cartouche", "plaque", 28, "map", "Cinzel", "EB Garamond", true]);
+    assert.equal(panel().x, 500, "centred");
+    assert.ok(panel().y < 400, "near the top");
+    assert.equal(steps(app), 1);
+    assert.ok(Inspector.shows(app, "decoration", id));
+    assert.equal(form(app).querySelectorAll(".fwmb-design-thumb--wide").length, 3, "a thumbnail of each design");
+    assert.ok(!field(app, "cartoucheTitle"), "no title field while it shows the map's name");
+    assert.ok(!field(app, "cartoucheSubtitleSize"), "no subtitle settings without a subtitle");
+    assert.ok(!field(app, "cartoucheColorShade"), "only the ribbon has a shade");
+    let before = steps(app);
+
+    await choose(app, "cartoucheDesign", "ribbon");
+    assert.deepEqual([panel().design, panel().fontFamily, panel().bold], ["ribbon", "IM Fell English", false], "a design brings its own face");
+    assert.ok(field(app, "cartoucheColorShade"), "the ribbon's tails have a shade");
+    assert.ok(!field(app, "cartoucheColorAccent"), "and it has no accent");
+
+    await commit(app, "cartoucheTitleSource", "custom");
+    await commit(app, "cartoucheTitle", "  The Kingdom of <b>Islemark</b>  ");
+    assert.equal(panel().title, "The Kingdom of <b>Islemark</b>", "plain text, trimmed");
+    await commit(app, "cartoucheSubtitle", "Drawn in the third age");
+    assert.ok(field(app, "cartoucheSubtitleSize") && field(app, "cartoucheSubtitleItalic"), "a subtitle brings its settings");
+    await commit(app, "cartoucheSubtitleItalic", false);
+    await commit(app, "cartoucheCapitals", true);
+    await commit(app, "cartoucheMaxWidth", "0.6");
+    assert.deepEqual([panel().subtitle, panel().subtitleItalic, panel().capitals, panel().maxWidth], ["Drawn in the third age", false, true, 0.6]);
+    assert.equal(steps(app), before + 7);
+
+    before = steps(app);
+    await commit(app, "cartoucheScheme", "crimson");
+    const crimson = FILRODENSWMB.DECORATIONS.SCHEMES.crimson;
+    assert.deepEqual(panel().colors, { fill: crimson.fill, line: crimson.line, accent: crimson.accent, shade: crimson.shade, text: crimson.text });
+    assert.equal(steps(app), before + 1, "a scheme is one step");
+    await commit(app, "cartoucheColorText", "#123456");
+    assert.equal(panel().colors.text, "#123456");
+
+    assert.ok(!form(app).querySelector(".fwmb-hint--warning"));
+    app.canvasEngine = { ...app.canvasEngine, isOverflowing: (which) => which === id };
+    await commit(app, "cartoucheMaxWidth", "0.1");
+    assert.ok(form(app).querySelector(".fwmb-hint--warning"), "a title that does not fit is reported");
+    VectorHistory.step(app, true);
+    assert.equal(panel().maxWidth, 0.6, "undo brings the width back");
+});
+
 test("a land mask on a guided map has its own coast settings: each follows the map until ticked, Sharp edge once one is, and Coast only shapes no land", async () => {
     const { app } = await studio();
     Object.assign(app.uiState, { generationEngine: "guided", terrainVersion: 3, coastlineFracture: 0.2, coastalPlain: 0.05, shelfRange: 0.15 });
