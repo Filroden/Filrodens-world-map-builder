@@ -28,6 +28,7 @@ import { RiverRelay } from "./RiverRelay.js";
 import { RunCells } from "./RunCells.js";
 import { Infilling } from "./Infilling.js";
 import { RandomNames } from "./RandomNames.js";
+import { FeatureNames } from "./FeatureNames.js";
 import { InfillInput } from "./InfillInput.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { FaultThickness } from "../tools/FaultThickness.js";
@@ -300,6 +301,7 @@ export class MapStudio {
         clearTravelStart()              { TravelView.clearStart(this); },
         fillIn()                        { Infilling.run(this); },
         nameAll()                       { RandomNames.openNameAll(this); },
+        nameFeatures()                  { FeatureNames.run(this); },
         toggleLabelOverlaps()           { this.#toggleLabelOverlaps(); },
         setSymbolSize(_e, t)            { this.#setSymbolSize(t.dataset.symbolSize); },
         toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
@@ -1304,7 +1306,10 @@ export class MapStudio {
                 context.pinList = await this.#listContext("pin", context);
                 context.routeList = await this.#listContext("route", context);
             }
-            if (this.activeTool === "labels") context.labelList = await this.#listContext("label", context);
+            if (this.activeTool === "labels") {
+                context.labelList = await this.#listContext("label", context);
+                context.featureReport = FeatureNames.lastReport(this);
+            }
             // Each row shows what kind of decoration it is: an image of the user's, or one the module draws
             context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort).map((decoration) => ({ ...decoration, kindIcon: DECORATION_ICONS[decoration.kind] ?? DECORATION_ICONS.image, kindLabel: DECORATION_LABELS[decoration.kind] ?? DECORATION_LABELS.image }));
             const { ADD: landColor, SUBTRACT: oceanColor, COAST: coastColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
@@ -4241,6 +4246,8 @@ export class MapStudio {
         this.landMasks = payload.landMasks || [];
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
+        // The last Name natural features report was the map before's
+        FeatureNames.forget(this);
 
         // Label widths saved in pixels (before widths were measured in characters) become
         // characters, rounded up so no label wraps earlier than before (see LabelWidth). The map
@@ -5275,6 +5282,7 @@ export class MapStudio {
 
         this.mapLabels = [];
         this.mapDecorations = [];
+        FeatureNames.forget(this);
         this.pinHistory = [];
         this.pinRedoStack = [];
         this.globalHistoryLedger = [];

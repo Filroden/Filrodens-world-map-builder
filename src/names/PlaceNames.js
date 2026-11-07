@@ -36,14 +36,15 @@ export function nameStream(mapSeed, itemId, roll) {
  * Coast", "Port {name}"), or with `descriptor.realm` a realm's form of the name by the name base's
  * own rule (Ashford gives Ashfordia or Ashland; a fantasy base keeps it as it is), as the generator
  * names kingdoms. With `descriptor.short`, a name set in a form is a short one, as features'
- * names are.
+ * names are; with `descriptor.always`, every roll sets the name in a form (a natural feature's
+ * name always says what it is).
  *
  * @param {object} item
  * @param {string} item.mapSeed - The map's seed.
  * @param {string} item.itemId - The item's id.
  * @param {number} [item.roll] - How many times it has been rerolled (0 for the first suggestion).
  * @param {string} [item.nameBase] - A name base's name; an unknown one takes the default.
- * @param {{forms?: string[], realm?: boolean, short?: boolean}|null} [item.descriptor]
+ * @param {{forms?: string[], realm?: boolean, short?: boolean, always?: boolean}|null} [item.descriptor]
  * @returns {string}
  */
 export function placeName({ mapSeed, itemId, roll = 0, nameBase, descriptor = null }) {
@@ -52,7 +53,7 @@ export function placeName({ mapSeed, itemId, roll = 0, nameBase, descriptor = nu
     const forms = (descriptor?.forms ?? []).filter((form) => typeof form === "string" && form.includes("{name}"));
     const words = forms.length + (descriptor?.realm ? 1 : 0);
     // Drawn first, so whether a word is added never shifts the name drawn after it
-    const worded = generator.rng() < FILRODENSWMB.PLACE_NAMES.FORM_SHARE;
+    const worded = generator.rng() < FILRODENSWMB.PLACE_NAMES.FORM_SHARE || descriptor?.always === true;
     const pick = Math.floor(generator.rng() * Math.max(1, words));
     if (!worded || !words) return generator.getBase(base);
     if (pick >= forms.length) return generator.getState(generator.getBase(base), base);

@@ -4,8 +4,32 @@
     meta. The list is searched and filtered (by who made it and its kind), its rows
     rendered only when they change (see ListQuery). A row opens its label in the inspector; an owned label's inspector links to its
     owner. Mass Edit (with Delete) chooses among the standalone labels. Placing a label is the state
-    block's (and the bar's) work.
+    block's (and the bar's) work. Above it, Natural features names the map's features (see
+    FeatureNames) and shows what its last run did.
 --}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="featureNames" title="FILRODENSWMB.UI.SectionFeatureNames"}}
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.FeatureNamesHint"}}</p>
+    <button type="button" class="fwmb-btn fwmb-btn--wide" data-action="nameFeatures" data-tooltip="{{localize 'FILRODENSWMB.UI.FeatureNamesButtonHint'}}">
+        <i class="fwmb-icon fwmb-icon--shuffle" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.FeatureNamesRun"}}
+    </button>
+    {{#if featureReport}}
+    <dl class="fwmb-generate-results">
+        <dt>{{localize "FILRODENSWMB.UI.FeatureNamesAdded"}}</dt>
+        <dd class="fwmb-readout">{{featureReport.added}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.FeatureNamesReplaced"}}</dt>
+        <dd class="fwmb-readout">{{featureReport.replaced}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.FeatureNamesKept"}}</dt>
+        <dd class="fwmb-readout">{{featureReport.kept}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.FeatureNamesSkipped"}}</dt>
+        <dd class="fwmb-readout">{{featureReport.skipped}}</dd>
+        <dt>{{localize "FILRODENSWMB.UI.FeatureNamesGone"}}</dt>
+        <dd class="fwmb-readout">{{featureReport.gone}}</dd>
+    </dl>
+    {{#if featureReport.gone}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.FeatureNamesGoneHint"}}</p>{{/if}}
+    {{#if featureReport.retired}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.FeatureNamesRetired" count=featureReport.retired}}</p>{{/if}}
+    {{/if}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="allLabels" title="FILRODENSWMB.UI.AllLabels" count=labelList.total massType="label"}}
     {{> "modules/filrodens-world-map-builder/templates/parts/list-query.hbs" query=labelList.controls kindLabel="FILRODENSWMB.UI.LabelFilter"}}
 

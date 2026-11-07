@@ -253,18 +253,33 @@ export class RandomNames {
      * else the map's Name style.
      */
     static #nameBase(app, kind, item, region) {
-        const fallback = app.uiState?.generatorSettings?.nameBase || FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE;
+        if (kind === "region") return this.#baseOfVotes(app, region?.cultures ?? new Map());
+        return this.nameBaseAt(app, this.#cellsOf(app, kind, item));
+    }
+
+    /**
+     * The name base of the people living in display cells: their commonest culture in the map's
+     * run, in its Name style as the map has it now, else the map's Name style.
+     * @param {object} app
+     * @param {Iterable<number>} cells
+     */
+    static nameBaseAt(app, cells) {
         const culture = this.#cultures(app);
-        if (!culture) return fallback;
-        let votes;
-        if (kind === "region") votes = region?.cultures ?? new Map();
-        else {
-            votes = new Map();
-            for (const cell of this.#cellsOf(app, kind, item)) {
+        const votes = new Map();
+        if (culture) {
+            for (const cell of cells) {
                 const at = culture.source.cultureAt(cell);
                 if (at) votes.set(at.index, (votes.get(at.index) ?? 0) + 1);
             }
         }
+        return this.#baseOfVotes(app, votes);
+    }
+
+    /** The name base of the culture with the most votes (cells by the run's culture index). */
+    static #baseOfVotes(app, votes) {
+        const fallback = app.uiState?.generatorSettings?.nameBase || FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE;
+        const culture = this.#cultures(app);
+        if (!culture) return fallback;
         let best = -1;
         for (const [index, count] of votes) if (best < 0 || count > votes.get(best) || (count === votes.get(best) && index < best)) best = index;
         // The culture as the map has it now, so a Name style changed since the run is used at

@@ -595,3 +595,18 @@ test("where a name came from and its roll are kept to their rules", () => {
     const older = MapImport.read(v4Map()).mapData;
     assert.ok(!("nameSource" in older.mapPins[0]) && !("nameSource" in older.layerSets[0].levels[0].regions[0]));
 });
+
+test("a natural feature's label keeps its feature record within its rules", () => {
+    const file = v4Map();
+    Object.assign(file.mapLabels[0], { feature: { kind: "sea", cell: 8, runs: [3, 10, 5, 4, 9, 7], x: 5, y: 5, rotation: 0, fontSize: 3.2, text: "Grey Sea", style: "label-style-ocean-sea" } });
+    file.mapLabels.push({ ...file.mapLabels[0], id: "labelBBBBBBBBBBB", feature: { kind: "volcano", cell: -2, runs: [1, "x", 2], path: [{ x: 1, y: 2 }, { x: "evil" }], text: SCRIPT, style: "a b" } });
+    const { mapData } = MapImport.read(file);
+    const [kept, odd] = mapData.mapLabels;
+    assert.deepEqual(kept.feature, { kind: "sea", cell: 8, runs: [3, 10, 5, 4, 9, 7], x: 5, y: 5, rotation: 0, fontSize: 3.2, text: "Grey Sea", style: "label-style-ocean-sea" });
+    assert.ok(!("kind" in odd.feature) && !("style" in odd.feature), "an unknown kind and a bad style id are dropped");
+    assert.equal(odd.feature.cell, 1, "a cell size is kept in its range");
+    assert.deepEqual(odd.feature.runs, [1, 2]);
+    assert.deepEqual(odd.feature.path, [{ x: 1, y: 2 }]);
+    assert.equal(odd.feature.text, SCRIPT, "the text it was given stays plain text");
+    assert.ok(!("feature" in MapImport.read(v4Map()).mapData.mapLabels[0]), "a label with none reads as before");
+});

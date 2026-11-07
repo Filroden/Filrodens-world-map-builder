@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { LAYER_SET_KINDS, NESTING_MODES, ROUTE_CLASSES, ROUTE_TRANSPORTS, VISIBILITIES } from "../mesh/Schema.js";
 import { MODEL_RUN_ARRAYS } from "../generator/ModelRun.js";
 import { Sanitize } from "./Sanitize.js";
+import { FEATURE_KINDS } from "../names/FeatureDetection.js";
 
 /**
  * The allow-list of a saved map's data: every field each kind of object may hold, and what its
@@ -153,10 +154,32 @@ const PIN = obj({
     inflow: num(RANGE.SIGNED),
 });
 
+/**
+ * What a natural feature's label keeps of its feature (see FeatureNames): the feature's kind, its
+ * footprint (an area's cells on a grid of `cell` pixels as row runs, or a river's course), and
+ * what the action gave the label, against which a change by the reader is told.
+ */
+const FEATURE = obj(
+    {
+        kind: enumOf(Object.keys(FEATURE_KINDS)),
+        cell: int(1, 1000),
+        runs: { t: "cells" },
+        path: points,
+        x: num(RANGE.COORD),
+        y: num(RANGE.COORD),
+        rotation: num(RANGE.ANGLE),
+        fontSize: num({ min: 0.01, max: 100 }),
+        text: text("label", "FILRODENSWMB.UI.LimitKindLabel", "FILRODENSWMB.UI.LimitFieldText"),
+        style: key,
+    },
+    { nullable: true },
+);
+
 const LABEL = obj({
     ...LABEL_LOOK,
     id,
     name: text("label", "FILRODENSWMB.UI.LimitKindLabel", "FILRODENSWMB.UI.LimitFieldText"),
+    feature: FEATURE,
 });
 
 const { COMPASS, CARTOUCHE } = FILRODENSWMB.DECORATIONS;

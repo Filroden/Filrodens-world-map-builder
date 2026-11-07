@@ -90,7 +90,9 @@ export class RegionalExtractor {
             manualRivers: this.guideRivers(app, this.#scaleRiverWidths(translate(app.manualRivers), zoomScale), cropBox),
             mapPins: [...translate(app.mapPins), ...this.#riverInflows(app, cropBox, zoomScale, targetWidth, targetHeight)],
             mapRoutes: translate(app.mapRoutes),
-            mapLabels: translate(app.mapLabels),
+            // A natural feature's name comes as the reader's own label: its feature record is in
+            // the parent's pixels, and the regional map finds its own features
+            mapLabels: translate(app.mapLabels).map(({ feature: _feature, ...label }) => label),
             landMasks: state.generationEngine === "guided" ? this.#translateLandMasks(app.landMasks ?? [], cropBox, zoomScale) : [],
             mapDecorations: this.carryDecorations(app.mapDecorations ?? [], { width: app.mapWidth, height: app.mapHeight }, { width: targetWidth, height: targetHeight }, translate),
             upwindMargin: upwindMargin(cropBox, zoomScale),

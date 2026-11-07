@@ -1,5 +1,15 @@
 import { DEFAULT_LABEL_FONT } from "./data/fonts.js";
 
+/** The geographic label styles (see LABELS.DEFAULT_STYLES and FEATURE_NAMES). */
+const FEATURE_LABEL_STYLES = Object.freeze([
+    Object.freeze({ id: "label-style-ocean-sea", nameKey: "FILRODENSWMB.LABELS.StyleOceanSea", fontFamily: "Cormorant Garamond", fontSize: 3.2, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
+    Object.freeze({ id: "label-style-gulf-bay-lake", nameKey: "FILRODENSWMB.LABELS.StyleGulfBayLake", fontFamily: "Cormorant Garamond", fontSize: 1.8, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
+    Object.freeze({ id: "label-style-river", nameKey: "FILRODENSWMB.LABELS.StyleRiver", fontFamily: "Cormorant Garamond", fontSize: 1.3, fillColor: "#C4DDEE", maxChars: 0, justify: "center", bold: true, italic: true }),
+    Object.freeze({ id: "label-style-mountains", nameKey: "FILRODENSWMB.LABELS.StyleMountains", fontFamily: "Alegreya Sans SC", fontSize: 2.2, fillColor: "#E6D9C2", maxChars: 0, justify: "center", bold: true, italic: false }),
+    Object.freeze({ id: "label-style-hills", nameKey: "FILRODENSWMB.LABELS.StyleHills", fontFamily: "Alegreya Sans SC", fontSize: 1.7, fillColor: "#E6D9C2", maxChars: 0, justify: "center", bold: false, italic: false }),
+    Object.freeze({ id: "label-style-land", nameKey: "FILRODENSWMB.LABELS.StyleLand", fontFamily: "Alegreya SC", fontSize: 1.9, fillColor: "#DCE4C8", maxChars: 0, justify: "center", bold: false, italic: true }),
+]);
+
 export const FILRODENSWMB = {
     ID: "filrodens-world-map-builder",
     FLAGS: {
@@ -1678,7 +1688,6 @@ export const FILRODENSWMB = {
         DEFAULT_STYLES: Object.freeze([
             Object.freeze({ id: "label-style-realm", nameKey: "FILRODENSWMB.LABELS.StyleRealm", fontFamily: "Cinzel", fontSize: 3, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: true, italic: false }),
             Object.freeze({ id: "label-style-place", nameKey: "FILRODENSWMB.LABELS.StylePlace", fontFamily: "EB Garamond", fontSize: 2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: true, italic: false }),
-            Object.freeze({ id: "label-style-water", nameKey: "FILRODENSWMB.LABELS.StyleWater", fontFamily: "EB Garamond", fontSize: 2.4, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
             Object.freeze({ id: "label-style-note", nameKey: "FILRODENSWMB.LABELS.StyleNote", fontFamily: "Kalam", fontSize: 1.6, fillColor: "#DEDCD3", maxChars: 24, justify: "left", bold: false, italic: false }),
             // For the routes' labels (see ROUTES.DEFAULT_STYLES)
             Object.freeze({ id: "label-style-road", nameKey: "FILRODENSWMB.LABELS.StyleRoad", fontFamily: "Barlow Semi Condensed", fontSize: 1.4, fillColor: "#5a3a1e", maxChars: 0, justify: "center", bold: false, italic: false }),
@@ -1690,6 +1699,10 @@ export const FILRODENSWMB = {
             Object.freeze({ id: "label-style-county", nameKey: "FILRODENSWMB.LABELS.StyleCounty", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: false, italic: true }),
             Object.freeze({ id: "label-style-capital", nameKey: "FILRODENSWMB.LABELS.StyleCapital", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#FFFFFF", maxChars: 0, justify: "left", bold: true, italic: false }),
             Object.freeze({ id: "label-style-settlement", nameKey: "FILRODENSWMB.LABELS.StyleSettlement", fontFamily: "EB Garamond", fontSize: 1.2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: false, italic: false }),
+            // The geographic family, for natural features' names (see FEATURE_NAMES): water in a
+            // light italic, rivers smaller, relief in spaced small capitals (not the realms' gold),
+            // and land areas in an italic small-capital face
+            ...FEATURE_LABEL_STYLES,
         ]),
         PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
     },
@@ -1868,6 +1881,45 @@ export const FILRODENSWMB = {
         // What Name all can name, and which names it can replace (a typed name never)
         NAME_ALL_KINDS: Object.freeze({ region: "FILRODENSWMB.UI.NameAllRegions", pin: "FILRODENSWMB.UI.NameAllPins", route: "FILRODENSWMB.UI.NameAllRoutes" }),
         NAME_ALL_SOURCES: Object.freeze({ unnamed: "FILRODENSWMB.UI.NameAllUnnamed", random: "FILRODENSWMB.UI.NameAllRandom", default: "FILRODENSWMB.UI.NameAllDefault", generated: "FILRODENSWMB.UI.NameAllGenerated" }),
+    }),
+    // Natural features named by the Labels tool (see FeatureDetection and FeatureNames): the
+    // label style each group is named in, how each kind is written ({name} is the proper name),
+    // and the old Water style the family replaces
+    FEATURE_NAMES: Object.freeze({
+        STYLES: Object.freeze({
+            oceanSea: "label-style-ocean-sea",
+            gulfBayLake: "label-style-gulf-bay-lake",
+            river: "label-style-river",
+            mountains: "label-style-mountains",
+            hills: "label-style-hills",
+            land: "label-style-land",
+        }),
+        FORMS: Object.freeze({
+            ocean: Object.freeze(["FILRODENSWMB.UI.NameFormOcean"]),
+            sea: Object.freeze(["FILRODENSWMB.UI.NameFormSea", "FILRODENSWMB.UI.NameFormSeaOf"]),
+            gulf: Object.freeze(["FILRODENSWMB.UI.NameFormGulf"]),
+            bay: Object.freeze(["FILRODENSWMB.UI.NameFormBay"]),
+            lake: Object.freeze(["FILRODENSWMB.UI.NameFormLake"]),
+            mountains: Object.freeze(["FILRODENSWMB.UI.NameFormMountains"]),
+            hills: Object.freeze(["FILRODENSWMB.UI.NameFormHills"]),
+            highlands: Object.freeze(["FILRODENSWMB.UI.NameFormHighlands"]),
+            forest: Object.freeze(["FILRODENSWMB.UI.NameFormForest", "FILRODENSWMB.UI.NameFormWeald"]),
+            jungle: Object.freeze(["FILRODENSWMB.UI.NameFormJungle"]),
+            desert: Object.freeze(["FILRODENSWMB.UI.NameFormDesert"]),
+            steppe: Object.freeze(["FILRODENSWMB.UI.NameFormSteppe"]),
+            tundra: Object.freeze(["FILRODENSWMB.UI.NameFormBarrens"]),
+            plains: Object.freeze(["FILRODENSWMB.UI.NameFormPlains"]),
+            river: Object.freeze(["FILRODENSWMB.UI.NameFormRiver"]),
+        }),
+        RETIRED_STYLE: "label-style-water",
+        // A feature's name fitted inside it is turned at most this far (degrees): water less than land
+        MAX_ANGLE: Object.freeze({ water: 30, land: 60 }),
+        // How alike a feature found now and a label's must be (see FeatureDetection.matchFeatures)
+        MATCH: 0.5,
+        // The share of a character's height its width is, where the face cannot be measured, and
+        // the length of a river's name a river must have room for to be named
+        CHAR_RATIO: 0.55,
+        RIVER_NAME_CHARACTERS: 13,
     }),
     PINS: {
         // The size new pins (and their labels) start with: small, so a map of many places stays readable
