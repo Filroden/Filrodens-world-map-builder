@@ -36,11 +36,12 @@ export const ESCAPE = { do: "key", key: "Escape" };
 export const HILLS = [1000, 300, 1440, 760];
 export const EAST = [1000, 300, 1700, 1100];
 
-/** Exports the open map through Export to PNG at 1× into the temporary folder, as `file`. */
+/** Exports the open map through Export image as a PNG at 1× into the temporary folder, as `file`. */
 export const exportPng = (file) => [
     { do: "tool", tool: "export" },
     { do: "click", target: '[data-region="context"] [data-action="exportPng"]' },
     { do: "waitForDialog" },
     { do: "set", field: `${DIALOG} select[name="exportScale"]`, value: "1" },
+    { do: "set", field: `${DIALOG} select[name="exportFormat"]`, value: "png" },
     { do: "download", target: `${DIALOG} [data-overlay-action="ok"]`, file },
 ];

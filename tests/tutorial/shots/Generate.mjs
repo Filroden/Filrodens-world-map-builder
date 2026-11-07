@@ -1,4 +1,5 @@
-// The Generate page: the panel after a run, the Ages section, and Fill in on a regional map.
+// The Generate page: the panel after a run, the Ages section, Name all's dialogue, and Fill in on a
+// regional map.
 import { MAP } from "./_common.mjs";
 
 export default [
@@ -15,6 +16,21 @@ export default [
         caption: "The Ages section: an early medieval age of peace, then the present, troubled, with the Hillfolk invading.",
         action: [{ do: "openSection", section: "generateAges" }],
         screenshot: { region: { selector: 'details.fwmb-section[data-section="generateAges"]' }, pad: 8 },
+    },
+    {
+        slug: "generate-name-all",
+        start: MAP.generated,
+        caption: "The Name all dialogue, with the number of items it will name.",
+        action: [
+            { do: "openSection", section: "generateNames" },
+            { do: "click", target: '[data-region="context"] [data-action="nameAll"]' },
+            { do: "waitForDialog" },
+            // A generated map's names are all generated, so they are ticked to show what it would name
+            { do: "set", field: 'dialog.fwmb-overlay-modal[open] input[name="nameAllSource"][value="generated"]', value: true },
+        ],
+        settle: false,
+        screenshot: { region: "dialog", pad: 8 },
+        after: [{ do: "dialog", button: "cancel" }],
     },
     {
         slug: "generate-fill-in",

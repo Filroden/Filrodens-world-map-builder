@@ -118,7 +118,7 @@ export default {
             action: [{ do: "click", target: VIEW("gm"), label: "GM view" }],
             screenshot: { name: "player-view", region: { map: WEST_HILLS }, mapOnly: true },
             caption: "Player view alone: the ruined towns are left out.",
-            note: "An export shows the map as these buttons do. With **GM view** off, a PNG is a player's map; with it on, a GM's. In Foundry, **Export to scene** makes both at once: the scene's image holds what is visible to Everyone, and a hidden tile over it, seen only by the GM, holds the GM-only items.",
+            note: "An export shows the map as these buttons do. With **GM view** off, an exported image is a player's map; with it on, a GM's. In Foundry, **Export to scene** makes both at once: the scene's image holds what is visible to Everyone, and a hidden tile over it, seen only by the GM, holds the GM-only items.",
             narration: "Turn off GM view, and the ruins disappear: this is your players' map, and what an export shows.",
             pause: 4,
         },

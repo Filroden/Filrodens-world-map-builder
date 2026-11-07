@@ -1,4 +1,4 @@
-// The Export page: the panel, the PNG dialogue, and from Foundry (supplied) the scene dialogue.
+// The Export page: the panel, the Export image dialogue, and from Foundry (supplied) the scene dialogue.
 import { MAP } from "./_common.mjs";
 
 export default [
@@ -12,8 +12,17 @@ export default [
     {
         slug: "export-png-dialogue",
         start: MAP.regional,
-        caption: "Export to PNG on a regional map, with the recommended scale and the reason for it.",
-        action: [{ do: "click", target: '[data-region="context"] [data-action="exportPng"]' }, { do: "waitForDialog" }],
+        caption: "Export image on a regional map, with the recommended scale, the reason for it, and each format's estimated size.",
+        action: [
+            { do: "click", target: '[data-region="context"] [data-action="exportPng"]' },
+            { do: "waitForDialog" },
+            {
+                do: "expect",
+                check: () => [...document.querySelectorAll('dialog.fwmb-overlay-modal[open] select[name="exportFormat"] option')].every((option) => !option.dataset.estimating && !/working/i.test(option.textContent)),
+                message: "every format's size was worked out",
+                within: 60000,
+            },
+        ],
         settle: false,
         screenshot: { region: "dialog", pad: 8 },
         after: [{ do: "dialog", button: "cancel" }],

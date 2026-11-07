@@ -1,33 +1,33 @@
-// The Cartography page: the panel with two decorations, and a decoration in the inspector.
-import { DIALOG, MAP } from "./_common.mjs";
+// The Cartography page: the panel with a compass rose and a cartouche, Add decoration's menu, a
+// compass rose in the inspector, and a cartouche in the inspector.
+import { INSPECTOR, MAP } from "./_common.mjs";
 
-/** The decorations, original images made for the wiki (samples/wiki). */
-const COMPASS = "samples/wiki/compass-rose.png";
-const CARTOUCHE = "samples/wiki/cartouche.png";
+/** Add decoration's menu on the bar, and one of its items by kind. */
+const ADD_MENU = '[data-region="editToolbar"] .fwmb-bar-add > button';
+const addItem = (kind) => `[data-region="editToolbar"] [data-action="addDecoration"][data-kind="${kind}"]`;
 
-const addDecoration = (name, file) => [
-    { do: "click", target: '[data-region="editToolbar"] [data-action="addDecoration"]' },
-    { do: "waitForDialog" },
-    { do: "set", field: `${DIALOG} input[name="fwmb-dec-name"]`, value: name },
-    { do: "chooseFile", target: `${DIALOG} button[data-tooltip="Choose a file"]`, file },
-    { do: "dialog", button: "ok" },
-];
+/** A design's thumbnail in the inspector, by its value. */
+const design = (name, value) => `${INSPECTOR} .fwmb-design-option:has(input[name="${name}"][value="${value}"])`;
+
+/** The compass rose's corner and the cartouche's place at the top, on the finished world map. */
+const ROSE_VIEW = [1450, 1050, 2000, 1600];
+const TITLE_VIEW = [600, 0, 1400, 900];
 
 export default [
     {
         slug: "cartography-panel",
         start: MAP.finished,
-        caption: "Cartography, with the scale bar, border and grid, and two decorations.",
+        caption: "Cartography, with the scale bar, border and grid, a compass rose and a cartouche.",
         action: [
             { do: "tool", tool: "cartography" },
-            { do: "mode", action: "setCartographyMode", mode: "move" },
-            ...addDecoration("Compass rose", COMPASS),
+            { do: "click", target: ADD_MENU },
+            { do: "click", target: addItem("compass") },
             { do: "settle" },
-            { do: "drag", from: [1000, 800], to: [1760, 1360] },
-            ...addDecoration("Title", CARTOUCHE),
+            { do: "click", target: `${INSPECTOR} .fwmb-overlay-close` },
+            { do: "click", target: ADD_MENU },
+            { do: "click", target: addItem("cartouche") },
             { do: "settle" },
-            { do: "drag", from: [1000, 800], to: [1000, 150] },
-            { do: "mode", action: "setCartographyMode", mode: "select" },
+            { do: "click", target: `${INSPECTOR} .fwmb-overlay-close` },
             { do: "camera", view: "fit" },
         ],
         screenshot: { region: "studio" },
@@ -35,10 +35,36 @@ export default [
     {
         slug: "cartography-decorations",
         start: MAP.finished,
-        caption: "The compass rose, open in the inspector.",
+        caption: "Add decoration's menu: an image of your own, a compass rose or a cartouche.",
+        action: [{ do: "click", target: ADD_MENU }],
+        settle: false,
+        // The menu shows while its button has focus
+        screenshot: { region: "studio", keepFocus: true },
+        after: [{ do: "key", key: "Escape" }],
+    },
+    {
+        slug: "cartography-compass",
+        start: MAP.finished,
+        caption: "A mariner's compass rose in the Sea chart colours, open in the inspector.",
         action: [
             { do: "click", target: '.fwmb-list-item:has(:text-is("Compass rose"))' },
-            { do: "camera", view: "fit" },
+            { do: "click", target: design("compassDesign", "mariner") },
+            { do: "set", field: `${INSPECTOR} select[name="compassScheme"]`, value: "seaChart" },
+            { do: "frame", rect: ROSE_VIEW },
+        ],
+        screenshot: { region: "studio" },
+    },
+    {
+        slug: "cartography-cartouche",
+        start: MAP.finished,
+        caption: "A ribbon cartouche with the map's name and a subtitle, open in the inspector.",
+        action: [
+            { do: "click", target: `${INSPECTOR} .fwmb-overlay-close` },
+            { do: "click", target: '.fwmb-list-item:has(:text-is("Cartouche"))' },
+            { do: "click", target: design("cartoucheDesign", "ribbon") },
+            { do: "set", field: `${INSPECTOR} input[name="cartoucheSubtitle"]`, value: "The known lands" },
+            { do: "openSection", section: "inspectorCartoucheTitle" },
+            { do: "frame", rect: TITLE_VIEW },
         ],
         screenshot: { region: "studio" },
     },
