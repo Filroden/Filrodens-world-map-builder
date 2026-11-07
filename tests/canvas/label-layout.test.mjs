@@ -1,7 +1,10 @@
 // Where the map's names are drawn (LabelLayout): a pin's name beside it, keeping clear of other
 // pins; a capital's name before a realm's, which is fitted round it and always drawn; a label with
 // its own position staying there; a region name preferring places that do not spill over its
-// border; every name at its first place with Avoid overlaps off; and names clear of a map border.
+// border; every name at its first place with Avoid overlaps off; names clear of a map border;
+// natural features' names placed with the others, inside their features (a river's on any
+// stretch of its course, turned to follow it) and clear of decorations, unless the reader moved
+// them; and named routes ranked above the smallest places.
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -107,4 +110,93 @@ test("names keep clear of a border's band along the map's edges", async () => {
     const beyond = pinItem("beyond", -8, 150, "town");
     const outside = new LabelLayout().layout([beyond], { pins: [beyond.pin], pinWidth, pass: "normal", bounds });
     assert.ok(outside.position(beyond).x + beyond.w / 2 <= 0, `off the map: ${outside.position(beyond).x + beyond.w / 2}`);
+});
+
+/** A natural feature's label as Name natural features makes it: placed at x, y, with its footprint. */
+function featureItem(id, kind, x, y, w = 120, h = 24, runs = null) {
+    const labelData = { id, name: "Grey Sea", x, y, rotation: 0, fontSize: 3, quickStyle: "label-style-ocean-sea" };
+    labelData.feature = { kind, cell: 8, runs: runs ?? [Math.floor(y / 8) - 10, Math.floor(x / 8) - 20, 40], x, y, rotation: 0, fontSize: 3, text: "Grey Sea", style: "label-style-ocean-sea" };
+    return { id: `custom:${id}`, type: "custom", labelData, w, h, defaultX: x, defaultY: y };
+}
+
+test("a feature's name moves off a decoration, while one the reader moved stays; decorations are obstacles for every name", () => {
+    const layout = new LabelLayout();
+    const sea = featureItem("sea", "sea", 200, 200);
+    const rose = { x: 200, y: 200, w: 100, h: 20 };
+    let placed = layout.layout([sea], { pins: [], pinWidth, pass: "a", obstacles: [rose] });
+    const at = placed.position(sea);
+    assert.ok(at && !overlaps({ ...at, w: sea.w, h: sea.h }, rose), "the sea's name is moved clear of the rose");
+    assert.ok(Math.abs(at.y - 200) <= sea.h * 1.2 + 1, "to a place beside its own");
+
+    const moved = featureItem("moved", "sea", 200, 200);
+    moved.labelData.x = 210;
+    placed = new LabelLayout().layout([moved], { pins: [], pinWidth, pass: "b", obstacles: [rose] });
+    assert.deepEqual(placed.position(moved), { x: 210, y: 200 }, "a label the reader moved stays where they put it");
+
+    const town = pinItem("t", 200, 300, "town");
+    const plate = { x: town.defaultX + 30, y: 300, w: 80, h: 30 };
+    placed = new LabelLayout().layout([town], { pins: [town.pin], pinWidth, pass: "c", obstacles: [plate] });
+    const name = placed.position(town);
+    assert.ok(!name || !overlaps({ ...name, w: town.w, h: town.h }, plate), "a town's name goes round the cartouche, not over it");
+});
+
+test("a feature's name prefers places inside its feature, and ranks by its kind", () => {
+    const layout = new LabelLayout();
+    // A lake reaching only below the fitted place (rows from y = 200): the name moves down into it
+    const rows = [];
+    for (let row = 25; row < 35; row++) rows.push(row, 10, 30);
+    const lake = featureItem("lake", "lake", 200, 200, 60, 12, rows);
+    const at = layout.layout([lake], { pins: [], pinWidth, pass: "d" }).position(lake);
+    assert.ok(at.y > 200 && at.x === 200, `moved down into its lake (${JSON.stringify(at)})`);
+    const { FEATURES } = FILRODENSWMB.LABELS.PLACEMENT;
+    assert.ok(FEATURES.ocean.order <= FILRODENSWMB.LABELS.PLACEMENT.REGION_DEPTHS[0].order && FEATURES.bay.order > FILRODENSWMB.LABELS.PLACEMENT.ROUTE.order);
+});
+
+test("a named route ranks above the smallest places and below towns; a generated route's own name with the other routes", () => {
+    const { PIN_TIERS, NAMED_ROUTE } = FILRODENSWMB.LABELS.PLACEMENT;
+    assert.ok(NAMED_ROUTE.weight < PIN_TIERS.town.weight && NAMED_ROUTE.weight > PIN_TIERS.village.weight && NAMED_ROUTE.order <= PIN_TIERS.village.order);
+    const routeItem = (route) => ({ id: `route:${route.id}`, type: "route", labelData: {}, w: 60, h: 12, defaultX: 100, defaultY: 100, route });
+    // Two routes' names wanting the same place: the reader's own wins it
+    const mine = routeItem({ id: "mine", name: "King's Road" });
+    const made = routeItem({ id: "made", name: "Old Way", generated: { edited: false }, nameSource: "random" });
+    const placed = new LabelLayout().layout([made, mine], { pins: [], pinWidth, pass: "e" });
+    assert.deepEqual(placed.position(mine), { x: 100, y: 100 });
+    assert.equal(placed.position(made), null);
+    const typed = routeItem({ id: "typed", name: "Salt Road", generated: { edited: true } });
+    const placedAgain = new LabelLayout().layout([made, typed], { pins: [], pinWidth, pass: "f" });
+    assert.deepEqual(placedAgain.position(typed), { x: 100, y: 100 }, "an edited generated route's name is the reader's");
+});
+
+test("a river's name moves along its course at its own turn, off a decoration, and stays on the river", () => {
+    // A river running down to the south east at 30 degrees, its name fitted half way
+    const angle = 30;
+    const [dx, dy] = [Math.cos((angle * Math.PI) / 180), Math.sin((angle * Math.PI) / 180)];
+    const path = Array.from({ length: 40 }, (_, i) => ({ x: Math.round(100 + i * 20 * dx), y: Math.round(100 + i * 20 * dy) }));
+    const [fx, fy] = [100 + 400 * dx, 100 + 400 * dy];
+    const labelData = { id: "river", name: "River Wend", x: fx, y: fy, rotation: angle, fontSize: 1.3, quickStyle: "label-style-river" };
+    labelData.feature = { kind: "river", path, x: fx, y: fy, rotation: angle, fontSize: 1.3, text: "River Wend", style: "label-style-river" };
+    // Its box when turned, and its text's own length
+    const item = { id: "custom:river", type: "custom", labelData, w: 100 * dx + 12 * dy, h: 100 * dy + 12 * dx, length: 100, defaultX: fx, defaultY: fy };
+    const plate = { x: fx, y: fy, w: 160, h: 120 };
+    const at = new LabelLayout().layout([item], { pins: [], pinWidth, pass: "river", obstacles: [plate] }).position(item);
+    assert.ok(at && !overlaps({ ...at, w: item.w, h: item.h }, plate), `moved clear of the cartouche (${JSON.stringify(at)})`);
+    assert.ok(Math.hypot(at.x - fx, at.y - fy) > 100, "along its course, beyond the nudges an area's name has");
+    const nearest = Math.min(...path.map((point) => Math.hypot(point.x - at.x, point.y - at.y)));
+    assert.ok(nearest < 2, "on the river itself");
+    assert.ok(Math.abs(at.rotation - angle) < 1, "turned as the river runs");
+});
+
+test("a river's name on another stretch of a bending river is turned to follow that stretch", () => {
+    // Running east, then turning south: the name fitted on the eastward stretch, which a cartouche covers
+    const path = [...Array.from({ length: 20 }, (_, i) => ({ x: 100 + i * 20, y: 100 })), ...Array.from({ length: 20 }, (_, i) => ({ x: 480, y: 120 + i * 20 }))];
+    const labelData = { id: "river", name: "River Bend", x: 290, y: 100, rotation: 0, fontSize: 1.3, quickStyle: "label-style-river" };
+    labelData.feature = { kind: "river", path, x: 290, y: 100, rotation: 0, fontSize: 1.3, text: "River Bend", style: "label-style-river" };
+    const item = { id: "custom:river", type: "custom", labelData, w: 100, h: 12, length: 100, thickness: 12, defaultX: 290, defaultY: 100 };
+    const plate = { x: 290, y: 100, w: 400, h: 60 };
+    const at = new LabelLayout().layout([item], { pins: [], pinWidth, pass: "bend", obstacles: [plate] }).position(item);
+    assert.ok(at, "placed");
+    assert.ok(Math.abs(at.x - 480) < 2 && at.y > 160, `on the southward stretch (${JSON.stringify(at)})`);
+    assert.equal(at.rotation, 75, "turned as far as names turn, to run down the river");
+    // Its box is the turned name's, so it keeps clear of the cartouche
+    assert.ok(!overlaps({ x: at.x, y: at.y, w: 100 * Math.cos((75 * Math.PI) / 180) + 12 * Math.sin((75 * Math.PI) / 180), h: 100 * Math.sin((75 * Math.PI) / 180) + 12 * Math.cos((75 * Math.PI) / 180) }, plate));
 });

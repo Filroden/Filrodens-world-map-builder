@@ -1075,6 +1075,7 @@
     "FILRODENSWMB.UI.LabelFilter_pin": "Of pins",
     "FILRODENSWMB.UI.LabelFilter_route": "Of routes",
     "FILRODENSWMB.UI.LabelFilter_region": "Of regions",
+    "FILRODENSWMB.UI.LabelFilter_feature": "Of natural features",
     "FILRODENSWMB.UI.LabelFilter_noRoom": "With no room",
     "FILRODENSWMB.UI.LabelNoRoom": "No room",
     "FILRODENSWMB.UI.LabelNoRoomHint": "There is no room for this name among the others, so it is not drawn. Drag it into place in the Labels tool, where it shows faintly, or turn off Avoid overlaps in the Detail menu.",

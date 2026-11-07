@@ -1412,7 +1412,7 @@ export class MapStudio {
     /** The kinds the pin, route and label lists can be narrowed to (value to localisation key). */
     static #PIN_KINDS = Object.freeze({ ...Object.fromEntries(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style.name])), other: "FILRODENSWMB.UI.ListKindOther" });
     static #ROUTE_KINDS = Object.freeze({ road: "FILRODENSWMB.UI.TransportRoad", river: "FILRODENSWMB.UI.TransportRiver", sea: "FILRODENSWMB.UI.TransportSea" });
-    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region", noRoom: "FILRODENSWMB.UI.LabelFilter_noRoom" });
+    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region", feature: "FILRODENSWMB.UI.LabelFilter_feature", noRoom: "FILRODENSWMB.UI.LabelFilter_noRoom" });
 
     /**
      * Each long list's kinds, rows template, and the fields of a row its template shows (a row's
@@ -1457,16 +1457,20 @@ export class MapStudio {
         return this.#labelRows(selected).sort(byName);
     }
 
-    /** The Labels list's rows: every label with a name, each with what it belongs to as its meta. */
+    /**
+     * The Labels list's rows: every label with a name, each with what it belongs to as its meta. A
+     * natural feature's name is a standalone label also found by Of natural features, and made by
+     * the map (see FeatureNames.listRowFields).
+     */
     #labelRows(selected) {
         const owner = (key) => platform.i18n.localize(key);
         const named = (item) => !!item.name;
         const ownerMeta = { pin: owner("FILRODENSWMB.UI.InspectorOwnerPin"), route: owner("FILRODENSWMB.UI.InspectorOwnerRoute") };
         // A name the map had no room for at its last draw is marked, and found with the No room filter
         const withoutRoom = this.canvasEngine?.labelsWithoutRoom ?? new Set();
-        const marked = (row) => (withoutRoom.has(`${row.type}:${row.id}`) ? { ...row, noRoom: true, also: ["noRoom"] } : row);
+        const marked = (row) => (withoutRoom.has(`${row.type}:${row.id}`) ? { ...row, noRoom: true, also: [...(row.also ?? []), "noRoom"] } : row);
         return [
-            ...(this.mapLabels || []).filter(named).map((label) => ({ id: label.id, name: label.name, type: "custom", kind: "custom", generated: false, labelKey: "labelcustom", standalone: true, visibility: label.visibility ?? "all", massEditSelected: selected.has(label.id) })),
+            ...(this.mapLabels || []).filter(named).map((label) => ({ id: label.id, name: label.name, type: "custom", kind: "custom", ...FeatureNames.listRowFields(label), labelKey: "labelcustom", standalone: true, visibility: label.visibility ?? "all", massEditSelected: selected.has(label.id) })),
             ...(this.mapPins || []).filter((pin) => !!pin.icon && named(pin)).map((pin) => ({ id: pin.id, name: pin.name, type: "pin", kind: "pin", generated: !!pin.generated, labelKey: "labelpin", meta: ownerMeta.pin, visibility: pin.label?.visibility ?? "all" })),
             ...(this.mapRoutes || []).filter(named).map((route) => ({ id: route.id, name: route.name, type: "route", kind: "route", generated: !!route.generated, labelKey: "labelroute", meta: ownerMeta.route, visibility: route.label?.visibility ?? "all" })),
             ...this.regionLevels.flatMap((level) =>
@@ -2836,7 +2840,9 @@ export class MapStudio {
         // A region's label is drawn on the labels layer, which the drag itself does not redraw
         // outside the Labels tool (see #handleInfraDrag). A label not yet placed sits at its
         // region's centre, so redrawing once on release brings it to the region's new centre.
-        if (this.activeTool === "regions") this._repaintVectors();
+        // Likewise a decoration moved, turned or resized in the Cartography tool: names keep clear
+        // of where it now is once it is let go.
+        if (this.activeTool === "regions" || this.activeTool === "cartography") this._repaintVectors();
 
         this.view?.render(["context"]);
         this.markDirty();
@@ -3703,22 +3709,22 @@ export class MapStudio {
         TravelView.render(this);
         TravelView.readout(this, null, null);
 
-        // 4. Render Labels
+        // 4. Render Cartography, before the labels, which keep clear of its decorations and scale bar
+        const isCartographyEdit = this.activeTool === "cartography" && isEditModeActive;
+        if (this.canvasEngine.renderCartography) {
+            this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit, this.mapDecorations);
+        }
+
+        // 5. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
         this.canvasEngine.renderLabels(this.mapLabels, shownPins, shownRoutes, isLabelEdit, past ? past.session : this.meshSession);
 
-        // 5. Render Land Masks
+        // 6. Render Land Masks
         if (this.canvasEngine.renderLandMasks) {
             // Visible if in Guided Mode and on the Scene Tool, regardless of Edit Mode
             const isGuidedScene = this.uiState.generationEngine === "guided" && this.activeTool === "scene";
 
             this.canvasEngine.renderLandMasks(this.landMasks, isEditModeActive && !picking, this.activeLandMaskId, isGuidedScene);
-        }
-
-        // 6. Render Cartography
-        const isCartographyEdit = this.activeTool === "cartography" && isEditModeActive;
-        if (this.canvasEngine.renderCartography) {
-            this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit, this.mapDecorations);
         }
 
         // 7. The Labels and Regions menus follow the map's styles and levels

@@ -1,5 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
-import { FEATURE_KINDS, findFeatures, fitLabel, footprintCell, footprintHas, footprintOf, matchFeatures, samplePoints } from "../names/FeatureDetection.js";
+import { FEATURE_KINDS, findFeatures, fitLabel, footprintCell, footprintHas, footprintOf, isEditedFeatureLabel, matchFeatures, samplePoints } from "../names/FeatureDetection.js";
 import { placeName } from "../names/PlaceNames.js";
 import { modelBiomeRaster } from "../generator/ModelBiomes.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
@@ -113,7 +113,7 @@ export class FeatureNames {
         MapStateManager.pushVectorState(app);
         const retired = this.#ensureStyles(app);
         app.mapLabels ??= [];
-        const made = app.mapLabels.filter((label) => label.feature && FEATURE_KINDS[label.feature.kind]);
+        const made = app.mapLabels.filter((label) => this.isFeatureLabel(label));
         const matched = matchFeatures(features, made.map((label) => ({ kind: label.feature.kind, footprint: label.feature })), FEATURE_NAMES.MATCH);
         const report = { added: 0, replaced: 0, kept: 0, gone: made.length - matched.size, skipped: 0, retired };
         // The reader's own names in the family: a feature with one inside it is left to it
@@ -146,15 +146,22 @@ export class FeatureNames {
         return report;
     }
 
+    /** Whether a label is a natural feature's name, made by the action (it carries a `feature` record of a known kind). */
+    static isFeatureLabel(label) {
+        return !!label?.feature && Object.hasOwn(FEATURE_KINDS, label.feature.kind);
+    }
+
     /**
-     * Whether the reader has changed a feature label since the action placed it: its place, turn,
-     * size, text or style.
+     * What a standalone label's row in the Labels list adds for a natural feature's name: made by
+     * the map, not the reader (even once moved or edited), and found by Of natural features.
      */
+    static listRowFields(label) {
+        return this.isFeatureLabel(label) ? { generated: true, also: ["feature"] } : { generated: false };
+    }
+
+    /** Whether the reader has changed a feature label since the action placed it (see FeatureDetection). */
     static edited(label) {
-        const given = label.feature;
-        if (!given) return true;
-        const near = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) < 0.5;
-        return !near(label.x, given.x) || !near(label.y, given.y) || !near(label.rotation, given.rotation) || label.fontSize !== given.fontSize || label.name !== given.text || label.quickStyle !== given.style;
+        return isEditedFeatureLabel(label);
     }
 
     /**

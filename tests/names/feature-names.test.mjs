@@ -2,7 +2,9 @@
 // it (src/applications/FeatureNames.js): each kind found, footprints that find a feature again,
 // labels in the geographic styles with a feature record, a second run placing untouched labels
 // again and keeping edited ones, a gone feature's label kept and counted, a feature the reader
-// named in a geographic style left alone, the Water style retired, and one undo step.
+// named in a geographic style left alone, the Water style retired, one undo step, and the
+// labels it made found by the Labels list's Of natural features and Generated filters; and the
+// stretches of a river's course a name can follow.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -14,9 +16,10 @@ installPlatform({
     utils: { ...platform.utils, randomID: () => `label${String(++nextId).padStart(11, "0")}`, deepClone: (value) => structuredClone(value) },
 });
 const { FILRODENSWMB } = await import("../../src/config.js");
-const { findFeatures, footprintCell, footprintOf, matchFeatures, overlap, footprintHas } = await import("../../src/names/FeatureDetection.js");
+const { findFeatures, footprintCell, footprintOf, matchFeatures, overlap, footprintHas, riverStretches, SETTINGS } = await import("../../src/names/FeatureDetection.js");
 const { FeatureNames } = await import("../../src/applications/FeatureNames.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
+const { ListQuery } = await import("../../src/applications/ListQuery.js");
 
 const W = 800;
 const H = 600;
@@ -178,4 +181,45 @@ test("the last run's report belongs to its map: another map opening forgets it",
     ready.currentElevationData = new Float32Array(W * H);
     FeatureNames.forget(ready);
     assert.equal(FeatureNames.lastReport(ready), null);
+});
+
+test("the labels the action made are natural features' names, found by Of natural features and Generated, moved or not", () => {
+    const app = studio();
+    FeatureNames.apply(app, syntheticMap());
+    const made = app.mapLabels.filter((label) => FeatureNames.isFeatureLabel(label));
+    assert.ok(made.length >= 5);
+    assert.equal(FeatureNames.isFeatureLabel(app.mapLabels[0]), false, "the reader's own label is not");
+    assert.equal(FeatureNames.isFeatureLabel({ feature: { kind: "volcano" } }), false, "nor one of a kind not known");
+    made[0].x += 40;
+    // As the Labels list makes its standalone rows (MapStudio#labelRows)
+    const rows = app.mapLabels.map((label) => ({ id: label.id, name: label.name, kind: "custom", ...FeatureNames.listRowFields(label) }));
+    const found = (query) => ListQuery.matching(rows, { search: "", origin: "all", kind: "all", ...query }).map((row) => row.id);
+    assert.deepEqual(found({ kind: "feature" }).sort(), made.map((label) => label.id).sort());
+    assert.deepEqual(found({ kind: "feature", origin: "generated" }).sort(), made.map((label) => label.id).sort(), "a moved one too");
+    assert.deepEqual(found({ origin: "handmade" }), [app.mapLabels[0].id]);
+    assert.equal(found({ kind: "custom" }).length, app.mapLabels.length, "all are standalone");
+});
+
+test("a river's stretches for a name: one round each point it fits round, turned to read and straighter where the course is", () => {
+    // East for 200 px, then south for 200 px
+    const path = [...Array.from({ length: 11 }, (_, i) => ({ x: i * 20, y: 0 })), ...Array.from({ length: 10 }, (_, i) => ({ x: 200, y: 20 + i * 20 }))];
+    const stretches = riverStretches(path, 80);
+    assert.ok(stretches.length > 0 && stretches.length < path.length, "only where the name fits round the point");
+    const east = stretches[0];
+    assert.deepEqual([east.angle, east.straight], [0, 1]);
+    const south = stretches.at(-1);
+    assert.equal(south.angle, 75, "a southward stretch turned as far as names turn");
+    assert.ok(Math.min(...stretches.map((stretch) => stretch.straight)) < 0.8, "the bend is less straight");
+    assert.deepEqual(riverStretches(path, 1000), [], "nowhere for a name longer than the river");
+});
+
+test("a map whose ocean is larger than a call's arguments can hold is still read (a 2000 by 2000 map)", () => {
+    // Read at a pixel a cell, 600 by 600 is as many cells as a 2000 by 2000 map's ocean can be
+    const size = 600;
+    const elev = new Float32Array(size * size).fill(0.1);
+    // A small island, so there is land as well
+    for (let y = 280; y < 320; y++) for (let x = 280; x < 320; x++) elev[y * size + x] = 0.6;
+    const map = { W: size, H: size, elev, lake: new Uint8Array(size * size), biome: new Uint8Array(size * size).fill(4), moisture: new Float32Array(size * size).fill(0.5), seaLevel: 0.35, rivers: [] };
+    const features = findFeatures(map, {}, { ...SETTINGS, COARSE: 1 });
+    assert.ok(features.some((feature) => feature.kind === "ocean"), "its ocean is found");
 });

@@ -64,6 +64,10 @@ export const SETTINGS = Object.freeze({
     // Rivers: named when their largest flow is at least this share of the map's largest, at most MAX_RIVERS
     RIVER_FLOW_SHARE: 0.12,
     MAX_RIVERS: 12,
+    // A river's name is turned to follow its stretch, up to this many degrees from level, and
+    // the stretch it follows is this many times its length (so it follows the course, not each meander)
+    RIVER_MAX_TURN: 75,
+    RIVER_SPAN: 2,
     // Footprints: cells of this share of the map's shorter side (at least 4 px), and the river
     // points kept (at most)
     FOOTPRINT_CELL: 0.005,
@@ -410,7 +414,9 @@ export function waterBodies(g, settings = SETTINGS) {
     basins.forEach((basin, i) => {
         const r = resolve(i);
         if (!groups.has(r)) groups.set(r, []);
-        groups.get(r).push(...basin.cells);
+        // One at a time: an ocean's cells are too many to spread into one call
+        const group = groups.get(r);
+        for (const cell of basin.cells) group.push(cell);
     });
     const label = new Int32Array(w * h).fill(-1);
     const bodies = [];
@@ -674,8 +680,9 @@ function desertKind(g, cells, settings) {
  * long enough for its name (`labelLength`, in map pixels, a function of the river).
  */
 export function namedRivers(rivers, labelLength, settings = SETTINGS) {
-    const flows = rivers.map((river) => Math.max(0, ...(river.flow ?? [0])));
-    const biggest = Math.max(...flows, 1);
+    const largest = (values) => (values ?? []).reduce((most, value) => Math.max(most, value), 0);
+    const flows = rivers.map((river) => largest(river.flow));
+    const biggest = Math.max(largest(flows), 1);
     const chosen = rivers
         .map((river, i) => ({ river, flow: flows[i] }))
         .filter(({ river, flow }) => flow >= settings.RIVER_FLOW_SHARE * biggest && river.path.length > 20)
@@ -708,7 +715,7 @@ export function namedRivers(rivers, labelLength, settings = SETTINGS) {
                   const a = path[best.i];
                   const b = path[best.j];
                   const angle = (Math.atan2(b[1] - a[1], b[0] - a[0]) * 180) / Math.PI;
-                  return { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, angle: readable(angle, 75), straight: best.straight, along: [best.i, best.j] };
+                  return { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, angle: readable(angle, settings.RIVER_MAX_TURN), straight: best.straight, along: [best.i, best.j] };
               })()
             : null;
         return { kind: "river", id: river.id, flow, length: total, path, label };
@@ -932,4 +939,97 @@ export function footprintHas(footprint, x, y) {
     const { runs } = footprint;
     for (let i = 0; i + 2 < runs.length; i += 3) if (runs[i] === row && column >= runs[i + 1] && column < runs[i + 1] + runs[i + 2]) return true;
     return false;
+}
+
+/**
+ * The stretches of a river's course (its footprint's `path`) a name of `length` map pixels can
+ * follow, one centred on each point of the course with room round it: the point, the turn of the
+ * course over RIVER_SPAN times the name's length (read left to right, see RIVER_MAX_TURN), and
+ * how straight that is (the distance between its ends over its length along the course, 1 when
+ * straight).
+ * @param {{x: number, y: number}[]} path
+ * @param {number} length
+ * @returns {{x: number, y: number, angle: number, straight: number}[]}
+ */
+export function riverStretches(path, length, settings = SETTINGS) {
+    if (!(path?.length > 1) || !(length > 0)) return [];
+    const along = [0];
+    for (let i = 1; i < path.length; i++) along.push(along[i - 1] + Math.hypot(path[i].x - path[i - 1].x, path[i].y - path[i - 1].y));
+    const total = along.at(-1);
+    // The point `distance` along the course
+    const at = (distance) => {
+        let i = 1;
+        while (i < path.length - 1 && along[i] < distance) i++;
+        const span = along[i] - along[i - 1] || 1;
+        const t = Math.min(1, Math.max(0, (distance - along[i - 1]) / span));
+        return { x: path[i - 1].x + (path[i].x - path[i - 1].x) * t, y: path[i - 1].y + (path[i].y - path[i - 1].y) * t };
+    };
+    const span = length * settings.RIVER_SPAN;
+    const stretches = [];
+    for (let i = 0; i < path.length; i++) {
+        const [from, to] = [along[i] - span / 2, along[i] + span / 2];
+        if (from < 0 || to > total) continue;
+        const a = at(from);
+        const b = at(to);
+        const chord = Math.hypot(b.x - a.x, b.y - a.y);
+        const angle = readable((Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI, settings.RIVER_MAX_TURN);
+        stretches.push({ x: path[i].x, y: path[i].y, angle, straight: chord / span });
+    }
+    return stretches;
+}
+
+// ------------------------------------------------------------------ feature labels
+
+/**
+ * Whether the reader has changed a natural feature's label since the action placed it: its place,
+ * turn, size, text or style (against what its `feature` record says it was given). A label with
+ * no record is the reader's own.
+ */
+export function isEditedFeatureLabel(label) {
+    const given = label?.feature;
+    if (!given) return true;
+    const near = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) < 0.5;
+    return !near(label.x, given.x) || !near(label.y, given.y) || !near(label.rotation, given.rotation) || label.fontSize !== given.fontSize || label.name !== given.text || label.quickStyle !== given.style;
+}
+
+/** Each footprint's runs by row, worked out once. */
+const rowIndexes = new WeakMap();
+
+/**
+ * The share (0 to 1) of a name's sample points outside its feature's footprint: for an area, 3 by
+ * 3 over its box (centred on x, y); for a river, five along the name at its turn (`turn.angle` in
+ * degrees, `turn.length` its text's length; level and the box's width without one).
+ */
+export function footprintSpill(footprint, x, y, w, h, turn = null) {
+    if (footprint?.path) {
+        // Along the name as it is turned, from end to end
+        const angle = ((turn?.angle ?? 0) * Math.PI) / 180;
+        const length = turn?.length ?? w;
+        const shares = [0, -0.25, 0.25, -0.5, 0.5];
+        let outside = 0;
+        for (const share of shares) if (!footprintHas(footprint, x + share * length * Math.cos(angle), y + share * length * Math.sin(angle))) outside++;
+        return outside / shares.length;
+    }
+    if (!footprint?.runs) return 0;
+    let rows = rowIndexes.get(footprint);
+    if (!rows) {
+        rows = new Map();
+        const { runs } = footprint;
+        for (let i = 0; i + 2 < runs.length; i += 3) {
+            if (!rows.has(runs[i])) rows.set(runs[i], []);
+            rows.get(runs[i]).push(runs[i + 1], runs[i + 2]);
+        }
+        rowIndexes.set(footprint, rows);
+    }
+    let outside = 0;
+    for (const v of [-0.5, 0, 0.5]) {
+        const spans = rows.get(Math.floor((y + v * h) / footprint.cell));
+        for (const u of [-0.5, 0, 0.5]) {
+            const column = Math.floor((x + u * w) / footprint.cell);
+            let inside = false;
+            for (let k = 0; spans && k < spans.length; k += 2) if (column >= spans[k] && column < spans[k] + spans[k + 1]) inside = true;
+            if (!inside) outside++;
+        }
+    }
+    return outside / 9;
 }

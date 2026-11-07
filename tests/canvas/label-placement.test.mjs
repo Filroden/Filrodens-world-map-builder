@@ -1,6 +1,7 @@
 // Placing names so they do not cover each other (LabelPlacement): free candidates first, the
 // important labels first, obstacles avoided, names that must show kept, the annealing pass fitting
-// more than greedy alone, the same result for the same seed, and a small change leaving the rest.
+// more than greedy alone, the same result for the same seed, a small change leaving the rest, and
+// a candidate turned its own way placed by its own box, its turn carried back.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { placeLabels } from "../../src/canvas/LabelPlacement.js";
@@ -145,4 +146,13 @@ test("placing thousands of names takes well under a second", () => {
     const ms = Date.now() - started;
     assert.ok(ms < 3000, `${ms} ms`);
     assert.ok(result.stats.placed > 0);
+});
+
+test("a candidate with its own box and turn is placed by that box, and its turn comes back with its place", () => {
+    // A level box at its first place would cover the fixed label; turned upright at its second it fits beside it
+    const fixed = { id: "fixed", w: 60, h: 10, weight: 1, fixed: true, candidates: [{ x: 100, y: 100, cost: 0 }] };
+    const river = { id: "river", w: 60, h: 10, weight: 1, candidates: [{ x: 100, y: 100, cost: 0 }, { x: 140, y: 100, w: 10, h: 60, rotation: 75, cost: 0.2 }] };
+    const result = placeLabels([fixed, river], [], { seed: 1 });
+    assert.deepEqual(result.position("river"), { x: 140, y: 100, rotation: 75 });
+    assert.deepEqual(result.position("fixed"), { x: 100, y: 100 }, "a place with no turn of its own carries none");
 });

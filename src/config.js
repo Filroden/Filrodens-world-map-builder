@@ -5,9 +5,9 @@ const FEATURE_LABEL_STYLES = Object.freeze([
     Object.freeze({ id: "label-style-ocean-sea", nameKey: "FILRODENSWMB.LABELS.StyleOceanSea", fontFamily: "Cormorant Garamond", fontSize: 3.2, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
     Object.freeze({ id: "label-style-gulf-bay-lake", nameKey: "FILRODENSWMB.LABELS.StyleGulfBayLake", fontFamily: "Cormorant Garamond", fontSize: 1.8, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
     Object.freeze({ id: "label-style-river", nameKey: "FILRODENSWMB.LABELS.StyleRiver", fontFamily: "Cormorant Garamond", fontSize: 1.3, fillColor: "#C4DDEE", maxChars: 0, justify: "center", bold: true, italic: true }),
-    Object.freeze({ id: "label-style-mountains", nameKey: "FILRODENSWMB.LABELS.StyleMountains", fontFamily: "Alegreya Sans SC", fontSize: 2.2, fillColor: "#E6D9C2", maxChars: 0, justify: "center", bold: true, italic: false }),
-    Object.freeze({ id: "label-style-hills", nameKey: "FILRODENSWMB.LABELS.StyleHills", fontFamily: "Alegreya Sans SC", fontSize: 1.7, fillColor: "#E6D9C2", maxChars: 0, justify: "center", bold: false, italic: false }),
-    Object.freeze({ id: "label-style-land", nameKey: "FILRODENSWMB.LABELS.StyleLand", fontFamily: "Alegreya SC", fontSize: 1.9, fillColor: "#DCE4C8", maxChars: 0, justify: "center", bold: false, italic: true }),
+    Object.freeze({ id: "label-style-mountains", nameKey: "FILRODENSWMB.LABELS.StyleMountains", fontFamily: "Alegreya Sans SC", fontSize: 2.2, fillColor: "#A9CC8F", maxChars: 0, justify: "center", bold: true, italic: false }),
+    Object.freeze({ id: "label-style-hills", nameKey: "FILRODENSWMB.LABELS.StyleHills", fontFamily: "Alegreya Sans SC", fontSize: 1.7, fillColor: "#A9CC8F", maxChars: 0, justify: "center", bold: false, italic: false }),
+    Object.freeze({ id: "label-style-land", nameKey: "FILRODENSWMB.LABELS.StyleLand", fontFamily: "Alegreya SC", fontSize: 1.9, fillColor: "#CDD98C", maxChars: 0, justify: "center", bold: false, italic: true }),
 ]);
 
 export const FILRODENSWMB = {
@@ -1663,6 +1663,34 @@ export const FILRODENSWMB = {
             // Region names by their level's depth in its set: realms, then duchies, then counties
             REGION_DEPTHS: Object.freeze([Object.freeze({ order: 2, weight: 30, mustShow: true }), Object.freeze({ order: 3, weight: 8 }), Object.freeze({ order: 4, weight: 4 })]),
             ROUTE: Object.freeze({ order: 6, weight: 1 }),
+            // A named route (a hand-made route with a name, or a generated one whose name the reader
+            // typed or edited, or that is locked): placed before places and land areas (so they go
+            // round it), and weighing more than the smallest places, less than towns
+            NAMED_ROUTE: Object.freeze({ order: 4, weight: 1.3 }),
+            // Natural features' names (see FEATURE_NAMES) not moved by the reader: oceans and seas
+            // with the realms, then ranges, gulfs and lakes, then hills and land areas (after named
+            // routes, with the places), then rivers, and bays last
+            FEATURES: Object.freeze({
+                ocean: Object.freeze({ order: 2, weight: 20 }),
+                sea: Object.freeze({ order: 2, weight: 15 }),
+                mountains: Object.freeze({ order: 3, weight: 8 }),
+                gulf: Object.freeze({ order: 3, weight: 6 }),
+                lake: Object.freeze({ order: 3, weight: 5 }),
+                hills: Object.freeze({ order: 5, weight: 3 }),
+                highlands: Object.freeze({ order: 5, weight: 3 }),
+                forest: Object.freeze({ order: 5, weight: 2.5 }),
+                jungle: Object.freeze({ order: 5, weight: 2.5 }),
+                desert: Object.freeze({ order: 5, weight: 2.5 }),
+                steppe: Object.freeze({ order: 5, weight: 2.5 }),
+                tundra: Object.freeze({ order: 5, weight: 2.5 }),
+                plains: Object.freeze({ order: 5, weight: 2.5 }),
+                river: Object.freeze({ order: 6, weight: 1.2 }),
+                bay: Object.freeze({ order: 7, weight: 0.8 }),
+            }),
+            // A feature's name's place costs this much for each share of its box outside the feature
+            FEATURE_SPILL_COST: 1.5,
+            // Decorations and the scale bar: names keep clear of them, as of a capital's icon
+            OBSTACLE_WEIGHT: 50,
             // A pin's name beside it, in order of preference: right (as drawn without placement),
             // upper right, left, above, lower right, below, upper left, lower left. `side` is where
             // the name sits horizontally (1 right, -1 left, 0 centred) and `rise` vertically (-1 above)
@@ -1700,11 +1728,12 @@ export const FILRODENSWMB = {
             Object.freeze({ id: "label-style-capital", nameKey: "FILRODENSWMB.LABELS.StyleCapital", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#FFFFFF", maxChars: 0, justify: "left", bold: true, italic: false }),
             Object.freeze({ id: "label-style-settlement", nameKey: "FILRODENSWMB.LABELS.StyleSettlement", fontFamily: "EB Garamond", fontSize: 1.2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: false, italic: false }),
             // The geographic family, for natural features' names (see FEATURE_NAMES): water in a
-            // light italic, rivers smaller, relief in spaced small capitals (not the realms' gold),
-            // and land areas in an italic small-capital face
+            // light italic, rivers smaller, relief in spaced small capitals in a grass green, and
+            // land areas in an italic small-capital face in a paler yellow-green, so neither is
+            // taken for a place's or a realm's name
             ...FEATURE_LABEL_STYLES,
         ]),
-        PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
+        PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#A9CC8F", "#CDD98C", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
     },
     ROUTES: {
         // The route styles a new map starts with (a saved map keeps its own), each for one

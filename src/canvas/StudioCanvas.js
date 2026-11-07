@@ -641,7 +641,7 @@ export class StudioCanvas {
             // The drag is only "armed" here. It becomes a real drag - recording its undo snapshot
             // and moving the item - once the pointer has travelled past the drag threshold (see
             // #beginDragOnce), so a plain click or double-click on an item changes nothing.
-            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType, originX: e.clientX, originY: e.clientY, started: false };
+            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType, originX: e.clientX, originY: e.clientY, started: false, shownRotation: hit.shownRotation };
             if (isShapeGrab) this.#beginShapeDrag(hit.shape, coords);
             canvasElement.style.cursor = "grabbing";
             this.#setHeldItem(StudioCanvas.#heldItemKind(hit, this.activeDrag));
@@ -790,6 +790,8 @@ export class StudioCanvas {
 
         this.activeDrag.started = true;
         if (this.onInfraDragStart) this.onInfraDragStart();
+        // A river's name drawn along another stretch than its own keeps that turn once picked up
+        if (this.activeDrag.shownRotation !== undefined) this.activeDrag.target.rotation = this.activeDrag.shownRotation;
     }
 
     /**
@@ -1939,7 +1941,7 @@ export class StudioCanvas {
             drawn.push(labelData);
             const text = this.#labelText(name, labelData, rootFontSize, resScale);
             const { w, h } = turnedBox(text.width, text.height, text.rotation);
-            items.push({ id: `${parentType}:${parentId ?? labelData.id}`, type: parentType, labelData, text, w, h, defaultX, defaultY, parentId, layerId, ...extra });
+            items.push({ id: `${parentType}:${parentId ?? labelData.id}`, type: parentType, labelData, text, w, h, length: text.width, thickness: text.height, defaultX, defaultY, parentId, layerId, ...extra });
         };
 
         // Custom Labels
@@ -1957,7 +1959,7 @@ export class StudioCanvas {
 
         // 2. Where each goes
         const shownPins = mapPins.filter((pin) => pin.icon && this.#isVisibleInCurrentPass(pin.visibility, "all", false));
-        const layout = this.#labelLayout.layout(items, { pins: shownPins, pinWidth, meshSession, pass: this.renderPassMode, avoid: this.#avoidLabelOverlaps, bounds: { width: this.mapWidth, height: this.mapHeight, inset: this.#nameInset } });
+        const layout = this.#labelLayout.layout(items, { pins: shownPins, pinWidth, meshSession, pass: this.renderPassMode, avoid: this.#avoidLabelOverlaps, bounds: { width: this.mapWidth, height: this.mapHeight, inset: this.#nameInset }, obstacles: this.#labelObstacles() });
 
         // 3. Drawn there; a name with no room only while labels are edited, faintly
         for (const item of items) {
@@ -1972,6 +1974,8 @@ export class StudioCanvas {
             }
             item.text.x = position.x;
             item.text.y = position.y;
+            // A river's name placed on another stretch of its course is turned to follow it
+            if (position.rotation !== undefined) item.text.rotation = position.rotation * (Math.PI / 180);
             this.layers.labels.addChild(item.text);
             if (isEditMode) this.#addLabelTarget(item, position);
         }
@@ -2093,6 +2097,8 @@ export class StudioCanvas {
             entityId: item.parentId || item.labelData.id,
             parentType: item.type,
             layerId: item.layerId,
+            // The turn it is drawn at, which a drag keeps (see #beginDragOnce)
+            shownRotation: position.rotation,
         });
     }
 
@@ -2112,7 +2118,7 @@ export class StudioCanvas {
             if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) continue;
             const point = meshSession.routeMidpoint(route);
             if (!point) continue;
-            collect(route.name, ensureLabelData(route), point.x, point.y - ROUTE_LABEL_RISE, route.visibility, route.id, "route");
+            collect(route.name, ensureLabelData(route), point.x, point.y - ROUTE_LABEL_RISE, route.visibility, route.id, "route", null, { route });
         }
 
         for (const set of meshSession.layerSets) {
@@ -2143,6 +2149,7 @@ export class StudioCanvas {
         const args = [uiState, mapWidth, mapHeight, isEditMode, decorations];
         this.#cartographyArgs = args;
         this.layers.cartography.removeChildren().forEach((c) => c.destroy({ children: true }));
+        this.#obstacles = [];
 
         // Delegate to isolated drawing pipelines
         this.#drawCartographyBorder(uiState, mapWidth, mapHeight);
@@ -2163,6 +2170,35 @@ export class StudioCanvas {
 
     /** The last renderCartography call's arguments, so a face arriving late redraws only the latest. */
     #cartographyArgs = null;
+
+    /**
+     * The boxes (centred, in map pixels) of what the cartography layer last drew that names keep
+     * clear of: the scale bar and each decoration (see LabelLayout). The studio draws the layer
+     * before the labels, so they read the boxes of the same draw.
+     */
+    #obstacles = [];
+
+    /** A drawn object's box on the map: its own bounds turned, scaled and placed as it is drawn. */
+    #boxOf(object, x, y, rotation = 0, scale = 1) {
+        const local = object.getLocalBounds();
+        if (!(local.width > 1 && local.height > 1)) return null;
+        const angle = (rotation * Math.PI) / 180;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const xs = [];
+        const ys = [];
+        for (const [u, v] of [[local.x, local.y], [local.x + local.width, local.y], [local.x, local.y + local.height], [local.x + local.width, local.y + local.height]]) {
+            xs.push(x + (u * cos - v * sin) * scale);
+            ys.push(y + (u * sin + v * cos) * scale);
+        }
+        const [left, right, top, bottom] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+        return { x: (left + right) / 2, y: (top + bottom) / 2, w: right - left, h: bottom - top };
+    }
+
+    /** The obstacles names keep clear of, when the cartography layer is shown. */
+    #labelObstacles() {
+        return this.layers.cartography?.visible === false ? [] : this.#obstacles;
+    }
 
     /** The open map's name, which a cartouche showing it draws (see setMapName). */
     #mapName = null;
@@ -2279,6 +2315,8 @@ export class StudioCanvas {
         scaleContainer.addChild(textMax);
 
         this.layers.cartography.addChild(scaleContainer);
+        const scaleBox = this.#boxOf(scaleContainer, scaleContainer.x, scaleContainer.y);
+        if (scaleBox) this.#obstacles.push(scaleBox);
 
         if (isEditMode) {
             const scaleDataObj = {
@@ -2325,6 +2363,9 @@ export class StudioCanvas {
             sprite.alpha = dec.opacity ?? 1; // Allow opacity fading
 
             this.layers.cartography.addChild(sprite);
+            // An image still loading has no size yet, so keeps no names clear until it is drawn again
+            const box = this.#boxOf(sprite, dec.x, dec.y, dec.rotation ?? 0, dec.scale || 1);
+            if (box) this.#obstacles.push(box);
 
             if (isEditMode) {
                 this.interactiveTargets.push({
@@ -2359,6 +2400,8 @@ export class StudioCanvas {
         container.scale.set(dec.scale || 1);
         container.alpha = dec.opacity ?? 1;
         this.layers.cartography.addChild(container);
+        const box = this.#boxOf(container, dec.x, dec.y, dec.rotation ?? 0, dec.scale || 1);
+        if (box) this.#obstacles.push(box);
         if (!isEditMode) return;
         this.interactiveTargets.push({
             target: dec,
