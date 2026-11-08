@@ -108,7 +108,7 @@ export default {
             action: [{ do: "click", target: '[data-action="chooseHistoryAge"][data-age="2"]', label: "Age 2: the present" }],
             screenshot: { name: "what-changed", region: { union: ["map", { selector: 'details.fwmb-section:has(summary:has-text("What changed"))' }] } },
             caption: "The present, with what changed since Age 1.",
-            note: "**Export to PNG** at the foot of the panel saves the map of the age shown, named with the age, so a set of images can tell your world's story.",
+            note: "**Export image** (**Export to PNG** before version 4.2.0) at the foot of the panel saves the map of the age shown, named with the age, so a set of images can tell your world's story.",
             narration: "Choose the present age and compare it. The Hillfolk invaded and now hold most of the land. What changed lists the realms that fell and rose, and how each people's share of the land grew or shrank.",
             pause: 4,
         },

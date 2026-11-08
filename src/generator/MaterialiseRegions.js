@@ -154,6 +154,7 @@ function addRealms(level, result, { runId, idFactory, label, duchyLabel }) {
     result.realms.forEach((realm, index) => {
         addRegion(level, {
             name: realm.name,
+            nameSource: "generated",
             // Each region its own label (a moved label keeps its own position); an independent
             // duchy's in the duchies' look, so a realm's look marks a kingdom
             label: { ...(realm.kind === "kingdom" ? label : duchyLabel) },
@@ -171,6 +172,7 @@ function addChildren(level, list, parentKeys, { kind, units }, { runId, idFactor
         const unit = units[sourceIndex];
         addRegion(level, {
             name: unit.name,
+            nameSource: "generated",
             parentKey: parentKeys[key],
             label: { ...label },
             generated: generatedFor(runId, kind, sourceIndex, { population: unit.population, culture: cultureId(result, unit.culture) }),

@@ -2,6 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { LAYER_SET_KINDS, NESTING_MODES, ROUTE_CLASSES, ROUTE_TRANSPORTS, VISIBILITIES } from "../mesh/Schema.js";
 import { MODEL_RUN_ARRAYS } from "../generator/ModelRun.js";
 import { Sanitize } from "./Sanitize.js";
+import { FEATURE_KINDS } from "../names/FeatureDetection.js";
 
 /**
  * The allow-list of a saved map's data: every field each kind of object may hold, and what its
@@ -70,6 +71,9 @@ const routeStroke = enumOf(["solid", "dashed", "dotted", "dashdot"]);
 const fillStyle = enumOf(["solid", "diagonal", "crosshatch", "hatch"], { nullable: true });
 const justify = enumOf(["left", "center", "right"]);
 const custom = ref({ also: ["custom"] });
+// Where an item's name came from and its reroll count (see RandomNames)
+const nameSource = enumOf(FILRODENSWMB.PLACE_NAMES.SOURCES);
+const nameRoll = int(0, 1e6);
 
 // ------------------------------------------------------------------ generated content
 
@@ -130,6 +134,8 @@ const OWNED_LABEL = obj({ ...LABEL_LOOK, text: text("label", "FILRODENSWMB.UI.Li
 const PIN = obj({
     id,
     name: name("FILRODENSWMB.UI.LimitKindPin"),
+    nameSource,
+    nameRoll,
     description: description("FILRODENSWMB.UI.LimitKindPin"),
     icon: key,
     x: num(RANGE.COORD),
@@ -148,12 +154,41 @@ const PIN = obj({
     inflow: num(RANGE.SIGNED),
 });
 
+/**
+ * What a natural feature's label keeps of its feature (see FeatureNames): the feature's kind, its
+ * footprint (an area's cells on a grid of `cell` pixels as row runs, or a river's course), and
+ * what the action gave the label, against which a change by the reader is told.
+ */
+const FEATURE = obj(
+    {
+        kind: enumOf(Object.keys(FEATURE_KINDS)),
+        cell: int(1, 1000),
+        runs: { t: "cells" },
+        path: points,
+        x: num(RANGE.COORD),
+        y: num(RANGE.COORD),
+        rotation: num(RANGE.ANGLE),
+        fontSize: num({ min: 0.01, max: 100 }),
+        text: text("label", "FILRODENSWMB.UI.LimitKindLabel", "FILRODENSWMB.UI.LimitFieldText"),
+        style: key,
+    },
+    { nullable: true },
+);
+
 const LABEL = obj({
     ...LABEL_LOOK,
     id,
     name: text("label", "FILRODENSWMB.UI.LimitKindLabel", "FILRODENSWMB.UI.LimitFieldText"),
+    feature: FEATURE,
 });
 
+const { COMPASS, CARTOUCHE } = FILRODENSWMB.DECORATIONS;
+
+/**
+ * A map decoration: an image the user supplied (`src`, no `kind`), or one the module draws (`kind`:
+ * a compass rose or a cartouche, see DrawnDecoration), with the fields its kind reads. A drawn
+ * kind's colours are one object (`colors`), each a colour.
+ */
 const DECORATION = obj({
     id,
     type: enumOf(["decoration"]),
@@ -166,6 +201,33 @@ const DECORATION = obj({
     opacity: num(RANGE.UNIT),
     visibility,
     hidden,
+    kind: enumOf(FILRODENSWMB.DECORATIONS.KINDS),
+    design: enumOf([...COMPASS.DESIGNS, ...CARTOUCHE.DESIGNS]),
+    // A compass's radius, or a cartouche's title size, in map pixels at scale 1
+    size: num({ min: 1, max: 1e5 }),
+    colors: obj(Object.fromEntries(["light", "dark", "line", "accent", "letter", "backing", "fill", "shade", "text"].map((key) => [key, color]))),
+    fontFamily: { t: "font" },
+    bold: bool,
+    // Compass rose
+    points: enumOf(COMPASS.POINTS),
+    rings: int(0, 2),
+    degreeRing: bool,
+    north: enumOf(COMPASS.NORTH),
+    letters: enumOf(COMPASS.LETTERS),
+    letterSize: num({ min: COMPASS.LETTER_SIZE.MIN, max: COMPASS.LETTER_SIZE.MAX }),
+    upright: bool,
+    backing: bool,
+    backingOpacity: num(RANGE.UNIT),
+    halo: bool,
+    // Cartouche
+    titleSource: enumOf(CARTOUCHE.TITLE_SOURCES),
+    title: text("name", "FILRODENSWMB.UI.LimitKindDecoration", "FILRODENSWMB.UI.LimitFieldTitle"),
+    subtitle: text("name", "FILRODENSWMB.UI.LimitKindDecoration", "FILRODENSWMB.UI.LimitFieldSubtitle"),
+    subtitleSize: num({ min: CARTOUCHE.SUBTITLE_SIZE.MIN, max: CARTOUCHE.SUBTITLE_SIZE.MAX }),
+    subtitleItalic: bool,
+    subtitleFontFamily: { t: "font" },
+    capitals: bool,
+    maxWidth: num({ min: CARTOUCHE.MAX_WIDTH.MIN, max: CARTOUCHE.MAX_WIDTH.MAX }),
 });
 
 // ------------------------------------------------------------------ routes
@@ -173,6 +235,8 @@ const DECORATION = obj({
 const ROUTE = obj({
     id,
     name: name("FILRODENSWMB.UI.LimitKindRoute"),
+    nameSource,
+    nameRoll,
     description: description("FILRODENSWMB.UI.LimitKindRoute"),
     visibility,
     hidden,
@@ -204,6 +268,8 @@ const REGION = obj({
     id,
     key: int(0),
     name: name("FILRODENSWMB.UI.LimitKindRegion"),
+    nameSource,
+    nameRoll,
     description: description("FILRODENSWMB.UI.LimitKindRegion"),
     fillColor: { t: "color", transparent: true, nullable: true },
     fillStyle,

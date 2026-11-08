@@ -7,6 +7,7 @@ import { childLevels, descendantLevels, insertLevel, levelDepth, parentLevel, se
 import { assignToParents, autoAssign, claimWaters, deleteLevel, deleteRegion, deleteSet, levelCounts, mergeRegion, nestingProblems, regionParents, unassignedCount } from "../mesh/RegionEdits.js";
 import { platform } from "../platform/index.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
+import { RandomNames } from "./RandomNames.js";
 
 /** Where the dialogue templates live (Merge Into's). */
 const DIALOG_ROOT = "modules/filrodens-world-map-builder/templates/dialogs/";
@@ -395,6 +396,8 @@ export class RegionPanel {
         if (!object || !name || object.name === name) return false;
         MapStateManager.pushVectorState(app);
         object.name = name;
+        // A region records that its name was typed (see RandomNames); sets and levels keep no source
+        if (key.startsWith("region:")) RandomNames.markTyped(object);
         GeneratedEdits.mark(object);
         this.#refresh(app);
         return true;
@@ -600,21 +603,21 @@ export class RegionPanel {
      * style is chosen on the bar. One undo step. Returns `{ levelId, id }`, or null when the level
      * (or the parent) has gone.
      */
-    static createRegion(app, levelId, name, parentId = null) {
+    static createRegion(app, levelId, name, parentId = null, nameSource = "default") {
         const level = this.#level(app, levelId);
         const set = setOfLevel(app.layerSets ?? [], levelId);
         const parent = parentId && level?.parentLevelId ? this.#level(app, level.parentLevelId)?.regions.find((region) => region.id === parentId) : null;
         if (!level || (parentId && !parent)) return null;
         MapStateManager.pushVectorState(app);
-        const region = this.#newRegion(app, level, name, parent?.key ?? null);
+        const region = this.#newRegion(app, level, name, parent?.key ?? null, nameSource);
         this.#makeActive(app, set, level, region);
         return { levelId: level.id, id: region.id };
     }
 
     /** Adds a region to a level, in the bar's region style, if one is chosen. */
-    static #newRegion(app, level, name, parentKey) {
+    static #newRegion(app, level, name, parentKey, nameSource = "default") {
         const style = (app.uiState.customRegionStyles ?? []).find((candidate) => candidate.id === app.uiState.activeRegionQuickStyle);
-        return addRegion(level, { name: name || uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewRegionName"), level.regions), parentKey, quickStyle: style ? style.id : "custom", fillColor: style?.fillColor ?? null, fillStyle: style?.fillStyle ?? null, label: { visibility: "all" } }, this.#idFactory);
+        return addRegion(level, { name: name || uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewRegionName"), level.regions), nameSource: name ? nameSource : "default", parentKey, quickStyle: style ? style.id : "custom", fillColor: style?.fillColor ?? null, fillStyle: style?.fillStyle ?? null, label: { visibility: "all" } }, this.#idFactory);
     }
 
     /** A region just made becomes the one painted, chosen in its list. */

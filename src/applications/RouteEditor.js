@@ -12,6 +12,7 @@ import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
+import { RandomNames } from "./RandomNames.js";
 
 /** The localisation key of each leg mode, transport, class and stroke. */
 const LEG_MODE_LABELS = Object.freeze({ terrain: "FILRODENSWMB.UI.RouteLegTerrain", direct: "FILRODENSWMB.UI.RouteLegDirect" });
@@ -64,6 +65,7 @@ export class RouteEditor {
         apply: (app, route, _ref, form, field) => RouteEditor.#apply(app, route, form, field),
         actions: {
             lock: (app, route) => GeneratedEdits.toggleLock(app, route),
+            randomName: (app, route) => RandomNames.press(app, "route", route),
             zoom: (app, route) => {
                 const points = MeshIntegration.outlinePoints(app, route);
                 if (points.length) app.canvasEngine?.zoomToFeature(points);
@@ -146,6 +148,7 @@ export class RouteEditor {
         MapStateManager.pushVectorState(app);
         GeneratedEdits.markIfSubstantive(route, field);
         const { label, ...fields } = values;
+        if (fields.name !== route.name) RandomNames.markTyped(route);
         Object.assign(route, fields);
         route.label = { ...route.label, ...label };
         this.#redraw(app);

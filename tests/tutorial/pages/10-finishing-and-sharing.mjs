@@ -83,6 +83,7 @@ export default {
             settle: false,
             screenshot: { name: "png", region: "dialog", pad: 8 },
             caption: "The Export to PNG dialogue, with the recommended scale chosen.",
+            note: "**In version 4.2.0:** the button is **Export image**, and the dialogue also asks for **Image format and quality**: **PNG**, **WebP, lossless** or **WebP, 90% quality**, each with its estimated size (see [[Export]]).",
             narration: "Open Export and click Export to PNG. The dialogue recommends a scale where the smallest names can be read.",
             pause: 3,
         },

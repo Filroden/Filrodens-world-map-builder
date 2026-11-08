@@ -10,6 +10,7 @@ import { LabelFonts } from "../tools/LabelFonts.js";
 import { LabelWidth } from "../tools/LabelWidth.js";
 import { SymbolScale } from "../tools/SymbolScale.js";
 import { ExportScale } from "../tools/ExportScale.js";
+import { ImageFormat } from "../tools/ImageFormat.js";
 import { LabelLayout } from "./LabelLayout.js";
 import { borderLines } from "./MapBorder.js";
 import { RegionLevelLayers } from "./RegionLevelLayers.js";
@@ -19,6 +20,7 @@ import { TravelLayer } from "./TravelLayer.js";
 import { RegionOverlays } from "./RegionOverlays.js";
 import { RouteOverlays } from "./RouteOverlays.js";
 import { HomelandMarkers } from "./HomelandMarkers.js";
+import { DrawnDecoration } from "./decorations/DrawnDecoration.js";
 import { TouchGestures } from "./TouchGestures.js";
 import { platform } from "../platform/index.js";
 import { cleanUnit, formatDistance, scaleBarTick } from "../data/MapUnit.js";
@@ -639,7 +641,7 @@ export class StudioCanvas {
             // The drag is only "armed" here. It becomes a real drag - recording its undo snapshot
             // and moving the item - once the pointer has travelled past the drag threshold (see
             // #beginDragOnce), so a plain click or double-click on an item changes nothing.
-            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType, originX: e.clientX, originY: e.clientY, started: false };
+            this.activeDrag = { target: grabbedTarget, entityType: hit.entityType, originX: e.clientX, originY: e.clientY, started: false, shownRotation: hit.shownRotation };
             if (isShapeGrab) this.#beginShapeDrag(hit.shape, coords);
             canvasElement.style.cursor = "grabbing";
             this.#setHeldItem(StudioCanvas.#heldItemKind(hit, this.activeDrag));
@@ -788,6 +790,8 @@ export class StudioCanvas {
 
         this.activeDrag.started = true;
         if (this.onInfraDragStart) this.onInfraDragStart();
+        // A river's name drawn along another stretch than its own keeps that turn once picked up
+        if (this.activeDrag.shownRotation !== undefined) this.activeDrag.target.rotation = this.activeDrag.shownRotation;
     }
 
     /**
@@ -1452,7 +1456,7 @@ export class StudioCanvas {
      * @param {number} scale - 1 draws the map at its own size.
      * @returns {HTMLCanvasElement}
      */
-    #renderForExport(scale) {
+    #renderForExport(scale, samples = null) {
         const factor = Number(scale) > 0 ? scale : 1;
         const origX = this.stage.position.x;
         const origY = this.stage.position.y;
@@ -1473,11 +1477,22 @@ export class StudioCanvas {
                 child.children?.forEach(collect);
             });
 
+            this.stage.scale.set(factor);
+            // Sample tiles only (for an estimate of the file's size): each drawn on its own canvas
+            if (samples) {
+                return samples.map((tile) => {
+                    const renderTexture = PIXI.RenderTexture.create({ width: tile.width, height: tile.height, resolution: 1 });
+                    this.stage.position.set(-tile.x, -tile.y);
+                    this.app.renderer.render(this.stage, { renderTexture });
+                    const canvas = this.app.renderer.extract.canvas(renderTexture);
+                    renderTexture.destroy(true);
+                    return canvas;
+                });
+            }
             const output = document.createElement("canvas");
             output.width = width;
             output.height = height;
             const context = output.getContext("2d");
-            this.stage.scale.set(factor);
             for (const tile of ExportScale.tiles(width, height, this.#exportTileLimit())) {
                 const renderTexture = PIXI.RenderTexture.create({ width: tile.width, height: tile.height, resolution: 1 });
                 this.stage.position.set(-tile.x, -tile.y);
@@ -1516,14 +1531,16 @@ export class StudioCanvas {
     }
 
     /**
-     * Exports the map as a PNG at a scale (see #renderForExport). The reference image and the
-     * land masks' outlines are working aids, never exported. The file is downloaded through a
+     * Exports the map as an image at a scale (see #renderForExport), in a format (see
+     * ImageFormat; PNG where the browser cannot write the one asked for). The reference image and
+     * the land masks' outlines are working aids, never exported. The file is downloaded through a
      * detached link, which Electron's navigation interceptors leave alone.
      * @param {string} [filename]
      * @param {number} [scale] - 1 draws the map at its own size.
+     * @param {string} [format] - An EXPORT_FORMATS id.
      * @returns {Promise<boolean>} Whether the image was made.
      */
-    async exportToPNG(filename = "world-map", scale = 1) {
+    async exportToPNG(filename = "world-map", scale = 1, format = "png") {
         const referenceVisible = this.layers.reference.visible;
         const landMasksVisible = this.layers.landMasks.visible;
         try {
@@ -1537,13 +1554,12 @@ export class StudioCanvas {
                 this.layers.landMasks.visible = landMasksVisible;
             }
 
-            const blob = await new Promise((resolve) => output.toBlob(resolve, "image/png"));
-            if (!blob) throw new Error("The image could not be encoded");
+            const { blob, format: written } = await ImageFormat.encode(output, format);
             const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = blobUrl;
             const safeName = filename.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-            a.download = `fwmb_${safeName}.png`;
+            a.download = `fwmb_${safeName}.${written.extension}`;
             a.click();
             // Revoked once the download has had time to start
             setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
@@ -1925,7 +1941,7 @@ export class StudioCanvas {
             drawn.push(labelData);
             const text = this.#labelText(name, labelData, rootFontSize, resScale);
             const { w, h } = turnedBox(text.width, text.height, text.rotation);
-            items.push({ id: `${parentType}:${parentId ?? labelData.id}`, type: parentType, labelData, text, w, h, defaultX, defaultY, parentId, layerId, ...extra });
+            items.push({ id: `${parentType}:${parentId ?? labelData.id}`, type: parentType, labelData, text, w, h, length: text.width, thickness: text.height, defaultX, defaultY, parentId, layerId, ...extra });
         };
 
         // Custom Labels
@@ -1943,7 +1959,7 @@ export class StudioCanvas {
 
         // 2. Where each goes
         const shownPins = mapPins.filter((pin) => pin.icon && this.#isVisibleInCurrentPass(pin.visibility, "all", false));
-        const layout = this.#labelLayout.layout(items, { pins: shownPins, pinWidth, meshSession, pass: this.renderPassMode, avoid: this.#avoidLabelOverlaps, bounds: { width: this.mapWidth, height: this.mapHeight, inset: this.#nameInset } });
+        const layout = this.#labelLayout.layout(items, { pins: shownPins, pinWidth, meshSession, pass: this.renderPassMode, avoid: this.#avoidLabelOverlaps, bounds: { width: this.mapWidth, height: this.mapHeight, inset: this.#nameInset }, obstacles: this.#labelObstacles() });
 
         // 3. Drawn there; a name with no room only while labels are edited, faintly
         for (const item of items) {
@@ -1958,6 +1974,8 @@ export class StudioCanvas {
             }
             item.text.x = position.x;
             item.text.y = position.y;
+            // A river's name placed on another stretch of its course is turned to follow it
+            if (position.rotation !== undefined) item.text.rotation = position.rotation * (Math.PI / 180);
             this.layers.labels.addChild(item.text);
             if (isEditMode) this.#addLabelTarget(item, position);
         }
@@ -2079,6 +2097,8 @@ export class StudioCanvas {
             entityId: item.parentId || item.labelData.id,
             parentType: item.type,
             layerId: item.layerId,
+            // The turn it is drawn at, which a drag keeps (see #beginDragOnce)
+            shownRotation: position.rotation,
         });
     }
 
@@ -2098,7 +2118,7 @@ export class StudioCanvas {
             if (!this.#isVisibleInCurrentPass(route.visibility, "all", true)) continue;
             const point = meshSession.routeMidpoint(route);
             if (!point) continue;
-            collect(route.name, ensureLabelData(route), point.x, point.y - ROUTE_LABEL_RISE, route.visibility, route.id, "route");
+            collect(route.name, ensureLabelData(route), point.x, point.y - ROUTE_LABEL_RISE, route.visibility, route.id, "route", null, { route });
         }
 
         for (const set of meshSession.layerSets) {
@@ -2126,12 +2146,81 @@ export class StudioCanvas {
 
     renderCartography(uiState, mapWidth, mapHeight, isEditMode = false, decorations = []) {
         if (!this.layers.cartography) return;
+        const args = [uiState, mapWidth, mapHeight, isEditMode, decorations];
+        this.#cartographyArgs = args;
         this.layers.cartography.removeChildren().forEach((c) => c.destroy({ children: true }));
+        this.#obstacles = [];
 
         // Delegate to isolated drawing pipelines
         this.#drawCartographyBorder(uiState, mapWidth, mapHeight);
         this.#drawScaleBar(uiState, mapHeight, isEditMode);
-        this.#drawCartographyDecorations(decorations, isEditMode);
+        // A decoration's handle (the point it is held by and turns around) shows only in Move, so
+        // in Select nothing covers it, such as a compass rose's hub
+        this.#drawCartographyDecorations(decorations, isEditMode, mapWidth, isEditMode && uiState.cartographyMode === "move");
+
+        // A drawn decoration's letters in a face still loading were drawn in the fallback: once
+        // it arrives the layer is drawn again, unless it has been drawn since (see LabelFonts)
+        const faces = decorations.flatMap((decoration) => DrawnDecoration.faces(decoration));
+        if (faces.length) {
+            LabelFonts.load(faces).then((asked) => {
+                if (asked && this.#cartographyArgs === args && !this.#destroyed) this.renderCartography(...args);
+            });
+        }
+    }
+
+    /** The last renderCartography call's arguments, so a face arriving late redraws only the latest. */
+    #cartographyArgs = null;
+
+    /**
+     * The boxes (centred, in map pixels) of what the cartography layer last drew that names keep
+     * clear of: the scale bar and each decoration (see LabelLayout). The studio draws the layer
+     * before the labels, so they read the boxes of the same draw.
+     */
+    #obstacles = [];
+
+    /** A drawn object's box on the map: its own bounds turned, scaled and placed as it is drawn. */
+    #boxOf(object, x, y, rotation = 0, scale = 1) {
+        const local = object.getLocalBounds();
+        if (!(local.width > 1 && local.height > 1)) return null;
+        const angle = (rotation * Math.PI) / 180;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const xs = [];
+        const ys = [];
+        for (const [u, v] of [[local.x, local.y], [local.x + local.width, local.y], [local.x, local.y + local.height], [local.x + local.width, local.y + local.height]]) {
+            xs.push(x + (u * cos - v * sin) * scale);
+            ys.push(y + (u * sin + v * cos) * scale);
+        }
+        const [left, right, top, bottom] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+        return { x: (left + right) / 2, y: (top + bottom) / 2, w: right - left, h: bottom - top };
+    }
+
+    /** The obstacles names keep clear of, when the cartography layer is shown. */
+    #labelObstacles() {
+        return this.layers.cartography?.visible === false ? [] : this.#obstacles;
+    }
+
+    /** The open map's name, which a cartouche showing it draws (see setMapName). */
+    #mapName = null;
+
+    /** The ids of the cartouches whose text did not fit their widest when last drawn. */
+    #overflowing = new Set();
+
+    /**
+     * The open map's name has changed (saved, renamed, another map opened): a cartouche showing
+     * it is drawn again with the new name.
+     * @param {string|null} name - Null for a map never saved.
+     */
+    setMapName(name) {
+        if (name === this.#mapName) return;
+        this.#mapName = name;
+        const args = this.#cartographyArgs;
+        if (args && !this.#destroyed && args[4]?.some((decoration) => decoration.kind === "cartouche")) this.renderCartography(...args);
+    }
+
+    /** Whether a cartouche's text did not fit its widest when it was last drawn (for the inspector's hint). */
+    isOverflowing(id) {
+        return this.#overflowing.has(id);
     }
 
     #drawCartographyBorder(uiState, mapWidth, mapHeight) {
@@ -2226,6 +2315,8 @@ export class StudioCanvas {
         scaleContainer.addChild(textMax);
 
         this.layers.cartography.addChild(scaleContainer);
+        const scaleBox = this.#boxOf(scaleContainer, scaleContainer.x, scaleContainer.y);
+        if (scaleBox) this.#obstacles.push(scaleBox);
 
         if (isEditMode) {
             const scaleDataObj = {
@@ -2253,9 +2344,15 @@ export class StudioCanvas {
         }
     }
 
-    #drawCartographyDecorations(decorations, isEditMode) {
+    #drawCartographyDecorations(decorations, isEditMode, mapWidth, showHandles) {
+        this.#overflowing.clear();
         decorations.forEach((dec) => {
-            if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false) || !dec.src) return;
+            if (!this.#isVisibleInCurrentPass(dec.visibility, "all", false)) return;
+            if (DrawnDecoration.isDrawn(dec)) {
+                this.#drawDrawnDecoration(dec, isEditMode, mapWidth, showHandles);
+                return;
+            }
+            if (!dec.src) return;
 
             const sprite = new PIXI.Sprite(PIXI.Texture.from(platform.assets.url(dec.src)));
             sprite.anchor.set(0.5);
@@ -2266,6 +2363,9 @@ export class StudioCanvas {
             sprite.alpha = dec.opacity ?? 1; // Allow opacity fading
 
             this.layers.cartography.addChild(sprite);
+            // An image still loading has no size yet, so keeps no names clear until it is drawn again
+            const box = this.#boxOf(sprite, dec.x, dec.y, dec.rotation ?? 0, dec.scale || 1);
+            if (box) this.#obstacles.push(box);
 
             if (isEditMode) {
                 this.interactiveTargets.push({
@@ -2283,22 +2383,53 @@ export class StudioCanvas {
                 });
                 // A marker on its centre, the point it is held by and turns around; where two
                 // decorations overlap, a press picks the one whose centre is nearer
-                this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
+                if (showHandles) this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
             }
         });
     }
 
     /**
-     * One of a scene export's images as a PNG blob, drawn exactly as the PNG export draws (see
-     * #renderForExport) at the scale chosen: the player image (no grid, which Foundry draws), or
-     * the GM overlay (only what players must not see: no terrain, contours, thematic layers,
-     * rivers and faults, grid or cartography). The reference image and the land masks' outlines
-     * are never exported. Every layer goes back to how it was.
+     * A decoration the module draws (see DrawnDecoration): built afresh on each draw, which costs
+     * little (a rose is at most about 150 shapes), placed, turned and scaled as an image is.
+     */
+    #drawDrawnDecoration(dec, isEditMode, mapWidth, showHandles) {
+        const { container, reach, overflow } = DrawnDecoration.build(PIXI, dec, { fonts: LabelFonts, localize: (key) => platform.i18n.localize(key), mapWidth, mapName: this.#mapName });
+        if (overflow) this.#overflowing.add(dec.id);
+        container.position.set(dec.x, dec.y);
+        container.rotation = (dec.rotation ?? 0) * (Math.PI / 180);
+        container.scale.set(dec.scale || 1);
+        container.alpha = dec.opacity ?? 1;
+        this.layers.cartography.addChild(container);
+        const box = this.#boxOf(container, dec.x, dec.y, dec.rotation ?? 0, dec.scale || 1);
+        if (box) this.#obstacles.push(box);
+        if (!isEditMode) return;
+        this.interactiveTargets.push({
+            target: dec,
+            x: dec.x,
+            y: dec.y,
+            // Read when the pointer is tested: the scale may change while it is held
+            get radius() {
+                return Math.max(reach * (dec.scale || 1), DECORATION_MIN_HIT_RADIUS);
+            },
+            isDecoration: true,
+            entityType: "decoration",
+            entityId: dec.id,
+        });
+        if (showHandles) this.#createEditNode(this.layers.cartography, dec.x, dec.y, false, false);
+    }
+
+    /**
+     * One of a scene export's images as a blob in a format (see ImageFormat), drawn exactly as
+     * the image export draws (see #renderForExport) at the scale chosen: the player image (no
+     * grid, which Foundry draws), or the GM overlay (only what players must not see: no terrain,
+     * contours, thematic layers, rivers and faults, grid or cartography). The reference image and
+     * the land masks' outlines are never exported. Every layer goes back to how it was.
      * @param {"player"|"gm"} [passType]
      * @param {number} [scale] - 1 draws the map at its own size.
+     * @param {string} [format] - An EXPORT_FORMATS id.
      * @returns {Promise<Blob|null>}
      */
-    async extractCanvasBlob(passType = "player", scale = 1) {
+    async extractCanvasBlob(passType = "player", scale = 1, format = "png") {
         const hidden = [this.gridLayer, this.layers.reference, this.layers.landMasks];
         if (passType === "gm") {
             // The GM overlay holds only what players must not see; a thematic layer is in the
@@ -2317,7 +2448,45 @@ export class StudioCanvas {
                 layer.visible = visibility[index];
             });
         }
-        return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        const { blob } = await ImageFormat.encode(canvas, format);
+        return blob;
+    }
+
+    /**
+     * A few tiles of an export drawn at its scale (see ExportScale), spread over the map, for an
+     * estimate of the file's size in each format (see ImageFormat.estimate): drawn as the export
+     * of that kind would be, the reference image and the land masks' outlines (and for a scene,
+     * the grid) hidden.
+     * @param {number} scale
+     * @param {object} [options]
+     * @param {boolean} [options.forScene]
+     * @returns {{tiles: HTMLCanvasElement[], pixels: number}}
+     */
+    exportSamples(scale, { forScene = false } = {}) {
+        const { TILES, TILE_PX } = FILRODENSWMB.EXPORT_FORMATS.ESTIMATE;
+        const width = Math.round(this.mapWidth * scale);
+        const height = Math.round(this.mapHeight * scale);
+        const side = Math.min(TILE_PX, width, height);
+        // Spread over the map: at the middles of its four quarters
+        const across = Math.max(1, Math.round(Math.sqrt(TILES)));
+        const places = [];
+        for (let row = 0; row < across; row++) {
+            for (let column = 0; column < across && places.length < TILES; column++) {
+                const x = Math.round(((column + 0.5) / across) * width - side / 2);
+                const y = Math.round(((row + 0.5) / across) * height - side / 2);
+                places.push({ x: Math.max(0, Math.min(width - side, x)), y: Math.max(0, Math.min(height - side, y)), width: side, height: side });
+            }
+        }
+        const hidden = [this.layers.reference, this.layers.landMasks, ...(forScene ? [this.gridLayer] : [])];
+        const visibility = hidden.map((layer) => layer.visible);
+        try {
+            for (const layer of hidden) layer.visible = false;
+            return { tiles: this.#renderForExport(scale, places), pixels: width * height };
+        } finally {
+            hidden.forEach((layer, index) => {
+                layer.visible = visibility[index];
+            });
+        }
     }
 
     setRenderPass(mode) {

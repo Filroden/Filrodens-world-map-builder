@@ -74,6 +74,18 @@ test("the host's title shows the saved map and its id, and (unsaved) while there
     );
 });
 
+test("a renamed, saved-as or newly opened map's name reaches the canvas, so a cartouche showing it follows", () => {
+    installPlatform({ frame: { idLength: 4, setTitle: () => {} } });
+    const studio = new MapStudio();
+    const names = [];
+    studio.canvasEngine = { setMapName: (name) => names.push(name) };
+    studio.currentSaveName = "Harbour";
+    studio.currentSaveName = "Harbour";
+    studio.currentSaveName = "Old Harbour";
+    studio.currentSaveName = null;
+    assert.deepEqual(names, ["Harbour", "Old Harbour", null], "each change once");
+});
+
 test("destroy lets go of the root", () => {
     const studio = new MapStudio();
     studio.root = { querySelector: () => null };

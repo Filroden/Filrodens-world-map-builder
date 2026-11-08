@@ -1,5 +1,15 @@
 import { DEFAULT_LABEL_FONT } from "./data/fonts.js";
 
+/** The geographic label styles (see LABELS.DEFAULT_STYLES and FEATURE_NAMES). */
+const FEATURE_LABEL_STYLES = Object.freeze([
+    Object.freeze({ id: "label-style-ocean-sea", nameKey: "FILRODENSWMB.LABELS.StyleOceanSea", fontFamily: "Cormorant Garamond", fontSize: 3.2, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
+    Object.freeze({ id: "label-style-gulf-bay-lake", nameKey: "FILRODENSWMB.LABELS.StyleGulfBayLake", fontFamily: "Cormorant Garamond", fontSize: 1.8, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
+    Object.freeze({ id: "label-style-river", nameKey: "FILRODENSWMB.LABELS.StyleRiver", fontFamily: "Cormorant Garamond", fontSize: 1.3, fillColor: "#C4DDEE", maxChars: 0, justify: "center", bold: true, italic: true }),
+    Object.freeze({ id: "label-style-mountains", nameKey: "FILRODENSWMB.LABELS.StyleMountains", fontFamily: "Alegreya Sans SC", fontSize: 2.2, fillColor: "#A9CC8F", maxChars: 0, justify: "center", bold: true, italic: false }),
+    Object.freeze({ id: "label-style-hills", nameKey: "FILRODENSWMB.LABELS.StyleHills", fontFamily: "Alegreya Sans SC", fontSize: 1.7, fillColor: "#A9CC8F", maxChars: 0, justify: "center", bold: false, italic: false }),
+    Object.freeze({ id: "label-style-land", nameKey: "FILRODENSWMB.LABELS.StyleLand", fontFamily: "Alegreya SC", fontSize: 1.9, fillColor: "#CDD98C", maxChars: 0, justify: "center", bold: false, italic: true }),
+]);
+
 export const FILRODENSWMB = {
     ID: "filrodens-world-map-builder",
     FLAGS: {
@@ -1653,6 +1663,34 @@ export const FILRODENSWMB = {
             // Region names by their level's depth in its set: realms, then duchies, then counties
             REGION_DEPTHS: Object.freeze([Object.freeze({ order: 2, weight: 30, mustShow: true }), Object.freeze({ order: 3, weight: 8 }), Object.freeze({ order: 4, weight: 4 })]),
             ROUTE: Object.freeze({ order: 6, weight: 1 }),
+            // A named route (a hand-made route with a name, or a generated one whose name the reader
+            // typed or edited, or that is locked): placed before places and land areas (so they go
+            // round it), and weighing more than the smallest places, less than towns
+            NAMED_ROUTE: Object.freeze({ order: 4, weight: 1.3 }),
+            // Natural features' names (see FEATURE_NAMES) not moved by the reader: oceans and seas
+            // with the realms, then ranges, gulfs and lakes, then hills and land areas (after named
+            // routes, with the places), then rivers, and bays last
+            FEATURES: Object.freeze({
+                ocean: Object.freeze({ order: 2, weight: 20 }),
+                sea: Object.freeze({ order: 2, weight: 15 }),
+                mountains: Object.freeze({ order: 3, weight: 8 }),
+                gulf: Object.freeze({ order: 3, weight: 6 }),
+                lake: Object.freeze({ order: 3, weight: 5 }),
+                hills: Object.freeze({ order: 5, weight: 3 }),
+                highlands: Object.freeze({ order: 5, weight: 3 }),
+                forest: Object.freeze({ order: 5, weight: 2.5 }),
+                jungle: Object.freeze({ order: 5, weight: 2.5 }),
+                desert: Object.freeze({ order: 5, weight: 2.5 }),
+                steppe: Object.freeze({ order: 5, weight: 2.5 }),
+                tundra: Object.freeze({ order: 5, weight: 2.5 }),
+                plains: Object.freeze({ order: 5, weight: 2.5 }),
+                river: Object.freeze({ order: 6, weight: 1.2 }),
+                bay: Object.freeze({ order: 7, weight: 0.8 }),
+            }),
+            // A feature's name's place costs this much for each share of its box outside the feature
+            FEATURE_SPILL_COST: 1.5,
+            // Decorations and the scale bar: names keep clear of them, as of a capital's icon
+            OBSTACLE_WEIGHT: 50,
             // A pin's name beside it, in order of preference: right (as drawn without placement),
             // upper right, left, above, lower right, below, upper left, lower left. `side` is where
             // the name sits horizontally (1 right, -1 left, 0 centred) and `rise` vertically (-1 above)
@@ -1678,7 +1716,6 @@ export const FILRODENSWMB = {
         DEFAULT_STYLES: Object.freeze([
             Object.freeze({ id: "label-style-realm", nameKey: "FILRODENSWMB.LABELS.StyleRealm", fontFamily: "Cinzel", fontSize: 3, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: true, italic: false }),
             Object.freeze({ id: "label-style-place", nameKey: "FILRODENSWMB.LABELS.StylePlace", fontFamily: "EB Garamond", fontSize: 2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: true, italic: false }),
-            Object.freeze({ id: "label-style-water", nameKey: "FILRODENSWMB.LABELS.StyleWater", fontFamily: "EB Garamond", fontSize: 2.4, fillColor: "#E0F0FA", maxChars: 0, justify: "center", bold: false, italic: true }),
             Object.freeze({ id: "label-style-note", nameKey: "FILRODENSWMB.LABELS.StyleNote", fontFamily: "Kalam", fontSize: 1.6, fillColor: "#DEDCD3", maxChars: 24, justify: "left", bold: false, italic: false }),
             // For the routes' labels (see ROUTES.DEFAULT_STYLES)
             Object.freeze({ id: "label-style-road", nameKey: "FILRODENSWMB.LABELS.StyleRoad", fontFamily: "Barlow Semi Condensed", fontSize: 1.4, fillColor: "#5a3a1e", maxChars: 0, justify: "center", bold: false, italic: false }),
@@ -1690,8 +1727,13 @@ export const FILRODENSWMB = {
             Object.freeze({ id: "label-style-county", nameKey: "FILRODENSWMB.LABELS.StyleCounty", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#CEBB92", maxChars: 0, justify: "center", bold: false, italic: true }),
             Object.freeze({ id: "label-style-capital", nameKey: "FILRODENSWMB.LABELS.StyleCapital", fontFamily: "EB Garamond", fontSize: 1.6, fillColor: "#FFFFFF", maxChars: 0, justify: "left", bold: true, italic: false }),
             Object.freeze({ id: "label-style-settlement", nameKey: "FILRODENSWMB.LABELS.StyleSettlement", fontFamily: "EB Garamond", fontSize: 1.2, fillColor: "#DEDCD3", maxChars: 0, justify: "left", bold: false, italic: false }),
+            // The geographic family, for natural features' names (see FEATURE_NAMES): water in a
+            // light italic, rivers smaller, relief in spaced small capitals in a grass green, and
+            // land areas in an italic small-capital face in a paler yellow-green, so neither is
+            // taken for a place's or a realm's name
+            ...FEATURE_LABEL_STYLES,
         ]),
-        PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
+        PRESETS: ["#FFFFFF", "#DEDCD3", "#CEBB92", "#8A734D", "#A9CC8F", "#CDD98C", "#E0F0FA", "#8DB2CC", "#2A4B66", "#1A1A1A"],
     },
     ROUTES: {
         // The route styles a new map starts with (a saved map keeps its own), each for one
@@ -1733,6 +1775,181 @@ export const FILRODENSWMB = {
     // should reach for a scale to be recommended, the largest image (a side, and in all) a scale
     // may make, and the largest tile drawn at once
     EXPORT_PNG: Object.freeze({ SCALES: Object.freeze([1, 2, 3, 4]), MIN_LABEL_PX: 12, MAX_SIDE: 16384, MAX_PIXELS: 150_000_000, TILE_PX: 4096 }),
+    // The image formats an export can be saved in (see ImageFormat), in the order offered: PNG,
+    // WebP at quality 1 (lossless in the browsers that encode WebP) and WebP at 0.9 (lossy, about
+    // a fifth of a PNG with the line work intact). Their sizes are estimated from a few sample
+    // tiles drawn at the export's scale, which comes within about 15% of a full encode. The last
+    // choice is remembered per kind of export.
+    EXPORT_FORMATS: Object.freeze({
+        CHOICES: Object.freeze([
+            Object.freeze({ id: "png", type: "image/png", extension: "png", label: "FILRODENSWMB.UI.ExportFormatPng" }),
+            Object.freeze({ id: "webp", type: "image/webp", quality: 1, extension: "webp", label: "FILRODENSWMB.UI.ExportFormatWebpLossless" }),
+            Object.freeze({ id: "webp90", type: "image/webp", quality: 0.9, extension: "webp", label: "FILRODENSWMB.UI.ExportFormatWebp90" }),
+        ]),
+        DEFAULT: "png",
+        ESTIMATE: Object.freeze({ TILES: 4, TILE_PX: 512 }),
+        SETTINGS: Object.freeze({ PNG: "exportFormatPng", SCENE: "exportFormatScene" }),
+    }),
+    // Decorations drawn by the module (see DrawnDecoration): a compass rose or a cartouche, each
+    // a `kind` on a map decoration (a decoration with no kind is an image the user supplied).
+    DECORATIONS: Object.freeze({
+        KINDS: Object.freeze(["compass", "cartouche"]),
+        // Shapes are built this many times larger and scaled back, so curves keep enough
+        // segments when an export enlarges them
+        OVERSAMPLE: 2,
+        COMPASS: Object.freeze({
+            DESIGNS: Object.freeze(["classic", "mariner", "arrow"]),
+            POINTS: Object.freeze([4, 8, 16, 32]),
+            NORTH: Object.freeze(["letter", "fleur"]),
+            LETTERS: Object.freeze(["none", "cardinal", "all"]),
+            // A new rose's radius, as a share of the map's shorter side (at scale 1), so it looks
+            // the same on a small map and a large one
+            RADIUS_SHARE: 0.09,
+            LETTER_SIZE: Object.freeze({ MIN: 0.1, MAX: 0.5, DEFAULT: 0.22 }),
+            // A new rose sits near the map's bottom right corner, this many radii in from the
+            // border's inset
+            CORNER_RADII: 1.35,
+            DEFAULTS: Object.freeze({
+                classic: Object.freeze({ points: 8, rings: 2, degreeRing: false, north: "letter", letters: "cardinal", fontFamily: "Cinzel", bold: true }),
+                mariner: Object.freeze({ points: 32, rings: 2, degreeRing: true, north: "fleur", letters: "cardinal", fontFamily: "IM Fell English", bold: false }),
+                arrow: Object.freeze({ points: 4, rings: 1, degreeRing: false, north: "letter", letters: "cardinal", fontFamily: "Josefin Sans", bold: true }),
+            }),
+            BACKING_OPACITY: 0.85,
+        }),
+        CARTOUCHE: Object.freeze({
+            DESIGNS: Object.freeze(["plaque", "ribbon", "frame"]),
+            TITLE_SOURCES: Object.freeze(["map", "custom"]),
+            // A new cartouche's title size, as a share of the map's shorter side, and its widest,
+            // as a share of the map's width
+            TITLE_SHARE: 0.035,
+            MAX_WIDTH: Object.freeze({ MIN: 0.1, MAX: 1, DEFAULT: 0.4 }),
+            SUBTITLE_SIZE: Object.freeze({ MIN: 0.2, MAX: 1, DEFAULT: 0.45 }),
+            // A new cartouche sits at the top centre, this many title sizes in from the border's
+            // inset
+            TOP_TITLES: 1.6,
+            // Each design's title face; the subtitle is in a book face, in italic (an engraved
+            // face has no lower case or italic, so a subtitle in it would read as capitals)
+            DEFAULTS: Object.freeze({
+                plaque: Object.freeze({ fontFamily: "Cinzel", bold: true }),
+                ribbon: Object.freeze({ fontFamily: "IM Fell English", bold: false }),
+                frame: Object.freeze({ fontFamily: "Cinzel Decorative", bold: false }),
+            }),
+            SUBTITLE_FONT: "EB Garamond",
+        }),
+        // Colour schemes: every colour of a decoration at once (a one-off choice, not a link)
+        SCHEMES: Object.freeze({
+            parchment: Object.freeze({ light: "#f3e9cf", dark: "#5b4630", line: "#3b2c1c", accent: "#b8892e", letter: "#3b2c1c", backing: "#f3e9cf", fill: "#f3e9cf", shade: "#d8c69c", text: "#3b2c1c" }),
+            seaChart: Object.freeze({ light: "#eef4f7", dark: "#2e5f8a", line: "#1e3a52", accent: "#c9a227", letter: "#1e3a52", backing: "#eef4f7", fill: "#eef4f7", shade: "#b9cfdd", text: "#1e3a52" }),
+            ink: Object.freeze({ light: "#fbfaf6", dark: "#1a1a1a", line: "#1a1a1a", accent: "#7a7a7a", letter: "#1a1a1a", backing: "#fbfaf6", fill: "#fbfaf6", shade: "#d6d4cc", text: "#1a1a1a" }),
+            slate: Object.freeze({ light: "#d9dde3", dark: "#3f4a5a", line: "#20262f", accent: "#8a96a8", letter: "#eef1f5", backing: "#2b323d", fill: "#2b323d", shade: "#4a5566", text: "#eef1f5" }),
+            crimson: Object.freeze({ light: "#f4e6d4", dark: "#8c1c1c", line: "#3a1010", accent: "#c9a227", letter: "#3a1010", backing: "#f4e6d4", fill: "#f4e6d4", shade: "#c99a8a", text: "#3a1010" }),
+        }),
+        DEFAULT_SCHEME: "parchment",
+    }),
+    // Random names for regions, pins and routes (see PlaceNames and RandomNames). A suggestion is
+    // drawn from a stream seeded by the map's seed, the item's id and its reroll count, so it stays
+    // the same until rerolled. Some suggestions add a word that fits the item (FORMS).
+    PLACE_NAMES: Object.freeze({
+        // Where an item's name came from (its saved `nameSource`)
+        SOURCES: Object.freeze(["default", "random", "typed", "generated"]),
+        // The share of suggestions that add a word fitting the item, when one fits
+        FORM_SHARE: 1 / 3,
+        // How a name is written for each kind of land, place or route ({name} is the proper name).
+        // A kind with several forms takes one by the item's stream; a kind with none is the name alone
+        FORMS: Object.freeze({
+            island: Object.freeze(["FILRODENSWMB.UI.NameFormIsle"]),
+            mountains: Object.freeze(["FILRODENSWMB.UI.NameFormMountains", "FILRODENSWMB.UI.NameFormHighlands"]),
+            hills: Object.freeze(["FILRODENSWMB.UI.NameFormHills", "FILRODENSWMB.UI.NameFormDowns"]),
+            coast: Object.freeze(["FILRODENSWMB.UI.NameFormCoast"]),
+            forest: Object.freeze(["FILRODENSWMB.UI.NameFormForest", "FILRODENSWMB.UI.NameFormWeald"]),
+            plains: Object.freeze(["FILRODENSWMB.UI.NameFormVale", "FILRODENSWMB.UI.NameFormPlains"]),
+            desert: Object.freeze(["FILRODENSWMB.UI.NameFormWastes"]),
+            tundra: Object.freeze(["FILRODENSWMB.UI.NameFormBarrens"]),
+            castle: Object.freeze(["FILRODENSWMB.UI.GeneratedCastleName", "FILRODENSWMB.UI.GeneratedKeepName", "FILRODENSWMB.UI.GeneratedHoldName", "FILRODENSWMB.UI.GeneratedTowerName"]),
+            port: Object.freeze(["FILRODENSWMB.UI.NameFormPort", "FILRODENSWMB.UI.NameFormHaven"]),
+            market: Object.freeze(["FILRODENSWMB.UI.NameFormMarketBefore", "FILRODENSWMB.UI.NameFormMarketAfter"]),
+            ruin: Object.freeze(["FILRODENSWMB.UI.NameFormOld"]),
+            road: Object.freeze(["FILRODENSWMB.UI.NameFormRoad", "FILRODENSWMB.UI.NameFormWay"]),
+            river: Object.freeze(["FILRODENSWMB.UI.NameFormReach"]),
+            sea: Object.freeze(["FILRODENSWMB.UI.NameFormCrossing", "FILRODENSWMB.UI.NameFormPassage"]),
+        }),
+        // A pin's kind of place, by its style's tier (or its generated tier); tiers not listed
+        // (capital, city, town, village...) are the name alone
+        SETTLEMENT_TIERS: Object.freeze({
+            castle: "castle",
+            abandonedCastle: "castle",
+            port: "port",
+            marketTown: "market",
+            ruin: "ruin",
+            ruinedCapital: "ruin",
+            ruinedCity: "ruin",
+            ruinedLargeTown: "ruin",
+            ruinedTown: "ruin",
+        }),
+        // The same for a pin with no style, by its icon
+        SETTLEMENT_ICONS: Object.freeze({ castle: "castle", fortress: "castle", anchor: "port", classical_building: "ruin" }),
+        // How a region's land is read for Geographic: shares of its land cells. An island region
+        // (land with no land beside it outside the region) comes first, then mountains, hills,
+        // a mostly coastal region, and last the land's commonest kind of biome
+        GEOGRAPHIC: Object.freeze({ MOUNTAINS: 0.25, HILLS: 0.4, COAST: 0.5, BIOME: 0.4, MIN_ISLAND_CELLS: 1 }),
+        // The biomes each land kind counts (see BIOME_IDS)
+        BIOME_KINDS: Object.freeze({
+            DECIDUOUS_FOREST: "forest",
+            TEMPERATE_RAINFOREST: "forest",
+            TAIGA: "forest",
+            TROPICAL_RAINFOREST: "forest",
+            GRASSLAND: "plains",
+            SAVANNA: "plains",
+            TEMPERATE_DESERT: "desert",
+            SUBTROPICAL_DESERT: "desert",
+            TUNDRA: "tundra",
+            SNOW: "tundra",
+        }),
+        // Tries for a name not already used (Name all), as the generator does
+        RETRIES: 12,
+        // What Name all can name, and which names it can replace (a typed name never)
+        NAME_ALL_KINDS: Object.freeze({ region: "FILRODENSWMB.UI.NameAllRegions", pin: "FILRODENSWMB.UI.NameAllPins", route: "FILRODENSWMB.UI.NameAllRoutes" }),
+        NAME_ALL_SOURCES: Object.freeze({ unnamed: "FILRODENSWMB.UI.NameAllUnnamed", random: "FILRODENSWMB.UI.NameAllRandom", default: "FILRODENSWMB.UI.NameAllDefault", generated: "FILRODENSWMB.UI.NameAllGenerated" }),
+    }),
+    // Natural features named by the Labels tool (see FeatureDetection and FeatureNames): the
+    // label style each group is named in, how each kind is written ({name} is the proper name),
+    // and the old Water style the family replaces
+    FEATURE_NAMES: Object.freeze({
+        STYLES: Object.freeze({
+            oceanSea: "label-style-ocean-sea",
+            gulfBayLake: "label-style-gulf-bay-lake",
+            river: "label-style-river",
+            mountains: "label-style-mountains",
+            hills: "label-style-hills",
+            land: "label-style-land",
+        }),
+        FORMS: Object.freeze({
+            ocean: Object.freeze(["FILRODENSWMB.UI.NameFormOcean"]),
+            sea: Object.freeze(["FILRODENSWMB.UI.NameFormSea", "FILRODENSWMB.UI.NameFormSeaOf"]),
+            gulf: Object.freeze(["FILRODENSWMB.UI.NameFormGulf"]),
+            bay: Object.freeze(["FILRODENSWMB.UI.NameFormBay"]),
+            lake: Object.freeze(["FILRODENSWMB.UI.NameFormLake"]),
+            mountains: Object.freeze(["FILRODENSWMB.UI.NameFormMountains"]),
+            hills: Object.freeze(["FILRODENSWMB.UI.NameFormHills"]),
+            highlands: Object.freeze(["FILRODENSWMB.UI.NameFormHighlands"]),
+            forest: Object.freeze(["FILRODENSWMB.UI.NameFormForest", "FILRODENSWMB.UI.NameFormWeald"]),
+            jungle: Object.freeze(["FILRODENSWMB.UI.NameFormJungle"]),
+            desert: Object.freeze(["FILRODENSWMB.UI.NameFormDesert"]),
+            steppe: Object.freeze(["FILRODENSWMB.UI.NameFormSteppe"]),
+            tundra: Object.freeze(["FILRODENSWMB.UI.NameFormBarrens"]),
+            plains: Object.freeze(["FILRODENSWMB.UI.NameFormPlains"]),
+            river: Object.freeze(["FILRODENSWMB.UI.NameFormRiver"]),
+        }),
+        RETIRED_STYLE: "label-style-water",
+        // A feature's name fitted inside it is turned at most this far (degrees): water less than land
+        MAX_ANGLE: Object.freeze({ water: 30, land: 60 }),
+        // How alike a feature found now and a label's must be (see FeatureDetection.matchFeatures)
+        MATCH: 0.5,
+        // The share of a character's height its width is, where the face cannot be measured, and
+        // the length of a river's name a river must have room for to be named
+        CHAR_RATIO: 0.55,
+        RIVER_NAME_CHARACTERS: 13,
+    }),
     PINS: {
         // The size new pins (and their labels) start with: small, so a map of many places stays readable
         DEFAULT_SCALE: 1.2,

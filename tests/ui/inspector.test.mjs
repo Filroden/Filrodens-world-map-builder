@@ -172,6 +172,14 @@ async function commit(app, name, value) {
     await settle();
 }
 
+/** Picks a radio button of a group by its value and commits it, as the reader would. */
+async function choose(app, name, value) {
+    const radio = form(app).querySelector(`input[type="radio"][name="${name}"][value="${value}"]`);
+    radio.checked = true;
+    radio.dispatchEvent(new window.Event("change", { bubbles: true }));
+    await settle();
+}
+
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 const steps = (app) => app.pinHistory.length;
 
@@ -561,6 +569,126 @@ test("a decoration's look applies one step each; a land mask's type shapes the l
     assert.deepEqual([app.landMasks[0].name, app.landMasks[0].operation, app.terrainUpdates, steps(app)], ["Isle of Mist", "subtract", 1, 4]);
 });
 
+test("Add decoration's Compass rose adds a rose with its defaults near the bottom right, as one undo step, and opens it", async () => {
+    const { app } = await studio();
+    Object.assign(app, { mapWidth: 1000, mapHeight: 800 });
+    const id = await DecorationEditor.add(app, "compass");
+    const rose = app.mapDecorations.at(-1);
+    assert.equal(rose.id, id);
+    assert.deepEqual([rose.kind, rose.design, rose.size, rose.points, rose.letters, rose.backing, rose.halo, rose.upright], ["compass", "classic", 72, 8, "cardinal", true, true, false]);
+    assert.equal(rose.name, "FILRODENSWMB.UI.DecorationKindCompass");
+    assert.ok(rose.x > 500 && rose.x < 1000 && rose.y > 400 && rose.y < 800, "near the bottom right corner");
+    assert.ok(!("src" in rose));
+    assert.equal(steps(app), 1);
+    assert.ok(Inspector.shows(app, "decoration", id));
+    VectorHistory.step(app, true);
+    assert.equal(app.mapDecorations.length, 1, "undo takes it away");
+});
+
+test("a compass rose's own fields apply one step each: a design brings its own shape and font, a scheme sets every colour at once, and a family without bold disables Bold", async () => {
+    const { app } = await studio();
+    Object.assign(app, { mapWidth: 1000, mapHeight: 800 });
+    // A host that also offers Marcellus SC, a family with no bold face
+    const list = platform.fonts.list;
+    platform.fonts.list = () => [...list(), "Marcellus SC"];
+    const id = await DecorationEditor.add(app, "compass");
+    const rose = () => app.mapDecorations.find((decoration) => decoration.id === id);
+    const form_ = form(app);
+    assert.equal(form_.querySelectorAll(".fwmb-design-thumb").length, 3, "a thumbnail of each design");
+    // The thumbnails hold numbers and checked colours only
+    for (const shape of form_.querySelectorAll(".fwmb-design-thumb circle, .fwmb-design-thumb path")) {
+        for (const attribute of shape.attributes) {
+            if (attribute.name === "d") assert.match(attribute.value, /^[MLCQZ0-9 .-]*$/);
+            else if (["fill", "stroke"].includes(attribute.name)) assert.match(attribute.value, /^(#[0-9a-f]{6}|none)$/i);
+            else if (attribute.name === "stroke-linejoin") assert.match(attribute.value, /^(round|miter)$/);
+            else assert.match(attribute.value, /^-?[0-9.]+$/, attribute.name);
+        }
+    }
+    let before = steps(app);
+
+    await choose(app, "compassDesign", "mariner");
+    assert.deepEqual([rose().design, rose().points, rose().north, rose().degreeRing, rose().fontFamily, rose().bold], ["mariner", 32, "fleur", true, "IM Fell English", false]);
+    assert.equal(steps(app), before + 1, "one step");
+
+    await commit(app, "compassPoints", "16");
+    await commit(app, "compassRings", "1");
+    await commit(app, "compassLetters", "all");
+    await commit(app, "compassUpright", true);
+    await commit(app, "compassLetterSize", "0.3");
+    assert.deepEqual([rose().points, rose().rings, rose().letters, rose().upright, rose().letterSize], [16, 1, "all", true, 0.3]);
+    assert.equal(steps(app), before + 6);
+
+    before = steps(app);
+    await commit(app, "compassScheme", "slate");
+    const slate = FILRODENSWMB.DECORATIONS.SCHEMES.slate;
+    assert.deepEqual(rose().colors, { light: slate.light, dark: slate.dark, line: slate.line, accent: slate.accent, letter: slate.letter, backing: slate.backing });
+    assert.equal(steps(app), before + 1, "a scheme is one step");
+    assert.equal(field(app, "compassScheme").value, "", "the scheme menu is ready for another choice");
+    await commit(app, "compassColorAccent", "#123456");
+    assert.equal(rose().colors.accent, "#123456");
+    await commit(app, "compassColorAccent", "#123456");
+    assert.equal(steps(app), before + 2, "the same colour again is no step");
+
+    await commit(app, "compassFont", "Marcellus SC");
+    assert.equal(rose().fontFamily, "Marcellus SC");
+    assert.equal(field(app, "compassBold").disabled, true, "a family without bold disables Bold");
+
+    await choose(app, "compassDesign", "arrow");
+    assert.ok(!field(app, "compassPoints") && !field(app, "compassDegreeRing"), "the north arrow has no points or degree ring");
+    assert.ok(!field(app, "compassColorAccent"), "nor an accent colour");
+    VectorHistory.step(app, true);
+    assert.equal(rose().design, "mariner", "undo brings the design back");
+    platform.fonts.list = list;
+});
+
+test("Add decoration's Cartouche adds a plaque at the top centre showing the map's name; its fields apply one step each, and a title too long to fit is reported", async () => {
+    const { app } = await studio();
+    Object.assign(app, { mapWidth: 1000, mapHeight: 800 });
+    const id = await DecorationEditor.add(app, "cartouche");
+    const panel = () => app.mapDecorations.find((decoration) => decoration.id === id);
+    assert.deepEqual([panel().kind, panel().design, panel().size, panel().titleSource, panel().fontFamily, panel().subtitleFontFamily, panel().subtitleItalic], ["cartouche", "plaque", 28, "map", "Cinzel", "EB Garamond", true]);
+    assert.equal(panel().x, 500, "centred");
+    assert.ok(panel().y < 400, "near the top");
+    assert.equal(steps(app), 1);
+    assert.ok(Inspector.shows(app, "decoration", id));
+    assert.equal(form(app).querySelectorAll(".fwmb-design-thumb--wide").length, 3, "a thumbnail of each design");
+    assert.ok(!field(app, "cartoucheTitle"), "no title field while it shows the map's name");
+    assert.ok(!field(app, "cartoucheSubtitleSize"), "no subtitle settings without a subtitle");
+    assert.ok(!field(app, "cartoucheColorShade"), "only the ribbon has a shade");
+    let before = steps(app);
+
+    await choose(app, "cartoucheDesign", "ribbon");
+    assert.deepEqual([panel().design, panel().fontFamily, panel().bold], ["ribbon", "IM Fell English", false], "a design brings its own face");
+    assert.ok(field(app, "cartoucheColorShade"), "the ribbon's tails have a shade");
+    assert.ok(!field(app, "cartoucheColorAccent"), "and it has no accent");
+
+    await commit(app, "cartoucheTitleSource", "custom");
+    await commit(app, "cartoucheTitle", "  The Kingdom of <b>Islemark</b>  ");
+    assert.equal(panel().title, "The Kingdom of <b>Islemark</b>", "plain text, trimmed");
+    await commit(app, "cartoucheSubtitle", "Drawn in the third age");
+    assert.ok(field(app, "cartoucheSubtitleSize") && field(app, "cartoucheSubtitleItalic"), "a subtitle brings its settings");
+    await commit(app, "cartoucheSubtitleItalic", false);
+    await commit(app, "cartoucheCapitals", true);
+    await commit(app, "cartoucheMaxWidth", "0.6");
+    assert.deepEqual([panel().subtitle, panel().subtitleItalic, panel().capitals, panel().maxWidth], ["Drawn in the third age", false, true, 0.6]);
+    assert.equal(steps(app), before + 7);
+
+    before = steps(app);
+    await commit(app, "cartoucheScheme", "crimson");
+    const crimson = FILRODENSWMB.DECORATIONS.SCHEMES.crimson;
+    assert.deepEqual(panel().colors, { fill: crimson.fill, line: crimson.line, accent: crimson.accent, shade: crimson.shade, text: crimson.text });
+    assert.equal(steps(app), before + 1, "a scheme is one step");
+    await commit(app, "cartoucheColorText", "#123456");
+    assert.equal(panel().colors.text, "#123456");
+
+    assert.ok(!form(app).querySelector(".fwmb-hint--warning"));
+    app.canvasEngine = { ...app.canvasEngine, isOverflowing: (which) => which === id };
+    await commit(app, "cartoucheMaxWidth", "0.1");
+    assert.ok(form(app).querySelector(".fwmb-hint--warning"), "a title that does not fit is reported");
+    VectorHistory.step(app, true);
+    assert.equal(panel().maxWidth, 0.6, "undo brings the width back");
+});
+
 test("a land mask on a guided map has its own coast settings: each follows the map until ticked, Sharp edge once one is, and Coast only shapes no land", async () => {
     const { app } = await studio();
     Object.assign(app.uiState, { generationEngine: "guided", terrainVersion: 3, coastlineFracture: 0.2, coastalPlain: 0.05, shelfRange: 0.15 });
@@ -823,4 +951,156 @@ test("Add makes a custom biome and opens it; Delete asks, removes it, closes the
     assert.equal(app.stale, 1, "it behaved like Taiga, so a run made with it is out of date");
     VectorHistory.step(app, true);
     assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [14, 15], "undo brings it back");
+});
+
+// ------------------------------------------------------------------ random names
+
+const { RandomNames } = await import("../../src/applications/RandomNames.js");
+const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
+const { RegionLists } = await import("../../src/applications/RegionLists.js");
+const { placeName } = await import("../../src/names/PlaceNames.js");
+
+/** Presses an inspector button by its action. */
+async function press(app, action) {
+    form(app).querySelector(`[data-inspector-action="${action}"]`).click();
+    await settle();
+    await settle();
+}
+
+test("Random name gives a new name each press, one undo step each, and undo puts back the name and where it came from", async () => {
+    const { app } = await studio();
+    app.uiState.mapSeed = "P0JBVA";
+    await RegionEditor.open(app, "realms", "west");
+    const region = () => app.regionLevels[0].regions.find((each) => each.id === "west");
+
+    await press(app, "randomName");
+    const first = region().name;
+    assert.notEqual(first, "West");
+    assert.deepEqual([region().nameSource, region().nameRoll, steps(app)], ["random", 0, 1]);
+    assert.equal(first, placeName({ mapSeed: "P0JBVA", itemId: "west", roll: 0, nameBase: FILRODENSWMB.GENERATOR.DEFAULT_NAME_BASE }), "the map's Name style with no run, from the item's own stream");
+    assert.equal(field(app, "regionName").value, first, "the field shows it at once");
+
+    await press(app, "randomName");
+    assert.notEqual(region().name, first, "each press rerolls");
+    assert.deepEqual([region().nameSource, region().nameRoll, steps(app)], ["random", 1, 2]);
+
+    await undo(app);
+    assert.deepEqual([region().name, region().nameSource, region().nameRoll], [first, "random", 0]);
+    await undo(app);
+    assert.equal(region().name, "West");
+    assert.ok(!("nameSource" in region()) && !("nameRoll" in region()), "the region is as it was");
+});
+
+test("a name typed in the inspector or a list's row is recorded as typed; a new item starts as default", async () => {
+    const { app } = await studio();
+    app.uiState.mapSeed = "seed";
+    const pin = app.mapPins[0];
+    await PinEditor.open(app, "keep");
+    await press(app, "randomName");
+    assert.equal(pin.nameSource, "random");
+    await commit(app, "pinName", "Hightower");
+    assert.equal(pin.nameSource, "typed");
+    assert.ok(!("nameRoll" in pin), "a typed name has no roll");
+    await undo(app);
+    assert.equal(app.mapPins[0].nameSource, "random", "undo puts back the source with the name");
+
+    RegionPanel.rename(app, "region:east", "Eastmarch");
+    assert.equal(app.regionLevels[0].regions[1].nameSource, "typed");
+
+    // A region named in its row: the name offered is a default one, a name of the reader's typed
+    await RegionLists.startNaming(app, "region", { levelId: "realms" });
+    const offered = app.regionNaming.value;
+    await RegionLists.confirm(app, offered);
+    assert.equal(app.regionLevels[0].regions.at(-1).nameSource, "default");
+    await RegionLists.startNaming(app, "region", { levelId: "realms" });
+    await RegionLists.confirm(app, "Marchlands");
+    assert.equal(app.regionLevels[0].regions.at(-1).nameSource, "typed");
+
+    const road = placeRoad(app);
+    assert.equal(road.nameSource, "default");
+});
+
+test("Name all names the kinds and names ticked, with names not used in their group, never a typed name; one undo step", async () => {
+    const { app } = await studio();
+    app.uiState.mapSeed = "seed";
+    const level = app.regionLevels[0];
+    // West and East: older hand-made names (typed). Then a default name, an unnamed region, a
+    // random one, a generated one and a generated one the reader edited
+    addRegion(level, { id: "dflt", name: "FILRODENSWMB.UI.NewRegionName 2" });
+    addRegion(level, { id: "none", name: "" });
+    addRegion(level, { id: "rand", name: "Oldname", nameSource: "random", nameRoll: 3 });
+    addRegion(level, { id: "made", name: "Ashford", generated: made() });
+    addRegion(level, { id: "kept", name: "Brookby", generated: { ...made(), edited: true } });
+    addRegion(level, { id: "mine", name: "Mine", nameSource: "typed" });
+    app.mapPins.push({ id: "town", name: "Ashby", x: 200, y: 100, icon: "map_pin", generated: made() }, { id: "src", name: "River Source", type: "spring", x: 1, y: 1 });
+    app.mapRoutes.push({ id: "road", name: "", transport: "road", waypoints: [], legs: [], generated: made() }, { id: "lane", name: "FILRODENSWMB.UI.NewRouteName 3", transport: "road", waypoints: [], legs: [] });
+
+    const count = (kinds, sources) => RandomNames.nameAllCount(app, { kinds, sources });
+    assert.equal(count(["region"], ["unnamed", "random"]), 2);
+    assert.equal(count(["region"], ["unnamed", "random", "default"]), 3);
+    assert.equal(count(["region"], ["unnamed", "random", "default", "generated"]), 4);
+    assert.equal(count(["pin", "route"], ["unnamed", "default", "generated"]), 3, "the town, the generated road and Route 3; never a river source");
+    assert.equal(count(["region", "pin", "route"], ["typed"]), 0, "a typed name is never offered");
+
+    assert.equal(RandomNames.nameAll(app, { kinds: ["region", "route"], sources: ["unnamed", "random", "default"] }), 5);
+    const byId = Object.fromEntries(app.regionLevels[0].regions.map((region) => [region.id, region]));
+    assert.equal(steps(app), 1);
+    for (const id of ["dflt", "none", "rand"]) assert.equal(byId[id].nameSource, "random", `${id} is named`);
+    assert.ok(byId.rand.nameRoll >= 4, "a random name is rerolled");
+    assert.deepEqual([byId.west.name, byId.east.name, byId.made.name, byId.kept.name, byId.mine.name], ["West", "East", "Ashford", "Brookby", "Mine"], "the rest are kept");
+    assert.equal(app.mapPins.find((pin) => pin.id === "town").name, "Ashby", "pins were not ticked");
+    assert.ok(app.mapRoutes.every((route) => route.nameSource === "random" && route.name));
+    assert.equal(app.mapRoutes[0].generated.edited, false, "a random name leaves a generated item for Generate again");
+    const names = app.regionLevels[0].regions.map((region) => region.name);
+    assert.equal(new Set(names).size, names.length, "no name used twice in the level");
+
+    await undo(app);
+    assert.deepEqual(app.regionLevels[0].regions.map((region) => region.name), ["West", "East", "FILRODENSWMB.UI.NewRegionName 2", "", "Oldname", "Ashford", "Brookby", "Mine"]);
+    assert.equal(app.mapRoutes[0].name, "");
+    assert.equal(RandomNames.sourceOf(byId.made), "generated");
+    assert.equal(RandomNames.sourceOf(byId.kept), "kept");
+});
+
+test("Random name on a generated item does not mark it edited, so Generate again still replaces it; typing does", async () => {
+    const { app } = await studio();
+    app.uiState.mapSeed = "seed";
+    const pin = app.mapPins[0];
+    pin.generated = made();
+    await PinEditor.open(app, "keep");
+    await press(app, "randomName");
+    assert.equal(pin.nameSource, "random");
+    assert.equal(pin.generated.edited, false);
+    await commit(app, "pinName", "Hightower");
+    assert.equal(pin.generated.edited, true);
+    assert.ok(!form(app).querySelector('[name="namingContext"]'), "no naming context to choose");
+});
+
+test("a random name is in the Name style its culture has now, not the one the run recorded", async () => {
+    const { encodeModelRun } = await import("../../src/generator/ModelRun.js");
+    const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
+    const { app, session } = await studio();
+    const mesh = session.mesh;
+    const count = mesh.modelCount;
+    const column = (fill) => new Float64Array(count).fill(fill);
+    // Every model cell held by the run's first culture, recorded in English
+    const run = encodeModelRun({
+        modelCells: { capacity: column(0), population: column(100), landArea: column(1), security: column(1), cleared: column(0), water: column(0), realm: column(-1), duchy: column(-1), county: column(-1), culture: column(0), shareStart: Int32Array.from({ length: count + 1 }, (_, index) => index), shareCulture: new Int32Array(count), shareValue: new Float32Array(count).fill(1) },
+        settings: resolveSettings({}, "SEED"),
+        cellCount: count,
+        cultures: [{ id: "cultureAAAAAAAAA", name: "Folk", nameBase: "English", homelands: [0] }],
+        stats: {},
+    }, "runAAAAAAAAAAAAA");
+    app.modelRun = JSON.parse(JSON.stringify(run));
+    app.uiState.mapSeed = "seed";
+    app.uiState.generatorSettings = { nameBase: "Nordic" };
+    const pin = { id: "plain", name: "Plain", x: 200, y: 150, icon: "map_pin", pinStyle: null };
+    const expect = (nameBase) => placeName({ mapSeed: "seed", itemId: "plain", roll: 2, nameBase });
+    const suggested = () => RandomNames.suggest(app, "pin", pin, {}, { roll: 2 });
+
+    app.uiState.cultures = [{ id: "cultureAAAAAAAAA", name: "Folk", nameBase: "Elven" }];
+    assert.equal(suggested(), expect("Elven"), "the culture's Name style as it is now");
+    app.uiState.cultures = [{ id: "cultureAAAAAAAAA", name: "Folk", nameBase: "Arabic" }];
+    assert.equal(suggested(), expect("Arabic"), "and again after it changes, with no Generate again");
+    app.uiState.cultures = [];
+    assert.equal(suggested(), expect("English"), "a culture since deleted keeps the run's record");
 });

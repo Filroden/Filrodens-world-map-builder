@@ -381,6 +381,7 @@ export class RouteTool {
         const transport = this.transport(app);
         return {
             name: uniqueName(platform.i18n.localize("FILRODENSWMB.UI.NewRouteName"), app.mapRoutes ?? []),
+            nameSource: "default",
             quickStyle: style?.id ?? "custom",
             color: line.color,
             thickness: line.thickness,

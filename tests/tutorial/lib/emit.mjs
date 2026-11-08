@@ -50,6 +50,13 @@ function startFrom(page, pages) {
 }
 
 /**
+ * A note at the top of every page while its pictures lag the module: the screenshots, checkpoint
+ * maps and video are kept from the version they were made with, so each matches the maps a reader
+ * downloads, and the steps say where a name in them has since changed. Empty when they are current.
+ */
+export const PICTURES_NOTE = "**Version 4.2.0:** the screenshots, the maps you can download and the video were made with version 4.1.0, so they don't show what 4.2.0 changed. The steps are the same; where a step names something 4.2.0 changed, it says so.";
+
+/**
  * The wiki page.
  *
  * @param {object} page - The step file's page.
@@ -65,6 +72,7 @@ export function wikiMarkdown(page, pages, source) {
     lines.push("", `> Part of the tutorial: page ${page.number} of ${Math.max(TUTORIAL_LENGTH, pages.length)}`);
     const chapter = videoChapter(page.number);
     if (chapter) lines.push(">", `> ▶ **Watch this page:** [part ${page.number} of the tutorial video](${chapter.url}) (about ${chapter.minutes} min), with narration and subtitles.`);
+    if (PICTURES_NOTE) lines.push(">", `> ${PICTURES_NOTE}`);
     lines.push("");
     lines.push(`# Tutorial ${page.number}: ${page.title}`, "");
     lines.push(page.goal, "");

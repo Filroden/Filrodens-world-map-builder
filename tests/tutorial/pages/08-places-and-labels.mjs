@@ -108,7 +108,7 @@ Every name on the map is a **label**: the labels of pins, routes and regions fol
             ],
             screenshot: { name: "sea", region: { map: SEA_VIEW }, mapOnly: true },
             caption: "The Morning Sea, in the Water label style.",
-            note: "While you hold a label in Place mode, scroll to turn it and Shift+Scroll to resize it. To make every sea name look alike, give them all the Water style and change the style.",
+            note: "**In version 4.2.0:** a map started in 4.2.0 has no **Water** style, since the geographic styles replace it: choose **Ocean and sea** instead. The map you can download for this page still has Water. (Labels also has **Name natural features**, which names the map's seas, mountains, forests and rivers for you; see [[Labels]].)\n\nWhile you hold a label in Place mode, scroll to turn it and Shift+Scroll to resize it. To make every sea name look alike, give them all the Water style and change the style.",
             narration: "Open Labels, choose Place and the Water style, and click the open sea. Call it The Morning Sea, and turn it to follow the channel.",
             pause: 4,
         },

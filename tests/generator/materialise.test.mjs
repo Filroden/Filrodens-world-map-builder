@@ -58,6 +58,7 @@ test("the political set has three nested levels with the run's units, named with
     assert.ok(realms.regions.every((region) => region.generated?.run === "run" && region.generated.kind === "realm"));
     assert.deepEqual(duchies.regions.map((region) => region.name), result.duchies.map((duchy) => duchy.name), "a duchy's bare name: its level's look shows its rank");
     assert.equal(duchies.titleTemplate, MATERIALISE_NAMES.titles.duchy, "the title is kept on the level");
+    assert.ok(made.set.levels.every((level) => level.regions.every((region) => region.nameSource === "generated")), "Generate records where the names came from");
 });
 
 test("every child cell lies inside its region's parent, and the realms claim their waters", async () => {
@@ -133,6 +134,7 @@ test("routes join their waypoints with contiguous legs, carry class and transpor
         });
         assert.equal(route.quickStyle, FILRODENSWMB.GENERATOR.ROUTE_STYLES[route.transport][route.class]);
         assert.equal(route.generated.run, "run");
+        assert.equal(route.nameSource, "generated");
     }
     assert.ok(straight <= made.routes.length * 0.05, `${straight} straight steps`);
 });
@@ -146,6 +148,7 @@ test("every place has one pin on its tier's style, its name left to its style's 
         assert.equal(pin.generated.tier, placeTier(place));
         assert.equal(pin.generated.sourceId, index);
         assert.equal(pin.generated.edited, false);
+        assert.equal(pin.nameSource, "generated");
         assert.notEqual(pin.label.visibility, "none");
     });
     const castle = made.pins.find((pin) => pin.generated.kind === "castle");

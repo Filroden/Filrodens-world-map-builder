@@ -21,5 +21,9 @@
     "FILRODENSWMB.UI.MapUnitHint": "The name of the unit every distance on this map is shown in: the scale bar, territorial waters, the thematic layers and the line below. The module measures distances in kilometres and shows the number with this name, so the figures are true kilometres whatever the unit is called. Change it to give the unit your world's own name.",
     "FILRODENSWMB.UI.ThematicCultureHint": "The culture most of the people belong to in the last generator run, in its colour. The colour is paler where several peoples live together.",
     "FILRODENSWMB.UI.ThematicTradeHint": "The trade the last generator run carried, along its roads, rivers and sea lanes: the wider the line, the busier the route. It can be shown on its own or beside a colour layer.",
-    "FILRODENSWMB.UI.TravelStartHint": "Click the map to choose where the journey starts; a click on a place starts there. The land is then coloured by the days it takes to reach, with a line at the edge of each band, and the quickest way to the pointer is drawn with its time."
+    "FILRODENSWMB.UI.TravelStartHint": "Click the map to choose where the journey starts; a click on a place starts there. The land is then coloured by the days it takes to reach, with a line at the edge of each band, and the quickest way to the pointer is drawn with its time.",
+    "FILRODENSWMB.UI.CompassColors": "Colours",
+    "FILRODENSWMB.UI.ColorScheme": "Colour scheme",
+    "FILRODENSWMB.UI.ColorSchemeHint": "Sets all of the decoration's colours at once. You can still change each colour afterwards.",
+    "FILRODENSWMB.UI.CompassHaloHint": "An outline in the backing's colour around each letter, so letters outside the disc read over the map."
 }

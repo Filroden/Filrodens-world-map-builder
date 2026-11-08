@@ -45,6 +45,7 @@ export function buildRoutes(session, result, { runId, idFactory, styleFor, style
         const style = styleFor(chain.transport, chain.class);
         routes.push(createRoute({
             name: "",
+            nameSource: "generated",
             mode: "terrain",
             transport: chain.transport,
             class: chain.class,

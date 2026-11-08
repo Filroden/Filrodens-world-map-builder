@@ -27,6 +27,8 @@ import { ParentRunRecovery } from "./ParentRunRecovery.js";
 import { RiverRelay } from "./RiverRelay.js";
 import { RunCells } from "./RunCells.js";
 import { Infilling } from "./Infilling.js";
+import { RandomNames } from "./RandomNames.js";
+import { FeatureNames } from "./FeatureNames.js";
 import { InfillInput } from "./InfillInput.js";
 import { TerrainVersion } from "../tools/TerrainVersion.js";
 import { FaultThickness } from "../tools/FaultThickness.js";
@@ -86,7 +88,9 @@ import { refreshWaterRoutesOnce } from "../data/WaterRouteStyles.js";
 import { showNamesOnce } from "../data/NameLevels.js";
 import { SymbolScale } from "../tools/SymbolScale.js";
 import { nameInset } from "../canvas/MapBorder.js";
+import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
 import { ExportScale } from "../tools/ExportScale.js";
+import { ImageFormat } from "../tools/ImageFormat.js";
 
 // Turns a fraction into a percentage for the timing summary
 const PERCENT = 100;
@@ -119,6 +123,10 @@ const TEMPLATE_ROOT = "modules/filrodens-world-map-builder/templates/";
  *   FEATURES        - generateFeatures: the rivers, then the canvas.
  */
 const REFRESH = Object.freeze({ TERRAIN: "terrain", CHANGED_TERRAIN: "changedTerrain", CLIMATE: "climate", FEATURES: "features" });
+
+/** The icon and name of each kind of decoration in the Decorations list (no kind: an image). */
+const DECORATION_ICONS = Object.freeze({ image: "image", compass: "explore", cartouche: "insert-text" });
+const DECORATION_LABELS = Object.freeze({ image: "FILRODENSWMB.UI.DecorationKindImage", compass: "FILRODENSWMB.UI.DecorationKindCompass", cartouche: "FILRODENSWMB.UI.DecorationKindCartouche" });
 
 /**
  * The map studio: its state, its regions (the toolbar, the context panel, the map and the edit
@@ -188,7 +196,8 @@ export class MapStudio {
         editCustomBiome(e, t)   { if (!MapStudio.#fromRowControl(e, t)) BiomeEditor.open(this, MapStudio.#rowId(t), MapStudio.#FROM_LIST); },
         deleteCustomBiome(_e, t) { BiomeEditor.delete(this, MapStudio.#rowId(t)); },
         openBiomeRuleEditor(e, t) { MapDialogManager.onOpenBiomeRuleEditor(this, e, t); },
-        addDecoration(e, t)     { MapDialogManager.onAddDecoration(this, e, t); },
+        // Add decoration's menu: an image of the user's (a dialogue) or one the module draws
+        addDecoration(e, t)     { if (DrawnDecoration.canCreate(t.dataset.kind)) DecorationEditor.add(this, t.dataset.kind); else MapDialogManager.onAddDecoration(this, e, t); },
 
         // --- REGIONS PANEL: the cascading lists of sets and levels (see RegionPanel, RegionLists) ---
         // A row opens in the inspector when clicked anywhere but its own controls; every list ends
@@ -291,6 +300,8 @@ export class MapStudio {
         resetTravelSpeeds()             { TravelView.resetSpeeds(this); },
         clearTravelStart()              { TravelView.clearStart(this); },
         fillIn()                        { Infilling.run(this); },
+        nameAll()                       { RandomNames.openNameAll(this); },
+        nameFeatures()                  { FeatureNames.run(this); },
         toggleLabelOverlaps()           { this.#toggleLabelOverlaps(); },
         setSymbolSize(_e, t)            { this.#setSymbolSize(t.dataset.symbolSize); },
         toggleContentRow(_e, t)         { this.#toggleContentRow(t); },
@@ -681,6 +692,8 @@ export class MapStudio {
         if (name === this.#saveName) return;
         this.#saveName = name;
         this.#showTitle();
+        // A cartouche showing the map's name follows it
+        this.canvasEngine?.setMapName?.(name);
     }
 
     /** Whether the open map has changes that are not saved. */
@@ -1293,8 +1306,12 @@ export class MapStudio {
                 context.pinList = await this.#listContext("pin", context);
                 context.routeList = await this.#listContext("route", context);
             }
-            if (this.activeTool === "labels") context.labelList = await this.#listContext("label", context);
-            context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort);
+            if (this.activeTool === "labels") {
+                context.labelList = await this.#listContext("label", context);
+                context.featureReport = FeatureNames.lastReport(this);
+            }
+            // Each row shows what kind of decoration it is: an image of the user's, or one the module draws
+            context.mapDecorations = [...(this.mapDecorations || [])].sort(alphaSort).map((decoration) => ({ ...decoration, kindIcon: DECORATION_ICONS[decoration.kind] ?? DECORATION_ICONS.image, kindLabel: DECORATION_LABELS[decoration.kind] ?? DECORATION_LABELS.image }));
             const { ADD: landColor, SUBTRACT: oceanColor, COAST: coastColor } = FILRODENSWMB.DISPLAY.LAND_MASK_COLORS;
             // In their own order, not by name: later masks lie on top (see ListReorder)
             context.landMasks = [...(this.landMasks || [])].map((m) => {
@@ -1395,7 +1412,7 @@ export class MapStudio {
     /** The kinds the pin, route and label lists can be narrowed to (value to localisation key). */
     static #PIN_KINDS = Object.freeze({ ...Object.fromEntries(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style.name])), other: "FILRODENSWMB.UI.ListKindOther" });
     static #ROUTE_KINDS = Object.freeze({ road: "FILRODENSWMB.UI.TransportRoad", river: "FILRODENSWMB.UI.TransportRiver", sea: "FILRODENSWMB.UI.TransportSea" });
-    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region", noRoom: "FILRODENSWMB.UI.LabelFilter_noRoom" });
+    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region", feature: "FILRODENSWMB.UI.LabelFilter_feature", noRoom: "FILRODENSWMB.UI.LabelFilter_noRoom" });
 
     /**
      * Each long list's kinds, rows template, and the fields of a row its template shows (a row's
@@ -1440,16 +1457,20 @@ export class MapStudio {
         return this.#labelRows(selected).sort(byName);
     }
 
-    /** The Labels list's rows: every label with a name, each with what it belongs to as its meta. */
+    /**
+     * The Labels list's rows: every label with a name, each with what it belongs to as its meta. A
+     * natural feature's name is a standalone label also found by Of natural features, and made by
+     * the map (see FeatureNames.listRowFields).
+     */
     #labelRows(selected) {
         const owner = (key) => platform.i18n.localize(key);
         const named = (item) => !!item.name;
         const ownerMeta = { pin: owner("FILRODENSWMB.UI.InspectorOwnerPin"), route: owner("FILRODENSWMB.UI.InspectorOwnerRoute") };
         // A name the map had no room for at its last draw is marked, and found with the No room filter
         const withoutRoom = this.canvasEngine?.labelsWithoutRoom ?? new Set();
-        const marked = (row) => (withoutRoom.has(`${row.type}:${row.id}`) ? { ...row, noRoom: true, also: ["noRoom"] } : row);
+        const marked = (row) => (withoutRoom.has(`${row.type}:${row.id}`) ? { ...row, noRoom: true, also: [...(row.also ?? []), "noRoom"] } : row);
         return [
-            ...(this.mapLabels || []).filter(named).map((label) => ({ id: label.id, name: label.name, type: "custom", kind: "custom", generated: false, labelKey: "labelcustom", standalone: true, visibility: label.visibility ?? "all", massEditSelected: selected.has(label.id) })),
+            ...(this.mapLabels || []).filter(named).map((label) => ({ id: label.id, name: label.name, type: "custom", kind: "custom", ...FeatureNames.listRowFields(label), labelKey: "labelcustom", standalone: true, visibility: label.visibility ?? "all", massEditSelected: selected.has(label.id) })),
             ...(this.mapPins || []).filter((pin) => !!pin.icon && named(pin)).map((pin) => ({ id: pin.id, name: pin.name, type: "pin", kind: "pin", generated: !!pin.generated, labelKey: "labelpin", meta: ownerMeta.pin, visibility: pin.label?.visibility ?? "all" })),
             ...(this.mapRoutes || []).filter(named).map((route) => ({ id: route.id, name: route.name, type: "route", kind: "route", generated: !!route.generated, labelKey: "labelroute", meta: ownerMeta.route, visibility: route.label?.visibility ?? "all" })),
             ...this.regionLevels.flatMap((level) =>
@@ -1483,10 +1504,14 @@ export class MapStudio {
         return !!control && control !== row && row.contains(control);
     }
 
-    /** The fields of every label on the map: standalone labels, and the labels of pins, routes and regions. */
+    /**
+     * The fields of every label on the map: standalone labels, the labels of pins, routes and
+     * regions, and the faces of the decorations the module draws (their letters and titles).
+     */
     #labelFields(levels = this.regionLevels) {
         const owned = [...this.mapPins, ...this.mapRoutes, ...(levels ?? []).flatMap((level) => level.regions ?? [])].map((owner) => owner.label ?? {});
-        return [...this.mapLabels, ...owned];
+        const decorations = (this.mapDecorations ?? []).flatMap((decoration) => DrawnDecoration.faces(decoration));
+        return [...this.mapLabels, ...owned, ...decorations];
     }
 
     /**
@@ -1730,6 +1755,7 @@ export class MapStudio {
         this.canvasEngine.onCropRelease = (cropBox) => this.#snapCrop(cropBox);
         this.canvasEngine.onLabelsPlaced = (withoutRoom) => this.#labelsPlaced(withoutRoom);
         this.canvasEngine.setLabelOverlapAvoidance(this.uiState.avoidLabelOverlaps);
+        this.canvasEngine.setMapName(this.#saveName);
     }
 
     /** The names with no room at the last draw (see LabelLayout), as a key that changes when they do. */
@@ -2814,7 +2840,9 @@ export class MapStudio {
         // A region's label is drawn on the labels layer, which the drag itself does not redraw
         // outside the Labels tool (see #handleInfraDrag). A label not yet placed sits at its
         // region's centre, so redrawing once on release brings it to the region's new centre.
-        if (this.activeTool === "regions") this._repaintVectors();
+        // Likewise a decoration moved, turned or resized in the Cartography tool: names keep clear
+        // of where it now is once it is let go.
+        if (this.activeTool === "regions" || this.activeTool === "cartography") this._repaintVectors();
 
         this.view?.render(["context"]);
         this.markDirty();
@@ -3681,22 +3709,22 @@ export class MapStudio {
         TravelView.render(this);
         TravelView.readout(this, null, null);
 
-        // 4. Render Labels
+        // 4. Render Cartography, before the labels, which keep clear of its decorations and scale bar
+        const isCartographyEdit = this.activeTool === "cartography" && isEditModeActive;
+        if (this.canvasEngine.renderCartography) {
+            this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit, this.mapDecorations);
+        }
+
+        // 5. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
         this.canvasEngine.renderLabels(this.mapLabels, shownPins, shownRoutes, isLabelEdit, past ? past.session : this.meshSession);
 
-        // 5. Render Land Masks
+        // 6. Render Land Masks
         if (this.canvasEngine.renderLandMasks) {
             // Visible if in Guided Mode and on the Scene Tool, regardless of Edit Mode
             const isGuidedScene = this.uiState.generationEngine === "guided" && this.activeTool === "scene";
 
             this.canvasEngine.renderLandMasks(this.landMasks, isEditModeActive && !picking, this.activeLandMaskId, isGuidedScene);
-        }
-
-        // 6. Render Cartography
-        const isCartographyEdit = this.activeTool === "cartography" && isEditModeActive;
-        if (this.canvasEngine.renderCartography) {
-            this.canvasEngine.renderCartography(this.uiState, this.mapWidth, this.mapHeight, isCartographyEdit, this.mapDecorations);
         }
 
         // 7. The Labels and Regions menus follow the map's styles and levels
@@ -4224,6 +4252,8 @@ export class MapStudio {
         this.landMasks = payload.landMasks || [];
         this.mapLabels = payload.mapLabels || [];
         this.mapDecorations = payload.mapDecorations || [];
+        // The last Name natural features report was the map before's
+        FeatureNames.forget(this);
 
         // Label widths saved in pixels (before widths were measured in characters) become
         // characters, rounded up so no label wraps earlier than before (see LabelWidth). The map
@@ -4388,6 +4418,7 @@ export class MapStudio {
         const pin = {
             id: platform.utils.randomID(),
             name: style?.name ?? getPinIconLabel(icon),
+            nameSource: "default",
             icon,
             x,
             y,
@@ -5257,6 +5288,7 @@ export class MapStudio {
 
         this.mapLabels = [];
         this.mapDecorations = [];
+        FeatureNames.forget(this);
         this.pinHistory = [];
         this.pinRedoStack = [];
         this.globalHistoryLedger = [];
@@ -5450,34 +5482,96 @@ export class MapStudio {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.ExportNoMap"));
             return;
         }
-        const scale = await this.#chooseExportScale();
-        if (!scale) return;
+        const choice = await this.#chooseImageExport();
+        if (!choice) return;
+        const { scale, format } = choice;
 
         const mapName = TravelView.exportName(this, HistoryView.exportName(this, this.currentSaveName || platform.i18n.localize("FILRODENSWMB.UI.UnsavedMapName")));
         platform.notify.info(platform.i18n.format("FILRODENSWMB.UI.ExportPngStarted", { name: mapName }));
         await this.#startProcessing(platform.i18n.localize("FILRODENSWMB.UI.ExportingPng"));
         try {
             await this.#labelFacesReady();
-            await this.canvasEngine.exportToPNG(mapName, scale);
+            await this.canvasEngine.exportToPNG(mapName, scale, format);
         } finally {
             this.#endProcessing();
         }
     }
 
     /**
-     * Asks for the PNG's scale (see #exportScales). Resolves with the scale, or null when cancelled.
-     * @returns {Promise<number|null>}
+     * Asks for the image's scale (see #exportScales) and format (see #exportFormats). Resolves
+     * with both, or null when cancelled. The format chosen is remembered for the next export.
+     * @returns {Promise<{scale: number, format: string}|null>}
      */
-    async #chooseExportScale() {
+    async #chooseImageExport() {
         const { plan, options, reason } = this.#exportScales();
-        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-png.hbs", { options, reason });
+        const formats = await this.#exportFormats("png");
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-png.hbs", { options, reason, formats });
         const chosen = await platform.dialogs.prompt({
             classes: ["fwmb"],
             title: platform.i18n.localize("FILRODENSWMB.UI.ExportPNG"),
             content,
-            onSubmit: (form) => Number(form.elements.exportScale.value),
+            onRender: (element) => this.#estimateFormatSizes(element),
+            onSubmit: (form) => ({ scale: Number(form.elements.exportScale.value), format: form.elements.exportFormat.value }),
         });
-        return MapStudio.#allowedScale(plan, chosen);
+        const scale = MapStudio.#allowedScale(plan, chosen?.scale);
+        if (!scale) return null;
+        const format = formats.some((each) => each.id === chosen.format) ? chosen.format : FILRODENSWMB.EXPORT_FORMATS.DEFAULT;
+        await ImageFormat.remember("png", format);
+        return { scale, format };
+    }
+
+    /**
+     * The image formats an export offers (see ImageFormat): those this browser can write, the
+     * one last chosen for this kind of export selected.
+     * @param {"png"|"scene"} kind
+     * @returns {Promise<{id: string, label: string, selected: boolean}[]>}
+     */
+    async #exportFormats(kind) {
+        const available = await ImageFormat.available();
+        const chosen = ImageFormat.remembered(kind, available);
+        return available.map((id) => ({ id, label: platform.i18n.localize(ImageFormat.byId(id).label), selected: id === chosen }));
+    }
+
+    /**
+     * Shows each format's estimated file size beside its name in an export dialogue, worked out
+     * again when the scale changes (see StudioCanvas.exportSamples and ImageFormat.estimate). Each
+     * scale's sizes are kept while the dialogue is open; a slower answer for a scale no longer
+     * chosen is ignored.
+     * @param {HTMLElement} element - The dialogue.
+     * @param {object} [options]
+     * @param {boolean} [options.forScene]
+     */
+    #estimateFormatSizes(element, { forScene = false } = {}) {
+        const scaleField = element.querySelector('[name="exportScale"]');
+        const formatField = element.querySelector('[name="exportFormat"]');
+        if (!scaleField || !formatField || !this.canvasEngine?.exportSamples) return;
+        const label = (option) => option.dataset.label ?? option.textContent;
+        for (const option of formatField.options) option.dataset.label = option.textContent.trim();
+        const known = new Map();
+        let asked = 0;
+        const show = (sizes) => {
+            for (const option of formatField.options) {
+                option.textContent = sizes ? platform.i18n.format("FILRODENSWMB.UI.ExportFormatOption", { format: label(option), size: ImageFormat.sizeText(sizes[option.value] ?? 0) }) : platform.i18n.format("FILRODENSWMB.UI.ExportFormatEstimating", { format: label(option) });
+            }
+        };
+        const update = async () => {
+            const turn = ++asked;
+            const scale = Number(scaleField.value);
+            show(known.get(scale) ?? null);
+            if (known.has(scale)) return;
+            // Drawn after the dialogue has shown, so opening it is never held up
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            try {
+                const { tiles, pixels } = this.canvasEngine.exportSamples(scale, { forScene });
+                known.set(scale, await ImageFormat.estimate(tiles, pixels, [...formatField.options].map((option) => option.value)));
+            } catch (error) {
+                console.warn("FWMB | Export size estimate failed", error);
+                return;
+            }
+            if (turn === asked && element.isConnected) show(known.get(scale));
+        };
+        scaleField.addEventListener("change", update);
+        update();
     }
 
     /** The scale chosen, if the plan allows it; null otherwise (a cancelled dialogue included). */
@@ -5526,13 +5620,16 @@ export class MapStudio {
         const defaultFolder = "fwmb-exports";
 
         const scales = this.#exportScales({ forScene: true });
-        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder, options: scales.options, reason: scales.reason });
+        const formats = await this.#exportFormats("scene");
+        const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/export-scene.hbs", { defaultName, defaultFolder, options: scales.options, reason: scales.reason, formats });
 
         const config = await platform.dialogs.prompt({
             classes: ["fwmb"],
             title: platform.i18n.localize("FILRODENSWMB.UI.ExportScene"),
             content: content,
+            onRender: (element) => this.#estimateFormatSizes(element, { forScene: true }),
             onSubmit: (form) => ({
+                format: formats.some((each) => each.id === form.elements.exportFormat?.value) ? form.elements.exportFormat.value : FILRODENSWMB.EXPORT_FORMATS.DEFAULT,
                 sceneName: form.elements["sceneName"].value.trim() || defaultName,
                 exportFolder: form.elements["exportFolder"].value.trim() || defaultFolder,
                 generateJournals: form.elements["generateJournals"].checked,
@@ -5543,6 +5640,7 @@ export class MapStudio {
         });
 
         if (!config) return; // User cancelled
+        await ImageFormat.remember("scene", config.format);
 
         // The user has confirmed. Hand off to the background processing pipeline.
         this.#executeSceneExportPipeline(config);
@@ -5577,7 +5675,7 @@ export class MapStudio {
             // YIELD to the browser so the newly created PIXI SVG Sprites can upload to the GPU
             await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
 
-            const playerBlob = await this.canvasEngine.extractCanvasBlob("player", config.scale);
+            const playerBlob = await this.canvasEngine.extractCanvasBlob("player", config.scale, config.format);
 
             // --- 2. GM OVERLAY PASS ---
             let gmBlob = null;
@@ -5590,7 +5688,7 @@ export class MapStudio {
                 // YIELD again for the new GM sprites
                 await new Promise((resolve) => activeWindow.setTimeout(resolve, 250));
 
-                gmBlob = await this.canvasEngine.extractCanvasBlob("gm", config.scale);
+                gmBlob = await this.canvasEngine.extractCanvasBlob("gm", config.scale, config.format);
             }
 
             if (textEl) textEl.textContent = platform.i18n.localize("FILRODENSWMB.UI.ExportStepScene");

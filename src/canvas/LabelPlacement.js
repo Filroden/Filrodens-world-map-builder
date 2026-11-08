@@ -114,7 +114,9 @@ class BoxGrid {
  * @property {string} id - Unique among the labels.
  * @property {number} w - The label's width, in map pixels.
  * @property {number} h - The label's height, in map pixels.
- * @property {{x: number, y: number, cost: number}[]} candidates - Its possible centres, best first.
+ * @property {{x: number, y: number, cost: number, w?: number, h?: number, rotation?: number}[]} candidates - Its
+ *     possible centres, best first. A candidate turned its own way (a river's name along each stretch)
+ *     gives its own box (`w`, `h`) and `rotation` (degrees), which its position carries back.
  * @property {number} weight - How much dropping it costs (a more important label weighs more).
  * @property {boolean} [mustShow] - Never dropped (a realm's name).
  * @property {string} [beside] - The id of a fixed box it may touch (a pin's name, its own pin's icon).
@@ -161,11 +163,16 @@ function byCost(label) {
     return [...label.candidates.keys()].sort((a, b) => label.candidates[a].cost - label.candidates[b].cost || a - b);
 }
 
+/** A label's box at one of its candidates (the candidate's own size, when it is turned its own way). */
+function boxOf(label, candidate) {
+    return { x: candidate.x, y: candidate.y, w: candidate.w ?? label.w, h: candidate.h ?? label.h };
+}
+
 /** A label's entry in a result: its choice, where that puts it, and its key. */
 function entryOf(label, index) {
     const candidate = label.candidates[index];
-    const box = candidate ? { x: candidate.x, y: candidate.y, w: label.w, h: label.h } : null;
-    return { index: candidate ? index : -1, x: candidate?.x, y: candidate?.y, box, key: label.key };
+    const box = candidate ? boxOf(label, candidate) : null;
+    return { index: candidate ? index : -1, x: candidate?.x, y: candidate?.y, rotation: candidate?.rotation, box, key: label.key };
 }
 
 /** What placing gave: each label's chosen candidate (or -1, dropped). */
@@ -187,7 +194,8 @@ export class PlacementResult {
     /** Where a label goes, or null when it was dropped (or is not one of the labels placed). */
     position(id) {
         const entry = this.chosen.get(id);
-        return entry && entry.index >= 0 ? { x: entry.x, y: entry.y } : null;
+        if (!entry || entry.index < 0) return null;
+        return entry.rotation === undefined ? { x: entry.x, y: entry.y } : { x: entry.x, y: entry.y, rotation: entry.rotation };
     }
 
     /** This result again, for labels whose candidates are the same (their positions recomputed from them). */
@@ -242,8 +250,7 @@ class PlacementState {
 
     #box(index, choice = this.#choice[index]) {
         const label = this.#labels[index];
-        const candidate = label.candidates[choice];
-        return { x: candidate.x, y: candidate.y, w: label.w, h: label.h };
+        return boxOf(label, label.candidates[choice]);
     }
 
     #place(index, choice) {
@@ -429,10 +436,11 @@ class PlacementState {
         let x1 = -Infinity;
         let y1 = -Infinity;
         for (const candidate of label.candidates) {
-            x0 = Math.min(x0, candidate.x - label.w / 2);
-            x1 = Math.max(x1, candidate.x + label.w / 2);
-            y0 = Math.min(y0, candidate.y - label.h / 2);
-            y1 = Math.max(y1, candidate.y + label.h / 2);
+            const box = boxOf(label, candidate);
+            x0 = Math.min(x0, box.x - box.w / 2);
+            x1 = Math.max(x1, box.x + box.w / 2);
+            y0 = Math.min(y0, box.y - box.h / 2);
+            y1 = Math.max(y1, box.y + box.h / 2);
         }
         return { x: (x0 + x1) / 2, y: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 };
     }

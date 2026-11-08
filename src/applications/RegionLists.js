@@ -38,6 +38,8 @@ export class RegionLists {
         if (kind === "set") naming.value = RegionPanel.suggestedName(app, "set");
         if (kind === "region") {
             naming.value = RegionPanel.suggestedName(app, "region", { levelId });
+            // The name offered, so a name accepted as it is counts as the default (see RandomNames)
+            naming.suggested = naming.value;
             naming.swatch = this.#nextSwatch(app, RegionPanel.objectOf(app, `level:${levelId}`));
         }
         app.regionNaming = naming;
@@ -109,7 +111,7 @@ export class RegionLists {
                 break;
             }
             case "region": {
-                const region = RegionPanel.createRegion(app, naming.levelId, name, naming.parentId);
+                const region = RegionPanel.createRegion(app, naming.levelId, name, naming.parentId, name === naming.suggested ? "default" : "typed");
                 if (!region) break;
                 key = `region:${region.id}`;
                 await RegionEditor.open(app, region.levelId, region.id, { created: true });

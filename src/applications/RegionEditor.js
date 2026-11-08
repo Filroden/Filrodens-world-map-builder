@@ -10,6 +10,7 @@ import { typed } from "../data/MapRules.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
 import { FillMemory } from "./FillMemory.js";
+import { RandomNames } from "./RandomNames.js";
 
 /** The fill patterns a region can have, with their names. */
 const PATTERNS = Object.freeze({ solid: "FILRODENSWMB.UI.StyleSolid", diagonal: "FILRODENSWMB.UI.StyleDiagonalHatch", crosshatch: "FILRODENSWMB.UI.StyleCrossHatch" });
@@ -56,6 +57,7 @@ export class RegionEditor {
         apply: (app, region, ref, form, field) => RegionEditor.#apply(app, region, form, field),
         actions: {
             lock: (app, region) => GeneratedEdits.toggleLock(app, region),
+            randomName: (app, region, ref) => RandomNames.press(app, "region", region, ref),
             zoom: (app, region) => {
                 const points = MeshIntegration.outlinePoints(app, region);
                 if (points.length) app.canvasEngine?.zoomToFeature(points);
@@ -120,6 +122,7 @@ export class RegionEditor {
         MapStateManager.pushVectorState(app);
         GeneratedEdits.markIfSubstantive(region, field);
         const { label, ...fields } = values;
+        if (fields.name !== region.name) RandomNames.markTyped(region);
         Object.assign(region, fields);
         region.label = { ...region.label, ...label };
         this.#redraw(app);

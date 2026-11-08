@@ -11,6 +11,10 @@ import { MaskSettings } from "../generation/MaskSettings.js";
 import { FaultThickness } from "../tools/FaultThickness.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
+import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
+import { CartoucheFields } from "./CartoucheFields.js";
+import { CompassFields } from "./CompassFields.js";
+import { nameInset } from "../canvas/MapBorder.js";
 
 const TEMPLATES = "modules/filrodens-world-map-builder/templates/parts/";
 
@@ -228,9 +232,14 @@ export class FaultEditor {
     }
 }
 
+/** The name a new drawn decoration starts with, by kind. */
+const DECORATION_NAMES = Object.freeze({ compass: "FILRODENSWMB.UI.DecorationKindCompass", cartouche: "FILRODENSWMB.UI.DecorationKindCartouche" });
+
 /**
  * A decoration (Cartography) in the inspector: its name and visibility, its opacity, scale and
- * rotation, and Focus view and Delete.
+ * rotation, a compass rose's own design, options, colours and letters (see CompassFields), a
+ * cartouche's own design, title, colours and lettering (see CartoucheFields), and Focus view and
+ * Delete.
  */
 export class DecorationEditor {
     /** @returns {Promise<boolean>} */
@@ -238,12 +247,36 @@ export class DecorationEditor {
         return Inspector.open(app, this.KIND, { id }, options);
     }
 
+    /**
+     * Adds a decoration the module draws (see DrawnDecoration), with its defaults, and opens it in
+     * the inspector, as one undo step. It needs no dialogue: everything about it is changed
+     * afterwards in the inspector.
+     * @param {"compass"|"cartouche"} kind
+     * @returns {Promise<string>} Its id.
+     */
+    static async add(app, kind) {
+        MapStateManager.pushVectorState(app);
+        const decoration = DrawnDecoration.create(kind, {
+            id: platform.utils.randomID(),
+            name: platform.i18n.localize(DECORATION_NAMES[kind]),
+            mapWidth: app.mapWidth,
+            mapHeight: app.mapHeight,
+            inset: nameInset(app.uiState),
+        });
+        app.mapDecorations.push(decoration);
+        app._repaintVectors();
+        app.view?.render(["context"]);
+        app.markDirty();
+        await DecorationEditor.open(app, decoration.id);
+        return decoration.id;
+    }
+
     static KIND = Object.freeze({
         id: "decoration",
         template: `${TEMPLATES}inspector-decoration.hbs`,
         find: (app, { id }) => app.mapDecorations?.find((decoration) => decoration.id === id) ?? null,
         header: (_app, decoration) => ({ title: decoration.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitleDecoration") }),
-        context: (_app, decoration) => ({
+        context: (app, decoration) => ({
             decoration: {
                 name: decoration.name,
                 opacity: decoration.opacity ?? 1,
@@ -254,6 +287,10 @@ export class DecorationEditor {
             visibilities: RegionPanel.visibilityChoices(decoration.visibility),
             scaleRange: FILRODENSWMB.UI.WHEEL_RESIZE.DECORATION_SCALE,
             rotationRange: FILRODENSWMB.UI.ROTATION,
+            compass: decoration.kind === "compass" ? CompassFields.context(decoration) : null,
+            cartouche: decoration.kind === "cartouche" ? CartoucheFields.context(decoration, { overflow: app.canvasEngine?.isOverflowing?.(decoration.id) ?? false }) : null,
+            drawn: DrawnDecoration.isDrawn(decoration),
+            palette: FILRODENSWMB.LABELS?.PRESETS || [],
         }),
         apply: (app, decoration, _ref, form, field) => {
             const elements = form.elements;
@@ -266,7 +303,13 @@ export class DecorationEditor {
             if (field === "decorationOpacity") values.opacity = Number(elements.decorationOpacity.value);
             if (field === "decorationScale") values.scale = Number(elements.decorationScale.value) || 1;
             if (field === "decorationRotation") values.rotation = CanvasTransforms.normalizeAngle(elements.decorationRotation.value);
-            return applyValues(app, decoration, typed("decoration", values, decoration), [], { ...decoration, visibility: decoration.visibility ?? "all" });
+            if (decoration.kind === "compass") Object.assign(values, CompassFields.read(decoration, elements, field));
+            if (decoration.kind === "cartouche") Object.assign(values, CartoucheFields.read(decoration, elements, field));
+            const checked = typed("decoration", values, decoration);
+            const current = { ...decoration, visibility: decoration.visibility ?? "all" };
+            // Compared by value, so a colours object holding the same colours is no change
+            const changed = Object.fromEntries(Object.entries(checked).filter(([name, value]) => JSON.stringify(current[name]) !== JSON.stringify(value)));
+            return applyValues(app, decoration, changed, [], current);
         },
         actions: {
             zoom: (app, decoration) => zoomTo(app, [decoration]),

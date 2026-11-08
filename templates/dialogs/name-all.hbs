@@ -1,0 +1,28 @@
+<div class="fwmb-dialog-content">
+    {{!--
+        Name all (see RandomNames.openNameAll): which kinds of item, and which of their names, are
+        given a random name, with how many items that would name as the ticks change. A name the
+        reader typed is never replaced.
+    --}}
+    <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.NameAllHint"}}</div>
+    <fieldset class="fwmb-name-all-choices">
+        <legend>{{localize "FILRODENSWMB.UI.NameAllWhat"}}</legend>
+        {{#each kinds}}
+        <label class="fwmb-checkbox-label">
+            <input type="checkbox" class="fwmb-checkbox" name="nameAllKind" value="{{this.value}}" {{#if this.checked}}checked{{/if}} />
+            {{localize this.label}}
+        </label>
+        {{/each}}
+    </fieldset>
+    <fieldset class="fwmb-name-all-choices">
+        <legend>{{localize "FILRODENSWMB.UI.NameAllWhich"}}</legend>
+        {{#each sources}}
+        <label class="fwmb-checkbox-label">
+            <input type="checkbox" class="fwmb-checkbox" name="nameAllSource" value="{{this.value}}" {{#if this.checked}}checked{{/if}} />
+            {{localize this.label}}
+        </label>
+        {{/each}}
+    </fieldset>
+    <div class="fwmb-hint">{{localize "FILRODENSWMB.UI.NameAllTypedKept"}}</div>
+    <p class="fwmb-readout" data-name-all-count></p>
+</div>

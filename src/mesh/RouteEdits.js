@@ -414,6 +414,11 @@ export function splitRoute(route, index, idFactory = undefined, secondName = nul
     const label = route.label ? structuredClone(route.label) : null;
     const second = createRoute({ ...route, id: undefined, name: secondName ?? route.name, label, waypoints: route.waypoints.slice(index), legs: route.legs.slice(index), generated: null }, idFactory);
     delete second.legacy;
+    // A name numbered after the first route's is a default one, not the first's own
+    if (secondName !== null && secondName !== route.name) {
+        second.nameSource = "default";
+        delete second.nameRoll;
+    }
     route.waypoints = route.waypoints.slice(0, index + 1);
     route.legs = route.legs.slice(0, index);
     return second;

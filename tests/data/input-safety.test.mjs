@@ -366,7 +366,7 @@ test("a saved model run passes the importer whole, and a damaged or hostile one 
     assert.equal(MapImport.read(v4Map()).modelRun, null, "a map without a run has none");
 });
 
-// ------------------------------------------------------------------ colours, enums, numbers, fonts, images
+// ------------------------------------------------------------------ colors, enums, numbers, fonts, images
 
 test("a colour such as red;background:url(…) never passes, in a file or in the inspector", () => {
     const file = v4Map();
@@ -522,4 +522,91 @@ test("an imported map keeps its name, numbered only when a saved map already has
     assert.equal(MapNames.unique("Harbour", ["Coast"], numbered), "Harbour");
     assert.equal(MapNames.unique("Harbour", ["Harbour", "Harbour (2)"], numbered), "Harbour (3)");
     assert.deepEqual(MapNames.namesIn([{ name: "A", children: [{ name: "B", children: [] }] }, { name: "C" }]), ["A", "B", "C"]);
+});
+
+test("a drawn decoration's fields are kept to their rules: unknown kinds, designs and colors go, numbers stay in range, titles are plain text within their limit", () => {
+    const file = v4Map();
+    file.mapDecorations.push({
+        id: "roseAAAAAAAAAAAA",
+        type: "decoration",
+        name: "Compass rose",
+        kind: "compass",
+        design: "classic",
+        size: 144,
+        x: 10,
+        y: 10,
+        colors: { light: "#f3e9cf", dark: HOSTILE_COLOUR, letter: "#123456", glow: "#ffffff" },
+        fontFamily: "Cinzel",
+        bold: true,
+        points: 12,
+        rings: 5,
+        north: "fleur",
+        letters: "every",
+        letterSize: 0.3,
+        upright: "yes",
+        backingOpacity: 0.85,
+        title: SCRIPT,
+        subtitle: "In the fourth age",
+        maxWidth: 4,
+    });
+    file.mapDecorations.push({ id: "plateAAAAAAAAAAA", type: "decoration", name: "Cartouche", kind: "cartouche", design: "ribbon", titleSource: "elsewhere", subtitleFontFamily: "EB Garamond", subtitleItalic: "no", capitals: true, x: 5, y: 5 });
+    file.mapDecorations.push({ id: "oddAAAAAAAAAAAAA", type: "decoration", name: "Odd", kind: "sundial", design: "nonsense", size: -3, fontFamily: "Fell'); background: url(x", x: 1, y: 1 });
+    const { mapData } = MapImport.read(file);
+    const [, rose, plate, odd] = mapData.mapDecorations;
+    assert.deepEqual([plate.kind, plate.design, plate.subtitleFontFamily, plate.capitals], ["cartouche", "ribbon", "EB Garamond", true]);
+    assert.ok(!("titleSource" in plate) && !("subtitleItalic" in plate), "an unknown title source and a non-boolean italic are dropped");
+    assert.deepEqual(rose.colors, { light: "#f3e9cf", letter: "#123456" }, "a hostile colour and an unknown colour key are dropped");
+    assert.deepEqual([rose.kind, rose.design, rose.size, rose.fontFamily, rose.bold, rose.north, rose.letterSize, rose.backingOpacity], ["compass", "classic", 144, "Cinzel", true, "fleur", 0.3, 0.85]);
+    for (const dropped of ["points", "letters", "upright"]) assert.ok(!(dropped in rose), `${dropped} outside its rule is dropped`);
+    assert.deepEqual([rose.rings, rose.maxWidth], [2, 1], "numbers are kept in their ranges");
+    assert.equal(rose.title, SCRIPT, "markup in a title is kept as plain text");
+    assert.equal(rose.subtitle, "In the fourth age");
+    const long = v4Map();
+    long.mapDecorations.push({ id: "roseBBBBBBBBBBBB", type: "decoration", name: "Cartouche", kind: "cartouche", subtitle: "x".repeat(Sanitize.textLimit("name") + 1), x: 1, y: 1 });
+    let refusal;
+    assert.throws(
+        () => MapImport.read(long),
+        (error) => {
+            refusal = error;
+            return refusedFor("textTooLong")(error);
+        },
+        "an over-long subtitle refuses the import, as every over-long text does",
+    );
+    assert.match(Sanitize.refusalMessage(refusal, i18n), /the subtitle of the decoration/);
+    assert.equal(typed("decoration", { subtitle: "y".repeat(5000) }, {}).subtitle.length, Sanitize.textLimit("name"), "the inspector cuts it to the limit");
+    for (const dropped of ["kind", "design", "fontFamily"]) assert.ok(!(dropped in odd), `an unknown or unsafe ${dropped} is dropped`);
+    assert.equal(odd.size, 1, "a negative size is raised to the least");
+    const applied = typed("decoration", { design: "sundial", letters: "all", colors: { accent: "red;x", dark: "#000000" } }, rose);
+    assert.deepEqual([applied.design, applied.letters, applied.colors.accent, applied.colors.dark], ["classic", "all", undefined, "#000000"], "the inspector keeps the current value where a typed one fails");
+});
+
+test("where a name came from and its roll are kept to their rules", () => {
+    const file = v4Map();
+    const [region] = file.layerSets[0].levels[0].regions;
+    Object.assign(region, { nameSource: "random", nameRoll: 4 });
+    Object.assign(file.mapPins[0], { nameSource: "<b>typed</b>", nameRoll: -1 });
+    const { mapData } = MapImport.read(file);
+    const kept = mapData.layerSets[0].levels[0].regions[0];
+    assert.deepEqual([kept.nameSource, kept.nameRoll], ["random", 4]);
+    assert.ok(!("nameSource" in mapData.mapPins[0]), "an unknown source is dropped");
+    assert.equal(mapData.mapPins[0].nameRoll, 0, "a roll is kept in its range, as every number is");
+    assert.equal(typed("route", { nameSource: "<i>random</i>" }, { nameSource: "typed" }).nameSource, "typed", "the inspector's check keeps the route's own source");
+    // A map saved before names had sources reads as it did: no field, nothing added
+    const older = MapImport.read(v4Map()).mapData;
+    assert.ok(!("nameSource" in older.mapPins[0]) && !("nameSource" in older.layerSets[0].levels[0].regions[0]));
+});
+
+test("a natural feature's label keeps its feature record within its rules", () => {
+    const file = v4Map();
+    Object.assign(file.mapLabels[0], { feature: { kind: "sea", cell: 8, runs: [3, 10, 5, 4, 9, 7], x: 5, y: 5, rotation: 0, fontSize: 3.2, text: "Grey Sea", style: "label-style-ocean-sea" } });
+    file.mapLabels.push({ ...file.mapLabels[0], id: "labelBBBBBBBBBBB", feature: { kind: "volcano", cell: -2, runs: [1, "x", 2], path: [{ x: 1, y: 2 }, { x: "evil" }], text: SCRIPT, style: "a b" } });
+    const { mapData } = MapImport.read(file);
+    const [kept, odd] = mapData.mapLabels;
+    assert.deepEqual(kept.feature, { kind: "sea", cell: 8, runs: [3, 10, 5, 4, 9, 7], x: 5, y: 5, rotation: 0, fontSize: 3.2, text: "Grey Sea", style: "label-style-ocean-sea" });
+    assert.ok(!("kind" in odd.feature) && !("style" in odd.feature), "an unknown kind and a bad style id are dropped");
+    assert.equal(odd.feature.cell, 1, "a cell size is kept in its range");
+    assert.deepEqual(odd.feature.runs, [1, 2]);
+    assert.deepEqual(odd.feature.path, [{ x: 1, y: 2 }]);
+    assert.equal(odd.feature.text, SCRIPT, "the text it was given stays plain text");
+    assert.ok(!("feature" in MapImport.read(v4Map()).mapData.mapLabels[0]), "a label with none reads as before");
 });

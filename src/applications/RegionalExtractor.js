@@ -11,6 +11,7 @@ import { clampAreaFactor, effectiveKmPerPx } from "../mesh/Schema.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { RunCells } from "./RunCells.js";
 import { scaleBarOnMap, scaleBarTick, worldScaleTick } from "../data/MapUnit.js";
+import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
 import { platform } from "../platform/index.js";
 
 export class RegionalExtractor {
@@ -89,9 +90,11 @@ export class RegionalExtractor {
             manualRivers: this.guideRivers(app, this.#scaleRiverWidths(translate(app.manualRivers), zoomScale), cropBox),
             mapPins: [...translate(app.mapPins), ...this.#riverInflows(app, cropBox, zoomScale, targetWidth, targetHeight)],
             mapRoutes: translate(app.mapRoutes),
-            mapLabels: translate(app.mapLabels),
+            // A natural feature's name comes as the reader's own label: its feature record is in
+            // the parent's pixels, and the regional map finds its own features
+            mapLabels: translate(app.mapLabels).map(({ feature: _feature, ...label }) => label),
             landMasks: state.generationEngine === "guided" ? this.#translateLandMasks(app.landMasks ?? [], cropBox, zoomScale) : [],
-            mapDecorations: translate(app.mapDecorations),
+            mapDecorations: this.carryDecorations(app.mapDecorations ?? [], { width: app.mapWidth, height: app.mapHeight }, { width: targetWidth, height: targetHeight }, translate),
             upwindMargin: upwindMargin(cropBox, zoomScale),
             // The run its generated content came from, on its own area (see ParentRun)
             parentRun: RunCells.forRegion(app, cropBox, zoomScale),
@@ -393,6 +396,31 @@ export class RegionalExtractor {
     static #scaleRiverWidths(rivers, zoomScale) {
         for (const river of rivers) river.widthScale = (river.widthScale ?? 1) * zoomScale;
         return rivers;
+    }
+
+    /**
+     * The decorations a regional map gets. An image the user supplied is cropped as any item is
+     * (kept if its centre is on the regional map). A decoration the module draws is map furniture
+     * rather than a place, so the regional map keeps it at the same place relative to the map (a
+     * compass at 85% across and 78% down stays there) and the same size relative to the map's
+     * shorter side; otherwise most regional maps would lose the compass in their parent's corner.
+     *
+     * @param {object[]} decorations - The parent's, in their order (which is their drawing order).
+     * @param {{width: number, height: number}} parent - The parent map's size.
+     * @param {{width: number, height: number}} target - The regional map's size.
+     * @param {function(object[]): object[]} translate - Crops and moves a list of items.
+     * @returns {object[]}
+     */
+    static carryDecorations(decorations, parent, target, translate) {
+        const shrink = Math.min(target.width, target.height) / Math.min(parent.width, parent.height);
+        return decorations.flatMap((decoration) => {
+            if (!DrawnDecoration.isDrawn(decoration)) return translate([decoration]);
+            const carried = structuredClone(decoration);
+            carried.x = (decoration.x / parent.width) * target.width;
+            carried.y = (decoration.y / parent.height) * target.height;
+            if (Number.isFinite(decoration.size)) carried.size = decoration.size * shrink;
+            return [carried];
+        });
     }
 
     /**

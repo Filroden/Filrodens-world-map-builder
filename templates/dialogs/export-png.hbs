@@ -1,7 +1,9 @@
 {{!--
-    Export to PNG (see MapStudio#onExportPng and ExportScale): the scale, each with the image's
-    size, the recommended one chosen and marked, scales too large for the map disabled; and why
-    that scale is recommended.
+    Export an image (see MapStudio#chooseImageExport and ExportScale): the scale, each with the
+    image's size, the recommended one chosen and marked, scales too large for the map disabled, and
+    why that scale is recommended; then the format, each with its estimated file size at the
+    scale chosen (filled in once the dialogue shows, see MapStudio#estimateFormatSizes), the last
+    one chosen selected. Formats this browser cannot write are not offered.
 --}}
 <div class="fwmb-dialog-content">
     <div class="fwmb-form-group fwmb-form-group--stacked">
@@ -14,5 +16,16 @@
             </select>
         </div>
         <p class="fwmb-hint">{{reason}}</p>
+    </div>
+    <div class="fwmb-form-group fwmb-form-group--stacked">
+        <label for="fwmb-export-png-format">{{localize "FILRODENSWMB.UI.ExportFormat"}}</label>
+        <div class="fwmb-form-fields">
+            <select id="fwmb-export-png-format" name="exportFormat">
+                {{#each formats}}
+                <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+                {{/each}}
+            </select>
+        </div>
+        <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.ExportFormatHint"}}</p>
     </div>
 </div>

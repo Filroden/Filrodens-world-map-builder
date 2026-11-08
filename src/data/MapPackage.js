@@ -1,3 +1,4 @@
+import { FILRODENSWMB } from "../config.js";
 import { ImageCheck } from "./ImageCheck.js";
 import { MapJson } from "./MapJson.js";
 import { ASSET_SCHEME } from "./Sanitize.js";
@@ -23,7 +24,8 @@ import { ASSET_SCHEME } from "./Sanitize.js";
  *
  * Images that cannot be read, or fail their check, are left out and counted, so one broken image
  * never stops a map: a decoration without its image is removed, a reference image is dropped, and
- * pins on a missing icon fall back to the default, as an unknown icon always has.
+ * pins on a missing icon fall back to the default, as an unknown icon always has. A decoration the
+ * module draws (a compass rose, a cartouche) has no image, so it is carried as it is.
  */
 export class MapPackage {
     /**
@@ -59,6 +61,8 @@ export class MapPackage {
         const carry = (src) => carryOut(src, { mode, read, assets, state });
 
         for (const decoration of file.mapDecorations ?? []) {
+            // A decoration the module draws has no image to carry
+            if (isDrawn(decoration)) continue;
             const src = await carry(decoration.src);
             if (src) decoration.src = src;
             else delete decoration.src;
@@ -97,6 +101,10 @@ export class MapPackage {
 
         const decorations = [];
         for (const decoration of mapData.mapDecorations ?? []) {
+            if (isDrawn(decoration)) {
+                decorations.push(decoration);
+                continue;
+            }
             const src = await bring(decoration.src);
             if (src) decorations.push({ ...decoration, src });
             // A decoration that arrived without its image (left out when the file was written) counts as one missing
@@ -132,6 +140,9 @@ export class MapPackage {
         return Array.from(digest.subarray(0, HASH_BYTES), (byte) => byte.toString(HEX).padStart(2, "0")).join("");
     }
 }
+
+/** Whether a decoration is one the module draws (it has a kind) rather than an image. */
+const isDrawn = (decoration) => FILRODENSWMB.DECORATIONS.KINDS.includes(decoration?.kind);
 
 /** How many bytes of the SHA-256 name an asset (32 hex characters, see Sanitize's packaged images). */
 const HASH_BYTES = 16;

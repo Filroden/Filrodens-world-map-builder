@@ -562,7 +562,7 @@ export class MapDialogManager {
     static async onAddDecoration(app, _event, _target) {
         if (!app.canvasEngine?.isEditMode) return;
 
-        const defaultName = `Decoration ${app.mapDecorations.length + 1}`;
+        const defaultName = platform.i18n.format("FILRODENSWMB.UI.DecorationNumbered", { number: app.mapDecorations.length + 1 });
 
         const content = await platform.templates.render("modules/filrodens-world-map-builder/templates/dialogs/add-decoration.hbs", { defaultName });
 

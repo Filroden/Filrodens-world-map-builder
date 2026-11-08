@@ -6,15 +6,20 @@
     Parameters:
       bold, italic: the label's settings
       face: InspectorFields.faceChoices of its family: bold, italic, boldHint, italicHint
-      boldName, italicName: the fields' names
+      boldName, italicName: the fields' names (without italicName, Bold alone: a compass's letters;
+        without boldName, Italic alone: a cartouche's subtitle)
 --}}
 <div class="fwmb-row fwmb-inspector-face">
+    {{#if boldName}}
     <label class="fwmb-checkbox-label" {{#if face.boldHint}}data-tooltip-text="{{face.boldHint}}"{{/if}}>
         <input type="checkbox" class="fwmb-checkbox" name="{{boldName}}" {{#if bold}}checked{{/if}} {{#unless face.bold}}disabled aria-description="{{face.boldHint}}"{{/unless}} />
         {{localize "FILRODENSWMB.UI.LabelBold"}}
     </label>
+    {{/if}}
+    {{#if italicName}}
     <label class="fwmb-checkbox-label" {{#if face.italicHint}}data-tooltip-text="{{face.italicHint}}"{{/if}}>
         <input type="checkbox" class="fwmb-checkbox" name="{{italicName}}" {{#if italic}}checked{{/if}} {{#unless face.italic}}disabled aria-description="{{face.italicHint}}"{{/unless}} />
         {{localize "FILRODENSWMB.UI.LabelItalic"}}
     </label>
+    {{/if}}
 </div>
