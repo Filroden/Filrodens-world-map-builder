@@ -7,16 +7,24 @@
 // tier and the road network's length must be within PARITY of the prototype's. The model's code is
 // checked for exactness elsewhere: run on the prototype's own cells it gives the prototype's output.
 //
+// The prototype is the model as it was before revision 2 (see GeneratorRevision), so parity is
+// checked on a revision 1 run; the current revision's run is checked for what its rules promise
+// (every port has water in its own cell) and its figures reported beside revision 1's.
+//
 // The speed budget describes a developer's machine, so it is skipped where CI is set (unless
 // FWMB_PERF is set too), as tests/mesh/performance.test.mjs does.
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { before, test } from "node:test";
 import { materialise } from "../../src/generator/Materialise.js";
+import { buildModelCells } from "../../src/generator/CellValues.js";
+import { GeneratorRevision } from "../../src/generator/GeneratorRevision.js";
+import { modelBiomeRaster } from "../../src/generator/ModelBiomes.js";
 import { runGenerator } from "../../src/generator/Pipeline.js";
 import { MeshSession } from "../../src/mesh/MeshSession.js";
 import { UNCLAIMED } from "../../src/mesh/Schema.js";
 import { loadP0 } from "../mesh/helpers.mjs";
+import { FILRODENSWMB } from "../../src/config.js";
 import { BASELINE, GENERATOR_SKIP, MATERIALISE_NAMES, loadP0Generator, materialiseStyles } from "./helpers.mjs";
 
 const PARITY = 0.1;
@@ -25,6 +33,7 @@ const MATERIALISE_BUDGET_MS = 3000;
 const CI_SKIP = process.env.CI && !process.env.FWMB_PERF ? "performance budgets are not checked on CI runners (set FWMB_PERF to run)" : false;
 
 let run = null;
+let legacy = null;
 
 before(async () => {
     if (GENERATOR_SKIP) return;
@@ -32,11 +41,12 @@ before(async () => {
     const payload = makePayload();
     const started = performance.now();
     const result = await runGenerator(payload, { pause: () => Promise.resolve() });
-    run = { result, ms: performance.now() - started };
+    run = { result, ms: performance.now() - started, payload };
+    legacy = await runGenerator({ ...makePayload(), revision: FILRODENSWMB.GENERATOR.REVISIONS.LEGACY }, { pause: () => Promise.resolve() });
 });
 
-test("counts are within 10% of the prototype's", { skip: GENERATOR_SKIP }, (t) => {
-    const { stats } = run.result;
+test("counts are within 10% of the prototype's (the model before revision 2)", { skip: GENERATOR_SKIP }, (t) => {
+    const { stats } = legacy;
     const pairs = {
         realms: [stats.kingdoms + stats.independents, BASELINE.kingdoms + BASELINE.independents],
         duchies: [stats.duchies, BASELINE.duchies],
@@ -54,6 +64,19 @@ test("counts are within 10% of the prototype's", { skip: GENERATOR_SKIP }, (t) =
     for (const name of ["population", "kingdoms", "independents", "castles", "fortified", "riverKm", "seaKm"]) {
         t.diagnostic(`(not compared) ${name}: ${stats[name]} against ${BASELINE[name]}`);
     }
+});
+
+test("at the current revision every port has water in its own cell, and there are more ports and fishing towns", { skip: GENERATOR_SKIP }, (t) => {
+    const { result, payload } = run;
+    const cells = buildModelCells({ ...payload, biome: modelBiomeRaster(payload) }, {}, GeneratorRevision.rules(result.revision));
+    const ports = result.places.filter((place) => place.port);
+    const dry = ports.filter((place) => cells.waterShare[place.cell] < FILRODENSWMB.GENERATOR.PORTS.WATER_SHARE);
+    assert.deepEqual(dry.map((place) => place.cell), [], "no port without water in its own cell");
+    const legacyPorts = legacy.places.filter((place) => place.port).length;
+    assert.ok(ports.length > legacyPorts, `${ports.length} ports against ${legacyPorts}`);
+    const legacyDry = legacy.places.filter((place) => place.port && cells.waterShare[place.cell] < FILRODENSWMB.GENERATOR.PORTS.WATER_SHARE).length;
+    t.diagnostic(`ports: ${ports.length} (revision 1: ${legacyPorts}, ${legacyDry} of them dry)`);
+    for (const name of ["kingdoms", "independents", "cities", "largeTowns", "towns", "population", "roadKm", "seaKm"]) t.diagnostic(`${name}: ${Math.round(result.stats[name])} (revision 1: ${Math.round(legacy.stats[name])})`);
 });
 
 test(`a run takes under ${AGE_BUDGET_MS / 1000} s per age`, { skip: GENERATOR_SKIP || CI_SKIP }, (t) => {

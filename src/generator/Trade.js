@@ -19,6 +19,12 @@ import { SearchSpace, leastCostPerKm } from "./Search.js";
  * that loses its trade fades away; towns are re-tiered by population but never below their base
  * tier. The next round re-links with the new sizes over the roads already built.
  *
+ * A long passage by sea puts in on the way (with the ports of call rule, see GeneratorRevision.rules):
+ * every CALL_KM of sailing without a landing, the link calls at the best shore cell beside the lane
+ * it has passed since, which takes a share of the link's volume as transfer, so open coasts along
+ * the great sea lanes gain ports (and, by the trade-town rule, towns) where the gravity links alone
+ * would sail past.
+ *
  * The final round (after the feedback pass) starts from the roads and lanes already built and the
  * towns as the feedback pass left them, their trade share removed so it is recomputed, and traders
  * avoid insecure ground.
@@ -289,6 +295,8 @@ function layLink(state, link, flows) {
     state.space.run([from], state.cost, { target: to, estimatePerKm: state.estimatePerKm });
     const path = state.space.path(from, to);
     if (!path) return;
+    const callKm = state.context.rules?.callKm ?? null;
+    if (!link.local && callKm !== null) portsOfCall(state, link, path, from, flows, callKm);
     let cell = from;
     for (const edge of path) {
         state.traffic[edge] += link.volume;
@@ -302,6 +310,51 @@ function layLink(state, link, flows) {
         cell = next;
     }
 }
+
+/**
+ * A link's ports of call: along its path, each sea step adds to the sailing since the last landing
+ * and offers the land cells beside it that may load ships as places to put in (a town's first, else
+ * the most food); once the sailing reaches callKm, the best of them takes callShare of the link's
+ * volume as transfer and the count starts again. A port step (a landing) starts it again too.
+ */
+function portsOfCall(state, link, path, from, flows, callKm) {
+    const { graph, cells } = state;
+    const share = state.context.rules.callShare;
+    let cell = from;
+    let sailed = 0;
+    let best = -1;
+    let bestScore = -1;
+    for (const edge of path) {
+        const next = graph.other(edge, cell);
+        const kind = graph.edgeKind[edge];
+        if (kind === EDGE.PORT) {
+            sailed = 0;
+            best = -1;
+            bestScore = -1;
+        } else if (kind === EDGE.SEA) {
+            sailed += graph.edgeKm[edge];
+            for (let slot = graph.adjStart[next]; slot < graph.adjStart[next + 1]; slot++) {
+                const shore = graph.adjCell[slot];
+                if (cells.water[shore] || (cells.wet && !cells.wet[shore])) continue;
+                const score = (state.townAt[shore] >= 0 ? CALL_TOWN_FIRST : 0) + cells.food[shore];
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = shore;
+                }
+            }
+            if (sailed >= callKm && best >= 0) {
+                flows.transfer[best] += link.volume * share;
+                sailed = 0;
+                best = -1;
+                bestScore = -1;
+            }
+        }
+        cell = next;
+    }
+}
+
+/** Added to a shore cell's food when it holds a town, so a town is always the call chosen over empty shore. */
+const CALL_TOWN_FIRST = 1e12;
 
 /** Marks an edge as built (rivers need no road) and makes it cheaper for the links after it. */
 function buildRoad(state, edge) {

@@ -68,16 +68,20 @@ export class GenerationCancelled extends Error {
  * @param {function(): boolean} [options.isStopping] - Whether to end with the ages finished.
  * @param {function(): Promise<void>} [options.pause]
  * @param {number} [options.breathMs] - Longest stretch of work between pauses (BREATH_MS).
+ * @param {object} [options.rules] - The model's rules (see GeneratorRevision.rules) in place of the
+ *     payload's revision's, for checks that a rule's legacy setting gives the older run.
  * @returns {Promise<object>} The run's result (see assembleResult).
  */
-export async function runGenerator(payload, { onProgress = null, isCancelled = () => false, isStopping = () => false, pause = defaultPause, breathMs = BREATH_MS } = {}) {
+export async function runGenerator(payload, { onProgress = null, isCancelled = () => false, isStopping = () => false, pause = defaultPause, breathMs = BREATH_MS, rules = null } = {}) {
     const settings = resolveSettings(payload.settings, payload.mapSeed);
     const ages = settings.ages;
     const driver = new StageDriver({ onProgress, isCancelled, isStopping, pause, breathMs, ages: ages.length });
     // The rules the run follows (see GeneratorRevision): the current ones unless the payload names older
-    const run = { settings, revision: GeneratorRevision.ofPayload(payload), age: ages.at(-1), timings: {} };
+    const revision = GeneratorRevision.ofPayload(payload);
+    const run = { settings, revision, width: payload.width, rules: rules ?? GeneratorRevision.rules(revision), age: ages.at(-1), timings: {} };
 
-    run.cells = await driver.step("values", () => buildModelCells({ ...payload, biome: modelBiomeRaster(payload) }, settings.world), run);
+    run.cells = await driver.step("values", () => buildModelCells({ ...payload, biome: modelBiomeRaster(payload) }, settings.world, run.rules), run);
+    markWetCells(run.cells, run.rules);
     run.graph = new CellGraph(run.cells);
     const people = cultureList(settings, payload);
 
@@ -128,7 +132,7 @@ async function runAge(run, driver, { settings, people, ages, index, previous }) 
     const age = ages[index];
     const { list, invader } = agePeople(settings, people, ages, index);
     const cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(list), { invader }), run);
-    const common = { cultures, world: settings.world };
+    const common = { cultures, world: settings.world, rules: run.rules };
     const towns = await driver.stage("towns", () => placeTowns(run.graph, { ...common, era: age, previous }), run);
     const trade = await driver.stage("trade", () => tradeRounds(run.graph, { ...common, towns: towns.towns, cellPop: towns.cellPop, totalPop: towns.totalPop, built: previous?.built ?? null }), run);
     const realms = await driver.step("realms", () => buildRealms(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, keptSeats: previous?.seats ?? null }), run);
@@ -457,7 +461,33 @@ function townPlace(run, town, names, seats, cellPop) {
         security: round(town.security ?? 1, 3),
         culture: town.culture ?? mix[0][0],
         mix: mix.map(([culture, share]) => [culture, round(share, 3)]),
+        ...placeShore(run, town),
     };
+}
+
+/**
+ * Where a place stands within its cell, with the shore pins rule (see GeneratorRevision.rules): a
+ * port on its own shore, a town on a navigable river beside it, as a pixel ({ at: [x, y] }); none
+ * otherwise, and it stands on its cell's site.
+ */
+function placeShore(run, town) {
+    const { cells } = run;
+    const pixel = town.port ? (cells.shorePixel?.[town.cell] ?? -1) : town.navigable ? (cells.riverPixel?.[town.cell] ?? -1) : -1;
+    if (pixel < 0) return {};
+    const width = run.width;
+    return { at: [pixel % width, Math.floor(pixel / width)] };
+}
+
+/**
+ * Which land cells may load ships (cells.wet, read by CellGraph.portCost): with the port water
+ * rule, those whose own pixels are at least that share sea or lake; water cells always. Without
+ * the rule there is no such list and every coastal cell may.
+ */
+function markWetCells(cells, rules) {
+    if (rules.portWaterShare === null) return;
+    const wet = new Uint8Array(cells.count);
+    for (let cell = 0; cell < cells.count; cell++) wet[cell] = cells.water[cell] || cells.waterShare[cell] >= rules.portWaterShare ? 1 : 0;
+    cells.wet = wet;
 }
 
 function castlePlace(castle, name) {

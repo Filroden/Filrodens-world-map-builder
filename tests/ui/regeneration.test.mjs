@@ -123,6 +123,22 @@ test("an edited county keeps its whole realm; a locked place and an edited route
     assert.equal(realms.regions.length + duchies.regions.length >= 2, true);
 });
 
+test("a port or river town standing off its cell's site is not put beside a kept pin on that site", async () => {
+    const app = studio();
+    Generation.apply(app, await islandResult());
+    const { mesh } = app.meshSession;
+    const shore = generatedPins(app).find((pin) => mesh.parentOf[pin.cell] !== pin.cell);
+    assert.ok(shore, "a run on the island puts a port or river town off its site");
+    const site = mesh.parentOf[shore.cell];
+    const next = { ...shore, id: "next-run-pin" };
+    app.mapPins = [];
+    assert.deepEqual(Regeneration.placesBeside(app, [next]), [next], "with nothing kept, it stays");
+    app.mapPins = [{ id: "kept", name: "Kept", x: mesh.siteX(site), y: mesh.siteY(site), cell: site }];
+    assert.deepEqual(Regeneration.placesBeside(app, [next]), [], "a kept pin on its model cell's site");
+    app.mapPins = [{ id: "kept", name: "Kept", x: shore.x, y: shore.y, cell: shore.cell }];
+    assert.deepEqual(Regeneration.placesBeside(app, [next]), [], "a kept pin on its own cell");
+});
+
 test("Remove generated content takes what is not kept, drops a set left empty, and is one undo step", async () => {
     const app = studio();
     Generation.apply(app, await islandResult());

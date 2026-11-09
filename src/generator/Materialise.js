@@ -92,19 +92,20 @@ function buildPins(session, result, { runId, idFactory, names, pinStyleFor, appl
         const tier = placeTier(place);
         // A former capital keeps its own style, and says what it was after its name
         const former = Number.isInteger(place.formerCapital) && output.history;
+        const cell = standingCell(session, place);
         const pin = {
             id: idFactory(),
             name: former ? formerCapitalName(placeName(place, names), names) : placeName(place, names),
             description: "",
             icon: FILRODENSWMB.PINS.DEFAULT_ICON,
-            x: mesh.siteX(place.cell),
-            y: mesh.siteY(place.cell),
+            x: mesh.siteX(cell),
+            y: mesh.siteY(cell),
             scale: FILRODENSWMB.PINS.DEFAULT_SCALE,
             color: FILRODENSWMB.PINS.DEFAULT_COLOR,
             visibility: "all",
             pinStyle: null,
             label: { fontSize: FILRODENSWMB.PINS.DEFAULT_SCALE },
-            cell: place.cell,
+            cell,
             nameSource: "generated",
             generated: { run: runId, kind: place.kind, tier, sourceId: index, population: place.population ?? null, culture: cultureId(result, place.culture), ...cultureMix(result, place.mix), ...pastOf(place), edited: false, locked: false },
         };
@@ -114,6 +115,33 @@ function buildPins(session, result, { runId, idFactory, names, pinStyleFor, appl
         pins.push(pin);
     });
     return pins;
+}
+
+/**
+ * The display cell a place's pin stands on: for a place the run gave a pixel to stand at (a port's
+ * shore, a river town's river; see Pipeline.placeShore), the land display cell of its model cell
+ * nearest that pixel, the one under it when that is land; else the model cell's own site.
+ */
+function standingCell(session, place) {
+    const { mesh } = session;
+    if (!Array.isArray(place.at)) return place.cell;
+    const [x, y] = place.at;
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= mesh.width || y >= mesh.height) return place.cell;
+    const land = session.aggregates?.land ?? null;
+    const isLand = (cell) => !land || land[cell] === 1;
+    const under = mesh.cellRaster[y * mesh.width + x];
+    if (mesh.parentOf[under] === place.cell && isLand(under)) return under;
+    let best = place.cell;
+    let bestD = Infinity;
+    for (const child of mesh.childrenOf(place.cell)) {
+        if (!isLand(child)) continue;
+        const d = (mesh.siteX(child) - x - 0.5) ** 2 + (mesh.siteY(child) - y - 0.5) ** 2;
+        if (d < bestD) {
+            bestD = d;
+            best = child;
+        }
+    }
+    return best;
 }
 
 /** A place's past, as its generated details keep it (with more than one age): its tier in each age, and when it was last a realm's seat. */

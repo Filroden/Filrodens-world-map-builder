@@ -44,6 +44,14 @@ const PERCENT = 100;
 
 const formatCount = (value) => Math.round(value).toLocaleString(platform.i18n.lang);
 
+/**
+ * The model cell a pin's display cell lies in: a pin stands on a display cell (a port on its shore,
+ * a pin the reader moved), while the run's figures are kept by model cell.
+ */
+function modelCellOf(app, cell) {
+    return app.meshSession?.mesh?.parentOf?.[cell] ?? cell;
+}
+
 export class HistoryView {
     /** How many ages the map's run has (the present included), or 0 with no run. */
     static ageCount(app) {
@@ -265,7 +273,7 @@ export class HistoryView {
             to.push(cells.tradeTo[edge]);
         });
         const places = new Set();
-        for (const pin of app.mapPins ?? []) if (pin.generated?.run === app.modelRun.run && pin.generated.kind === "town" && Number.isInteger(pin.cell)) places.add(pin.cell);
+        for (const pin of app.mapPins ?? []) if (pin.generated?.run === app.modelRun.run && pin.generated.kind === "town" && Number.isInteger(pin.cell)) places.add(modelCellOf(app, pin.cell));
         const routes = this.#roadRoutes(app, from, to, places, "history-road-present");
         contents.set(app, { ...contents.get(app), present: { modelRun: app.modelRun, look, routes } });
         return routes;
@@ -532,7 +540,7 @@ export class HistoryView {
         const capitals = new Map();
         for (const pin of app.mapPins ?? []) {
             if (pin.generated?.run !== app.modelRun.run || pin.generated.tier !== FILRODENSWMB.GENERATOR.PIN_TIERS.capital || !Number.isInteger(pin.cell)) continue;
-            const realm = cells.realm?.[pin.cell];
+            const realm = cells.realm?.[modelCellOf(app, pin.cell)];
             if (realm >= 0) capitals.set(realm, pin.name);
         }
         return [...present.bySource]
@@ -594,7 +602,7 @@ export class HistoryView {
             if (!cells.realm) return null;
             const present = this.#presentRealms(app);
             const places = new Set();
-            for (const pin of app.mapPins ?? []) if (pin.generated?.run === modelRun.run && pin.generated.kind === "town" && Number.isInteger(pin.cell)) places.add(pin.cell);
+            for (const pin of app.mapPins ?? []) if (pin.generated?.run === modelRun.run && pin.generated.kind === "town" && Number.isInteger(pin.cell)) places.add(modelCellOf(app, pin.cell));
             let realmCount = 0;
             for (const realm of cells.realm) if (realm + 1 > realmCount) realmCount = realm + 1;
             return { realm: cells.realm, realmCount, seats: [], places, culture: cells.culture ?? null, realmName: (realm) => present?.bySource.get(realm)?.name ?? null };

@@ -64,6 +64,30 @@ export class GeneratorRevision {
     }
 
     /**
+     * The model's rules at a revision, as plain values whose legacy settings reproduce the older
+     * rules exactly, so the generator's stages read numbers rather than revisions:
+     * - portWaterShare: the share of a land cell's pixels that must be sea or lake for it to load
+     *   ships (see CellGraph.portCost); null for no such rule.
+     * - fishingDensity: people fed per km² of a coastal cell's land by fishing.
+     * - callKm, callShare: ports of call on long sea passages (see Trade); callKm null for none.
+     * - shorePins: whether a port's place stands on its cell's shore, and a town on a navigable
+     *   river beside the river, rather than on its cell's site (see CellValues, Materialise).
+     * @param {number} revision
+     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean}}
+     */
+    static rules(revision) {
+        const G = FILRODENSWMB.GENERATOR;
+        const ports = this.follows(revision, G.REVISIONS.REVISION_2);
+        return Object.freeze({
+            portWaterShare: ports ? G.PORTS.WATER_SHARE : null,
+            fishingDensity: ports ? G.VALUES.FISHING_DENSITY : G.VALUES.LEGACY_FISHING_DENSITY,
+            callKm: ports ? G.PORTS.CALL_KM : null,
+            callShare: G.PORTS.CALL_SHARE,
+            shorePins: ports,
+        });
+    }
+
+    /**
      * The revision a regional map cut from this map starts at: its parent's, since its Fill in
      * reads the parent's run and must read it by the rules it was made with.
      * @param {object} parentState - The parent map's uiState.

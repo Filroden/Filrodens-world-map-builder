@@ -165,9 +165,13 @@ export class Regeneration {
         return changes;
     }
 
-    /** New pins, less those on a kept pin's cell. */
+    /**
+     * New pins, less those on a kept pin's cell, or whose model cell's site a kept pin stands on (a
+     * port or river town stands off its site, on its shore or river).
+     */
     static placesBeside(app, pins) {
         const taken = new Set((app.mapPins ?? []).filter((pin) => Number.isInteger(pin.cell)).map((pin) => pin.cell));
-        return pins.filter((pin) => !taken.has(pin.cell));
+        const siteOf = (cell) => app.meshSession?.mesh?.parentOf?.[cell] ?? cell;
+        return pins.filter((pin) => !taken.has(pin.cell) && !taken.has(siteOf(pin.cell)));
     }
 }

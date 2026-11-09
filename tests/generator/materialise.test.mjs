@@ -144,7 +144,10 @@ test("every place has one pin on its tier's style, its name left to its style's 
     assert.equal(made.pins.length, result.places.length);
     made.pins.forEach((pin, index) => {
         const place = result.places[index];
-        assert.equal(pin.cell, place.cell);
+        // A port or river town stands on its shore or river, still inside its model cell
+        if (place.at) assert.equal(session.mesh.parentOf[pin.cell], place.cell);
+        else assert.equal(pin.cell, place.cell);
+        assert.deepEqual([pin.x, pin.y], [session.mesh.siteX(pin.cell), session.mesh.siteY(pin.cell)]);
         assert.equal(pin.generated.tier, placeTier(place));
         assert.equal(pin.generated.sourceId, index);
         assert.equal(pin.generated.edited, false);

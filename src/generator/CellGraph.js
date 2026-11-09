@@ -209,6 +209,9 @@ export function politicalCost(graph, { road, barrier = null }) {
 export function portCost(cells, townAt = null) {
     const { PORT_KM, SHELTERED_PORT_KM, SHELTERED, TOWN_PORT_KM } = FILRODENSWMB.GENERATOR.TRAVEL;
     return (cell) => {
+        // With the port water rule (see Pipeline.markWetCells), a cell with too little water of its
+        // own cannot load: trade walks overland to one that can, which becomes the port
+        if (cells.wet && !cells.wet[cell]) return Infinity;
         if (townAt && townAt[cell] >= 0) return TOWN_PORT_KM;
         return cells.mouthKm[cell] > 0 || cells.shelter[cell] >= SHELTERED ? SHELTERED_PORT_KM : PORT_KM;
     };

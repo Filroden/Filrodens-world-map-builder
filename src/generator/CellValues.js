@@ -1,5 +1,6 @@
 import { Delaunay } from "../../vendor/d3-delaunay/d3-delaunay.js";
 import { FILRODENSWMB } from "../config.js";
+import { GeneratorRevision } from "./GeneratorRevision.js";
 import { biomeProperties } from "./ModelBiomes.js";
 
 /**
@@ -37,6 +38,10 @@ import { biomeProperties } from "./ModelBiomes.js";
  * @property {Uint8Array} navigable
  * @property {Float64Array} mouthKm - Upstream length of a river reaching the sea here, or 0.
  * @property {Float64Array} landCost - Off-road travel cost per km (cover and relief).
+ * @property {Float64Array} waterShare - The share of the cell's own pixels that are sea or lake.
+ * @property {Int32Array} [shorePixel] - With the shore pins rule (see GeneratorRevision.rules): a land
+ *     cell's land pixel beside sea or lake nearest its site, or -1.
+ * @property {Int32Array} [riverPixel] - Likewise its navigable river pixel nearest its site, or -1.
  * @property {Int32Array} neighbourStart - Compressed neighbour rows.
  * @property {Int32Array} neighbourList
  */
@@ -57,13 +62,16 @@ export function smooth(a, b, value) {
  * Builds the model cells.
  * @param {import("./GeneratorInput.js").GeneratorInput} input
  * @param {{density?: number}} [world] - The world settings (density scales the peak density).
+ * @param {object} [rules] - The model's rules (GeneratorRevision.rules); the input's revision's by default.
  * @returns {ModelCells}
  */
-export function buildModelCells(input, world = {}) {
+export function buildModelCells(input, world = {}, rules = GeneratorRevision.rules(GeneratorRevision.ofPayload(input))) {
     const raster = rasterContext(input);
     const neighbours = modelNeighbours(input.modelSites);
     const sums = sumPixels(input, raster, (world.density ?? 1) * FILRODENSWMB.GENERATOR.VALUES.PEAK_DENSITY);
-    return finishCells(input, raster, sums, neighbours);
+    const cells = finishCells(input, raster, sums, neighbours, rules);
+    if (rules.shorePins) markShorePixels(cells, input, raster);
+    return cells;
 }
 
 /** Per-pixel helpers shared by the passes: scale, the pixel classes, rivers and shelter. */
@@ -253,14 +261,51 @@ function addLandPixel(sums, cell, pixel, { input, raster, properties, peakDensit
 }
 
 /** Turns the sums into the per-cell values. */
-function finishCells(input, raster, sums, neighbours) {
+function finishCells(input, raster, sums, neighbours, rules) {
     const count = input.modelSites.length / 2;
     const cells = allocateCells(count, input, neighbours);
     for (let cell = 0; cell < count; cell++) classifyCell(cells, sums, cell);
     const mouthAt = mouthsByCell(input, raster);
     const properties = biomeProperties(input.customBiomes);
-    for (let cell = 0; cell < count; cell++) finishCell(cells, sums, cell, raster, mouthAt, properties);
+    for (let cell = 0; cell < count; cell++) finishCell(cells, sums, cell, raster, mouthAt, properties, rules);
     return cells;
+}
+
+/**
+ * Where a port's place and a river town's stand (see Materialise): each land cell's land pixel
+ * beside sea or lake (a 4-neighbour) nearest its site, and its navigable river pixel nearest its
+ * site, so a port stands on its own shore and a river town on its river rather than up to half a
+ * cell inland. Each is -1 where the cell has none.
+ */
+function markShorePixels(cells, input, raster) {
+    const { width, height, modelOf } = input;
+    const navigableKm = FILRODENSWMB.GENERATOR.VALUES.NAVIGABLE_KM;
+    const count = cells.count;
+    const shorePixel = new Int32Array(count).fill(-1);
+    const riverPixel = new Int32Array(count).fill(-1);
+    const shoreD = new Float64Array(count).fill(Infinity);
+    const riverD = new Float64Array(count).fill(Infinity);
+    const wet = (pixel) => raster.isSea(pixel) || raster.isLake(pixel);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const pixel = y * width + x;
+            const cell = modelOf[pixel];
+            if (cells.water[cell] || wet(pixel)) continue;
+            const d = (x + 0.5 - cells.x[cell]) ** 2 + (y + 0.5 - cells.y[cell]) ** 2;
+            if (raster.riverKm[pixel] >= navigableKm && d < riverD[cell]) {
+                riverD[cell] = d;
+                riverPixel[cell] = pixel;
+            }
+            if (d >= shoreD[cell]) continue;
+            const shore = (x > 0 && wet(pixel - 1)) || (x < width - 1 && wet(pixel + 1)) || (y > 0 && wet(pixel - width)) || (y < height - 1 && wet(pixel + width));
+            if (shore) {
+                shoreD[cell] = d;
+                shorePixel[cell] = pixel;
+            }
+        }
+    }
+    cells.shorePixel = shorePixel;
+    cells.riverPixel = riverPixel;
 }
 
 function allocateCells(count, input, neighbours) {
@@ -297,6 +342,7 @@ function allocateCells(count, input, neighbours) {
         navigable: flag(),
         mouthKm: real(),
         landCost: real().fill(1),
+        waterShare: real(),
         neighbourStart: neighbours.start,
         neighbourList: neighbours.list,
     };
@@ -310,6 +356,7 @@ function classifyCell(cells, sums, cell) {
     else if (sums.lake[cell] > sums.sea[cell]) kind = CELL_KIND.LAKE;
     cells.kind[cell] = kind;
     cells.water[cell] = kind === CELL_KIND.LAND ? 0 : 1;
+    cells.waterShare[cell] = sums.pixels[cell] ? (sums.sea[cell] + sums.lake[cell]) / sums.pixels[cell] : 0;
 }
 
 /** The largest river mouth in each cell (upstream km), as a Map cell -> km. */
@@ -322,7 +369,7 @@ function mouthsByCell(input, raster) {
     return at;
 }
 
-function finishCell(cells, sums, cell, raster, mouthAt, properties) {
+function finishCell(cells, sums, cell, raster, mouthAt, properties, rules) {
     const V = FILRODENSWMB.GENERATOR.VALUES;
     const land = sums.land[cell];
     cells.riverKm[cell] = sums.river[cell];
@@ -333,7 +380,7 @@ function finishCell(cells, sums, cell, raster, mouthAt, properties) {
     const relief = sums.high[cell] - sums.low[cell];
     const landKm2 = land * raster.pixelKm2;
     const biome = dominantBiome(sums, cell, properties);
-    const fishing = coastal ? V.FISHING_DENSITY * landKm2 : 0;
+    const fishing = coastal ? rules.fishingDensity * landKm2 : 0;
     const food = sums.food[cell] / (1 + (relief / V.RELIEF_HALF_M) ** 2) + fishing;
     cells.landKm2[cell] = landKm2;
     cells.temperature[cell] = sums.temperature[cell] / land;

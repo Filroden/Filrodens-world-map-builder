@@ -2482,10 +2482,12 @@ export const FILRODENSWMB = {
         // Stage 1, the base layer: what each model cell holds.
         VALUES: Object.freeze({
             // Rural people per km² on the best farmland; pasture feeds this share of it; fishing adds
-            // this many per km² of a coastal cell's land
+            // this many per km² of a coastal cell's land (LEGACY_FISHING_DENSITY before revision 2,
+            // see GeneratorRevision.rules), enough for open coasts to hold fishing towns
             PEAK_DENSITY: 60,
             PASTURE_SHARE: 0.2,
-            FISHING_DENSITY: 8,
+            FISHING_DENSITY: 30,
+            LEGACY_FISHING_DENSITY: 8,
             // Crops: no harvest below the first temperature, full by the second, losing HOT_LOSS
             // towards the hottest (leached soils); moisture likewise, losing WET_LOSS when waterlogged
             CROP_TEMPERATURE: Object.freeze([0.25, 0.5]),
@@ -2525,6 +2527,16 @@ export const FILRODENSWMB = {
             TOWN_PORT_KM: 4,
             ROAD_FACTOR: 0.5,
             LANE_FACTOR: 0.6,
+        }),
+        // Ports, from revision 2 (see GeneratorRevision.rules). A land cell loads ships only when at
+        // least WATER_SHARE of its own pixels are sea or lake, so trade walks overland to such a cell
+        // and that cell becomes the port. A trade link that sails CALL_KM without landing puts in at
+        // the best shore cell beside the lane it has passed since (a town's first, else the most
+        // food), which takes CALL_SHARE of the link's volume as transfer: a port of call.
+        PORTS: Object.freeze({
+            WATER_SHARE: 0.02,
+            CALL_KM: 150,
+            CALL_SHARE: 0.25,
         }),
         // Cultures. With the single default culture every culture effect is neutral.
         CULTURES: Object.freeze({
