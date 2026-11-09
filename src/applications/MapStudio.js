@@ -69,6 +69,7 @@ import { LayerSetEditor, LevelEditor } from "./LayerEditors.js";
 import { PinStyles } from "./PinStyles.js";
 import { GeneratePanel } from "./GeneratePanel.js";
 import { ListQuery } from "./ListQuery.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { allLevels } from "../mesh/LayerTree.js";
 import { platform } from "../platform/index.js";
@@ -4037,6 +4038,9 @@ export class MapStudio {
         this.uiState.terrainVersion = TerrainVersion.getVersion(payload);
         this.uiState.world = payload.world ?? null;
         this.uiState.generatorStale = payload.generatorStale === true;
+        // The generator rules the map follows; a map saved before they were recorded reads as the
+        // oldest (see GeneratorRevision)
+        this.uiState.generatorRevision = GeneratorRevision.of(payload);
         this.uiState.generatorSettings = panelSettings(payload.generatorSettings);
         this.uiState.cultures = Array.isArray(payload.cultures) ? payload.cultures : [];
         this.upwindMargin = payload.upwindMargin ?? null;
@@ -4570,6 +4574,7 @@ export class MapStudio {
             world: this.uiState.world,
             mapUnit: cleanUnit(this.uiState.mapUnit),
             generatorStale: this.uiState.generatorStale === true,
+            generatorRevision: GeneratorRevision.of(this.uiState),
             generatorSettings: panelSettings(this.uiState.generatorSettings),
             cultures: platform.utils.deepClone(this.uiState.cultures ?? []),
             upwindMargin: this.upwindMargin ?? null,

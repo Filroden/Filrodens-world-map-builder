@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { generateInBackground } from "../generator/Generate.js";
 import { buildGeneratorPayload } from "../generator/GeneratorInput.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { materialise } from "../generator/Materialise.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { encodeModelRun } from "../generator/ModelRun.js";
@@ -71,7 +72,7 @@ export class Generation {
             }
         };
         try {
-            const result = await generateInBackground(() => this.payload(app, settings), { signal, stopSignal: stop.signal, onProgress }).catch((error) => {
+            const result = await generateInBackground(() => this.payload(app, settings, { revision: GeneratorRevision.CURRENT }), { signal, stopSignal: stop.signal, onProgress }).catch((error) => {
                 if (error?.name === "AbortError") return null;
                 throw error;
             });
@@ -154,11 +155,13 @@ export class Generation {
 
     /**
      * The generator's input from the open map (see GeneratorInput). Every array is a copy, so it
-     * may be moved to the worker.
+     * may be moved to the worker. It follows the generator rules the map does (see
+     * GeneratorRevision), as Travel and Fill in must; a run asks for the current ones.
      * @param {object} app
      * @param {object} [settings]
+     * @param {{revision?: number}} [options] - revision: the rules to follow instead of the map's.
      */
-    static payload(app, settings = panelSettings(app.uiState.generatorSettings)) {
+    static payload(app, settings = panelSettings(app.uiState.generatorSettings), { revision = GeneratorRevision.of(app.uiState) } = {}) {
         const mesh = app.meshSession.mesh;
         const { params } = MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors);
         return buildGeneratorPayload({
@@ -171,6 +174,7 @@ export class Generation {
             customBiomes: app.uiState.customBiomes ?? [],
             mapSeed: app.uiState.mapSeed,
             settings: { seed: settings.seed || undefined, nameBase: settings.nameBase, world: settings.world, ages: settings.ages, cultures: app.uiState.cultures ?? [] },
+            revision,
         });
     }
 
@@ -219,12 +223,15 @@ export class Generation {
         app.mapRoutes.push(...made.routes);
         app.mapPins.push(...Regeneration.placesBeside(app, made.pins));
         const modelRunBefore = app.modelRun ?? null;
+        const revisionBefore = GeneratorRevision.of(app.uiState);
         app.modelRun = encodeModelRun(result, runId);
+        // From now on the map follows the rules it was generated with (see GeneratorRevision)
+        app.uiState.generatorRevision = GeneratorRevision.ofPayload(result);
         app.uiState.generatorStale = false;
         app.activeLayerSetId = set.id;
         app.activeLevelId = set.levels[0].id;
 
-        VectorHistory.push(app, VectorHistory.composite([before, ...owners, VectorHistory.modelRun(modelRunBefore, app.modelRun)]));
+        VectorHistory.push(app, VectorHistory.composite([before, ...owners, VectorHistory.modelRun(modelRunBefore, app.modelRun, { before: revisionBefore, after: app.uiState.generatorRevision })]));
         // The map is shown at the detail its scale leaves room for (a view setting, so not undone with the run)
         app.setDetailLevel?.(DetailLevel.forScale(session.mesh.kmPerPx), { repaint: false });
         app._repaintVectors();

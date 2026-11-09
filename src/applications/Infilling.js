@@ -113,6 +113,7 @@ export class Infilling {
                 mesh,
                 grid,
                 parentRun: app.parentRun,
+                // In the generator rules the map follows, as its parent's run was made (see GeneratorRevision)
                 payload: Generation.payload(app),
                 pins: (app.mapPins ?? []).filter((pin) => !this.isInfill(pin)),
                 routes: (app.mapRoutes ?? []).filter((route) => !this.isInfill(route)),

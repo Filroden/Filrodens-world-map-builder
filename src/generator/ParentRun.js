@@ -69,7 +69,8 @@ export function cropRun(run, { sites, spacingKm, spacingPx, crop, zoomScale, mar
         version: PARENT_RUN_VERSION,
         origin: "parent",
         run: run.run,
-        revision: run.revision ?? FILRODENSWMB.GENERATOR.REVISION,
+        // Every saved run records its revision; one that somehow does not predates any change
+        revision: run.revision ?? FILRODENSWMB.GENERATOR.REVISIONS.LEGACY,
         cellCount: kept.length,
         cultures: structuredClone(run.cultures ?? []),
         cells,

@@ -10,6 +10,7 @@ import { extractRegionalVectors } from "../mesh/RegionalMesh.js";
 import { clampAreaFactor, effectiveKmPerPx } from "../mesh/Schema.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { RunCells } from "./RunCells.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { scaleBarOnMap, scaleBarTick, worldScaleTick } from "../data/MapUnit.js";
 import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
 import { platform } from "../platform/index.js";
@@ -65,6 +66,8 @@ export class RegionalExtractor {
             seed: currentSeed,
             generationEngine: state.generationEngine,
             terrainVersion: state.terrainVersion,
+            // Its Fill in reads the parent's run, so it follows the generator rules the parent does
+            generatorRevision: GeneratorRevision.forRegional(app.uiState),
             sizeRevision: FILRODENSWMB.SYMBOLS.REVISION,
             nameLevels: true,
             localLevel: true,

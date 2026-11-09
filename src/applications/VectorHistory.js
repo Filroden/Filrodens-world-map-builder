@@ -56,9 +56,16 @@ export class VectorHistory {
         return { kind: this.KIND.NOISE, before, after };
     }
 
-    /** An entry replacing the generator's saved outputs (app.modelRun; null for none). */
-    static modelRun(before, after) {
-        return { kind: this.KIND.MODEL_RUN, before, after };
+    /**
+     * An entry replacing the generator's saved outputs (app.modelRun; null for none) and, when
+     * given, the generator rules the map follows with them (uiState.generatorRevision, see
+     * GeneratorRevision), so undoing a run on an older map gives it back its older rules too.
+     * @param {object|null} before
+     * @param {object|null} after
+     * @param {{before: number, after: number}} [revision]
+     */
+    static modelRun(before, after, revision = null) {
+        return revision ? { kind: this.KIND.MODEL_RUN, before, after, revision } : { kind: this.KIND.MODEL_RUN, before, after };
     }
 
     /** Generated regions a change marked edited (see GeneratedEdits.markPatched), by id; null when none. */
@@ -121,6 +128,7 @@ export class VectorHistory {
                 return entry;
             case this.KIND.MODEL_RUN:
                 app.modelRun = isUndo ? entry.before : entry.after;
+                if (entry.revision && app.uiState) app.uiState.generatorRevision = isUndo ? entry.revision.before : entry.revision.after;
                 return entry;
             case this.KIND.EDITED:
                 this.#applyEdited(app, entry, isUndo);

@@ -20,6 +20,7 @@ const { createMeshBlock, createLayerSet, createLevel, addRegion, normaliseAreaFa
 const { decodeOwners, encodeOwners } = await import("../../src/mesh/OwnerLayer.js");
 const { encodeModelRun } = await import("../../src/generator/ModelRun.js");
 const { resolveSettings } = await import("../../src/generator/GeneratorSettings.js");
+const GeneratorRevisionModule = await import("../../src/generator/GeneratorRevision.js");
 const webUtils = await import("../../src/platform/web/utils.js");
 const { registerHelpers } = await import("../../src/platform/web/templates.js");
 
@@ -52,6 +53,7 @@ function v4Map() {
     mapData.customLabelStyles = [{ id: "label-style-realm", name: "Realm", fontFamily: "Cinzel", fontSize: 1.8, fillColor: "#dedcd3", maxChars: 0, justify: "center", bold: true, italic: false }];
     mapData.customPinStyles = [{ id: "pinStyleAAAAAAAA", name: "Town", icon: "map_pin", scale: 1, color: "#ffffff", detailLevel: 1, label: { fontSize: 1, visibility: "all", quickStyle: "custom" } }];
     mapData.sizeRevision = FILRODENSWMB.SYMBOLS.REVISION;
+    mapData.generatorRevision = FILRODENSWMB.GENERATOR.REVISION;
     mapData.mapUnit = "leagues";
     mapData.thematic = { fill: "population", opacity: 0.6 };
     mapData.params = { ...mapData.params, cartography: { ...mapData.params.cartography, scaleMatchWorld: true } };
@@ -367,6 +369,23 @@ test("a saved model run passes the importer whole, and a damaged or hostile one 
 });
 
 // ------------------------------------------------------------------ colors, enums, numbers, fonts, images
+
+test("the map's generator revision is a whole number in range, and a map without one reads as the oldest", () => {
+    const { GeneratorRevision } = GeneratorRevisionModule;
+    for (const [value, kept] of [[2, 2], [5000, 1000], [-4, 0]]) {
+        const file = v4Map();
+        file.generatorRevision = value;
+        assert.equal(MapImport.read(file).mapData.generatorRevision, kept, String(value));
+    }
+    for (const bad of ["2", "<b>2</b>", null, { revision: 2 }]) {
+        const file = v4Map();
+        file.generatorRevision = bad;
+        const { mapData } = MapImport.read(file);
+        assert.ok(!("generatorRevision" in mapData), JSON.stringify(bad));
+        assert.equal(GeneratorRevision.of(mapData), FILRODENSWMB.GENERATOR.REVISIONS.LEGACY);
+    }
+    for (const odd of [0, 2.6]) assert.equal(GeneratorRevision.of({ generatorRevision: odd }), FILRODENSWMB.GENERATOR.REVISIONS.LEGACY, `${odd}: not a revision, so read as the oldest`);
+});
 
 test("a colour such as red;background:url(…) never passes, in a file or in the inspector", () => {
     const file = v4Map();

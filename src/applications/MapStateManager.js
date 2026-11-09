@@ -111,6 +111,9 @@ export class MapStateManager {
             world: null,
             // Whether the generator's outputs were made with a different km scale than the map has now (see MapStudio's area factor setting)
             generatorStale: false,
+            // A new map follows the current generator rules (see GeneratorRevision); a regional map
+            // takes its parent's (see RegionalExtractor)
+            generatorRevision: FILRODENSWMB.GENERATOR.REVISION,
             // The Generate panel's settings: the run's seed (empty for the map's), name style,
             // world multipliers and output switches (see GeneratePanel)
             generatorSettings: panelSettings(),

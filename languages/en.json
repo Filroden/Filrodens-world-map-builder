@@ -1439,6 +1439,8 @@
     "FILRODENSWMB.UI.GenerateLongRun": "This will take a while. The map can't be used until it finishes, but you can cancel at any point.",
     "FILRODENSWMB.UI.GenerateOutOfDate": "out of date",
     "FILRODENSWMB.UI.GenerateOutOfDateHint": "The terrain, climate, rivers or area factor have changed since the last run. Generate again to bring the realms and settlements up to date.",
+    "FILRODENSWMB.UI.GenerateOlderRevision": "older generator",
+    "FILRODENSWMB.UI.GenerateOlderRevisionHint": "This map was made with an older version of the generator, and keeps its rules (in Travel and Fill in too) until you generate again. Generating uses the current rules: ports only where ships can reach the shore, settlement pins and drawn regions kept, travel times that follow the lie of the land, and more.",
     "FILRODENSWMB.UI.GenerateInheritedNotice": "This regional map holds generated content from the map it was cut from. Generating here replaces it (except what you have edited or locked) with a run made for this map. To keep it and add villages and market towns between its places, use Fill in.",
     "FILRODENSWMB.UI.GenerateSmallWorldNotice": "This map covers a small area, so it gets only a few realms and the larger settlements. A larger area factor (in New map) makes the world larger, with more of them.",
     "FILRODENSWMB.UI.GenerateRun": "Generate",

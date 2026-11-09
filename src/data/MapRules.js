@@ -671,6 +671,8 @@ const MAP = obj({
     // The name every distance shown is labelled with (see MapUnit)
     mapUnit: text("name", "FILRODENSWMB.UI.LimitKindMap", "FILRODENSWMB.UI.LimitFieldMapUnit"),
     generatorStale: bool,
+    // The generator rules the map follows (see GeneratorRevision); absent on maps made before it was kept
+    generatorRevision: int(0, 1000),
     generatorSettings: GENERATOR_PANEL,
     cultures: list(CULTURE),
     upwindMargin: obj(

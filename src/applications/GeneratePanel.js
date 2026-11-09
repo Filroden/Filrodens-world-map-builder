@@ -1,4 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { nameBaseNames } from "../generator/Names.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
@@ -49,14 +50,19 @@ export class GeneratePanel {
         const settings = this.settings(app);
         const hasRun = !!app.modelRun;
         const stale = hasRun && app.uiState.generatorStale === true;
+        // A map made with an older generator keeps its rules (in Travel and Fill in too) until it
+        // is generated again: one notice for every change since (see GeneratorRevision)
+        const older = GeneratorRevision.isOlder(app.uiState);
         return {
             seed: settings.seed,
             mapSeed: String(app.uiState.mapSeed ?? ""),
             nameBases: this.nameBaseChoices(settings.nameBase),
             estimate: this.#estimate(app),
             stale,
-            // The Generation section's badge: Out of date once what the last run read has changed
-            runBadge: stale ? "FILRODENSWMB.UI.GenerateOutOfDate" : null,
+            older,
+            // The Generation section's badge: Out of date once what the last run read has changed,
+            // else Older generator while the map keeps an older generator's rules
+            runBadge: stale ? "FILRODENSWMB.UI.GenerateOutOfDate" : older ? "FILRODENSWMB.UI.GenerateOlderRevision" : null,
             notices: this.#notices(app),
             hasRun,
             world: WORLD_FIELDS.map(({ key, label, hint }) => {

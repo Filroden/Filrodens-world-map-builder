@@ -2348,8 +2348,14 @@ export const FILRODENSWMB = {
     // The figures are tuned to give believable medieval places at world scale, not to be realistic.
     GENERATOR: {
         // Stored with every run so an old run stays explainable after the model changes. Any change
-        // that alters the output for the same seed and settings must bump it.
-        REVISION: 1,
+        // that alters the output for the same seed and settings must bump it. A map records the
+        // revision it was last generated with (or made at, before any run), and what is worked out
+        // live from the map rather than saved with the run (Travel's network, a regional map's
+        // Fill in) follows that map's revision (see GeneratorRevision).
+        REVISION: 2,
+        // Each revision by name, so every rule that differs between them is gated on its own
+        // name: LEGACY for every map made before maps recorded a revision
+        REVISIONS: Object.freeze({ LEGACY: 1, REVISION_2: 2 }),
         // The settings a new run starts from (see GeneratorSettings): one age, high medieval and
         // troubled, the world multipliers at 1, Human Generic names.
         DEFAULT_NAME_BASE: "Human Generic",

@@ -5,6 +5,7 @@ import { engineCultures } from "./CultureInput.js";
 import { resolveCultures, sharesOf, spreadCultures, townMix } from "./Cultures.js";
 import { feedbackPass } from "./Feedback.js";
 import { formerAge } from "./FormerAge.js";
+import { GeneratorRevision } from "./GeneratorRevision.js";
 import { resolveSettings } from "./GeneratorSettings.js";
 import { modelBiomeRaster } from "./ModelBiomes.js";
 import { nameEverything } from "./Names.js";
@@ -73,7 +74,8 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     const settings = resolveSettings(payload.settings, payload.mapSeed);
     const ages = settings.ages;
     const driver = new StageDriver({ onProgress, isCancelled, isStopping, pause, breathMs, ages: ages.length });
-    const run = { settings, age: ages.at(-1), timings: {} };
+    // The rules the run follows (see GeneratorRevision): the current ones unless the payload names older
+    const run = { settings, revision: GeneratorRevision.ofPayload(payload), age: ages.at(-1), timings: {} };
 
     run.cells = await driver.step("values", () => buildModelCells({ ...payload, biome: modelBiomeRaster(payload) }, settings.world), run);
     run.graph = new CellGraph(run.cells);
@@ -381,7 +383,7 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
     const duchyMix = unitCultures(cultures, finalRealms.duchyOfCell, feedback.cellPop, finalRealms.duchies.length);
     const countyMix = unitCultures(cultures, finalRealms.countyOfCell, feedback.cellPop, finalRealms.counties.length);
     return {
-        revision: FILRODENSWMB.GENERATOR.REVISION,
+        revision: run.revision,
         settings,
         modelCells: modelCellOutput(run, feedback, finalRealms),
         modelGraph: { neighbourStart: Int32Array.from(cells.neighbourStart), neighbourList: Int32Array.from(cells.neighbourList) },

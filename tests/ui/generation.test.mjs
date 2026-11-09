@@ -94,6 +94,17 @@ test("a run arrives as one undo step that undoes and redoes exactly", async () =
     assert.deepEqual(app.meshSession.layer(realms).owners, owned, "the realms' cells come back");
 });
 
+test("a run on an older map brings it to the run's generator revision, and undoing the run gives back the older one", async () => {
+    const app = studio();
+    assert.equal(app.uiState.generatorRevision, undefined, "a map saved before revisions were recorded");
+    Generation.apply(app, await islandResult());
+    assert.equal(app.uiState.generatorRevision, FILRODENSWMB.GENERATOR.REVISION);
+    VectorHistory.step(app, true);
+    assert.equal(app.uiState.generatorRevision, FILRODENSWMB.GENERATOR.REVISIONS.LEGACY);
+    VectorHistory.step(app, false);
+    assert.equal(app.uiState.generatorRevision, FILRODENSWMB.GENERATOR.REVISION);
+});
+
 test("pin styles are found by tier, the user's own styles are left alone, and route styles come from the defaults", async () => {
     const app = studio();
     Generation.apply(app, await islandResult());
