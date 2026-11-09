@@ -50,7 +50,16 @@
 
     {{#if generate.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOutOfDateHint"}}</p>{{/if}}
     {{#if generate.older}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOlderRevisionHint"}}</p>{{/if}}
-    {{#each generate.notices}}<p class="fwmb-hint fwmb-generate-notice">{{#if this.text}}{{this.text}}{{else}}{{localize this}}{{/if}}</p>{{/each}}
+    {{#each generate.notices}}
+    {{#if this.items}}
+    <div class="fwmb-generate-notice fwmb-generate-notice--list">
+        <p class="fwmb-hint" data-tooltip="{{this.hint}}">{{this.text}}</p>
+        <ul class="fwmb-hint fwmb-generate-notice-items">{{#each this.items}}<li>{{this}}</li>{{/each}}</ul>
+    </div>
+    {{else}}
+    <p class="fwmb-hint fwmb-generate-notice">{{#if this.text}}{{this.text}}{{else}}{{localize this}}{{/if}}</p>
+    {{/if}}
+    {{/each}}
 
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 

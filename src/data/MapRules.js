@@ -809,6 +809,8 @@ const MODEL_RUN = obj({
     cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
     ages: obj({ asked: int(1, 100), run: int(1, 100) }),
     // The settlement pins the run built on (see Pipeline.markSeatPlaces): how many, and each it could not honour
+    // A fingerprint of the map's own items the run read, as it left them (see RunInputs)
+    inputs: obj({ routes: key, seats: key, regions: key, rivers: key, features: key }, { nullable: true }),
     seats: obj({ used: int(0, 1e6), unhonoured: list(obj({ pin: ref(), kind: enumOf(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]), reason: enumOf(["noPlace", "dry", "notCapital", "water", "islet"]) })) }, { nullable: true }),
     // Each age before the last, in brief (see ModelRun); MapImport checks that its names run with
     // its places, castles and seats, and its arrays with the run's cells

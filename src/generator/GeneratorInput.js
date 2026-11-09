@@ -95,7 +95,7 @@ function modelOfPixels(mesh) {
  * a lake), its flow at each point (upstream length in baseline pixels), and whether it ends by
  * joining another river.
  */
-function riverList(riverData) {
+export function riverList(riverData) {
     const flows = riverData?.network?.flows;
     const list = (riverData?.vectors ?? []).map((river) => {
         const path = river.path ?? [];

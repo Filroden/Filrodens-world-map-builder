@@ -6,6 +6,7 @@ import { LAYERS, ThematicSource, TradeIndex, scalePosition, tradeLines } from ".
 import { CultureMarkers } from "./CultureMarkers.js";
 import { HistoryView } from "./HistoryView.js";
 import { RunCells } from "./RunCells.js";
+import { RunInputs } from "./RunInputs.js";
 import { TravelView } from "./TravelView.js";
 
 /**
@@ -278,13 +279,15 @@ export class ThematicView {
         // The run's id stands for its cultures, which the culture legend lists (an earlier age's
         // run has its own id; see HistoryView.thematicRun)
         const travel = TravelView.legendSignature(app);
-        const signature = layer || trade || travel ? JSON.stringify([layer?.id ?? null, trade, travel, (HistoryView.thematicRun(app) ?? app.modelRun ?? app.parentRun)?.run ?? null, this.inherited(app), cleanUnit(app.uiState?.mapUnit), app.uiState?.generatorStale === true, rtl, layer ? isFolded(layer.id) : false, isFolded("trade"), isFolded("travel")]) : "";
+        // Worked out once a legend is shown, since it reads the map's own items (see RunInputs)
+        const stale = layer || trade ? RunInputs.stale(app) : false;
+        const signature = layer || trade || travel ? JSON.stringify([layer?.id ?? null, trade, travel, (HistoryView.thematicRun(app) ?? app.modelRun ?? app.parentRun)?.run ?? null, this.inherited(app), cleanUnit(app.uiState?.mapUnit), stale, rtl, layer ? isFolded(layer.id) : false, isFolded("trade"), isFolded("travel")]) : "";
         if (container.dataset.signature === signature) return;
         container.dataset.signature = signature;
         const legends = [];
-        if (layer) legends.push(this.#legend(app, layer, { rtl, isFolded: isFolded(layer.id) }));
-        if (trade) legends.push(this.#legend(app, { id: "trade", label: "FILRODENSWMB.UI.ThematicTrade" }, { rtl, isFolded: isFolded("trade") }));
-        if (travel) legends.unshift(this.#legend(app, { id: "travel", label: "FILRODENSWMB.UI.TravelLegendTitle" }, { rtl, isFolded: isFolded("travel") }));
+        if (layer) legends.push(this.#legend(app, layer, { rtl, isFolded: isFolded(layer.id), stale }));
+        if (trade) legends.push(this.#legend(app, { id: "trade", label: "FILRODENSWMB.UI.ThematicTrade" }, { rtl, isFolded: isFolded("trade"), stale }));
+        if (travel) legends.unshift(this.#legend(app, { id: "travel", label: "FILRODENSWMB.UI.TravelLegendTitle" }, { rtl, isFolded: isFolded("travel"), stale }));
         container.replaceChildren(...legends);
     }
 
@@ -302,7 +305,7 @@ export class ThematicView {
         this.renderLegend(app);
     }
 
-    static #legend(app, layer, { rtl, isFolded }) {
+    static #legend(app, layer, { rtl, isFolded, stale }) {
         const doc = app.root.ownerDocument;
         const make = (tag, className, text) => {
             const element = doc.createElement(tag);
@@ -332,7 +335,7 @@ export class ThematicView {
 
         // The day bands are worked out now, from the terrain as it is, so they are never out of date
         if (layer.id !== "travel" && this.inherited(app)) section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicInherited")));
-        else if (app.uiState?.generatorStale === true && layer.id !== "travel") section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicStale")));
+        else if (layer.id !== "travel" && stale) section.append(make("p", "fwmb-legend-note", platform.i18n.localize("FILRODENSWMB.UI.ThematicStale")));
         return section;
     }
 

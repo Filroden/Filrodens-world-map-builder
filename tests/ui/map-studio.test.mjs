@@ -120,3 +120,16 @@ test("the Foundry window closes only when the studio agrees, and destroys it fir
     assert.deepEqual(closed, ["studio", "window"]);
     assert.equal(frame.options.position.width, 700, "opens at most of the browser window's width");
 });
+
+test("a change to the drawn features marks a run out of date by its fingerprint when it keeps one, so undo can clear it; an older run takes the lasting flag", () => {
+    const studio = new MapStudio();
+    const travelBefore = studio.travelInputs ?? 0;
+    studio.modelRun = { run: "r", inputs: { routes: "a", seats: "b", regions: "c", rivers: "d", features: "e" } };
+    studio.uiState.generatorStale = false;
+    studio.requestTerrainUpdate(null, () => {});
+    assert.equal(studio.uiState.generatorStale, false, "the fingerprint shows it instead");
+    assert.equal(studio.travelInputs, travelBefore + 1, "Travel's network is rebuilt either way");
+    studio.modelRun = { run: "r", inputs: { routes: "a", seats: "b", regions: "c", rivers: "d" } };
+    studio.requestTerrainUpdate(null, () => {});
+    assert.equal(studio.uiState.generatorStale, true, "a run without the features' fingerprint");
+});

@@ -13,6 +13,7 @@ import { MapDialogManager } from "./MapDialogManager.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { PinStyles } from "./PinStyles.js";
 import { Regeneration, isKept } from "./Regeneration.js";
+import { RunInputs } from "./RunInputs.js";
 import { VectorHistory } from "./VectorHistory.js";
 
 /**
@@ -408,6 +409,8 @@ export class Generation {
         app.uiState.generatorStale = false;
         app.activeLayerSetId = set.id;
         app.activeLevelId = set.levels[0].id;
+        // The map's own items the run read, as the run leaves them, so a later change shows it out of date
+        app.modelRun.inputs = RunInputs.of(app);
 
         VectorHistory.push(app, VectorHistory.composite([before, ...owners, VectorHistory.modelRun(modelRunBefore, app.modelRun, { before: revisionBefore, after: app.uiState.generatorRevision })]));
         // The map is shown at the detail its scale leaves room for (a view setting, so not undone with the run)

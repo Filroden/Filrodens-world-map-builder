@@ -25,6 +25,7 @@ const { GeneratedEdits } = await import("../../src/applications/GeneratedEdits.j
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
 const { MassEdit } = await import("../../src/applications/MassEdit.js");
 const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
+const { RunInputs } = await import("../../src/applications/RunInputs.js");
 const { runGenerator } = await import("../../src/generator/Pipeline.js");
 const { MeshSession } = await import("../../src/mesh/MeshSession.js");
 const { UNCLAIMED } = await import("../../src/mesh/Schema.js");
@@ -209,6 +210,103 @@ test("the map's own routes go to the run's trade: those drawn by hand and genera
     assert.equal(routes.length, 2, "the edited generated route and the hand-drawn road; not the untouched one, the old road, or one of a single cell");
     assert.equal(routes[0].transport, edited.transport);
     assert.ok(!routes.some((route) => route.cells.join() === untouched.waypoints.map((cell) => mesh.parentOf[cell]).join() && untouched !== edited));
+});
+
+test("a run is out of date once the routes, settlement pins, Political regions or rivers it read change, by any path, and no longer once undone", async () => {
+    const app = studio();
+    Generation.apply(app, await islandResult());
+    const { mesh } = app.meshSession;
+    assert.deepEqual(Object.keys(app.modelRun.inputs), RunInputs.KINDS, "the run keeps a fingerprint of each");
+    assert.deepEqual(RunInputs.changed(app), [], "the map as the run left it");
+    assert.equal(RunInputs.stale(app), false);
+    assert.equal(GeneratePanel.context(app).stale, false);
+
+    // A hand-drawn road: drawn, renamed and restyled (nothing the run reads), then deleted and undone
+    const line = [];
+    for (let x = 150; x <= 260; x += 3) {
+        const cell = app.meshSession.cellAt(x, 180);
+        if (line.at(-1) !== cell) line.push(cell);
+    }
+    VectorHistory.push(app, VectorHistory.snapshot(app));
+    app.mapRoutes.push({ id: "my-road", name: "Old road", transport: "road", waypoints: [line[0], line.at(-1)], legs: [line] });
+    assert.deepEqual(RunInputs.changed(app), ["routes"], "a route drawn");
+    assert.equal(GeneratePanel.context(app).stale, true);
+    assert.equal(GeneratePanel.context(app).runBadge, "FILRODENSWMB.UI.GenerateOutOfDate");
+    VectorHistory.step(app, true);
+    assert.deepEqual(RunInputs.changed(app), [], "and undone");
+    const kept = app.mapRoutes[0];
+    kept.generated.locked = true;
+    assert.deepEqual(RunInputs.changed(app), ["routes"], "a generated route locked is the reader's, so read");
+    app.modelRun.inputs = RunInputs.of(app);
+    Object.assign(kept, { name: "Renamed", color: "#123456", visibility: "none" });
+    assert.deepEqual(RunInputs.changed(app), [], "a name, look or visibility is not read");
+    app.mapRoutes = app.mapRoutes.filter((route) => route !== kept);
+    assert.deepEqual(RunInputs.changed(app), ["routes"], "a route deleted");
+    app.mapRoutes.unshift(kept);
+
+    // A settlement pin drawn on a city style, then moved
+    const city = app.uiState.customPinStyles.find((style) => style.tier === "city");
+    const site = Array.from({ length: mesh.modelCount }, (_, cell) => cell).find((cell) => app.meshSession.aggregates.land[cell] === 1);
+    const pin = { id: "my-city", name: "Hightower", icon: "star", x: mesh.siteX(site), y: mesh.siteY(site), pinStyle: city.id };
+    app.mapPins.push(pin);
+    assert.deepEqual(RunInputs.changed(app), ["seats"]);
+    app.modelRun.inputs = RunInputs.of(app);
+    pin.x += 30;
+    assert.deepEqual(RunInputs.changed(app), ["seats"], "a seat moved");
+    pin.x -= 30;
+    pin.name = "Lowtower";
+    assert.deepEqual(RunInputs.changed(app), [], "a seat renamed is not read");
+
+    // A Political region locked (kept, so read), then given the Independent choice
+    const county = political(app)[0].levels[2].regions[0];
+    county.generated.locked = true;
+    assert.deepEqual(RunInputs.changed(app), ["regions"], "a kept region");
+    app.modelRun.inputs = RunInputs.of(app);
+    county.independent = true;
+    assert.deepEqual(RunInputs.changed(app), ["regions"], "its Independent choice");
+    county.independent = false;
+    // Land made water where no kept region lies (a lake a river source makes) is not a change to the regions
+    const owners = app.meshSession.layer(political(app)[0].levels[2].id).owners;
+    const keptCounties = Regeneration.keptKeys(political(app)[0])[2];
+    const land = app.meshSession.aggregates.land;
+    const elsewhere = land.findIndex((value, cell) => value === 1 && !keptCounties.has(owners[cell]));
+    land[elsewhere] = 0;
+    assert.deepEqual(RunInputs.changed(app), [], "land changed outside the kept regions");
+    land[elsewhere] = 1;
+
+    // The rivers traced again differently (a spring added, a custom river drawn)
+    app.currentRiverData = { vectors: [{ id: "r", mergeInto: null, path: [{ x: 10, y: 20 }, { x: 11, y: 21, isLake: true }] }], network: { flows: new Map([["r", Float32Array.of(1, 2)]]), pixelsPerBaseline: 1 } };
+    assert.deepEqual(RunInputs.changed(app), ["rivers"]);
+    app.modelRun.inputs = RunInputs.of(app);
+    app.currentRiverData = { ...app.currentRiverData, network: { flows: new Map([["r", Float32Array.of(1, 3)]]), pixelsPerBaseline: 1 } };
+    assert.deepEqual(RunInputs.changed(app), ["rivers"], "a river's flow");
+
+    // The drawn features: a custom river and a river source drawn, renamed (not read), moved, and undone
+    app.modelRun.inputs = RunInputs.of(app);
+    assert.equal(RunInputs.tracksFeatures(app), true);
+    app.manualRivers = [{ id: "river", name: "Brook", points: [{ x: 10, y: 10 }, { x: 40, y: 30 }], width: 2, visibility: "all" }];
+    assert.deepEqual(RunInputs.changed(app), ["features"], "a custom river drawn");
+    app.modelRun.inputs = RunInputs.of(app);
+    Object.assign(app.manualRivers[0], { name: "Beck", visibility: "none" });
+    assert.deepEqual(RunInputs.changed(app), [], "a custom river renamed or hidden");
+    app.manualRivers[0].points[1].x = 45;
+    assert.deepEqual(RunInputs.changed(app), ["features"], "and moved");
+    app.manualRivers[0].points[1].x = 40;
+    app.mapPins.push({ id: "spring", name: "River Source", x: 100, y: 80, type: "spring", radius: 6, visibility: "all" });
+    assert.deepEqual(RunInputs.changed(app), ["features"], "a river source placed");
+    app.mapPins.pop();
+    app.tectonicFaults = [{ id: "fault", points: [{ x: 1, y: 1 }, { x: 9, y: 9 }], type: "ridge", thickness: 5, strength: 1 }];
+    assert.deepEqual(RunInputs.changed(app), ["features"], "a fault");
+    app.tectonicFaults = [];
+    assert.deepEqual(RunInputs.changed(app), [], "each taken back");
+
+    // The flag set by the terrain and settings still counts; a run saved without a fingerprint is never out of date by one
+    delete app.modelRun.inputs;
+    assert.equal(RunInputs.stale(app), false);
+    app.uiState.generatorStale = true;
+    assert.equal(RunInputs.stale(app), true);
+    app.modelRun = null;
+    assert.equal(RunInputs.stale(app), false, "no run, nothing out of date");
 });
 
 test("Remove generated content takes what is not kept, drops a set left empty, and is one undo step", async () => {

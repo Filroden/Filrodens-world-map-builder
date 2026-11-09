@@ -407,6 +407,18 @@ test("what a run gave a settlement pin, and the run's report of its seats, keep 
     assert.deepEqual(modelRun?.seats?.unhonoured.map((entry) => Object.keys(entry).sort()) ?? [], [["pin", "reason"], ["kind", "pin"]], "an unknown kind or reason is dropped");
 });
 
+test("a run's fingerprint of the map's own items it read keeps to its rules", () => {
+    const file = v4Map();
+    const inputs = { routes: "302dc36a", seats: "ea11758b", regions: "", rivers: "5c5cca25", features: "0badf00d" };
+    file.modelRun = { ...savedModelRun(), inputs };
+    const kept = MapImport.read(structuredClone(file)).modelRun;
+    assert.deepEqual(kept.inputs, { routes: "302dc36a", seats: "ea11758b", rivers: "5c5cca25", features: "0badf00d" }, "an empty value is no key, so dropped");
+    file.modelRun.inputs = { routes: SCRIPT, seats: 7, rivers: "5c5cca25", extra: "x", __proto__: { polluted: true } };
+    const { modelRun } = MapImport.read(file);
+    assert.deepEqual(modelRun.inputs, { rivers: "5c5cca25" }, "what is no key is dropped, and nothing else is kept");
+    assert.equal({}.polluted, undefined);
+});
+
 test("a colour such as red;background:url(…) never passes, in a file or in the inspector", () => {
     const file = v4Map();
     file.mapPins[0].color = HOSTILE_COLOUR;

@@ -1753,6 +1753,16 @@
 .fwmb-generate-notice {
     color: var(--fwmb-color-warning);
 }
+/* A notice that lists items (the settlement pins a run could not build on): its heading, then the
+   names, both in the hint's colour as the other notices are */
+.fwmb-generate-notice--list .fwmb-hint {
+    margin-block-end: 0.125rem;
+}
+.fwmb-generate-notice-items {
+    margin-block: 0 0.5rem;
+    padding-inline-start: 1.25rem;
+    font-size: var(--fwmb-size-12);
+}
 .fwmb-generate-action {
     display: flex;
     margin: 0.5rem;

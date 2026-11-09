@@ -26,6 +26,7 @@ import { RegionalExtractor } from "./RegionalExtractor.js";
 import { ParentRunRecovery } from "./ParentRunRecovery.js";
 import { RiverRelay } from "./RiverRelay.js";
 import { RunCells } from "./RunCells.js";
+import { RunInputs } from "./RunInputs.js";
 import { Infilling } from "./Infilling.js";
 import { RandomNames } from "./RandomNames.js";
 import { FeatureNames } from "./FeatureNames.js";
@@ -4709,6 +4710,20 @@ export class MapStudio {
 
         const overlay = this.root?.querySelector(".fwmb-processing-overlay");
         if (overlay) overlay.classList.add("fwmb-hidden");
+        this.#showRunInputs();
+    }
+
+    /**
+     * Brings what says a run is out of date up to date once a refresh has finished. The rivers are
+     * traced again in the refresh, after the edit or undo that asked for it has already drawn the
+     * Generate panel and the legends, and a run is out of date by its rivers (see RunInputs), so
+     * without this an undo that restores them would leave Out of date showing until the panel is
+     * next drawn.
+     */
+    #showRunInputs() {
+        if (!this.modelRun) return;
+        if (this.activeTool === "generate") this.view?.render(["context"]);
+        ThematicView.renderLegend(this);
     }
 
     /**
@@ -4722,7 +4737,10 @@ export class MapStudio {
      * @param {Function} generate - The debounced generator to run when updates are live.
      */
     requestTerrainUpdate(bounds = null, generate = this.debouncedCanvasTerrain) {
-        this.#markGeneratorStale();
+        // Every change routed here is to the drawn features (faults, custom rivers, land masks, river
+        // sources). A run that keeps their fingerprint shows out of date by it, so undoing the change
+        // clears it again; an older run needs the lasting flag
+        this.#markGeneratorStale({ lasting: !RunInputs.tracksFeatures(this) });
         this.pendingTerrainBounds = SpatialMath.mergeBounds(this.pendingTerrainBounds, bounds);
         if (this.uiState.liveFeatureUpdates) {
             generate();
@@ -4741,10 +4759,16 @@ export class MapStudio {
     /**
      * Marks the last generator run out of date (the Generate panel says so) once what it read has
      * changed. A map without a run has nothing to be out of date.
+     * @param {{lasting?: boolean}} [options] - lasting: false when the run's fingerprint of the
+     *     map's own items already shows the change (see RunInputs), so only Travel's input moves.
      */
-    #markGeneratorStale() {
+    #markGeneratorStale({ lasting = true } = {}) {
         // The Travel tool's network is built from the same input (see TravelNetwork)
         this.travelInputs = (this.travelInputs ?? 0) + 1;
+        if (!lasting) {
+            if (this.activeTool === "generate") this.view?.render(["context"]);
+            return;
+        }
         if (!this.modelRun || this.uiState.generatorStale) return;
         this.uiState.generatorStale = true;
         if (this.activeTool === "generate") this.view?.render(["context"]);

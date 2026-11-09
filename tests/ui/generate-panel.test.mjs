@@ -148,6 +148,26 @@ test("Out of date shows only for a map with a run, and the notices follow the ma
     assert.ok(GeneratePanel.context(small).notices.includes("FILRODENSWMB.UI.GenerateSmallWorldNotice"));
 });
 
+test("the settlement pins a run could not build on are listed under one heading per reason, its tooltip giving the detail", () => {
+    const pins = [{ id: "a", name: "Ushaak" }, { id: "b", name: "Tower of the Raathmuarglig" }, { id: "c", name: "Uvamag" }, { id: "d", name: "" }, { id: "e", name: "Seaport" }];
+    const unhonoured = [
+        { pin: "a", kind: "town", reason: "islet" },
+        { pin: "b", kind: "castle", reason: "islet" },
+        { pin: "c", kind: "town", reason: "islet" },
+        { pin: "e", kind: "port", reason: "dry" },
+        { pin: "d", kind: "city", reason: "water" },
+        { pin: "gone", kind: "city", reason: "water" },
+        { pin: "a", kind: "town", reason: "unknown" },
+    ];
+    const app = studio({ mapPins: pins, modelRun: { run: "mine", stats: {}, seats: { used: 5, unhonoured } } });
+    const groups = GeneratePanel.context(app).notices.filter((notice) => notice.items);
+    assert.deepEqual(groups, [
+        { text: "FILRODENSWMB.UI.GenerateSeatWaterHeading", hint: "FILRODENSWMB.UI.GenerateSeatWaterHint", items: ["FILRODENSWMB.UI.GenerateSeatUnnamed"] },
+        { text: "FILRODENSWMB.UI.GenerateSeatIsletHeading", hint: "FILRODENSWMB.UI.GenerateSeatIsletHint", items: ["Tower of the Raathmuarglig", "Ushaak", "Uvamag"] },
+        { text: "FILRODENSWMB.UI.GenerateSeatDryHeading", hint: "FILRODENSWMB.UI.GenerateSeatDryHint", items: ["Seaport"] },
+    ], "by reason, names in order, a deleted pin and an unknown reason left out, a reason with none left giving no notice");
+});
+
 test("the results count what the last run left on the map", () => {
     const run = "last";
     const app = studio({

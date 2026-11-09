@@ -6,6 +6,18 @@ import { GeneratedDetails } from "./GeneratedDetails.js";
 import { platform } from "../platform/index.js";
 import { Generation } from "./Generation.js";
 import { isKept } from "./Regeneration.js";
+import { RunInputs } from "./RunInputs.js";
+
+/** Why a run could not build on a settlement pin as its style asked (see Pipeline.markSeatPlaces), in the order the notices list them. */
+const SEAT_REASONS = Object.freeze(["water", "islet", "dry", "notCapital", "noPlace"]);
+/** Each reason's notice: its heading and its tooltip. */
+const SEAT_NOTICE = Object.freeze({
+    water: { heading: "FILRODENSWMB.UI.GenerateSeatWaterHeading", hint: "FILRODENSWMB.UI.GenerateSeatWaterHint" },
+    islet: { heading: "FILRODENSWMB.UI.GenerateSeatIsletHeading", hint: "FILRODENSWMB.UI.GenerateSeatIsletHint" },
+    dry: { heading: "FILRODENSWMB.UI.GenerateSeatDryHeading", hint: "FILRODENSWMB.UI.GenerateSeatDryHint" },
+    notCapital: { heading: "FILRODENSWMB.UI.GenerateSeatNotCapitalHeading", hint: "FILRODENSWMB.UI.GenerateSeatNotCapitalHint" },
+    noPlace: { heading: "FILRODENSWMB.UI.GenerateSeatNoPlaceHeading", hint: "FILRODENSWMB.UI.GenerateSeatNoPlaceHint" },
+});
 
 /**
  * The Generate tool's panel (templates/tools-generate.hbs): the settings a run is made with, kept
@@ -50,7 +62,8 @@ export class GeneratePanel {
     static context(app) {
         const settings = this.settings(app);
         const hasRun = !!app.modelRun;
-        const stale = hasRun && app.uiState.generatorStale === true;
+        // Out of date: what the run read has changed, the map's own routes, pins, regions and rivers included
+        const stale = RunInputs.stale(app);
         // A map made with an older generator keeps its rules (in Travel and Fill in too) until it
         // is generated again: one notice for every change since (see GeneratorRevision)
         const older = GeneratorRevision.isOlder(app.uiState);
@@ -188,8 +201,10 @@ export class GeneratePanel {
      * The notices the panel shows: on a regional map holding content generated on the map it was
      * cut from, that in-fill is the way to refine it; on a map covering a small area, that it will
      * get few realms and only the larger settlements; and, after a run, each culture whose
-     * homelands were not all on land (some left out, and one placed for it when none was left).
-     * @returns {(string|{text: string})[]} Localisation keys, or text already put together.
+     * homelands were not all on land (some left out, and one placed for it when none was left),
+     * and the settlement pins it could not build on as their styles asked, grouped by why.
+     * @returns {(string|{text: string, hint?: string, items?: string[]})[]} Localisation keys, or
+     *     text already put together (with a group's tooltip and the names it lists).
      */
     static #notices(app) {
         const notices = [];
@@ -210,13 +225,27 @@ export class GeneratePanel {
         return notices;
     }
 
-    /** Each settlement pin the last run could not build on as its style asked, by name (pins deleted since are left out). */
+    /**
+     * The settlement pins the last run could not build on as their styles asked, one notice per
+     * reason (in SEAT_REASONS' order): a heading saying why, a tooltip with the detail, and the
+     * pins' names in alphabetical order. Pins deleted since are left out, and a reason with none
+     * left gives no notice.
+     */
     static #seatNotices(app) {
         const byId = new Map((app.mapPins ?? []).map((pin) => [pin.id, pin]));
-        const keys = { dry: "FILRODENSWMB.UI.GenerateSeatDryNotice", notCapital: "FILRODENSWMB.UI.GenerateSeatNotCapitalNotice", noPlace: "FILRODENSWMB.UI.GenerateSeatNoPlaceNotice", water: "FILRODENSWMB.UI.GenerateSeatWaterNotice", islet: "FILRODENSWMB.UI.GenerateSeatIsletNotice" };
-        return (app.modelRun?.seats?.unhonoured ?? [])
-            .filter(({ pin, reason }) => byId.has(pin) && keys[reason])
-            .map(({ pin, reason }) => ({ text: platform.i18n.format(keys[reason], { name: byId.get(pin).name || platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatUnnamed") }) }));
+        const unnamed = platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatUnnamed");
+        const names = new Map(SEAT_REASONS.map((reason) => [reason, []]));
+        for (const { pin, reason } of app.modelRun?.seats?.unhonoured ?? []) {
+            if (byId.has(pin) && names.has(reason)) names.get(reason).push(byId.get(pin).name || unnamed);
+        }
+        return SEAT_REASONS.filter((reason) => names.get(reason).length).map((reason) => {
+            const { heading, hint } = SEAT_NOTICE[reason];
+            return {
+                text: platform.i18n.localize(heading),
+                hint: platform.i18n.localize(hint),
+                items: names.get(reason).sort((a, b) => a.localeCompare(b)),
+            };
+        });
     }
 
     /**
