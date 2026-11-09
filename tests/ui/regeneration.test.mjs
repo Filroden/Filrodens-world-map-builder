@@ -184,6 +184,33 @@ test("settlement pins are seats: a hand-placed one gains the run's figures and s
     assert.equal(app.mapPins.find((pin) => pin.id === "my-city").modelled.run, run, "undo brings it back");
 });
 
+test("the map's own routes go to the run's trade: those drawn by hand and generated ones kept, by their model cells, but not an old road or one a run replaces", async () => {
+    const app = studio();
+    Generation.apply(app, await islandResult());
+    const { mesh } = app.meshSession;
+    const [edited, untouched, old] = app.mapRoutes;
+    edited.generated.edited = true;
+    old.generated.locked = true;
+    old.generated.oldRoad = true;
+    // A road drawn by hand along display cells, with a stretch in one model cell
+    const line = [];
+    for (let x = 150; x <= 260; x += 3) {
+        const cell = app.meshSession.cellAt(x, 180);
+        if (line.at(-1) !== cell) line.push(cell);
+    }
+    const mine = { id: "my-road", transport: "road", waypoints: [line[0], line.at(-1)], legs: [line] };
+    const lone = { id: "short", transport: "sea", waypoints: [line[0]], legs: [] };
+    app.mapRoutes.push(mine, lone);
+
+    const routes = Generation.userRoutes(app);
+    const expected = [];
+    for (const cell of line) if (expected.at(-1) !== mesh.parentOf[cell]) expected.push(mesh.parentOf[cell]);
+    assert.deepEqual(routes.at(-1), { transport: "road", cells: expected }, "a hand-drawn road by the model cells its line passes, repeats dropped");
+    assert.equal(routes.length, 2, "the edited generated route and the hand-drawn road; not the untouched one, the old road, or one of a single cell");
+    assert.equal(routes[0].transport, edited.transport);
+    assert.ok(!routes.some((route) => route.cells.join() === untouched.waypoints.map((cell) => mesh.parentOf[cell]).join() && untouched !== edited));
+});
+
 test("Remove generated content takes what is not kept, drops a set left empty, and is one undo step", async () => {
     const app = studio();
     Generation.apply(app, await islandResult());

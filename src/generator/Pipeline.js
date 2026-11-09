@@ -11,6 +11,7 @@ import { modelBiomeRaster } from "./ModelBiomes.js";
 import { nameEverything } from "./Names.js";
 import { buildRealms } from "./Realms.js";
 import { buildRealmsAround, userZones } from "./UserRealms.js";
+import { applyUserRivers, uncoveredTraffic, userRoutes } from "./UserRoutes.js";
 import { routeChains } from "./RouteChains.js";
 import { placeTowns } from "./Towns.js";
 import { tradeRounds } from "./Trade.js";
@@ -89,6 +90,9 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     // The map's own realms, duchies and counties, which the present age's realms are built round
     run.userZones = run.rules.userRegions ? userZones(payload.userRegions, run.cells) : null;
     run.graph = new CellGraph(run.cells);
+    // The map's own routes, which the run's trade may use in every age (see UserRoutes)
+    run.userRoutes = run.rules.userRoutes ? userRoutes(payload.routes, run.graph) : null;
+    if (run.userRoutes) applyUserRivers(run.graph, run.userRoutes.rivers);
     const people = cultureList(settings, payload);
 
     let previous = null;
@@ -139,17 +143,18 @@ async function runAge(run, driver, { settings, people, ages, index, previous }) 
     const { list, invader } = agePeople(settings, people, ages, index);
     const cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(list), { invader }), run);
     const common = { cultures, world: settings.world, rules: run.rules };
+    const userBuilt = run.userRoutes?.built ?? null;
     // The map's own regions hold in the present age only: the ages before are its history
     const userZonesOfAge = index === ages.length - 1 ? run.userZones : null;
     const realmsOf = (context) => (userZonesOfAge ? buildRealmsAround(run.graph, { ...context, userZones: userZonesOfAge }) : buildRealms(run.graph, context));
     const towns = await driver.stage("towns", () => placeTowns(run.graph, { ...common, era: age, previous }), run);
-    const trade = await driver.stage("trade", () => tradeRounds(run.graph, { ...common, towns: towns.towns, cellPop: towns.cellPop, totalPop: towns.totalPop, built: previous?.built ?? null }), run);
+    const trade = await driver.stage("trade", () => tradeRounds(run.graph, { ...common, towns: towns.towns, cellPop: towns.cellPop, totalPop: towns.totalPop, built: previous?.built ?? null, userBuilt }), run);
     const realms = await driver.step("realms", () => realmsOf({ ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, keptSeats: previous?.seats ?? null }), run);
     const strifeAt = invader >= 0 && previous ? invasionStrife(run.cells, cultures, invader, previous, age.strife) : null;
     const feedback = await driver.step("feedback", () => feedbackPass(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, realms, strife: age.strife, strifeAt }), run);
 
     const final = { traffic: trade.traffic, security: feedback.security, royalSeats: feedback.royalSeats };
-    const finalTrade = await driver.stage("finalTrade", () => tradeRounds(run.graph, { ...common, towns: feedback.towns, cellPop: feedback.cellPop, totalPop: feedback.totalPop, final }), run);
+    const finalTrade = await driver.stage("finalTrade", () => tradeRounds(run.graph, { ...common, towns: feedback.towns, cellPop: feedback.cellPop, totalPop: feedback.totalPop, final, userBuilt }), run);
     const finalRealms = await driver.step("finalRealms", () => realmsOf({ ...common, towns: finalTrade.towns, cellPop: feedback.cellPop, traffic: finalTrade.traffic, fixedSeats: feedback.royalSeats }), run);
 
     return {
@@ -239,7 +244,7 @@ function formerResult(run, result, former, names, history) {
     }));
     const abandonedCastles = former.castles.map((castle, index) => ({ kind: "abandonedCastle", cell: castle.cell, name: names.former.castles[index].name, keep: names.former.castles[index].keep, formerAge: formerAgeNumber }));
     const nodes = [...result.places.map((place) => place.cell), ...ruins.map((ruin) => ruin.cell)];
-    const oldRoads = routeChains(run.graph, former.oldTraffic, nodes).filter((chain) => chain.transport === "road");
+    const oldRoads = routeChains(run.graph, uncoveredTraffic(former.oldTraffic, run.userRoutes?.covered), nodes).filter((chain) => chain.transport === "road");
     return { ruins, abandonedCastles, oldRoads };
 }
 
@@ -390,7 +395,8 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
         ...finalTrade.towns.map((town) => townPlace(run, town, names, seats, feedback.cellPop)),
         ...feedback.castles.map((castle, index) => castlePlace(castle, names.castles[index])),
     ];
-    const routes = routeChains(graph, finalTrade.traffic, finalTrade.towns.map((town) => town.cell));
+    // No route is laid where the map already has one of its own (see UserRoutes)
+    const routes = routeChains(graph, uncoveredTraffic(finalTrade.traffic, run.userRoutes?.covered), finalTrade.towns.map((town) => town.cell));
     const people = peopleByUnit(feedback.cellPop, finalRealms);
     const realmMix = unitCultures(cultures, finalRealms.realmOfCell, feedback.cellPop, finalRealms.realms.length);
     const duchyMix = unitCultures(cultures, finalRealms.duchyOfCell, feedback.cellPop, finalRealms.duchies.length);

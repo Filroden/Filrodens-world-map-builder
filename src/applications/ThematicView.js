@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { platform } from "../platform/index.js";
 import { cleanUnit, formatDistance } from "../data/MapUnit.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { LAYERS, ThematicSource, TradeIndex, scalePosition, tradeLines } from "../thematic/ThematicData.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 import { HistoryView } from "./HistoryView.js";
@@ -36,11 +37,14 @@ const PERCENT = 100;
 /** A trade legend sample's thickness per map pixel of the line it stands for (rem). */
 const LINE_SAMPLE_REM = 0.0625;
 
-/** What the generated routes are now, in brief: the trade lines follow their legs. */
+/**
+ * What the routes the trade lines may follow are now, in brief: the generated routes (but old
+ * roads) and those drawn by hand, whose legs the lines follow.
+ */
 function routeSignature(routes) {
     let signature = "";
     for (const route of routes ?? []) {
-        if (!route?.generated || route.generated.oldRoad) continue;
+        if (!route || route.generated?.oldRoad) continue;
         let cells = 0;
         for (const leg of route.legs ?? []) cells += leg.length;
         signature += `${route.id}:${route.waypoints?.length ?? 0}:${cells};`;
@@ -119,7 +123,8 @@ export class ThematicView {
 
     /**
      * The trade lines and their index (see ThematicData.tradeLines), worked out again only when
-     * the run or the generated routes they follow change (a route edited, deleted or undone).
+     * the run or the routes they follow change (a route drawn, edited, deleted or undone). A run
+     * whose trade used the map's own routes (see UserRoutes) draws its trade along them too.
      * @returns {{lines: object[], index: TradeIndex}|null}
      */
     static #trade(app) {
@@ -129,7 +134,9 @@ export class ThematicView {
         const signature = routeSignature(app.mapRoutes);
         const cached = trades.get(app);
         if (cached?.source === source && cached.signature === signature) return cached;
-        const lines = tradeLines(trade, this.#runCells(app).cells, app.mapRoutes);
+        const { run, cells } = this.#runCells(app);
+        const userRoutes = GeneratorRevision.rules(run?.revision ?? FILRODENSWMB.GENERATOR.REVISIONS.LEGACY).userRoutes;
+        const lines = tradeLines(trade, cells, app.mapRoutes, { userRoutes });
         const made = { source, signature, lines, index: new TradeIndex(lines, app.mapWidth) };
         trades.set(app, made);
         return made;

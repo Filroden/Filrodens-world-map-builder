@@ -25,6 +25,10 @@ import { SearchSpace, leastCostPerKm } from "./Search.js";
  * the great sea lanes gain ports (and, by the trade-town rule, towns) where the gravity links alone
  * would sail past.
  *
+ * The map's own roads and sea routes (with the userRoutes rule) are built before the first link is
+ * laid, and its river routes are rivers in the graph itself (see UserRoutes), so trade takes them
+ * where they make the way cheaper, as it does a road the model built.
+ *
  * The final round (after the feedback pass) starts from the roads and lanes already built and the
  * towns as the feedback pass left them, their trade share removed so it is recomputed, and traders
  * avoid insecure ground.
@@ -46,6 +50,8 @@ const REPORT_EVERY = 32;
  * @param {object} [context.final] - { traffic (the earlier rounds' traffic per edge), security, royalSeats: Set }
  * @param {Uint8Array} [context.built] - Edges the age before built as roads and lanes (see Pipeline):
  *     the first round starts from them.
+ * @param {Uint8Array} [context.userBuilt] - Edges the map's own routes make roads and lanes (see
+ *     UserRoutes): built from the start of every round, so no new road is counted on them.
  * @returns {Generator<number, {towns: object[], traffic: Float64Array, newRoadKm: number}>}
  */
 export function* tradeRounds(graph, context) {
@@ -77,6 +83,8 @@ function createState(graph, context) {
     };
     if (final) preloadRoads(state, final.traffic);
     else if (context.built) for (let edge = 0; edge < graph.edgeCount; edge++) if (context.built[edge]) state.road[edge] = 1;
+    // The map's own roads and lanes are built from the start, in every round (see UserRoutes)
+    if (context.userBuilt) for (let edge = 0; edge < graph.edgeCount; edge++) if (context.userBuilt[edge]) state.road[edge] = 1;
     indexTowns(state);
     return state;
 }

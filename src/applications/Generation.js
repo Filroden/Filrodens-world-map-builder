@@ -188,6 +188,7 @@ export class Generation {
             seats: this.seats(app),
             revision,
             userRegions,
+            routes: this.userRoutes(app),
         });
     }
 
@@ -270,6 +271,33 @@ export class Generation {
             cellsOf.get(best).push(modelCell);
         }
         return level.regions.filter((region) => keys.has(region.key)).map((region) => ({ key: region.key, cells: (cellsOf.get(region.key) ?? []).sort((a, b) => a - b), independent: region.independent === true }));
+    }
+
+    /**
+     * The map's own routes as the run's trade may use them (see UserRoutes): every route drawn by
+     * hand, and every generated one a run keeps (edited or locked), since a run lays its own routes
+     * only where the map has none (an earlier age's old road is left out: it carries no trade).
+     * Each is its transport and the model cells its drawn line passes through, in order: its legs'
+     * display cells (or, for a route without legs, its waypoints), each read as its model cell,
+     * with repeats in a row dropped.
+     * @param {object} app
+     * @returns {{transport: string, cells: number[]}[]}
+     */
+    static userRoutes(app) {
+        const mesh = app.meshSession?.mesh;
+        if (!mesh) return [];
+        const routes = [];
+        for (const route of app.mapRoutes ?? []) {
+            if (route.generated && (!isKept(route) || route.generated.oldRoad)) continue;
+            const line = route.legs?.length ? route.legs.flat() : (route.waypoints ?? []);
+            const cells = [];
+            for (const display of line) {
+                const cell = Number.isInteger(display) && display >= 0 && display < mesh.cellCount ? mesh.parentOf[display] : -1;
+                if (cell >= 0 && cells.at(-1) !== cell) cells.push(cell);
+            }
+            if (cells.length >= 2) routes.push({ transport: route.transport ?? "road", cells });
+        }
+        return routes;
     }
 
     /**

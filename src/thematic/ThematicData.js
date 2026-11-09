@@ -467,14 +467,20 @@ function smoothed(points) {
     return out;
 }
 
+const edgeKey = (a, b) => (a < b ? `${a},${b}` : `${b},${a}`);
+
 /**
- * The display legs of the generated routes, by the pair of model cells they join ("a,b", the lower
- * first): a generated route's waypoints are the model sites its chain ran through (or display cells
- * beside them, where a lane or river route had to be snapped onto water), so each leg joins two
- * model cells that a trade edge joins. Old roads (an earlier age's) are left out: they carry no
- * trade now. A route the user has deleted leaves no leg, and its edges are drawn straight.
+ * The display legs of the routes, by the pair of model cells they join ("a,b", the lower first).
+ *
+ * A generated route's waypoints are the model sites its chain ran through (or display cells beside
+ * them, where a lane or river route had to be snapped onto water), so each leg joins two model
+ * cells that a trade edge joins. Old roads (an earlier age's) are left out: they carry no trade
+ * now. A route the user has deleted leaves no leg, and its edges are drawn straight.
+ *
+ * With `userRoutes` (a run whose trade used the map's own routes; see UserRoutes), the routes
+ * drawn by hand then give the pairs no generated route gives (see userLegs).
  */
-function legsByModelEdge(mesh, routes) {
+function legsByModelEdge(mesh, routes, userRoutes) {
     const legs = new Map();
     for (const route of routes ?? []) {
         if (!route?.generated || route.generated.oldRoad || !Array.isArray(route.waypoints) || !Array.isArray(route.legs)) continue;
@@ -483,31 +489,66 @@ function legsByModelEdge(mesh, routes) {
             const b = mesh.parentOf[route.waypoints[at + 1]];
             const leg = route.legs[at];
             if (a === undefined || b === undefined || a === b || !Array.isArray(leg) || leg.length < 2) continue;
-            legs.set(a < b ? `${a},${b}` : `${b},${a}`, leg);
+            legs.set(edgeKey(a, b), leg);
         }
     }
+    if (userRoutes) for (const route of routes ?? []) if (route && !route.generated) userLegs(mesh, route, legs);
     return legs;
 }
 
 /**
+ * A hand-drawn route's stretches between the model cells it passes through, added for each pair
+ * not yet given. Its waypoints lie anywhere, so its line (its legs' display cells, in order) is
+ * read as runs of display cells in one model cell; a trade edge between two cells the line passes
+ * from one to the next is drawn along the line from the middle of the one run to the middle of the
+ * other. A run two along is paired too, after every pair of neighbouring runs, since the model's
+ * edge can skip a cell the line only clips (see UserRoutes, which reads the line the same way).
+ */
+function userLegs(mesh, route, legs) {
+    const line = [];
+    for (const cell of (route.legs?.length ? route.legs.flat() : route.waypoints) ?? []) if (line.at(-1) !== cell) line.push(cell);
+    const runs = [];
+    line.forEach((cell, at) => {
+        const model = mesh.parentOf[cell];
+        if (model === undefined) return;
+        if (runs.at(-1)?.model === model) runs.at(-1).end = at;
+        else runs.push({ model, start: at, end: at });
+    });
+    const middle = (run) => Math.floor((run.start + run.end) / 2);
+    for (const gap of USER_RUN_GAPS) {
+        for (let at = 0; at + gap < runs.length; at++) {
+            const key = edgeKey(runs[at].model, runs[at + gap].model);
+            if (runs[at].model === runs[at + gap].model || legs.has(key)) continue;
+            legs.set(key, line.slice(middle(runs[at]), middle(runs[at + gap]) + 1));
+        }
+    }
+}
+
+/** The runs of a hand-drawn route's line paired with each run (see userLegs): the next, then the one after. */
+const USER_RUN_GAPS = Object.freeze([1, 2]);
+
+/**
  * The trade as lines to draw: each edge along the display leg of the generated route that joins
- * its two model cells, so the flow follows the drawn roads, rivers and lanes, or, where no route
+ * its two model cells (or, for a run whose trade used the map's own routes, a hand-drawn route's
+ * stretch between them), so the flow follows the drawn roads, rivers and lanes, or, where no route
  * joins them, straight between the two model sites. Each line has its points (map pixels, smoothed
  * once), its transport (an index into TRADE.TRANSPORTS), its class (TRADE.CLASSES) and its traffic.
  * Quiet lines come first, so the busiest are drawn on top.
  * @param {{from: ArrayLike<number>, to: ArrayLike<number>, kind: ArrayLike<number>, value: ArrayLike<number>}} trade
  * @param {import("../mesh/MeshBuilder.js").Mesh} mesh - Or cells of the same shape (see RunCells).
  * @param {object[]} routes - The map's routes.
+ * @param {{userRoutes?: boolean}} [options] - userRoutes: whether the run's trade used the map's
+ *     own routes (GeneratorRevision.rules for the run's revision), so hand-drawn routes carry it.
  * @returns {{points: number[], kind: number, cls: number, value: number}[]}
  */
-export function tradeLines(trade, mesh, routes) {
-    const legs = legsByModelEdge(mesh, routes);
+export function tradeLines(trade, mesh, routes, { userRoutes = false } = {}) {
+    const legs = legsByModelEdge(mesh, routes, userRoutes);
     const lines = [];
     for (let edge = 0; edge < trade.from.length; edge++) {
         const a = trade.from[edge];
         const b = trade.to[edge];
         if (!(a >= 0 && a < mesh.modelCount && b >= 0 && b < mesh.modelCount)) continue;
-        const leg = legs.get(a < b ? `${a},${b}` : `${b},${a}`);
+        const leg = legs.get(edgeKey(a, b));
         const points = [];
         if (leg) for (const cell of leg) points.push(mesh.siteX(cell), mesh.siteY(cell));
         // A mesh's model sites are its first display sites; other cells (a regional map's copy of

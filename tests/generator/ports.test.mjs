@@ -34,9 +34,9 @@ function islandCells() {
 
 test("revision 1 keeps the old rules, and the legacy settings of revision 2's rules give its run exactly", async () => {
     const old = GeneratorRevision.rules(LEGACY);
-    assert.deepEqual({ ...old }, { portWaterShare: null, fishingDensity: 8, callKm: null, callShare: 0.25, shorePins: false, seats: false, userRegions: false });
+    assert.deepEqual({ ...old }, { portWaterShare: null, fishingDensity: 8, callKm: null, callShare: 0.25, shorePins: false, seats: false, userRegions: false, userRoutes: false });
     const now = GeneratorRevision.rules(REVISION_2);
-    assert.deepEqual({ ...now }, { portWaterShare: 0.02, fishingDensity: 30, callKm: 150, callShare: 0.25, shorePins: true, seats: true, userRegions: true });
+    assert.deepEqual({ ...now }, { portWaterShare: 0.02, fishingDensity: 30, callKm: 150, callShare: 0.25, shorePins: true, seats: true, userRegions: true, userRoutes: true });
 
     const legacy = await runGenerator({ ...syntheticMap().makePayload(), revision: LEGACY }, quick);
     // Every cell wet (a share of 0), fishing as before, no calls, pins on their sites

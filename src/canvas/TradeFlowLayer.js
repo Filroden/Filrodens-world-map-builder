@@ -8,8 +8,9 @@ import { FILRODENSWMB } from "../config.js";
  * repaint of the vectors would cost more than everything else drawn then.
  *
  * While the lines are shown the routes beneath are drawn fainter (TRADE.ROUTE_ALPHA), hand-placed
- * and generated alike: trade follows only the generated routes, so a hand-placed route would
- * otherwise be the one road on the map with nothing over it.
+ * and generated alike, so the trade reads first: a hand-placed route carries trade only in a run
+ * that used the map's own routes (see UserRoutes), and one that carries none would otherwise be
+ * the one road on the map with nothing over it.
  */
 export class TradeFlowLayer {
     #pixi;

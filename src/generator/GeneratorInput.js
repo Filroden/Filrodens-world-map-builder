@@ -33,6 +33,9 @@ import { FILRODENSWMB } from "../config.js";
  * @property {{realms: object[], duchies: object[], counties: object[]}|null} userRegions - The map's
  *   own realms, duchies and counties a run builds round (see Generation.userRegions and
  *   UserRealms), each `{ key, cells, independent? }` by model cell; null for none.
+ * @property {{transport: string, cells: number[]}[]} routes - The map's own routes the run's trade
+ *   may use (see Generation.userRoutes and UserRoutes), each by its transport and the model cells
+ *   its drawn line passes through, in order.
  */
 
 /**
@@ -49,9 +52,10 @@ import { FILRODENSWMB } from "../config.js";
  * @param {{cell: number, kind: string, pin: string, x?: number, y?: number, land?: boolean}[]} [source.seats] - Settlement pins as seats.
  * @param {number} [source.revision] - The generator rules to follow; the current ones when left out.
  * @param {object|null} [source.userRegions] - The map's own realms, duchies and counties (see GeneratorPayload).
+ * @param {{transport: string, cells: number[]}[]} [source.routes] - The map's own routes (see GeneratorPayload).
  * @returns {GeneratorPayload}
  */
-export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverData = null, biomeParams = null, customBiomes = [], mapSeed, settings = {}, seats = [], revision = FILRODENSWMB.GENERATOR.REVISION, userRegions = null }) {
+export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverData = null, biomeParams = null, customBiomes = [], mapSeed, settings = {}, seats = [], revision = FILRODENSWMB.GENERATOR.REVISION, userRegions = null, routes = [] }) {
     return {
         width: mesh.width,
         height: mesh.height,
@@ -73,6 +77,7 @@ export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverD
         seats: seats.map(({ cell, kind, pin, x = null, y = null, land = null }) => ({ cell, kind, pin, x, y, land })),
         revision,
         userRegions: userRegions ? structuredClone(userRegions) : null,
+        routes: routes.map(({ transport, cells }) => ({ transport, cells: Array.from(cells) })),
     };
 }
 

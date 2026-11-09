@@ -75,8 +75,10 @@ export class GeneratorRevision {
      * - seats: whether the map's settlement pins are seats the run must build on (see Pipeline.seatsOf).
      * - userRegions: whether the realms, duchies and counties the map's Political set holds as its
      *   own are fixed units the present age's realms are built round (see UserRealms).
+     * - userRoutes: whether the map's own routes are roads, sea lanes and traded rivers the run's
+     *   trade may use (see UserRoutes).
      * @param {number} revision
-     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean, seats: boolean, userRegions: boolean}}
+     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean, seats: boolean, userRegions: boolean, userRoutes: boolean}}
      */
     static rules(revision) {
         const G = FILRODENSWMB.GENERATOR;
@@ -89,6 +91,7 @@ export class GeneratorRevision {
             shorePins: ports,
             seats: ports,
             userRegions: ports,
+            userRoutes: ports,
         });
     }
 
