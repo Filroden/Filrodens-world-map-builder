@@ -56,13 +56,37 @@ export function* placeTowns(graph, { cultures, era, world, previous = null }) {
     // The age before's towns, by cell: the smallest tier at which each is favoured
     const earlier = new Map((previous?.towns ?? []).map((town) => [town.cell, town.tier]));
     for (let tier = 0; tier < tiers.length; tier++) {
+        placeSeats(state, cells, tier);
         const potential = yield* potentials(state, tier, (done) => (tier + done) / tiers.length);
         for (const [cell, earlierTier] of earlier) if (earlierTier <= tier) potential[cell] *= 1 + FILRODENSWMB.GENERATOR.AGES.INERTIA;
         placeTier(state, tier, potential);
         pruneTier(state, tier);
     }
+    markSeats(state, cells);
     const towns = sizeTowns(state);
     return { towns, cellPop, totalPop };
+}
+
+/**
+ * A tier's seats (see Pipeline.seatsOf: settlement pins the run must build on), placed before the
+ * tier's free towns wherever they are, so the free towns keep their spacing from them; a town of a
+ * bigger tier already on the cell honours the seat. A seat is never pruned and is kept however few
+ * people its catchment holds (seatTier).
+ */
+function placeSeats(state, cells, tier) {
+    for (const [cell, seat] of cells.seats ?? []) {
+        if (seat.tier !== tier || state.townAt[cell] >= 0 || !cells.landKm2[cell]) continue;
+        state.townAt[cell] = state.towns.length;
+        state.towns.push({ cell, tier, population: 0, origin: "seat", seatTier: tier });
+    }
+}
+
+/** A free town placed on a seat's cell before the seat's tier came round is the seat, at its own tier or the seat's. */
+function markSeats(state, cells) {
+    for (const town of state.towns) {
+        const seat = cells.seats?.get(town.cell);
+        if (seat?.tier !== undefined && town.seatTier === undefined) town.seatTier = Math.max(town.tier, seat.tier);
+    }
 }
 
 /** The tiers with the urbanisation setting applied to their urban shares. */
@@ -155,7 +179,7 @@ function pruneTier(state, tierIndex) {
         const sums = catchmentSums(state, tierIndex);
         const weak = [];
         state.towns.forEach((town, index) => {
-            if (town.tier === tierIndex && tier.urbanShare * sums[index] < tier.minPop) weak.push(index);
+            if (town.tier === tierIndex && town.seatTier === undefined && tier.urbanShare * sums[index] < tier.minPop) weak.push(index);
         });
         if (!weak.length) return;
         weak.sort((a, b) => sums[a] - sums[b] || a - b);
@@ -176,5 +200,5 @@ function sizeTowns(state) {
         });
     }
     const keep = FILRODENSWMB.GENERATOR.TOWNS.KEEP_SHARE;
-    return towns.filter((town) => town.population >= tiers[town.tier].minPop * keep).sort((a, b) => b.population - a.population || a.cell - b.cell);
+    return towns.filter((town) => town.seatTier !== undefined || town.population >= tiers[town.tier].minPop * keep).sort((a, b) => b.population - a.population || a.cell - b.cell);
 }

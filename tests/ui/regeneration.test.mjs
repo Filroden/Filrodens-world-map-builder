@@ -18,6 +18,8 @@ installPlatform({
 });
 
 const { Generation } = await import("../../src/applications/Generation.js");
+const { GeneratePanel } = await import("../../src/applications/GeneratePanel.js");
+const { GeneratedDetails } = await import("../../src/applications/GeneratedDetails.js");
 const { Regeneration } = await import("../../src/applications/Regeneration.js");
 const { GeneratedEdits } = await import("../../src/applications/GeneratedEdits.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
@@ -137,6 +139,49 @@ test("a port or river town standing off its cell's site is not put beside a kept
     assert.deepEqual(Regeneration.placesBeside(app, [next]), [], "a kept pin on its model cell's site");
     app.mapPins = [{ id: "kept", name: "Kept", x: shore.x, y: shore.y, cell: shore.cell }];
     assert.deepEqual(Regeneration.placesBeside(app, [next]), [], "a kept pin on its own cell");
+});
+
+test("settlement pins are seats: a hand-placed one gains the run's figures and stays the reader's, a kept generated one is refreshed, and neither gets a pin beside it", async () => {
+    const app = studio();
+    Generation.apply(app, await islandResult());
+    const { mesh } = app.meshSession;
+    const styleOf = (tier) => app.uiState.customPinStyles.find((style) => style.tier === tier);
+    const kept = generatedPins(app).find((pin) => pin.generated.kind === "town");
+    kept.generated.locked = true;
+    const keptName = kept.name;
+    // A city drawn by hand on empty land (no generated pin in its model cell)
+    const taken = new Set(app.mapPins.filter((pin) => Number.isInteger(pin.cell)).map((pin) => mesh.parentOf[pin.cell]));
+    const empty = Array.from({ length: mesh.modelCount }, (_, cell) => cell).find((cell) => !taken.has(cell) && app.meshSession.aggregates.land[cell] === 1);
+    const mine = { id: "my-city", name: "Hightower", icon: "star", x: mesh.siteX(empty), y: mesh.siteY(empty), cell: empty, pinStyle: styleOf("city").id };
+    const ruin = { id: "my-ruin", name: "Old", icon: "x", x: 1, y: 1, pinStyle: styleOf("ruin")?.id ?? null };
+    app.mapPins.push(mine, ruin);
+
+    const seats = Generation.seats(app);
+    assert.deepEqual(seats.find((seat) => seat.pin === "my-city"), { cell: empty, kind: "city", pin: "my-city" });
+    assert.ok(seats.some((seat) => seat.pin === kept.id), "a kept generated settlement is a seat");
+    assert.ok(!seats.some((seat) => seat.pin === "my-ruin" || seat.pin === "own-pin"), "a ruin and a pin of no settlement style are not");
+    assert.ok(!seats.some((seat) => generatedPins(app).some((pin) => pin.id === seat.pin && !pin.generated.locked && !pin.generated.edited)), "a generated pin a run replaces is not");
+
+    const result = await runGenerator(syntheticMap().makePayload({}, seats), { pause: () => Promise.resolve() });
+    Generation.apply(app, result);
+    const run = app.modelRun.run;
+    assert.equal(mine.generated, undefined, "still the reader's own");
+    assert.equal(mine.modelled.run, run);
+    assert.ok(mine.modelled.population > 0 && ["city", "capital"].includes(mine.modelled.tier));
+    assert.deepEqual([mine.x, mine.y, mine.name], [mesh.siteX(empty), mesh.siteY(empty), "Hightower"], "never moved or renamed");
+    assert.equal(kept.generated.run, run, "the kept pin's figures are this run's");
+    assert.equal(kept.name, keptName);
+    assert.equal(app.mapPins.filter((pin) => Number.isInteger(pin.cell) && mesh.parentOf[pin.cell] === empty).length, 1, "no new pin beside the seat");
+    assert.ok(app.modelRun.seats.used >= 2);
+    assert.ok(GeneratePanel.results(app).rows.some((row) => row.label === "FILRODENSWMB.UI.GenerateResultSeats"));
+    const rows = GeneratedDetails.forPin(app, mine);
+    assert.ok(rows.some((row) => row.value === "FILRODENSWMB.UI.GeneratedKeptSeat"), "the inspector shows what the run made of it, and that it stays");
+
+    assert.equal(await Generation.removeGenerated(app), true);
+    assert.ok(app.mapPins.includes(mine) && app.mapPins.includes(kept), "Remove generated content leaves seats");
+    assert.equal(mine.modelled, undefined, "and what the run gave them goes with it");
+    VectorHistory.step(app, true);
+    assert.equal(app.mapPins.find((pin) => pin.id === "my-city").modelled.run, run, "undo brings it back");
 });
 
 test("Remove generated content takes what is not kept, drops a set left empty, and is one undo step", async () => {

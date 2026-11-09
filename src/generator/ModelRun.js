@@ -153,6 +153,7 @@ export function encodeModelRun(result, runId) {
         stats: { ...result.stats },
         cells,
         ages: { asked: result.ages?.asked ?? 1, run: result.ages?.run ?? 1 },
+        seats: result.seats ? { used: result.seats.used, unhonoured: result.seats.unhonoured.map(({ pin, kind, reason }) => ({ pin, kind, reason })) } : null,
         history: (result.history ?? []).map(encodeAge),
     };
 }

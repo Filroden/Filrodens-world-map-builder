@@ -75,6 +75,8 @@ export class PinEditor {
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
             generated: GeneratedDetails.forPin(app, pin),
             generatedLocked: pin.generated?.locked === true,
+            // A hand-placed settlement pin a run built on: its figures, without Lock (it is the reader's own)
+            generatedModelled: !pin.generated && !!pin.modelled,
         };
     }
 

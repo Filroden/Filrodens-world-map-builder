@@ -29,13 +29,14 @@ const TIER_NAMES = new Map(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [styl
 
 export class GeneratedDetails {
     /**
-     * A generated pin's rows, or null for a pin no run made.
+     * A generated pin's rows, or a hand-placed settlement pin's from what the last run gave it as a
+     * seat (`modelled`, see Generation.seats); null for a pin no run made or built on.
      * @param {object} app
      * @param {object} pin
      * @returns {{label: string, value: string}[]|null}
      */
     static forPin(app, pin) {
-        const generated = pin.generated;
+        const generated = pin.generated ?? pin.modelled;
         if (!generated) return null;
         const tierName = TIER_NAMES.get(generated.tier);
         return this.#rows([
@@ -47,7 +48,7 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedFormerCapital", Number.isInteger(generated.formerCapital) ? platform.i18n.format("FILRODENSWMB.UI.GeneratedInAge", { age: generated.formerCapital }) : null],
             ["FILRODENSWMB.UI.GeneratedShownFrom", this.#levelName(DetailLevel.ofPin(app, pin))],
             ["FILRODENSWMB.UI.GeneratedNameShownFrom", this.#nameLevel(app, pin)],
-            ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(pin)],
+            ["FILRODENSWMB.UI.GeneratedNextRun", pin.generated ? this.#fate(pin) : platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptSeat")],
         ]);
     }
 

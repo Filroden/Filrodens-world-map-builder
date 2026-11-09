@@ -11,7 +11,7 @@ import { FieldSpecs } from "./FieldSpecs.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { PinStyles } from "./PinStyles.js";
-import { Regeneration } from "./Regeneration.js";
+import { Regeneration, isKept } from "./Regeneration.js";
 import { VectorHistory } from "./VectorHistory.js";
 
 /**
@@ -25,6 +25,9 @@ import { VectorHistory } from "./VectorHistory.js";
  * defaults when the map lacks it, so a map whose styles were edited keeps its look and one whose
  * styles were deleted gets them back for the run.
  */
+/** The pin style tiers a run takes as seats: the settlements and castles the world model makes. */
+const SEAT_KINDS = new Set(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]);
+
 export class Generation {
     /**
      * Runs the generator with the map's Generate settings (see GeneratePanel) and adds its output
@@ -124,6 +127,8 @@ export class Generation {
         if (!(await this.#confirmReplacing(app, "FILRODENSWMB.UI.RemoveGeneratedTitle", "FILRODENSWMB.UI.RemoveGeneratedMessage"))) return false;
         const before = VectorHistory.snapshot(app);
         const removal = Regeneration.remove(app);
+        // What the run gave hand-placed settlement pins goes with it; the pins stay
+        for (const pin of app.mapPins ?? []) delete pin.modelled;
         const modelRunBefore = app.modelRun ?? null;
         app.modelRun = null;
         const owners = removal.owners.map((entry) => VectorHistory.levelOwners(entry.levelId, entry.before, entry.after));
@@ -174,8 +179,33 @@ export class Generation {
             customBiomes: app.uiState.customBiomes ?? [],
             mapSeed: app.uiState.mapSeed,
             settings: { seed: settings.seed || undefined, nameBase: settings.nameBase, world: settings.world, ages: settings.ages, cultures: app.uiState.cultures ?? [] },
+            seats: this.seats(app),
             revision,
         });
+    }
+
+    /**
+     * The map's settlement pins as seats a run must build on: every pin on the map whose style has
+     * a settlement tier the world model makes (SEAT_KINDS), hand-placed or generated and kept
+     * (edited or locked); a generated pin a run would replace is no seat. Each by the model cell
+     * its display cell lies in.
+     * @param {object} app
+     * @returns {{cell: number, kind: string, pin: string}[]}
+     */
+    static seats(app) {
+        const session = app.meshSession;
+        if (!session?.mesh) return [];
+        const styles = new Map((app.uiState.customPinStyles ?? []).map((style) => [style.id, style]));
+        const seats = [];
+        for (const pin of app.mapPins ?? []) {
+            if (pin.generated && !isKept(pin)) continue;
+            const kind = styles.get(pin.pinStyle)?.tier;
+            if (!SEAT_KINDS.has(kind) || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
+            const display = session.cellAt(pin.x, pin.y);
+            if (!(display >= 0)) continue;
+            seats.push({ cell: session.mesh.parentOf[display], kind, pin: pin.id });
+        }
+        return seats;
     }
 
     /**
@@ -221,6 +251,7 @@ export class Generation {
             owners.push(...made.set.levels.map((level) => VectorHistory.levelOwners(level.id, null, made.owners[level.id])));
         }
         app.mapRoutes.push(...made.routes);
+        this.#writeSeats(app, made.seated ?? []);
         app.mapPins.push(...Regeneration.placesBeside(app, made.pins));
         const modelRunBefore = app.modelRun ?? null;
         const revisionBefore = GeneratorRevision.of(app.uiState);
@@ -237,6 +268,28 @@ export class Generation {
         app._repaintVectors();
         app.view?.render(["context"]);
         app.markDirty();
+    }
+
+    /**
+     * What the run gave the places it built on settlement pins (see Generation.seats): a hand-placed
+     * pin keeps them as `modelled` (it stays the reader's, never moved or removed by a run); a kept
+     * generated pin has its generated figures refreshed, keeping its name, place and style.
+     */
+    static #writeSeats(app, seated) {
+        const byId = new Map((app.mapPins ?? []).map((pin) => [pin.id, pin]));
+        for (const { pins, figures } of seated) {
+            for (const id of pins) {
+                const pin = byId.get(id);
+                if (!pin) continue;
+                if (!pin.generated) {
+                    pin.modelled = { ...figures };
+                    continue;
+                }
+                const { tier: _tier, capital: _capital, fortified: _fortified, port: _port, ...refreshed } = figures;
+                for (const key of ["mix", "ages", "formerCapital"]) delete pin.generated[key];
+                Object.assign(pin.generated, refreshed);
+            }
+        }
     }
 
     /** Removes a set and its levels' owner arrays; returns the undo entries that bring them back. */

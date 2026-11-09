@@ -387,6 +387,26 @@ test("the map's generator revision is a whole number in range, and a map without
     for (const odd of [0, 2.6]) assert.equal(GeneratorRevision.of({ generatorRevision: odd }), FILRODENSWMB.GENERATOR.REVISIONS.LEGACY, `${odd}: not a revision, so read as the oldest`);
 });
 
+test("what a run gave a settlement pin, and the run's report of its seats, keep to their rules", () => {
+    const file = v4Map();
+    file.mapPins[0].modelled = { run: "runAAAAAAAAAAAAA", sourceId: 3, tier: "city", population: 15000, culture: "cultureAAAAAAAAA", mix: [{ culture: "cultureAAAAAAAAA", share: 1 }], capital: false, fortified: true, port: false };
+    file.modelRun = { ...savedModelRun(), seats: { used: 2, unhonoured: [{ pin: "pinAAAAAAAAAAAAA", kind: "port", reason: "dry" }] } };
+    const kept = MapImport.read(structuredClone(file));
+    assert.deepEqual(kept.mapData.mapPins[0].modelled, file.mapPins[0].modelled);
+    assert.deepEqual(kept.modelRun.seats, file.modelRun.seats);
+    assert.equal(kept.corrected, 0);
+
+    file.mapPins[0].modelled = { run: "<b>x</b>", population: -5, tier: SCRIPT, capital: "yes", port: true, __proto__: { polluted: true } };
+    file.modelRun.seats = { used: 2, unhonoured: [{ pin: "pinAAAAAAAAAAAAA", kind: "dragon", reason: "dry" }, { pin: "pinAAAAAAAAAAAAA", kind: "port", reason: SCRIPT }] };
+    const { mapData, modelRun } = MapImport.read(file);
+    const modelled = mapData.mapPins[0].modelled;
+    assert.ok(!("capital" in modelled), "a flag that is no flag is dropped");
+    assert.equal(modelled.port, true);
+    assert.equal(modelled.population, 0, "people are kept in range");
+    assert.equal({}.polluted, undefined);
+    assert.deepEqual(modelRun?.seats?.unhonoured.map((entry) => Object.keys(entry).sort()) ?? [], [["pin", "reason"], ["kind", "pin"]], "an unknown kind or reason is dropped");
+});
+
 test("a colour such as red;background:url(…) never passes, in a file or in the inspector", () => {
     const file = v4Map();
     file.mapPins[0].color = HOSTILE_COLOUR;

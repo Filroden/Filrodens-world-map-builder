@@ -5,6 +5,7 @@ import { nameBaseNames } from "../generator/Names.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
 import { platform } from "../platform/index.js";
 import { Generation } from "./Generation.js";
+import { isKept } from "./Regeneration.js";
 
 /**
  * The Generate tool's panel (templates/tools-generate.hbs): the settings a run is made with, kept
@@ -205,7 +206,17 @@ export class GeneratePanel {
             const key = culture.homelandsAuto ? "FILRODENSWMB.UI.GenerateHomelandsPlacedNotice" : "FILRODENSWMB.UI.GenerateHomelandsLeftOutNotice";
             notices.push({ text: platform.i18n.format(key, { name: culture.name, count: culture.homelandsLeftOut }) });
         }
+        notices.push(...this.#seatNotices(app));
         return notices;
+    }
+
+    /** Each settlement pin the last run could not build on as its style asked, by name (pins deleted since are left out). */
+    static #seatNotices(app) {
+        const byId = new Map((app.mapPins ?? []).map((pin) => [pin.id, pin]));
+        const keys = { dry: "FILRODENSWMB.UI.GenerateSeatDryNotice", notCapital: "FILRODENSWMB.UI.GenerateSeatNotCapitalNotice", noPlace: "FILRODENSWMB.UI.GenerateSeatNoPlaceNotice", water: "FILRODENSWMB.UI.GenerateSeatWaterNotice" };
+        return (app.modelRun?.seats?.unhonoured ?? [])
+            .filter(({ pin, reason }) => byId.has(pin) && keys[reason])
+            .map(({ pin, reason }) => ({ text: platform.i18n.format(keys[reason], { name: byId.get(pin).name || platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatUnnamed") }) }));
     }
 
     /**
@@ -254,6 +265,9 @@ export class GeneratePanel {
             ["FILRODENSWMB.UI.GenerateResultOldRoads", count(routes, (route) => route.generated.oldRoad === true)],
         ];
         if (former.some(([, value]) => value > 0)) rows.push(...former);
+        // The settlement pins it built on, when there were any
+        const seats = (app.mapPins ?? []).filter((pin) => pin.modelled?.run === run || (pin.generated?.run === run && isKept(pin))).length;
+        if (seats > 0) rows.push(["FILRODENSWMB.UI.GenerateResultSeats", seats]);
         const population = Number(app.modelRun?.stats?.population) || 0;
         return {
             rows: rows.map(([label, value]) => ({ label, value: value.toLocaleString(platform.i18n.lang) })),

@@ -165,7 +165,7 @@ function resizeTowns(state, security, cellPop) {
         town.population *= ratio;
         if (town.tradePop) town.tradePop *= ratio;
         town.security = security[town.cell];
-        town.fortified = security[town.cell] < F.FORTIFIED_BELOW;
+        town.fortified = security[town.cell] < F.FORTIFIED_BELOW || state.cells.seats?.get(town.cell)?.kind === "fortifiedTown";
     }
     concentrate(state, towns, totals);
     return keepTowns(state, towns, cellPop);
@@ -193,9 +193,10 @@ function concentrate(state, towns, totals) {
 function keepTowns(state, towns, cellPop) {
     const tiers = FILRODENSWMB.GENERATOR.TOWNS.TIERS;
     const keep = FILRODENSWMB.GENERATOR.TOWNS.KEEP_SHARE;
-    const kept = towns.filter((town) => town.population >= tiers[2].minPop * keep);
+    const kept = towns.filter((town) => town.seatTier !== undefined || town.population >= tiers[2].minPop * keep);
     for (const town of kept) {
         town.tier = tierOf(town.population);
+        if (town.seatTier !== undefined) town.tier = Math.min(town.tier, town.seatTier);
         town.tradePop = Math.min(town.population, town.tradePop ?? 0);
     }
     const seats = new Set(state.context.realms.realms.map((realm) => realm.seat));
@@ -224,6 +225,12 @@ function placeCastles(state, threats, towns) {
     const blocked = new Uint8Array(cells.count);
     for (const town of towns) if (town.fortified) blocked[town.cell] = 1;
     const castles = [];
+    // Castle seats first, wherever they are, so the free castles keep their spacing from them
+    for (const [cell, seat] of cells.seats ?? []) {
+        if (seat.kind !== "castle" || cells.water[cell]) continue;
+        castles.push({ cell, reason: "seat", security: threats.security[cell] });
+        space.run([cell], cost, { limit: F.CASTLE_SPACING_KM, visit: (reached) => (blocked[reached] = 1) });
+    }
     for (const candidate of castleCandidates(state, threats)) {
         if (blocked[candidate.cell]) continue;
         castles.push({ cell: candidate.cell, reason: candidate.reason, security: threats.security[candidate.cell] });

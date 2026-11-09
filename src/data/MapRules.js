@@ -109,6 +109,29 @@ const GENERATED = obj(
     { nullable: true },
 );
 
+/**
+ * What the last run gave a hand-placed settlement pin it built on as a seat (see Generation.seats):
+ * the run, the place's index in it, its pin style tier, people, culture and mix, its past with
+ * several ages, and whether it was a realm's seat, walled or a port. Read only: the pin stays the
+ * reader's.
+ */
+const MODELLED = obj(
+    {
+        run: { t: "key" },
+        sourceId: int(0),
+        tier: { t: "key", nullable: true },
+        population: num(RANGE.COUNT, { nullable: true }),
+        culture: { t: "cultureRef", nullable: true },
+        mix: list(obj({ culture: key, share: num(RANGE.UNIT) })),
+        ages: list(int(-1, 10)),
+        formerCapital: int(1, 100, { nullable: true }),
+        capital: bool,
+        fortified: bool,
+        port: bool,
+    },
+    { nullable: true },
+);
+
 // ------------------------------------------------------------------ labels, pins, decorations
 
 /** The look of a label, owned (a pin's, route's or region's) or standalone. */
@@ -149,6 +172,7 @@ const PIN = obj({
     pinStyle: custom,
     cell: int(0, 1e9, { nullable: true }),
     generated: GENERATED,
+    modelled: MODELLED,
     type: enumOf(["spring", "block_spring"]),
     radius: num(RANGE.SIZE),
     inflow: num(RANGE.SIGNED),
@@ -780,6 +804,8 @@ const MODEL_RUN = obj({
     stats: numTree,
     cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
     ages: obj({ asked: int(1, 100), run: int(1, 100) }),
+    // The settlement pins the run built on (see Pipeline.markSeatPlaces): how many, and each it could not honour
+    seats: obj({ used: int(0, 1e6), unhonoured: list(obj({ pin: ref(), kind: enumOf(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]), reason: enumOf(["noPlace", "dry", "notCapital", "water"]) })) }, { nullable: true }),
     // Each age before the last, in brief (see ModelRun); MapImport checks that its names run with
     // its places, castles and seats, and its arrays with the run's cells
     history: list(obj({

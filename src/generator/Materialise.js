@@ -58,12 +58,30 @@ export function materialise(session, result, options) {
     const owners = installPolitical(session, options.layerSets, political.set, political.owners);
     const routes = buildRoutes(session, result, { runId, idFactory, styleFor: options.routeStyleFor, styleFields: options.routeStyleFields, transports: output.routes });
     const pins = buildPins(session, result, { ...options, output });
+    const seated = seatedFigures(result, options.runId);
     // What the age before the present left: its ruins, abandoned castles and old roads
     if (output.history) {
         pins.push(...buildFormerPins(session, result, { ...options, output }));
         if (output.routes.road !== false) routes.push(...buildRoutes(session, { routes: result.oldRoads ?? [] }, { runId, idFactory, styleFor: (_transport, routeClass) => options.routeStyleFor("old", routeClass), styleFields: options.routeStyleFields, old: true }));
     }
-    return { set: political.set, owners, routes, pins };
+    return { set: political.set, owners, routes, pins, seated };
+}
+
+/**
+ * What the run gave each place built on a seat (a settlement pin already on the map, which gets
+ * no new pin): the pins it stands for, and its figures as a pin's generated details keep them.
+ * @returns {{pins: string[], figures: object}[]}
+ */
+function seatedFigures(result, runId) {
+    const seated = [];
+    result.places.forEach((place, index) => {
+        if (!Array.isArray(place.seat)) return;
+        const town = place.kind === "town";
+        const figures = { run: runId, sourceId: index, tier: placeTier(place), population: town ? (place.population ?? null) : null, culture: cultureId(result, place.culture), ...cultureMix(result, place.mix), ...pastOf(place) };
+        if (town) Object.assign(figures, { capital: !!place.capital, fortified: !!place.fortified, port: !!place.port });
+        seated.push({ pins: place.seat, figures });
+    });
+    return seated;
 }
 
 /** The Output switch of each settlement size tier (a place's tier 0, 1 and 2). */
@@ -88,7 +106,8 @@ function buildPins(session, result, { runId, idFactory, names, pinStyleFor, appl
     const { mesh } = session;
     const pins = [];
     result.places.forEach((place, index) => {
-        if (!placeWanted(place, output.places)) return;
+        // A place built on a seat is the settlement pin already there (see seatedFigures)
+        if (Array.isArray(place.seat) || !placeWanted(place, output.places)) return;
         const tier = placeTier(place);
         // A former capital keeps its own style, and says what it was after its name
         const former = Number.isInteger(place.formerCapital) && output.history;

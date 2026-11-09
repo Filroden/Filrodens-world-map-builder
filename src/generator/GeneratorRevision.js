@@ -72,8 +72,9 @@ export class GeneratorRevision {
      * - callKm, callShare: ports of call on long sea passages (see Trade); callKm null for none.
      * - shorePins: whether a port's place stands on its cell's shore, and a town on a navigable
      *   river beside the river, rather than on its cell's site (see CellValues, Materialise).
+     * - seats: whether the map's settlement pins are seats the run must build on (see Pipeline.seatsOf).
      * @param {number} revision
-     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean}}
+     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean, seats: boolean}}
      */
     static rules(revision) {
         const G = FILRODENSWMB.GENERATOR;
@@ -84,6 +85,7 @@ export class GeneratorRevision {
             callKm: ports ? G.PORTS.CALL_KM : null,
             callShare: G.PORTS.CALL_SHARE,
             shorePins: ports,
+            seats: ports,
         });
     }
 

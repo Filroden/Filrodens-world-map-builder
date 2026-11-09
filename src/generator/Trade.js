@@ -85,7 +85,7 @@ function createState(graph, context) {
 function finalTowns(towns, royalSeats) {
     return towns.map((town) => {
         const base = Math.max(0, town.population - (town.tradePop ?? 0));
-        return { ...town, population: base, stage2Pop: base, tier: royalSeats.has(town.cell) ? 0 : Math.max(town.tier, tierOfPopulation(base)), baseTier: undefined };
+        return { ...town, population: base, stage2Pop: base, tier: royalSeats.has(town.cell) ? 0 : Math.min(town.seatTier ?? Infinity, Math.max(town.tier, tierOfPopulation(base))), baseTier: undefined };
     });
 }
 
@@ -417,8 +417,9 @@ function tradeToTownspeople(state, flows) {
         recordTrade(state, score, flows);
         return;
     }
-    const budget = FILRODENSWMB.GENERATOR.TRADE.URBAN_SHARE * (state.context.world.urbanisation ?? 1) * state.context.totalPop;
+    let budget = FILRODENSWMB.GENERATOR.TRADE.URBAN_SHARE * (state.context.world.urbanisation ?? 1) * state.context.totalPop;
     for (const town of state.towns) town.population = town.stage2Pop;
+    budget -= supplySeats(state, budget);
     const byScore = [];
     for (let cell = 0; cell < score.length; cell++) if (score[cell] > 0) byScore.push(cell);
     byScore.sort((a, b) => score[b] - score[a] || a - b);
@@ -432,6 +433,38 @@ function tradeToTownspeople(state, flows) {
     indexTowns(state);
     retier(state);
     recordTrade(state, score, flows);
+}
+
+/**
+ * A seat short of its tier's minimum (a city the reader placed in a desert) lives by trade: before
+ * the round's townspeople are shared among the towns, each such seat draws what it lacks, all of
+ * them together at most SEAT_SUPPLY_SHARE of the round's, so the townspeople in all stay what
+ * trade supports. Returns what the seats drew.
+ */
+function supplySeats(state, budget) {
+    const short = [];
+    let wanted = 0;
+    for (const town of state.towns) {
+        if (town.seatTier === undefined) continue;
+        const lack = state.tierMin[town.seatTier] - town.population;
+        if (lack > 0) {
+            short.push([town, lack]);
+            wanted += lack;
+        }
+    }
+    if (!wanted) return 0;
+    const scale = Math.min(1, (SEAT_SUPPLY_SHARE * budget) / wanted);
+    for (const [town, lack] of short) town.population += lack * scale;
+    return wanted * scale;
+}
+
+/** The most of a round's townspeople the seats short of their tier's minimum may draw between them. */
+const SEAT_SUPPLY_SHARE = 0.5;
+
+/** A port seat (a pin on the Port style) is a port on any cell that may load ships. */
+function portSeat(cells, cell) {
+    if (cells.seats?.get(cell)?.kind !== "port" || cells.coastal[cell] !== 1) return false;
+    return !cells.wet || cells.wet[cell] === 1;
 }
 
 function createTradeTown(state, cell, population, flows) {
@@ -453,7 +486,7 @@ function retier(state) {
 function recordTrade(state, score, flows) {
     for (const town of state.towns) {
         town.trade = score[town.cell];
-        town.port = flows.transfer[town.cell] > 0;
+        town.port = flows.transfer[town.cell] > 0 || portSeat(state.cells, town.cell);
         town.transfer = flows.transfer[town.cell];
         town.through = flows.through[town.cell];
     }

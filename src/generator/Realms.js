@@ -191,7 +191,16 @@ function royalDuchies(state, duchies) {
     const blocked = new Uint8Array(state.graph.count);
     const space = new SearchSpace(state.graph);
     const royal = [];
+    // Capital seats are crowns whatever the spacing
+    const seats = state.cells.seats;
+    const isCapital = (duchy) => seats?.get(duchies[duchy].seat)?.kind === "capital";
     for (const duchy of byPower) {
+        if (!isCapital(duchy)) continue;
+        royal.push(duchy);
+        space.run([duchies[duchy].seat], state.cost, { limit: state.power.spacing, visit: (cell) => (blocked[cell] = 1) });
+    }
+    for (const duchy of byPower) {
+        if (isCapital(duchy)) continue;
         if (blocked[duchies[duchy].seat]) continue;
         royal.push(duchy);
         space.run([duchies[duchy].seat], state.cost, { limit: state.power.spacing, visit: (cell) => (blocked[cell] = 1) });

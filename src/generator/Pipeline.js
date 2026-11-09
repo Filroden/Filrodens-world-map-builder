@@ -82,6 +82,9 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
 
     run.cells = await driver.step("values", () => buildModelCells({ ...payload, biome: modelBiomeRaster(payload) }, settings.world, run.rules), run);
     markWetCells(run.cells, run.rules);
+    // Settlement pins the run must build on, in every age
+    run.seatsOffLand = [];
+    run.cells.seats = run.rules.seats ? seatsOf(payload.seats, run.cells, run.seatsOffLand) : null;
     run.graph = new CellGraph(run.cells);
     const people = cultureList(settings, payload);
 
@@ -420,9 +423,39 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
         counties: finalRealms.counties.map((county, index) => ({ seat: county.seat, name: names.counties[index], duchy: finalRealms.duchyOfCounty[index], population: Math.round(people.county[index]), culture: countyMix[index][0]?.[0] ?? -1 })),
         routes,
         stats: statistics(run, { feedback, finalTrade, finalRealms, routes, places }),
+        seats: markSeatPlaces(run, places, seats),
         timings: run.timings,
         cellCount: cells.count,
     };
+}
+
+/**
+ * Ties each seat to the place the run built on it (the place's `seat`: the pins it stands for), and
+ * reports how many seats there were and each pin whose seat the run could not honour as asked: a
+ * port on a cell that cannot load ships (kept as a town), a capital that is no realm's seat, or a
+ * settlement on a cell with no town. Null without seats.
+ * @returns {{used: number, unhonoured: {pin: string, kind: string, reason: string}[]}|null}
+ */
+function markSeatPlaces(run, places, realmSeats) {
+    const seats = run.cells.seats;
+    if (!seats) return run.seatsOffLand?.length ? { used: 0, unhonoured: [...run.seatsOffLand] } : null;
+    const placeAt = new Map();
+    for (const place of places) if (!placeAt.has(place.cell) || place.kind === "town") placeAt.set(place.cell, place);
+    const castleAt = new Map(places.filter((place) => place.kind === "castle").map((place) => [place.cell, place]));
+    const unhonoured = [...(run.seatsOffLand ?? [])];
+    let used = 0;
+    for (const [cell, seat] of seats) {
+        const place = seat.kind === "castle" ? castleAt.get(cell) : placeAt.get(cell);
+        const town = place?.kind === "town" ? place : null;
+        let reason = null;
+        if (!place || (seat.kind !== "castle" && !town)) reason = "noPlace";
+        else if (seat.kind === "port" && !town.port) reason = "dry";
+        else if (seat.kind === "capital" && !realmSeats.has(cell)) reason = "notCapital";
+        if (place) place.seat = [...seat.pins];
+        used += seat.pins.length;
+        if (reason) for (const pin of seat.pins) unhonoured.push({ pin, kind: seat.kind, reason });
+    }
+    return { used, unhonoured };
 }
 
 /**
@@ -476,6 +509,37 @@ function placeShore(run, town) {
     if (pixel < 0) return {};
     const width = run.width;
     return { at: [pixel % width, Math.floor(pixel / width)] };
+}
+
+/** Each seat kind's town tier (0 city, 1 large town, 2 town); a castle has none. */
+const SEAT_TIERS = Object.freeze({ capital: 0, city: 0, largeTown: 1, town: 2, fortifiedTown: 2, port: 2, castle: undefined });
+
+/**
+ * The map's settlement pins as seats (see GeneratorInput), by model cell: { kind, tier, pins }.
+ * Where several stand in one cell, the biggest tier's kind is the seat's, and every pin is its.
+ * Seats of kinds the world model has no counterpart for are left out, and seats on water cells
+ * too (their pins listed in `offLand`).
+ * @returns {Map<number, {kind: string, tier: number|undefined, pins: string[]}>|null}
+ */
+function seatsOf(list, cells, offLand) {
+    if (!Array.isArray(list) || !list.length) return null;
+    const seats = new Map();
+    for (const { cell, kind, pin } of list) {
+        if (!Number.isInteger(cell) || cell < 0 || cell >= cells.count || !Object.hasOwn(SEAT_TIERS, kind)) continue;
+        if (cells.water[cell]) {
+            offLand.push({ pin, kind, reason: "water" });
+            continue;
+        }
+        const tier = SEAT_TIERS[kind];
+        const held = seats.get(cell);
+        if (!held) {
+            seats.set(cell, { kind, tier, pins: [pin] });
+            continue;
+        }
+        held.pins.push(pin);
+        if ((tier ?? Infinity) < (held.tier ?? Infinity)) Object.assign(held, { kind, tier });
+    }
+    return seats.size ? seats : null;
 }
 
 /**
