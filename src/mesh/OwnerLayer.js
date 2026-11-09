@@ -384,18 +384,22 @@ function majority(tally) {
 /**
  * The child cells that break the nesting rule: a claimed child cell whose parent cell is not owned
  * by the parent region its region belongs to (see parentAssignments), including a child cell over
- * unclaimed parent ground.
+ * unclaimed parent ground. With `lone`, a child region belonging to no parent region stands alone
+ * (see RegionEdits.mayStandAlone): only its cells inside a parent region break the rule.
  * @param {Int32Array} childOwners
  * @param {Int32Array} parentOwners
  * @param {Map<number, number>} [assignments] - Child key to parent key; worked out if omitted.
+ * @param {{lone?: boolean}} [options]
  * @returns {Int32Array}
  */
-export function nestingViolations(childOwners, parentOwners, assignments = parentAssignments(childOwners, parentOwners)) {
+export function nestingViolations(childOwners, parentOwners, assignments = parentAssignments(childOwners, parentOwners), { lone = false } = {}) {
     const cells = [];
     childOwners.forEach((child, cell) => {
         if (child === UNCLAIMED) return;
         const parent = assignments.get(child) ?? UNCLAIMED;
-        if (parent === UNCLAIMED || parentOwners[cell] !== parent) cells.push(cell);
+        if (parent === UNCLAIMED && lone) {
+            if (parentOwners[cell] !== UNCLAIMED) cells.push(cell);
+        } else if (parent === UNCLAIMED || parentOwners[cell] !== parent) cells.push(cell);
     });
     return Int32Array.from(cells);
 }

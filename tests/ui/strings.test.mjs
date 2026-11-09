@@ -134,7 +134,7 @@ test("en.json is US English, and en-gb.json gives the British spelling of every 
 const PROPER = new Set(
     `Foundry VTT Filroden Filroden's World Map Builder Delaunay Pixi Three Handlebars Material Symbols Pinhead Atkinson Hyperlegible
     Sora Barlow Semi Condensed Noto Serif Sans Ko-fi GitHub Sponsors Ctrl Shift Alt Enter Escape Esc Backspace Tab Space Home End
-    American`.split(/\s+/),
+    American Political`.split(/\s+/),
 );
 /**
  * Strings that are the pattern of a proper name rather than a label: the generator names a castle

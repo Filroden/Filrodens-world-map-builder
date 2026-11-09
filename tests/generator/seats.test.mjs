@@ -1,9 +1,10 @@
 // Settlement pins as seats a run must build on (Pipeline.seatsOf, from revision 2), on the synthetic
 // island: a seat of each kind honoured at its tier, a capital crowned, a fortified town walled, a
 // castle placed, a port on a coast that can load ships made a port and one that cannot kept as a
-// town and reported, a seat on water reported; a seat in a poor place given its tier's people by
-// trade, the townspeople in all staying what trade supports; seats ignored at revision 1; and no
-// seats giving the run without them.
+// town and reported, a seat on water reported; a pin on land in a model cell counted as sea built
+// in the land cell beside it, and one on land too small for the model reported as an islet; a seat
+// in a poor place given its tier's people by trade, the townspeople in all staying what trade
+// supports; seats ignored at revision 1; and no seats giving the run without them.
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -106,4 +107,28 @@ test("a city seat in a poor place lives by trade: it has its tier's people, and 
     const cityMin = FILRODENSWMB.GENERATOR.TOWNS.TIERS[0].minPop;
     assert.ok(place.population >= cityMin * 0.99, `${place.population} people`);
     assert.ok(Math.abs(townSum(result) / townSum(base) - 1) < 0.1, `townspeople ${townSum(result)} against ${townSum(base)}`);
+});
+
+test("a pin on land in a model cell counted as sea is built in the land cell beside it; one on the open sea is not", async () => {
+    await setup();
+    // A sea model cell on the coast: its land neighbour nearest the pin takes the seat
+    const neighbours = (cell) => Array.from(cells.neighbourList.subarray(cells.neighbourStart[cell], cells.neighbourStart[cell + 1]));
+    const shore = cells.water.findIndex((water, cell) => water === 1 && neighbours(cell).some((other) => !cells.water[other] && cells.landKm2[other] > 0));
+    const land = neighbours(shore).filter((other) => !cells.water[other] && cells.landKm2[other] > 0);
+    const target = land[0];
+    // The pin's point between the sea cell's site and that land cell's, nearer the land
+    const x = cells.x[shore] + 0.7 * (cells.x[target] - cells.x[shore]);
+    const y = cells.y[shore] + 0.7 * (cells.y[target] - cells.y[shore]);
+    const nearest = land.reduce((best, other) => (Math.hypot(cells.x[other] - x, cells.y[other] - y) < Math.hypot(cells.x[best] - x, cells.y[best] - y) ? other : best));
+    // The open sea: a sea cell with no land within two rings
+    const ring2 = (cell) => [...new Set(neighbours(cell).flatMap((other) => [other, ...neighbours(other)]))];
+    const open = cells.water.findIndex((water, cell) => water === 1 && ring2(cell).every((other) => cells.water[other]));
+    const result = await run([
+        { cell: shore, kind: "town", pin: "shore", x, y, land: true },
+        { cell: shore, kind: "town", pin: "offshore", x, y, land: false },
+        { cell: open, kind: "town", pin: "islet", x: cells.x[open], y: cells.y[open], land: true },
+    ]);
+    const place = result.places.find((each) => each.kind === "town" && each.cell === nearest);
+    assert.ok(place?.seat?.includes("shore"), "built in the nearest land cell");
+    assert.deepEqual(result.seats.unhonoured.map(({ pin, reason }) => [pin, reason]).sort(), [["islet", "islet"], ["offshore", "water"]]);
 });

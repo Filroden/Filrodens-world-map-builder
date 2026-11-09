@@ -4,7 +4,10 @@ import { InspectorFields } from "./InspectorFields.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { MeshIntegration } from "./MeshIntegration.js";
 import { RegionPanel } from "./RegionPanel.js";
-import { regionFillColor } from "../mesh/Schema.js";
+import { UNCLAIMED, regionFillColor } from "../mesh/Schema.js";
+import { levelDepth, parentLevel, setOfLevel } from "../mesh/LayerTree.js";
+import { parentAssignments } from "../mesh/OwnerLayer.js";
+import { Regeneration } from "./Regeneration.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
@@ -53,7 +56,7 @@ export class RegionEditor {
             subtitle: platform.i18n.format("FILRODENSWMB.UI.InspectorSubtitleRegion", { level: app.regionLevels.find((level) => level.id === ref.levelId)?.name ?? "" }),
             swatch: region.fillColor === "transparent" ? null : regionFillColor(region),
         }),
-        context: (app, region) => RegionEditor.#context(app, region),
+        context: (app, region, ref) => ({ ...RegionEditor.#context(app, region), canMoveToPolitical: RegionPanel.canMoveToPolitical(app, ref.levelId), canChangeRank: RegionPanel.canChangeRank(app, ref.levelId), independent: RegionEditor.#independentField(app, region, ref.levelId) }),
         apply: (app, region, ref, form, field) => RegionEditor.#apply(app, region, form, field),
         actions: {
             lock: (app, region) => GeneratedEdits.toggleLock(app, region),
@@ -63,6 +66,8 @@ export class RegionEditor {
                 if (points.length) app.canvasEngine?.zoomToFeature(points);
             },
             merge: (app, _region, ref) => RegionPanel.mergeRegion(app, ref.levelId, ref.id),
+            moveToPolitical: (app, _region, ref) => RegionPanel.moveToPolitical(app, ref.levelId, [ref.id]),
+            changeRank: (app, _region, ref) => RegionPanel.changeRank(app, ref.levelId, ref.id),
             delete: (app, _region, ref) => RegionPanel.deleteRegion(app, ref.levelId, ref.id),
             saveStyle: (app, region, ref, button) => RegionEditor.#saveStyle(app, region, button.dataset.styleType),
         },
@@ -89,6 +94,34 @@ export class RegionEditor {
         };
     }
 
+    /**
+     * The Independent field, for a lone region of the Political set's duchies or counties (see
+     * UserRealms): a duchy in no realm, or a county in no duchy and on land no kept realm holds. A
+     * parent a run gave it does not count (see Regeneration.merge), since the next run places it
+     * again. Null for every other region.
+     */
+    static #independentField(app, region, levelId) {
+        const session = app.meshSession;
+        const set = setOfLevel(app.layerSets ?? [], levelId);
+        const level = set?.levels.find((candidate) => candidate.id === levelId);
+        if (!session || set?.kind !== "political" || !level) return null;
+        const depth = levelDepth(set, level);
+        const free = (each) => !Number.isInteger(each.parentKey) || each.parentFromRun === true;
+        if (depth < 1 || depth > 2 || !free(region)) return null;
+        if (depth === 2 && !this.#outsideKeptRealms(session, set, level, region)) return null;
+        return { checked: region.independent === true, hint: depth === 1 ? "FILRODENSWMB.UI.RegionIndependentDuchyHint" : "FILRODENSWMB.UI.RegionIndependentCountyHint" };
+    }
+
+    /** Whether most of a county's cells lie on land no kept realm holds (see Regeneration.keptKeys). */
+    static #outsideKeptRealms(session, set, level, region) {
+        const duchies = parentLevel(set, level);
+        const realms = duchies ? parentLevel(set, duchies) : null;
+        if (!realms) return true;
+        const keptRealms = Regeneration.keptKeys(set)[set.levels.indexOf(realms)] ?? new Set();
+        const realmOf = parentAssignments(session.layer(level.id).owners, session.layer(realms.id).owners).get(region.key) ?? UNCLAIMED;
+        return realmOf === UNCLAIMED || !keptRealms.has(realmOf);
+    }
+
     /** What the form holds, as region fields, once `field` has taken effect (see InspectorFields). */
     static read(app, region, form, field) {
         const elements = form.elements;
@@ -109,6 +142,7 @@ export class RegionEditor {
             key: "quickStyle",
         });
         values.label = InspectorFields.readLabel(form, field, app);
+        if (elements.regionIndependent) values.independent = elements.regionIndependent.checked;
         return values;
     }
 
@@ -117,13 +151,17 @@ export class RegionEditor {
         // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the region's own
         const values = typed("region", this.read(app, region, form, field), region);
         // A region drawn in its preset colour holds no fill of its own until one is given
-        const current = { ...region, fillColor: region.fillColor ?? regionFillColor(region), fillStyle: region.fillStyle ?? "solid", label: InspectorFields.label(app, region) };
+        const current = { ...region, fillColor: region.fillColor ?? regionFillColor(region), fillStyle: region.fillStyle ?? "solid", label: InspectorFields.label(app, region), independent: region.independent === true };
         if (!InspectorFields.differs(current, values)) return false;
         MapStateManager.pushVectorState(app);
         GeneratedEdits.markIfSubstantive(region, field);
         const { label, ...fields } = values;
         if (fields.name !== region.name) RandomNames.markTyped(region);
-        Object.assign(region, fields);
+        const { independent, ...rest } = fields;
+        Object.assign(region, rest);
+        // Saved only while ticked, so a region never ticked stays as it was
+        if (independent === true) region.independent = true;
+        else delete region.independent;
         region.label = { ...region.label, ...label };
         this.#redraw(app);
         return true;

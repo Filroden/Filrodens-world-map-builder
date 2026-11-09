@@ -220,6 +220,9 @@ export class MapStudio {
         massEditLevel(_e, t)        { this.#massEditLevel(RegionPanel.levelIdOf(t)); },
         selectRegion(e, t)          { if (!MapStudio.#fromRowControl(e, t)) this.#selectRegionRow(t); },
         mergeRegion(_e, t)          { RegionPanel.mergeRegion(this, ...RegionPanel.regionIdsOf(t)); },
+        moveRegionToPolitical(_e, t) { const [levelId, regionId] = RegionPanel.regionIdsOf(t); RegionPanel.moveToPolitical(this, levelId, [regionId]); },
+        changeRegionRank(_e, t)     { RegionPanel.changeRank(this, ...RegionPanel.regionIdsOf(t)); },
+        moveLevelToPolitical(_e, t) { RegionPanel.moveToPolitical(this, RegionPanel.levelIdOf(t), null); },
         // --- GENERATE ---
         generateWorld()             { GeneratePanel.generate(this); },
         removeGenerated()           { GeneratePanel.removeGenerated(this); },

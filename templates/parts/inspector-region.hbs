@@ -1,6 +1,8 @@
 {{!--
     The inspector's region (see RegionEditor): its name, description and visibility; its fill (a
-    region style, or its own colour and pattern); its label; and Focus view, Merge into… and Delete.
+    region style, or its own colour and pattern); for a lone duchy or county of the Political set,
+    Independent; its label; and Focus view, Merge into…, Move to Political set… (outside the
+    Political set) or Change rank… (inside it) and Delete.
     Every field applies when committed, one undo step each (see Inspector).
 --}}
 <datalist id="fwmb-inspector-colors">
@@ -59,12 +61,24 @@
     </div>
 </div>
 
+{{#if independent}}
+<div class="fwmb-group">
+    <label class="fwmb-checkbox-label" data-tooltip="{{localize independent.hint}}">
+        <input type="checkbox" class="fwmb-checkbox" name="regionIndependent" {{#if independent.checked}}checked{{/if}} />
+        {{localize "FILRODENSWMB.UI.RegionIndependent"}}
+    </label>
+    <p class="fwmb-hint">{{localize independent.hint}}</p>
+</div>
+{{/if}}
+
 {{> "modules/filrodens-world-map-builder/templates/parts/label-fields.hbs" label=label choices=labelChoices styleName=labelStyleName visibilities=labelVisibilities sectionId="inspectorLabel" sectionTitle="FILRODENSWMB.UI.InspectorLabel" closed=true}}
 {{> "modules/filrodens-world-map-builder/templates/parts/inspector-generated.hbs" generated=generated locked=generatedLocked}}
 
 <div class="fwmb-inspector-actions">
     <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="zoom"><i class="fwmb-icon fwmb-icon--center-focus" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ZoomTo"}}</button>
     <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="merge"><i class="fwmb-icon fwmb-icon--merge" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.InspectorMergeInto"}}</button>
+    {{#if canChangeRank}}<button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="changeRank" data-tooltip="{{localize 'FILRODENSWMB.UI.ChangeRankTooltip'}}"><i class="fwmb-icon fwmb-icon--palace" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.ChangeRank"}}</button>{{/if}}
+    {{#if canMoveToPolitical}}<button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="moveToPolitical" data-tooltip="{{localize 'FILRODENSWMB.UI.MoveToPoliticalTooltip'}}"><i class="fwmb-icon fwmb-icon--palace" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.MoveToPolitical"}}</button>{{/if}}
     <button type="button" class="fwmb-btn fwmb-btn--danger-quiet fwmb-inspector-delete" data-inspector-action="delete"><i class="fwmb-icon fwmb-icon--delete" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.Delete"}}</button>
 </div>
 <p class="fwmb-hint fwmb-inspector-hint">{{localize "FILRODENSWMB.UI.InspectorApplyHint"}}</p>

@@ -213,7 +213,7 @@ export class GeneratePanel {
     /** Each settlement pin the last run could not build on as its style asked, by name (pins deleted since are left out). */
     static #seatNotices(app) {
         const byId = new Map((app.mapPins ?? []).map((pin) => [pin.id, pin]));
-        const keys = { dry: "FILRODENSWMB.UI.GenerateSeatDryNotice", notCapital: "FILRODENSWMB.UI.GenerateSeatNotCapitalNotice", noPlace: "FILRODENSWMB.UI.GenerateSeatNoPlaceNotice", water: "FILRODENSWMB.UI.GenerateSeatWaterNotice" };
+        const keys = { dry: "FILRODENSWMB.UI.GenerateSeatDryNotice", notCapital: "FILRODENSWMB.UI.GenerateSeatNotCapitalNotice", noPlace: "FILRODENSWMB.UI.GenerateSeatNoPlaceNotice", water: "FILRODENSWMB.UI.GenerateSeatWaterNotice", islet: "FILRODENSWMB.UI.GenerateSeatIsletNotice" };
         return (app.modelRun?.seats?.unhonoured ?? [])
             .filter(({ pin, reason }) => byId.has(pin) && keys[reason])
             .map(({ pin, reason }) => ({ text: platform.i18n.format(keys[reason], { name: byId.get(pin).name || platform.i18n.localize("FILRODENSWMB.UI.GenerateSeatUnnamed") }) }));

@@ -635,6 +635,19 @@ test("where a name came from and its roll are kept to their rules", () => {
     assert.ok(!("nameSource" in older.mapPins[0]) && !("nameSource" in older.layerSets[0].levels[0].regions[0]));
 });
 
+test("a region's Independent choice and the parent a run gave it are true or false, and absent on older maps", () => {
+    const file = v4Map();
+    const [region] = file.layerSets[0].levels[0].regions;
+    Object.assign(region, { independent: true, parentFromRun: "<b>yes</b>" });
+    const { mapData } = MapImport.read(file);
+    const kept = mapData.layerSets[0].levels[0].regions[0];
+    assert.equal(kept.independent, true);
+    assert.ok(!("parentFromRun" in kept), "a value that is not true or false is dropped");
+    assert.equal(typed("region", { independent: "true" }, { independent: false }).independent, false, "the inspector keeps the region's own");
+    const older = MapImport.read(v4Map()).mapData.layerSets[0].levels[0].regions[0];
+    assert.ok(!("independent" in older) && !("parentFromRun" in older), "nothing is added to a region saved before");
+});
+
 test("a natural feature's label keeps its feature record within its rules", () => {
     const file = v4Map();
     Object.assign(file.mapLabels[0], { feature: { kind: "sea", cell: 8, runs: [3, 10, 5, 4, 9, 7], x: 5, y: 5, rotation: 0, fontSize: 3.2, text: "Grey Sea", style: "label-style-ocean-sea" } });

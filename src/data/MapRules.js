@@ -299,6 +299,10 @@ const REGION = obj({
     fillStyle,
     quickStyle: custom,
     parentKey: int(0, 1e9, { nullable: true }),
+    // A lone duchy or county of the Political set: a state of its own when a run builds round it (see UserRealms)
+    independent: bool,
+    // The parent a run gave a lone region, which the next run may change (see Regeneration.merge)
+    parentFromRun: bool,
     visibility,
     hidden,
     label: OWNED_LABEL,
@@ -805,7 +809,7 @@ const MODEL_RUN = obj({
     cells: obj(Object.fromEntries(MODEL_RUN_ARRAYS.map((name) => [name, PACKED_ARRAY]))),
     ages: obj({ asked: int(1, 100), run: int(1, 100) }),
     // The settlement pins the run built on (see Pipeline.markSeatPlaces): how many, and each it could not honour
-    seats: obj({ used: int(0, 1e6), unhonoured: list(obj({ pin: ref(), kind: enumOf(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]), reason: enumOf(["noPlace", "dry", "notCapital", "water"]) })) }, { nullable: true }),
+    seats: obj({ used: int(0, 1e6), unhonoured: list(obj({ pin: ref(), kind: enumOf(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]), reason: enumOf(["noPlace", "dry", "notCapital", "water", "islet"]) })) }, { nullable: true }),
     // Each age before the last, in brief (see ModelRun); MapImport checks that its names run with
     // its places, castles and seats, and its arrays with the run's cells
     history: list(obj({

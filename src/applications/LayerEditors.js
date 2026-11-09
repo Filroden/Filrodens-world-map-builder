@@ -106,6 +106,7 @@ export class LevelEditor {
         context: (app, level, ref) => LevelEditor.#context(app, level, LevelEditor.#find(app, ref).set),
         apply: (app, level, ref, form, field) => LevelEditor.#apply(app, level, LevelEditor.#find(app, ref).set, form, field),
         actions: {
+            moveToPolitical: (app, level) => RegionPanel.moveToPolitical(app, level.id, null),
             delete: (app, level) => RegionPanel.deleteLevelById(app, level.id),
         },
     });
@@ -137,6 +138,7 @@ export class LevelEditor {
             thicknessStep: FILRODENSWMB.MESH.ARCS.THICKNESS_STEP,
             // Stored in map pixels and shown in the map unit (see MapUnit)
             waters: { ...FILRODENSWMB.MESH.WATERS, ...LevelEditor.#watersInUnit(app, level.watersPx ?? 0) },
+            canMoveToPolitical: RegionPanel.canMoveToPolitical(app, level.id) && level.regions.length > 0,
         };
     }
 

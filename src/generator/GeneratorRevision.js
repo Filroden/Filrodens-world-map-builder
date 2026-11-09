@@ -73,8 +73,10 @@ export class GeneratorRevision {
      * - shorePins: whether a port's place stands on its cell's shore, and a town on a navigable
      *   river beside the river, rather than on its cell's site (see CellValues, Materialise).
      * - seats: whether the map's settlement pins are seats the run must build on (see Pipeline.seatsOf).
+     * - userRegions: whether the realms, duchies and counties the map's Political set holds as its
+     *   own are fixed units the present age's realms are built round (see UserRealms).
      * @param {number} revision
-     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean, seats: boolean}}
+     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean, seats: boolean, userRegions: boolean}}
      */
     static rules(revision) {
         const G = FILRODENSWMB.GENERATOR;
@@ -86,6 +88,7 @@ export class GeneratorRevision {
             callShare: G.PORTS.CALL_SHARE,
             shorePins: ports,
             seats: ports,
+            userRegions: ports,
         });
     }
 

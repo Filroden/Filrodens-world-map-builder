@@ -157,7 +157,7 @@ test("settlement pins are seats: a hand-placed one gains the run's figures and s
     app.mapPins.push(mine, ruin);
 
     const seats = Generation.seats(app);
-    assert.deepEqual(seats.find((seat) => seat.pin === "my-city"), { cell: empty, kind: "city", pin: "my-city" });
+    assert.deepEqual(seats.find((seat) => seat.pin === "my-city"), { cell: empty, kind: "city", pin: "my-city", x: mine.x, y: mine.y, land: true });
     assert.ok(seats.some((seat) => seat.pin === kept.id), "a kept generated settlement is a seat");
     assert.ok(!seats.some((seat) => seat.pin === "my-ruin" || seat.pin === "own-pin"), "a ruin and a pin of no settlement style are not");
     assert.ok(!seats.some((seat) => generatedPins(app).some((pin) => pin.id === seat.pin && !pin.generated.locked && !pin.generated.edited)), "a generated pin a run replaces is not");

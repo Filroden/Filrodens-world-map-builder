@@ -62,7 +62,7 @@ const labelFields = (store) => [
  * inspector's fields for several items at once, so a field here names the inspector fields it
  * stands for (`inspector`), and a test checks every field of a kind's inspector is here, except
  * those that belong to each item (`perItem`: its name, description, text, rotation, how its new
- * legs are found).
+ * legs are found, and whether a lone duchy or county is a state of its own, which only such regions offer).
  *
  * A field is `{ key, store, type, label, inspector, ... }`:
  * - `store`: "item" (the object's own field) or "label" (its label's).
@@ -114,7 +114,7 @@ export class FieldSpecs {
             legend: "FILRODENSWMB.UI.MassEditFieldsRegions",
             hasLabel: true,
             style: { type: "Region", key: "quickStyle", none: "custom", write: (_app, style) => ({ quickStyle: style.id, fillColor: style.fillColor, fillStyle: style.fillStyle ?? "solid" }) },
-            perItem: ["regionName", "regionDesc", "labelRotation"],
+            perItem: ["regionName", "regionDesc", "regionIndependent", "labelRotation"],
             fields: [
                 { key: "quickStyle", store: "item", type: "style", styleType: "Region", label: "FILRODENSWMB.UI.InspectorStyle", inspector: ["regionQuickStyle"], options: styleOptions("customRegionStyles") },
                 { key: "visibility", store: "item", type: "visibility", label: "FILRODENSWMB.UI.Visibility", inspector: ["regionVisibility"] },

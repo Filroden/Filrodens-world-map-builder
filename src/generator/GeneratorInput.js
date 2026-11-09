@@ -25,10 +25,14 @@ import { FILRODENSWMB } from "../config.js";
  * @property {{pixelsPerBaseline: number, list: {merges: boolean, x: Int32Array, y: Int32Array, lake: Uint8Array, flow: Float32Array|null}[]}} rivers
  * @property {string} mapSeed
  * @property {object} settings - The user's settings (see GeneratorSettings).
- * @property {{cell: number, kind: string, pin: string}[]} seats - The map's settlement pins the run
- *   must build on, each by its model cell and its style's tier (see Pipeline.seatsOf).
+ * @property {{cell: number, kind: string, pin: string, x: number|null, y: number|null, land: boolean|null}[]} seats -
+ *   The map's settlement pins the run must build on, each by its model cell and its style's tier,
+ *   with the pin's map point and whether it stands on land (see Pipeline.seatsOf).
  * @property {number} revision - The generator rules to follow (see GeneratorRevision): the current
  *   ones for a run, the map's own for what is worked out live from the map (Travel, Fill in).
+ * @property {{realms: object[], duchies: object[], counties: object[]}|null} userRegions - The map's
+ *   own realms, duchies and counties a run builds round (see Generation.userRegions and
+ *   UserRealms), each `{ key, cells, independent? }` by model cell; null for none.
  */
 
 /**
@@ -42,11 +46,12 @@ import { FILRODENSWMB } from "../config.js";
  * @param {object[]} [source.customBiomes]
  * @param {string} source.mapSeed
  * @param {object} [source.settings]
- * @param {{cell: number, kind: string, pin: string}[]} [source.seats] - Settlement pins as seats.
+ * @param {{cell: number, kind: string, pin: string, x?: number, y?: number, land?: boolean}[]} [source.seats] - Settlement pins as seats.
  * @param {number} [source.revision] - The generator rules to follow; the current ones when left out.
+ * @param {object|null} [source.userRegions] - The map's own realms, duchies and counties (see GeneratorPayload).
  * @returns {GeneratorPayload}
  */
-export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverData = null, biomeParams = null, customBiomes = [], mapSeed, settings = {}, seats = [], revision = FILRODENSWMB.GENERATOR.REVISION }) {
+export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverData = null, biomeParams = null, customBiomes = [], mapSeed, settings = {}, seats = [], revision = FILRODENSWMB.GENERATOR.REVISION, userRegions = null }) {
     return {
         width: mesh.width,
         height: mesh.height,
@@ -65,8 +70,9 @@ export function buildGeneratorPayload({ mesh, buffers, seaLevel, kmPerPx, riverD
         rivers: riverList(riverData),
         mapSeed: String(mapSeed ?? ""),
         settings: structuredClone(settings ?? {}),
-        seats: seats.map(({ cell, kind, pin }) => ({ cell, kind, pin })),
+        seats: seats.map(({ cell, kind, pin, x = null, y = null, land = null }) => ({ cell, kind, pin, x, y, land })),
         revision,
+        userRegions: userRegions ? structuredClone(userRegions) : null,
     };
 }
 

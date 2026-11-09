@@ -10,6 +10,7 @@ import { resolveSettings } from "./GeneratorSettings.js";
 import { modelBiomeRaster } from "./ModelBiomes.js";
 import { nameEverything } from "./Names.js";
 import { buildRealms } from "./Realms.js";
+import { buildRealmsAround, userZones } from "./UserRealms.js";
 import { routeChains } from "./RouteChains.js";
 import { placeTowns } from "./Towns.js";
 import { tradeRounds } from "./Trade.js";
@@ -85,6 +86,8 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     // Settlement pins the run must build on, in every age
     run.seatsOffLand = [];
     run.cells.seats = run.rules.seats ? seatsOf(payload.seats, run.cells, run.seatsOffLand) : null;
+    // The map's own realms, duchies and counties, which the present age's realms are built round
+    run.userZones = run.rules.userRegions ? userZones(payload.userRegions, run.cells) : null;
     run.graph = new CellGraph(run.cells);
     const people = cultureList(settings, payload);
 
@@ -136,15 +139,18 @@ async function runAge(run, driver, { settings, people, ages, index, previous }) 
     const { list, invader } = agePeople(settings, people, ages, index);
     const cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(list), { invader }), run);
     const common = { cultures, world: settings.world, rules: run.rules };
+    // The map's own regions hold in the present age only: the ages before are its history
+    const userZonesOfAge = index === ages.length - 1 ? run.userZones : null;
+    const realmsOf = (context) => (userZonesOfAge ? buildRealmsAround(run.graph, { ...context, userZones: userZonesOfAge }) : buildRealms(run.graph, context));
     const towns = await driver.stage("towns", () => placeTowns(run.graph, { ...common, era: age, previous }), run);
     const trade = await driver.stage("trade", () => tradeRounds(run.graph, { ...common, towns: towns.towns, cellPop: towns.cellPop, totalPop: towns.totalPop, built: previous?.built ?? null }), run);
-    const realms = await driver.step("realms", () => buildRealms(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, keptSeats: previous?.seats ?? null }), run);
+    const realms = await driver.step("realms", () => realmsOf({ ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, keptSeats: previous?.seats ?? null }), run);
     const strifeAt = invader >= 0 && previous ? invasionStrife(run.cells, cultures, invader, previous, age.strife) : null;
     const feedback = await driver.step("feedback", () => feedbackPass(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, realms, strife: age.strife, strifeAt }), run);
 
     const final = { traffic: trade.traffic, security: feedback.security, royalSeats: feedback.royalSeats };
     const finalTrade = await driver.stage("finalTrade", () => tradeRounds(run.graph, { ...common, towns: feedback.towns, cellPop: feedback.cellPop, totalPop: feedback.totalPop, final }), run);
-    const finalRealms = await driver.step("finalRealms", () => buildRealms(run.graph, { ...common, towns: finalTrade.towns, cellPop: feedback.cellPop, traffic: finalTrade.traffic, fixedSeats: feedback.royalSeats }), run);
+    const finalRealms = await driver.step("finalRealms", () => realmsOf({ ...common, towns: finalTrade.towns, cellPop: feedback.cellPop, traffic: finalTrade.traffic, fixedSeats: feedback.royalSeats }), run);
 
     return {
         age: { cultures, feedback, finalTrade, finalRealms },
@@ -417,16 +423,29 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
             population: Math.round(people.realm[index]),
             landKm2: Math.round(realm.landKm2),
             cultures: realmMix[index],
+            ...userFields(realm),
         })),
         // Duchies and counties name their largest culture (-1 for none)
-        duchies: finalRealms.duchies.map((duchy, index) => ({ seat: duchy.seat, name: names.duchies[index], realm: finalRealms.realmOfDuchy[index], counties: duchy.counties, population: Math.round(people.duchy[index]), culture: duchyMix[index][0]?.[0] ?? -1 })),
-        counties: finalRealms.counties.map((county, index) => ({ seat: county.seat, name: names.counties[index], duchy: finalRealms.duchyOfCounty[index], population: Math.round(people.county[index]), culture: countyMix[index][0]?.[0] ?? -1 })),
+        duchies: finalRealms.duchies.map((duchy, index) => ({ seat: duchy.seat, name: names.duchies[index], realm: finalRealms.realmOfDuchy[index], counties: duchy.counties, population: Math.round(people.duchy[index]), culture: duchyMix[index][0]?.[0] ?? -1, ...userFields(duchy) })),
+        counties: finalRealms.counties.map((county, index) => ({ seat: county.seat, name: names.counties[index], duchy: finalRealms.duchyOfCounty[index], population: Math.round(people.county[index]), culture: countyMix[index][0]?.[0] ?? -1, ...userFields(county) })),
         routes,
         stats: statistics(run, { feedback, finalTrade, finalRealms, routes, places }),
         seats: markSeatPlaces(run, places, seats),
         timings: run.timings,
         cellCount: cells.count,
     };
+}
+
+/**
+ * What a realm unit built round the map's own regions carries for the display (see UserRealms):
+ * `user`, the key of the user region it stands for, and a county's `zone`. Nothing otherwise, so a
+ * run without user regions is as it always was.
+ */
+function userFields(unit) {
+    const fields = {};
+    if (unit.user !== undefined) fields.user = unit.user;
+    if (unit.zone !== undefined) fields.zone = unit.zone;
+    return fields;
 }
 
 /**
@@ -514,20 +533,31 @@ function placeShore(run, town) {
 /** Each seat kind's town tier (0 city, 1 large town, 2 town); a castle has none. */
 const SEAT_TIERS = Object.freeze({ capital: 0, city: 0, largeTown: 1, town: 2, fortifiedTown: 2, port: 2, castle: undefined });
 
+/** How many rings of neighbours a seat on land in a model cell the model counts as water looks through for a land cell (see landCellFor). */
+const SEAT_LAND_RINGS = 2;
+
 /**
  * The map's settlement pins as seats (see GeneratorInput), by model cell: { kind, tier, pins }.
  * Where several stand in one cell, the biggest tier's kind is the seat's, and every pin is its.
- * Seats of kinds the world model has no counterpart for are left out, and seats on water cells
- * too (their pins listed in `offLand`).
+ * Seats of kinds the world model has no counterpart for are left out.
+ *
+ * A model cell is water when less than half its pixels are land (CellValues), so a pin standing on
+ * land by a coast often lies in a model cell the model counts as sea. Such a seat (its pin on land,
+ * `land`) is built in the land model cell nearest the pin within SEAT_LAND_RINGS rings (see
+ * landCellFor). A seat whose pin stands on water is left out (reason `water`), and so is one on
+ * land the model has no land cell near, an islet or a thin spit smaller than half a model cell
+ * (reason `islet`); its pins are listed in `offLand`.
  * @returns {Map<number, {kind: string, tier: number|undefined, pins: string[]}>|null}
  */
 function seatsOf(list, cells, offLand) {
     if (!Array.isArray(list) || !list.length) return null;
     const seats = new Map();
-    for (const { cell, kind, pin } of list) {
-        if (!Number.isInteger(cell) || cell < 0 || cell >= cells.count || !Object.hasOwn(SEAT_TIERS, kind)) continue;
-        if (cells.water[cell]) {
-            offLand.push({ pin, kind, reason: "water" });
+    for (const seat of list) {
+        const { kind, pin } = seat;
+        if (!Number.isInteger(seat.cell) || seat.cell < 0 || seat.cell >= cells.count || !Object.hasOwn(SEAT_TIERS, kind)) continue;
+        const cell = cells.water[seat.cell] ? landCellFor(cells, seat) : seat.cell;
+        if (cell < 0) {
+            offLand.push({ pin, kind, reason: seat.land === true ? "islet" : "water" });
             continue;
         }
         const tier = SEAT_TIERS[kind];
@@ -540,6 +570,33 @@ function seatsOf(list, cells, offLand) {
         if ((tier ?? Infinity) < (held.tier ?? Infinity)) Object.assign(held, { kind, tier });
     }
     return seats.size ? seats : null;
+}
+
+/**
+ * For a seat whose model cell is water: when its pin stands on land (`land`, with the pin's map
+ * point `x`, `y`), the land model cell nearest that point among the cell's neighbours out to
+ * SEAT_LAND_RINGS rings; -1 when the pin stands on water or no land cell lies that near. A seat
+ * from an older payload without `land` counts as on water, as it always did.
+ */
+function landCellFor(cells, { cell, land, x, y }) {
+    if (land !== true || !Number.isFinite(x) || !Number.isFinite(y)) return -1;
+    const seen = new Set([cell]);
+    let ring = [cell];
+    for (let step = 0; step < SEAT_LAND_RINGS && ring.length; step++) {
+        const next = [];
+        for (const at of ring) {
+            for (let slot = cells.neighbourStart[at]; slot < cells.neighbourStart[at + 1]; slot++) {
+                const other = cells.neighbourList[slot];
+                if (seen.has(other)) continue;
+                seen.add(other);
+                next.push(other);
+            }
+        }
+        const dry = next.filter((other) => !cells.water[other] && cells.landKm2[other] > 0);
+        if (dry.length) return dry.reduce((best, other) => (Math.hypot(cells.x[other] - x, cells.y[other] - y) < Math.hypot(cells.x[best] - x, cells.y[best] - y) ? other : best));
+        ring = next;
+    }
+    return -1;
 }
 
 /**

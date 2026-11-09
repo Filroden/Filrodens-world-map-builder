@@ -4,9 +4,11 @@ import { MapDialogManager } from "./MapDialogManager.js";
 import { VectorHistory } from "./VectorHistory.js";
 import { addRegion, childLevelFields, createLayerSet, createLevel, regionFillColor, UNCLAIMED, VISIBILITIES } from "../mesh/Schema.js";
 import { childLevels, descendantLevels, insertLevel, levelDepth, parentLevel, setOfLevel, setParent, uniqueName } from "../mesh/LayerTree.js";
-import { assignToParents, autoAssign, claimWaters, deleteLevel, deleteRegion, deleteSet, levelCounts, mergeRegion, nestingProblems, regionParents, unassignedCount } from "../mesh/RegionEdits.js";
+import { assignToParents, autoAssign, claimWaters, deleteLevel, deleteRegion, deleteSet, levelCounts, mergeRegion, moveRegions, nestingProblems, regionParents, unassignedCount } from "../mesh/RegionEdits.js";
 import { platform } from "../platform/index.js";
 import { GeneratedEdits } from "./GeneratedEdits.js";
+import { Generation } from "./Generation.js";
+import { Regeneration } from "./Regeneration.js";
 import { RandomNames } from "./RandomNames.js";
 
 /** Where the dialogue templates live (Merge Into's). */
@@ -118,6 +120,7 @@ export class RegionPanel {
         const waiting = !!parentLevelOf && !parent;
         const painting = !!app.uiState?.isEditMode && app.activeTool === "regions";
         const massEdit = !!app.massEditMode?.region && app.massEditLevelId === level.id;
+        const canChangeRank = this.canChangeRank(app, level.id);
         const regionRow = (region) => {
             const regionKey = `region:${region.id}`;
             if (naming?.kind === "rename" && naming.key === regionKey) return this.#namingRow(naming);
@@ -134,6 +137,8 @@ export class RegionPanel {
                 generated: !!region.generated,
                 locked: region.generated?.locked === true,
                 edited: region.generated?.edited === true,
+                canMoveToPolitical: set.kind !== "political",
+                canChangeRank,
                 // The regions inside it, in the layers below (none shown when there are none below)
                 count: below.length ? below.reduce((sum, child) => sum + child.regions.filter((inner) => inner.parentKey === region.key).length, 0) : null,
                 working,
@@ -165,6 +170,7 @@ export class RegionPanel {
             parentName: waiting ? null : parent ? parent.name : set.name,
             hasParent: !!level.parentLevelId,
             isFree: level.nestingMode === "free",
+            canMoveToPolitical: set.kind !== "political" && level.regions.length > 0,
             problems: level.parentLevelId && app.meshSession ? nestingProblems(app.meshSession, level).length : 0,
             unassignedCells: level.parentLevelId && app.meshSession ? unassignedCount(app.meshSession, level) : 0,
             canMassEdit: listed.length + unassigned.length > 0,
@@ -523,6 +529,7 @@ export class RegionPanel {
             for (const region of level.regions) {
                 const key = parents.get(region.key) ?? UNCLAIMED;
                 region.parentKey = key === UNCLAIMED ? null : key;
+                delete region.parentFromRun;
             }
         }
         const waters = watersChanged || parentChanged ? this.watersEntry(app, level.id) : null;
@@ -675,6 +682,167 @@ export class RegionPanel {
         app.activeRegionId = intoId;
         this.#refresh(app);
         return true;
+    }
+
+    // ------------------------------------------------------------------ Move to Political set
+
+    /** The Political set's layers a region can be moved to, by depth, with their names in the choice. */
+    static #MOVE_CHOICES = Object.freeze(["FILRODENSWMB.UI.MoveAsRealm", "FILRODENSWMB.UI.MoveAsDuchy", "FILRODENSWMB.UI.MoveAsCounty"]);
+
+    /** Whether a level's regions can be moved to the Political set: a level of any other set. */
+    static canMoveToPolitical(app, levelId) {
+        const set = setOfLevel(app.layerSets ?? [], levelId);
+        return !!set && set.kind !== "political";
+    }
+
+    /**
+     * The Political set's levels by depth (realms, duchies, counties): its first top level, that
+     * level's first child, and that one's first child; a depth the set lacks is null. All null
+     * without a set.
+     */
+    static #politicalDepths(set) {
+        const depths = [null, null, null];
+        let level = set ? (childLevels(set, null)[0] ?? null) : null;
+        for (let depth = 0; depth < depths.length && level; depth++) {
+            depths[depth] = level;
+            level = childLevels(set, level.id)[0] ?? null;
+        }
+        return depths;
+    }
+
+    /**
+     * Move to Political set (a region's menu and inspector, or a whole layer's): asks whether the
+     * region (or every region of the layer) becomes a realm, duchy or county, then moves it into
+     * that layer of the Political set a run writes into (see Regeneration.target), where Generate
+     * keeps it and builds round it (see UserRealms). With no Political set on the map, one is made
+     * first with Generate's three layers and looks (see Generation.newPoliticalSet), so a later run
+     * writes into it.
+     *
+     * The regions leave their own layer (a set or layer left empty stays, for the reader to delete)
+     * and win their land in the Political layer: regions there lose what they overlap, and what lay
+     * under those cells in the layers below is cleared (see RegionEdits.moveRegions). A moved region
+     * belongs to the region of the layer above holding most of its land, or to none (a lone duchy or
+     * county, whose Independent choice then says whether it is a state of its own). Generated regions
+     * it cuts into are not marked as edited: a run replaces them as before. One undo step.
+     * @param {object} app
+     * @param {string} levelId
+     * @param {string[]|null} regionIds - The regions to move; null for every region of the layer.
+     * @returns {Promise<boolean>} Whether anything moved.
+     */
+    static async moveToPolitical(app, levelId, regionIds = null) {
+        const session = app.meshSession;
+        const level = this.#level(app, levelId);
+        if (!session || !level || !this.canMoveToPolitical(app, levelId)) return false;
+        const ids = (regionIds ?? level.regions.map((region) => region.id)).filter((id) => level.regions.some((region) => region.id === id));
+        if (!ids.length) {
+            platform.notify.info(platform.i18n.localize("FILRODENSWMB.UI.MoveToPoliticalEmpty"));
+            return false;
+        }
+        const target = Regeneration.target(app);
+        const depths = this.#politicalDepths(target);
+        const own = Math.min(levelDepth(setOfLevel(app.layerSets ?? [], level.id), level), depths.length - 1);
+        const single = ids.length === 1 ? level.regions.find((region) => region.id === ids[0]) : null;
+        const depth = await this.#askDepth({
+            depths,
+            own,
+            available: (each) => !target || !!depths[each],
+            creates: !target,
+            title: platform.i18n.format("FILRODENSWMB.UI.MoveToPoliticalTitle", { name: single ? single.name : level.name }),
+            hint: single ? platform.i18n.format("FILRODENSWMB.UI.MoveToPoliticalHint", { name: single.name }) : platform.i18n.format("FILRODENSWMB.UI.MoveToPoliticalLevelHint", { name: level.name, count: ids.length }),
+        });
+        if (depth === null) return false;
+
+        const before = VectorHistory.snapshot(app);
+        const entries = [before];
+        let set = target;
+        if (!set) {
+            set = Generation.newPoliticalSet(app);
+            app.layerSets.push(set);
+            session.setLayerSets(app.layerSets);
+            entries.push(...set.levels.map((each) => VectorHistory.levelOwners(each.id, null, session.layer(each.id).encode())));
+        }
+        return this.#moveInto(app, { level, ids, set, into: this.#politicalDepths(set)[depth], entries });
+    }
+
+    /** The depth (0 realm, 1 duchy, 2 county) of a Political set's level, or -1 when it is not one of its three (see #politicalDepths). */
+    static #rankOf(app, levelId) {
+        const set = setOfLevel(app.layerSets ?? [], levelId);
+        if (set?.kind !== "political") return -1;
+        return this.#politicalDepths(set).findIndex((level) => level?.id === levelId);
+    }
+
+    /** Whether a region of this level can change rank: a realm, duchy or county of a Political set. */
+    static canChangeRank(app, levelId) {
+        return this.#rankOf(app, levelId) >= 0;
+    }
+
+    /**
+     * Change rank (a Political region's menu and inspector): makes a realm a duchy or county, a
+     * duchy a realm or county, a county a realm or duchy, in its own Political set. It moves as Move
+     * to Political set moves a region (see RegionEdits.moveRegions): it keeps its id, name and look,
+     * wins its land at the new layer, clears what lay under it in the constrained layers below that
+     * one (as painting does, so a duchy made a realm clears the counties under it), and belongs to
+     * the region of the layer above holding most of its land, or to none (a lone duchy or county).
+     * One undo step.
+     * @param {object} app
+     * @param {string} levelId
+     * @param {string} regionId
+     * @returns {Promise<boolean>} Whether it moved.
+     */
+    static async changeRank(app, levelId, regionId) {
+        const level = this.#level(app, levelId);
+        const region = level?.regions.find((each) => each.id === regionId);
+        const own = this.#rankOf(app, levelId);
+        if (!app.meshSession || !region || own < 0) return false;
+        const set = setOfLevel(app.layerSets, levelId);
+        const depths = this.#politicalDepths(set);
+        const depth = await this.#askDepth({
+            depths,
+            own,
+            available: (each) => each !== own && !!depths[each],
+            creates: false,
+            title: platform.i18n.format("FILRODENSWMB.UI.ChangeRankTitle", { name: region.name }),
+            hint: platform.i18n.format("FILRODENSWMB.UI.ChangeRankHint", { name: region.name }),
+        });
+        if (depth === null) return false;
+        return this.#moveInto(app, { level, ids: [region.id], set, into: depths[depth], entries: [VectorHistory.snapshot(app)] });
+    }
+
+    /** Moves regions into a layer as one undo step (after `entries`), and makes the first the one being edited. */
+    static #moveInto(app, { level, ids, set, into, entries }) {
+        if (!into) return false;
+        const result = moveRegions(app.meshSession, app.layerSets, level.id, ids, into.id);
+        if (!result) return false;
+        entries.push(...result.patches.map((entry) => VectorHistory.owners(entry.levelId, entry.patch)));
+        VectorHistory.push(app, VectorHistory.composite(entries));
+        const [first] = result.moved;
+        app.activeLayerSetId = set.id;
+        app.activeLevelId = into.id;
+        app.activeRegionId = first?.id ?? null;
+        if (first) this.choosePath(app, into.id, first.id);
+        const done = result.moved.length === 1 ? platform.i18n.format("FILRODENSWMB.UI.MoveToPoliticalDoneOne", { name: first.name, level: into.name, set: set.name }) : platform.i18n.format("FILRODENSWMB.UI.MoveToPoliticalDone", { count: result.moved.length, level: into.name, set: set.name });
+        platform.notify.info(done);
+        this.#refresh(app, { toolbar: true });
+        return true;
+    }
+
+    /**
+     * Asks which of the Political set's layers (by depth: 0 realm, 1 duchy, 2 county) the regions
+     * go to, offering those `available` allows; the region's own depth is chosen first when it is
+     * offered, else the first offered. Null when cancelled.
+     */
+    static async #askDepth({ depths, own, available, creates, title, hint }) {
+        const preferred = available(own) ? own : depths.findIndex((_, depth) => available(depth));
+        const choices = this.#MOVE_CHOICES.map((label, depth) => {
+            const name = platform.i18n.localize(label);
+            const missing = !creates && !depths[depth];
+            const text = depth === own && !available(depth) && !missing ? platform.i18n.format("FILRODENSWMB.UI.MoveAsCurrent", { level: name }) : missing ? platform.i18n.format("FILRODENSWMB.UI.MoveAsMissing", { level: name }) : name;
+            return { depth, available: available(depth), selected: depth === preferred, label: text };
+        });
+        const content = await platform.templates.render(`${DIALOG_ROOT}move-to-political.hbs`, { hint, creates, choices });
+        const chosen = await platform.dialogs.prompt({ classes: ["fwmb"], title, content, onSubmit: (form) => form.elements.moveAs.value });
+        const depth = Number.parseInt(chosen, 10);
+        return Number.isInteger(depth) && available(depth) ? depth : null;
     }
 
     // ------------------------------------------------------------------ helpers

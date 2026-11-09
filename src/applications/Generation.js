@@ -3,7 +3,8 @@ import { generateInBackground } from "../generator/Generate.js";
 import { buildGeneratorPayload } from "../generator/GeneratorInput.js";
 import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { materialise } from "../generator/Materialise.js";
-import { panelSettings } from "../generator/GeneratorSettings.js";
+import { createPoliticalSet } from "../generator/MaterialiseRegions.js";
+import { panelSettings, resolveOutput } from "../generator/GeneratorSettings.js";
 import { encodeModelRun } from "../generator/ModelRun.js";
 import { platform } from "../platform/index.js";
 import { DetailLevel } from "./DetailLevel.js";
@@ -27,6 +28,9 @@ import { VectorHistory } from "./VectorHistory.js";
  */
 /** The pin style tiers a run takes as seats: the settlements and castles the world model makes. */
 const SEAT_KINDS = new Set(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]);
+
+/** How far (map pixels, each way) from a settlement pin's point a land pixel makes it a pin on land (see Generation.#onLand). */
+const SEAT_SHORE_PX = 4;
 
 export class Generation {
     /**
@@ -75,7 +79,7 @@ export class Generation {
             }
         };
         try {
-            const result = await generateInBackground(() => this.payload(app, settings, { revision: GeneratorRevision.CURRENT }), { signal, stopSignal: stop.signal, onProgress }).catch((error) => {
+            const result = await generateInBackground(() => this.payload(app, settings, { revision: GeneratorRevision.CURRENT, userRegions: this.userRegions(app, settings.output) }), { signal, stopSignal: stop.signal, onProgress }).catch((error) => {
                 if (error?.name === "AbortError") return null;
                 throw error;
             });
@@ -164,9 +168,11 @@ export class Generation {
      * GeneratorRevision), as Travel and Fill in must; a run asks for the current ones.
      * @param {object} app
      * @param {object} [settings]
-     * @param {{revision?: number}} [options] - revision: the rules to follow instead of the map's.
+     * @param {{revision?: number, userRegions?: object|null}} [options] - revision: the rules to
+     *     follow instead of the map's; userRegions: the map's own regions a run builds round (see
+     *     userRegions), which only a run needs.
      */
-    static payload(app, settings = panelSettings(app.uiState.generatorSettings), { revision = GeneratorRevision.of(app.uiState) } = {}) {
+    static payload(app, settings = panelSettings(app.uiState.generatorSettings), { revision = GeneratorRevision.of(app.uiState), userRegions = null } = {}) {
         const mesh = app.meshSession.mesh;
         const { params } = MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors);
         return buildGeneratorPayload({
@@ -181,16 +187,100 @@ export class Generation {
             settings: { seed: settings.seed || undefined, nameBase: settings.nameBase, world: settings.world, ages: settings.ages, cultures: app.uiState.cultures ?? [] },
             seats: this.seats(app),
             revision,
+            userRegions,
         });
+    }
+
+    /**
+     * The map's own realms, duchies and counties, which a run builds round (see UserRealms): the
+     * regions of the Political set the run writes into (Regeneration.target) that a run keeps
+     * (Regeneration.keptKeys: hand-made, edited or locked, and the rest of a realm holding one), so
+     * what the model is given is what the map will show. Each level by depth as `{ key, cells,
+     * independent }`, its cells the model cells whose land display cells it holds most of
+     * (cells outside every such region of the level count too, so a region holding a sliver of a
+     * model cell does not take it).
+     *
+     * Null when there are none, and when the set's levels are not the chain of levels the run makes
+     * (see Regeneration.chain and GeneratorSettings.resolveOutput), since the run could not then
+     * be written into it.
+     * @param {object} app
+     * @param {object} [output] - The run's output settings.
+     * @returns {{realms: object[], duchies: object[], counties: object[]}|null}
+     */
+    static userRegions(app, output = {}) {
+        const levels = this.#userLevels(app, output);
+        if (!levels) return null;
+        const session = app.meshSession;
+        const kept = Regeneration.keptKeys(Regeneration.target(app));
+        const [realms, duchies, counties] = [0, 1, 2].map((depth) => (levels[depth] ? this.#modelRegions(session, levels[depth], kept[depth]) : []));
+        return realms.length || duchies.length || counties.length ? { realms, duchies, counties } : null;
+    }
+
+    /**
+     * The user regions on the display mesh, for writing the run (see MaterialiseRegions): each
+     * level of the target set by depth, its owners and the keys of the regions it keeps. Called
+     * once the run's replaced regions are gone, so the target's regions are those it keeps.
+     */
+    static #userDisplay(app, output) {
+        const levels = this.#userLevels(app, output);
+        if (!levels) return null;
+        return levels.map((level) => ({ owners: app.meshSession.layer(level.id).owners, keys: new Set(level.regions.map((region) => region.key)) }));
+    }
+
+    /** The target set's levels by depth, when they are the levels the run makes; null otherwise. */
+    static #userLevels(app, output) {
+        const session = app.meshSession;
+        const set = Regeneration.target(app);
+        const levels = Regeneration.chain(set);
+        if (!session?.mesh || !session.aggregates || !levels) return null;
+        const made = resolveOutput(output);
+        const count = 1 + (made.duchies ? 1 : 0) + (made.counties ? 1 : 0);
+        return levels.length === count ? levels : null;
+    }
+
+    /** A level's kept regions by model cell (see userRegions). */
+    static #modelRegions(session, level, keys) {
+        const { mesh, aggregates } = session;
+        const owners = session.layer(level.id).owners;
+        const NONE = -1;
+        const ownerOf = (cell) => (keys.has(owners[cell]) ? owners[cell] : NONE);
+        // Only the model cells some user region touches need a tally
+        const tallies = new Map();
+        for (let cell = 0; cell < mesh.cellCount; cell++) {
+            if (aggregates.land[cell] === 1 && ownerOf(cell) !== NONE) tallies.set(mesh.parentOf[cell], new Map());
+        }
+        for (let cell = 0; cell < mesh.cellCount; cell++) {
+            const tally = aggregates.land[cell] === 1 ? tallies.get(mesh.parentOf[cell]) : undefined;
+            if (!tally) continue;
+            const owner = ownerOf(cell);
+            tally.set(owner, (tally.get(owner) ?? 0) + 1);
+        }
+        const cellsOf = new Map();
+        for (const [modelCell, tally] of tallies) {
+            let best = NONE;
+            let most = 0;
+            for (const [owner, n] of tally) {
+                if (n > most || (n === most && owner < best)) {
+                    best = owner;
+                    most = n;
+                }
+            }
+            if (best === NONE) continue;
+            if (!cellsOf.has(best)) cellsOf.set(best, []);
+            cellsOf.get(best).push(modelCell);
+        }
+        return level.regions.filter((region) => keys.has(region.key)).map((region) => ({ key: region.key, cells: (cellsOf.get(region.key) ?? []).sort((a, b) => a - b), independent: region.independent === true }));
     }
 
     /**
      * The map's settlement pins as seats a run must build on: every pin on the map whose style has
      * a settlement tier the world model makes (SEAT_KINDS), hand-placed or generated and kept
      * (edited or locked); a generated pin a run would replace is no seat. Each by the model cell
-     * its display cell lies in.
+     * its display cell lies in, with the pin's point and whether it stands on land (see #onLand),
+     * so a pin on a coast in a model cell the model counts as sea is built on the land beside it
+     * (see Pipeline.seatsOf).
      * @param {object} app
-     * @returns {{cell: number, kind: string, pin: string}[]}
+     * @returns {{cell: number, kind: string, pin: string, x: number, y: number, land: boolean|null}[]}
      */
     static seats(app) {
         const session = app.meshSession;
@@ -203,9 +293,34 @@ export class Generation {
             if (!SEAT_KINDS.has(kind) || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) continue;
             const display = session.cellAt(pin.x, pin.y);
             if (!(display >= 0)) continue;
-            seats.push({ cell: session.mesh.parentOf[display], kind, pin: pin.id });
+            seats.push({ cell: session.mesh.parentOf[display], kind, pin: pin.id, x: pin.x, y: pin.y, land: this.#onLand(app, display, pin) });
         }
         return seats;
+    }
+
+    /**
+     * Whether a settlement pin stands on land, for its seat (see Pipeline.seatsOf): its display
+     * cell is land, or there is a land pixel within SEAT_SHORE_PX of its point. The second counts a
+     * pin dropped just off a coast (its icon sits on the shore, its point in the water) as the
+     * coastal settlement it plainly is. Null without the terrain to tell.
+     */
+    static #onLand(app, display, pin) {
+        if (app.meshSession?.aggregates?.land[display] === 1) return true;
+        const elevation = app.currentElevationData;
+        const width = app.mapWidth ?? app.meshSession?.mesh?.width;
+        if (!elevation || !width) return app.meshSession?.aggregates ? false : null;
+        const height = elevation.length / width;
+        const water = app.bufferWaterMask;
+        const seaLevel = app.uiState.seaLevel;
+        const cx = Math.floor(pin.x);
+        const cy = Math.floor(pin.y);
+        for (let y = Math.max(0, cy - SEAT_SHORE_PX); y <= Math.min(height - 1, cy + SEAT_SHORE_PX); y++) {
+            for (let x = Math.max(0, cx - SEAT_SHORE_PX); x <= Math.min(width - 1, cx + SEAT_SHORE_PX); x++) {
+                const pixel = y * width + x;
+                if (elevation[pixel] >= seaLevel && !(water?.[pixel] > 0)) return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -223,6 +338,8 @@ export class Generation {
         this.#ensureLabelStyles(app);
         const removal = Regeneration.remove(app, { keepLatest: true });
         const session = app.meshSession;
+        // The map's own regions the run was built round, as they stand once the rest has gone
+        const userRegions = result.realms.some((realm) => realm.user !== undefined) || result.counties.some((county) => county.zone !== undefined) ? this.#userDisplay(app, output) : null;
         const runId = platform.utils.randomID();
         const made = materialise(session, result, {
             runId,
@@ -236,6 +353,7 @@ export class Generation {
             applyPinStyle: (pin, style) => PinStyles.apply(app, pin, style),
             regionLabel: this.#regionLabels(app),
             output,
+            userRegions,
         });
         const owners = removal.owners.map((entry) => VectorHistory.levelOwners(entry.levelId, entry.before, entry.after));
         const merged = removal.target ? Regeneration.merge(app, removal.target, made.set) : null;
@@ -246,6 +364,7 @@ export class Generation {
         } else {
             // A kept set the run could not write into (its levels differ) goes if it was left empty
             if (removal.target?.levels.every((level) => level.regions.length === 0)) owners.push(...this.#dropSet(app, removal.target));
+            for (const level of made.set.levels) for (const region of level.regions) delete region.standsFor;
             app.layerSets = [...(app.layerSets ?? []), made.set];
             session.setLayerSets(app.layerSets);
             owners.push(...made.set.levels.map((level) => VectorHistory.levelOwners(level.id, null, made.owners[level.id])));
@@ -290,6 +409,19 @@ export class Generation {
                 Object.assign(pin.generated, refreshed);
             }
         }
+    }
+
+    /**
+     * An empty Political set as a run makes one (its three levels, named and drawn as a run's; see
+     * MaterialiseRegions.createPoliticalSet), with the label styles generated regions use added
+     * when the map lacks them, so a later run writes into it and keeps its levels' looks. Not added
+     * to the map: the caller does that, inside its own undo step.
+     * @param {object} app
+     * @returns {object}
+     */
+    static newPoliticalSet(app) {
+        this.#ensureLabelStyles(app);
+        return createPoliticalSet({ names: this.#names(), watersPx: this.#watersPx(app.meshSession.mesh.kmPerPx), idFactory: () => platform.utils.randomID() });
     }
 
     /** Removes a set and its levels' owner arrays; returns the undo entries that bring them back. */

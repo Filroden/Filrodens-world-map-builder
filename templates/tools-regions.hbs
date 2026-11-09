@@ -76,6 +76,9 @@
                         <button type="button" data-action="autoAssignLevel" {{#unless this.unassignedCells}}disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.AutoAssignHint'}}"><i class="fwmb-icon fwmb-icon--format-paint"></i> {{localize "FILRODENSWMB.UI.AutoAssign"}}</button>
                         <button type="button" data-action="fixLevelNesting" {{#unless this.problems}}disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.FixNestingHint'}}"><i class="fwmb-icon fwmb-icon--layers"></i> {{localize "FILRODENSWMB.UI.FixNesting"}}</button>
                         {{/if}}
+                        {{#if this.canMoveToPolitical}}
+                        <button type="button" data-action="moveLevelToPolitical" data-tooltip="{{localize 'FILRODENSWMB.UI.MoveLevelToPoliticalHint'}}"><i class="fwmb-icon fwmb-icon--palace"></i> {{localize "FILRODENSWMB.UI.MoveToPolitical"}}</button>
+                        {{/if}}
                         <button type="button" data-action="deleteLevel" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>
                     </div>
                 </div>
@@ -125,6 +128,12 @@
                         <div class="fwmb-dropdown-menu">
                             <button type="button" data-action="renameListEntry"><i class="fwmb-icon fwmb-icon--edit"></i> {{localize "FILRODENSWMB.UI.Rename"}}</button>
                             <button type="button" data-action="mergeRegion"><i class="fwmb-icon fwmb-icon--merge"></i> {{localize "FILRODENSWMB.UI.MergeInto"}}</button>
+                            {{#if this.canChangeRank}}
+                            <button type="button" data-action="changeRegionRank" data-tooltip="{{localize 'FILRODENSWMB.UI.ChangeRankTooltip'}}"><i class="fwmb-icon fwmb-icon--palace"></i> {{localize "FILRODENSWMB.UI.ChangeRank"}}</button>
+                            {{/if}}
+                            {{#if this.canMoveToPolitical}}
+                            <button type="button" data-action="moveRegionToPolitical" data-tooltip="{{localize 'FILRODENSWMB.UI.MoveToPoliticalTooltip'}}"><i class="fwmb-icon fwmb-icon--palace"></i> {{localize "FILRODENSWMB.UI.MoveToPolitical"}}</button>
+                            {{/if}}
                             <button type="button" data-action="deleteRegion" class="fwmb-danger"><i class="fwmb-icon fwmb-icon--delete"></i> {{localize "FILRODENSWMB.UI.Delete"}}</button>
                         </div>
                     </div>

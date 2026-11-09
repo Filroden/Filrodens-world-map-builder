@@ -54,7 +54,7 @@ export function placeTier(place) {
 export function materialise(session, result, options) {
     const { runId, idFactory } = options;
     const output = resolveOutput(options.output);
-    const political = buildPolitical(session, result, { runId, idFactory, names: options.names, watersPx: options.watersPx, regionLabel: options.regionLabel, output });
+    const political = buildPolitical(session, result, { runId, idFactory, names: options.names, watersPx: options.watersPx, regionLabel: options.regionLabel, output, userRegions: options.userRegions ?? null });
     const owners = installPolitical(session, options.layerSets, political.set, political.owners);
     const routes = buildRoutes(session, result, { runId, idFactory, styleFor: options.routeStyleFor, styleFields: options.routeStyleFields, transports: output.routes });
     const pins = buildPins(session, result, { ...options, output });
