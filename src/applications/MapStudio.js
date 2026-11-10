@@ -57,6 +57,8 @@ import { BiomeEditor } from "./BiomeEditor.js";
 import { CultureLists } from "./CultureLists.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 import { RegionPainter } from "./RegionPainter.js";
+import { InfluencePainter } from "./InfluencePainter.js";
+import { InfluenceView } from "./InfluenceView.js";
 import { Inspector } from "./Inspector.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RouteTool } from "./RouteTool.js";
@@ -224,6 +226,9 @@ export class MapStudio {
         moveRegionToPolitical(_e, t) { const [levelId, regionId] = RegionPanel.regionIdsOf(t); RegionPanel.moveToPolitical(this, levelId, [regionId]); },
         changeRegionRank(_e, t)     { RegionPanel.changeRank(this, ...RegionPanel.regionIdsOf(t)); },
         moveLevelToPolitical(_e, t) { RegionPanel.moveToPolitical(this, RegionPanel.levelIdOf(t), null); },
+        // --- INFLUENCES (see InfluenceView, InfluencePainter) ---
+        chooseInfluenceKind(_e, t)  { InfluenceView.chooseKind(this, t.dataset.kind); },
+        clearInfluences(_e, t)      { InfluenceView.clear(this, t.dataset.kind, (title, message) => MapDialogManager._confirmDialog(title, message)); },
         // --- GENERATE ---
         generateWorld()             { GeneratePanel.generate(this); },
         removeGenerated()           { GeneratePanel.removeGenerated(this); },
@@ -281,6 +286,7 @@ export class MapStudio {
         setFeatureMode(e, t)            { this._onSetFeatureMode(e, t); },
         setInfraMode(e, t)              { this._onSetInfraMode(e, t); },
         setRegionMode(_e, t)            { RegionPainter.setMode(this, t); this.#modeChosen(RegionPainter.mode(this) !== "select"); },
+        setInfluenceMode(_e, t)         { InfluencePainter.setMode(this, t); this.#modeChosen(true); },
         toggleRegionShowAll()           { RegionPainter.toggleShowAll(this); },
         setRouteMode(_e, t)             { RouteTool.setMode(this, t); this.#modeChosen(RouteTool.mode(this) !== "select"); },
         setInfrastructureIcon(_e, t)    { this.#choosePinIcon(t.dataset.icon); },
@@ -974,6 +980,8 @@ export class MapStudio {
                 if (!canCrop) return [];
                 return [group(ui("ModesMask"), "scene", [mode("setBrushTool", "tool", "crop", ui("ModeCrop"), cropTip, "crop", true)])];
             }
+            case "influences":
+                return [group(ui("ModesInfluence"), "influences", InfluencePainter.toolbarContext(this).modes.map((entry) => mode("setInfluenceMode", "mode", entry.value, ui(`Mode${entry.value.charAt(0).toUpperCase()}${entry.value.slice(1)}`), entry.label, entry.icon, entry.active)))];
             case "regions":
                 return [group(ui("ModesRegion"), "regions", RegionPainter.toolbarContext(this).modes.map((entry) => mode("setRegionMode", "mode", entry.value, ui(`Mode${entry.value.charAt(0).toUpperCase()}${entry.value.slice(1)}`), entry.label, entry.icon, entry.active)))];
             case "infrastructure": {
@@ -1276,6 +1284,7 @@ export class MapStudio {
         context.pinStyles = PinStyles.choices(this, this.uiState.activePinStyle);
 
         if (this.activeTool === "regions") context.regionToolbar = RegionPainter.toolbarContext(this);
+        if (this.activeTool === "influences") context.influenceToolbar = InfluencePainter.toolbarContext(this);
         if (this.activeTool === "infrastructure") context.routeToolbar = RouteTool.toolbarContext(this);
 
         context.regionStyles = (this.uiState.customRegionStyles || []).map((style) => ({
@@ -1331,6 +1340,7 @@ export class MapStudio {
             if (this.activeTool === "regions") context.regionPanel = RegionPanel.context(this, context.inspected);
             if (this.activeTool === "history") context.history = HistoryView.context(this);
             if (this.activeTool === "travel") context.travel = TravelView.context(this);
+            if (this.activeTool === "influences") context.influences = InfluenceView.context(this);
             if (this.activeTool === "generate") {
                 context.generate = { ...GeneratePanel.context(this), infill: Infilling.context(this) };
                 context.cultureList = CultureLists.context(this);
@@ -1652,6 +1662,11 @@ export class MapStudio {
 
         // The Regions tool takes Escape: a stroke left hanging, or the region being edited
         if (this.activeTool === "regions" && RegionPainter.handleKey(this, event)) {
+            event.preventDefault();
+            return;
+        }
+        // The Influences tool takes Escape for a stroke left hanging
+        if (this.activeTool === "influences" && InfluencePainter.handleKey(this, event)) {
             event.preventDefault();
             return;
         }
@@ -2336,6 +2351,7 @@ export class MapStudio {
         // the Infrastructure tool is in Route mode, it places and edits routes (see RouteTool)
         this.canvasEngine.pointerToolProvider = () => {
             if (this.activeTool === "regions") return RegionPainter.tool(this);
+            if (this.activeTool === "influences") return InfluencePainter.tool(this);
             if (this.#isRouteMode()) return RouteTool.tool(this);
             return PickTool.tool(this);
         };
@@ -2551,6 +2567,7 @@ export class MapStudio {
             featureMode: this.uiState.activeFeatureMode,
             infraMode: this.uiState.activeInfraMode,
             regionMode: RegionPainter.mode(this),
+            influenceMode: InfluencePainter.mode(this),
             routeMode: RouteTool.mode(this),
             pickMode: PickTool.mode(this),
             selecting: PickTool.selecting(this),
@@ -4864,7 +4881,7 @@ export class MapStudio {
 
         // Painted cells: their bounds, labelled as a region edit
         const painted = VectorHistory.patchBounds(this, entry);
-        if (painted) return { bounds: this.#calculatePointBounds([{ x: painted.minX, y: painted.minY }, { x: painted.maxX, y: painted.maxY }], VECTOR_PREVIEW_PADDING), label: this.#getActionLabel("layerSets") };
+        if (painted) return { bounds: this.#calculatePointBounds([{ x: painted.minX, y: painted.minY }, { x: painted.maxX, y: painted.maxY }], VECTOR_PREVIEW_PADDING), label: this.#getActionLabel(VectorHistory.touchesInfluences(entry) ? "influences" : "layerSets") };
 
         const targetSnapshot = VectorHistory.snapshotOf(entry);
         if (!targetSnapshot) return null;
@@ -4978,6 +4995,7 @@ export class MapStudio {
             manualRivers: "FILRODENSWMB.UI.ActionCustomRiver",
             routes: "FILRODENSWMB.UI.ActionRoute",
             layerSets: "FILRODENSWMB.UI.ActionRegion",
+            influences: "FILRODENSWMB.UI.ActionInfluence",
             landMasks: "FILRODENSWMB.UI.ActionLandMask",
             mapLabels: "FILRODENSWMB.UI.ActionLabel",
             mapDecorations: "FILRODENSWMB.UI.ActionDecoration",
@@ -5415,6 +5433,7 @@ export class MapStudio {
             if (config.activeKey) this[config.activeKey] = null;
         }
         RegionPainter.cancel(this);
+        InfluencePainter.cancel(this);
         RouteTool.cancel(this);
         RouteTool.updateOverlays(this);
 

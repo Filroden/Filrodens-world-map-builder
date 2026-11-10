@@ -5,6 +5,7 @@ import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { LAYERS, ThematicSource, TradeIndex, scalePosition, tradeLines } from "../thematic/ThematicData.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 import { HistoryView } from "./HistoryView.js";
+import { InfluenceView } from "./InfluenceView.js";
 import { RunCells } from "./RunCells.js";
 import { RunInputs } from "./RunInputs.js";
 import { TravelView } from "./TravelView.js";
@@ -115,10 +116,15 @@ export class ThematicView {
 
     /** The colour layer drawn now: the chosen one, when the run holds what it needs. */
     static shownLayer(app) {
-        // The Travel tool's day bands take the colour layer's place while it is open
-        if (TravelView.active(app)) return null;
+        // The Travel tool's day bands, and the Influences tool's painting, take the colour layer's place while open
+        if (this.#overlaid(app)) return null;
         const { fill } = this.setting(app);
         return fill && this.source(app)?.has(fill) ? LAYERS.get(fill) : null;
+    }
+
+    /** Whether a tool's own overlay takes the colour layer's place: the Travel tool's day bands, the Influences tool's painting. */
+    static #overlaid(app) {
+        return TravelView.active(app) || InfluenceView.active(app);
     }
 
     /** Whether the trade lines are drawn: chosen, and kept by the run (a run saved before trade was kept has none). */
@@ -170,9 +176,9 @@ export class ThematicView {
         const rows = THEMATIC.LAYERS.map((layer) => {
             const missing = source?.missing(layer.id);
             // An earlier age's cultures came later than its brief: an older run lacks them
-            const why = TravelView.active(app) ? "FILRODENSWMB.UI.ThematicTravelShown" : past && layer.id === "culture" && missing === "run" ? "FILRODENSWMB.UI.ThematicNeedsRerunAge" : reasons[missing];
+            const why = this.#overlaidReason(app) ?? (past && layer.id === "culture" && missing === "run" ? "FILRODENSWMB.UI.ThematicNeedsRerunAge" : reasons[missing]);
             // A row the run cannot show says why; one it can, what it shows
-            return { id: layer.id, disabled: !source || !!missing || TravelView.active(app), title: platform.i18n.localize(why ?? layer.hint) };
+            return { id: layer.id, disabled: !source || !!missing || this.#overlaid(app), title: platform.i18n.localize(why ?? layer.hint) };
         });
         const lines = THEMATIC.LINES.map((id) => ({
             id,
@@ -182,8 +188,15 @@ export class ThematicView {
         }));
         // The chosen layer stays the map's setting when the run cannot show it (a map opened before
         // generating), but the menu marks what is drawn: None
-        // The opacity also fades the Travel tool's day bands, so it stays usable while they show
-        return { fill: this.shownLayer(app)?.id ?? null, bands: TravelView.active(app), rows, lines, opacity, note: reason ? platform.i18n.localize(reason) : "" };
+        // The opacity also fades the Travel tool's day bands and the Influences tool's painting, so it stays usable while they show
+        return { fill: this.shownLayer(app)?.id ?? null, bands: this.#overlaid(app), rows, lines, opacity, note: reason ? platform.i18n.localize(reason) : "" };
+    }
+
+    /** Why the colour layers cannot be chosen while a tool's overlay shows, or null. */
+    static #overlaidReason(app) {
+        if (TravelView.active(app)) return "FILRODENSWMB.UI.ThematicTravelShown";
+        if (InfluenceView.active(app)) return "FILRODENSWMB.UI.ThematicInfluencesShown";
+        return null;
     }
 
     // ------------------------------------------------------------------ drawing
@@ -193,10 +206,17 @@ export class ThematicView {
         const layer = this.shownLayer(app);
         const source = this.source(app);
         const { opacity } = this.setting(app);
-        const display = TravelView.active(app) ? TravelView.bandsDisplay(app, opacity) : layer ? { values: source.displayBytes(layer.id), lookup: source.lookup(layer.id), opacity } : null;
+        const display = this.#display(app, layer, source, opacity);
         app.canvasEngine?.renderThematic(app.meshSession, display);
         app.canvasEngine?.renderTrade(this.tradeShown(app) ? (this.#trade(app)?.lines ?? null) : null);
         this.renderLegend(app);
+    }
+
+    /** What the thematic layer draws: a tool's overlay while it is open, else the shown layer, or nothing. */
+    static #display(app, layer, source, opacity) {
+        if (TravelView.active(app)) return TravelView.bandsDisplay(app, opacity);
+        if (InfluenceView.active(app)) return InfluenceView.display(app, opacity);
+        return layer ? { values: source.displayBytes(layer.id), lookup: source.lookup(layer.id), opacity } : null;
     }
 
     // ------------------------------------------------------------------ the information bar
@@ -213,10 +233,15 @@ export class ThematicView {
         const element = app.root?.querySelector("[data-thematic-readout]");
         if (!element) return;
         const layer = this.shownLayer(app);
-        element.classList.toggle("fwmb-hidden", !layer);
-        if (!layer) return;
+        const influences = InfluenceView.active(app) && !!app.meshSession;
+        element.classList.toggle("fwmb-hidden", !layer && !influences);
+        if (!layer && !influences) return;
         const cell = x === null || y === null || !CultureMarkers.isLand(app, x, y) ? -1 : app.meshSession.mesh.cellAt(x, y);
         const text = element.querySelector("[data-thematic-value]");
+        if (influences) {
+            text.textContent = InfluenceView.readout(app, cell) ?? NO_VALUE;
+            return;
+        }
         if (ThematicSource.isClassLayer(layer.id)) {
             const culture = this.source(app).cultureAt(cell);
             text.textContent = culture ? platform.i18n.format("FILRODENSWMB.UI.ThematicCultureValue", { name: culture.name, share: Math.round(culture.share * PERCENT) }) : NO_VALUE;
@@ -274,8 +299,10 @@ export class ThematicView {
         const layer = this.shownLayer(app);
         const trade = this.tradeShown(app);
         if (readout) {
-            readout.classList.toggle("fwmb-hidden", !layer);
-            if (layer) readout.querySelector("[data-thematic-key]").textContent = platform.i18n.localize(layer.label);
+            // The Influences tool reads its painting in the bar in the layer's place
+            const influences = InfluenceView.active(app);
+            readout.classList.toggle("fwmb-hidden", !layer && !influences);
+            if (layer || influences) readout.querySelector("[data-thematic-key]").textContent = platform.i18n.localize(influences ? "FILRODENSWMB.UI.ToolInfluences" : layer.label);
         }
         app.root.querySelector("[data-thematic-trade-readout]")?.classList.toggle("fwmb-hidden", !trade);
         const rtl = app.root.ownerDocument?.documentElement?.dir === "rtl" || app.root.closest?.('[dir="rtl"]') !== null;

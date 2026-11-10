@@ -34,11 +34,11 @@ export default {
         {
             id: "open",
             title: "Open Generate",
-            instruction: "Click **Generate** on the rail, the first tool in the **Populate** group. Leave **Seed** empty: the run then uses the map's own seed, P0JBVA, so your run matches the tutorial's. **World** scales how many people the land feeds, how many live in towns, and how large realms and duchies grow; the tutorial keeps them at 1.",
+            instruction: "Click **Generate** on the rail, the second tool in the **Populate** group (the first, **Influences**, steers a run and is optional; the tutorial does without it). Leave **Seed** empty: the run then uses the map's own seed, P0JBVA, so your run matches the tutorial's. **World** scales how many people the land feeds, how many live in towns, and how large realms and duchies grow; the tutorial keeps them at 1.",
             action: { do: "tool", tool: "generate", label: "Generate" },
             screenshot: { name: "generate", region: "studio" },
             caption: "The Generate tool before its first run.",
-            narration: "Open Generate, the first tool in the Populate group. Leave the seed empty, so the run uses the map's own seed, and keep the World settings as they are.",
+            narration: "Open Generate, the second tool in the Populate group. Leave the seed empty, so the run uses the map's own seed, and keep the World settings as they are.",
             pause: 3,
         },
         {

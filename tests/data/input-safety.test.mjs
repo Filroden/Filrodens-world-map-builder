@@ -387,6 +387,22 @@ test("the map's generator revision is a whole number in range, and a map without
     for (const odd of [0, 2.6]) assert.equal(GeneratorRevision.of({ generatorRevision: odd }), FILRODENSWMB.GENERATOR.REVISIONS.LEGACY, `${odd}: not a revision, so read as the oldest`);
 });
 
+test("the map's painted influences keep to their rules: each kind encoded text, anything else dropped", () => {
+    const file = v4Map();
+    file.influences = { capacity: "BQYC", security: "AA==", extra: "BQYC", __proto__: { polluted: true } };
+    assert.deepEqual(MapImport.read(structuredClone(file)).mapData.influences, { capacity: "BQYC", security: "AA==" });
+    file.influences = { capacity: SCRIPT, security: 3 };
+    assert.deepEqual(MapImport.read(structuredClone(file)).mapData.influences, {}, "text that is not encoded steps is dropped");
+    for (const bad of ["BQYC", 7, ["BQYC"]]) {
+        file.influences = bad;
+        assert.ok(!("influences" in MapImport.read(structuredClone(file)).mapData), JSON.stringify(bad));
+    }
+    file.influences = null;
+    assert.equal(MapImport.read(structuredClone(file)).mapData.influences, null);
+    assert.equal({}.polluted, undefined);
+    // Text that passes as encoded but is not the map's cells is read as no painting (see tests/mesh/influences.test.mjs)
+});
+
 test("what a run gave a settlement pin, and the run's report of its seats, keep to their rules", () => {
     const file = v4Map();
     file.mapPins[0].modelled = { run: "runAAAAAAAAAAAAA", sourceId: 3, tier: "city", population: 15000, culture: "cultureAAAAAAAAA", mix: [{ culture: "cultureAAAAAAAAA", share: 1 }], capital: false, fortified: true, port: false };
@@ -409,10 +425,10 @@ test("what a run gave a settlement pin, and the run's report of its seats, keep 
 
 test("a run's fingerprint of the map's own items it read keeps to its rules", () => {
     const file = v4Map();
-    const inputs = { routes: "302dc36a", seats: "ea11758b", regions: "", rivers: "5c5cca25", features: "0badf00d" };
+    const inputs = { routes: "302dc36a", seats: "ea11758b", regions: "", rivers: "5c5cca25", features: "0badf00d", influences: "811c9dc5" };
     file.modelRun = { ...savedModelRun(), inputs };
     const kept = MapImport.read(structuredClone(file)).modelRun;
-    assert.deepEqual(kept.inputs, { routes: "302dc36a", seats: "ea11758b", rivers: "5c5cca25", features: "0badf00d" }, "an empty value is no key, so dropped");
+    assert.deepEqual(kept.inputs, { routes: "302dc36a", seats: "ea11758b", rivers: "5c5cca25", features: "0badf00d", influences: "811c9dc5" }, "an empty value is no key, so dropped");
     file.modelRun.inputs = { routes: SCRIPT, seats: 7, rivers: "5c5cca25", extra: "x", __proto__: { polluted: true } };
     const { modelRun } = MapImport.read(file);
     assert.deepEqual(modelRun.inputs, { rivers: "5c5cca25" }, "what is no key is dropped, and nothing else is kept");

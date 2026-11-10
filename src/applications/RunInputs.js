@@ -1,6 +1,7 @@
 import { FILRODENSWMB } from "../config.js";
 import { MaskSettings } from "../generation/MaskSettings.js";
 import { riverList } from "../generator/GeneratorInput.js";
+import { INFLUENCE_KINDS, NO_INFLUENCE } from "../mesh/Influences.js";
 import { Generation } from "./Generation.js";
 import { Regeneration } from "./Regeneration.js";
 
@@ -8,7 +9,7 @@ import { Regeneration } from "./Regeneration.js";
  * A short fingerprint of the map's own items a generator run reads, so the run can be shown out of
  * date once any of them changes, by whatever path: drawn, deleted, edited, mass edited or undone.
  *
- * Five kinds, each hashed on its own:
+ * Six kinds, each hashed on its own:
  * - routes: the routes the run's trade uses (see Generation.userRoutes);
  * - seats: the settlement pins it builds on (see Generation.seats);
  * - regions: the kept regions of the Political set it builds round (see Generation.userRegions),
@@ -20,6 +21,7 @@ import { Regeneration } from "./Regeneration.js";
  *   pins, by what shapes the land (not their names, descriptions or visibility). With it kept, an
  *   edit to them marks a run out of date through the fingerprint alone, not through the lasting
  *   `generatorStale` flag (see MapStudio.requestTerrainUpdate), so undoing the edit clears it.
+ * - influences: the values painted in the Influences tool (see Influences), by kind, cell and value.
  *
  * The fingerprint is taken once a run has been written onto the map (Generation.apply) and kept in
  * the saved run (`modelRun.inputs`). It describes the map as the run left it, not the run's own
@@ -32,12 +34,12 @@ import { Regeneration } from "./Regeneration.js";
  */
 export class RunInputs {
     /** The kinds, in the order they are listed. */
-    static KINDS = Object.freeze(["routes", "seats", "regions", "rivers", "features"]);
+    static KINDS = Object.freeze(["routes", "seats", "regions", "rivers", "features", "influences"]);
 
     /**
      * The map's fingerprint now.
      * @param {object} app
-     * @returns {{routes: string, seats: string, regions: string, rivers: string, features: string}}
+     * @returns {{routes: string, seats: string, regions: string, rivers: string, features: string, influences: string}}
      */
     static of(app) {
         return {
@@ -46,6 +48,7 @@ export class RunInputs {
             regions: regionsHash(app),
             rivers: riversHash(app.currentRiverData),
             features: hashText(featureText(app)),
+            influences: influencesHash(app.meshSession?.influences),
         };
     }
 
@@ -151,6 +154,18 @@ function riversHash(riverData) {
         hash.add(river.merges ? 1 : 0).add(river.x.length).addAll(river.x).addAll(river.y).addAll(river.lake);
         if (river.flow) hash.addAll(new Int32Array(river.flow.buffer, river.flow.byteOffset, river.flow.length));
     }
+    return hash.hex;
+}
+
+/** Each painted cell of each kind of influence, with its value; unpainted cells count for nothing, so the hash costs what is painted. */
+function influencesHash(influences) {
+    const hash = new Hash();
+    INFLUENCE_KINDS.forEach((kind, index) => {
+        hash.add(index);
+        const levels = influences?.layer(kind)?.owners;
+        if (!levels) return;
+        for (let cell = 0; cell < levels.length; cell++) if (levels[cell] !== NO_INFLUENCE) hash.add(cell).add(levels[cell]);
+    });
     return hash.hex;
 }
 

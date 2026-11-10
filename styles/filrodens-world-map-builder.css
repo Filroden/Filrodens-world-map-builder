@@ -1173,6 +1173,36 @@
     align-items: center;
     gap: 0.5rem;
 }
+/* The Influences tool (tools-influences.hbs): the scale of the painting's tints, from the most
+   lowered (red) through none (white) to the most raised (blue), matching InfluenceView's TINTS and
+   running the other way in a right-to-left layout, as its ticks do; and a row per kind with its
+   Clear button */
+.fwmb-influence-scale {
+    margin: 0.25rem 0 0.5rem;
+}
+.fwmb-influence-ramp {
+    block-size: 0.75rem;
+    margin-block: 0.25rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--fwmb-border-main);
+    background: linear-gradient(to right, #b2182b, #ffffff, #2166ac);
+}
+.fwmb-influence-ramp:dir(rtl) {
+    background: linear-gradient(to left, #b2182b, #ffffff, #2166ac);
+}
+.fwmb-influence-ticks {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--fwmb-text-secondary);
+}
+.fwmb-influence-painted {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-block: 0.25rem;
+}
 /* A way of travel is one line, so its row is shorter than an age's */
 .fwmb .fwmb-travel-modes .fwmb-list-item {
     min-block-size: 2rem;

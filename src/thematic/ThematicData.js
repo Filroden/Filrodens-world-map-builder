@@ -246,11 +246,12 @@ export class ThematicSource {
     /**
      * @param {object} modelRun - A saved run (see ModelRun).
      * @param {import("../mesh/MeshBuilder.js").Mesh} mesh - The map's display mesh, whose model cells the run's are.
+     * @param {object} [arrays] - The run's arrays already decoded, in place of the saved run's (see ofArrays).
      */
-    constructor(modelRun, mesh) {
-        this.#arrays = decodeModelRun(modelRun);
+    constructor(modelRun, mesh, arrays = null) {
+        this.#arrays = arrays ?? decodeModelRun(modelRun);
         this.#mesh = mesh;
-        this.#runCultures = Array.isArray(modelRun.cultures) ? modelRun.cultures : [];
+        this.#runCultures = Array.isArray(modelRun?.cultures) ? modelRun.cultures : [];
         this.#cultures = this.#runCultures;
     }
 
@@ -285,6 +286,19 @@ export class ThematicSource {
     static of(modelRun, mesh) {
         if (!modelRun || !mesh || modelRun.cellCount !== mesh.modelCount) return null;
         return new ThematicSource(modelRun, mesh);
+    }
+
+    /**
+     * The layers of model-cell arrays that are not a saved run (the land's capacity worked out
+     * without one; see LandCapacity), on the mesh whose model cells they are; null when they are
+     * not one value per model cell. Only the layers those arrays hold can be shown.
+     * @param {object} arrays - By ModelRun's names (capacity, landArea, water...).
+     * @param {import("../mesh/MeshBuilder.js").Mesh} mesh
+     * @returns {ThematicSource|null}
+     */
+    static ofArrays(arrays, mesh) {
+        if (!arrays || !mesh || !Object.values(arrays).every((array) => array?.length === mesh.modelCount)) return null;
+        return new ThematicSource(null, mesh, arrays);
     }
 
     /**

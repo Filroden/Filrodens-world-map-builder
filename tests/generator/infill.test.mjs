@@ -153,3 +153,24 @@ test("a town of the generator's tiers draws its people from its reach, so the co
     for (let cell = 0; cell < input.parentOf.length; cell++) if (input.parentOf[cell] === own) localOwn += local.people[cell];
     assert.equal(Math.round(localOwn), 0, "a town bigger than its cell empties it");
 });
+
+test("a regional map's painted food capacity shares the parent's people towards its richer land", () => {
+    const { mesh, makePayload } = syntheticMap();
+    const plain = makePayload();
+    const parentRun = parentRunOf(mesh, plain);
+    // Narrow stripes painted poorer, so each parent cell holds both kinds of land
+    const STRIPE_PX = 6;
+    const poorer = (x) => Math.floor(x / STRIPE_PX) % 2 === 0;
+    const steps = new Int8Array(mesh.width * mesh.height);
+    for (let y = 0; y < mesh.height; y++) for (let x = 0; x < mesh.width; x++) if (poorer(x)) steps[y * mesh.width + x] = -FILRODENSWMB.GENERATOR.INFLUENCES.LEVELS;
+    const peopleOnPoorer = (payload) => {
+        const { input, grid } = InfillInput.gather({ mesh, parentRun, payload, pins: [], routes: [], speeds: FILRODENSWMB.TRAVEL_TIME.SPEEDS, seed: "SYNTH", nameBase: "English" });
+        const { people } = runInfill(input);
+        let sum = 0;
+        for (let cell = 0; cell < people.length; cell++) if (poorer(grid.sites[2 * cell])) sum += people[cell];
+        return sum;
+    };
+    const without = peopleOnPoorer(plain);
+    const withPainting = peopleOnPoorer({ ...makePayload(), influences: { capacity: steps, security: null } });
+    assert.ok(withPainting < without * 0.8, `${Math.round(withPainting)} on the poorer stripes against ${Math.round(without)}`);
+});

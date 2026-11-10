@@ -142,6 +142,11 @@ export class MapStateManager {
             brushSize: 20,
             brushStrength: 0.02,
             brushFeather: 0.4,
+            // The Influences tool's kind, mode and brush (see InfluenceView and InfluencePainter)
+            influenceKind: "capacity",
+            influencePaintMode: "raise",
+            influenceStrength: FILRODENSWMB.GENERATOR.INFLUENCES.BRUSH.STRENGTH.DEFAULT,
+            influenceFeather: FILRODENSWMB.GENERATOR.INFLUENCES.BRUSH.FEATHER.DEFAULT,
             brushBiome: FILRODENSWMB.BIOME_IDS.GRASSLAND,
             customBiomes: [],
             nextCustomBiomeId: FILRODENSWMB.LIMITS.CUSTOM_BIOME_START_ID,

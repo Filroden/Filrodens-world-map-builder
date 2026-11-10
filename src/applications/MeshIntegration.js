@@ -6,6 +6,7 @@ import { distanceToSegment } from "../mesh/RoutePath.js";
 import { resampleOwners, retraceLine, routeMarkedLine } from "../mesh/Resample.js";
 import { VECTOR_SCHEMA_VERSION, createMeshBlock, createRoute, validateOwners } from "../mesh/Schema.js";
 import { allLevels } from "../mesh/LayerTree.js";
+import { INFLUENCE_KINDS } from "../mesh/Influences.js";
 import { RegionPanel } from "./RegionPanel.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { ContentRows } from "./ContentRows.js";
@@ -63,6 +64,7 @@ export class MeshIntegration {
         app.meshSession = null;
         app.layerSets = payload.layerSets ?? [];
         state.load = { token: state.token, payload, owners: owners ?? {}, prefetch: this.#prefetch(payload) };
+        state.loadedInfluences = payload.influences ?? null;
     }
 
     /**
@@ -190,6 +192,7 @@ export class MeshIntegration {
         state.load = null;
         state.changedOnLoad = false;
         state.unavailable = false;
+        state.loadedInfluences = null;
         const token = state.token;
         app.meshSession = null;
         // A new map starts with one set and its first layer, ready for regions (S12)
@@ -248,6 +251,7 @@ export class MeshIntegration {
             session.restoreLevelOwners(level.id, resampleOwners(mesh, layer.owners, mesh, fromEdge));
             entries.push(VectorHistory.levelOwners(level.id, before, session.layer(level.id).encode()));
         }
+        entries.push(...this.#movedInfluences(session, fromEdge));
         app.mapRoutes = (app.mapRoutes ?? []).flatMap((route) => this.#movedRoute(session, route, toTarget));
         const runEntry = this.#movedModelRun(app, fromEdge, toTarget);
         if (runEntry) entries.push(runEntry);
@@ -271,6 +275,19 @@ export class MeshIntegration {
         const targetOf = (cell) => (cell >= 0 && cell < mesh.modelCount ? modelCellAt(toTarget(mesh.siteX(cell), mesh.siteY(cell))) : -1);
         app.modelRun = resampleModelRun(before, sourceOf, targetOf);
         return VectorHistory.modelRun(before, app.modelRun);
+    }
+
+    /** The painted influences moved with the terrain as the owners are (see Influences.resampled), one undo entry per kind painted. */
+    static #movedInfluences(session, fromEdge) {
+        const influences = session.influences;
+        if (!influences?.any()) return [];
+        const moved = influences.resampled(session.mesh, session.mesh, fromEdge);
+        return INFLUENCE_KINDS.filter((kind) => influences.any(kind)).map((kind) => {
+            const before = influences.encodeKind(kind);
+            const after = moved.encodeKind(kind);
+            influences.restoreKind(kind, after);
+            return VectorHistory.influenceLayer(kind, before, after);
+        });
     }
 
     /** A route traced again along its moved line: itself for the first piece on the map, a new route for each other piece. */
@@ -320,12 +337,15 @@ export class MeshIntegration {
      * multiplied by its layer set's, or, while the Regions tool is painting a level, that level and
      * its ancestors alone, drawn for painting (see RegionLevelLayers.describeLevels), unless the
      * toolbar's Show Everything is on. With the Regions menu's Fills off, levels are drawn as
-     * borders alone (see ContentRows.fillsShown), except the level being painted. The outline of
-     * the region being edited follows (see updateOutline).
+     * borders alone (see ContentRows.fillsShown), except the level being painted. While the
+     * Influences tool is open, levels are drawn as borders alone too: its painting is drawn under
+     * them (with the thematic layer), and a region's fill would hide it. The outline of the region
+     * being edited follows (see updateOutline).
      */
     static renderRegions(app) {
         const painting = app.activeTool === "regions" && app.uiState.isEditMode && !app.uiState.regionShowAll;
-        app.canvasEngine.renderRegionLevels(app.meshSession, { focusLevelId: painting ? app.activeLevelId : null, fills: ContentRows.fillsShown(app) });
+        const fills = ContentRows.fillsShown(app) && app.activeTool !== "influences";
+        app.canvasEngine.renderRegionLevels(app.meshSession, { focusLevelId: painting ? app.activeLevelId : null, fills });
         this.updateOutline(app);
     }
 
@@ -443,7 +463,11 @@ export class MeshIntegration {
      */
     static preparePayload(app, payload) {
         const state = this.#state(app);
-        if (state.unavailable) return null;
+        // The influences as they were loaded, kept like the rest of the vector data
+        if (state.unavailable) {
+            if (state.loadedInfluences) payload.influences = state.loadedInfluences;
+            return null;
+        }
 
         const session = app.meshSession;
         if (session) {
@@ -455,6 +479,9 @@ export class MeshIntegration {
         payload.vectorSchemaVersion = VECTOR_SCHEMA_VERSION;
         payload.mesh = session ? { ...session.meshBlock } : createMeshBlock(payload);
         payload.layerSets = app.layerSets ?? [];
+        // The painted influences (see Influences), only when any is painted
+        const influences = session?.influences?.encode() ?? null;
+        if (influences) payload.influences = influences;
         return session ? session.encodeOwners() : {};
     }
 

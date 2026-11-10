@@ -26,6 +26,10 @@ import { NoiseTransform } from "./NoiseTransform.js";
  * - `{ kind: "modelRun", before, after }`: the generator's saved model-cell outputs (see
  *   ModelRun) before and after a run. Undo puts `before` back, redo `after`; both are kept as they
  *   are (a run's outputs are never changed in place), so the entry costs no copy.
+ * - `{ kind: "influence", influence, patch }`: cells of one kind of the painted influences (see
+ *   Influences) that changed step, as an OwnerLayer patch; applied as an owners entry is.
+ * - `{ kind: "influenceLayer", influence, before, after }`: one kind's whole steps, encoded (or null
+ *   for none), before and after a change across the map (Clear, or the steps moved with the noise).
  * - `{ kind: "composite", entries }`: several of the above made by one action (deleting a region
  *   changes the layer sets and its cells). Undo steps its entries backwards, redo forwards.
  *
@@ -34,7 +38,7 @@ import { NoiseTransform } from "./NoiseTransform.js";
  * many entries it holds. HISTORY_MAX counts entries, as it always has.
  */
 export class VectorHistory {
-    static KIND = Object.freeze({ VECTOR: "vector", OWNERS: "owners", LEVEL_OWNERS: "levelOwners", NOISE: "noise", MODEL_RUN: "modelRun", EDITED: "edited", COMPOSITE: "composite" });
+    static KIND = Object.freeze({ VECTOR: "vector", OWNERS: "owners", LEVEL_OWNERS: "levelOwners", NOISE: "noise", MODEL_RUN: "modelRun", EDITED: "edited", INFLUENCE: "influence", INFLUENCE_LAYER: "influenceLayer", COMPOSITE: "composite" });
 
     /** An entry restoring the vector state as it is now. Take it before changing anything. */
     static snapshot(app) {
@@ -44,6 +48,16 @@ export class VectorHistory {
     /** An entry for a patch of one level's owners (null for a patch that changed nothing). */
     static owners(levelId, patch) {
         return patch?.cells.length ? { kind: this.KIND.OWNERS, levelId, patch } : null;
+    }
+
+    /** An entry for a patch of one kind of influence's steps (null for a patch that changed nothing). */
+    static influence(kind, patch) {
+        return patch?.cells.length ? { kind: this.KIND.INFLUENCE, influence: kind, patch } : null;
+    }
+
+    /** An entry replacing one kind of influence's whole steps (encoded, or null for none). */
+    static influenceLayer(kind, before, after) {
+        return { kind: this.KIND.INFLUENCE_LAYER, influence: kind, before, after };
     }
 
     /** An entry replacing a level's whole owner array (encoded, or null for none). */
@@ -133,6 +147,12 @@ export class VectorHistory {
             case this.KIND.EDITED:
                 this.#applyEdited(app, entry, isUndo);
                 return entry;
+            case this.KIND.INFLUENCE:
+                this.#applyInfluence(app, entry, isUndo);
+                return entry;
+            case this.KIND.INFLUENCE_LAYER:
+                app.meshSession?.influences?.restoreKind(entry.influence, isUndo ? entry.before : entry.after);
+                return entry;
             case this.KIND.COMPOSITE: {
                 const order = isUndo ? [...entry.entries].reverse() : entry.entries;
                 const reversed = order.map((inner) => this.#apply(app, inner, isUndo));
@@ -156,6 +176,13 @@ export class VectorHistory {
         }
     }
 
+    static #applyInfluence(app, entry, isUndo) {
+        const layer = app.meshSession?.influences?.layer(entry.influence);
+        if (!layer) return;
+        if (isUndo) layer.revert(entry.patch);
+        else layer.apply(entry.patch);
+    }
+
     static #applyOwners(app, entry, isUndo) {
         const session = app.meshSession;
         if (!session) return entry;
@@ -164,6 +191,13 @@ export class VectorHistory {
         else layer.apply(entry.patch);
         session.ownersChanged(entry.levelId, entry.patch);
         return entry;
+    }
+
+    /** Whether an entry changes the painted influences (so the Influences tool's overlay must be drawn again). */
+    static touchesInfluences(entry) {
+        if (!entry) return false;
+        if (entry.kind === this.KIND.COMPOSITE) return entry.entries.some((inner) => this.touchesInfluences(inner));
+        return entry.kind === this.KIND.INFLUENCE || entry.kind === this.KIND.INFLUENCE_LAYER;
     }
 
     /**
@@ -215,7 +249,7 @@ export class VectorHistory {
     }
 
     static #patches(entry) {
-        if (entry.kind === this.KIND.OWNERS) return [entry.patch];
+        if (entry.kind === this.KIND.OWNERS || entry.kind === this.KIND.INFLUENCE) return [entry.patch];
         if (entry.kind === this.KIND.COMPOSITE) return entry.entries.flatMap((inner) => this.#patches(inner));
         return [];
     }

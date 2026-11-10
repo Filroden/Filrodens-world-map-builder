@@ -14,6 +14,11 @@ import { SearchSpace, searchAll } from "./Search.js";
  * on an exposed coast; protection comes from royal (full) and ducal (partial) seats nearby.
  * Distances are political travel costs.
  *
+ * Security influences painted on the map (see CellValues' strifeScale and dangerThreat) take part
+ * here: the strife felt in a cell is multiplied by its painted factor (at most 1), and land painted
+ * more dangerous is a threat source of its own, fading with distance as wild land's threat does,
+ * so "bandit country" is felt even where no border or wild land is near. Protection still applies.
+ *
  * Clearing: each town clears the land around it (further for bigger towns) and roads clear their
  * own cells, raising forest cells towards the yield they would have as open land.
  *
@@ -58,6 +63,7 @@ function securityField(state) {
     const fromWild = searchAll(graph, wild, cost, { limit: F.THREAT_REACH * F.WILD_KM }).best;
     const fromRoyal = searchAll(graph, context.realms.realms.map((realm) => realm.seat), cost, { limit: F.SEAT_REACH * F.SEAT_KM }).best;
     const fromDucal = searchAll(graph, context.realms.duchies.map((duchy) => duchy.seat), cost, { limit: F.SEAT_REACH * F.SEAT_KM }).best;
+    const painted = cells.dangerThreat ? paintedThreat(state) : null;
     const security = new Float64Array(cells.count).fill(1);
     for (let cell = 0; cell < cells.count; cell++) {
         if (cells.water[cell]) continue;
@@ -65,11 +71,39 @@ function securityField(state) {
         const borderThreat = Math.min(1, Math.exp(-fromBorder.best[cell] / F.BORDER_KM) * (source >= 0 ? hostility.get(border[source]) ?? 1 : 1));
         const wildThreat = Math.exp(-fromWild[cell] / F.WILD_KM);
         const raid = cells.coastal[cell] ? F.SEA_RAID * (1 - Math.min(1, cells.shelter[cell] / F.RAID_SHELTER)) : 0;
-        const threat = Math.max(borderThreat, wildThreat, raid);
+        const threat = Math.max(borderThreat, wildThreat, raid, painted ? painted[cell] : 0);
         const protection = Math.max(F.ROYAL_PROTECTION * Math.exp(-fromRoyal[cell] / F.SEAT_KM), F.DUCAL_PROTECTION * Math.exp(-fromDucal[cell] / F.SEAT_KM));
-        security[cell] = 1 - (context.strifeAt ? context.strifeAt[cell] : context.strife) * threat * (1 - protection);
+        security[cell] = 1 - strifeFelt(cells, context, cell) * threat * (1 - protection);
     }
     return { security, fromBorder: fromBorder.best };
+}
+
+/** The strife felt in a cell: the age's (or an invasion's there), times its painted security factor, at most 1. */
+function strifeFelt(cells, context, cell) {
+    const strife = context.strifeAt ? context.strifeAt[cell] : context.strife;
+    return cells.strifeScale ? Math.min(1, strife * cells.strifeScale[cell]) : strife;
+}
+
+/**
+ * The threat from land painted more dangerous (see CellValues' dangerThreat): each painted cell a
+ * source as strong as its share of the most dangerous value (times INFLUENCES.DANGER_THREAT), its
+ * threat fading with political distance over WILD_KM as wild land's does. Each cell takes the
+ * nearest source's, which is the strongest wherever the painting is alike.
+ */
+function paintedThreat(state) {
+    const F = FILRODENSWMB.GENERATOR.FEEDBACK;
+    const { graph, cells, cost } = state;
+    const strength = FILRODENSWMB.GENERATOR.INFLUENCES.DANGER_THREAT;
+    const sources = [];
+    for (let cell = 0; cell < cells.count; cell++) if (!cells.water[cell] && cells.dangerThreat[cell] > 0) sources.push(cell);
+    const threat = new Float64Array(cells.count);
+    if (!sources.length) return threat;
+    const reach = searchAll(graph, sources, cost, { limit: F.THREAT_REACH * F.WILD_KM });
+    for (let cell = 0; cell < cells.count; cell++) {
+        const source = reach.owner[cell];
+        if (source >= 0) threat[cell] = Math.min(1, strength * cells.dangerThreat[sources[source]] * Math.exp(-reach.best[cell] / F.WILD_KM));
+    }
+    return threat;
 }
 
 /**

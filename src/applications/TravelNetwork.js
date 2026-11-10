@@ -41,7 +41,7 @@ export class TravelNetwork {
         const entry = { mesh, inputs, promise: null, value: null };
         const grid = gridFor(mesh);
         const makePayload = () => {
-            const payload = Generation.payload(app);
+            const payload = Generation.payload(app, undefined, { influences: false });
             if (grid.coarse) return payload;
             // The travel cells in the model cells' place, with relief measured as on the generator's
             const kmPerPx = payload.kmPerPx;

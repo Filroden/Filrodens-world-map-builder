@@ -171,11 +171,13 @@ export class Generation {
      * GeneratorRevision), as Travel and Fill in must; a run asks for the current ones.
      * @param {object} app
      * @param {object} [settings]
-     * @param {{revision?: number, userRegions?: object|null}} [options] - revision: the rules to
-     *     follow instead of the map's; userRegions: the map's own regions a run builds round (see
-     *     userRegions), which only a run needs.
+     * @param {{revision?: number, userRegions?: object|null, influences?: boolean}} [options] -
+     *     revision: the rules to follow instead of the map's; userRegions: the map's own regions a
+     *     run builds round (see userRegions), which only a run needs; influences: whether to carry
+     *     the painted influences (see Influences), which Travel's network and the Influences tool's
+     *     own capacity layer leave out (neither reads them).
      */
-    static payload(app, settings = panelSettings(app.uiState.generatorSettings), { revision = GeneratorRevision.of(app.uiState), userRegions = null } = {}) {
+    static payload(app, settings = panelSettings(app.uiState.generatorSettings), { revision = GeneratorRevision.of(app.uiState), userRegions = null, influences = true } = {}) {
         const mesh = app.meshSession.mesh;
         const { params } = MapStateManager.getDerivedMapParameters(app.uiState, app.customBiomeColors);
         return buildGeneratorPayload({
@@ -192,7 +194,20 @@ export class Generation {
             revision,
             userRegions,
             routes: this.userRoutes(app),
+            influences: influences ? this.influencePixels(app) : null,
         });
+    }
+
+    /**
+     * The influences painted on the map, per pixel as the generator reads them (see
+     * Influences.pixels): each kind painted, or null when none is.
+     * @param {object} app
+     * @returns {{capacity: Int8Array|null, security: Int8Array|null}|null}
+     */
+    static influencePixels(app) {
+        const session = app.meshSession;
+        if (!session?.influences?.any()) return null;
+        return { capacity: session.influences.pixels(session.mesh, "capacity"), security: session.influences.pixels(session.mesh, "security") };
     }
 
     /**

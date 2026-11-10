@@ -735,6 +735,9 @@ const MAP = obj({
     generatorStale: bool,
     // The generator rules the map follows (see GeneratorRevision); absent on maps made before it was kept
     generatorRevision: int(0, 1000),
+    // The influences painted on the map's cells (see Influences): each kind painted, its steps
+    // encoded as the level owners are; a kind that does not decode to the mesh's cells is unpainted
+    influences: obj({ capacity: { t: "base64" }, security: { t: "base64" } }, { nullable: true }),
     generatorSettings: GENERATOR_PANEL,
     cultures: list(CULTURE),
     upwindMargin: obj(
@@ -844,7 +847,7 @@ const MODEL_RUN = obj({
     ages: obj({ asked: int(1, 100), run: int(1, 100) }),
     // The settlement pins the run built on (see Pipeline.markSeatPlaces): how many, and each it could not honour
     // A fingerprint of the map's own items the run read, as it left them (see RunInputs)
-    inputs: obj({ routes: key, seats: key, regions: key, rivers: key, features: key }, { nullable: true }),
+    inputs: obj({ routes: key, seats: key, regions: key, rivers: key, features: key, influences: key }, { nullable: true }),
     seats: obj({ used: int(0, 1e6), unhonoured: list(obj({ pin: ref(), kind: enumOf(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]), reason: enumOf(["noPlace", "dry", "notCapital", "water", "islet"]) })) }, { nullable: true }),
     // Each age before the last, in brief (see ModelRun); MapImport checks that its names run with
     // its places, castles and seats, and its arrays with the run's cells

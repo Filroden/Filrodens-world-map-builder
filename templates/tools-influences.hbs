@@ -1,0 +1,44 @@
+{{!--
+    Influences (tool id "influences"; see InfluenceView): optional painting on the land that steers
+    Generate, relative to what it works out. What is painted (food capacity or security), the scale of
+    its tints with what the painting does at each end and at none, what the map shows under the painting, and
+    clearing a kind. The painting itself is done on the map with the bar's brush (see
+    InfluencePainter).
+--}}
+<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.InfluenceIntro"}}</p>
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="influenceKind" title="FILRODENSWMB.UI.SectionInfluenceKind"}}
+    <div role="radiogroup" aria-label="{{localize 'FILRODENSWMB.UI.SectionInfluenceKind'}}" class="fwmb-list-container fwmb-history-ages fwmb-travel-modes">
+        {{#each influences.kinds}}
+        <button type="button" role="radio" aria-checked="{{#if this.chosen}}true{{else}}false{{/if}}" class="fwmb-list-item fwmb-history-age" data-action="chooseInfluenceKind" data-kind="{{this.id}}" data-tooltip="{{localize this.hint}}">
+            <span class="fwmb-history-age-name">{{localize this.label}}</span>
+        </button>
+        {{/each}}
+    </div>
+    <p class="fwmb-hint">{{localize influences.kindHint}}</p>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="influenceBrush" title="FILRODENSWMB.UI.SectionInfluenceBrush"}}
+    <figure class="fwmb-influence-scale">
+        <figcaption class="fwmb-label">{{localize influences.legend.caption}}</figcaption>
+        <div class="fwmb-influence-ramp" aria-hidden="true"></div>
+        <div class="fwmb-influence-ticks">
+            <span>{{localize "FILRODENSWMB.UI.InfluenceScaleLowered"}} {{influences.legend.least}}</span>
+            <span>{{influences.legend.none}}</span>
+            <span>{{localize "FILRODENSWMB.UI.InfluenceScaleRaised"}} {{influences.legend.most}}</span>
+        </div>
+    </figure>
+    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.InfluenceBrushHint"}}</p>
+    <p class="fwmb-hint">{{localize influences.base}}</p>
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="influencePainted" title="FILRODENSWMB.UI.SectionInfluencePainted"}}
+    {{#each influences.kinds}}
+    <div class="fwmb-influence-painted">
+        <span class="fwmb-flex-1">{{localize this.label}}</span>
+        <span class="fwmb-meta">{{#if this.painted}}{{localize "FILRODENSWMB.UI.InfluencePainted"}}{{else}}{{localize "FILRODENSWMB.UI.InfluenceNonePainted"}}{{/if}}</span>
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="clearInfluences" data-kind="{{this.id}}" data-tooltip="{{localize 'FILRODENSWMB.UI.InfluenceClearHint'}}" {{#unless this.painted}}disabled{{/unless}}>{{localize "FILRODENSWMB.UI.InfluenceClear"}}</button>
+    </div>
+    {{/each}}
+    {{#if influences.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.InfluenceStale"}}</p>{{/if}}
+{{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}

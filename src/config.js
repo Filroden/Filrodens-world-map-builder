@@ -486,8 +486,8 @@ export const FILRODENSWMB = {
     UI: {
         RTL_LANGUAGES: ["ar", "he", "fa", "ur"],
         VISIBILITY_STATES: ["all", "gm", "none"],
-        EDITABLE_TOOLS: ["scene", "terrain", "biomes", "features", "infrastructure", "regions", "labels", "cartography"],
-        VECTOR_TOOLS: ["scene", "features", "infrastructure", "regions", "labels", "cartography"],
+        EDITABLE_TOOLS: ["scene", "terrain", "biomes", "features", "influences", "infrastructure", "regions", "labels", "cartography"],
+        VECTOR_TOOLS: ["scene", "features", "influences", "infrastructure", "regions", "labels", "cartography"],
         // How far (in screen pixels) the pointer must travel after pressing on a node, pin, label or
         // decoration before it counts as a drag. A press-and-release below this - such as either
         // half of a double-click - is a click and must not move the item, record an undo step or
@@ -556,6 +556,10 @@ export const FILRODENSWMB = {
                 biomes: ["PaintBiomes"],
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
                 line: ["AddPoint", "FinishLine", "MovePoint", "InsertPoint", "DeletePoint", "EditLine"],
+                // The Influences tool, by mode (see InfluencePainter)
+                influenceRaise: ["InfluenceRaise", "InfluenceRaiseShift"],
+                influenceLower: ["InfluenceLower", "InfluenceLowerShift"],
+                influenceErase: ["InfluenceErase"],
                 // The Regions tool, by edit mode (see RegionPainter)
                 regionSelect: ["SelectRegion"],
                 regionPaint: ["RegionPaint", "RegionPaintShift"],
@@ -630,13 +634,16 @@ export const FILRODENSWMB = {
         // `FILRODENSWMB.UI.Shortcut…` keys; "everywhere" holds those that work in every tool. SHEET
         // is the sheet's order: one table per tool, a caption per mode, each naming the hint
         // context whose actions it lists. Keep KEYS in step with the key handling in MapStudio
-        // (#handleStudioKeydown), RegionPainter.handleKey, RouteTool.handleKey and PickTool.handleKey.
+        // (#handleStudioKeydown), RegionPainter.handleKey, InfluencePainter.handleKey, RouteTool.handleKey and PickTool.handleKey.
         SHORTCUTS: {
             KEYS: {
                 everywhere: ["Undo", "Redo", "Sheet", "Escape"],
                 regionSelect: ["RegionLetGo"],
                 regionPaint: ["RegionStopStroke"],
                 regionErase: ["RegionStopStroke"],
+                influenceRaise: ["InfluenceStopStroke"],
+                influenceLower: ["InfluenceStopStroke"],
+                influenceErase: ["InfluenceStopStroke"],
                 routeSelect: ["RouteLetGo"],
                 pinSelect: ["PickClose"],
                 labelSelect: ["PickClose"],
@@ -662,6 +669,14 @@ export const FILRODENSWMB = {
                         { caption: "FILRODENSWMB.UI.ShortcutsSelect", context: "featureSelect" },
                         { caption: "FILRODENSWMB.UI.ShortcutsRiverSources", context: "spring" },
                         { caption: "FILRODENSWMB.UI.ShortcutsLines", context: "line" },
+                    ],
+                },
+                {
+                    title: "FILRODENSWMB.UI.ToolInfluences",
+                    tables: [
+                        { caption: "FILRODENSWMB.UI.ShortcutsRaise", context: "influenceRaise" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsLower", context: "influenceLower" },
+                        { caption: "FILRODENSWMB.UI.ShortcutsErase", context: "influenceErase" },
                     ],
                 },
                 { title: "FILRODENSWMB.UI.ToolGenerate", tables: [{ caption: "FILRODENSWMB.UI.ShortcutsHomeland", context: "homeland" }] },
@@ -761,6 +776,7 @@ export const FILRODENSWMB = {
             terrain: { icon: "landscape", label: "FILRODENSWMB.UI.ToolTerrain" },
             biomes: { icon: "forest", label: "FILRODENSWMB.UI.ToolBiomes" },
             features: { icon: "ssid-chart", label: "FILRODENSWMB.UI.ToolFeatures" },
+            influences: { icon: "tune", label: "FILRODENSWMB.UI.ToolInfluences" },
             generate: { icon: "generate", label: "FILRODENSWMB.UI.ToolGenerate" },
             regions: { icon: "pentagon", label: "FILRODENSWMB.UI.ToolRegions" },
             infrastructure: { icon: "location-city", label: "FILRODENSWMB.UI.ToolInfrastructure" },
@@ -775,7 +791,7 @@ export const FILRODENSWMB = {
         },
         STAGES: [
             { id: "shape", label: "FILRODENSWMB.UI.StageShape", tools: ["scene", "terrain", "biomes", "features"] },
-            { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["generate", "regions", "infrastructure", "labels"] },
+            { id: "populate", label: "FILRODENSWMB.UI.StagePopulate", tools: ["influences", "generate", "regions", "infrastructure", "labels"] },
             { id: "finish", label: "FILRODENSWMB.UI.StageFinish", tools: ["cartography", "export"] },
             // Tools to look at a finished map with, outside the order of work (no Next leads to them)
             { id: "explore", label: "FILRODENSWMB.UI.StageExplore", tools: ["history", "travel"], optional: true },
@@ -799,7 +815,8 @@ export const FILRODENSWMB = {
             scene: { tool: "terrain", reason: "FILRODENSWMB.UI.NextReasonScene" },
             terrain: { tool: "biomes", reason: "FILRODENSWMB.UI.NextReasonTerrain" },
             biomes: { tool: "features", reason: "FILRODENSWMB.UI.NextReasonBiomes" },
-            features: { tool: "generate", reason: "FILRODENSWMB.UI.NextReasonFeatures" },
+            features: { tool: "influences", reason: "FILRODENSWMB.UI.NextReasonFeatures" },
+            influences: { tool: "generate", reason: "FILRODENSWMB.UI.NextReasonInfluences" },
             generate: { tool: "regions", reason: "FILRODENSWMB.UI.NextReasonGenerate" },
             regions: { tool: "infrastructure", reason: "FILRODENSWMB.UI.NextReasonRegions" },
             infrastructure: { tool: "labels", reason: "FILRODENSWMB.UI.NextReasonInfrastructure" },
@@ -822,6 +839,7 @@ export const FILRODENSWMB = {
             biomes: "painting",
             // Select starts editing in River (see PickTool.settleForEditing)
             features: { select: "drawing", spring: "placing", river: "drawing", fault: "drawing" },
+            influences: "painting",
             generate: null,
             regions: "painting",
             infrastructure: { pin: "placing", route: "drawing" },
@@ -2688,6 +2706,27 @@ export const FILRODENSWMB = {
             CASTLE_PASS_RELIEF_M: 400,
             CASTLE_BORDER_KM: 30,
             CASTLE_SCORE: 1.5,
+        }),
+        // Influences (see Influences): a value painted on the map's land with a brush, from
+        // -LEVELS to LEVELS (0 is none; LEVELS for the most), so a feathered stroke fades into the
+        // land round it. A value v (as a share of LEVELS, -1 to 1) stands for the factor
+        // MAX_FACTOR to the power v: food capacity multiplies what the land feeds by it (above 0
+        // more, below less); security above 0 (safer) divides the strife felt there by it, below 0
+        // (more dangerous) multiplies it. A more dangerous value also makes the painted land a
+        // source of threat, DANGER_THREAT at the most dangerous and in proportion above it, fading
+        // with distance as unclaimed wild land's does (FEEDBACK.WILD_KM), since scaling the strife
+        // alone does nothing where nothing threatens (a heartland by its seat). BRUSH holds the
+        // Influences bar's strength (the share of LEVELS one stroke adds at the brush's core) and
+        // feather (the solid share of its radius, as the terrain brush's), with their ranges.
+        INFLUENCES: Object.freeze({
+            KINDS: Object.freeze(["capacity", "security"]),
+            LEVELS: 100,
+            MAX_FACTOR: 3.375,
+            DANGER_THREAT: 1,
+            BRUSH: Object.freeze({
+                STRENGTH: Object.freeze({ MIN: 0.05, MAX: 1, STEP: 0.05, DEFAULT: 0.25 }),
+                FEATHER: Object.freeze({ MIN: 0, MAX: 0.9, STEP: 0.1, DEFAULT: 0.4 }),
+            }),
         }),
         // Generated routes are classed by traffic: the busiest TRUNK_SHARE of their steps trunk,
         // up to MAIN_SHARE main, the rest minor.

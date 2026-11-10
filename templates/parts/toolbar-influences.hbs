@@ -1,0 +1,8 @@
+{{!-- The Influences tool's bar (see InfluencePainter.toolbarContext): Raise, Lower and Erase, then
+     the brush's size, strength and feather, as Terrain's bar has them. What is painted is chosen in
+     the panel. --}}
+{{#each bar.modeGroups}}{{> "modules/filrodens-world-map-builder/templates/parts/bar-modes.hbs" group=this}}{{/each}}
+<span class="fwmb-sep"></span>
+{{> "modules/filrodens-world-map-builder/templates/parts/toolbar-shared-brush-size.hbs"}}
+{{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="influenceStrength" label="FILRODENSWMB.UI.BarBrushStrength" icon="format-paint" value=influenceToolbar.strength.value min=influenceToolbar.strength.MIN max=influenceToolbar.strength.MAX step=influenceToolbar.strength.STEP hint="FILRODENSWMB.UI.InfluenceStrengthHint"}}
+{{> "modules/filrodens-world-map-builder/templates/parts/bar-range.hbs" name="influenceFeather" label="FILRODENSWMB.UI.BarBrushFeather" icon="gesture" value=influenceToolbar.feather.value min=influenceToolbar.feather.MIN max=influenceToolbar.feather.MAX step=influenceToolbar.feather.STEP hint="FILRODENSWMB.UI.InfluenceFeatherHint"}}

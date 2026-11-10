@@ -20,6 +20,7 @@ import { runGenerator } from "../generator/Pipeline.js";
 import { resultTransfer } from "../generator/GeneratorInput.js";
 import { buildTravelGraph, travelGraphTransfer } from "../travel/TravelGraph.js";
 import { runInfill } from "../generator/Infill.js";
+import { landCapacity, landCapacityTransfer } from "../generator/LandCapacity.js";
 
 /** One band's rows, newly allocated: `width` values per row. */
 const bandBuffer = (width, rowStart, rowEnd) => new Float32Array((rowEnd - rowStart) * width);
@@ -96,7 +97,13 @@ function infill(input) {
     return { value: result, transfer: [result.people.buffer] };
 }
 
-const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh, generate, travelGraph, infill };
+/** The food the land feeds per model cell, without a run (see LandCapacity). */
+function capacity(payload) {
+    const result = landCapacity(payload);
+    return { value: result, transfer: landCapacityTransfer(result) };
+}
+
+const TASKS = { detailRows, topographyRows, surfaceTextureRows, climateRows, paintRows, buildMesh, generate, travelGraph, infill, capacity };
 
 /** Ids of jobs asked to stop (cancelled), and of jobs asked to end early with what they have. */
 const cancelled = new Set();
