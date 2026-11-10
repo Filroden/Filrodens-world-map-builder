@@ -160,11 +160,14 @@ export class InspectorFields {
 
     /**
      * Whether `values` would change `object`: any of its fields differs, compared by value (a
-     * nested object such as a label compared field by field).
+     * nested object such as a label compared field by field). A list compared entry by entry
+     * differs too when its length does: walking only the new list's entries would miss the ones
+     * taken off its end (a removed zone, an unticked biome).
      */
     static differs(object, values) {
         return Object.entries(values).some(([name, value]) => {
             const current = object?.[name];
+            if (Array.isArray(value) && (!Array.isArray(current) || current.length !== value.length)) return true;
             if (value && typeof value === "object") return this.differs(current ?? {}, value);
             return current !== value;
         });

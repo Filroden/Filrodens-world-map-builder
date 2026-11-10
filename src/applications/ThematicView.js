@@ -91,8 +91,12 @@ export class ThematicView {
     static source(app) {
         const { run: modelRun, cells: mesh } = this.#runCells(app);
         const cached = sources.get(app);
-        if (cached?.modelRun === modelRun && cached?.mesh === mesh) return cached.source;
+        if (cached?.modelRun === modelRun && cached?.mesh === mesh) {
+            cached.source?.useCultures(app.uiState?.cultures);
+            return cached.source;
+        }
         const source = ThematicSource.of(modelRun, mesh);
+        source?.useCultures(app.uiState?.cultures);
         sources.set(app, { modelRun, mesh, source });
         return source;
     }
@@ -277,11 +281,11 @@ export class ThematicView {
         const rtl = app.root.ownerDocument?.documentElement?.dir === "rtl" || app.root.closest?.('[dir="rtl"]') !== null;
         const isFolded = (id) => folded.get(app)?.has(id) ?? false;
         // The run's id stands for its cultures, which the culture legend lists (an earlier age's
-        // run has its own id; see HistoryView.thematicRun)
+        // run has its own id; see HistoryView.thematicRun), with their names and colours now
         const travel = TravelView.legendSignature(app);
         // Worked out once a legend is shown, since it reads the map's own items (see RunInputs)
         const stale = layer || trade ? RunInputs.stale(app) : false;
-        const signature = layer || trade || travel ? JSON.stringify([layer?.id ?? null, trade, travel, (HistoryView.thematicRun(app) ?? app.modelRun ?? app.parentRun)?.run ?? null, this.inherited(app), cleanUnit(app.uiState?.mapUnit), stale, rtl, layer ? isFolded(layer.id) : false, isFolded("trade"), isFolded("travel")]) : "";
+        const signature = layer || trade || travel ? JSON.stringify([layer?.id ?? null, trade, travel, (HistoryView.thematicRun(app) ?? app.modelRun ?? app.parentRun)?.run ?? null, layer?.id === "culture" ? this.source(app)?.useCultures(app.uiState?.cultures) : null, this.inherited(app), cleanUnit(app.uiState?.mapUnit), stale, rtl, layer ? isFolded(layer.id) : false, isFolded("trade"), isFolded("travel")]) : "";
         if (container.dataset.signature === signature) return;
         container.dataset.signature = signature;
         const legends = [];

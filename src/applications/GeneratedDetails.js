@@ -60,14 +60,16 @@ export class GeneratedDetails {
     }
 
     /**
-     * A generated region's rows, or null for a region no run made: its rank (realms), population,
-     * the duchies and counties beneath it, and the detail level it is shown from.
+     * A generated region's rows, or a drawn region's from what the last run made of it (`modelled`,
+     * see Regeneration.merge); null for a region no run made or built round: its rank (realms), population,
+     * a realm's ruling culture (its capital's people) and its cultures, the duchies and counties
+     * beneath it, and the detail level it is shown from.
      * @param {object} app
      * @param {object} region
      * @returns {{label: string, value: string}[]|null}
      */
     static forRegion(app, region) {
-        const generated = region.generated;
+        const generated = region.generated ?? region.modelled;
         if (!generated) return null;
         const place = this.#placeOf(app, region);
         const below = place ? this.#beneath(place.set, place.depth, region.key) : [];
@@ -75,11 +77,12 @@ export class GeneratedDetails {
             ["FILRODENSWMB.UI.GeneratedTitle", place ? this.#titleOf(region, place) : null],
             ["FILRODENSWMB.UI.GeneratedRank", RANKS[generated.tier] ? platform.i18n.localize(RANKS[generated.tier]) : null],
             ["FILRODENSWMB.UI.GeneratedPopulation", this.#count(generated.population)],
+            ["FILRODENSWMB.UI.GeneratedRulingCulture", this.cultureName(app, generated.rulingCulture)],
             [generated.mix ? "FILRODENSWMB.UI.GeneratedCultures" : "FILRODENSWMB.UI.GeneratedCulture", this.#cultures(app, generated)],
             ["FILRODENSWMB.UI.GeneratedDuchies", place?.depth === REALMS ? this.#count(below[0]) : null],
             ["FILRODENSWMB.UI.GeneratedCounties", place ? this.#count(below[COUNTIES - place.depth - 1]) : null],
             ["FILRODENSWMB.UI.GeneratedShownFrom", place ? this.#levelName(DetailLevel.ofLevel(place.set, place.level)) : null],
-            ["FILRODENSWMB.UI.GeneratedNextRun", this.#fate(region, place)],
+            ["FILRODENSWMB.UI.GeneratedNextRun", region.generated ? this.#fate(region, place) : platform.i18n.localize("FILRODENSWMB.UI.GeneratedKeptRegion")],
         ]);
     }
 
@@ -146,7 +149,7 @@ export class GeneratedDetails {
      * is drawn, its level's look showing its rank. An independent duchy takes the duchy title.
      */
     static #titleOf(region, place) {
-        const independent = place.depth === REALMS && region.generated?.tier === "independent";
+        const independent = place.depth === REALMS && (region.generated ?? region.modelled)?.tier === "independent";
         const template = (independent ? place.set.levels[REALMS + 1]?.titleTemplate : null) ?? place.level.titleTemplate;
         return template?.includes("{name}") ? template.replaceAll("{name}", region.name) : null;
     }

@@ -5649,6 +5649,42 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     gap: var(--fwmb-size-4);
     font-variant-numeric: tabular-nums;
 }
+/* A culture's chosen biomes (its climate): a check box per land biome, with its colour, as many
+   to a row as fit (names wrapping); and the warning when its climate takes in most of the map's land */
+.fwmb-culture-biomes {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    gap: var(--fwmb-size-2) var(--fwmb-size-8);
+    margin: 0 0 var(--fwmb-size-8);
+    padding: 0;
+    border: none;
+}
+.fwmb-culture-biome {
+    display: flex;
+    align-items: center;
+    gap: var(--fwmb-size-4);
+    min-width: 0;
+    white-space: normal;
+}
+/* A culture's climate zones, each its name over its three axes' ranges */
+.fwmb-culture-zones {
+    list-style: none;
+    margin: 0 0 var(--fwmb-size-8);
+    padding: 0;
+}
+.fwmb-culture-zone-name {
+    font-weight: 600;
+}
+.fwmb-culture-biome-swatch {
+    flex: none;
+    width: var(--fwmb-size-12);
+    height: var(--fwmb-size-12);
+    border-radius: var(--fwmb-size-2);
+    border: 1px solid var(--fwmb-border-subtle);
+}
+.fwmb-culture-climate-wide {
+    color: var(--fwmb-color-warning);
+}
 .fwmb-range-band-ends {
     display: flex;
     justify-content: space-between;

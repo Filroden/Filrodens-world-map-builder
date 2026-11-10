@@ -1,8 +1,10 @@
 // The Generate panel's cultures (CultureLists) and a culture in the inspector (CultureEditor),
 // drawn from the real templates in a happy-dom document: the add row names and makes a culture
 // with the default culture's fields and the panel's name style; Rename, Duplicate and Delete; each
-// change one undo step that marks a run out of date; the inspector's fields, its habitat bands
-// (RangeTrack: keys, quick picks, double-click to the whole track, kept as no limit) and Use auto.
+// change one undo step that marks a run out of date; the inspector's fields, its relief band
+// (RangeTrack: keys, quick picks, double-click to the whole track, kept as no limit), its climate
+// (chosen biomes, or zones through the rule editor; an older culture's bands as its one zone; the
+// warning when it takes in most of the land), Use auto, and a realm's ruling culture in its details.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -28,9 +30,10 @@ const i18n = { localize: (key) => key, format: (key, data) => `${key} ${JSON.str
 const handlebars = Handlebars.create();
 registerHelpers(handlebars, i18n);
 const templates = createWebTemplates({ handlebars, prefix: "modules/filrodens-world-map-builder/templates/", fetchText: async (path) => readFileSync(join(ROOT, "templates", path), "utf8") });
-await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/range-band.hbs", "parts/inspector-culture.hbs", "tools-generate.hbs"]);
+await templates.load(["parts/section.hbs", "parts/shared-range.hbs", "parts/range-band.hbs", "parts/inspector-culture.hbs", "tools-generate.hbs", "dialogs/culture-zones-editor.hbs", "dialogs/biome-rule-editor.hbs"]);
 
-const answers = { confirm: true };
+// A dialogue choice: `choose(options)` answers it (the rule editor's), by default with Cancel
+const answers = { confirm: true, choose: async () => "cancel" };
 const warnings = [];
 let host = null;
 let nextId = 0;
@@ -42,6 +45,7 @@ installPlatform({
     settings: { get: () => [] },
     dialogs: {
         confirm: async () => answers.confirm,
+        choose: (options) => answers.choose(options),
         prompt: async () => null,
         dismiss: ({ placement } = {}) => host && Overlay.dismissAll(host, placement),
         attach: () => () => {},
@@ -58,8 +62,12 @@ const { Inspector } = await import("../../src/applications/Inspector.js");
 const { GeneratedDetails } = await import("../../src/applications/GeneratedDetails.js");
 const { GeneratePanel } = await import("../../src/applications/GeneratePanel.js");
 
+const { RuleEditorDialog } = await import("../../src/applications/RuleEditorDialog.js");
+const { zoneFromBands } = await import("../../src/generator/CultureClimate.js");
+
 beforeEach(() => {
     answers.confirm = true;
+    answers.choose = async () => "cancel";
     document.body.innerHTML = "";
 });
 
@@ -132,7 +140,7 @@ test("the add row makes a culture with the default culture's fields and the pane
     const id = await CultureLists.confirm(app, "Hillfolk");
     const made = culture(app);
     const { FIELDS } = FILRODENSWMB.GENERATOR.CULTURES;
-    assert.deepEqual({ ...made, id: undefined }, { id: undefined, name: "Hillfolk", color: FILRODENSWMB.REGIONS.PRESETS[0], nameBase: "Nordic", openness: FIELDS.openness.default, density: FIELDS.density.default, habitat: { temperature: null, moisture: null, height: null, relief: null, coast: 0, river: 0 }, homelands: [] });
+    assert.deepEqual({ ...made, id: undefined }, { id: undefined, name: "Hillfolk", color: FILRODENSWMB.REGIONS.PRESETS[0], nameBase: "Nordic", openness: FIELDS.openness.default, density: FIELDS.density.default, habitat: { climate: "biomes", biomes: [], zones: [], relief: null, coast: 0, river: 0 }, homelands: [] });
     assert.equal(made.id, id);
     assert.ok(app.root.querySelector("dialog.fwmb-inspector--culture"), "opened in the inspector");
     assert.equal(app.stale, 1, "a run made before is out of date");
@@ -188,29 +196,213 @@ test("the inspector's fields apply as one undo step each, and a run made before 
     assert.equal(culture(app).nameBase, "Dwarven");
 });
 
-test("a habitat band moves with the keys and its quick picks, returns to no limit on double-click, and is kept in the map's elevation", async () => {
+test("the relief band moves with the keys and its quick picks, returns to no limit on double-click", async () => {
+    const app = await withCulture();
+    const band = form(app).querySelector('[data-range-band] input[name="habitatRelief"]').closest("[data-range-band]");
+    // The high end down ten steps with Page Down
+    const high = band.querySelector('[data-band-edge="1"]');
+    high.dispatchEvent(new window.KeyboardEvent("keydown", { key: "PageDown", bubbles: true }));
+    await settle();
+    assert.deepEqual(culture(app).habitat.relief, [0, 0.2]);
+    // The Rolling quick pick
+    const rolling = [...band.querySelectorAll("[data-band-zone]")].find((pick) => pick.textContent.includes("CultureReliefRolling"));
+    rolling.click();
+    await settle();
+    assert.deepEqual(culture(app).habitat.relief, [0.02, 0.06]);
+    // Double-click: the whole track, kept as no limit
+    form(app).querySelector('[data-range-band] input[name="habitatRelief"]').closest("[data-range-band]").querySelector("[data-band-track]").dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true }));
+    await settle();
+    assert.equal(culture(app).habitat.relief, null);
+    undo(app);
+    assert.deepEqual(culture(app).habitat.relief, [0.02, 0.06]);
+});
+
+/** The studio with one new culture, open in the inspector. */
+async function withCulture(habitat = null) {
     const app = studio();
     await addCulture(app, "Hillfolk");
-    const band = (name) => form(app).querySelector(`[data-range-band] input[name="${name}"]`).closest("[data-range-band]");
-    // Temperature: the low end up ten steps with Page Up
-    const low = band("habitatTemperature").querySelector('[data-band-edge="0"]');
-    low.dispatchEvent(new window.KeyboardEvent("keydown", { key: "PageUp", bubbles: true }));
+    if (habitat) {
+        culture(app).habitat = habitat;
+        await CultureEditor.open(app, culture(app).id);
+    }
+    return app;
+}
+
+const commitField = async (field, value) => {
+    if (typeof value === "boolean") field.checked = value;
+    else field.value = value;
+    field.dispatchEvent(new window.Event("change", { bubbles: true }));
     await settle();
-    assert.deepEqual(culture(app).habitat.temperature, [0.1, 1]);
-    assert.equal(low.getAttribute("aria-valuenow"), "0.1");
-    // Height: the Highland quick pick, from the sea level's quarters as the rule editor's
-    const highland = [...band("habitatHeight").querySelectorAll("[data-band-zone]")].find((pick) => pick.textContent.includes("Highland"));
-    highland.click();
-    await settle();
-    assert.deepEqual(culture(app).habitat.height, [0.7, 0.85]);
-    assert.equal(band("habitatHeight").querySelector("[data-band-reading]").textContent, "70% – 85%");
-    // Double-click: the whole track, kept as no limit
-    band("habitatTemperature").querySelector("[data-band-track]").dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true }));
-    await settle();
-    assert.equal(culture(app).habitat.temperature, null);
-    assert.equal(band("habitatTemperature").querySelector("[data-band-reading]").textContent, "FILRODENSWMB.UI.CultureAny");
+};
+
+test("a new culture's climate is its chosen biomes: none at first; ticking one chooses it, as one undo step", async () => {
+    const app = await withCulture();
+    assert.equal(form(app).elements.habitatClimate.value, "biomes");
+    const boxes = () => [...form(app).querySelectorAll('input[name="habitatBiome"]')];
+    assert.deepEqual(boxes().map((box) => Number(box.value)), [3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "every built-in land biome");
+    assert.ok(boxes().every((box) => !box.checked));
+    const stale = app.stale;
+    await commitField(boxes().find((box) => box.value === "7"), true);
+    assert.deepEqual(culture(app).habitat.biomes, [7]);
+    assert.ok(app.stale > stale, "a run made before is out of date");
+    await commitField(boxes().find((box) => box.value === "10"), true);
+    assert.deepEqual(culture(app).habitat.biomes, [7, 10]);
     undo(app);
-    assert.deepEqual(culture(app).habitat.temperature, [0.1, 1]);
+    assert.deepEqual(culture(app).habitat.biomes, [7]);
+    // Unticking the last biome is a change too (the list is only shorter)
+    await CultureEditor.open(app, culture(app).id);
+    await commitField(boxes().find((box) => box.value === "7"), false);
+    assert.deepEqual(culture(app).habitat.biomes, []);
+});
+
+test("a zone deleted in the rule editor is gone on Accept", async () => {
+    const app = await withCulture({ climate: "zones", biomes: [], zones: [zoneFromBands({ height: [0.5, 1] }), zoneFromBands({ moisture: [0.6, 1] })], relief: null, coast: 0, river: 0 });
+    const removeFirst = async ({ content, onRender }) => {
+        const element = document.body.appendChild(document.createElement("div"));
+        element.innerHTML = content;
+        onRender(element);
+        element.querySelector(".fwmb-rule-remove-row").click();
+        element.remove();
+        return "accept";
+    };
+    answers.choose = removeFirst;
+    form(app).querySelector('[data-inspector-action="editZones"]').click();
+    await settle();
+    await settle();
+    assert.deepEqual(culture(app).habitat.zones, [zoneFromBands({ moisture: [0.6, 1] })]);
+    answers.choose = removeFirst;
+    form(app).querySelector('[data-inspector-action="editZones"]').click();
+    await settle();
+    await settle();
+    assert.deepEqual(culture(app).habitat.zones, [], "the last zone too");
+});
+
+test("a culture's name and colour apply at once without making a run out of date", async () => {
+    const app = await withCulture();
+    let repaints = 0;
+    app._repaintVectors = () => repaints++;
+    const stale = app.stale;
+    await commitField(form(app).elements.cultureColor, "#123456");
+    assert.equal(culture(app).color, "#123456");
+    assert.equal(app.stale, stale, "Generate does not read a culture's colour");
+    assert.equal(repaints, 1, "the map is drawn again in it");
+    await commitField(form(app).elements.cultureName, "Hill people");
+    assert.equal(culture(app).name, "Hill people");
+    assert.equal(app.stale, stale, "nor its name");
+    await commitField(form(app).elements.cultureOpenness, "0.2");
+    assert.ok(app.stale > stale, "what it reads does");
+    // An older culture's bands written as its one zone with a new colour: the same climate
+    culture(app).habitat = { temperature: [0.2, 0.5], moisture: null, height: null, relief: null, coast: 0, river: 0 };
+    await CultureEditor.open(app, culture(app).id);
+    const before = app.stale;
+    await commitField(form(app).elements.cultureColor, "#654321");
+    assert.equal(culture(app).habitat.climate, "zones");
+    assert.equal(app.stale, before);
+});
+
+test("the map's land custom biomes can be chosen; one that cannot show on land is not offered", async () => {
+    const app = studio();
+    app.uiState.customBiomes = [{ id: 40, name: "Moor", color: [90, 80, 70], placement: "land", rules: [] }, { id: 41, name: "Kelp", color: [10, 80, 70], placement: "underwater", rules: [] }];
+    await addCulture(app, "Moorfolk");
+    const moor = form(app).querySelector('input[name="habitatBiome"][value="40"]');
+    assert.ok(moor, "Moor is offered");
+    assert.match(moor.closest("label").textContent, /Moor/);
+    assert.equal(form(app).querySelector('input[name="habitatBiome"][value="41"]'), null);
+    await commitField(moor, true);
+    assert.deepEqual(culture(app).habitat.biomes, [40]);
+});
+
+test("Zones: none at first, then set in the rule editor on Accept, as one undo step; Cancel changes nothing", async () => {
+    const app = await withCulture();
+    await commitField(form(app).elements.habitatClimate, "zones");
+    assert.equal(culture(app).habitat.climate, "zones");
+    assert.match(form(app).textContent, /CultureZonesNone/);
+    assert.equal(form(app).querySelector('input[name="habitatBiome"]'), null, "the biomes are not shown");
+    // The rule editor: one row added, then Accept
+    answers.choose = async ({ content, onRender }) => {
+        const element = document.body.appendChild(document.createElement("div"));
+        element.innerHTML = content;
+        onRender(element);
+        assert.equal(element.querySelector(".fwmb-rule-step-btn"), null, "zones have no priority");
+        element.querySelector(".fwmb-rule-add-row-btn").click();
+        assert.equal(element.querySelectorAll(".fwmb-rule-row-custom").length, 1);
+        assert.ok(![...element.querySelectorAll(".fwmb-rule-zone-chip")].some((chip) => chip.textContent.includes("Underwater")), "land quick picks only");
+        element.remove();
+        return "accept";
+    };
+    const stale = app.stale;
+    form(app).querySelector('[data-inspector-action="editZones"]').click();
+    await settle();
+    await settle();
+    assert.equal(culture(app).habitat.zones.length, 1);
+    assert.deepEqual(culture(app).habitat.zones[0].moisture, [[0, 1, true, true]]);
+    assert.ok(app.stale > stale);
+    assert.match(form(app).querySelector(".fwmb-culture-zones").textContent, /CultureZoneNumber/);
+    // Cancel: nothing changes
+    answers.choose = async () => "cancel";
+    form(app).querySelector('[data-inspector-action="editZones"]').click();
+    await settle();
+    await settle();
+    assert.equal(culture(app).habitat.zones.length, 1);
+    undo(app);
+    assert.deepEqual(culture(app).habitat.zones, []);
+    // Back to biomes: its biomes and zones are both kept
+    await commitField(form(app).elements.habitatClimate, "biomes");
+    assert.equal(culture(app).habitat.climate, "biomes");
+    assert.deepEqual(culture(app).habitat.zones, []);
+});
+
+test("an older culture's bands show as its one zone, and become that zone when a change is written", async () => {
+    const habitat = { temperature: [0.2, 0.5], moisture: null, height: [0.5, 1], relief: null, coast: 0, river: 0 };
+    const app = await withCulture(structuredClone(habitat));
+    assert.equal(form(app).elements.habitatClimate.value, "zones");
+    assert.match(form(app).querySelector(".fwmb-culture-zones").textContent, /0\.50–1\.00/);
+    await commitField(form(app).elements.cultureOpenness, "0.3");
+    const written = culture(app).habitat;
+    assert.equal(written.climate, "zones");
+    assert.deepEqual(written.zones, [zoneFromBands(habitat)]);
+    assert.ok(!("temperature" in written) && !("height" in written) && !("moisture" in written), "the bands are its zone now");
+    undo(app);
+    assert.deepEqual(culture(app).habitat, habitat);
+});
+
+test("a climate taking in most of the map's land is warned of", async () => {
+    const app = studio();
+    // The map's right half is land, its moisture rising to the right
+    app.currentMoistureData = Float32Array.from({ length: 100 }, (_, index) => (index % 10) / 10);
+    app.currentTemperatureData = new Float32Array(100).fill(0.5);
+    await addCulture(app, "Hillfolk");
+    culture(app).habitat = { climate: "zones", zones: [zoneFromBands({})], relief: null, coast: 0, river: 0 };
+    await CultureEditor.open(app, culture(app).id);
+    assert.ok(form(app).querySelector(".fwmb-culture-climate-wide"), "no limit in every zone: all the land");
+    culture(app).habitat.zones = [zoneFromBands({ moisture: [0.85, 1] })];
+    await CultureEditor.open(app, culture(app).id);
+    assert.equal(form(app).querySelector(".fwmb-culture-climate-wide"), null, "the wettest fifth of the land");
+});
+
+test("the rule editor marks a run out of date when its rules change while a culture's climate is chosen biomes", async () => {
+    const app = studio();
+    app._repaintCanvas = () => {};
+    app.uiState.customBiomes = [{ id: 40, name: "Moor", color: [90, 80, 70], placement: "land", rules: [] }];
+    app.uiState.cultures = [{ id: "c1", name: "Moorfolk", color: "#808080", nameBase: "Nordic", openness: 0.5, density: 1, habitat: { climate: "zones", biomes: [40], zones: [] }, homelands: [] }];
+    const addRule = async ({ content, onRender }) => {
+        const element = document.body.appendChild(document.createElement("div"));
+        element.innerHTML = content;
+        onRender(element);
+        element.querySelector(".fwmb-rule-add-row-btn").click();
+        element.remove();
+        return "accept";
+    };
+    answers.choose = addRule;
+    await RuleEditorDialog.open(app);
+    assert.equal(app.stale, 0, "no culture's climate is chosen biomes");
+    app.uiState.cultures[0].habitat.climate = "biomes";
+    answers.choose = async () => "accept";
+    await RuleEditorDialog.open(app);
+    assert.equal(app.stale, 0, "nothing changed");
+    answers.choose = addRule;
+    await RuleEditorDialog.open(app);
+    assert.equal(app.stale, 1);
 });
 
 test("Use auto takes the culture's homelands away, as one undo step", async () => {
@@ -317,4 +509,9 @@ test("generated details name cultures by id (a deleted one as the run knew it), 
     const shares = GeneratePanel.results(app).cultures;
     assert.deepEqual(shares.map((entry) => [entry.name, entry.color]), [["Hillfolk", "#aa0000"], ["Old folk", "#00aa00"]]);
     assert.match(shares[0].share, /75/);
+    // A realm's ruling culture (its capital's people) beside its cultures; none recorded, no row
+    const realm = { key: 2, name: "C", generated: { run: "r", kind: "realm", population: 100, culture: "gone", rulingCulture: "hill", mix: [{ culture: "gone", share: 0.8 }, { culture: "hill", share: 0.2 }] } };
+    const ruling = (region) => GeneratedDetails.forRegion(app, region).find((row) => row.label === "FILRODENSWMB.UI.GeneratedRulingCulture");
+    assert.equal(ruling(realm).value, "Hillfolk");
+    assert.equal(ruling(app.layerSets[0].levels[0].regions[0]), undefined);
 });

@@ -660,6 +660,36 @@ test("a region's Independent choice and the parent a run gave it are true or fal
     assert.ok(!("independent" in older) && !("parentFromRun" in older), "nothing is added to a region saved before");
 });
 
+test("a culture's climate is biomes or zones, its biomes ids and its zones rule rows; a realm's ruling culture is a culture's id; a drawn region's figures keep to their rules; an older culture reads as it did", () => {
+    const file = v4Map();
+    Object.assign(file.cultures[0].habitat, {
+        climate: "<script>",
+        biomes: [7, "8", -2, 999, 10.5, 40],
+        zones: [{ elevation: [[0.2, 0.8, false, false]], moisture: [[0, 1, true, true]], temperature: [[0.1, 0.4, false, false], ["x", 1]] }, "zone"],
+    });
+    const [region] = file.layerSets[0].levels[0].regions;
+    region.generated = { run: "r1", kind: "realm", sourceId: 0, rulingCulture: "<b>c</b>", edited: false, locked: false };
+    const { mapData } = MapImport.read(file);
+    const habitat = mapData.cultures[0].habitat;
+    assert.ok(!("climate" in habitat), "an unknown climate is dropped");
+    assert.deepEqual(habitat.biomes, [7, 40], "whole biome ids in range only");
+    assert.deepEqual(habitat.zones, [{ elevation: [[0.2, 0.8, false, false]], moisture: [[0, 1, true, true]], temperature: [[0.1, 0.4, false, false]] }]);
+    assert.ok(!("rulingCulture" in mapData.layerSets[0].levels[0].regions[0].generated), "not an id");
+    file.cultures[0].habitat.climate = "biomes";
+    region.generated.rulingCulture = "cultureAAAAAAAAA";
+    const again = MapImport.read(file).mapData;
+    assert.equal(again.cultures[0].habitat.climate, "biomes");
+    assert.equal(again.layerSets[0].levels[0].regions[0].generated.rulingCulture, "cultureAAAAAAAAA");
+    // What a run made of a drawn region: its figures, to their rules
+    region.modelled = { run: "r1", kind: "realm", tier: "kingdom", sourceId: 2, population: -5, culture: "cultureAAAAAAAAA", rulingCulture: 7, edited: true };
+    const modelled = MapImport.read(file).mapData.layerSets[0].levels[0].regions[0].modelled;
+    assert.deepEqual({ ...modelled, population: undefined }, { run: "r1", kind: "realm", tier: "kingdom", sourceId: 2, population: undefined, culture: "cultureAAAAAAAAA", rulingCulture: 7 }, "an unknown field is dropped");
+    assert.ok(modelled.population >= 0, "a count is never negative");
+    const older = MapImport.read(v4Map()).mapData.cultures[0].habitat;
+    assert.ok(!("climate" in older) && !("biomes" in older) && !("zones" in older), "nothing is added to a culture saved before");
+    assert.deepEqual(older.temperature, [0, 0.4]);
+});
+
 test("a natural feature's label keeps its feature record within its rules", () => {
     const file = v4Map();
     Object.assign(file.mapLabels[0], { feature: { kind: "sea", cell: 8, runs: [3, 10, 5, 4, 9, 7], x: 5, y: 5, rotation: 0, fontSize: 3.2, text: "Grey Sea", style: "label-style-ocean-sea" } });

@@ -3,11 +3,12 @@
     about the item, read only (see GeneratedDetails), what Generate again will do with it, and Lock
     (see GeneratedEdits.toggleLock). Closed until opened. Context: generated (rows of label and
     value), or nothing for an item no run made; locked; modelled, for a hand-placed settlement pin
-    a run built on (its figures, no Lock: it is the reader's own).
+    a run built on or a drawn region it built round (its figures, no Lock: it is the reader's own),
+    with modelledHint naming its hint (the pin's by default).
 --}}
 {{#if generated}}
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="inspectorGenerated" title="FILRODENSWMB.UI.InspectorGenerated" closed=true}}
-    <p class="fwmb-hint">{{#if modelled}}{{localize "FILRODENSWMB.UI.InspectorModelledHint"}}{{else}}{{localize "FILRODENSWMB.UI.InspectorGeneratedHint"}}{{/if}}</p>
+    <p class="fwmb-hint">{{#if modelled}}{{#if modelledHint}}{{localize modelledHint}}{{else}}{{localize "FILRODENSWMB.UI.InspectorModelledHint"}}{{/if}}{{else}}{{localize "FILRODENSWMB.UI.InspectorGeneratedHint"}}{{/if}}</p>
     <dl class="fwmb-generate-results">
         {{#each generated}}
         <dt>{{this.label}}</dt>

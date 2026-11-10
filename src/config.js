@@ -2551,6 +2551,12 @@ export const FILRODENSWMB = {
                 coast: Object.freeze({ min: -1, max: 1, default: 0 }),
                 river: Object.freeze({ min: -1, max: 1, default: 0 }),
             }),
+            // Where a culture's climate comes from (see CultureClimate): its chosen biomes, or
+            // zones set by hand. Saved with cultures, so they must never be renamed
+            CLIMATES: Object.freeze({ BIOMES: "biomes", ZONES: "zones" }),
+            // The share of the map's land a culture's climate may take in before the culture
+            // inspector warns that it does little
+            CLIMATE_WIDE: 0.6,
             // The most cultures a map holds, and the most homelands each may have
             MAX: 24,
             MAX_HOMELANDS: 12,

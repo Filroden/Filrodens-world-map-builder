@@ -21,6 +21,31 @@ export function isKept(item) {
     return !!item && (!item.generated || item.generated.edited === true || item.generated.locked === true);
 }
 
+/** What a run made of a region, as written onto a kept one: its figures, not its look, name or rank. */
+const REGION_FIGURES = Object.freeze(["population", "culture", "mix", "rulingCulture"]);
+
+/**
+ * Writes what a run made of a kept region it built round onto it, as a seat's figures are written
+ * onto its pin (see Generation.seats): a region the reader drew gains them as `modelled` (read
+ * only, and the region stays the reader's); a kept generated region (edited or locked) has its
+ * generated figures refreshed and joins the run (its run and index in it), keeping its name, look,
+ * rank and whether it was edited or locked.
+ * @param {object} own - The kept region.
+ * @param {object|undefined} made - The `generated` record of the region the run made for it.
+ */
+function writeFigures(own, made) {
+    if (!made) return;
+    if (!own.generated) {
+        const { edited: _edited, locked: _locked, ...figures } = made;
+        own.modelled = figures;
+        return;
+    }
+    for (const key of REGION_FIGURES) delete own.generated[key];
+    own.generated.run = made.run;
+    own.generated.sourceId = made.sourceId;
+    for (const key of REGION_FIGURES) if (made[key] !== undefined) own.generated[key] = made[key];
+}
+
 /** The sets a run writes into and removes from. */
 function politicalSets(app) {
     return (app.layerSets ?? []).filter((set) => set.kind === "political");
@@ -155,8 +180,8 @@ export class Regeneration {
      * parent of its own (a lone duchy or county) takes the one the run gave it (the state it made
      * of it, or the realm it placed it in), marked `parentFromRun`: the link keeps the levels
      * nested on the map, but keptKeys does not follow it, so the next run is free to place the
-     * region again rather than keeping that parent as the reader's own. The new set's own levels
-     * leave the session. Returns each target level's owners before and after (encoded).
+     * region again rather than keeping that parent as the reader's own. The kept region also takes
+     * what the run made of it (see writeFigures). The new set's own levels leave the session. Returns each target level's owners before and after (encoded).
      * @param {object} app
      * @param {object} target - The set written into (in app.layerSets).
      * @param {object} made - The run's set, installed in the session but not in app.layerSets.
@@ -190,6 +215,7 @@ export class Regeneration {
             const parentOf = (region) => (depth === 0 ? region.parentKey : (parentKeys?.get(region.parentKey) ?? UNCLAIMED));
             for (const region of fresh.regions.filter(standing)) {
                 const own = kept.get(region.standsFor);
+                writeFigures(own, region.generated);
                 if (depth === 0 || (Number.isInteger(own.parentKey) && !own.parentFromRun)) continue;
                 const parent = parentOf(region);
                 own.parentKey = parent === UNCLAIMED ? null : parent;

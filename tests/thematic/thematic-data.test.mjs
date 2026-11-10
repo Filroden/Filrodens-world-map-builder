@@ -232,6 +232,18 @@ test("the culture layer: each model cell in its dominant culture's colour, faint
     assert.deepEqual(source.cultureClasses().map((entry) => entry.name), ["Westfolk", "Eastfolk"]);
     assert.equal(source.cultureAt(-1), null);
 
+    // The map's cultures now name and colour the run's of the same id: only the colours are drawn again
+    const values = source.displayBytes("culture");
+    const key = source.useCultures([{ id: "cultureAAAAAAAAA", name: "West folk", color: "#00ff00" }]);
+    assert.equal(source.useCultures([{ id: "cultureAAAAAAAAA", name: "West folk", color: "#00ff00" }]), key, "the same names and colours, the same key");
+    assert.equal(source.displayBytes("culture"), values, "the cells' values are kept");
+    const recoloured = source.lookup("culture");
+    assert.notEqual(recoloured, lookup);
+    assert.deepEqual([...recoloured.slice(4, 7)], [0, 255, 0], "the first culture's first step in its new colour");
+    assert.deepEqual(source.cultureClasses().map((entry) => [entry.name, entry.color]), [["West folk", "#00ff00"], ["Eastfolk", source.cultureColor(1)]], "a culture the map no longer has keeps what the run recorded");
+    source.useCultures([]);
+    assert.equal(source.cultureClasses()[0].color, "#ff0000");
+
     // With only the run's default culture, the layer says why it cannot be shown
     const single = ThematicSource.of(runOf(mesh, { culture: () => 0 }), mesh);
     assert.equal(single.missing("culture"), "cultures");

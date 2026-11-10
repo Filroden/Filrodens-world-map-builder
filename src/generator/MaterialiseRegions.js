@@ -174,6 +174,12 @@ function generatedFor(runId, kind, sourceId, extra = {}) {
     return { run: runId, kind, sourceId, edited: false, locked: false, ...extra };
 }
 
+/** A realm's ruling culture by the map culture's id (`rulingCulture`), or nothing for a run with no cultures or one made before it was recorded. */
+function rulingOf(result, realm) {
+    const id = cultureId(result, realm.rulingCulture);
+    return id === null ? {} : { rulingCulture: id };
+}
+
 function addRealms(level, result, { runId, idFactory, label, duchyLabel }) {
     result.realms.forEach((realm, index) => {
         const region = addRegion(level, {
@@ -182,7 +188,7 @@ function addRealms(level, result, { runId, idFactory, label, duchyLabel }) {
             // Each region its own label (a moved label keeps its own position); an independent
             // duchy's in the duchies' look, so a realm's look marks a kingdom
             label: { ...(realm.kind === "kingdom" ? label : duchyLabel) },
-            generated: generatedFor(runId, "realm", index, { tier: realm.kind, population: realm.population, culture: cultureId(result, realm.cultures?.[0]?.[0]), ...cultureMix(result, realm.cultures) }),
+            generated: generatedFor(runId, "realm", index, { tier: realm.kind, population: realm.population, culture: cultureId(result, realm.cultures?.[0]?.[0]), ...cultureMix(result, realm.cultures), ...rulingOf(result, realm) }),
         }, idFactory);
         markStandsFor(region, realm);
     });

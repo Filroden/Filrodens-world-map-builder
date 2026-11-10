@@ -26,7 +26,8 @@ import { FEATURE_KINDS } from "../names/FeatureDetection.js";
  *   `ref` (another object's id, with `also` for extra words such as "custom");
  * - `num` (`min`, `max`, `int`), `bool`, `null`, `font`, `image`, `base64`;
  * - `points` (`[{x, y}]`, or an older map's pairs or flat numbers), `cells` (cell ids), `legs`;
- * - `segment` (a biome rule segment, `[min, max, openMin, openMax]`);
+ * - `segment` (a biome rule segment, `[min, max, openMin, openMax]`), `biomeId` (a biome's id,
+ *   dropped when it names none, rather than kept in range as a number would be);
  * - `obj` (`fields`), `list` (`of`), `record` (`keys`: id | biome, `of`);
  * - `numTree` (derived data of numbers, booleans and nesting only, kept as stored).
  * Any rule may be `nullable`. A `text` rule may carry `where`, the localisation key of the kind of
@@ -81,7 +82,8 @@ const nameRoll = int(0, 1e6);
  * What the generator records on everything it makes: its run, what it is (a realm, duchy or
  * county; a town or castle; a route), its tier (kingdom or independent, a pin style tier, a route
  * class), its index in the run, its people, its dominant culture and culture mix (by the map
- * culture's id; a number is an older run's index into its own cultures), and whether the user has
+ * culture's id; a number is an older run's index into its own cultures), a realm's ruling culture,
+ * and whether the user has
  * edited or locked it (which a re-run reads).
  */
 const GENERATED = obj(
@@ -93,6 +95,8 @@ const GENERATED = obj(
         population: num(RANGE.COUNT, { nullable: true }),
         culture: { t: "cultureRef", nullable: true },
         mix: list(obj({ culture: key, share: num(RANGE.UNIT) })),
+        // A realm's ruling culture: its capital's people (the others in its mix are its subjects)
+        rulingCulture: { t: "cultureRef", nullable: true },
         // With ages (see Pipeline): the tier in each age (-1 for none), the age last a realm's seat,
         // and for what the age before left: the age, its tier and people then, and an old road
         ages: list(int(-1, 10)),
@@ -128,6 +132,26 @@ const MODELLED = obj(
         capital: bool,
         fortified: bool,
         port: bool,
+    },
+    { nullable: true },
+);
+
+/**
+ * What the last run made of a region the reader drew in its Political set and the run built round
+ * (see Regeneration.merge): the run, the unit's index in it, what it is (a realm, duchy or
+ * county), a realm's rank, its people, culture and mix, and a realm's ruling culture. Read only:
+ * the region stays the reader's.
+ */
+const MODELLED_REGION = obj(
+    {
+        run: { t: "key" },
+        kind: enumOf(["realm", "duchy", "county"]),
+        tier: { t: "key", nullable: true },
+        sourceId: int(0),
+        population: num(RANGE.COUNT, { nullable: true }),
+        culture: { t: "cultureRef", nullable: true },
+        mix: list(obj({ culture: key, share: num(RANGE.UNIT) })),
+        rulingCulture: { t: "cultureRef", nullable: true },
     },
     { nullable: true },
 );
@@ -308,6 +332,7 @@ const REGION = obj({
     label: OWNED_LABEL,
     journalPageId: ref(),
     generated: GENERATED,
+    modelled: MODELLED_REGION,
     legacy: REGION_LEGACY,
 });
 
@@ -353,9 +378,14 @@ const generatorText = (field) => text("name", "FILRODENSWMB.UI.LimitKindGenerato
 /** A habitat band: [lo, hi] (see CultureInput), or null for no limit. */
 const band = { t: "band", nullable: true };
 
+/** One row of a custom biome's rules, or one of a culture's climate zones: ranges on each axis. */
+const RULE_ROW = obj({ elevation: list({ t: "segment" }), moisture: list({ t: "segment" }), temperature: list({ t: "segment" }) });
+
 /**
  * A culture (the Cultures section and the culture inspector; see CultureInput): its look, name
- * base, how open and how dense it is, its habitat, and its homelands as map points.
+ * base, how open and how dense it is, its habitat (its climate from chosen biomes or from zones,
+ * or, saved before that choice, from its temperature, moisture and height bands; see
+ * CultureClimate), and its homelands as map points.
  */
 const CULTURE = obj({
     id,
@@ -364,7 +394,11 @@ const CULTURE = obj({
     nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
     openness: num(RANGE.UNIT),
     density: num({ min: FILRODENSWMB.GENERATOR.CULTURES.FIELDS.density.min, max: FILRODENSWMB.GENERATOR.CULTURES.FIELDS.density.max }),
-    habitat: obj({ temperature: band, moisture: band, height: band, relief: band, coast: num({ min: -1, max: 1 }), river: num({ min: -1, max: 1 }) }),
+    habitat: obj({
+        climate: enumOf(Object.values(FILRODENSWMB.GENERATOR.CULTURES.CLIMATES)),
+        biomes: list({ t: "biomeId" }),
+        zones: list(RULE_ROW),
+        temperature: band, moisture: band, height: band, relief: band, coast: num({ min: -1, max: 1 }), river: num({ min: -1, max: 1 }) }),
     homelands: list({ t: "xy" }),
 });
 
@@ -518,7 +552,7 @@ const CUSTOM_BIOME = obj({
     behavesLike: enumOf(Object.keys(FILRODENSWMB.GENERATOR.BIOMES), { nullable: true }),
     // Numbers of its own for the generator (see ModelBiomes); null: those of behavesLike
     properties: obj(Object.fromEntries(FILRODENSWMB.GENERATOR.BIOME_PROPERTIES.map((property) => [property.key, num({ min: property.min, max: property.max })])), { nullable: true }),
-    rules: list(obj({ elevation: list({ t: "segment" }), moisture: list({ t: "segment" }), temperature: list({ t: "segment" }) })),
+    rules: list(RULE_ROW),
 });
 
 const styleName = name("FILRODENSWMB.UI.LimitKindStyle");
@@ -938,6 +972,7 @@ const CLEANERS = {
     cellSlots: (value) => (Array.isArray(value) && value.every((cell) => cell === -1 || isCell(cell)) ? value : DROP),
     legs: (value) => (Array.isArray(value) ? value.map((leg) => (Array.isArray(leg) ? leg.filter(isCell) : [])) : DROP),
     segment: (value) => cleanSegment(value),
+    biomeId: (value) => (Number.isInteger(value) && value >= 1 && value <= MAX_BIOME_ID ? value : DROP),
     // A map point: finite x and y within the coordinate range, and nothing else
     xy: (value) => (value && typeof value === "object" && !Array.isArray(value) && [value.x, value.y].every((n) => Number.isFinite(n) && Math.abs(n) <= RANGE.COORD.max) ? { x: value.x, y: value.y } : DROP),
     cultureRef: (value) => (Number.isInteger(value) && value >= 0 && value < 1e6 ? value : orDrop(Sanitize.id(value))),

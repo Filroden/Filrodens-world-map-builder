@@ -953,6 +953,22 @@ test("Add makes a custom biome and opens it; Delete asks, removes it, closes the
     assert.deepEqual(app.uiState.customBiomes.map((biome) => biome.id), [14, 15], "undo brings it back");
 });
 
+test("while a culture's climate is chosen biomes, a custom biome's placement and its deletion mark a run out of date", async () => {
+    const app = await biomeStudio({ behavesLike: null });
+    await BiomeEditor.open(app, 14);
+    await commit(app, "biomePlacement", "landUnderwater");
+    assert.equal(app.stale, 0, "no culture reads where biomes show");
+    app.uiState.cultures = [{ id: "c1", name: "Moorfolk", habitat: { climate: "biomes", biomes: [14] } }];
+    await commit(app, "biomePlacement", "land");
+    assert.equal(app.stale, 1, "where it may show is where the culture's climate comes from");
+    await commit(app, "biomeColor", "#654321");
+    assert.equal(app.stale, 1, "its colour is not");
+    form(app).querySelector('[data-inspector-action="delete"]').click();
+    await settle();
+    await settle();
+    assert.equal(app.stale, 2, "its land shows the biome beneath now");
+});
+
 // ------------------------------------------------------------------ random names
 
 const { RandomNames } = await import("../../src/applications/RandomNames.js");

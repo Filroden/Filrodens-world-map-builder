@@ -23,8 +23,10 @@ import { SearchSpace, searchAll } from "./Search.js";
  * @property {string} nameBase - A name base of the name generator.
  * @property {number} openness - 0 closed to 1 open.
  * @property {number} density - Population multiplier.
- * @property {object} habitat - Soft ranges: temperature and moisture [lo, hi] (0 to 1), heightM
- *     and reliefM [lo, hi] (metres), coast and river affinity (-1 avoids to 1 seeks).
+ * @property {object} habitat - Soft ranges: the climate as temperature and moisture [lo, hi] (0 to
+ *     1) and heightM [lo, hi] (metres), or as `zones` (each { temperature, moisture, heightM }, a
+ *     list of such ranges per measure or null for none; the best zone counts); reliefM [lo, hi]
+ *     (metres); coast and river affinity (-1 avoids to 1 seeks).
  * @property {number[]} [homelandCells] - Model cells it starts from (all at once), or none to
  *     place one automatically. (`homelandCell`, a single cell, is read as a list of one.)
  */
@@ -68,14 +70,41 @@ function affinityFactor(affinity, present) {
     return present ? 1 + AFFINITY_RAISE * affinity : 1 - AFFINITY_LOWER * Math.max(0, affinity);
 }
 
+/** The best of an axis's soft bands at a value; 1 with no bands (no limit on that axis). */
+function axisFit(value, bands, soft) {
+    if (!bands) return 1;
+    let best = 0;
+    for (const range of bands) best = Math.max(best, band(value, range, soft));
+    return best;
+}
+
+/**
+ * How well a cell's climate suits a culture, 0 to 1. A culture with zones (its chosen biomes, or
+ * zones set by hand; see CultureClimate) fits as well as its best zone, each zone's three measures
+ * multiplied as single bands are; one with its older single bands, by those, exactly as before
+ * zones existed; one with neither fits every climate.
+ */
+function climateFit(habitat, cells, cell, soft) {
+    if (!habitat.zones) {
+        return band(cells.temperature[cell], habitat.temperature, soft.temperature)
+            * band(cells.moisture[cell], habitat.moisture, soft.moisture)
+            * band(cells.heightM[cell], habitat.heightM, soft.heightM);
+    }
+    let best = 0;
+    for (const zone of habitat.zones) {
+        const fit = axisFit(cells.temperature[cell], zone.temperature, soft.temperature)
+            * axisFit(cells.moisture[cell], zone.moisture, soft.moisture)
+            * axisFit(cells.heightM[cell], zone.heightM, soft.heightM);
+        best = Math.max(best, fit);
+    }
+    return best;
+}
+
 /** How well a land cell suits a culture, FIT_FLOOR to 1 (1 everywhere for a generalist). */
 export function habitatFit(culture, cells, cell) {
     const { FIT_FLOOR, SOFT } = FILRODENSWMB.GENERATOR.CULTURES;
     const habitat = culture.habitat;
-    let fit = band(cells.temperature[cell], habitat.temperature, SOFT.temperature)
-        * band(cells.moisture[cell], habitat.moisture, SOFT.moisture)
-        * band(cells.heightM[cell], habitat.heightM, SOFT.heightM)
-        * band(cells.reliefM[cell], habitat.reliefM, SOFT.reliefM);
+    let fit = climateFit(habitat, cells, cell, SOFT) * band(cells.reliefM[cell], habitat.reliefM, SOFT.reliefM);
     fit *= affinityFactor(habitat.coast, cells.coastal[cell] === 1);
     fit *= affinityFactor(habitat.river, cells.riverKm[cell] > 0);
     return Math.min(1, Math.max(FIT_FLOOR, fit));

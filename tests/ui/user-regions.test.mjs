@@ -4,7 +4,8 @@
 // wins its land there, clears what lay below it and takes the parent holding most of it, or none (a
 // lone county, which the Political set allows and the Independent field is offered for); a run is
 // built round the moved regions and written into the map keeping their painted borders exactly,
-// filling inside them and giving a lone region a parent the next run may change.
+// filling inside them and giving a lone region a parent the next run may change; what a run made of
+// a drawn region kept on it read only (`modelled`), and a kept generated one refreshed.
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
@@ -26,6 +27,7 @@ const { Generation } = await import("../../src/applications/Generation.js");
 const { Regeneration } = await import("../../src/applications/Regeneration.js");
 const { RegionPanel } = await import("../../src/applications/RegionPanel.js");
 const { RegionEditor } = await import("../../src/applications/RegionEditor.js");
+const { GeneratedDetails } = await import("../../src/applications/GeneratedDetails.js");
 const { VectorHistory } = await import("../../src/applications/VectorHistory.js");
 const { runGenerator } = await import("../../src/generator/Pipeline.js");
 const { MeshSession } = await import("../../src/mesh/MeshSession.js");
@@ -211,12 +213,35 @@ test("a run is built round the moved regions, keeps their painted borders exactl
     const state = result.realms.find((each) => each.kind === "independent" && result.duchies[result.counties.find((c) => c.user === county.key).duchy].realm === result.realms.indexOf(each));
     assert.ok(state, "the ticked county is a state of its own");
 
+    // What the run made of the drawn regions, read only, without making them generated
+    assert.ok(!realm.generated && !county.generated, "the drawn regions stay the reader's");
+    assert.equal(realm.modelled.kind, "realm");
+    assert.equal(realm.modelled.run, app.modelRun.run);
+    assert.ok(realm.modelled.population > 0);
+    assert.ok(!("edited" in realm.modelled) && !("locked" in realm.modelled));
+    assert.equal(county.modelled.kind, "county");
+    const rows = GeneratedDetails.forRegion(app, realm);
+    assert.ok(rows.some((row) => row.label === "FILRODENSWMB.UI.GeneratedPopulation"));
+    assert.equal(rows.find((row) => row.label === "FILRODENSWMB.UI.GeneratedNextRun").value, "FILRODENSWMB.UI.GeneratedKeptRegion");
+    // A generated duchy inside, edited, is kept by the next run and refreshed by it
+    const duchy = inside[0];
+    duchy.generated.edited = true;
+    const firstRun = app.modelRun.run;
+
     // The next run places the lone county again rather than keeping the duchy it was given
     const kept = Regeneration.keptKeys(set);
     assert.ok(!kept[1].has(county.parentKey), "its duchy is not kept");
     await generate(app);
     assert.deepEqual(sorted(cellsOf(app, counties, county.key)), sorted(eastLand), "a second run keeps it as painted");
     assert.ok(duchies.regions.some((each) => each.key === county.parentKey), "with a parent of the new run's");
+    assert.notEqual(app.modelRun.run, firstRun);
+    assert.equal(realm.modelled.run, app.modelRun.run, "the drawn realm's figures are the new run's");
+    assert.equal(duchy.generated.run, app.modelRun.run, "the edited duchy's figures are refreshed");
+    assert.equal(duchy.generated.edited, true, "and it is still edited");
+    assert.ok(duchies.regions.includes(duchy));
+    // Remove generated content takes the figures and leaves the regions
+    await Generation.removeGenerated(app);
+    assert.ok(!("modelled" in realm) && !("modelled" in county));
 });
 
 test("Independent and a run's parent are kept to their rules", () => {

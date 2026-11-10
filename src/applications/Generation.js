@@ -134,6 +134,8 @@ export class Generation {
         const removal = Regeneration.remove(app);
         // What the run gave hand-placed settlement pins goes with it; the pins stay
         for (const pin of app.mapPins ?? []) delete pin.modelled;
+        // And so does what it made of the reader's own regions; the regions stay
+        for (const set of app.layerSets ?? []) for (const level of set.levels) for (const region of level.regions) delete region.modelled;
         const modelRunBefore = app.modelRun ?? null;
         app.modelRun = null;
         const owners = removal.owners.map((entry) => VectorHistory.levelOwners(entry.levelId, entry.before, entry.after));

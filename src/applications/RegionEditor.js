@@ -91,6 +91,8 @@ export class RegionEditor {
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
             generated: GeneratedDetails.forRegion(app, region),
             generatedLocked: region.generated?.locked === true,
+            // A region the reader drew that a run built round: its figures, without Lock (it is the reader's own)
+            generatedModelled: !region.generated && !!region.modelled,
         };
     }
 

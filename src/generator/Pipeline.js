@@ -1,7 +1,8 @@
 import { FILRODENSWMB } from "../config.js";
 import { buildModelCells } from "./CellValues.js";
 import { CellGraph, EDGE } from "./CellGraph.js";
-import { engineCultures } from "./CultureInput.js";
+import { biomeZones } from "./CultureClimate.js";
+import { engineCultures, engineZones } from "./CultureInput.js";
 import { resolveCultures, sharesOf, spreadCultures, townMix } from "./Cultures.js";
 import { feedbackPass } from "./Feedback.js";
 import { formerAge } from "./FormerAge.js";
@@ -82,7 +83,11 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     const revision = GeneratorRevision.ofPayload(payload);
     const run = { settings, revision, width: payload.width, rules: rules ?? GeneratorRevision.rules(revision), age: ages.at(-1), timings: {} };
 
-    run.cells = await driver.step("values", () => buildModelCells({ ...payload, biome: modelBiomeRaster(payload) }, settings.world, run.rules), run);
+    const people = cultureList(settings, payload);
+    // The biome each pixel shows, read in the same pass only when a culture's climate is its chosen biomes
+    const shown = people.some((culture) => culture.habitat?.biomes) ? new Uint8Array(payload.elevation.length) : null;
+    run.cells = await driver.step("values", () => buildModelCells({ ...payload, biome: modelBiomeRaster(payload, shown) }, settings.world, run.rules), run);
+    if (shown) attachBiomeZones(people, shown, payload);
     markWetCells(run.cells, run.rules);
     // Settlement pins the run must build on, in every age
     run.seatsOffLand = [];
@@ -93,7 +98,6 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     // The map's own routes, which the run's trade may use in every age (see UserRoutes)
     run.userRoutes = run.rules.userRoutes ? userRoutes(payload.routes, run.graph) : null;
     if (run.userRoutes) applyUserRivers(run.graph, run.userRoutes.rivers);
-    const people = cultureList(settings, payload);
 
     let previous = null;
     const history = [];
@@ -174,6 +178,23 @@ async function runAge(run, driver, { settings, people, ages, index, previous }) 
 function cultureList(settings, payload) {
     if (settings.cultures.length) return engineCultures(settings.cultures, payload);
     return [{ ...FILRODENSWMB.GENERATOR.CULTURES.DEFAULT, nameBase: settings.nameBase }];
+}
+
+/**
+ * Gives each culture whose climate is its chosen biomes the zones of those biomes on the map as it
+ * is now (see CultureClimate.biomeZones), so it follows later terrain, climate and biome edits. A
+ * chosen biome the map does not know (a deleted custom biome) or does not show anywhere adds no
+ * zone; with none left the culture has no climate limit, as with none chosen.
+ */
+function attachBiomeZones(people, shown, payload) {
+    const metres = payload.metresPerUnit ?? FILRODENSWMB.MESH.METRES_PER_UNIT;
+    const rasters = { shown, elevation: payload.elevation, moisture: payload.moisture, temperature: payload.temperature };
+    for (const culture of people) {
+        const ids = culture.habitat?.biomes;
+        if (!ids) continue;
+        const zones = engineZones(biomeZones(ids, rasters), payload.seaLevel, metres);
+        if (zones) culture.habitat.zones = zones;
+    }
 }
 
 /**
@@ -429,6 +450,7 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
             population: Math.round(people.realm[index]),
             landKm2: Math.round(realm.landKm2),
             cultures: realmMix[index],
+            rulingCulture: rulingCulture(cultures, places, realm.seat),
             ...userFields(realm),
         })),
         // Duchies and counties name their largest culture (-1 for none)
@@ -440,6 +462,17 @@ function assembleResult(run, { feedback, finalTrade, finalRealms, names }) {
         timings: run.timings,
         cellCount: cells.count,
     };
+}
+
+/**
+ * A realm's ruling culture: the culture of the town at its seat (the people of its capital, so a
+ * realm whose land is mostly another people's is ruled by its capital's), else the culture holding
+ * the seat's cell; -1 for none. The realm's other cultures are its subject peoples.
+ */
+function rulingCulture(cultures, places, seat) {
+    const capital = places.find((place) => place.kind === "town" && place.cell === seat);
+    if (capital && Number.isInteger(capital.culture)) return capital.culture;
+    return cultures.dominant[seat] ?? -1;
 }
 
 /**

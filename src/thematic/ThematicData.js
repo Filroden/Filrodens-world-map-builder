@@ -236,6 +236,8 @@ export class ThematicSource {
     #arrays;
     #mesh;
     #cultures;
+    #runCultures;
+    #culturesKey = "";
     #values = new Map();
     #bytes = new Map();
     #lookups = new Map();
@@ -248,7 +250,31 @@ export class ThematicSource {
     constructor(modelRun, mesh) {
         this.#arrays = decodeModelRun(modelRun);
         this.#mesh = mesh;
-        this.#cultures = Array.isArray(modelRun.cultures) ? modelRun.cultures : [];
+        this.#runCultures = Array.isArray(modelRun.cultures) ? modelRun.cultures : [];
+        this.#cultures = this.#runCultures;
+    }
+
+    /**
+     * Names and colours the run's cultures as the map's cultures of the same id now are, so a
+     * culture renamed or given a new colour after the run shows so at once (Generate reads
+     * neither). A culture the map no longer has keeps what the run recorded. Only the colour
+     * lookup is worked out again, and only when a name or colour has changed.
+     * @param {object[]} [mapCultures] - The map's cultures ({ id, name, color }).
+     * @returns {string} The cultures' names and colours, for a legend to compare.
+     */
+    useCultures(mapCultures = []) {
+        const byId = new Map((Array.isArray(mapCultures) ? mapCultures : []).map((culture) => [culture?.id, culture]));
+        const cultures = this.#runCultures.map((culture) => {
+            const own = culture?.id != null ? byId.get(culture.id) : null;
+            return own ? { ...culture, name: own.name ?? culture.name, color: own.color ?? culture.color } : culture;
+        });
+        const key = JSON.stringify(cultures.map((culture) => [culture?.name ?? null, culture?.color ?? null]));
+        if (key !== this.#culturesKey) {
+            this.#culturesKey = key;
+            this.#cultures = cultures;
+            for (const layerId of CLASS_LAYERS) this.#lookups.delete(layerId);
+        }
+        return key;
     }
 
     /**
