@@ -132,7 +132,7 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     const former = before ? formerAge(run.graph, before, last, settings.nameBase) : null;
     const formerNames = former ? { towns: former.ruins, castles: former.castles } : null;
     const pastForNames = pastAges.map((age) => ({ cultures: age.cultures, towns: age.finalTrade.towns, castles: age.feedback.castles, realms: age.finalRealms }));
-    const names = await driver.step("names", () => nameEverything({ seed: settings.seed, nameBase: settings.nameBase, cultures: run.cultures, towns: finalTrade.towns, castles: feedback.castles, realms: finalRealms, former: formerNames, history: pastForNames }), run);
+    const names = await driver.step("names", () => nameEverything({ seed: settings.seed, nameBase: settings.nameBase, cultures: run.cultures, towns: finalTrade.towns, castles: feedback.castles, realms: finalRealms, former: formerNames, history: pastForNames, idNames: run.rules.idNames }), run);
     driver.report("names", 1);
     const result = assembleResult(run, { feedback, finalTrade, finalRealms, names });
     result.history = history.map((age, at) => namedHistory(age, names.history[at], run.cultures));

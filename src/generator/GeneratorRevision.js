@@ -92,6 +92,8 @@ export class GeneratorRevision {
             seats: ports,
             userRegions: ports,
             userRoutes: ports,
+            // Each place, castle and realm named from a stream of its own (see Names)
+            idNames: ports,
         });
     }
 

@@ -34,13 +34,13 @@ function islandCells() {
 
 test("revision 1 keeps the old rules, and the legacy settings of revision 2's rules give its run exactly", async () => {
     const old = GeneratorRevision.rules(LEGACY);
-    assert.deepEqual({ ...old }, { portWaterShare: null, fishingDensity: 8, callKm: null, callShare: 0.25, shorePins: false, seats: false, userRegions: false, userRoutes: false });
+    assert.deepEqual({ ...old }, { portWaterShare: null, fishingDensity: 8, callKm: null, callShare: 0.25, shorePins: false, seats: false, userRegions: false, userRoutes: false, idNames: false });
     const now = GeneratorRevision.rules(REVISION_2);
-    assert.deepEqual({ ...now }, { portWaterShare: 0.02, fishingDensity: 30, callKm: 150, callShare: 0.25, shorePins: true, seats: true, userRegions: true, userRoutes: true });
+    assert.deepEqual({ ...now }, { portWaterShare: 0.02, fishingDensity: 30, callKm: 150, callShare: 0.25, shorePins: true, seats: true, userRegions: true, userRoutes: true, idNames: true });
 
     const legacy = await runGenerator({ ...syntheticMap().makePayload(), revision: LEGACY }, quick);
-    // Every cell wet (a share of 0), fishing as before, no calls, pins on their sites
-    const identity = await islandRun("identity", { ...now, portWaterShare: 0, fishingDensity: old.fishingDensity, callKm: null, shorePins: false });
+    // Every cell wet (a share of 0), fishing as before, no calls, pins on their sites, names from the run's one stream
+    const identity = await islandRun("identity", { ...now, portWaterShare: 0, fishingDensity: old.fishingDensity, callKm: null, shorePins: false, idNames: false });
     assert.deepEqual({ ...identity, revision: LEGACY, timings: null }, { ...legacy, timings: null });
     assert.notDeepEqual((await current()).stats, legacy.stats, "revision 2 changes the run");
 });
