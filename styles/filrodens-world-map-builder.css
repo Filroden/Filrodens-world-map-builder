@@ -5648,23 +5648,60 @@ input[type="color"].fwmb-swatch.fwmb-swatch-lg {
     margin-block: var(--fwmb-size-4) var(--fwmb-size-2);
     cursor: default;
 }
-/* The Generate panel's ages, oldest first, each with its era, strife and event */
-.fwmb-age-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
+/* The Generate panel's ages, oldest first: each its name over its era, strife and events in brief */
+.fwmb-age-row {
+    min-height: 2.5rem;
+}
+.fwmb-age-row-text {
     display: flex;
     flex-direction: column;
-    gap: var(--fwmb-size-8);
+    min-width: 0;
 }
-.fwmb-age-row + .fwmb-age-row {
-    border-block-start: 1px solid var(--fwmb-border-subtle);
-    padding-block-start: var(--fwmb-size-8);
+.fwmb-age-row-text .fwmb-name,
+.fwmb-age-row-text .fwmb-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
-.fwmb-age-head {
+/* An age in the inspector: what the chosen era, strife or event does, under its choice */
+.fwmb-age-choice-note {
+    color: var(--fwmb-text-muted);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    margin: 0.25rem 0 0.5rem;
+}
+/* An age's events in its inspector: each a folding fieldset of its own, in the order added, its
+   summary naming it over a line in brief (its group, and its culture or place) */
+.fwmb details.fwmb-fieldset.fwmb-age-event {
+    padding-inline: var(--fwmb-size-8);
+}
+.fwmb details.fwmb-fieldset.fwmb-age-event[open] {
+    padding-block-end: var(--fwmb-size-8);
+}
+.fwmb details.fwmb-fieldset > summary.fwmb-age-event-heading {
+    padding-block: var(--fwmb-size-6);
+}
+.fwmb-age-event-titles {
     display: flex;
-    align-items: center;
-    gap: var(--fwmb-size-2);
+    flex-direction: column;
+    min-width: 0;
+}
+.fwmb-age-event-title {
+    font-weight: 600;
+}
+.fwmb-age-event-summary {
+    color: var(--fwmb-text-muted);
+    font-weight: 400;
+    letter-spacing: normal;
+    text-transform: none;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.fwmb-age-event-place {
+    color: var(--fwmb-text-muted);
 }
 
 /* A culture's homelands in its inspector, each with its remove button */

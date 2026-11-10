@@ -15,6 +15,7 @@ installPlatform({
 
 const { FILRODENSWMB } = await import("../../src/config.js");
 const { GeneratePanel } = await import("../../src/applications/GeneratePanel.js");
+const { AgeEventRows } = await import("../../src/applications/AgeEventRows.js");
 const { Generation } = await import("../../src/applications/Generation.js");
 const { panelSettings, resolveOutput } = await import("../../src/generator/GeneratorSettings.js");
 const { materialise } = await import("../../src/generator/Materialise.js");
@@ -31,6 +32,8 @@ function studio(extra = {}) {
         layerSets: [],
         mapPins: [],
         mapRoutes: [],
+        pinHistory: [],
+        pinRedoStack: [],
         modelRun: null,
         currentParentId: null,
         meshSession: null,
@@ -81,30 +84,63 @@ test("a slider writes when let go, a text field when left, a tick at once; other
     assert.equal({}.polluted, undefined);
 });
 
-test("the Ages section: add copies the present, remove, move earlier and later, an era, strife and event per age; a run made before is out of date", () => {
+test("the Ages section: each age's row in brief; add copies the present's era and strife, remove, move earlier and later, each a run out of date", () => {
     let stale = 0;
-    const app = studio({ uiState: { mapSeed: "M", generatorSettings: null, generatorStale: false, cultures: [{ id: "elves", name: "Elves" }] }, markGeneratorStale: () => stale++ });
-    GeneratePanel.handleInput(app, fieldEvent("change", { name: "generator.ages.0.era", type: "select-one", value: "afterPlague" }));
+    const app = studio({ uiState: { mapSeed: "M", generatorSettings: { ages: [{ era: "afterPlague", strife: "peaceful", event: { kind: "invasion", culture: "elves" } }] }, generatorStale: false, cultures: [{ id: "elves", name: "Elves" }] }, markGeneratorStale: () => stale++ });
     GeneratePanel.editAges(app, "add");
-    assert.deepEqual(GeneratePanel.settings(app).ages.map((age) => age.era), ["afterPlague", "afterPlague"], "a new age copies the present");
-    GeneratePanel.handleInput(app, fieldEvent("change", { name: "generator.ages.1.strife", type: "select-one", value: "warTorn" }));
-    GeneratePanel.handleInput(app, fieldEvent("change", { name: "generator.ages.1.event", type: "select-one", value: "invasion:elves" }));
-    assert.deepEqual(GeneratePanel.settings(app).ages[1], { era: "afterPlague", strife: "warTorn", event: { kind: "invasion", culture: "elves" } });
-    GeneratePanel.editAges(app, "up", 1);
-    assert.equal(GeneratePanel.settings(app).ages[0].strife, "warTorn");
+    const ages = GeneratePanel.settings(app).ages;
+    assert.deepEqual(ages.map(({ era, strife, events }) => ({ era, strife, events })), [
+        { era: "afterPlague", strife: "peaceful", events: [{ kind: "invasion", culture: "elves" }] },
+        { era: "afterPlague", strife: "peaceful", events: [] },
+    ], "a new age copies the present's era and strife, with no events");
+    assert.equal(new Set(ages.map((age) => age.id)).size, 2, "each age its own id");
+    const first = ages[0].id;
     GeneratePanel.editAges(app, "down", 0);
-    assert.equal(GeneratePanel.settings(app).ages[1].strife, "warTorn");
-    GeneratePanel.handleInput(app, fieldEvent("change", { name: "generator.ages.1.event", type: "select-one", value: "" }));
-    assert.equal(GeneratePanel.settings(app).ages[1].event, null);
+    assert.equal(GeneratePanel.settings(app).ages[1].id, first, "an age keeps its id as it moves");
+    GeneratePanel.editAges(app, "up", 1);
     const rows = GeneratePanel.context(app).ages.rows;
     assert.match(rows[1].label, /GenerateAgePresent/);
-    assert.deepEqual(rows[0].events.map((event) => event.value), ["", "arrival:elves", "invasion:elves"]);
+    assert.equal(rows[0].summary, "FILRODENSWMB.UI.GenerateEraAfterPlague · FILRODENSWMB.UI.GenerateStrifePeaceful" + " · FILRODENSWMB.UI.GenerateAgeEventsOne {\"count\":1}");
+    assert.equal(rows[1].summary, "FILRODENSWMB.UI.GenerateEraAfterPlague · FILRODENSWMB.UI.GenerateStrifePeaceful");
     assert.deepEqual([rows[0].canUp, rows[0].canDown, rows[1].canDown], [false, true, false]);
     GeneratePanel.editAges(app, "remove", 0);
     GeneratePanel.editAges(app, "remove", 0);
     assert.equal(GeneratePanel.settings(app).ages.length, 1, "at least one age");
-    assert.ok(stale >= 6);
-    assert.equal(GeneratePanel.context(studio()).ages.rows[0].events, null, "no events without cultures");
+    assert.ok(stale >= 4);
+});
+
+test("an age's events: each kind once, peoples events naming a free culture, the others a place; an older age's one event as a list of one", () => {
+    const cultures = [{ id: "elves", name: "Elves" }, { id: "dwarves", name: "Dwarves" }];
+    const age = { id: "a", events: [] };
+    const first = AgeEventRows.firstFree(age, cultures);
+    assert.deepEqual(first, { kind: "invasion", culture: "elves" }, "the first kind the age lacks, naming a free culture");
+    age.events.push(first);
+    assert.deepEqual(AgeEventRows.firstFree(age, cultures), { kind: "arrival", culture: "dwarves" }, "a second peoples event names the culture left");
+    assert.deepEqual(AgeEventRows.fresh("civilWar", first, age, cultures), { kind: "civilWar", place: null });
+    assert.deepEqual(AgeEventRows.fresh("famine", first, age, cultures), { kind: "famine" });
+    assert.deepEqual(AgeEventRows.fresh("migration", first, age, cultures, "dwarves"), { kind: "migration", culture: "dwarves" });
+    assert.equal(AgeEventRows.firstFree({ id: "b", events: [] }, []).kind, "plague", "without cultures no peoples event");
+    const app = studio({ uiState: { mapSeed: "M", generatorSettings: null, generatorStale: false, cultures } });
+    const rows = AgeEventRows.rows(app, { id: "a", events: [first, { kind: "civilWar", place: null }] }).rows;
+    const kinds = rows[0].groups.flatMap((group) => group.kinds);
+    assert.deepEqual(rows[0].groups.map((group) => group.label), ["FILRODENSWMB.UI.GenerateEventGroupPeoples", "FILRODENSWMB.UI.GenerateEventGroupHardship", "FILRODENSWMB.UI.GenerateEventGroupRealms", "FILRODENSWMB.UI.GenerateEventGroupProsperity"]);
+    assert.equal(kinds.find((kind) => kind.value === "civilWar").disabled, true, "a kind already in the age cannot be chosen again");
+    assert.equal(rows[0].hint, "FILRODENSWMB.UI.GenerateEventHintInvasion");
+    assert.equal(rows[1].placeLabel, "FILRODENSWMB.UI.GenerateEventPlaceLargestRealm");
+    // After a run, the present's realm events name the realm they act on, as the map shows it
+    const level = { id: "realms", regions: [{ name: "Persteria", generated: { run: "r1", kind: "realm", population: 5 } }, { name: "Thaxted", generated: { run: "r1", kind: "realm", population: 9 } }] };
+    const ran = studio({ uiState: { mapSeed: "M", generatorSettings: null, generatorStale: false, cultures }, modelRun: { run: "r1" }, meshSession: { layerSets: [{ levels: [level] }], regionAt: (id, x) => (id === "realms" && x < 50 ? level.regions[0] : null) } });
+    const named = (events, present) => AgeEventRows.rows(ran, { id: "a", events }, { present }).rows.map((row) => row.placeLabel);
+    assert.deepEqual(named([{ kind: "civilWar", place: null }, { kind: "union", place: { x: 10, y: 1 } }, { kind: "collapse", place: { x: 90, y: 1 } }], true), [
+        'FILRODENSWMB.UI.GenerateEventPlaceLargestNamed {"name":"Thaxted"}',
+        'FILRODENSWMB.UI.GenerateEventPlaceInRealm {"name":"Persteria"}',
+        "FILRODENSWMB.UI.GenerateEventPlaceNearestRealm",
+    ]);
+    assert.deepEqual(named([{ kind: "civilWar", place: null }], false), ["FILRODENSWMB.UI.GenerateEventPlaceLargestRealm"], "an earlier age's realms are not the map's");
+    const older = studio({ uiState: { mapSeed: "M", generatorSettings: { ages: [{ era: "highMedieval", strife: "troubled", event: { kind: "arrival", culture: "elves" } }] }, generatorStale: false, cultures } });
+    assert.deepEqual(GeneratePanel.settings(older).ages[0].events, [{ kind: "arrival", culture: "elves" }]);
+    assert.match(AgeEventRows.label({ kind: "arrival", culture: "elves" }, cultures), /GenerateEventArrival .*Elves/);
+    assert.equal(AgeEventRows.label({ kind: "arrival", culture: "gone" }, []), null, "a culture since deleted names no event");
 });
 
 // ------------------------------------------------------------------ estimate, staleness, notices, results

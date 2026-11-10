@@ -1,8 +1,9 @@
 import { FILRODENSWMB } from "../config.js";
+import { ageEvents } from "./AgeEvents.js";
 import { buildModelCells } from "./CellValues.js";
 import { CellGraph, EDGE } from "./CellGraph.js";
 import { biomeZones } from "./CultureClimate.js";
-import { engineCultures, engineZones } from "./CultureInput.js";
+import { engineCultures, engineZones, modelCellAt } from "./CultureInput.js";
 import { resolveCultures, sharesOf, spreadCultures, townMix } from "./Cultures.js";
 import { feedbackPass } from "./Feedback.js";
 import { formerAge } from "./FormerAge.js";
@@ -82,6 +83,8 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     // The rules the run follows (see GeneratorRevision): the current ones unless the payload names older
     const revision = GeneratorRevision.ofPayload(payload);
     const run = { settings, revision, width: payload.width, rules: rules ?? GeneratorRevision.rules(revision), age: ages.at(-1), timings: {} };
+    // The model cell under a point on the map (an event's place), or -1 off the map
+    run.cellAt = (point) => modelCellAt(point, payload);
 
     const people = cultureList(settings, payload);
     // The biome each pixel shows, read in the same pass only when a culture's climate is its chosen biomes
@@ -114,7 +117,7 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
         });
         if (!finished) break;
         if (last) {
-            history.push(ageHistory(run.graph, last, ages[index - 1]));
+            history.push(ageHistory(run.graph, last, last.era));
             pastAges.push(last);
         }
         before = last;
@@ -134,6 +137,8 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
     const result = assembleResult(run, { feedback, finalTrade, finalRealms, names });
     result.history = history.map((age, at) => namedHistory(age, names.history[at], run.cultures));
     result.ages = { asked: ages.length, run: run.agesRun };
+    // What each age's events acted on (the realm, the disaster's centre), oldest first
+    result.events = [...pastAges, last].map((age) => age.events.map(({ partition, ...entry }) => ({ ...entry, ...(partition ? { crownSeats: partition.crownSeats ?? [] } : {}) })));
     if (former) Object.assign(result, formerResult(run, result, former, names, history));
     return result;
 }
@@ -143,32 +148,45 @@ export async function runGenerator(payload, { onProgress = null, isCancelled = (
  * the next age starts from it.
  */
 async function runAge(run, driver, { settings, people, ages, index, previous }) {
-    const age = ages[index];
-    const { list, invader } = agePeople(settings, people, ages, index);
-    const cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(list), { invader }), run);
-    const common = { cultures, world: settings.world, rules: run.rules };
+    // The age's era and events (see AgeEvents): the age as the stages read it, the world, and the rest
+    const events = ageEvents(run, ages, index, previous);
+    const age = events.age;
+    const { list: listed, invader } = agePeople(settings, people, ages, index);
+    const list = events.people(listed);
+    const cultures = await driver.step("cultures", () => spreadCultures(run.graph, resolveCultures(list), { invader, scales: events.scales(list) }), run);
+    const common = { cultures, world: events.world, rules: run.rules };
     const userBuilt = run.userRoutes?.built ?? null;
     // The map's own regions hold in the present age only: the ages before are its history
     const userZonesOfAge = index === ages.length - 1 ? run.userZones : null;
     const realmsOf = (context) => (userZonesOfAge ? buildRealmsAround(run.graph, { ...context, userZones: userZonesOfAge }) : buildRealms(run.graph, context));
     const towns = await driver.stage("towns", () => placeTowns(run.graph, { ...common, era: age, previous }), run);
     const trade = await driver.stage("trade", () => tradeRounds(run.graph, { ...common, towns: towns.towns, cellPop: towns.cellPop, totalPop: towns.totalPop, built: previous?.built ?? null, userBuilt }), run);
-    const realms = await driver.step("realms", () => realmsOf({ ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, keptSeats: previous?.seats ?? null }), run);
-    const strifeAt = invader >= 0 && previous ? invasionStrife(run.cells, cultures, invader, previous, age.strife) : null;
+    const realms = await driver.step("realms", () => {
+        const context = { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, keptSeats: previous?.seats ?? null };
+        const withExtra = (extra) => ({ ...context, ...extra, keptSeats: extra.barredSeats && context.keptSeats ? new Set([...context.keptSeats].filter((seat) => !extra.barredSeats.has(seat))) : context.keptSeats });
+        // A realm event acts on a realm of this age: the realms built once without it (with the unions lasting from before) find it
+        if (!events.realmEvents) return realmsOf(withExtra(events.realmExtra));
+        return realmsOf(withExtra(events.resolveRealms(realmsOf(withExtra(events.realmExtra)))));
+    }, run);
+    const invaded = invader >= 0 && previous ? invasionStrife(run.cells, cultures, invader, previous, age.strife) : null;
+    const strifeAt = events.strifeAt(invaded);
     const feedback = await driver.step("feedback", () => feedbackPass(run.graph, { ...common, towns: trade.towns, cellPop: towns.cellPop, traffic: trade.traffic, realms, strife: age.strife, strifeAt }), run);
 
-    const final = { traffic: trade.traffic, security: feedback.security, royalSeats: feedback.royalSeats };
+    const final = { traffic: trade.traffic, security: feedback.security, royalSeats: feedback.royalSeats, tradeWar: events.tradeWar(realms) };
     const finalTrade = await driver.stage("finalTrade", () => tradeRounds(run.graph, { ...common, towns: feedback.towns, cellPop: feedback.cellPop, totalPop: feedback.totalPop, final, userBuilt }), run);
-    const finalRealms = await driver.step("finalRealms", () => realmsOf({ ...common, towns: finalTrade.towns, cellPop: feedback.cellPop, traffic: finalTrade.traffic, fixedSeats: feedback.royalSeats }), run);
+    const finalRealms = await driver.step("finalRealms", () => realmsOf({ ...common, towns: finalTrade.towns, cellPop: feedback.cellPop, traffic: finalTrade.traffic, fixedSeats: feedback.royalSeats, ...events.realmExtra }), run);
 
     return {
-        age: { cultures, feedback, finalTrade, finalRealms },
+        age: { cultures, feedback, finalTrade, finalRealms, era: age, events: events.report },
         next: (before) => ({
             towns: finalTrade.towns,
             cleared: feedback.cleared,
             // Roads and lanes stay built from age to age, used or not
             built: builtEdges(run.graph, finalTrade.traffic, before?.built ?? null),
             seats: new Set(finalRealms.realms.map((realm) => realm.seat)),
+            realmOfCell: finalRealms.realmOfCell,
+            // The unions lasting into the next age (see AgeEvents)
+            unions: events.lastingUnions(finalRealms),
             dominantId: Array.from(cultures.dominant, (culture) => (culture >= 0 ? (cultures.cultures[culture].id ?? null) : null)),
         }),
     };
@@ -198,19 +216,21 @@ function attachBiomeZones(people, shown, payload) {
 }
 
 /**
- * The cultures living in an age: every map culture but those an event brings in a later age (with
- * none left, the default culture), and the index among them of the one invading in this age (-1).
+ * The cultures living in an age: every map culture but those a peoples event brings in a later
+ * age (each arrives in the first age with one naming it; with none left, the default culture), and
+ * the index among them of the one invading in this age (-1).
  */
 function agePeople(settings, people, ages, index) {
     if (!settings.cultures.length) return { list: people, invader: -1 };
+    const peoples = new Set(FILRODENSWMB.GENERATOR.EVENTS.PEOPLES);
     const arrives = new Map();
     ages.forEach((age, at) => {
-        if (age.event && !arrives.has(age.event.culture)) arrives.set(age.event.culture, at);
+        for (const event of age.events ?? []) if (peoples.has(event.kind) && !arrives.has(event.culture)) arrives.set(event.culture, at);
     });
     const list = people.filter((culture) => !(arrives.get(culture.id) > index));
     if (!list.length) return { list: [{ ...FILRODENSWMB.GENERATOR.CULTURES.DEFAULT, nameBase: settings.nameBase }], invader: -1 };
-    const event = ages[index].event;
-    return { list, invader: event?.kind === "invasion" ? list.findIndex((culture) => culture.id === event.culture) : -1 };
+    const invasion = (ages[index].events ?? []).find((event) => event.kind === "invasion");
+    return { list, invader: invasion ? list.findIndex((culture) => culture.id === invasion.culture) : -1 };
 }
 
 /**

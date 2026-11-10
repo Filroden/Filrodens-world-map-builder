@@ -387,6 +387,27 @@ test("the map's generator revision is a whole number in range, and a map without
     for (const odd of [0, 2.6]) assert.equal(GeneratorRevision.of({ generatorRevision: odd }), FILRODENSWMB.GENERATOR.REVISIONS.LEGACY, `${odd}: not a revision, so read as the oldest`);
 });
 
+test("an age's events keep to their rules: known kinds, a culture's id, a place as a point; an older age's one event is kept as it was", () => {
+    const file = v4Map();
+    file.generatorSettings = {
+        ...file.generatorSettings,
+        ages: [
+            { era: "darkAge", strife: "troubled", events: [{ kind: "civilWar", place: { x: 10, y: 20 } }, { kind: "arrival", culture: "elves" }, { kind: "conquest" }, { kind: "disaster", place: { x: "<b>", y: 1 } }, { kind: "famine", place: { x: 1e9, y: 0 }, extra: "<script>" }] },
+            { era: "highMedieval", strife: "troubled", event: { kind: "invasion", culture: "elves" } },
+            { era: "goldenAge", strife: "troubled", events: "many" },
+        ],
+    };
+    const ages = MapImport.read(file).mapData.generatorSettings.ages;
+    assert.deepEqual(ages[0].events[0], { kind: "civilWar", place: { x: 10, y: 20 } });
+    assert.deepEqual(ages[0].events[1], { kind: "arrival", culture: "elves" });
+    assert.ok(!ages[0].events.some((event) => event?.kind === "conquest"), "an unknown kind goes");
+    assert.ok(ages[0].events.every((event) => !event || (!("extra" in event) && !(event.place && !Number.isFinite(event.place.x)))), "unknown fields and a bad place go");
+    assert.equal(ages[0].era, "darkAge", "the new eras are known");
+    assert.deepEqual(ages[1].event, { kind: "invasion", culture: "elves" });
+    assert.ok(!("events" in ages[2]), "events that are not a list go");
+    assert.ok(!("era" in ages[2]), "an unknown era goes");
+});
+
 test("the map's painted influences keep to their rules: each kind encoded text, anything else dropped", () => {
     const file = v4Map();
     file.influences = { capacity: "BQYC", security: "AA==", extra: "BQYC", __proto__: { polluted: true } };

@@ -25,5 +25,9 @@
     "FILRODENSWMB.UI.CompassColors": "Colours",
     "FILRODENSWMB.UI.ColorScheme": "Colour scheme",
     "FILRODENSWMB.UI.ColorSchemeHint": "Sets all of the decoration's colours at once. You can still change each colour afterwards.",
-    "FILRODENSWMB.UI.CompassHaloHint": "An outline in the backing's colour around each letter, so letters outside the disc read over the map."
+    "FILRODENSWMB.UI.CompassHaloHint": "An outline in the backing's colour around each letter, so letters outside the disc read over the map.",
+    "FILRODENSWMB.UI.GenerateEventKindColonisation": "Colonisation",
+    "FILRODENSWMB.UI.GenerateEventColonisation": "{name} colonise",
+    "FILRODENSWMB.UI.GenerateEventHintUnion": "The realm at its place (or the largest) absorbs its strongest neighbour (across the sea for an island realm) by marriage or inheritance, and keeps it in the ages after. A realm you drew yourself keeps exactly its land, so it neither absorbs nor is absorbed.",
+    "FILRODENSWMB.UI.GenerateEventPlaceHint": "Click land on the map to choose where the event acts: a realm event acts on the realm holding it (or the nearest), a disaster centres on it. The place is marked in red while this tool is open."
 }

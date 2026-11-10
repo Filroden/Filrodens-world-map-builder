@@ -4,6 +4,7 @@ import { decodeAge, decodeModelRun, packArray } from "../generator/ModelRun.js";
 import { pastRealmLayer } from "../generator/MaterialiseRegions.js";
 import { buildRoutes } from "../generator/MaterialiseRoutes.js";
 import { ageChanges, chainRoads, matchRealms, placeCells } from "../history/PastAge.js";
+import { AgeEventRows } from "./AgeEventRows.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { PinStyles } from "./PinStyles.js";
 import { MeshSession } from "../mesh/MeshSession.js";
@@ -474,9 +475,9 @@ export class HistoryView {
         const strife = name("FILRODENSWMB.UI.GenerateStrife", settings?.strifeName);
         if (era) rows.push({ label: "FILRODENSWMB.UI.GenerateEra", value: era });
         if (strife) rows.push({ label: "FILRODENSWMB.UI.GenerateStrife", value: strife });
-        const event = settings?.event;
-        const culture = event ? modelRun.cultures?.find((entry) => entry.id === event.culture) : null;
-        if (culture) rows.push({ label: "FILRODENSWMB.UI.GenerateEvent", value: platform.i18n.format(`FILRODENSWMB.UI.GenerateEvent${event.kind.charAt(0).toUpperCase()}${event.kind.slice(1)}`, { name: culture.name }) });
+        // Its events (a run made before ages held several has one, `event`, or none)
+        const events = (Array.isArray(settings?.events) ? settings.events : settings?.event ? [settings.event] : []).map((event) => AgeEventRows.label(event, modelRun.cultures ?? [])).filter(Boolean);
+        if (events.length) rows.push({ label: "FILRODENSWMB.UI.GenerateEvents", value: events.join(", ") });
         const counts = this.#counts(app, number);
         rows.push({ label: "FILRODENSWMB.UI.HistoryRealms", value: formatCount(counts.realms) });
         rows.push({ label: "FILRODENSWMB.UI.HistoryPlaces", value: formatCount(counts.places) });

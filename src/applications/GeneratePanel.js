@@ -2,9 +2,12 @@ import { FILRODENSWMB } from "../config.js";
 import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { nameBaseNames } from "../generator/Names.js";
+import { AgeEditor } from "./AgeEditor.js";
 import { GeneratedDetails } from "./GeneratedDetails.js";
 import { platform } from "../platform/index.js";
 import { Generation } from "./Generation.js";
+import { Inspector } from "./Inspector.js";
+import { MapStateManager } from "./MapStateManager.js";
 import { isKept } from "./Regeneration.js";
 import { RunInputs } from "./RunInputs.js";
 
@@ -102,42 +105,32 @@ export class GeneratePanel {
     }
 
     /**
-     * The Ages section's rows, oldest first (the last is the present): each age's era, strife and
-     * culture event (offered only while the map has cultures), and whether it can move or go.
+     * The Ages section's rows, oldest first (the last is the present): each age's name, its era,
+     * strife and how many events in brief (see AgeEditor.summary), whether the inspector shows it,
+     * and whether it can move or go.
      */
     static #ages(app, ages) {
-        const G = FILRODENSWMB.GENERATOR;
-        const cultures = app.uiState.cultures ?? [];
-        const choices = (presets, chosen, prefix) => Object.keys(presets).map((value) => ({ value, label: `${prefix}${value.charAt(0).toUpperCase()}${value.slice(1)}`, selected: value === chosen }));
-        const eventValue = (event) => (event ? `${event.kind}:${event.culture}` : "");
+        const shown = Inspector.current(app);
         return {
             rows: ages.map((age, index) => ({
                 index,
-                label: platform.i18n.format(index === ages.length - 1 && ages.length > 1 ? "FILRODENSWMB.UI.GenerateAgePresent" : "FILRODENSWMB.UI.GenerateAgeNumber", { number: index + 1 }),
-                eras: choices(G.ERAS, age.era, "FILRODENSWMB.UI.GenerateEra"),
-                strifes: choices(G.STRIFES, age.strife, "FILRODENSWMB.UI.GenerateStrife"),
-                events: cultures.length
-                    ? [
-                          { value: "", label: platform.i18n.localize("FILRODENSWMB.UI.GenerateEventNone"), selected: !age.event },
-                          ...cultures.flatMap((culture) => G.AGES.EVENTS.map((kind) => {
-                              const value = `${kind}:${culture.id}`;
-                              return { value, label: platform.i18n.format(`FILRODENSWMB.UI.GenerateEvent${kind.charAt(0).toUpperCase()}${kind.slice(1)}`, { name: culture.name }), selected: value === eventValue(age.event) };
-                          })),
-                      ]
-                    : null,
-                // An event naming a culture since deleted is shown as none, and ignored by the run
+                id: age.id,
+                label: AgeEditor.label(ages, index),
+                summary: AgeEditor.summary(age),
+                selected: shown?.kind === AgeEditor.KIND && shown.ref.id === age.id,
                 canUp: index > 0,
                 canDown: index < ages.length - 1,
                 canRemove: ages.length > 1,
             })),
-            canAdd: ages.length < G.MAX_AGES,
+            canAdd: ages.length < FILRODENSWMB.GENERATOR.MAX_AGES,
             count: ages.length,
         };
     }
 
     /**
-     * The Ages section's commands: add an age (a copy of the present, which it becomes), remove
-     * one, or move one earlier or later. Saved with the map; a run made before is out of date.
+     * The Ages section's commands: add an age (a copy of the present's era and strife, with no
+     * events, which becomes the present and opens in the inspector), remove one, or move one
+     * earlier or later; each one undo step. Saved with the map; a run made before is out of date.
      * @param {object} app
      * @param {"add"|"remove"|"up"|"down"} command
      * @param {number} [index]
@@ -145,18 +138,24 @@ export class GeneratePanel {
     static editAges(app, command, index = -1) {
         const settings = this.settings(app);
         const ages = settings.ages.map((age) => ({ ...age }));
-        if (command === "add" && ages.length < FILRODENSWMB.GENERATOR.MAX_AGES) ages.push({ ...ages.at(-1), event: null });
-        else if (command === "remove" && ages.length > 1 && ages[index]) ages.splice(index, 1);
+        let opened = null;
+        if (command === "add" && ages.length < FILRODENSWMB.GENERATOR.MAX_AGES) {
+            const { id: _id, ...present } = ages.at(-1);
+            ages.push({ ...present, events: [] });
+            opened = ages.length - 1;
+        } else if (command === "remove" && ages.length > 1 && ages[index]) ages.splice(index, 1);
         else if ((command === "up" || command === "down") && ages[index]) {
             const other = command === "up" ? index - 1 : index + 1;
             if (!ages[other]) return;
             [ages[index], ages[other]] = [ages[other], ages[index]];
         } else return;
+        MapStateManager.pushVectorState(app);
         settings.ages = ages;
         app.uiState.generatorSettings = panelSettings(settings);
         app.markGeneratorStale?.();
         app.markDirty();
         app.view?.render(["context"]);
+        if (opened !== null) AgeEditor.open(app, app.uiState.generatorSettings.ages[opened].id, { keepFocus: true });
     }
 
     /** The name styles, by their localised names, with the chosen one marked (also a culture's Name style). */
@@ -348,11 +347,6 @@ export class GeneratePanel {
         let value = target.value;
         if (target.type === "checkbox") value = target.checked;
         else if (target.type === "range" || target.type === "number") value = Number(target.value);
-        // An age's event: "kind:culture id", or none
-        if (path[0] === "ages" && path[2] === "event") {
-            const [kind, culture] = String(value).split(":");
-            value = kind && culture ? { kind, culture } : null;
-        }
         setPath(settings, path, value);
         app.uiState.generatorSettings = panelSettings(settings);
         app.markDirty();

@@ -94,7 +94,7 @@ function engineClimate(habitat, sea, metres) {
 }
 
 /** The model cell under a map point, or -1 off the map. */
-function modelCellAt(point, payload) {
+export function modelCellAt(point, payload) {
     if (!point || !isNumber(point.x) || !isNumber(point.y)) return -1;
     const x = Math.floor(point.x);
     const y = Math.floor(point.y);

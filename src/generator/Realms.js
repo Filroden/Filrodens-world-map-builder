@@ -35,6 +35,8 @@ import { SearchSpace, searchAll } from "./Search.js";
  * @param {Set<number>|null} [context.fixedSeats] - Realm seat cells to keep.
  * @param {Set<number>|null} [context.keptSeats] - The age before's realm seats (see Pipeline): a
  *     duchy seated on one stays a kingdom's seat; more are chosen as usual, spaced from them.
+ * @param {object} [context.partition] - An age's civil war, `unions` its union and those lasting from before, `barredSeats` the
+ *     seats that may not be crowned and `collapseArea` a collapse's land (see AgeEvents).
  */
 export function buildRealms(graph, context) {
     const cells = graph.cells;
@@ -183,6 +185,7 @@ function buildKingdoms(state, counties, duchies) {
     const flood = searchAll(state.graph, royal.map((duchy) => list[duchy].seat), state.cost, { scale, limit: R.KINGDOM_REACH_KM });
     const kingdomOfDuchy = Int32Array.from(list, (duchy) => flood.owner[duchy.seat]);
     royal.forEach((duchy, index) => (kingdomOfDuchy[duchy] = index));
+    applyRealmEvents(state, list, royal, kingdomOfDuchy);
     const members = royal.map(() => []);
     kingdomOfDuchy.forEach((kingdom, duchy) => {
         if (kingdom >= 0) members[kingdom].push(duchy);
@@ -204,21 +207,100 @@ export function royalDuchies(state, duchies, eligible = null) {
     const blocked = new Uint8Array(state.graph.count);
     const space = new SearchSpace(state.graph);
     const royal = [];
-    // Capital seats are crowns whatever the spacing
+    // Capital seats are crowns whatever the spacing, and so are a civil war's two rivals; a union's
+    // partner and a collapsing realm's duchies never are (see AgeEvents)
     const seats = state.cells.seats;
     const isCapital = (duchy) => seats?.get(duchies[duchy].seat)?.kind === "capital";
+    const { forced, barred } = eventSeats(state, duchies.filter(may));
+    const first = (duchy) => isCapital(duchy) || forced.has(duchy);
     for (const duchy of byPower) {
-        if (!isCapital(duchy)) continue;
+        if (!first(duchy)) continue;
         royal.push(duchy);
         space.run([duchies[duchy].seat], state.cost, { limit: state.power.spacing, visit: (cell) => (blocked[cell] = 1) });
     }
     for (const duchy of byPower) {
-        if (isCapital(duchy)) continue;
+        if (first(duchy) || barred(duchies[duchy].seat)) continue;
         if (blocked[duchies[duchy].seat]) continue;
         royal.push(duchy);
         space.run([duchies[duchy].seat], state.cost, { limit: state.power.spacing, visit: (cell) => (blocked[cell] = 1) });
     }
     return royal;
+}
+
+/**
+ * An age's realm events' seats (see AgeEvents): the duchies a civil war forces to be crowns (the
+ * richest seated in the realm's land, and its rival, the one splitting the realm most evenly with
+ * it; see evenRival), kept on the partition for the
+ * realm passes after, and whether a seat is barred from a crown
+ * (a union's partner's, and every seat in a collapsing realm's land).
+ */
+function eventSeats(state, candidates) {
+    const { partition, barredSeats = null, collapseArea = null } = state.context;
+    const forced = new Set();
+    if (partition) {
+        const inside = candidates.filter((duchy) => partition.area[duchy.seat]).sort((a, b) => b.tax - a.tax || a.id - b.id);
+        if (inside.length) {
+            forced.add(inside[0].id);
+            const rival = evenRival(state, inside, inside.slice(1));
+            if (rival) forced.add(rival.id);
+        }
+        partition.crownSeats ??= [...forced].map((id) => candidates.find((duchy) => duchy.id === id).seat);
+    }
+    return { forced, barred: (cell) => !!(collapseArea?.[cell] || barredSeats?.has(cell)) };
+}
+
+/**
+ * A civil war's rival crown among `candidates`: the one that, with the realm's first crown
+ * (`inside[0]`), splits the realm's duchies (`inside`, each going to the nearer) most evenly by tax
+ * base, ties to the richer. Null with no candidate.
+ */
+function evenRival(state, inside, candidates) {
+    let best = null;
+    let bestShare = -1;
+    const total = inside.reduce((sum, duchy) => sum + duchy.tax, 0) || 1;
+    for (const candidate of candidates) {
+        const near = searchAll(state.graph, [inside[0].seat, candidate.seat], state.cost);
+        let rival = 0;
+        for (const duchy of inside) if (near.owner[duchy.seat] === 1) rival += duchy.tax;
+        const share = Math.min(rival, total - rival) / total;
+        if (share > bestShare + 1e-9) {
+            best = candidate;
+            bestShare = share;
+        }
+    }
+    return best;
+}
+
+/**
+ * An age's realm events on the kingdoms' duchies (see AgeEvents), in every realm pass of the age:
+ * a union's partner's duchies go to its crown (seated in the absorbing realm's land in its own age,
+ * the union's crown seat in the ages after); a civil war's
+ * duchies go to whichever of its two crowns is nearer (not by wealth), so the land splits between
+ * them; a collapsing realm's duchies stand alone. Only duchies `may` allows are moved (all of them
+ * unless the map's own regions hold some; see UserRealms).
+ */
+export function applyRealmEvents(state, list, royal, kingdomOfDuchy, may = () => true) {
+    const { unions = null, partition, collapseArea } = state.context;
+    const free = (index) => may(index) && !royal.includes(index);
+    for (const union of unions ?? []) {
+        // The crown: a lasting union's own seat, or this age's crowned in the absorbing realm's land
+        const crown = union.home ? royal.findIndex((duchy) => union.home[list[duchy].seat]) : royal.findIndex((duchy) => list[duchy].seat === union.crownSeat);
+        if (crown >= 0) list.forEach((duchy, index) => {
+            if (union.area[duchy.seat] && free(index)) kingdomOfDuchy[index] = crown;
+        });
+    }
+    if (partition?.crownSeats?.length > 1) {
+        const crowns = royal.map((duchy, index) => (partition.crownSeats.includes(list[duchy].seat) ? index : -1)).filter((index) => index >= 0);
+        if (crowns.length > 1) {
+            const near = searchAll(state.graph, crowns.map((index) => list[royal[index]].seat), state.cost);
+            list.forEach((duchy, index) => {
+                if (partition.area[duchy.seat] && free(index) && near.owner[duchy.seat] >= 0) kingdomOfDuchy[index] = crowns[near.owner[duchy.seat]];
+            });
+        }
+    }
+    if (collapseArea) list.forEach((duchy, index) => {
+        if (collapseArea[duchy.seat] && free(index)) kingdomOfDuchy[index] = -1;
+    });
 }
 
 /** Kingdoms holding too few duchies are really independent duchies. */

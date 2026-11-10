@@ -47,7 +47,8 @@ const REPORT_EVERY = 32;
  * @param {number} context.totalPop
  * @param {import("./Cultures.js").CultureData} context.cultures
  * @param {{urbanisation: number}} context.world
- * @param {object} [context.final] - { traffic (the earlier rounds' traffic per edge), security, royalSeats: Set }
+ * @param {object} [context.final] - { traffic (the earlier rounds' traffic per edge), security, royalSeats: Set,
+ *     tradeWar (an age's trade war, or null; see AgeEvents) }
  * @param {Uint8Array} [context.built] - Edges the age before built as roads and lanes (see Pipeline):
  *     the first round starts from them.
  * @param {Uint8Array} [context.userBuilt] - Edges the map's own routes make roads and lanes (see
@@ -122,7 +123,29 @@ function edgeCostFunction(state) {
     if (!security) return base;
     const { edgeA, edgeB } = state.graph;
     const danger = FILRODENSWMB.GENERATOR.TRADE.DANGER;
-    return (edge) => base(edge) * (1 + danger * (1 - 0.5 * ((security[edgeA[edge]] || 1) + (security[edgeB[edge]] || 1))));
+    const withDanger = (edge) => base(edge) * (1 + danger * (1 - 0.5 * ((security[edgeA[edge]] || 1) + (security[edgeB[edge]] || 1))));
+    // A trade war: a step across the warring realms' border costs more
+    const war = tradeWar(state);
+    if (!war) return withDanger;
+    return (edge) => withDanger(edge) * (war.split(edgeA[edge], edgeB[edge]) ? war.cost : 1);
+}
+
+/**
+ * The final round's trade war (see AgeEvents), or null: its volume and cost factors, and whether two
+ * cells lie on opposite sides of it (in different realms, one of them the war's realm when it
+ * has one).
+ */
+function tradeWar(state) {
+    const war = state.final?.tradeWar;
+    if (!war) return null;
+    const realm = war.realmOfCell;
+    const split = (a, b) => {
+        const ra = realm[a];
+        const rb = realm[b];
+        if (ra < 0 || rb < 0 || ra === rb) return false;
+        return war.only < 0 || ra === war.only || rb === war.only;
+    };
+    return { volume: war.volume, cost: war.cost, split };
 }
 
 /** One trade round: pick the links, lay them, turn trade into townspeople. */
@@ -136,7 +159,9 @@ function* tradeRound(state, progress) {
     const { SEA_COST, LANE_FACTOR } = FILRODENSWMB.GENERATOR.TRAVEL;
     state.estimatePerKm = Math.min(leastCostPerKm(state.graph, state.cost), SEA_COST * LANE_FACTOR);
     const mixes = state.mixed ? state.towns.map((town) => townMix(state.context.cultures, state.cells, state.context.cellPop, town.cell, 3 - town.tier)) : null;
-    const gravity = (i, j, cost) => (state.towns[i].population * state.towns[j].population) / Math.max(cost, FILRODENSWMB.GENERATOR.TRADE.GRAVITY_FLOOR_KM) ** 2 * (mixes ? affinity(state.context.cultures.cultures, mixes[i], mixes[j]) : 1);
+    const war = tradeWar(state);
+    const apart = (i, j) => (war?.split(state.towns[i].cell, state.towns[j].cell) ? war.volume : 1);
+    const gravity = (i, j, cost) => (state.towns[i].population * state.towns[j].population) / Math.max(cost, FILRODENSWMB.GENERATOR.TRADE.GRAVITY_FLOOR_KM) ** 2 * (mixes ? affinity(state.context.cultures.cultures, mixes[i], mixes[j]) : 1) * apart(i, j);
     const pairs = new Map();
     yield* cityPairs(state, pairs, gravity, (done) => progress(0.2 * done));
     largeTownPairs(state, pairs, gravity);
@@ -425,7 +450,7 @@ function tradeToTownspeople(state, flows) {
         recordTrade(state, score, flows);
         return;
     }
-    let budget = FILRODENSWMB.GENERATOR.TRADE.URBAN_SHARE * (state.context.world.urbanisation ?? 1) * state.context.totalPop;
+    let budget = FILRODENSWMB.GENERATOR.TRADE.URBAN_SHARE * (state.context.world.urbanisation ?? 1) * (state.context.world.tradeBoom ?? 1) * state.context.totalPop;
     for (const town of state.towns) town.population = town.stage2Pop;
     budget -= supplySeats(state, budget);
     const byScore = [];

@@ -52,7 +52,8 @@ export function* placeTowns(graph, { cultures, era, world, previous = null }) {
     const landIds = [];
     for (let cell = 0; cell < cells.count; cell++) if (cells.kind[cell] === CELL_KIND.LAND && cells.landKm2[cell] > 0) landIds.push(cell);
 
-    const state = { graph, cost, cellPop, landIds, tiers, towns: [], townAt: new Int32Array(cells.count).fill(-1), space: new SearchSpace(graph) };
+    // Cells an age's disaster bars from holding a new town (see AgeEvents)
+    const state = { barred: era.barredCells ?? null, graph, cost, cellPop, landIds, tiers, towns: [], townAt: new Int32Array(cells.count).fill(-1), space: new SearchSpace(graph) };
     // The age before's towns, by cell: the smallest tier at which each is favoured
     const earlier = new Map((previous?.towns ?? []).map((town) => [town.cell, town.tier]));
     for (let tier = 0; tier < tiers.length; tier++) {
@@ -101,7 +102,7 @@ function population(cells, cultures, era, cleared) {
     for (let cell = 0; cell < cells.count; cell++) {
         if (!cells.landKm2[cell]) continue;
         const boost = cleared ? 1 + (1 / cells.cover[cell] - 1) * cleared[cell] : 1;
-        cellPop[cell] = cells.food[cell] * era.development * health(cells, cell) * cultures.popMult[cell] * (1 - era.plague) * boost;
+        cellPop[cell] = cells.food[cell] * era.development * health(cells, cell) * cultures.popMult[cell] * (1 - era.plague) * boost * (era.cellFactor ? era.cellFactor[cell] : 1);
         totalPop += cellPop[cell];
     }
     return { cellPop, totalPop };
@@ -144,7 +145,7 @@ function placeTier(state, tierIndex, potential) {
     if (towns.length) space.run(towns.map((town) => town.cell), cost, { limit: spacing, visit: block });
     const order = landIds.slice().sort((a, b) => potential[b] - potential[a] || a - b);
     for (const cell of order) {
-        if (blocked[cell] || townAt[cell] >= 0) continue;
+        if (blocked[cell] || townAt[cell] >= 0 || state.barred?.[cell]) continue;
         townAt[cell] = towns.length;
         towns.push({ cell, tier: tierIndex, population: 0, origin: "centralPlace" });
         space.run([cell], cost, { limit: spacing, visit: block });

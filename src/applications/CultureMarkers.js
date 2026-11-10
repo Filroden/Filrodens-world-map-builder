@@ -18,11 +18,14 @@ export class CultureMarkers {
     /** The culture whose homeland the next click adds, by studio. */
     static #picking = new WeakMap();
 
-    /** Shows the markers the Generate tool shows, or none in any other tool. */
-    static update(app) {
+    /**
+     * Shows the markers the Generate tool shows, or none in any other tool, with `extra` markers
+     * beside the homelands (the ages' events' places; see AgeEventRows.markers).
+     */
+    static update(app, extra = []) {
         const layer = app.canvasEngine?.homelandMarkers;
         if (!layer) return;
-        layer.set(app.activeTool === "generate" ? this.markers(app) : []);
+        layer.set(app.activeTool === "generate" ? [...this.markers(app), ...extra] : []);
     }
 
     /**

@@ -550,6 +550,8 @@ export const FILRODENSWMB = {
                 crop: ["CropDraw", "CropMove", "CropResize"],
                 // A culture's homeland being picked on the map (see CultureMarkers)
                 homeland: ["PlaceHomeland", "StopHomeland"],
+                // An age's event's place being picked on the map (see AgeEventRows)
+                eventPlace: ["PlaceEventPlace", "StopEventPlace"],
                 // The Travel tool: a click sets where the journey starts (see TravelView)
                 travel: ["SetTravelStart"],
                 terrain: ["PaintTerrain"],
@@ -627,6 +629,7 @@ export const FILRODENSWMB = {
                 DropMask: "DropMaskTouch",
                 SetTravelStart: "SetTravelStartTouch",
                 PlaceHomeland: "PlaceHomelandTouch",
+                PlaceEventPlace: "PlaceEventPlaceTouch",
             },
         },
         // The keyboard shortcuts sheet (see CanvasHints.sheet and dialogs/shortcuts.hbs). KEYS lists,
@@ -679,7 +682,7 @@ export const FILRODENSWMB = {
                         { caption: "FILRODENSWMB.UI.ShortcutsErase", context: "influenceErase" },
                     ],
                 },
-                { title: "FILRODENSWMB.UI.ToolGenerate", tables: [{ caption: "FILRODENSWMB.UI.ShortcutsHomeland", context: "homeland" }] },
+                { title: "FILRODENSWMB.UI.ToolGenerate", tables: [{ caption: "FILRODENSWMB.UI.ShortcutsHomeland", context: "homeland" }, { caption: "FILRODENSWMB.UI.ShortcutsEventPlace", context: "eventPlace" }] },
                 {
                     title: "FILRODENSWMB.UI.ToolRegions",
                     tables: [
@@ -2379,9 +2382,17 @@ export const FILRODENSWMB = {
         DEFAULT_NAME_BASE: "Human Generic",
         // Era: development is the share of the land's food capacity actually farmed; plague the share
         // of people lost to a recent great pandemic (the Black Death took 30 to 50%).
+        // An era may also carry world multipliers (urbanisation, fragmentation: a dark age has fewer,
+        // smaller towns and more, smaller realms), a capacity multiplier (an age of advancement's
+        // better farming, tools and boats: land and sea feed more) and a frontier lift (an age of
+        // expansion: marginal land, growing less food per km² than the median, fed up to 1 + frontier
+        // times as many). Listed in the Ages list in this order.
         ERAS: Object.freeze({
+            darkAge: Object.freeze({ development: 0.35, plague: 0, urbanisation: 0.6, fragmentation: 1.5 }),
             earlyMedieval: Object.freeze({ development: 0.45, plague: 0 }),
             highMedieval: Object.freeze({ development: 0.7, plague: 0 }),
+            expansion: Object.freeze({ development: 0.7, plague: 0, frontier: 0.8 }),
+            advancement: Object.freeze({ development: 0.75, plague: 0, capacity: 1.3 }),
             afterPlague: Object.freeze({ development: 0.75, plague: 0.35 }),
         }),
         DEFAULT_ERA: "highMedieval",
@@ -2397,7 +2408,46 @@ export const FILRODENSWMB = {
         AGES: Object.freeze({
             INERTIA: 0.6,
             INVASION: Object.freeze({ SPREAD: 0.5, STRIFE: 0.35 }),
-            EVENTS: Object.freeze(["arrival", "invasion"]),
+        }),
+        // An age's events (see AgeEvents), at most one of each kind, grouped and ordered by scale as
+        // the Ages list offers them. Peoples events name a culture (it is absent from the ages before
+        // its first); the others may name a place on the map (a realm event acts on the realm holding
+        // it, a disaster centres on it, a trade war sets that realm against the rest), else the
+        // largest realm (or the largest coastal or river town of the age before).
+        EVENTS: Object.freeze({
+            GROUPS: Object.freeze({
+                peoples: Object.freeze(["invasion", "arrival", "migration", "colonisation"]),
+                hardship: Object.freeze(["plague", "famine", "disaster"]),
+                realms: Object.freeze(["collapse", "civilWar", "union"]),
+                prosperity: Object.freeze(["tradeBoom", "tradeWar"]),
+            }),
+            PEOPLES: Object.freeze(["invasion", "arrival", "migration", "colonisation"]),
+            PLACED: Object.freeze(["disaster", "collapse", "civilWar", "union", "tradeWar"]),
+            // A plague takes PLAGUE more of the people, on top of the era's
+            PLAGUE: 0.35,
+            // A famine takes FAMINE_BASE everywhere, and up to FAMINE_MARGINAL more on marginal land
+            FAMINE_BASE: 0.1,
+            FAMINE_MARGINAL: 0.4,
+            // A disaster: within DISASTER_KM of its centre (over the cells, not by travel) the land
+            // feeds up to DISASTER_LOSS fewer, fading; no town stands within DISASTER_BAR_KM
+            DISASTER_KM: 50,
+            DISASTER_LOSS: 0.7,
+            DISASTER_BAR_KM: 15,
+            // A trade boom multiplies the age's trade budget
+            TRADE_BOOM: 2,
+            // A trade war (the final trade round): trade between realms carries TRADE_WAR_VOLUME of its
+            // volume, and a step across their border costs TRADE_WAR_COST times as much
+            TRADE_WAR_VOLUME: 0.25,
+            TRADE_WAR_COST: 3,
+            // A civil war: the realm splits between its richest duchy and the rival splitting it most
+            // evenly; strife rises by CIVIL_WAR_STRIFE in its land
+            CIVIL_WAR_STRIFE: 0.3,
+            // A collapse: strife rises by COLLAPSE_STRIFE in the realm's land
+            COLLAPSE_STRIFE: 0.3,
+            // A migrant people spreads into land another people held in the age before at
+            // MIGRATION_SPREAD times the cost; a colonist into land a realm held at COLONY_SPREAD
+            MIGRATION_SPREAD: 2,
+            COLONY_SPREAD: 3,
         }),
         // What a run writes onto the map, as the Generate panel's Output section starts: the levels
         // below Realms, the settlement tiers given pins (capitals always are), the kinds of route,

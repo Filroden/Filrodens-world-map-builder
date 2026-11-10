@@ -402,15 +402,20 @@ const CULTURE = obj({
     homelands: list({ t: "xy" }),
 });
 
-/** An age's culture event (see GeneratorSettings.resolveEvent): a culture arriving or invading, or none. */
-const AGE_EVENT = obj({ kind: enumOf(FILRODENSWMB.GENERATOR.AGES.EVENTS), culture: key }, { nullable: true });
+/**
+ * An age's event (see GeneratorSettings.resolveEvent): its kind, the culture a peoples event names,
+ * and the place on the map an event that acts somewhere may name (none for the largest realm or
+ * town). An age saved before ages held several keeps its one `event` (or none), read as a list of one.
+ */
+const AGE_EVENT = obj({ kind: enumOf(Object.values(FILRODENSWMB.GENERATOR.EVENTS.GROUPS).flat()), culture: key, place: { t: "xy", nullable: true } }, { nullable: true });
+const AGE_EVENTS = list(AGE_EVENT);
 
 /** The settings a run was made with (see GeneratorSettings.resolveSettings). */
 const GENERATOR_SETTINGS = obj({
     seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
     nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
     world: obj({ density: num(RANGE.SCALE), urbanisation: num(RANGE.SCALE), realmSpacing: num(RANGE.SCALE), fragmentation: num(RANGE.SCALE) }),
-    ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), strifeName: key, strife: num(RANGE.UNIT), event: AGE_EVENT })),
+    ages: list(obj({ era: key, development: num(RANGE.UNIT), plague: num(RANGE.UNIT), urbanisation: num(RANGE.SCALE), fragmentation: num(RANGE.SCALE), capacity: num(RANGE.SCALE), frontier: num(RANGE.SCALE), strifeName: key, strife: num(RANGE.UNIT), event: AGE_EVENT, events: AGE_EVENTS })),
     cultures: list(CULTURE),
 });
 
@@ -422,8 +427,8 @@ const GENERATOR_PANEL = obj({
     seed: generatorText("FILRODENSWMB.UI.LimitFieldSeed"),
     nameBase: generatorText("FILRODENSWMB.UI.LimitFieldName"),
     world: GENERATOR_SETTINGS.fields.world,
-    // The ages as the panel keeps them: each age's era and strife presets, and its event
-    ages: list(obj({ era: enumOf(Object.keys(FILRODENSWMB.GENERATOR.ERAS)), strife: enumOf(Object.keys(FILRODENSWMB.GENERATOR.STRIFES)), event: AGE_EVENT })),
+    // The ages as the panel keeps them: each age's id, era and strife presets, and its events
+    ages: list(obj({ id: key, era: enumOf(Object.keys(FILRODENSWMB.GENERATOR.ERAS)), strife: enumOf(Object.keys(FILRODENSWMB.GENERATOR.STRIFES)), event: AGE_EVENT, events: AGE_EVENTS })),
     output: obj({
         duchies: bool,
         counties: bool,

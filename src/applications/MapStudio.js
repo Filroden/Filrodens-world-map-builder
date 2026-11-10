@@ -55,6 +55,8 @@ import { StyleLists } from "./StyleLists.js";
 import { CultureEditor } from "./CultureEditor.js";
 import { BiomeEditor } from "./BiomeEditor.js";
 import { CultureLists } from "./CultureLists.js";
+import { AgeEditor } from "./AgeEditor.js";
+import { AgeEventRows } from "./AgeEventRows.js";
 import { CultureMarkers } from "./CultureMarkers.js";
 import { RegionPainter } from "./RegionPainter.js";
 import { InfluencePainter } from "./InfluencePainter.js";
@@ -234,6 +236,7 @@ export class MapStudio {
         removeGenerated()           { GeneratePanel.removeGenerated(this); },
         randomizeGeneratorSeed()    { GeneratePanel.randomizeSeed(this); },
         addAge()                    { GeneratePanel.editAges(this, "add"); },
+        openAge(e, t)               { if (!MapStudio.#fromRowControl(e, t)) AgeEditor.open(this, t.dataset.id, MapStudio.#FROM_LIST); },
         removeAge(_e, t)            { GeneratePanel.editAges(this, "remove", Number(t.dataset.age)); },
         moveAgeUp(_e, t)            { GeneratePanel.editAges(this, "up", Number(t.dataset.age)); },
         moveAgeDown(_e, t)          { GeneratePanel.editAges(this, "down", Number(t.dataset.age)); },
@@ -1404,7 +1407,9 @@ export class MapStudio {
         this.#updateCanvasHint();
         MeshIntegration.updateOutline(this);
         RouteTool.updateOverlays(this);
-        CultureMarkers.update(this);
+        // An event's place is picked only while the Generate tool is open
+        if (this.activeTool !== "generate") AgeEventRows.stopPick(this);
+        CultureMarkers.update(this, AgeEventRows.markers(this));
         // The inspector shows the object as it is now: a change made in the panel, the bar or by
         // an undo redraws the panel, and the inspector with it (or closes it, if the object went)
         if (regions.includes("context")) Inspector.refresh(this);
@@ -1675,9 +1680,9 @@ export class MapStudio {
             event.preventDefault();
             return;
         }
-        // A homeland pick takes Escape, ending it; pins' and labels' Select mode takes it, closing the
+        // A homeland or event place pick takes Escape, ending it; pins' and labels' Select mode takes it, closing the
         // inspector on what it picked
-        if (CultureMarkers.handleKey(this, event) || PickTool.handleKey(this, event)) {
+        if (CultureMarkers.handleKey(this, event) || AgeEventRows.handleKey(this, event) || PickTool.handleKey(this, event)) {
             event.preventDefault();
             return;
         }
@@ -2574,6 +2579,7 @@ export class MapStudio {
             isMaskDrawing: this.#isMaskDrawingMode(),
             heldItem: this.canvasEngine?.heldItem ?? null,
             pickingHomeland: CultureMarkers.picking(this),
+            pickingEventPlace: AgeEventRows.picking(this),
             travelPicking: TravelView.picking(this),
         });
 

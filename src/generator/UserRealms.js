@@ -2,7 +2,7 @@ import { FILRODENSWMB } from "../config.js";
 import { politicalCost } from "./CellGraph.js";
 import { borderHostility } from "./Borders.js";
 import { searchAll } from "./Search.js";
-import { absorbEnclaves, countyEntry, cultureBarrier, keepRealKingdoms, median, powers, realmEntry, roadsFrom, royalDuchies, tallyCounties } from "./Realms.js";
+import { absorbEnclaves, applyRealmEvents, countyEntry, cultureBarrier, keepRealKingdoms, median, powers, realmEntry, roadsFrom, royalDuchies, tallyCounties } from "./Realms.js";
 
 /**
  * Realms built round the map's own realms, duchies and counties (the user regions of its
@@ -331,6 +331,7 @@ function zoneKingdoms(state, duchies) {
     const flood = searchAll(state.graph, royal.map((duchy) => list[duchy].seat), state.kingdomCost, { scale, limit: R.KINGDOM_REACH_KM });
     const kingdomOfDuchy = Int32Array.from(list, (duchy, index) => (eligible(index) ? flood.owner[duchy.seat] : NONE));
     royal.forEach((duchy, index) => (kingdomOfDuchy[duchy] = index));
+    applyRealmEvents({ ...state, cost: state.kingdomCost }, list, royal, kingdomOfDuchy, eligible);
     const members = royal.map(() => []);
     kingdomOfDuchy.forEach((kingdom, duchy) => {
         if (kingdom >= 0) members[kingdom].push(duchy);
