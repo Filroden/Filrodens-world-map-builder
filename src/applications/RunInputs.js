@@ -84,6 +84,16 @@ export class RunInputs {
         if (!app.modelRun) return false;
         return app.uiState?.generatorStale === true || this.changed(app).length > 0;
     }
+
+    /** A text's fingerprint (eight hex digits), as each kind's (for Fill in's own; see Infilling.inputs). */
+    static hash(text) {
+        return hashText(text);
+    }
+
+    /** The painted influences' fingerprint, of every kind or of those given. */
+    static influencesHash(influences, kinds = INFLUENCE_KINDS) {
+        return influencesHash(influences, kinds);
+    }
 }
 
 // ------------------------------------------------------------------ hashing
@@ -158,9 +168,10 @@ function riversHash(riverData) {
 }
 
 /** Each painted cell of each kind of influence, with its value; unpainted cells count for nothing, so the hash costs what is painted. */
-function influencesHash(influences) {
+function influencesHash(influences, kinds = INFLUENCE_KINDS) {
     const hash = new Hash();
     INFLUENCE_KINDS.forEach((kind, index) => {
+        if (!kinds.includes(kind)) return;
         hash.add(index);
         const levels = influences?.layer(kind)?.owners;
         if (!levels) return;

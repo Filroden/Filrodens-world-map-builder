@@ -585,6 +585,8 @@ export class MapStudio {
         this.parentRun = null;
         // A regional map asked to be filled in when it was cut, until it has been (see Infilling)
         this.infillPending = false;
+        // What the last fill-in read, for its Out of date (see Infilling.inputs); null with none
+        this.infillInputs = null;
         // Whether a regional map's inherited river routes have been laid over its own rivers (see RiverRelay)
         this.riverRoutesLaid = false;
         this.isDirty = false;
@@ -4073,6 +4075,7 @@ export class MapStudio {
         this.upwindMargin = payload.upwindMargin ?? null;
         this.parentRun = payload.parentRun ?? null;
         this.infillPending = payload.infillPending === true;
+        this.infillInputs = payload.infillInputs ?? null;
         this.riverRoutesLaid = payload.riverRoutes === true;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
@@ -4607,6 +4610,7 @@ export class MapStudio {
             upwindMargin: this.upwindMargin ?? null,
             parentRun: this.parentRun ?? null,
             infillPending: this.infillPending === true,
+            infillInputs: this.infillInputs ?? null,
             riverRoutes: this.riverRoutesLaid === true,
             terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
             springsBaked: this.uiState.springsBaked,
@@ -5312,6 +5316,7 @@ export class MapStudio {
         this.upwindMargin = null;
         this.parentRun = null;
         this.infillPending = false;
+        this.infillInputs = null;
         this.riverRoutesLaid = false;
 
         // Reset biome colours to defaults so the DOM sync catches them

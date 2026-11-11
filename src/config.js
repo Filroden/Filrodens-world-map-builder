@@ -935,6 +935,11 @@ export const FILRODENSWMB = {
         // the area factor, as it serves more of them), and has at least MARKET_MIN_POP
         MARKET_SHARE: 0.06,
         MARKET_MIN_POP: 300,
+        // The people a settlement pin with no figures of its own (drawn on the regional map, or
+        // carried without them) holds, by its style's tier, from generator revision 2 (see
+        // InfillInput.places): each tier's least (a town tier's the generator's minimum, a castle
+        // none of its own)
+        PIN_PEOPLE: Object.freeze({ capital: 15000, city: 15000, largeTown: 4000, town: 1500, fortifiedTown: 1500, port: 1500, marketTown: 300, largeVillage: 1000, village: 100, castle: 0 }),
         // A market needs at least this many people within its reach that no town or market serves yet
         MARKET_MIN_SERVED: 4000,
         // A cell with fewer country people than this has hamlets and farms, not a village

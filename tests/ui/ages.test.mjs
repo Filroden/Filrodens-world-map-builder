@@ -225,6 +225,9 @@ test("a regional map holding its parent's run: no Generate, the world and ages r
     assert.match(panel.textContent, /GenerateHeldBadge/);
     assert.doesNotMatch(panel.textContent, /GenerateInheritedNotice|GenerateOlderRevisionHint/, "no notice about generating here");
     assert.equal(panel.querySelector('[name="generator.seed"]'), null, "no seed");
+    const nameStyle = panel.querySelector('[name="generator.nameBase"]');
+    assert.ok(nameStyle && !nameStyle.disabled, "the default name style, still live: Fill in and Name all use it");
+    assert.match(panel.textContent, /GenerateDefaultNameStyle/);
     assert.equal(panel.querySelector('[data-section="generateOutput"]'), null, "no Output");
     const sliders = [...panel.querySelectorAll('input[name^="generator.world."]')];
     assert.equal(sliders.length, 4);
@@ -245,6 +248,8 @@ test("a regional map holding its parent's run: no Generate, the world and ages r
     GeneratePanel.editAges(app, "add");
     GeneratePanel.randomizeSeed(app);
     assert.equal(JSON.stringify(app.uiState.generatorSettings), before);
+    GeneratePanel.handleInput(app, { type: "change", target: { name: "generator.nameBase", type: "select-one", value: "French" } });
+    assert.equal(app.uiState.generatorSettings.nameBase, "French", "the default name style still writes");
     warnings.length = 0;
     assert.equal(await Generation.run(app), false);
     assert.deepEqual(warnings, ["FILRODENSWMB.UI.GenerateHeldByParentWarn"]);

@@ -762,6 +762,8 @@ const MAP = obj({
     parentRun: PARENT_RUN,
     // A regional map asked to be filled in when cut, not yet filled in (see Infilling)
     infillPending: bool,
+    // A fingerprint of what the last fill-in read, as it left the map (see Infilling.inputs)
+    infillInputs: obj({ places: key, routes: key, influences: key }, { nullable: true }),
     riverRoutes: bool,
     terrainUpgradeDismissed: bool,
     springsBaked: bool,

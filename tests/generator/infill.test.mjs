@@ -174,3 +174,71 @@ test("a regional map's painted food capacity shares the parent's people towards 
     const withPainting = peopleOnPoorer({ ...makePayload(), influences: { capacity: steps, security: null } });
     assert.ok(withPainting < without * 0.8, `${Math.round(withPainting)} on the poorer stripes against ${Math.round(without)}`);
 });
+
+test("from revision 2, every settlement pin is a place in-fill builds round, holding its people; before, only generated towns", () => {
+    const { mesh, makePayload } = syntheticMap();
+    const payload = makePayload();
+    const parentRun = parentRunOf(mesh, payload);
+    const pinStyles = [
+        { id: "styleCity", tier: "city" },
+        { id: "styleVillage", tier: "village" },
+        { id: "styleRuin", tier: "ruinedTown" },
+        { id: "styleCastle", tier: "castle" },
+        { id: "styleInn", tier: null },
+    ];
+    const pins = [
+        // A city the parent's run built on, with its figures
+        { name: "Handford", x: 240, y: 180, pinStyle: "styleCity", modelled: { population: 15000 } },
+        // A village drawn on the regional map, with none
+        { name: "Little Hay", x: 160, y: 120, pinStyle: "styleVillage" },
+        { name: "Old Wall", x: 300, y: 220, pinStyle: "styleRuin" },
+        { name: "Keep", x: 200, y: 240, pinStyle: "styleCastle", generated: { kind: "castle" } },
+        { name: "The Inn", x: 280, y: 120, pinStyle: "styleInn" },
+        // A generated town restyled to a style with no tier still counts by its own
+        { name: "Ashby", x: 320, y: 160, pinStyle: "styleInn", generated: { kind: "town", tier: "town", population: 2500 } },
+    ];
+    const places = InfillInput.places(pins, pinStyles, { seats: true });
+    assert.deepEqual(places.map(({ pin, tier, population }) => [pin.name, tier, population]), [
+        ["Handford", "city", 15000],
+        ["Little Hay", "village", FILRODENSWMB.INFILL.PIN_PEOPLE.village],
+        ["Keep", "castle", 0],
+        ["Ashby", "town", 2500],
+    ]);
+    assert.deepEqual(InfillInput.places(pins, pinStyles, {}).map(({ pin }) => pin.name), ["Ashby"], "revision 1: the generated towns only");
+
+    const gather = (rules) => {
+        const { input } = InfillInput.gather({ mesh, parentRun, payload, pins, routes: [], speeds: FILRODENSWMB.TRAVEL_TIME.SPEEDS, seed: "SYNTH", nameBase: "English", pinStyles, rules });
+        input.options = { ROUTE_REACH_KM: 1e9 };
+        return { input, result: runInfill(input) };
+    };
+    const now = gather({ seats: true });
+    const before = gather({});
+    const city = now.input.towns.find((town) => town.population === 15000).cell;
+    assert.ok(!now.result.places.some((place) => place.cell === city), "nothing on the city's own cell");
+    const country = (run) => run.people.reduce((sum, value) => sum + value, 0) + run.places.filter((place) => place.tier === "marketTown").reduce((sum, place) => sum + place.population, 0);
+    const held = country(before.result) - country(now.result);
+    assert.ok(held > 10000, `the city's people are not shared out again: ${Math.round(held)} fewer in the country`);
+});
+
+test("from revision 2, each place is named from its in-fill cell, so a place keeps its name when another comes or goes", () => {
+    const { mesh, makePayload } = syntheticMap();
+    const payload = makePayload();
+    const parentRun = parentRunOf(mesh, payload);
+    const base = [{ name: "Ashby", x: 180, y: 180, generated: { kind: "town", population: 5000 } }];
+    const extra = [...base, { name: "Brook", x: 300, y: 180, generated: { kind: "town", population: 3000 } }];
+    const run = (pins, idNames) => {
+        const { input } = InfillInput.gather({ mesh, parentRun, payload, pins, routes: [], speeds: FILRODENSWMB.TRAVEL_TIME.SPEEDS, seed: "SYNTH", nameBase: "English", rules: { idNames } });
+        input.options = { ROUTE_REACH_KM: 1e9 };
+        return runInfill(input);
+    };
+    const kept = (idNames) => {
+        const a = new Map(run(base, idNames).places.map((place) => [place.cell, place.name]));
+        const b = run(extra, idNames).places.filter((place) => a.has(place.cell));
+        return { share: b.filter((place) => a.get(place.cell) === place.name).length / Math.max(1, b.length), count: b.length };
+    };
+    const byCell = kept(true);
+    const inOrder = kept(false);
+    assert.ok(byCell.count > 10, `places in the same cell both times: ${byCell.count}`);
+    assert.ok(byCell.share > 0.9, `by cell, ${Math.round(byCell.share * 100)}% keep their name`);
+    assert.ok(byCell.share > inOrder.share, `more than in order (${Math.round(inOrder.share * 100)}%)`);
+});

@@ -456,6 +456,15 @@ test("a run's fingerprint of the map's own items it read keeps to its rules", ()
     assert.equal({}.polluted, undefined);
 });
 
+test("a fill-in's fingerprint of what it read keeps to its rules", () => {
+    const file = v4Map();
+    file.infillInputs = { places: "302dc36a", routes: "ea11758b", influences: "811c9dc5" };
+    assert.deepEqual(MapImport.read(structuredClone(file)).mapData.infillInputs, file.infillInputs);
+    file.infillInputs = { places: SCRIPT, routes: 7, influences: "811c9dc5", extra: "x", __proto__: { polluted: true } };
+    assert.deepEqual(MapImport.read(file).mapData.infillInputs, { influences: "811c9dc5" }, "what is no key is dropped, and nothing else is kept");
+    assert.equal({}.polluted, undefined);
+});
+
 test("a colour such as red;background:url(…) never passes, in a file or in the inspector", () => {
     const file = v4Map();
     file.mapPins[0].color = HOSTILE_COLOUR;

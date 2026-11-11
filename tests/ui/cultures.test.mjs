@@ -134,7 +134,7 @@ async function addCulture(app, name) {
 test("the add row makes a culture with the default culture's fields and the panel's name style, opens it, and is one undo step", async () => {
     const app = studio();
     await drawPanel(app);
-    assert.ok(app.root.querySelector(".fwmb-context-panel select[name='generator.nameBase']"), "with no cultures the Name style shows");
+    assert.ok(app.root.querySelector(".fwmb-context-panel select[name='generator.nameBase']"), "with no cultures the default name style shows");
     await CultureLists.startAdding(app);
     assert.equal(app.root.querySelector("[data-culture-naming]").value, "FILRODENSWMB.UI.CultureNewName");
     const id = await CultureLists.confirm(app, "Hillfolk");
@@ -144,7 +144,7 @@ test("the add row makes a culture with the default culture's fields and the pane
     assert.equal(made.id, id);
     assert.ok(app.root.querySelector("dialog.fwmb-inspector--culture"), "opened in the inspector");
     assert.equal(app.stale, 1, "a run made before is out of date");
-    assert.equal(app.root.querySelector(".fwmb-context-panel select[name='generator.nameBase']"), null, "each culture names its own places");
+    assert.ok(app.root.querySelector(".fwmb-context-panel select[name='generator.nameBase']"), "the default name style shows with cultures too, for land no culture names");
     const second = await addCulture(app, "Lowlanders");
     assert.notEqual(culture(app, 1).color, made.color, "the next unused colour");
     undo(app);

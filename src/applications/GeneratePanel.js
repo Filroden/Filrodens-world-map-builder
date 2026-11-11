@@ -351,8 +351,9 @@ export class GeneratePanel {
         if (!name.startsWith(FIELD_PREFIX)) return false;
         const isText = target.type === "text";
         if ((target.type === "range" || isText) && event.type === "input") return true;
-        // The settings carried from the parent are read only while the map holds its parent's run
-        if (Generation.heldByParent(app)) return true;
+        // The settings carried from the parent are read only while the map holds its parent's run,
+        // bar the default name style, which names what Fill in and Name all add there too
+        if (Generation.heldByParent(app) && name !== `${FIELD_PREFIX}nameBase`) return true;
         const path = name.slice(FIELD_PREFIX.length).split(".");
         const settings = this.settings(app);
         let value = target.value;

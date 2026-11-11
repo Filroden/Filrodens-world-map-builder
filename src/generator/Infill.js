@@ -1,5 +1,6 @@
 import { NamesGenerator } from "../../vendor/azgaar-names/names-generator.js";
 import { FILRODENSWMB } from "../config.js";
+import { nameStream } from "../names/PlaceNames.js";
 import { MinHeap } from "../mesh/MinHeap.js";
 import { EDGE } from "./CellGraph.js";
 import { stageRandom } from "./Random.js";
@@ -38,7 +39,9 @@ import { edgeDays, flagRoute } from "../travel/TravelTime.js";
  *    to the nearest road, town, market or lane, along the quickest way on foot over land. The ways
  *    form one tree from the network, so lanes merge as they near it.
  * 7. **Names:** in the name base of the culture most of the parent cell's people belong to, none
- *    the same as a name already on the map (where avoidable).
+ *    the same as a name already on the map (where avoidable). From generator revision 2
+ *    (`idNames`), each place from a stream of its own, keyed by its in-fill cell, so a place keeps
+ *    its name when another comes or goes; before, from the fill-in's one stream in order.
  *
  * Deterministic for its seed.
  */
@@ -58,6 +61,7 @@ import { edgeDays, flagRoute } from "../travel/TravelTime.js";
  * @param {Uint8Array} [input.dry] - Each cell's flag: 1 where a place could stand clear of the drawn rivers (see InfillInput.dryCell).
  * @param {number} [input.areaFactor] - The map's area factor: about one settled cell in this many has a village (see placeVillages).
  * @param {Iterable<string>} [input.names] - Names already on the map.
+ * @param {boolean} [input.idNames] - Each place named from a stream of its own (generator revision 2).
  * @param {object} [input.options] - Overrides of FILRODENSWMB.INFILL.
  * @returns {{places: {cell: number, tier: string, population: number, name: string}[], lanes: {cells: number[]}[], people: Float64Array, stats: object}}
  */
@@ -534,8 +538,16 @@ function treeFrom(graph, cost, sources) {
  * Names, largest place first, each in the name base of its parent cell's main culture, retried a
  * few times to avoid a name already used (on the map or by in-fill).
  */
-function namePlaces(places, { parentOf, parent, seed, nameBase, names = [] }) {
+function namePlaces(places, { parentOf, parent, seed, nameBase, names = [], idNames = false }) {
     const generator = new NamesGenerator(stageRandom(seed, "infill"));
+    // A place's draws: its own stream from revision 2 (each try a new roll), before the one stream
+    const draw = (cell, base) => {
+        let roll = 0;
+        return () => {
+            if (idNames) generator.rng = nameStream(seed, `infill:${cell}`, roll++);
+            return generator.getBase(base);
+        };
+    };
     const fallback = Math.max(0, generator.indexOf(nameBase));
     const baseOf = (cell) => {
         const culture = parentOf[cell] >= 0 ? parent.cultureOf[parentOf[cell]] : -1;
@@ -545,9 +557,9 @@ function namePlaces(places, { parentOf, parent, seed, nameBase, names = [] }) {
     const used = new Set(names);
     const order = places.map((place, index) => index).sort((a, b) => places[b].population - places[a].population || places[a].cell - places[b].cell);
     for (const index of order) {
-        const base = baseOf(places[index].cell);
-        let name = generator.getBase(base);
-        for (let attempt = 0; attempt < FILRODENSWMB.GENERATOR.NAME_RETRIES && used.has(name); attempt++) name = generator.getBase(base);
+        const next = draw(places[index].cell, baseOf(places[index].cell));
+        let name = next();
+        for (let attempt = 0; attempt < FILRODENSWMB.GENERATOR.NAME_RETRIES && used.has(name); attempt++) name = next();
         used.add(name);
         places[index].name = name;
     }

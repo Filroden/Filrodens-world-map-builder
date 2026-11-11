@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { infillInBackground } from "../generator/Generate.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { panelSettings } from "../generator/GeneratorSettings.js";
 import { RiverNetwork } from "../generation/RiverNetwork.js";
 import { buildRoutes } from "../generator/MaterialiseRoutes.js";
@@ -12,6 +13,7 @@ import { InfillInput } from "./InfillInput.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { PinStyles } from "./PinStyles.js";
 import { Regeneration, isKept } from "./Regeneration.js";
+import { RunInputs } from "./RunInputs.js";
 import { TravelView } from "./TravelView.js";
 import { VectorHistory } from "./VectorHistory.js";
 
@@ -25,6 +27,12 @@ import { VectorHistory } from "./VectorHistory.js";
  * run id), so Generate and Remove generated content treat it as generated content. Filling in again
  * replaces what the last fill-in added, except what the reader has edited or locked, and never
  * touches what the map inherited.
+ *
+ * Out of date: once a fill-in is written, a fingerprint of what it read is kept with the map
+ * (`app.infillInputs`, saved as `infillInputs`, and held in the undo snapshot): the places it built
+ * round, the routes it followed and the food capacity painted in Influences (see inputs). Any
+ * change to them shows Fill in out of date, by whatever path, and undoing it clears it, as a run's
+ * fingerprint does (see RunInputs).
  *
  * Pins take the map's Market town and Village styles and lanes its Lane style, each added from the
  * defaults when the map lacks it (see Generation's style finders).
@@ -49,13 +57,52 @@ export class Infilling {
     static context(app) {
         const regional = !!(app.currentParentId || app.parentRun);
         if (!regional) return null;
+        const stale = this.stale(app);
         const offered = InfillInput.offered(app);
         let reason = null;
         if (!offered) reason = app.parentRun ? "FILRODENSWMB.UI.InfillTooCoarse" : "FILRODENSWMB.UI.InfillNoParentRun";
         const counts = this.counts(app);
         // As the panel shows them, grouped for the reader's language
         const shown = Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, value.toLocaleString(platform.i18n.lang)]));
-        return { offered, reason, counts, shown, again: counts.markets + counts.villages + counts.lanes > 0 };
+        return { offered, reason, counts, shown, again: counts.markets + counts.villages + counts.lanes > 0, stale, badge: stale ? "FILRODENSWMB.UI.GenerateOutOfDate" : null };
+    }
+
+    /** The generator rules the map follows (see GeneratorRevision.rules): from revision 2, settlement pins as places and names by cell. */
+    static rules(app) {
+        return GeneratorRevision.rules(GeneratorRevision.of(app.uiState));
+    }
+
+    /**
+     * The pins and routes a fill-in reads: the map's own and inherited ones, not the last fill-in's,
+     * which it replaces; from revision 2 also those of it the reader kept (edited or locked), which
+     * stay on the map and so are built round.
+     */
+    static readItems(app) {
+        const keptToo = this.rules(app).seats === true;
+        const read = (item) => !this.isInfill(item) || (keptToo && isKept(item));
+        return { pins: (app.mapPins ?? []).filter(read), routes: (app.mapRoutes ?? []).filter(read) };
+    }
+
+    /**
+     * The fingerprint of what a fill-in reads, as the map stands: the places it builds round (where
+     * each stands, its tier and people; see InfillInput.places), the routes it follows (transport
+     * and cells) and the food capacity painted in Influences (security is not read). Eight hex
+     * digits each (see RunInputs.hash).
+     * @returns {{places: string, routes: string, influences: string}}
+     */
+    static inputs(app) {
+        const { pins, routes } = this.readItems(app);
+        const places = InfillInput.places(pins, app.uiState?.customPinStyles ?? [], this.rules(app)).map(({ tier, population, x, y }) => [x, y, tier, population]);
+        const lines = routes.map((route) => [route.transport ?? "road", route.legs?.length ? route.legs : (route.waypoints ?? [])]);
+        return { places: RunInputs.hash(JSON.stringify(places)), routes: RunInputs.hash(JSON.stringify(lines)), influences: RunInputs.influencesHash(app.meshSession?.influences, ["capacity"]) };
+    }
+
+    /** Whether the last fill-in is out of date: what it read differs from its fingerprint (none kept, never). */
+    static stale(app) {
+        const saved = app.infillInputs;
+        if (!saved || typeof saved !== "object") return false;
+        const now = this.inputs(app);
+        return Object.keys(now).some((kind) => typeof saved[kind] === "string" && saved[kind] !== now[kind]);
     }
 
     /** What the map holds of in-fill's: market towns, villages and lanes. */
@@ -108,6 +155,8 @@ export class Infilling {
         const grid = InfillInput.grid(mesh);
         const settings = panelSettings(app.uiState.generatorSettings);
         const seed = `${settings.seed || app.uiState.mapSeed || ""}:infill`;
+        const rules = this.rules(app);
+        const { pins, routes } = this.readItems(app);
         const gatherInput = () =>
             InfillInput.gather({
                 mesh,
@@ -115,8 +164,10 @@ export class Infilling {
                 parentRun: app.parentRun,
                 // In the generator rules the map follows, as its parent's run was made (see GeneratorRevision)
                 payload: Generation.payload(app),
-                pins: (app.mapPins ?? []).filter((pin) => !this.isInfill(pin)),
-                routes: (app.mapRoutes ?? []).filter((route) => !this.isInfill(route)),
+                pins,
+                routes,
+                pinStyles: app.uiState.customPinStyles ?? [],
+                rules,
                 speeds: TravelView.setting(app).speeds,
                 seed,
                 nameBase: settings.nameBase,
@@ -180,6 +231,8 @@ export class Infilling {
         const placed = Regeneration.placesBeside(app, pins);
         app.mapPins.push(...placed);
         app.mapRoutes.push(...routes);
+        // What it read, as the map now stands, for Out of date (the undo snapshot holds the one before)
+        app.infillInputs = this.inputs(app);
         VectorHistory.push(app, VectorHistory.composite([before]));
         // The map starts at the level its new places read at (a view setting, so not undone with it)
         app.setDetailLevel?.(this.startLevel(app, placed), { repaint: false });
@@ -215,7 +268,8 @@ export class Infilling {
      * The display cell each place is set on: one of the dry cells within its in-fill cell (see
      * InfillInput.dryCell), by chance, one beside a river twice as likely (weighted reservoir
      * sampling, one pass over the display cells). Failing a dry cell, any land cell; failing that,
-     * the in-fill cell's site.
+     * the in-fill cell's site. From generator revision 2 each in-fill cell draws from a stream of
+     * its own, so a place keeps its spot when another comes or goes.
      * @returns {Map<number, number>} In-fill cell to display cell.
      */
     static #placeSites(app, places, grid, seed) {
@@ -223,7 +277,14 @@ export class Infilling {
         const land = app.meshSession.aggregates?.land ?? null;
         const image = app.bufferRivers?.length === mesh.width * mesh.height * 4 ? app.bufferRivers : null;
         const inRiver = (cell) => !!image && RiverNetwork.isInChannel(image, Math.floor(mesh.siteY(cell)) * mesh.width + Math.floor(mesh.siteX(cell)));
-        const random = stageRandom(seed, "infill-sites");
+        const shared = stageRandom(seed, "infill-sites");
+        const streams = new Map();
+        const byCell = this.rules(app).idNames === true;
+        const randomOf = (cell) => {
+            if (!byCell) return shared;
+            if (!streams.has(cell)) streams.set(cell, stageRandom(seed, `infill-site:${cell}`));
+            return streams.get(cell);
+        };
         const chosen = new Map(places.map((place) => [place.cell, -1]));
         const anyLand = new Map();
         const weights = new Map();
@@ -235,7 +296,7 @@ export class Infilling {
             const weight = mesh.neighbours(cell).some(inRiver) ? 2 : 1;
             const total = (weights.get(own) ?? 0) + weight;
             weights.set(own, total);
-            if (random() * total < weight) chosen.set(own, cell);
+            if (randomOf(own)() * total < weight) chosen.set(own, cell);
         }
         for (const [own, cell] of chosen) if (cell < 0) chosen.set(own, anyLand.get(own) ?? grid.siteCell[own]);
         return chosen;

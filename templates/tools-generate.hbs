@@ -28,22 +28,21 @@
             </button>
         </div>
     </div>
+    {{/if}}
 
-    {{#unless cultureList.count}}
     <div class="fwmb-form-group">
-        <label for="fwmb-generator-name-base">{{localize "FILRODENSWMB.UI.GenerateNameStyle"}}</label>
+        <label for="fwmb-generator-name-base">{{localize "FILRODENSWMB.UI.GenerateDefaultNameStyle"}}</label>
         <div class="fwmb-form-fields">
             <select id="fwmb-generator-name-base" name="generator.nameBase">
                 {{#each generate.nameBases}}
                 <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
                 {{/each}}
             </select>
-            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateNameStyleHint'}}"></i>
+            <i class="fwmb-icon fwmb-icon--info" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateDefaultNameStyleHint'}}"></i>
         </div>
     </div>
-    {{/unless}}
 
-    {{#if generate.estimate}}
+    {{#if generate.held}}{{else if generate.estimate}}
     <div class="fwmb-form-group">
         <label>{{localize "FILRODENSWMB.UI.GenerateEstimate"}}</label>
         <div class="fwmb-form-fields fwmb-setting-row--readout">
@@ -53,7 +52,6 @@
         </div>
     </div>
     {{#if generate.estimate.long}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateLongRun"}}</p>{{/if}}
-    {{/if}}
     {{/if}}
 
     {{#if generate.held}}{{else if generate.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOutOfDateHint"}}</p>{{/if}}
@@ -72,8 +70,9 @@
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#if generate.infill}}
-{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateInfill" title="FILRODENSWMB.UI.SectionGenerateInfill"}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateInfill" title="FILRODENSWMB.UI.SectionGenerateInfill" badge=generate.infill.badge}}
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.InfillHint"}}</p>
+    {{#if generate.infill.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.InfillOutOfDateHint"}}</p>{{/if}}
     {{#if generate.infill.offered}}
     {{#if generate.infill.again}}
     <dl class="fwmb-generate-results">

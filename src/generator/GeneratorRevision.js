@@ -72,7 +72,9 @@ export class GeneratorRevision {
      * - callKm, callShare: ports of call on long sea passages (see Trade); callKm null for none.
      * - shorePins: whether a port's place stands on its cell's shore, and a town on a navigable
      *   river beside the river, rather than on its cell's site (see CellValues, Materialise).
-     * - seats: whether the map's settlement pins are seats the run must build on (see Pipeline.seatsOf).
+     * - seats: whether the map's settlement pins are seats the run must build on (see Pipeline.seatsOf),
+     *   and on a regional map places its Fill in builds round, holding their people (see
+     *   InfillInput.places); before, Fill in read only the generated towns.
      * - userRegions: whether the realms, duchies and counties the map's Political set holds as its
      *   own are fixed units the present age's realms are built round (see UserRealms).
      * - userRoutes: whether the map's own routes are roads, sea lanes and traded rivers the run's
@@ -92,7 +94,8 @@ export class GeneratorRevision {
             seats: ports,
             userRegions: ports,
             userRoutes: ports,
-            // Each place, castle and realm named from a stream of its own (see Names)
+            // Each place, castle and realm named from a stream of its own (see Names), and each of
+            // Fill in's villages and market towns by its in-fill cell (see Infill)
             idNames: ports,
         });
     }
