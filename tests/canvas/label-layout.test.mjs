@@ -200,3 +200,20 @@ test("a river's name on another stretch of a bending river is turned to follow t
     // Its box is the turned name's, so it keeps clear of the cartouche
     assert.ok(!overlaps({ x: at.x, y: at.y, w: 100 * Math.cos((75 * Math.PI) / 180) + 12 * Math.sin((75 * Math.PI) / 180), h: 100 * Math.sin((75 * Math.PI) / 180) + 12 * Math.cos((75 * Math.PI) / 180) }, plate));
 });
+
+test("a custom river's name follows its course, turned to the stretch it sits on; moved, it stays where it was put", () => {
+    // A course rising to the north-east, as a river's name reads
+    const course = [];
+    for (let k = 0; k <= 200; k += 4) course.push({ x: 100 + k, y: 300 - k });
+    const item = { id: "river:silver", type: "river", labelData: {}, w: 60, h: 12, length: 60, thickness: 12, defaultX: 200, defaultY: 200, course };
+    const layout = new LabelLayout();
+    const placed = layout.layout([item], { pins: [], pinWidth, pass: "normal" });
+    const at = placed.position(item);
+    assert.ok(at, "placed");
+    assert.ok(Math.abs(at.rotation + 45) < 2, `turned to the course (${at.rotation})`);
+    assert.ok(Math.abs(at.x + at.y - 400) < 2, "on the course");
+    assert.ok(Math.hypot(at.x - 200, at.y - 200) < 40, "near the middle of the course");
+
+    const moved = { ...item, labelData: { x: 50, y: 60 } };
+    assert.deepEqual(new LabelLayout().layout([moved], { pins: [], pinWidth, pass: "normal" }).position(moved), { x: 50, y: 60 });
+});

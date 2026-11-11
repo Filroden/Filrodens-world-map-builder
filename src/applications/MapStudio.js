@@ -70,6 +70,7 @@ import { PinEditor } from "./PinEditor.js";
 import { LabelEditor } from "./LabelEditor.js";
 import { PickTool } from "./PickTool.js";
 import { DecorationEditor, FaultEditor, LandMaskEditor, RiverEditor } from "./FeatureEditors.js";
+import { RiverLabels } from "./RiverLabels.js";
 import { LayerSetEditor, LevelEditor } from "./LayerEditors.js";
 import { PinStyles } from "./PinStyles.js";
 import { GeneratePanel } from "./GeneratePanel.js";
@@ -501,8 +502,8 @@ export class MapStudio {
         // Mass Edit selection tool state - also Studio-session UI state, not map data, for the
         // same reason: which items are checked for a batch edit has nothing to do with the map
         // itself, and should reset (not persist) whenever the Studio app is reopened.
-        this.massEditMode = { pin: false, route: false, region: false, label: false };
-        this.massEditSelection = { pin: new Set(), route: new Set(), region: new Set(), label: new Set() };
+        this.massEditMode = { pin: false, route: false, region: false, label: false, river: false };
+        this.massEditSelection = { pin: new Set(), route: new Set(), region: new Set(), label: new Set(), river: new Set() };
         // The level whose regions Mass Edit is choosing from (see #massEditLevel)
         this.massEditLevelId = null;
         // The Regions lists: the region chosen in each level's list, the levels whose Unassigned row
@@ -1242,6 +1243,8 @@ export class MapStudio {
 
         context.tectonicFaults = [...(this.tectonicFaults || [])].sort(alphaSort);
         context.manualRivers = [...(this.manualRivers || [])].sort(alphaSort);
+        // The custom rivers Mass Edit has chosen, by id (see tools-features.hbs)
+        context.riverSelection = Object.fromEntries([...this.massEditSelection.river].map((id) => [id, true]));
 
         context.uiState = this.uiState;
         context.worldAreaFactor = clampAreaFactor(this.uiState.world?.areaFactor);
@@ -1317,6 +1320,7 @@ export class MapStudio {
                 route: this.massEditSelection.route.size,
                 region: this.massEditSelection.region.size,
                 label: this.massEditSelection.label.size,
+                river: this.massEditSelection.river.size,
             };
             context.massEditBlocked = Object.fromEntries(Object.keys(this.massEditMode).map((type) => [type, this.#isMassEditBlocked(type)]));
 
@@ -1434,7 +1438,7 @@ export class MapStudio {
     /** The kinds the pin, route and label lists can be narrowed to (value to localisation key). */
     static #PIN_KINDS = Object.freeze({ ...Object.fromEntries(FILRODENSWMB.PINS.DEFAULT_STYLES.map((style) => [style.tier, style.name])), other: "FILRODENSWMB.UI.ListKindOther" });
     static #ROUTE_KINDS = Object.freeze({ road: "FILRODENSWMB.UI.TransportRoad", river: "FILRODENSWMB.UI.TransportRiver", sea: "FILRODENSWMB.UI.TransportSea" });
-    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region", feature: "FILRODENSWMB.UI.LabelFilter_feature", noRoom: "FILRODENSWMB.UI.LabelFilter_noRoom" });
+    static #LABEL_KINDS = Object.freeze({ custom: "FILRODENSWMB.UI.LabelFilter_custom", pin: "FILRODENSWMB.UI.LabelFilter_pin", route: "FILRODENSWMB.UI.LabelFilter_route", region: "FILRODENSWMB.UI.LabelFilter_region", river: "FILRODENSWMB.UI.LabelFilter_river", feature: "FILRODENSWMB.UI.LabelFilter_feature", noRoom: "FILRODENSWMB.UI.LabelFilter_noRoom" });
 
     /**
      * Each long list's kinds, rows template, and the fields of a row its template shows (a row's
@@ -1487,7 +1491,7 @@ export class MapStudio {
     #labelRows(selected) {
         const owner = (key) => platform.i18n.localize(key);
         const named = (item) => !!item.name;
-        const ownerMeta = { pin: owner("FILRODENSWMB.UI.InspectorOwnerPin"), route: owner("FILRODENSWMB.UI.InspectorOwnerRoute") };
+        const ownerMeta = { pin: owner("FILRODENSWMB.UI.InspectorOwnerPin"), route: owner("FILRODENSWMB.UI.InspectorOwnerRoute"), river: owner("FILRODENSWMB.UI.InspectorOwnerRiver") };
         // A name the map had no room for at its last draw is marked, and found with the No room filter
         const withoutRoom = this.canvasEngine?.labelsWithoutRoom ?? new Set();
         const marked = (row) => (withoutRoom.has(`${row.type}:${row.id}`) ? { ...row, noRoom: true, also: [...(row.also ?? []), "noRoom"] } : row);
@@ -1498,6 +1502,8 @@ export class MapStudio {
             ...this.regionLevels.flatMap((level) =>
                 level.regions.filter(named).map((region) => ({ id: region.id, name: region.name, type: "region", kind: "region", generated: !!region.generated, labelKey: "labelregion", layerId: level.id, meta: platform.i18n.format("FILRODENSWMB.UI.LabelOwnerRegionMeta", { kind: owner("FILRODENSWMB.UI.InspectorOwnerRegion"), level: level.name }), visibility: region.label?.visibility ?? "all" })),
             ),
+            // Custom rivers' names (see RiverLabels), hidden until shown for a river drawn before they had labels
+            ...(this.manualRivers || []).filter(named).map((river) => ({ id: river.id, name: river.name, type: "river", kind: "river", labelKey: "labelriver", meta: ownerMeta.river, visibility: RiverLabels.label(this, river).visibility })),
         ].map(marked);
     }
 
@@ -2818,7 +2824,7 @@ export class MapStudio {
         }
 
         if (this.activeTool === "labels") {
-            this.canvasEngine.renderLabels(this.mapLabels, shown.pins, shown.routes, isEdit, this.meshSession);
+            this.canvasEngine.renderLabels(this.mapLabels, shown.pins, shown.routes, isEdit, this.meshSession, RiverLabels.items(this));
         }
 
         if (this.activeTool === "scene" && this.canvasEngine.renderLandMasks) {
@@ -3298,13 +3304,21 @@ export class MapStudio {
                 if (river) river.points.push(finalPos);
             } else {
                 this.activeRiverId = platform.utils.randomID();
-                this.manualRivers.push({
+                const river = {
                     id: this.activeRiverId,
-                    name: `Manual River ${this.manualRivers.length + 1}`,
+                    name: "",
                     points: [finalPos],
                     width: this.uiState.riverWidth,
                     visibility: "all",
-                });
+                    // Its name is drawn along it (see RiverLabels), in the River label style when the map has it
+                    label: RiverLabels.newLabel(this),
+                };
+                // A name in the language of the people living there, as Random name gives
+                // (its number in the list only when none can be made)
+                river.name = RandomNames.suggest(this, "river", river) || platform.i18n.format("FILRODENSWMB.UI.RiverDefaultName", { number: this.manualRivers.length + 1 });
+                river.nameSource = "random";
+                river.nameRoll = 0;
+                this.manualRivers.push(river);
                 RiverEditor.open(this, this.activeRiverId, { created: true });
             }
             activeEntity = this.manualRivers.find((r) => r.id === this.activeRiverId);
@@ -3747,7 +3761,7 @@ export class MapStudio {
 
         // 5. Render Labels
         const isLabelEdit = this.activeTool === "labels" && isEditModeActive;
-        this.canvasEngine.renderLabels(this.mapLabels, shownPins, shownRoutes, isLabelEdit, past ? past.session : this.meshSession);
+        this.canvasEngine.renderLabels(this.mapLabels, shownPins, shownRoutes, isLabelEdit, past ? past.session : this.meshSession, RiverLabels.items(this));
 
         // 6. Render Land Masks
         if (this.canvasEngine.renderLandMasks) {
@@ -6801,6 +6815,8 @@ export class MapStudio {
                     .map((row) => row.id);
             case "region":
                 return RegionPanel.listedRegionIds(this, this.massEditLevelId);
+            case "river":
+                return (this.manualRivers ?? []).map((river) => river.id);
             default:
                 return [];
         }
@@ -6898,6 +6914,8 @@ export class MapStudio {
             if (type === "custom") {
                 obj.visibility = this.#cycleVisibilityState(obj.visibility);
             } else {
+                // A custom river with no label yet has its name hidden: shown, it starts in the River label style
+                if (!obj.label && type === "river") obj.label = RiverLabels.newLabel(this, "none");
                 if (!obj.label) obj.label = { visibility: "all" };
                 obj.label.visibility = this.#cycleVisibilityState(obj.label.visibility);
             }
@@ -6916,6 +6934,7 @@ export class MapStudio {
             pin: this.mapPins,
             route: this.mapRoutes,
             fault: this.tectonicFaults,
+            river: this.manualRivers,
         };
 
         if (collections[type]) {

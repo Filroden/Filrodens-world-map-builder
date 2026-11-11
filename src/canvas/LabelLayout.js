@@ -105,7 +105,8 @@ const KEY_PRECISION = 2;
 /**
  * @typedef {object} LabelItem
  * @property {string} id - "<type>:<owner id>", unique among the labels.
- * @property {string} type - "custom", "pin", "route" or "region".
+ * @property {string} type - "custom", "pin", "route", "region" or "river" (a custom river's).
+ * @property {{x: number, y: number}[]} [course] - A custom river's label: the river's course (see RiverLabels).
  * @property {object} labelData - The label's own fields (x and y when it has its own position).
  * @property {number} w - Its drawn width, in map pixels (of its box, if rotated).
  * @property {number} h - Its drawn height.
@@ -157,6 +158,7 @@ export class LabelLayout {
     /** A label's request for LabelPlacement: its candidates, turn and weight, and its key. */
     #request(item, meshSession, bounds) {
         if (item.type === "custom" && item.labelData.feature && !isEditedFeatureLabel(item.labelData) && PLACEMENT.FEATURES[item.labelData.feature.kind]) return this.#featureRequest(item, bounds);
+        if (item.type === "river" && item.labelData.x === undefined && item.course?.length) return this.#customRiverRequest(item, bounds);
         if (item.type === "custom" || item.labelData.x !== undefined) {
             return fixedBox(item.id, item.labelData.x ?? item.defaultX, item.labelData.y ?? item.defaultY, item.w, item.h, PLACEMENT.REGION_DEPTHS[0].weight);
         }
@@ -195,6 +197,22 @@ export class LabelLayout {
             });
         }
         if (bounds) candidates = withinMap(candidates, item, bounds);
+        return withKey({ id: item.id, w: item.w, h: item.h, candidates, order: rank.order, weight: rank.weight, mustShow: false });
+    }
+
+    /**
+     * A custom river's name not moved by the reader (see RiverLabels): along its course, as a
+     * natural feature's river name is (see #riverPlaces), the stretches nearest the middle of its
+     * course costing least; its middle, unturned, when no stretch is long and straight enough.
+     */
+    #customRiverRequest(item, bounds) {
+        const course = item.course;
+        const middle = course[Math.floor(course.length / 2)];
+        const fitted = { ...item, labelData: { ...item.labelData, x: middle.x, y: middle.y } };
+        let candidates = this.#riverPlaces(fitted, { path: course }, () => 0);
+        candidates.push({ x: middle.x, y: middle.y, cost: RIVER_PLACES.FAR_COST + RIVER_PLACES.BEND_COST });
+        if (bounds) candidates = withinMap(candidates, item, bounds);
+        const rank = PLACEMENT.FEATURES.river;
         return withKey({ id: item.id, w: item.w, h: item.h, candidates, order: rank.order, weight: rank.weight, mustShow: false });
     }
 

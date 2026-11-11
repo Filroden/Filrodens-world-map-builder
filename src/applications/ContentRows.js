@@ -72,7 +72,7 @@ export class ContentRows {
         return { id: "labels", state: stateOf(rows), rows };
     }
 
-    /** The rows' keys of every name the map has (standalone labels, and named pins, routes and regions). */
+    /** The rows' keys of every name the map has (standalone labels, and named pins, routes, regions and custom rivers with a label). */
     static #stylesInUse(app) {
         const used = new Set();
         const add = (labelData) => used.add(this.labelKey(app, labelData));
@@ -80,6 +80,7 @@ export class ContentRows {
         for (const pin of app.mapPins ?? []) if (pin.icon && pin.name) add(pin.label);
         for (const route of app.mapRoutes ?? []) if (route.name) add(route.label);
         for (const set of app.layerSets ?? []) for (const level of set.levels) for (const region of level.regions) if (region.name) add(region.label);
+        for (const river of app.manualRivers ?? []) if (river.name && river.label) add(river.label);
         return used;
     }
 

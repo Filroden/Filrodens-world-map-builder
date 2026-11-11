@@ -1937,6 +1937,11 @@ export const FILRODENSWMB = {
         NAME_ALL_KINDS: Object.freeze({ region: "FILRODENSWMB.UI.NameAllRegions", pin: "FILRODENSWMB.UI.NameAllPins", route: "FILRODENSWMB.UI.NameAllRoutes" }),
         NAME_ALL_SOURCES: Object.freeze({ unnamed: "FILRODENSWMB.UI.NameAllUnnamed", random: "FILRODENSWMB.UI.NameAllRandom", default: "FILRODENSWMB.UI.NameAllDefault", generated: "FILRODENSWMB.UI.NameAllGenerated" }),
     }),
+    // A custom river's name (see RiverLabels): drawn along the traced river nearest its guide, the
+    // guide read every COURSE_STEP_PX and each point moved onto the traced river within SNAP_PX;
+    // Name natural features leaves a river to a custom river whose name is shown when at least
+    // COVER_SHARE of that river's course lies within SNAP_PX of it
+    RIVER_LABELS: Object.freeze({ COURSE_STEP_PX: 4, SNAP_PX: 12, COVER_SHARE: 0.5 }),
     // Natural features named by the Labels tool (see FeatureDetection and FeatureNames): the
     // label style each group is named in, how each kind is written ({name} is the proper name),
     // and the old Water style the family replaces

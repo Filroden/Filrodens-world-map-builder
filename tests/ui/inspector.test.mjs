@@ -1144,3 +1144,34 @@ test("a moved pin label offers Place automatically, in the pin's and the label's
     await LabelEditor.open(app, { type: "custom", id: "sea" });
     assert.equal(form(app).querySelector('[data-inspector-action="placeLabel"]'), null, "a standalone label's position is its own");
 });
+
+test("a custom river's label: hidden for a river drawn before, shown as one undo step, its look its own; Random name, Place automatically, and its label's own inspector", async () => {
+    const { app } = await studio();
+    const river = () => app.manualRivers.find((each) => each.id === "silver");
+    await RiverEditor.open(app, "silver");
+    assert.equal(field(app, "labelVisibility").value, "none", "a river drawn before rivers had labels has its name hidden");
+    await commit(app, "labelVisibility", "all");
+    assert.equal(river().label.visibility, "all");
+    assert.equal(app.terrainUpdates, 0, "a label carves nothing");
+    await commit(app, "labelFontSize", "2.5");
+    assert.equal(river().label.fontSize, 2.5);
+    assert.equal(steps(app), 2);
+    await undo(app);
+    assert.notEqual(river().label?.fontSize, 2.5, "one undo step each");
+
+    const named = river().name;
+    await press(app, "randomName");
+    assert.notEqual(river().name, named, "Random name");
+    assert.equal(river().nameSource, "random");
+
+    river().label = { ...river().label, x: 40, y: 50 };
+    Inspector.refresh(app);
+    await settle();
+    await press(app, "placeLabel");
+    assert.ok(!("x" in river().label), "Place automatically");
+
+    await LabelEditor.open(app, { type: "river", id: "silver" });
+    assert.ok(form(app).querySelector(".fwmb-inspector-owner").textContent.includes(river().name), "the label's own inspector names its river");
+    await commit(app, "labelVisibility", "gm");
+    assert.equal(river().label.visibility, "gm");
+});

@@ -15,6 +15,7 @@ const TITLES = Object.freeze({
     route: "FILRODENSWMB.UI.MassEditRoutesTitle",
     region: "FILRODENSWMB.UI.MassEditRegionsTitle",
     label: "FILRODENSWMB.UI.MassEditLabelsTitle",
+    river: "FILRODENSWMB.UI.MassEditRiversTitle",
 });
 /** The value of a select left as is. */
 const KEEP = "";
@@ -23,7 +24,7 @@ const PLACEMENT = "placement";
 const PLACE_AUTOMATICALLY = "auto";
 
 /**
- * Mass edit: the inspector's fields for several pins, routes, regions or standalone labels at once
+ * Mass edit: the inspector's fields for several pins, routes, regions, custom rivers or standalone labels at once
  * (see FieldSpecs), in one dialogue drawn from the kind's field descriptions: the item's fields,
  * then (for a pin, route or region) its label's.
  *
@@ -83,6 +84,8 @@ export class MassEdit {
                 return app.regionLevels.flatMap((level) => level.regions).filter((region) => ids.has(region.id));
             case "label":
                 return app.mapLabels.filter((label) => ids.has(label.id));
+            case "river":
+                return (app.manualRivers ?? []).filter((river) => ids.has(river.id));
             default:
                 return [];
         }
@@ -341,11 +344,12 @@ export class MassEdit {
             if (substantive) GeneratedEdits.mark(item);
             if (kind.hasLabel) {
                 this.#applyStore(app, item, kind.style, changes.filter((change) => change.store === "item"), fields, "item", type);
-                const label = { ...(item.label ?? {}) };
+                // A kind's label it has none of yet starts as the kind says (a custom river's hidden)
+                const label = { ...(item.label ?? kind.newLabel?.(app) ?? {}) };
                 const labelChanges = changes.filter((change) => change.store === "label" && change.key !== PLACEMENT);
                 if (labelChanges.length) {
                     this.#applyStore(app, label, FieldSpecs.labelStyle, labelChanges, fields, "label", "ownedLabel");
-                    item.label = { ...(item.label ?? {}), ...label };
+                    item.label = { ...(item.label ?? kind.newLabel?.(app) ?? {}), ...label };
                 }
                 // Place automatically: the label's own position goes, so the map places it
                 if (item.label && changes.some((change) => change.store === "label" && change.key === PLACEMENT && change.value === PLACE_AUTOMATICALLY)) {
@@ -357,6 +361,8 @@ export class MassEdit {
             }
         }
         app._repaintVectors();
+        // A custom river's width carves it again
+        if (kind.terrainFields && changes.some((change) => change.store === "item" && kind.terrainFields.includes(change.key))) app.requestTerrainUpdate?.();
         app.markDirty();
         return true;
     }

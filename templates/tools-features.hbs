@@ -1,12 +1,28 @@
 {{!--
     Rivers and faults (tool id "features"): the rivers and fault lines drawn by hand, and the
     hydrology settings the generated rivers follow (which rebuild the rivers). Drawing and placing
-    river sources are the bar's modes.
+    river sources are the bar's modes. Mass Edit (with Delete) of the custom rivers is toggled from
+    their list's title, as the Routes and pins lists' are.
 --}}
-{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="rivers" title="FILRODENSWMB.UI.ManualRivers" count=manualRivers.length}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="rivers" title="FILRODENSWMB.UI.ManualRivers" count=manualRivers.length massType="river"}}
+    {{#if massEditMode.river}}
+    <div class="fwmb-mass-edit-bar fwmb-mass-edit-bar--list">
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="massEditSelectAll" data-type="river">{{localize "FILRODENSWMB.UI.MassEditSelectAll"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--subtle" data-action="massEditSelectNone" data-type="river">{{localize "FILRODENSWMB.UI.MassEditSelectNone"}}</button>
+        <button type="button" class="fwmb-btn fwmb-btn--danger-quiet" data-action="massDelete" data-type="river" {{#unless massEditCount.river}}disabled{{/unless}} data-tooltip="{{localize 'FILRODENSWMB.UI.MassDeleteHint'}}">
+            {{localize "FILRODENSWMB.UI.MassDelete" count=massEditCount.river}}
+        </button>
+        <button type="button" class="fwmb-btn fwmb-btn--primary" data-action="openMassEdit" data-type="river" {{#unless massEditCount.river}}disabled{{/unless}}>
+            {{localize "FILRODENSWMB.UI.MassEdit"}} ({{massEditCount.river}})
+        </button>
+    </div>
+    {{/if}}
     <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.ManualRivers'}}" data-list-nav id="fwmb-scroll-rivers" class="fwmb-list-container fwmb-scrollable fwmb-scrollable--stable">
         {{#each manualRivers}}
             <div role="option" tabindex="-1" data-list-item class="fwmb-list-item" aria-selected="{{#if (eq this.id @root.inspected.river)}}true{{else}}false{{/if}}" data-id="{{this.id}}" data-type="river" data-action="editRiver">
+                {{#if @root.massEditMode.river}}
+                <input type="checkbox" class="fwmb-checkbox" data-action="toggleMassEditItem" data-mass-type="river" data-panel-ui aria-label="{{localize 'FILRODENSWMB.UI.MassEditChoose' name=this.name}}" {{#if (lookup @root.riverSelection this.id)}}checked{{/if}} />
+                {{/if}}
                 <div class="fwmb-route-swatch fwmb-route-swatch--river"></div>
                 <span class="fwmb-name fwmb-flex-1" title="{{this.name}}">{{this.name}}</span>
                 <span class="fwmb-actions">

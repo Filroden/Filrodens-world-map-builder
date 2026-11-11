@@ -501,6 +501,10 @@ const FAULT = obj({
 const RIVER = obj({
     id,
     name: name("FILRODENSWMB.UI.LimitKindRiver"),
+    // Where its name came from (see RandomNames), and its label: its name drawn along it (see RiverLabels)
+    nameSource,
+    nameRoll,
+    label: OWNED_LABEL,
     points,
     // Rivers drawn before the width was kept as a number carry it as text ("4"), so a numeric
     // string is read as its number

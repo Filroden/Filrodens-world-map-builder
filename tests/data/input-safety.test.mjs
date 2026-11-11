@@ -456,6 +456,20 @@ test("a run's fingerprint of the map's own items it read keeps to its rules", ()
     assert.equal({}.polluted, undefined);
 });
 
+test("a custom river's label and the source of its name keep to their rules", () => {
+    const file = v4Map();
+    file.manualRivers = [{ id: "riverAAAAAAAAAAA", name: "Silverrun", points: [{ x: 0, y: 0 }], width: 4, nameSource: "random", nameRoll: 2, label: { visibility: "gm", fontSize: 2, x: 10, y: 20, quickStyle: "label-style-river" } }];
+    const kept = MapImport.read(structuredClone(file)).mapData.manualRivers[0];
+    assert.deepEqual([kept.nameSource, kept.nameRoll, kept.label.visibility, kept.label.fontSize, kept.label.x, kept.label.quickStyle], ["random", 2, "gm", 2, 10, "label-style-river"]);
+    file.manualRivers[0].nameSource = SCRIPT;
+    file.manualRivers[0].label = { visibility: "everyone", fontFamily: SCRIPT, x: "far", __proto__: { polluted: true } };
+    const cleaned = MapImport.read(file).mapData.manualRivers[0];
+    assert.notEqual(cleaned.nameSource, SCRIPT);
+    assert.ok(!("visibility" in (cleaned.label ?? {})) && !("x" in (cleaned.label ?? {})), "an unknown visibility and a position that is no number are dropped");
+    assert.notEqual(cleaned.label?.fontFamily, SCRIPT);
+    assert.equal({}.polluted, undefined);
+});
+
 test("a fill-in's fingerprint of what it read keeps to its rules", () => {
     const file = v4Map();
     file.infillInputs = { places: "302dc36a", routes: "ea11758b", influences: "811c9dc5" };

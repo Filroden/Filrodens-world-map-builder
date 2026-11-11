@@ -1,5 +1,8 @@
 import { FILRODENSWMB } from "../config.js";
 import { Inspector } from "./Inspector.js";
+import { InspectorFields } from "./InspectorFields.js";
+import { RandomNames } from "./RandomNames.js";
+import { RiverLabels } from "./RiverLabels.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { MapStateManager } from "./MapStateManager.js";
 import { RegionPanel } from "./RegionPanel.js";
@@ -68,6 +71,34 @@ function zoomTo(app, points) {
  * drawn, the bar's width follows it, so the rest of the line is drawn at the same width.
  */
 export class RiverEditor {
+    /**
+     * Applies the form as one undo step, when anything changed: the name, the width and corridor
+     * (which carve the river again) and the label's fields.
+     */
+    static #apply(app, river, form, field) {
+        const elements = form.elements;
+        const fields = { name: elements.riverName.value.trim() || river.name, width: Number(elements.riverWidth.value) };
+        // The corridor's settings, shown from terrain revision 3 on
+        if (elements.riverCorridor) fields.corridor = Number(elements.riverCorridor.value);
+        if (elements.riverCutThrough) fields.cutThrough = elements.riverCutThrough.checked;
+        const values = typed("river", fields, river);
+        const current = { ...river, corridor: RiverEditor.corridorOf(river), cutThrough: river.cutThrough === true };
+        const changed = Object.keys(values).filter((name) => current[name] !== values[name]);
+        // Checked as an import is (see MapRules.typed): a value that fails its rule keeps the label's own
+        const shownLabel = RiverLabels.label(app, river);
+        const label = elements.labelQuickStyle ? typed("ownedLabel", InspectorFields.readLabel(form, field, app), shownLabel) : null;
+        const labelChanged = !!label && InspectorFields.differs(shownLabel, label);
+        if (!changed.length && !labelChanged) return false;
+        MapStateManager.pushVectorState(app);
+        if (values.name !== river.name) RandomNames.markTyped(river);
+        Object.assign(river, values);
+        if (river.cutThrough === false) delete river.cutThrough;
+        if (labelChanged) river.label = { ...(river.label ?? {}), ...label };
+        if (app.activeRiverId === river.id) app.uiState.riverWidth = river.width;
+        redraw(app, changed.some((name) => ["width", "corridor", "cutThrough"].includes(name)));
+        return true;
+    }
+
     /** @returns {Promise<boolean>} */
     static open(app, id, options) {
         return Inspector.open(app, this.KIND, { id }, options);
@@ -83,28 +114,27 @@ export class RiverEditor {
         template: `${TEMPLATES}inspector-river.hbs`,
         find: (app, { id }) => app.manualRivers?.find((river) => river.id === id) ?? null,
         header: (_app, river) => ({ title: river.name, subtitle: platform.i18n.localize("FILRODENSWMB.UI.InspectorSubtitleRiver") }),
-        context: (app, river) => ({
-            river,
-            widths: RIVER_WIDTHS.map(([value, label]) => ({ value, label, selected: value === Number(river.width) })),
-            guided: TerrainVersion.usesGuidedRivers(app.uiState),
-            corridor: { value: RiverEditor.corridorOf(river), min: FILRODENSWMB.HYDROLOGY.CORRIDOR_MIN, max: FILRODENSWMB.HYDROLOGY.CORRIDOR_MAX },
-        }),
-        apply: (app, river, _ref, form) => {
-            const elements = form.elements;
-            const fields = { name: elements.riverName.value.trim() || river.name, width: Number(elements.riverWidth.value) };
-            // The corridor's settings, shown from terrain revision 3 on
-            if (elements.riverCorridor) fields.corridor = Number(elements.riverCorridor.value);
-            if (elements.riverCutThrough) fields.cutThrough = elements.riverCutThrough.checked;
-            const values = typed("river", fields, river);
-            const current = { ...river, corridor: RiverEditor.corridorOf(river), cutThrough: river.cutThrough === true };
-            const applied = applyValues(app, river, values, ["width", "corridor", "cutThrough"], current);
-            if (applied && river.cutThrough === false) delete river.cutThrough;
-            if (applied && app.activeRiverId === river.id) app.uiState.riverWidth = river.width;
-            return applied;
+        context: (app, river) => {
+            const label = RiverLabels.label(app, river);
+            return {
+                river,
+                widths: RIVER_WIDTHS.map(([value, label]) => ({ value, label, selected: value === Number(river.width) })),
+                guided: TerrainVersion.usesGuidedRivers(app.uiState),
+                corridor: { value: RiverEditor.corridorOf(river), min: FILRODENSWMB.HYDROLOGY.CORRIDOR_MIN, max: FILRODENSWMB.HYDROLOGY.CORRIDOR_MAX },
+                // Its name on the map (see RiverLabels): hidden for a river drawn before rivers had labels
+                label,
+                labelChoices: InspectorFields.labelChoices(app, label),
+                labelStyleName: InspectorFields.styleName(app.uiState.customLabelStyles, label.quickStyle),
+                labelVisibilities: RegionPanel.visibilityChoices(label.visibility),
+                palette: FILRODENSWMB.LABELS?.PRESETS || [],
+            };
         },
+        apply: (app, river, _ref, form, field) => RiverEditor.#apply(app, river, form, field),
         actions: {
             zoom: (app, river) => zoomTo(app, river.points),
             delete: (app, river) => MapDialogManager.deleteEntityById(app, "river", river.id),
+            randomName: (app, river) => RandomNames.press(app, "river", river),
+            placeLabel: (app, river) => InspectorFields.placeLabel(app, river),
         },
     });
 }

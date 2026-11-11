@@ -7,6 +7,8 @@ import { MeshIntegration } from "./MeshIntegration.js";
 import { PinEditor } from "./PinEditor.js";
 import { RegionEditor } from "./RegionEditor.js";
 import { RegionPanel } from "./RegionPanel.js";
+import { RiverEditor } from "./FeatureEditors.js";
+import { RiverLabels } from "./RiverLabels.js";
 import { RouteEditor } from "./RouteEditor.js";
 import { platform } from "../platform/index.js";
 import { typed } from "../data/MapRules.js";
@@ -16,11 +18,13 @@ const OWNERS = Object.freeze({
     pin: { kind: "FILRODENSWMB.UI.InspectorOwnerPin", icon: "place", tool: "infrastructure", infraMode: "pin" },
     route: { kind: "FILRODENSWMB.UI.InspectorOwnerRoute", icon: "timeline", tool: "infrastructure", infraMode: "route" },
     region: { kind: "FILRODENSWMB.UI.InspectorOwnerRegion", icon: "pentagon", tool: "regions" },
+    river: { kind: "FILRODENSWMB.UI.InspectorOwnerRiver", icon: "water", tool: "features", featureMode: "river" },
 });
 
 /**
  * A label in the inspector (see Inspector): a standalone label (the Labels tool's own, `type`
- * "custom") or the label of a pin, route or region (`type` "pin", "route" or "region").
+ * "custom") or the label of a pin, route, region or custom river (`type` "pin", "route", "region"
+ * or "river"; a river's label is hidden until shown, see RiverLabels).
  *
  * A standalone label's fields are its own: its text, visibility and look, with Focus view and
  * Delete. An owned label's text is its owner's name, so it shows what it belongs to and a link
@@ -47,11 +51,13 @@ export class LabelEditor {
         if (type === "pin") return app.mapPins?.find((pin) => pin.id === id) ?? null;
         if (type === "route") return app.mapRoutes?.find((route) => route.id === id) ?? null;
         if (type === "region") return app.regionLevels?.find((level) => level.id === layerId)?.regions.find((region) => region.id === id) ?? null;
+        if (type === "river") return app.manualRivers?.find((river) => river.id === id) ?? null;
         return null;
     }
 
     /** The label's fields with their defaults: a standalone label's own, an owner's `label`. */
     static #label(app, object, ref) {
+        if (ref.type === "river") return RiverLabels.label(app, object);
         return InspectorFields.label(app, ref.type === "custom" ? { label: object } : object);
     }
 
@@ -69,7 +75,7 @@ export class LabelEditor {
         apply: (app, object, ref, form, field) => LabelEditor.#apply(app, object, ref, form, field),
         actions: {
             zoom: (app, object, ref) => {
-                const points = ref.type === "custom" || ref.type === "pin" ? [object] : MeshIntegration.outlinePoints(app, object);
+                const points = ref.type === "custom" || ref.type === "pin" ? [object] : ref.type === "river" ? (object.points ?? []) : MeshIntegration.outlinePoints(app, object);
                 if (points.length) app.canvasEngine?.zoomToFeature(points);
             },
             goToOwner: (app, object, ref) => LabelEditor.#goToOwner(app, object, ref),
@@ -125,9 +131,11 @@ export class LabelEditor {
         const owner = OWNERS[ref.type];
         if (!owner) return;
         if (owner.infraMode) app.uiState.activeInfraMode = owner.infraMode;
+        if (owner.featureMode) app.uiState.activeFeatureMode = owner.featureMode;
         if (app.activeTool !== owner.tool) app._onChangeTool?.(null, { dataset: { tool: owner.tool } });
         if (ref.type === "pin") await PinEditor.open(app, object.id);
         else if (ref.type === "route") await RouteEditor.open(app, object.id);
+        else if (ref.type === "river") await RiverEditor.open(app, object.id);
         else await RegionEditor.open(app, ref.layerId, object.id);
     }
 

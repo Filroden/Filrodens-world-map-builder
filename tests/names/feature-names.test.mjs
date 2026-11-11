@@ -223,3 +223,36 @@ test("a map whose ocean is larger than a call's arguments can hold is still read
     const features = findFeatures(map, {}, { ...SETTINGS, COARSE: 1 });
     assert.ok(features.some((feature) => feature.kind === "ocean"), "its ocean is found");
 });
+
+test("a river a custom river names (its name shown along it) is left to it: not labelled, and an earlier unedited label taken away", () => {
+    const guide = { id: "silver", name: "Silverrun", width: 4, points: [{ x: 450, y: 60 }, { x: 330, y: 180 }, { x: 210, y: 300 }] };
+    const riverLabels = (app) => app.mapLabels.filter((label) => label.feature?.kind === "river");
+
+    // Hidden (a river drawn before rivers had labels): the map names the river as before
+    const hidden = studio();
+    hidden.manualRivers = [structuredClone(guide)];
+    FeatureNames.apply(hidden, syntheticMap());
+    assert.equal(riverLabels(hidden).length, 1, "a custom river with its name hidden leaves the river to the map");
+
+    // Shown: the river is left to it, and the label the first run made goes
+    hidden.manualRivers[0].label = { visibility: "all" };
+    const report = FeatureNames.apply(hidden, syntheticMap());
+    assert.equal(riverLabels(hidden).length, 0, "the earlier label taken away");
+    assert.ok(report.skipped >= 1, "counted as already named");
+
+    // An earlier label the reader moved stays
+    const edited = studio();
+    edited.manualRivers = [structuredClone(guide)];
+    FeatureNames.apply(edited, syntheticMap());
+    const moved = riverLabels(edited)[0];
+    moved.x += 30;
+    edited.manualRivers[0].label = { visibility: "all" };
+    FeatureNames.apply(edited, syntheticMap());
+    assert.deepEqual(riverLabels(edited).map((label) => label.id), [moved.id], "a label the reader changed is kept");
+
+    // A custom river elsewhere does not take the river from the map
+    const elsewhere = studio();
+    elsewhere.manualRivers = [{ ...structuredClone(guide), points: [{ x: 700, y: 500 }, { x: 760, y: 560 }], label: { visibility: "all" } }];
+    FeatureNames.apply(elsewhere, syntheticMap());
+    assert.equal(riverLabels(elsewhere).length, 1);
+});

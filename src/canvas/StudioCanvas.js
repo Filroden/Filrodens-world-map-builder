@@ -1911,14 +1911,15 @@ export class StudioCanvas {
     }
 
     /**
-     * Draws the map's names: standalone labels, and those of the pins, routes and regions. Every
+     * Draws the map's names: standalone labels, and those of the pins, routes, regions and custom
+     * rivers (`rivers`: each shown river with its course; see RiverLabels.items). Every
      * label is measured first, then LabelLayout decides where each goes so names do not cover
      * each other or the pins (unless Avoid overlaps is off); a name with no room is not drawn,
      * except faintly while labels are edited, so it can be dragged into place.
      */
-    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], isEditMode = false, meshSession = null) {
+    renderLabels(mapLabels = [], mapPins = [], mapRoutes = [], isEditMode = false, meshSession = null, rivers = []) {
         this.layers.labels.removeChildren().forEach((c) => c.destroy({ children: true, texture: true, baseTexture: true }));
-        const args = [mapLabels, mapPins, mapRoutes, isEditMode, meshSession];
+        const args = [mapLabels, mapPins, mapRoutes, isEditMode, meshSession, rivers];
         this.#labelArgs = args;
         // The faces the labels are drawn in, so any still loading are drawn again once they arrive
         const drawn = [];
@@ -1956,6 +1957,13 @@ export class StudioCanvas {
         });
 
         this.#collectMeshLabels(collect, ensureLabelData, mapRoutes, meshSession);
+
+        // Custom rivers' names, along their course (see RiverLabels); placed at its middle without placement
+        for (const { river, course } of rivers ?? []) {
+            if (!river.label || !course?.length) continue;
+            const middle = course[Math.floor(course.length / 2)];
+            collect(river.name, river.label, middle.x, middle.y, river.visibility ?? "all", river.id, "river", null, { course });
+        }
 
         // 2. Where each goes
         const shownPins = mapPins.filter((pin) => pin.icon && this.#isVisibleInCurrentPass(pin.visibility, "all", false));
