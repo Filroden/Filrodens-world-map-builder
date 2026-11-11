@@ -212,3 +212,74 @@ test("an age's era, strife and events apply as one undo step each, marking a run
     assert.ok(Inspector.shows(app, "age", id));
     assert.equal(ages(app)[0].id, id);
 });
+
+test("a regional map holding its parent's run: no Generate, the world and ages read only (each age opening read only), Output left out; Clone as new brings them back", async () => {
+    const { Generation } = await import("../../src/applications/Generation.js");
+    const app = studio();
+    Object.assign(app, { currentParentId: "parent", parentRun: { run: "parentRun" }, modelRun: null });
+    app.uiState.generatorSettings.ages[1].events = [{ kind: "invasion", culture: "hill" }, { kind: "civilWar", place: { x: 8, y: 3 } }];
+    await drawPanel(app);
+    const panel = app.root.querySelector(".fwmb-context-panel");
+    assert.equal(panel.querySelector('[data-action="generateWorld"]'), null, "no Generate");
+    assert.match(panel.textContent, /GenerateHeldNotice/);
+    assert.match(panel.textContent, /GenerateHeldBadge/);
+    assert.doesNotMatch(panel.textContent, /GenerateInheritedNotice|GenerateOlderRevisionHint/, "no notice about generating here");
+    assert.equal(panel.querySelector('[name="generator.seed"]'), null, "no seed");
+    assert.equal(panel.querySelector('[data-section="generateOutput"]'), null, "no Output");
+    const sliders = [...panel.querySelectorAll('input[name^="generator.world."]')];
+    assert.equal(sliders.length, 4);
+    assert.ok(sliders.every((slider) => slider.disabled), "the world sliders read only");
+    assert.equal(panel.querySelectorAll('[data-action="moveAgeUp"], [data-action="removeAge"], [data-action="addAge"]').length, 0, "the ages cannot be moved, removed or added");
+    assert.match(panel.textContent, /GenerateAgesHeldHint/);
+    // Each age opens, read only
+    const id = present(app).id;
+    await AgeEditor.open(app, id);
+    assert.match(body(app).textContent, /AgeHeldNotice/);
+    assert.ok([...body(app).querySelectorAll("select")].every((select) => select.disabled), "every choice read only");
+    assert.equal(body(app).querySelectorAll("[data-inspector-action]").length, 0, "no + Event, Remove, Choose on map or Clear");
+    assert.equal(AgeEditor.change(app, id, (age) => (age.era = "darkAge")), false);
+    assert.equal(present(app).era, "highMedieval");
+    // Nothing writes the settings, and Generate is refused with a warning
+    const before = JSON.stringify(app.uiState.generatorSettings);
+    GeneratePanel.handleInput(app, { type: "change", target: { name: "generator.world.density", type: "range", value: "2" } });
+    GeneratePanel.editAges(app, "add");
+    GeneratePanel.randomizeSeed(app);
+    assert.equal(JSON.stringify(app.uiState.generatorSettings), before);
+    warnings.length = 0;
+    assert.equal(await Generation.run(app), false);
+    assert.deepEqual(warnings, ["FILRODENSWMB.UI.GenerateHeldByParentWarn"]);
+    // A map of its own (Clone as new drops its parent): Generate is back, with the carried settings
+    Inspector.close(app);
+    app.currentParentId = null;
+    await drawPanel(app);
+    assert.ok(panel.querySelector('[data-action="generateWorld"]'));
+    assert.ok(panel.querySelector('[data-section="generateOutput"]'));
+    assert.ok([...panel.querySelectorAll('input[name^="generator.world."]')].every((slider) => !slider.disabled));
+    assert.equal(AgeEditor.change(app, id, (age) => (age.era = "darkAge")), true);
+});
+
+test("the cut carries the parent's Generate settings: its own seed, an event's place moved onto the regional map or dropped outside it", async () => {
+    const { RegionalExtractor } = await import("../../src/applications/RegionalExtractor.js");
+    const settings = {
+        seed: "Parent's seed",
+        nameBase: "French",
+        world: { density: 1.5, urbanisation: 0.8, realmSpacing: 1.2, fragmentation: 0.6 },
+        output: { counties: false, places: { castle: false }, labels: false },
+        ages: [
+            { id: "age-a", era: "darkAge", strife: "warTorn", events: [{ kind: "plague" }] },
+            { id: "age-b", era: "advancement", strife: "troubled", events: [{ kind: "invasion", culture: "hill" }, { kind: "civilWar", place: { x: 150, y: 120 } }, { kind: "disaster", place: { x: 10, y: 10 } }] },
+        ],
+    };
+    const carried = RegionalExtractor.carrySettings(settings, { x: 100, y: 100, width: 100, height: 50 }, 4, 400, 200);
+    assert.equal(carried.seed, "", "the regional map's own seed");
+    assert.equal(carried.nameBase, "French");
+    assert.deepEqual(carried.world, settings.world);
+    assert.equal(carried.output.counties, false);
+    assert.equal(carried.output.places.castle, false);
+    assert.equal(carried.output.labels, false);
+    assert.deepEqual(carried.ages.map(({ id, era, strife }) => [id, era, strife]), [["age-a", "darkAge", "warTorn"], ["age-b", "advancement", "troubled"]]);
+    assert.deepEqual(carried.ages[0].events, [{ kind: "plague" }]);
+    assert.deepEqual(carried.ages[1].events, [{ kind: "invasion", culture: "hill" }, { kind: "civilWar", place: { x: 200, y: 80 } }, { kind: "disaster", place: null }], "inside moved, outside dropped to the fallback");
+    assert.equal(settings.ages[1].events[1].place.x, 150, "the parent's own settings untouched");
+    assert.equal(RegionalExtractor.carrySettings(undefined, { x: 0, y: 0 }, 2, 10, 10).ages.length, 1, "a parent with no settings gives the defaults");
+});

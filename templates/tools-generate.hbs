@@ -1,17 +1,24 @@
 {{!--
     Generate (tool id "generate"; see GeneratePanel): the run itself at the top, on a regional map
-    Fill in (see Infilling), then the settings
+    Fill in (see Infilling), then the settings. On a regional map holding its parent's run
+    (generate.held, see Generation.heldByParent) there is no Generate: Fill in only, with the
+    settings carried from the parent shown read only (the seed, the estimate and Output left out),
     the settlements, routes and realms are made with, what the last run made, and Remove generated
     content. Fields are named
     "generator.<path>" and kept with the map. The estimate and the notices come from GeneratePanel.
 --}}
+{{#unless generate.held}}
 <div class="fwmb-generate-action">
     <button type="button" class="fwmb-btn fwmb-btn--primary fwmb-btn--wide" data-action="generateWorld" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateRunHint'}}">
         {{#if generate.hasRun}}{{localize "FILRODENSWMB.UI.GenerateAgain"}}{{else}}{{localize "FILRODENSWMB.UI.GenerateRun"}}{{/if}}
     </button>
 </div>
+{{/unless}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateRun" title="FILRODENSWMB.UI.SectionGeneration" badge=generate.runBadge}}
+    {{#if generate.held}}
+    <p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateHeldNotice"}}</p>
+    {{else}}
     <div class="fwmb-form-group">
         <label for="fwmb-generator-seed">{{localize "FILRODENSWMB.UI.GenerateSeed"}}</label>
         <div class="fwmb-form-fields">
@@ -47,9 +54,10 @@
     </div>
     {{#if generate.estimate.long}}<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateLongRun"}}</p>{{/if}}
     {{/if}}
+    {{/if}}
 
-    {{#if generate.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOutOfDateHint"}}</p>{{/if}}
-    {{#if generate.older}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOlderRevisionHint"}}</p>{{/if}}
+    {{#if generate.held}}{{else if generate.stale}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOutOfDateHint"}}</p>{{/if}}
+    {{#if generate.held}}{{else if generate.older}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.GenerateOlderRevisionHint"}}</p>{{/if}}
     {{#each generate.notices}}
     {{#if this.items}}
     <div class="fwmb-generate-notice fwmb-generate-notice--list">
@@ -95,7 +103,7 @@
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateWorld" title="FILRODENSWMB.UI.SectionGenerateWorld" badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
     {{#each generate.world}}
-    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name=this.name label=this.label hint=this.hint value=this.value min=this.min max=this.max step=this.step resetTo=this.resetTo}}
+    {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name=this.name label=this.label hint=this.hint value=this.value min=this.min max=this.max step=this.step resetTo=this.resetTo disabled=this.disabled}}
     {{/each}}
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
@@ -139,7 +147,7 @@
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateAges" title="FILRODENSWMB.UI.SectionGenerateAges" count=generate.ages.count badge="FILRODENSWMB.UI.BadgeRebuildsPolitical"}}
-    <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateAgesHint"}}</p>
+    <p class="fwmb-hint">{{#if generate.ages.held}}{{localize "FILRODENSWMB.UI.GenerateAgesHeldHint"}}{{else}}{{localize "FILRODENSWMB.UI.GenerateAgesHint"}}{{/if}}</p>
     <div role="listbox" aria-label="{{localize 'FILRODENSWMB.UI.SectionGenerateAges'}}" data-list-nav class="fwmb-list-container fwmb-space-before">
         {{#each generate.ages.rows}}
         <div role="option" aria-selected="{{#if this.selected}}true{{else}}false{{/if}}" tabindex="-1" data-list-item class="fwmb-list-item fwmb-age-row" data-id="{{this.id}}" data-action="openAge">
@@ -147,11 +155,13 @@
                 <span class="fwmb-name">{{this.label}}</span>
                 <span class="fwmb-meta">{{this.summary}}</span>
             </span>
+            {{#unless this.held}}
             <span class="fwmb-actions">
                 <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeUp" data-age="{{this.index}}" {{#unless this.canUp}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeEarlier'}}"><i class="fwmb-icon fwmb-icon--arrow-upward"></i></button>
                 <button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-action="moveAgeDown" data-age="{{this.index}}" {{#unless this.canDown}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeLater'}}"><i class="fwmb-icon fwmb-icon--arrow-downward"></i></button>
                 <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-action="removeAge" data-age="{{this.index}}" {{#unless this.canRemove}}disabled{{/unless}} aria-label="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateAgeRemove'}}"><i class="fwmb-icon fwmb-icon--delete"></i></button>
             </span>
+            {{/unless}}
         </div>
         {{/each}}
         {{#if generate.ages.canAdd}}
@@ -162,6 +172,7 @@
     </div>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
 
+{{#unless generate.held}}
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateOutput" title="FILRODENSWMB.UI.SectionGenerateOutput"}}
     <div class="fwmb-range-group-heading">{{localize "FILRODENSWMB.UI.GenerateLevels"}}</div>
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.GenerateLevelsHint"}}</p>
@@ -211,6 +222,7 @@
         {{localize "FILRODENSWMB.UI.GenerateDefaultStyles"}}
     </label>
 {{/"modules/filrodens-world-map-builder/templates/parts/section.hbs"}}
+{{/unless}}
 
 {{#if generate.results}}
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="generateResults" title="FILRODENSWMB.UI.SectionGenerateResults" badge="FILRODENSWMB.UI.BadgeLastRun" instant=true}}

@@ -11,6 +11,7 @@ import { clampAreaFactor, effectiveKmPerPx } from "../mesh/Schema.js";
 import { DetailLevel } from "./DetailLevel.js";
 import { RunCells } from "./RunCells.js";
 import { GeneratorRevision } from "../generator/GeneratorRevision.js";
+import { panelSettings } from "../generator/GeneratorSettings.js";
 import { scaleBarOnMap, scaleBarTick, worldScaleTick } from "../data/MapUnit.js";
 import { DrawnDecoration } from "../canvas/decorations/DrawnDecoration.js";
 import { platform } from "../platform/index.js";
@@ -88,6 +89,8 @@ export class RegionalExtractor {
             customRegionStyles: state.customRegionStyles,
             // The cultures come too, their homelands moved onto the regional map (one outside it is left behind)
             cultures: this.#translateCultures(state.cultures ?? [], cropBox, zoomScale, targetWidth, targetHeight),
+            // And the Generate settings its run was made with, for when the map leaves its parent
+            generatorSettings: this.carrySettings(state.generatorSettings, cropBox, zoomScale, targetWidth, targetHeight),
             history: this.#translateHistory(app.brushEngine.history, cropBox, zoomScale, targetWidth, targetHeight, this.#resolveAnchors(app, newParams.seaLevel)),
             tectonicFaults: this.#translateFaults(app.tectonicFaults ?? [], cropBox, zoomScale, targetWidth, targetHeight),
             manualRivers: this.guideRivers(app, this.#scaleRiverWidths(translate(app.manualRivers), zoomScale), cropBox),
@@ -117,6 +120,32 @@ export class RegionalExtractor {
     }
 
     /**
+     * The parent's Generate settings as the regional map keeps them (see GeneratorSettings.
+     * panelSettings): its ages with their eras, strifes and events, the world sliders, the name
+     * style and the output switches. The seed is the regional map's own (a seed the parent chose
+     * for its runs is not carried). An event's place moves onto the regional map with the rest; a
+     * place outside it is dropped, so the event falls back as with none chosen (the largest realm,
+     * or the largest coastal or river town).
+     * @param {object} [settings] - The parent's generatorSettings.
+     * @param {{x: number, y: number}} cropBox
+     * @param {number} zoomScale
+     * @param {number} targetWidth
+     * @param {number} targetHeight
+     */
+    static carrySettings(settings, cropBox, zoomScale, targetWidth, targetHeight) {
+        const carried = panelSettings(settings);
+        carried.seed = "";
+        const move = (place) => {
+            if (!place) return null;
+            const x = (place.x - cropBox.x) * zoomScale;
+            const y = (place.y - cropBox.y) * zoomScale;
+            return x >= 0 && y >= 0 && x < targetWidth && y < targetHeight ? { x, y } : null;
+        };
+        for (const age of carried.ages) for (const event of age.events) if ("place" in event) event.place = move(event.place);
+        return carried;
+    }
+
+    /**
      * Gives the payload the parent's regions and routes on the display mesh, carried onto the
      * regional map's own mesh (see RegionalMesh.extractRegionalVectors). Without a mesh session
      * (the parent's mesh could not be prepared) the regional map has no regions or routes.
@@ -135,12 +164,15 @@ export class RegionalExtractor {
             layerSets: app.layerSets,
             routes: app.mapRoutes,
             pins: payload.mapPins,
+            influences: app.meshSession.influences ?? null,
             childMapData: { mapWidth: payload.mapWidth, mapHeight: payload.mapHeight, seed: payload.seed, params: payload.params, world: payload.world },
             crop: { x: cropBox.x, y: cropBox.y },
             zoom: zoomScale,
             idFactory: () => platform.utils.randomID(),
         });
         Object.assign(payload, fields);
+        // The influences painted on the parent come too, on the regional map's own cells
+        if (!payload.influences) delete payload.influences;
         return owners;
     }
 

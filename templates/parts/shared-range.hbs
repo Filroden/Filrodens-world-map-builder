@@ -26,6 +26,7 @@
                 gives the low end more of its travel (see src/tools/RangeCurve.js). The value is
                 kept in data-value, shown, and read and saved; min, max and step are the
                 position's (0, 1 and its step)
+      disabled: optional; the slider shown but not moved (a setting read only)
       resetTo: optional value (as a string, so 0 counts) a double-click returns the slider to, for
                 a setting that is not one of the map's (see StudioView's data-default); the
                 map's own settings are reset from their map defaults by the studio
@@ -44,5 +45,5 @@
             {{#if unitText}}<span class="fwmb-unit">{{unitText}}</span>{{else if unit}}<span class="fwmb-unit"><span class="fwmb-unit-long">{{localize unit}}</span><span class="fwmb-unit-short">{{#if unitShort}}{{localize unitShort}}{{else}}{{localize unit}}{{/if}}</span></span>{{/if}}
         </span>
     </div>
-    <input type="range" class="fwmb-range-input" name="{{name}}" value="{{#if curve}}{{position}}{{else}}{{value}}{{/if}}" min="{{min}}" max="{{max}}" step="{{step}}"{{#if curve}} data-curve="{{curve}}" data-value="{{value}}"{{/if}}{{#if resetTo}} data-default="{{resetTo}}"{{/if}}{{#if displayScale}} data-display-scale="{{displayScale}}"{{/if}} aria-label="{{localize label}}" />
+    <input type="range" class="fwmb-range-input" name="{{name}}" value="{{#if curve}}{{position}}{{else}}{{value}}{{/if}}" min="{{min}}" max="{{max}}" step="{{step}}"{{#if curve}} data-curve="{{curve}}" data-value="{{value}}"{{/if}}{{#if resetTo}} data-default="{{resetTo}}"{{/if}}{{#if displayScale}} data-display-scale="{{displayScale}}"{{/if}} aria-label="{{localize label}}"{{#if disabled}} disabled{{/if}} />
 </div>

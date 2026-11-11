@@ -10,6 +10,8 @@ import { MeshIntegration } from "../../src/applications/MeshIntegration.js";
 import { INFLUENCE_KINDS, InfluenceStroke, Influences, MAX_INFLUENCE_LEVEL, brushWeight, validLevel } from "../../src/mesh/Influences.js";
 import { MeshSession } from "../../src/mesh/MeshSession.js";
 import { encodeOwners } from "../../src/mesh/OwnerLayer.js";
+import { extractRegionalVectors } from "../../src/mesh/RegionalMesh.js";
+import { cellLookup } from "../../src/mesh/Resample.js";
 import { FIXTURES, P0_SKIP, cellsInRect, loadP0, readJson, smallMesh, smallSession } from "./helpers.mjs";
 
 test("a value is a whole number from -100 to 100; anything else is kept in range or none", () => {
@@ -177,4 +179,30 @@ test("a save carries the influences, a map opened again has them, and so does on
     const rebuilt = await MeshSession.open(misfit, { owners, buffers: loadP0().buffers });
     assert.equal(rebuilt.rebuilt, true);
     assert.equal(rebuilt.session.influences.count("security"), session.influences.count("security"));
+});
+
+test("a regional map cut from a painted map carries its influences on its own cells; none when the painting lies outside the crop", async () => {
+    const session = await smallSession();
+    const mesh = session.mesh;
+    session.influences.layer("capacity").set(cellsInRect(mesh, 150, 0, 400, 300), 60);
+    session.influences.layer("security").set(cellsInRect(mesh, 0, 0, 120, 300), -40);
+    const crop = { x: 100, y: 50 };
+    const zoom = 2;
+    const childMapData = { mapWidth: 200, mapHeight: 150, seed: "child", params: { latTop: 40, latBottom: 30 }, world: { zoom, areaFactor: 1 } };
+    const cut = (influences) => extractRegionalVectors({ session, layerSets: [], routes: [], pins: [], childMapData, crop, zoom, influences });
+    const { fields, mesh: child } = cut(session.influences);
+    assert.deepEqual(Object.keys(fields.influences).sort(), ["capacity", "security"]);
+    const carried = new Influences(child.cellCount, fields.influences);
+    const lookup = cellLookup(mesh);
+    for (let cell = 0; cell < child.cellCount; cell += 13) {
+        const x = child.siteX(cell) / zoom + crop.x;
+        const y = child.siteY(cell) / zoom + crop.y;
+        const from = lookup(x, y);
+        if (from >= 0) for (const kind of INFLUENCE_KINDS) assert.equal(carried.levelAt(kind, cell), session.influences.levelAt(kind, from));
+    }
+    assert.ok(carried.count("capacity") > 0 && carried.count("security") > 0, "both kinds reach into the crop");
+    assert.equal(cut(null).fields.influences, null, "none given, none carried");
+    const outside = new Influences(mesh.cellCount);
+    outside.layer("capacity").set(cellsInRect(mesh, 320, 0, 400, 300), 50);
+    assert.equal(cut(outside).fields.influences, null, "painting only beyond the crop carries nothing");
 });

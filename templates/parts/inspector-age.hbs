@@ -1,14 +1,16 @@
 {{!--
     The inspector's age (see AgeEditor): in folding sections, its era, its strife and its events
     (see AgeEventRows), each with what the chosen one does. Every field applies when committed,
-    one undo step each (see Inspector).
+    one undo step each (see Inspector). Read only (readOnly) on a regional map holding its
+    parent's run: the choices disabled, the buttons left out.
 --}}
+{{#if readOnly}}<p class="fwmb-hint fwmb-generate-notice">{{localize "FILRODENSWMB.UI.AgeHeldNotice"}}</p>{{/if}}
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="ageEra" title="FILRODENSWMB.UI.GenerateEra"}}
     <p class="fwmb-hint">{{localize "FILRODENSWMB.UI.AgeEraIntro"}}</p>
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-age-era">{{localize "FILRODENSWMB.UI.GenerateEra"}}</label>
         <div class="fwmb-form-fields">
-            <select id="fwmb-inspector-age-era" name="ageEra">
+            <select id="fwmb-inspector-age-era" name="ageEra" {{#if readOnly}}disabled{{/if}}>
                 {{#each eras}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>{{/each}}
             </select>
         </div>
@@ -21,7 +23,7 @@
     <div class="fwmb-form-group">
         <label class="fwmb-label" for="fwmb-inspector-age-strife">{{localize "FILRODENSWMB.UI.GenerateStrife"}}</label>
         <div class="fwmb-form-fields">
-            <select id="fwmb-inspector-age-strife" name="ageStrife">
+            <select id="fwmb-inspector-age-strife" name="ageStrife" {{#if readOnly}}disabled{{/if}}>
                 {{#each strifes}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{localize this.label}}</option>{{/each}}
             </select>
         </div>
@@ -39,12 +41,12 @@
                 <span class="fwmb-age-event-title">{{this.title}}</span>
                 <span class="fwmb-age-event-summary">{{this.summary}}</span>
             </span>
-            <button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-inspector-action="removeEvent" data-index="{{this.index}}" aria-label="{{localize 'FILRODENSWMB.UI.GenerateEventRemove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateEventRemove'}}"><i class="fwmb-icon fwmb-icon--delete"></i></button>
+            {{#unless @root.readOnly}}<button type="button" class="fwmb-btn fwmb-btn--square fwmb-btn--danger-quiet" data-inspector-action="removeEvent" data-index="{{this.index}}" aria-label="{{localize 'FILRODENSWMB.UI.GenerateEventRemove'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateEventRemove'}}"><i class="fwmb-icon fwmb-icon--delete"></i></button>{{/unless}}
         </summary>
         <div class="fwmb-form-group">
             <label class="fwmb-label" for="fwmb-inspector-age-event-{{this.index}}">{{localize "FILRODENSWMB.UI.GenerateEventKind"}}</label>
             <div class="fwmb-form-fields">
-                <select id="fwmb-inspector-age-event-{{this.index}}" name="event.{{this.index}}.kind">
+                <select id="fwmb-inspector-age-event-{{this.index}}" name="event.{{this.index}}.kind" {{#if @root.readOnly}}disabled{{/if}}>
                     {{#each this.groups}}
                     <optgroup label="{{localize this.label}}">
                         {{#each this.kinds}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}} {{#if this.disabled}}disabled{{/if}}>{{localize this.label}}</option>{{/each}}
@@ -58,7 +60,7 @@
         <div class="fwmb-form-group">
             <label class="fwmb-label" for="fwmb-inspector-age-event-{{this.index}}-culture">{{localize "FILRODENSWMB.UI.GenerateEventCulture"}}</label>
             <div class="fwmb-form-fields">
-                <select id="fwmb-inspector-age-event-{{this.index}}-culture" name="event.{{this.index}}.culture">
+                <select id="fwmb-inspector-age-event-{{this.index}}-culture" name="event.{{this.index}}.culture" {{#if @root.readOnly}}disabled{{/if}}>
                     {{#if this.cultureMissing}}<option value="" selected disabled>{{localize "FILRODENSWMB.UI.GenerateEventCultureMissing"}}</option>{{/if}}
                     {{#each this.cultures}}<option value="{{this.value}}" {{#if this.selected}}selected{{/if}} {{#if this.disabled}}disabled{{/if}}>{{this.label}}</option>{{/each}}
                 </select>
@@ -70,18 +72,20 @@
             <span class="fwmb-label">{{localize "FILRODENSWMB.UI.GenerateEventPlace"}}</span>
             <div class="fwmb-form-fields">
                 <span class="fwmb-age-event-place fwmb-flex-1">{{this.placeLabel}}</span>
-                {{#if this.hasPlace}}<button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-inspector-action="clearPlace" data-index="{{this.index}}" aria-label="{{localize 'FILRODENSWMB.UI.GenerateEventPlaceClear'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateEventPlaceClear'}}"><i class="fwmb-icon fwmb-icon--cancel"></i></button>{{/if}}
+                {{#if @root.readOnly}}{{else if this.hasPlace}}<button type="button" class="fwmb-btn fwmb-btn--subtle fwmb-btn--square" data-inspector-action="clearPlace" data-index="{{this.index}}" aria-label="{{localize 'FILRODENSWMB.UI.GenerateEventPlaceClear'}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateEventPlaceClear'}}"><i class="fwmb-icon fwmb-icon--cancel"></i></button>{{/if}}
             </div>
         </div>
+        {{#unless @root.readOnly}}
         <div class="fwmb-btn-row">
             <button type="button" class="fwmb-btn" data-inspector-action="pickPlace" data-index="{{this.index}}" aria-pressed="{{#if this.picking}}true{{else}}false{{/if}}" data-tooltip="{{localize 'FILRODENSWMB.UI.GenerateEventPlaceHint'}}">
                 <i class="fwmb-icon fwmb-icon--place" aria-hidden="true"></i>{{#if this.picking}}{{localize "FILRODENSWMB.UI.GenerateEventPlacePicking"}}{{else}}{{localize "FILRODENSWMB.UI.GenerateEventPlaceChoose"}}{{/if}}
             </button>
         </div>
+        {{/unless}}
         {{/if}}
     </details>
     {{/each}}
-    {{#if events.canAdd}}
+    {{#if readOnly}}{{else if events.canAdd}}
     <div class="fwmb-list-add">
         <button type="button" class="fwmb-btn fwmb-btn--subtle" data-inspector-action="addEvent"><i class="fwmb-icon fwmb-icon--add" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.GenerateEventAdd"}}</button>
     </div>

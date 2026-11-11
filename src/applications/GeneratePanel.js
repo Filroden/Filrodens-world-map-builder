@@ -70,7 +70,11 @@ export class GeneratePanel {
         // A map made with an older generator keeps its rules (in Travel and Fill in too) until it
         // is generated again: one notice for every change since (see GeneratorRevision)
         const older = GeneratorRevision.isOlder(app.uiState);
+        // On a regional map holding its parent's run, Fill in only: the settings carried from the
+        // parent are shown read only, for when the map leaves its parent (see Generation.heldByParent)
+        const held = Generation.heldByParent(app);
         return {
+            held,
             seed: settings.seed,
             mapSeed: String(app.uiState.mapSeed ?? ""),
             nameBases: this.nameBaseChoices(settings.nameBase),
@@ -79,12 +83,12 @@ export class GeneratePanel {
             older,
             // The Generation section's badge: Out of date once what the last run read has changed,
             // else Older generator while the map keeps an older generator's rules
-            runBadge: stale ? "FILRODENSWMB.UI.GenerateOutOfDate" : older ? "FILRODENSWMB.UI.GenerateOlderRevision" : null,
+            runBadge: held ? "FILRODENSWMB.UI.GenerateHeldBadge" : stale ? "FILRODENSWMB.UI.GenerateOutOfDate" : older ? "FILRODENSWMB.UI.GenerateOlderRevision" : null,
             notices: this.#notices(app),
             hasRun,
             world: WORLD_FIELDS.map(({ key, label, hint }) => {
                 const range = FILRODENSWMB.GENERATOR.WORLD[key];
-                return { name: `${FIELD_PREFIX}world.${key}`, label, hint, value: settings.world[key], min: range.min, max: range.max, step: SLIDER_STEP, resetTo: String(range.default) };
+                return { name: `${FIELD_PREFIX}world.${key}`, label, hint, value: settings.world[key], min: range.min, max: range.max, step: SLIDER_STEP, resetTo: held ? null : String(range.default), disabled: held };
             }),
             output: {
                 duchies: settings.output.duchies,
@@ -97,7 +101,7 @@ export class GeneratePanel {
                 places: Object.entries(PLACE_FIELDS).map(([field, label]) => ({ name: `${FIELD_PREFIX}output.places.${field}`, label, checked: settings.output.places[field] })),
                 routes: Object.entries(ROUTE_FIELDS).map(([field, label]) => ({ name: `${FIELD_PREFIX}output.routes.${field}`, label, checked: settings.output.routes[field] })),
             },
-            ages: this.#ages(app, settings.ages),
+            ages: this.#ages(app, settings.ages, held),
             results: hasRun ? this.results(app) : null,
             // Remove generated content, while anything a run made is on the map
             canRemove: Object.values(Generation.counts(app)).some((count) => count > 0),
@@ -109,9 +113,11 @@ export class GeneratePanel {
      * strife and how many events in brief (see AgeEditor.summary), whether the inspector shows it,
      * and whether it can move or go.
      */
-    static #ages(app, ages) {
+    static #ages(app, ages, held = false) {
         const shown = Inspector.current(app);
         return {
+            // Read only: each row still opens its age in the inspector, read only too
+            held,
             rows: ages.map((age, index) => ({
                 index,
                 id: age.id,
@@ -121,8 +127,9 @@ export class GeneratePanel {
                 canUp: index > 0,
                 canDown: index < ages.length - 1,
                 canRemove: ages.length > 1,
+                held,
             })),
-            canAdd: ages.length < FILRODENSWMB.GENERATOR.MAX_AGES,
+            canAdd: !held && ages.length < FILRODENSWMB.GENERATOR.MAX_AGES,
             count: ages.length,
         };
     }
@@ -136,6 +143,7 @@ export class GeneratePanel {
      * @param {number} [index]
      */
     static editAges(app, command, index = -1) {
+        if (Generation.heldByParent(app)) return;
         const settings = this.settings(app);
         const ages = settings.ages.map((age) => ({ ...age }));
         let opened = null;
@@ -210,9 +218,10 @@ export class GeneratePanel {
         const ownRun = app.modelRun?.run ?? null;
         const inherited = (item) => item?.generated && item.generated.run !== ownRun;
         const regions = (app.layerSets ?? []).flatMap((set) => set.levels ?? []).flatMap((level) => level.regions ?? []);
-        if (app.currentParentId && [...(app.mapPins ?? []), ...(app.mapRoutes ?? []), ...regions].some(inherited)) notices.push("FILRODENSWMB.UI.GenerateInheritedNotice");
+        // Held by its parent, the map cannot be generated, so the notice has nothing to warn of
+        if (app.currentParentId && !Generation.heldByParent(app) && [...(app.mapPins ?? []), ...(app.mapRoutes ?? []), ...regions].some(inherited)) notices.push("FILRODENSWMB.UI.GenerateInheritedNotice");
         const land = this.landModelCells(app.meshSession);
-        if (land !== null && land < FILRODENSWMB.GENERATOR.SMALL_WORLD_LAND_CELLS) notices.push("FILRODENSWMB.UI.GenerateSmallWorldNotice");
+        if (land !== null && land < FILRODENSWMB.GENERATOR.SMALL_WORLD_LAND_CELLS && !Generation.heldByParent(app)) notices.push("FILRODENSWMB.UI.GenerateSmallWorldNotice");
         const ages = app.modelRun?.ages;
         if (ages && ages.run < ages.asked) notices.push({ text: platform.i18n.format("FILRODENSWMB.UI.GenerateAgesStoppedNotice", { run: ages.run, asked: ages.asked }) });
         for (const culture of app.modelRun?.cultures ?? []) {
@@ -342,6 +351,8 @@ export class GeneratePanel {
         if (!name.startsWith(FIELD_PREFIX)) return false;
         const isText = target.type === "text";
         if ((target.type === "range" || isText) && event.type === "input") return true;
+        // The settings carried from the parent are read only while the map holds its parent's run
+        if (Generation.heldByParent(app)) return true;
         const path = name.slice(FIELD_PREFIX.length).split(".");
         const settings = this.settings(app);
         let value = target.value;
@@ -359,6 +370,7 @@ export class GeneratePanel {
 
     /** Randomise: a new seed for the next run. */
     static randomizeSeed(app) {
+        if (Generation.heldByParent(app)) return;
         this.settings(app).seed = platform.utils.randomID();
         app.markDirty();
         app.view?.render(["context"]);

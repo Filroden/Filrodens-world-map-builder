@@ -35,6 +35,19 @@ const SEAT_SHORE_PX = 4;
 
 export class Generation {
     /**
+     * Whether Generate is off on the open map: a regional map still under the map it was cut from
+     * and holding that map's run (its parentRun), which Fill in builds on. A run here would be made
+     * on the regional map's own, finer terrain, blind to the land beyond its edges, and so would not
+     * match its parent whatever settings it carried. Leave parent (in the Maps panel) makes a copy
+     * of its own, where Generate is back with the settings carried from the parent; a regional map
+     * with no copy of its parent's run can still be generated.
+     * @param {object} app
+     */
+    static heldByParent(app) {
+        return !!(app?.currentParentId && app?.parentRun);
+    }
+
+    /**
      * Runs the generator with the map's Generate settings (see GeneratePanel) and adds its output
      * to the map. When the map already holds generated content, the user is asked first (the new
      * run is added beside it). Does nothing while the map's mesh or terrain is not ready, or when
@@ -43,6 +56,10 @@ export class Generation {
      * @returns {Promise<boolean>} Whether content was added.
      */
     static async run(app) {
+        if (this.heldByParent(app)) {
+            platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.GenerateHeldByParentWarn"));
+            return false;
+        }
         if (!app.meshSession?.aggregates || !app.currentElevationData) {
             platform.notify.warn(platform.i18n.localize("FILRODENSWMB.UI.GenerateNotReady"));
             return false;
