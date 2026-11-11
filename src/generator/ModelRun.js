@@ -241,6 +241,22 @@ export function resampleModelRun(modelRun, sourceOf, targetOf) {
 }
 
 /**
+ * A run's earlier ages on some of its cells (a regional map's copy; see ParentRun.cropRun): each
+ * age as movedAge gives it, each kept cell's values taken from it, and its places, castles, seats
+ * and roads on the kept cells (those on cells not kept dropped, a seat left as -1 so each realm
+ * keeps its index).
+ * @param {object[]} history - A saved run's history.
+ * @param {number[]} kept - The kept cells, in their new order.
+ * @param {Int32Array} newIndex - Each old cell's new index, or -1.
+ * @returns {object[]}
+ */
+export function cropHistory(history, kept, newIndex) {
+    const take = (values, empty) => Float64Array.from(kept, (cell) => values[cell] ?? empty);
+    const targetOf = (cell) => (Number.isInteger(cell) && cell >= 0 && cell < newIndex.length ? newIndex[cell] : -1);
+    return (history ?? []).map((age) => movedAge(age, take, targetOf));
+}
+
+/**
  * An earlier age moved with its map: its per-cell arrays taken from their source cells, its places
  * and castles moved with their names (those moved off the map dropped with them), its seats moved
  * in place (-1 for one off the map, so each still stands at its realm's index), and its roads moved

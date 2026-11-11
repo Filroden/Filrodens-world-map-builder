@@ -105,7 +105,11 @@ export class ThematicView {
     /** The run the layers read and the cells it is on (see RunCells), the age shown first. */
     static #runCells(app) {
         const past = HistoryView.thematicRun(app);
-        if (past) return { run: past, cells: app.meshSession?.mesh ?? null, inherited: false };
+        if (past) {
+            // An earlier age is on the run's own cells: the map's model cells, or a regional map's copy of its parent's
+            const found = RunCells.of(app);
+            return found?.inherited ? { run: past, cells: found.cells, inherited: true } : { run: past, cells: app.meshSession?.mesh ?? null, inherited: false };
+        }
         return RunCells.of(app) ?? { run: null, cells: null, inherited: false };
     }
 

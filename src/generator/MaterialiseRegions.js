@@ -113,14 +113,26 @@ export function createPoliticalSet({ names, watersPx, idFactory, output = {} }) 
  * @param {ArrayLike<number>} realmOfModelCell - Each model cell's realm in that age, or -1.
  * @param {ArrayLike<number>} modelWater - Each model cell's water flag (the run's `water`).
  * @param {number[]} seats - Each realm's seat (a model cell, which is also its site's display cell), or -1.
+ * @param {object} [options]
+ * @param {ArrayLike<number>} [options.parentOf] - Each display cell's run cell: the mesh's model
+ *     cells for the map's own run, a regional map's copy of its parent's run's cells otherwise.
+ * @param {number[]} [options.anchors] - The seats as display cells (-1 for one off the map), kept by the borders.
  * @returns {OwnerLayer}
  */
-export function pastRealmLayer(session, realmOfModelCell, modelWater, seats) {
-    const result = { modelCells: { realm: realmOfModelCell, water: modelWater } };
-    const keyOf = Int32Array.from({ length: seats.length }, (_, index) => index);
-    const layer = carry(session, result, "realm", keyOf);
-    joinCoast(session, result, layer);
-    relaxBorders(session.mesh, layer, session.aggregates, {}, { anchors: seats.filter((cell) => cell >= 0) });
+export function pastRealmLayer(session, realmOfModelCell, modelWater, seats, { parentOf = session.mesh.parentOf, anchors = seats } = {}) {
+    // Each land display cell takes its run cell's realm: the map's own model cell, or on a regional
+    // map the cell of its parent's run it lies in (`parentOf`; -1 for none)
+    const { mesh, aggregates } = session;
+    const layer = new OwnerLayer(mesh.cellCount);
+    const owners = layer.owners;
+    for (let cell = 0; cell < mesh.cellCount; cell++) {
+        if (aggregates.land[cell] !== 1) continue;
+        const unit = realmOfModelCell[parentOf[cell]];
+        owners[cell] = Number.isInteger(unit) && unit >= 0 && unit < seats.length ? unit : UNCLAIMED;
+    }
+    // Land the run called sea (its coast is coarser) goes to the nearest realm overland
+    fillFrom(session, layer, (cell) => aggregates.land[cell] === 1 && owners[cell] === UNCLAIMED && modelWater[parentOf[cell]] === 1);
+    relaxBorders(mesh, layer, aggregates, {}, { anchors: anchors.filter((cell) => cell >= 0) });
     return layer;
 }
 

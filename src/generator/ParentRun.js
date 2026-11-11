@@ -1,5 +1,5 @@
 import { FILRODENSWMB } from "../config.js";
-import { CELL_FIELDS, TRADE_FIELDS, decodeModelRun, packArray, unpackArray } from "./ModelRun.js";
+import { CELL_FIELDS, TRADE_FIELDS, cropHistory, decodeModelRun, packArray, unpackArray } from "./ModelRun.js";
 
 /**
  * A regional map's copy of the run it inherited its generated content from (its `parentRun`): the
@@ -8,8 +8,10 @@ import { CELL_FIELDS, TRADE_FIELDS, decodeModelRun, packArray, unpackArray } fro
  * thematic layers, the Travel tool's farmland and in-fill read until it is generated itself.
  *
  * The cells are kept as a saved run keeps them (see ModelRun: the same packed arrays, the culture
- * shares and the trade among them, the run's cultures), so whatever reads a run reads this one;
- * the history is left behind, since the History tool shows a map's own run. Its own fields:
+ * shares and the trade among them, the run's cultures), so whatever reads a run reads this one,
+ * with the run's settings and its earlier ages on the same cells (see ModelRun.cropHistory), so the
+ * History tool shows the regional map's past until it is generated itself (a copy made before it
+ * carried them has no `history`, and History shows no run). Its own fields:
  *   - `sites`: each cell's site in the regional map's pixels (`x` and `y`, packed at a tenth of
  *     a pixel, offset so a site in the margin off the map's top or left edge fits);
  *   - `spacingKm` and `spacingPx`: how far apart the cells are, in effective km and in the
@@ -18,7 +20,7 @@ import { CELL_FIELDS, TRADE_FIELDS, decodeModelRun, packArray, unpackArray } fro
  * one, else those of its parent's copy.
  *
  * Shape: { version, origin: "parent", run, revision, cellCount, cultures, cells, sites: {x, y},
- *          spacingKm, spacingPx }
+ *          spacingKm, spacingPx, settings, ages, history }
  */
 
 export const PARENT_RUN_VERSION = 1;
@@ -80,6 +82,9 @@ export function cropRun(run, { sites, spacingKm, spacingPx, crop, zoomScale, mar
         },
         spacingKm,
         spacingPx: spacingPx * zoomScale,
+        ...(run.settings ? { settings: structuredClone(run.settings) } : {}),
+        ages: structuredClone(run.ages ?? { asked: 1, run: 1 }),
+        history: cropHistory(run.history, kept, newIndex),
     };
 }
 

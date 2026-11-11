@@ -8,6 +8,7 @@ import { AgeEventRows } from "./AgeEventRows.js";
 import { MapDialogManager } from "./MapDialogManager.js";
 import { PinStyles } from "./PinStyles.js";
 import { MeshSession } from "../mesh/MeshSession.js";
+import { RunCells } from "./RunCells.js";
 import { claimWaters } from "../mesh/RegionEdits.js";
 import { UNCLAIMED, createLayerSet, createLevel, regionFillColor } from "../mesh/Schema.js";
 
@@ -25,6 +26,11 @@ import { UNCLAIMED, createLayerSet, createLevel, regionFillColor } from "../mesh
  * A past realm that carried on to the present (see PastAge.matchRealms) takes that realm's colour,
  * name and label look from the map, so a realm keeps its look from age to age; one that did not
  * takes the name the generator gave it and a colour of its own.
+ *
+ * On a regional map not generated itself, the ages are those of the run it was cut from, carried
+ * on its cells (see ParentRun): the realms, places, castles and roads of each earlier age that lie
+ * on the regional map, read through the parent run's cells (see RunCells and #frame), so History
+ * shows the regional map's past before (or without) a run of its own.
  */
 
 /** Per studio: the past map last made, with what it was made from. */
@@ -45,18 +51,57 @@ const PERCENT = 100;
 
 const formatCount = (value) => Math.round(value).toLocaleString(platform.i18n.lang);
 
+/** Per studio: the run History reads and how its cells lie on the map (see #frame), with what it was worked out from. */
+const frames = new WeakMap();
+
 /**
- * The model cell a pin's display cell lies in: a pin stands on a display cell (a port on its shore,
- * a pin the reader moved), while the run's figures are kept by model cell.
+ * The run cell a pin's display cell lies in: a pin stands on a display cell (a port on its shore,
+ * a pin the reader moved), while the run's figures are kept by run cell (the map's model cells, or
+ * a regional map's copy of its parent's).
  */
-function modelCellOf(app, cell) {
-    return app.meshSession?.mesh?.parentOf?.[cell] ?? cell;
+function modelCellOf(frame, cell) {
+    return frame?.parentOf?.[cell] ?? cell;
 }
 
 export class HistoryView {
     /** How many ages the map's run has (the present included), or 0 with no run. */
     static ageCount(app) {
-        return app.modelRun ? (app.modelRun.history?.length ?? 0) + 1 : 0;
+        const frame = this.#frame(app);
+        return frame ? (frame.run.history?.length ?? 0) + 1 : 0;
+    }
+
+    /**
+     * The run History reads and its cells on the map: the map's own run on its model cells, or on
+     * a regional map not generated itself its copy of its parent's run (when the copy carries the
+     * run's ages; one made before has none, and History shows no run). `parentOf` is each display
+     * cell's run cell, `siteX` and `siteY` a run cell's site, and `displayOf` the display cell at a
+     * run cell's site (-1 for one off the map, as a regional map's margin cells are).
+     * @returns {{run: object, inherited: boolean, parentOf: ArrayLike<number>, siteX: function(number): number, siteY: function(number): number, displayOf: function(number): number}|null}
+     */
+    static #frame(app) {
+        const found = RunCells.of(app);
+        if (!found?.run || (found.inherited && !Array.isArray(found.run.history))) return null;
+        const session = app.meshSession;
+        const mesh = session.mesh;
+        const cached = frames.get(app);
+        if (cached?.run === found.run && cached.mesh === mesh) return cached.frame;
+        const cells = found.cells;
+        const frame = found.inherited
+            ? {
+                  run: found.run,
+                  inherited: true,
+                  parentOf: cells.parentOf,
+                  siteX: (cell) => cells.modelSiteX(cell),
+                  siteY: (cell) => cells.modelSiteY(cell),
+                  displayOf: (cell) => {
+                      if (!(cell >= 0 && cell < cells.modelCount)) return -1;
+                      const [x, y] = [cells.modelSiteX(cell), cells.modelSiteY(cell)];
+                      return x >= 0 && y >= 0 && x < mesh.width && y < mesh.height ? session.cellAt(x, y) : -1;
+                  },
+              }
+            : { run: found.run, inherited: false, parentOf: mesh.parentOf, siteX: (cell) => mesh.siteX(cell), siteY: (cell) => mesh.siteY(cell), displayOf: (cell) => (cell >= 0 && cell < mesh.modelCount ? cell : -1) };
+        frames.set(app, { run: found.run, mesh, frame });
+        return frame;
     }
 
     /**
@@ -107,7 +152,8 @@ export class HistoryView {
     static pastMap(app) {
         const index = this.shownIndex(app);
         if (index < 0 || !app.meshSession?.aggregates) return null;
-        const modelRun = app.modelRun;
+        const modelRun = this.#frame(app)?.run;
+        if (!modelRun) return null;
         const mesh = app.meshSession.mesh;
         const cached = pasts.get(app);
         // The map's own realms lend their look, so a change to them is a change to the past map
@@ -124,7 +170,8 @@ export class HistoryView {
      * map's realm level (its look, waters and visibility), so the past is drawn as the present is.
      */
     static #makePastMap(app, index, present) {
-        const modelRun = app.modelRun;
+        const frame = this.#frame(app);
+        const modelRun = frame.run;
         const age = modelRun.history[index];
         const { realm } = decodeAge(age);
         if (!realm) return null;
@@ -174,10 +221,13 @@ export class HistoryView {
         level.nextKey = regions.length;
         set.levels = [level];
 
-        const layer = pastRealmLayer(app.meshSession, realm, cells.water ?? new Float64Array(realm.length), seats);
+        const layer = pastRealmLayer(app.meshSession, realm, cells.water ?? new Float64Array(realm.length), seats, { parentOf: frame.parentOf, anchors: seats.map((cell) => frame.displayOf(cell)) });
+        // The realms with land on the map (on a regional map, those of the parent's age that reach it)
+        const onMap = new Set();
+        for (const key of layer.owners) if (key !== UNCLAIMED) onMap.add(key);
         const session = new MeshSession({ mesh: app.meshSession.mesh, meshBlock: app.meshSession.meshBlock, layerSets: [set], owners: { [LEVEL_ID]: layer.owners }, aggregates: app.meshSession.aggregates });
         claimWaters(session, level);
-        return { index, session, level, regions, carried, presentLevel: present?.level ?? null };
+        return { index, session, level, regions, carried, onMap, presentLevel: present?.level ?? null };
     }
 
     /**
@@ -200,8 +250,8 @@ export class HistoryView {
     }
 
     static #pastPins(app, index) {
-        const age = app.modelRun.history[index];
-        const mesh = app.meshSession.mesh;
+        const frame = this.#frame(app);
+        const age = frame.run.history[index];
         const T = FILRODENSWMB.GENERATOR.PIN_TIERS;
         const styles = PinStyles.list(app);
         let defaults = null;
@@ -209,20 +259,22 @@ export class HistoryView {
         const styleOf = (tier) => styles.find((style) => style.tier === tier) ?? (defaults ??= PinStyles.defaults()).find((style) => style.tier === tier) ?? null;
         const pins = [];
         const add = (key, cell, name, kind, tier) => {
-            if (!(cell >= 0 && cell < mesh.modelCount)) return;
+            // On a regional map a place of its margin, off the map, is left out
+            const display = frame.displayOf(cell);
+            if (display < 0) return;
             const pin = {
                 id: `history-pin-${key}`,
                 name,
                 description: "",
                 icon: FILRODENSWMB.PINS.DEFAULT_ICON,
-                x: mesh.siteX(cell),
-                y: mesh.siteY(cell),
+                x: frame.siteX(cell),
+                y: frame.siteY(cell),
                 scale: FILRODENSWMB.PINS.DEFAULT_SCALE,
                 color: FILRODENSWMB.PINS.DEFAULT_COLOR,
                 visibility: "all",
                 pinStyle: null,
                 label: { fontSize: FILRODENSWMB.PINS.DEFAULT_SCALE },
-                cell,
+                cell: display,
                 generated: { kind, tier },
             };
             const style = styleOf(tier);
@@ -246,7 +298,7 @@ export class HistoryView {
     }
 
     static #pastRoutes(app, index) {
-        const age = app.modelRun.history[index];
+        const age = this.#frame(app).run.history[index];
         const { roadFrom, roadTo } = decodeAge(age);
         if (!roadFrom || !roadTo) return [];
         return this.#roadRoutes(app, roadFrom, roadTo, placeCells(age.places ?? []), `history-road-${index}`);
@@ -264,8 +316,9 @@ export class HistoryView {
         const cells = this.#cells(app);
         if (!cells.tradeFrom || !cells.tradeTo || !cells.tradeKind) return null;
         const look = JSON.stringify(app.uiState.customRouteStyles);
+        const frame = this.#frame(app);
         const cached = contents.get(app)?.present;
-        if (cached?.modelRun === app.modelRun && cached.look === look) return cached.routes;
+        if (cached?.modelRun === frame.run && cached.look === look) return cached.routes;
         const from = [];
         const to = [];
         cells.tradeFrom.forEach((cell, edge) => {
@@ -274,15 +327,28 @@ export class HistoryView {
             to.push(cells.tradeTo[edge]);
         });
         const places = new Set();
-        for (const pin of app.mapPins ?? []) if (pin.generated?.run === app.modelRun.run && pin.generated.kind === "town" && Number.isInteger(pin.cell)) places.add(modelCellOf(app, pin.cell));
+        for (const pin of app.mapPins ?? []) if (pin.generated?.run === frame.run.run && pin.generated.kind === "town" && Number.isInteger(pin.cell)) places.add(modelCellOf(frame, pin.cell));
         const routes = this.#roadRoutes(app, from, to, places, "history-road-present");
-        contents.set(app, { ...contents.get(app), present: { modelRun: app.modelRun, look, routes } });
+        contents.set(app, { ...contents.get(app), present: { modelRun: frame.run, look, routes } });
         return routes;
     }
 
     /** Roads (model cell pairs) as routes laid on the display mesh in the map's Main road style. */
     static #roadRoutes(app, roadFrom, roadTo, places, prefix) {
-        const chains = chainRoads(roadFrom, roadTo, places);
+        const frame = this.#frame(app);
+        // Each chain of run cells as the display cells at their sites, broken where it leaves the map
+        const chains = [];
+        for (const chain of chainRoads(roadFrom, roadTo, places)) {
+            let piece = [];
+            for (const cell of chain) {
+                const display = frame.displayOf(cell);
+                if (display < 0) {
+                    if (piece.length > 1) chains.push(piece);
+                    piece = [];
+                } else if (piece.at(-1) !== display) piece.push(display);
+            }
+            if (piece.length > 1) chains.push(piece);
+        }
         const id = FILRODENSWMB.GENERATOR.ROUTE_STYLES.road.main;
         const own = (app.uiState.customRouteStyles ?? []).find((style) => style.id === id);
         const seed = own ? null : FILRODENSWMB.ROUTES.DEFAULT_STYLES.find((style) => style.id === id);
@@ -310,8 +376,8 @@ export class HistoryView {
     }
 
     /** Which present realm each realm of an earlier age carried on as (see PastAge.matchRealms), or -1. */
-    static #carried(app, index, realm = decodeAge(app.modelRun.history[index]).realm) {
-        const seats = app.modelRun.history[index].seats ?? [];
+    static #carried(app, index, realm = decodeAge(this.#frame(app).run.history[index]).realm) {
+        const seats = this.#frame(app).run.history[index].seats ?? [];
         const present = this.#cells(app).realm;
         return realm && present ? matchRealms(realm, seats, present) : new Int32Array(seats.length).fill(-1);
     }
@@ -321,7 +387,7 @@ export class HistoryView {
      * by the present realm's name on the map, any other by the name the generator gave it.
      */
     static #realmNames(app, index, realm) {
-        const age = app.modelRun.history[index];
+        const age = this.#frame(app).run.history[index];
         const carried = this.#carried(app, index, realm);
         const present = this.#presentRealms(app);
         return (age.seats ?? []).map((_, key) => (carried[key] >= 0 ? present?.bySource.get(carried[key])?.name : null) || age.realmNames?.[key] || null);
@@ -353,7 +419,7 @@ export class HistoryView {
      * regions by the realm they came from. Null when they have been deleted.
      */
     static #presentRealms(app) {
-        const runId = app.modelRun?.run;
+        const runId = this.#frame(app)?.run.run;
         if (!runId) return null;
         for (const set of app.meshSession?.layerSets ?? []) {
             const level = set.levels[0];
@@ -365,10 +431,11 @@ export class HistoryView {
 
     /** The run's present arrays (decoded once per run). */
     static #cells(app) {
+        const run = this.#frame(app)?.run ?? null;
         const cached = runs.get(app);
-        if (cached?.cellsOf === app.modelRun) return cached.cells;
-        const cells = decodeModelRun(app.modelRun);
-        runs.set(app, { ...cached, cellsOf: app.modelRun, cells });
+        if (cached?.cellsOf === run) return cached.cells;
+        const cells = decodeModelRun(run);
+        runs.set(app, { ...cached, cellsOf: run, cells });
         return cells;
     }
 
@@ -383,9 +450,10 @@ export class HistoryView {
     static thematicRun(app) {
         const index = this.shownIndex(app);
         if (index < 0) return null;
+        const modelRun = this.#frame(app)?.run;
+        if (!modelRun) return null;
         const cached = runs.get(app);
-        if (cached?.thematicOf === app.modelRun && cached.thematicIndex === index) return cached.thematic;
-        const modelRun = app.modelRun;
+        if (cached?.thematicOf === modelRun && cached.thematicIndex === index) return cached.thematic;
         const age = modelRun.history[index];
         const cells = { water: modelRun.cells.water, landArea: modelRun.cells.landArea };
         if (age.culture) {
@@ -437,7 +505,7 @@ export class HistoryView {
         const count = this.ageCount(app);
         if (count < 2) return { ages: null, note: platform.i18n.localize(count ? "FILRODENSWMB.UI.HistoryOneAge" : "FILRODENSWMB.UI.HistoryNoRun") };
         const chosen = this.chosenAge(app);
-        const settings = app.modelRun.settings?.ages ?? [];
+        const settings = this.#frame(app).run.settings?.ages ?? [];
         const ages = Array.from({ length: count }, (_, at) => ({
             number: at + 1,
             label: platform.i18n.format(at + 1 === count ? "FILRODENSWMB.UI.GenerateAgePresent" : "FILRODENSWMB.UI.GenerateAgeNumber", { number: at + 1 }),
@@ -468,7 +536,7 @@ export class HistoryView {
 
     /** The age in brief: its era, strife and event, and how many realms, places, castles and people it had. */
     static #brief(app, number, settings) {
-        const modelRun = app.modelRun;
+        const modelRun = this.#frame(app).run;
         const rows = [];
         const name = (prefix, id) => (id && id !== "custom" ? platform.i18n.localize(`${prefix}${id.charAt(0).toUpperCase()}${id.slice(1)}`) : null);
         const era = name("FILRODENSWMB.UI.GenerateEra", settings?.era);
@@ -488,7 +556,10 @@ export class HistoryView {
 
     /** An age's counts: from its brief for an earlier age, from the run's figures for the present. */
     static #counts(app, number) {
-        const modelRun = app.modelRun;
+        const frame = this.#frame(app);
+        const modelRun = frame.run;
+        // On a regional map, what lies on it: its realms, its places, and no count of people (a realm's spans beyond it)
+        if (frame.inherited) return this.#countsOnMap(app, frame, number);
         if (number === this.ageCount(app)) {
             const stats = modelRun.stats ?? {};
             return {
@@ -507,6 +578,28 @@ export class HistoryView {
         };
     }
 
+    /** An age's counts on a regional map not generated itself: realms with land on it, its places and castles; no people. */
+    static #countsOnMap(app, frame, number) {
+        if (number === this.ageCount(app)) {
+            const pins = (app.mapPins ?? []).filter((pin) => pin.generated?.run === frame.run.run);
+            return {
+                realms: this.#presentRealms(app)?.bySource.size ?? 0,
+                places: pins.filter((pin) => pin.generated.kind === "town").length,
+                castles: pins.filter((pin) => pin.generated.kind === "castle").length,
+                people: null,
+            };
+        }
+        const age = frame.run.history[number - 1];
+        const onMap = (cell) => frame.displayOf(cell) >= 0;
+        const places = age.places ?? [];
+        let placeCount = 0;
+        for (let at = 0; at + 2 < places.length; at += 3) if (onMap(places[at])) placeCount++;
+        const { realm } = decodeAge(age);
+        const realms = new Set();
+        if (realm) for (let cell = 0; cell < realm.length; cell++) if (realm[cell] >= 0 && onMap(cell)) realms.add(realm[cell]);
+        return { realms: realms.size, places: placeCount, castles: (age.castles ?? []).filter(onMap).length, people: null };
+    }
+
     /**
      * The realms of the age, most people first: their colour, name, people and capital, and (for
      * an earlier age) whether they carried on to the present. An earlier age's rows centre the map
@@ -515,11 +608,14 @@ export class HistoryView {
     static #realmRows(app, number) {
         if (number === this.ageCount(app)) return this.#presentRealmRows(app);
         const past = this.pastMap(app);
-        const age = app.modelRun.history[number - 1];
+        const frame = this.#frame(app);
+        const age = frame.run.history[number - 1];
         if (!past) return [];
         const seatNames = new Map();
         for (let at = 0; at + 2 < (age.places?.length ?? 0); at += 3) seatNames.set(age.places[at], age.placeNames?.[at / 3] ?? "");
+        // On a regional map, only the realms of the parent's age that reach it
         return past.regions
+            .filter((region) => !frame.inherited || past.onMap.has(region.key))
             .map((region) => ({
                 key: region.key,
                 name: region.name || NO_VALUE,
@@ -540,8 +636,8 @@ export class HistoryView {
         const cells = this.#cells(app);
         const capitals = new Map();
         for (const pin of app.mapPins ?? []) {
-            if (pin.generated?.run !== app.modelRun.run || pin.generated.tier !== FILRODENSWMB.GENERATOR.PIN_TIERS.capital || !Number.isInteger(pin.cell)) continue;
-            const realm = cells.realm?.[modelCellOf(app, pin.cell)];
+            if (pin.generated?.run !== this.#frame(app).run.run || pin.generated.tier !== FILRODENSWMB.GENERATOR.PIN_TIERS.capital || !Number.isInteger(pin.cell)) continue;
+            const realm = cells.realm?.[modelCellOf(this.#frame(app), pin.cell)];
             if (realm >= 0) capitals.set(realm, pin.name);
         }
         return [...present.bySource]
@@ -558,11 +654,14 @@ export class HistoryView {
     static #changes(app, number) {
         const count = this.ageCount(app);
         const from = number === count ? number - 1 : number;
-        const modelRun = app.modelRun;
+        const modelRun = this.#frame(app).run;
         const earlier = this.#ageState(app, from);
         const later = this.#ageState(app, from + 1);
         if (!earlier || !later) return null;
         const result = ageChanges(earlier, later, modelRun.cultures?.length ?? 0);
+        // On a regional map, only the realms that reach it rose or fell there
+        if (earlier.onMap) result.fell = result.fell.filter((realm) => earlier.onMap.has(realm));
+        if (later.onMap) result.rose = result.rose.filter((realm) => later.onMap.has(realm));
         const names = (list, nameOf) => {
             const named = list.map(nameOf).filter(Boolean);
             if (!named.length) return platform.i18n.localize("FILRODENSWMB.UI.HistoryNone");
@@ -595,7 +694,28 @@ export class HistoryView {
      * cultures, and its realms' names. The present's places are the run's town pins on the map.
      */
     static #ageState(app, number) {
-        const modelRun = app.modelRun;
+        const state = this.#fullAgeState(app, number);
+        const frame = this.#frame(app);
+        return state && frame.inherited ? this.#onMapState(frame, state) : state;
+    }
+
+    /**
+     * An age's state kept to the cells a regional map shows (its copy of its parent's run reaches
+     * a margin beyond it): realms, cultures and places off it left out, and the realms with land
+     * on it (`onMap`), so What changed tells of the regional map alone.
+     */
+    static #onMapState(frame, state) {
+        const onMap = (cell) => frame.displayOf(cell) >= 0;
+        const realm = Float64Array.from(state.realm, (value, cell) => (onMap(cell) ? value : -1));
+        const culture = state.culture ? Float64Array.from(state.culture, (value, cell) => (onMap(cell) ? value : -1)) : null;
+        const realms = new Set();
+        for (const value of realm) if (value >= 0) realms.add(value);
+        return { ...state, realm, culture, places: new Set([...state.places].filter(onMap)), onMap: realms };
+    }
+
+    static #fullAgeState(app, number) {
+        const frame = this.#frame(app);
+        const modelRun = frame.run;
         const count = this.ageCount(app);
         if (number < 1 || number > count) return null;
         if (number === count) {
@@ -603,7 +723,7 @@ export class HistoryView {
             if (!cells.realm) return null;
             const present = this.#presentRealms(app);
             const places = new Set();
-            for (const pin of app.mapPins ?? []) if (pin.generated?.run === modelRun.run && pin.generated.kind === "town" && Number.isInteger(pin.cell)) places.add(modelCellOf(app, pin.cell));
+            for (const pin of app.mapPins ?? []) if (pin.generated?.run === modelRun.run && pin.generated.kind === "town" && Number.isInteger(pin.cell)) places.add(modelCellOf(frame, pin.cell));
             let realmCount = 0;
             for (const realm of cells.realm) if (realm + 1 > realmCount) realmCount = realm + 1;
             return { realm: cells.realm, realmCount, seats: [], places, culture: cells.culture ?? null, realmName: (realm) => present?.bySource.get(realm)?.name ?? null };

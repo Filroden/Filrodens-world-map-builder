@@ -699,6 +699,27 @@ const RUN_CULTURE = obj({ id: { ...key, nullable: true }, name: generatorText("F
  * cultures, with each cell's site in the regional map's pixels. MapImport also checks that every
  * array holds a value per cell.
  */
+const HISTORY_NAME = generatorText("FILRODENSWMB.UI.LimitFieldName");
+
+/** An earlier age of a run, in brief (see ModelRun); MapImport checks that its names run with its places, castles and seats, and its arrays with the run's cells. */
+const RUN_AGE = obj({
+    development: num(RANGE.UNIT),
+    plague: num(RANGE.UNIT),
+    strife: num(RANGE.UNIT),
+    places: { t: "cells" },
+    placeNames: list(HISTORY_NAME),
+    castles: { t: "cells" },
+    castleNames: list(HISTORY_NAME),
+    castleKeeps: list(HISTORY_NAME),
+    seats: { t: "cellSlots" },
+    realmNames: list(HISTORY_NAME),
+    realmPeople: list(int(0, 1e12)),
+    realm: PACKED_ARRAY,
+    culture: PACKED_ARRAY,
+    roadFrom: PACKED_ARRAY,
+    roadTo: PACKED_ARRAY,
+});
+
 const PARENT_RUN = obj(
     {
         version: int(0, 1000),
@@ -711,6 +732,10 @@ const PARENT_RUN = obj(
         sites: obj({ x: PACKED_ARRAY, y: PACKED_ARRAY }),
         spacingKm: num({ min: 1e-6, max: 1e6 }),
         spacingPx: num({ min: 1e-6, max: 1e6 }),
+        // The parent run's settings and earlier ages on the regional map's cells, for its History (see ParentRun)
+        settings: GENERATOR_SETTINGS,
+        ages: obj({ asked: int(1, 100), run: int(1, 100) }),
+        history: list(RUN_AGE),
     },
     { nullable: true },
 );
@@ -839,7 +864,6 @@ const MAP = obj({
 // ------------------------------------------------------------------ the generator's outputs
 
 /** A name an earlier age gave a place, castle or realm, or a kind of keep (empty for none). */
-const HISTORY_NAME = generatorText("FILRODENSWMB.UI.LimitFieldName");
 
 
 /**
@@ -864,23 +888,7 @@ const MODEL_RUN = obj({
     seats: obj({ used: int(0, 1e6), unhonoured: list(obj({ pin: ref(), kind: enumOf(["capital", "city", "largeTown", "town", "fortifiedTown", "port", "castle"]), reason: enumOf(["noPlace", "dry", "notCapital", "water", "islet"]) })) }, { nullable: true }),
     // Each age before the last, in brief (see ModelRun); MapImport checks that its names run with
     // its places, castles and seats, and its arrays with the run's cells
-    history: list(obj({
-        development: num(RANGE.UNIT),
-        plague: num(RANGE.UNIT),
-        strife: num(RANGE.UNIT),
-        places: { t: "cells" },
-        placeNames: list(HISTORY_NAME),
-        castles: { t: "cells" },
-        castleNames: list(HISTORY_NAME),
-        castleKeeps: list(HISTORY_NAME),
-        seats: { t: "cellSlots" },
-        realmNames: list(HISTORY_NAME),
-        realmPeople: list(int(0, 1e12)),
-        realm: PACKED_ARRAY,
-        culture: PACKED_ARRAY,
-        roadFrom: PACKED_ARRAY,
-        roadTo: PACKED_ARRAY,
-    })),
+    history: list(RUN_AGE),
 });
 
 /** The rules, by kind. `map` is a whole saved map; the rest are the objects inside it. */
