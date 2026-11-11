@@ -79,8 +79,11 @@ export class GeneratorRevision {
      *   own are fixed units the present age's realms are built round (see UserRealms).
      * - userRoutes: whether the map's own routes are roads, sea lanes and traded rivers the run's
      *   trade may use (see UserRoutes).
+     * - idNames: whether places, castles and realms are named from streams of their own (see Names).
+     * - travelCosts: whether the Travel tool times climbs, the winds at sea and the seasons (see
+     *   TravelTime.travelConditions); a run's own output does not change with it.
      * @param {number} revision
-     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean, seats: boolean, userRegions: boolean, userRoutes: boolean}}
+     * @returns {{portWaterShare: number|null, fishingDensity: number, callKm: number|null, callShare: number, shorePins: boolean, seats: boolean, userRegions: boolean, userRoutes: boolean, idNames: boolean, travelCosts: boolean}}
      */
     static rules(revision) {
         const G = FILRODENSWMB.GENERATOR;
@@ -97,6 +100,7 @@ export class GeneratorRevision {
             // Each place, castle and realm named from a stream of its own (see Names), and each of
             // Fill in's villages and market towns by its in-fill cell (see Infill)
             idNames: ports,
+            travelCosts: ports,
         });
     }
 

@@ -2,15 +2,16 @@
 // the wilds slower than farmland and rough ground slower again, rivers faster downstream, ships on
 // sea routes and small boats elsewhere, waiting for passage when going aboard), the quickest times
 // and way from a start, and the lines at each band's edge; and the network built from a map as a
-// run builds it.
+// run builds it. From generator revision 2: climbs, the winds at sea and the seasons.
 import "../mesh/foundry-stubs.mjs";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 const { FILRODENSWMB } = await import("../../src/config.js");
 const { EDGE } = await import("../../src/generator/CellGraph.js");
-const { dayRings, edgeBetween, edgeDays, flagRoute, groundPace, joinSegments, riverDirection, roadEdges, travelFrom, wayTo } = await import("../../src/travel/TravelTime.js");
+const { dayRings, edgeBetween, edgeDays, flagRoute, groundPace, joinSegments, riverDirection, roadEdges, travelConditions, travelFrom, travelTo, wayTo } = await import("../../src/travel/TravelTime.js");
 const { buildTravelGraph } = await import("../../src/travel/TravelGraph.js");
+const { GeneratorRevision } = await import("../../src/generator/GeneratorRevision.js");
 const { travelGrid, travelCellOfPixels } = await import("../../src/travel/TravelGrid.js");
 const { syntheticMap } = await import("../generator/synthetic.mjs");
 
@@ -165,4 +166,146 @@ test("the travel network is built from a map as a run builds it, and reaches its
     const reach = travelFrom(graph, edgeDays(graph, { speeds: SPEEDS, mode: "foot" }), land[Math.floor(land.length / 2)]);
     assert.ok(land.every((cell) => Number.isFinite(reach.days[cell])), "all of the island is reached");
     assert.ok(graph.edgeKind.includes(EDGE.RIVER), "the river is navigable");
+});
+
+/** The line graph (see lineGraph) with a climate: mild everywhere at the equator, no wind, sites 30 px apart along x. */
+function climateGraph() {
+    return Object.assign(lineGraph(), {
+        siteX: Float32Array.from([0, 30, 60, 90, 120]),
+        siteY: new Float32Array(5),
+        temperature: Float32Array.from([0.6, 0.6, 0.6, 0.6, 0.6]),
+        latitude: new Float32Array(5),
+        windX: new Float32Array(5),
+    });
+}
+
+test("revision 2's times: climbs are slower than descents, and no conditions give revision 1's times", () => {
+    assert.equal(GeneratorRevision.rules(FILRODENSWMB.GENERATOR.REVISIONS.LEGACY).travelCosts, false, "revision 1 keeps today's times");
+    assert.equal(GeneratorRevision.rules(FILRODENSWMB.GENERATOR.REVISIONS.REVISION_2).travelCosts, true);
+    const graph = climateGraph();
+    const road = new Uint8Array(4).fill(1);
+    const legacy = edgeDays(graph, { speeds: SPEEDS, mode: "foot", road });
+    assert.deepEqual(edgeDays(lineGraph(), { speeds: SPEEDS, mode: "foot", road, conditions: null }), legacy, "without conditions the times are revision 1's");
+    const conditions = travelConditions(graph, { season: "year" });
+    assert.ok(conditions.land.every((value) => value === 1) && conditions.water.every((value) => value === 1), "a mild map is not slowed");
+    // Level ground and no wind: the conditions change nothing
+    const flat = Object.assign(climateGraph(), { heightM: new Float32Array(5) });
+    assert.deepEqual(edgeDays(flat, { speeds: SPEEDS, mode: "foot", road, conditions }), edgeDays(flat, { speeds: SPEEDS, mode: "foot", road }), "level ground, no wind, a mild season: the times are unchanged");
+    // Cell 0 stands 1,800 m above cell 1
+    graph.heightM[0] = 1840;
+    const days = edgeDays(graph, { speeds: SPEEDS, mode: "foot", road, conditions });
+    near(days.back[0], 1 + 1800 / TT.CLIMB_M.foot, "climbing 1,800 m on foot adds half a day");
+    near(days.out[0], 1, "coming down costs nothing more");
+    const wagon = edgeDays(graph, { speeds: SPEEDS, mode: "wagon", road, conditions });
+    near(wagon.back[0] - wagon.out[0], 1800 / TT.CLIMB_M.wagon, "a wagon climbs twice as slowly");
+    const from1 = travelFrom(graph, days, 1).days[0];
+    const from0 = travelFrom(graph, days, 0).days[1];
+    assert.ok(from1 > from0, "up the pass is slower than down it");
+});
+
+test("seasons: winter closes a snowbound pass and ice, slows snow and cold seas, freezes rivers; summer opens them", () => {
+    const graph = climateGraph();
+    // Far from the equator; cell 2 high and cold, cell 4 a cold sea
+    graph.latitude.fill(60);
+    graph.temperature.set([0.6, 0.6, 0.3, 0.6, 0.45]);
+    const swing = TT.SEASON_SWING * (60 / 90);
+    const winter = travelConditions(graph, { season: "winter" });
+    assert.ok(0.3 - swing < FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD);
+    assert.equal(winter.land[2], Infinity, "the pass is snowbound in winter");
+    assert.equal(winter.frozen[2], 1, "and its river frozen");
+    const year = travelConditions(graph, { season: "year" });
+    assert.equal(year.land[2], 1, "open all year");
+    near(winter.land[0], 1, "the lowland stays open");
+    const iced = travelConditions(Object.assign(climateGraph(), { temperature: Float32Array.from([0.6, 0.6, 0.6, 0.6, 0.1]) }), { season: "year" });
+    assert.equal(iced.water[4], Infinity, "ice closes the sea");
+    const cold = graph.temperature[4] - swing - FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD;
+    near(winter.water[4], 1 / (1 - TT.COLD_SEA_SLOW * (1 - cold / TT.COLD_SEA_BAND)), "a cold sea is slower in winter");
+    const snowy = travelConditions(Object.assign(climateGraph(), { temperature: Float32Array.from([0.25, 0.6, 0.6, 0.6, 0.6]) }), { season: "year" });
+    near(snowy.land[0], 1 / TT.SNOW_PACE, "snowy land goes at the snow's pace");
+    const summer = travelConditions(graph, { season: "summer" });
+    assert.equal(summer.land[2], 1, "summer opens the pass");
+    const road = new Uint8Array(4).fill(1);
+    const winterDays = edgeDays(graph, { speeds: SPEEDS, mode: "foot", road, conditions: winter });
+    assert.equal(winterDays.out[1], Infinity, "no way into the snowbound cell, by river or by its bank");
+    assert.equal(winterDays.out[2], Infinity);
+    const reach = travelFrom(graph, winterDays, 0);
+    assert.equal(reach.days[3], Infinity, "the pass cuts the way in winter");
+    assert.ok(Number.isFinite(travelFrom(graph, edgeDays(graph, { speeds: SPEEDS, mode: "foot", road, conditions: summer }), 0).days[3]), "in summer the way is open");
+    // A river whose upper cell freezes in winter only
+    const north = Object.assign(climateGraph(), { temperature: Float32Array.from([0.6, 0.15, 0.6, 0.6, 0.6]) });
+    north.latitude.fill(60);
+    const river = Uint8Array.from([0, 1, 0, 0]);
+    const thawed = edgeDays(north, { speeds: SPEEDS, mode: "foot", road, river, conditions: travelConditions(north, { season: "summer" }) });
+    assert.equal(thawed.out[1], 0.5, "a trading river in summer has boats downstream");
+    assert.equal(travelConditions(north, { season: "winter" }).frozen[1], 1, "and freezes in winter");
+});
+
+test("winds: ships sail faster with the prevailing wind than against it, small boats less so", () => {
+    const graph = climateGraph();
+    // Two water cells side by side, 30 km apart along x, joined by a sea edge (edge 0 made a sea step)
+    graph.edgeKind[0] = EDGE.SEA;
+    graph.water.set([1, 1, 0, 0, 1]);
+    graph.windX.fill(1);
+    const conditions = travelConditions(graph);
+    const lane = Uint8Array.from([1, 0, 0, 0]);
+    const ship = edgeDays(graph, { speeds: SPEEDS, mode: "foot", lane, conditions });
+    near(ship.out[0], 30 / 150 / (1 + TT.WIND.WITH), "with the wind, a quarter faster");
+    near(ship.back[0], 30 / 150 / (1 - TT.WIND.AGAINST), "against it, two fifths slower");
+    const boat = edgeDays(graph, { speeds: SPEEDS, mode: "foot", conditions });
+    near(boat.out[0], 30 / 40 / (1 + TT.WIND.WITH * TT.WIND.BOAT), "a small boat feels half of it");
+    graph.windX.fill(0);
+    const calm = edgeDays(graph, { speeds: SPEEDS, mode: "foot", lane, conditions });
+    near(calm.out[0], calm.back[0], "no wind, no difference");
+});
+
+test("the network carries the climate: latitudes from the map's, a wind by band, temperatures over land and sea", () => {
+    const { makePayload } = syntheticMap();
+    const payload = makePayload();
+    const graph = buildTravelGraph({ ...payload, travelClimate: { latTop: 60, latBottom: 0, windDistance: 40 } });
+    const top = graph.siteY.indexOf(Math.min(...graph.siteY));
+    assert.ok(graph.latitude[top] <= 60 && graph.latitude[top] > 30, "the top of the map near 60 degrees");
+    for (let cell = 0; cell < graph.count; cell++) {
+        const lat = Math.abs(graph.latitude[cell]);
+        if (lat > 30 && lat < 60) assert.ok(graph.windX[cell] > 0, "the westerlies blow east");
+        if (lat < 20) assert.ok(graph.windX[cell] < 0, "the easterlies blow west");
+    }
+    assert.ok([...graph.water.keys()].filter((cell) => graph.water[cell]).every((cell) => Number.isFinite(graph.temperature[cell])), "water has a temperature too");
+    const still = buildTravelGraph({ ...payload, travelClimate: { latTop: 60, latBottom: 0, windDistance: 0 } });
+    assert.ok(still.windX.every((value) => value === 0 || Object.is(value, -0)), "no wind distance, no wind");
+});
+
+test("the Travel tool follows the map's revision (a regional map its parent's), and its season is kept valid", async () => {
+    const { TravelView } = await import("../../src/applications/TravelView.js");
+    const { LEGACY, REVISION_2 } = FILRODENSWMB.GENERATOR.REVISIONS;
+    const older = { uiState: { travel: { season: "winter" } } };
+    assert.equal(TravelView.hasConditions(older), false, "a map saved before v4.3 keeps today's times");
+    assert.equal(TravelView.season(older), "year", "and its season is all year whatever was saved");
+    const current = { uiState: { generatorRevision: REVISION_2, travel: { season: "winter" } } };
+    assert.equal(TravelView.hasConditions(current), true);
+    assert.equal(TravelView.season(current), "winter");
+    assert.equal(TravelView.setting({ uiState: { generatorRevision: REVISION_2, travel: { season: "monsoon" } } }).season, "year", "an unknown season reads as all year");
+    for (const parent of [LEGACY, REVISION_2]) {
+        const regional = { uiState: { generatorRevision: GeneratorRevision.forRegional({ generatorRevision: parent }) } };
+        assert.equal(TravelView.hasConditions(regional), parent >= REVISION_2, "a regional map's times follow its parent's revision");
+    }
+});
+
+test("the way back: each cell's time to the start, each step timed the way it is travelled", () => {
+    const graph = lineGraph();
+    const days = edgeDays(graph, { speeds: SPEEDS, mode: "foot", road: new Uint8Array(4).fill(1), river: Uint8Array.from([0, 1, 0, 0]) });
+    const home = travelTo(graph, days, 0);
+    for (let cell = 0; cell < graph.count; cell++) near(home.days[cell], travelFrom(graph, days, cell).days[0], `from cell ${cell} to the start`);
+    // Down the river from 1 to 2 is quicker than back up it
+    assert.ok(travelFrom(graph, days, 1).days[2] < travelTo(graph, days, 1).days[2], "the way out downstream is quicker than the way back");
+    assert.equal(travelTo(graph, days, -1).days[0], Infinity, "no destination, no way");
+});
+
+test("the way to the pointer is hidden at first and toggled for the session", async () => {
+    const { TravelView } = await import("../../src/applications/TravelView.js");
+    const app = { uiState: {}, view: { render() {} } };
+    assert.equal(TravelView.wayShown(app), false);
+    TravelView.toggleWay(app);
+    assert.equal(TravelView.wayShown(app), true);
+    TravelView.toggleWay(app);
+    assert.equal(TravelView.wayShown(app), false);
 });

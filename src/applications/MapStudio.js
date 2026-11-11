@@ -313,6 +313,8 @@ export class MapStudio {
         chooseHistoryAge(_e, t)         { this.#chooseHistoryAge(Number(t.dataset.age)); },
         focusHistoryRealm(_e, t)        { HistoryView.focusRealm(this, Number(t.dataset.realm)); },
         chooseTravelMode(_e, t)         { TravelView.chooseMode(this, t.dataset.mode); },
+        chooseTravelSeason(_e, t)       { TravelView.chooseSeason(this, t.dataset.season); },
+        toggleTravelWay()               { TravelView.toggleWay(this); },
         resetTravelSpeeds()             { TravelView.resetSpeeds(this); },
         clearTravelStart()              { TravelView.clearStart(this); },
         fillIn()                        { Infilling.run(this); },

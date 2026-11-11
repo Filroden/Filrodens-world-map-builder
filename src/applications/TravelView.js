@@ -2,8 +2,10 @@ import { FILRODENSWMB } from "../config.js";
 import { platform } from "../platform/index.js";
 import { cleanUnit } from "../data/MapUnit.js";
 import { decodeModelRun } from "../generator/ModelRun.js";
+import { GeneratorRevision } from "../generator/GeneratorRevision.js";
 import { blendValues, blendWeights } from "../thematic/ThematicData.js";
-import { dayRings, edgeDays, flagRoute, groundPace, travelFrom, wayTo } from "../travel/TravelTime.js";
+import { dayRings, edgeDays, flagRoute, groundPace, travelConditions, travelFrom, travelTo, wayTo } from "../travel/TravelTime.js";
+import { Generation } from "./Generation.js";
 import { RunCells } from "./RunCells.js";
 import { TravelNetwork } from "./TravelNetwork.js";
 
@@ -14,12 +16,18 @@ import { TravelNetwork } from "./TravelNetwork.js";
  * (see TravelTime and TravelNetwork), so they explain the network the run built.
  *
  * While the tool is open: a click on the map sets the start; the land is coloured by days of
- * travel (drawn in the thematic layer's place, so the thematic colour layers are set aside), a line
- * marks each whole day, and the quickest way to the pointer is drawn with its time in the
- * information bar. A click near a place starts there; elsewhere the journey starts at the point
+ * travel (drawn in the thematic layer's place, so the thematic colour layers are set aside), and a
+ * line marks each whole day. The information bar gives the time from the start to the pointer and
+ * back again (the two differ: rivers, winds and climbs run one way). Shift+click (or the panel's
+ * button) shows or hides the quickest way to the pointer, drawn on the map as it moves; hidden at
+ * first, so the bands read on their own. A click near a place starts there; elsewhere the journey starts at the point
  * clicked, with the walk to the network's nearest cell added. The bands are a day wide or more
- * (automatic by the map's size, or chosen). The way of travel, the map's speeds, the band width and
- * the start are saved with the map (uiState.travel).
+ * (automatic by the map's size, or chosen). The way of travel, the map's speeds, the band width,
+ * the start and the season are saved with the map (uiState.travel).
+ *
+ * On a map that follows generator revision 2 (see GeneratorRevision.rules, travelCosts), climbs,
+ * the winds at sea and the season chosen count too (see TravelTime.travelConditions); an older
+ * map keeps the times it was made with, and the panel says generating again brings the new ones.
  */
 
 const T = FILRODENSWMB.TRAVEL_TIME;
@@ -34,6 +42,9 @@ const SPEED_LABELS = Object.freeze({
     sea: "FILRODENSWMB.UI.TravelSea",
     boat: "FILRODENSWMB.UI.TravelBoat",
 });
+const SEASON_LABELS = Object.freeze({ year: "FILRODENSWMB.UI.TravelSeasonYear", summer: "FILRODENSWMB.UI.TravelSeasonSummer", winter: "FILRODENSWMB.UI.TravelSeasonWinter" });
+/** The season within a sentence ("in winter"), for the legend and an export's name; none all year. */
+const SEASON_PHRASES = Object.freeze({ summer: "FILRODENSWMB.UI.TravelPhraseSummer", winter: "FILRODENSWMB.UI.TravelPhraseWinter" });
 /** The way of travel within a sentence ("on foot"), for the legend and an export's name. */
 const MODE_PHRASES = Object.freeze({ foot: "FILRODENSWMB.UI.TravelPhraseFoot", wagon: "FILRODENSWMB.UI.TravelPhraseWagon", mount: "FILRODENSWMB.UI.TravelPhraseMount" });
 const FIELD_PREFIX = "travel.speeds.";
@@ -46,6 +57,8 @@ const NO_VALUE = "–";
 const journeys = new WeakMap();
 /** Per studio: the pointer tool that sets the start, while the tool is open. */
 const pickTools = new WeakMap();
+/** Studios showing the way to the pointer (for the session; hidden at first). */
+const waysShown = new WeakSet();
 
 export class TravelView {
     /** Whether the Travel tool is open. */
@@ -55,8 +68,9 @@ export class TravelView {
 
     /**
      * The map's setting made valid: a known way of travel, every speed within its range (the
-     * preset where missing), a band width (null for automatic) and a start on the map or none.
-     * @returns {{mode: string, speeds: Object<string, number>, interval: number|null, start: {x: number, y: number}|null}}
+     * preset where missing), a band width (null for automatic), a start on the map or none, and a
+     * known season (all year where missing).
+     * @returns {{mode: string, speeds: Object<string, number>, interval: number|null, start: {x: number, y: number}|null, season: string}}
      */
     static setting(app) {
         const saved = app.uiState?.travel ?? {};
@@ -68,7 +82,21 @@ export class TravelView {
         }));
         const start = Number.isFinite(saved.start?.x) && Number.isFinite(saved.start?.y) ? { x: saved.start.x, y: saved.start.y } : null;
         const interval = T.INTERVALS.includes(saved.interval) ? saved.interval : null;
-        return { mode, speeds, interval, start };
+        const season = T.SEASONS.includes(saved.season) ? saved.season : T.SEASONS[0];
+        return { mode, speeds, interval, start, season };
+    }
+
+    /**
+     * Whether the map's times count climbs, winds and seasons: from generator revision 2, which a
+     * regional map takes from its parent (see GeneratorRevision).
+     */
+    static hasConditions(app) {
+        return GeneratorRevision.rules(GeneratorRevision.of(app.uiState)).travelCosts;
+    }
+
+    /** The season the times are for: the one chosen, or all year on an older map. */
+    static season(app) {
+        return this.hasConditions(app) ? this.setting(app).season : T.SEASONS[0];
     }
 
     /** The automatic band width for the map: by its longer side in km (TRAVEL_TIME.AUTO_KM). */
@@ -107,7 +135,7 @@ export class TravelView {
             return;
         }
         const tool = {
-            down: (x, y) => this.setStart(app, x, y),
+            down: (x, y, event) => (event?.shiftKey ? this.toggleWay(app) : this.setStart(app, x, y)),
             move: () => {},
             up: () => {},
             hover: () => this.#setCursor(app, "crosshair"),
@@ -151,6 +179,20 @@ export class TravelView {
         app.view?.render(["context"]);
     }
 
+    /** Whether the way to the pointer is drawn. */
+    static wayShown(app) {
+        return waysShown.has(app);
+    }
+
+    /** Shows or hides the way to the pointer (Shift+click, or the panel's button). */
+    static toggleWay(app) {
+        if (waysShown.has(app)) waysShown.delete(app);
+        else waysShown.add(app);
+        const journey = this.journey(app);
+        if (!this.wayShown(app)) app.canvasEngine?.renderTravel?.(journey?.rings ?? null, null, journey?.start ?? null);
+        app.view?.render(["context"]);
+    }
+
     /** Clears the start. */
     static clearStart(app) {
         this.#save(app, { start: null });
@@ -162,6 +204,14 @@ export class TravelView {
     static chooseMode(app, mode) {
         if (!T.MODES.includes(mode)) return;
         this.#save(app, { mode });
+        app._repaintVectors?.();
+        app.view?.render(["context"]);
+    }
+
+    /** Chooses the season (see TRAVEL_TIME.SEASONS). */
+    static chooseSeason(app, season) {
+        if (!T.SEASONS.includes(season)) return;
+        this.#save(app, { season });
         app._repaintVectors?.();
         app.view?.render(["context"]);
     }
@@ -226,27 +276,44 @@ export class TravelView {
         const interval = this.interval(app);
         const mesh = app.meshSession?.mesh;
         if (!graph || !start || !mesh) return null;
-        const key = JSON.stringify([mode, speeds, interval, start, app.modelRun?.run ?? app.parentRun?.run ?? null]);
+        const conditioned = this.hasConditions(app);
+        const season = this.season(app);
+        const freezing = app.uiState?.freezingThreshold;
+        const key = JSON.stringify([mode, speeds, interval, start, conditioned, season, freezing, app.modelRun?.run ?? app.parentRun?.run ?? null]);
         const cached = journeys.get(app);
         if (cached?.graph === graph && cached.key === key && cached.modelRun === app.modelRun) return cached.journey;
         const display = app.meshSession.cellAt(start.x, start.y);
         const { grid } = graph;
         const startCell = display >= 0 ? grid.of[display] : -1;
         const run = this.#runNetwork(app, graph);
-        const options = { speeds, mode, ...run, maxKm: T.MAX_EDGE_SPACINGS * grid.spacingPx * mesh.kmPerPx };
-        const reach = travelFrom(graph, edgeDays(graph, options), startCell);
+        const conditions = conditioned ? travelConditions(graph, { season, freezing: Number.isFinite(freezing) ? freezing : undefined }) : null;
+        const options = { speeds, mode, ...run, conditions, maxKm: T.MAX_EDGE_SPACINGS * grid.spacingPx * mesh.kmPerPx };
+        const days = edgeDays(graph, options);
+        const reach = travelFrom(graph, days, startCell);
+        // And from every cell back to the start, each step timed the way it is travelled
+        const home = travelTo(graph, days, startCell);
         // The journey starts at the point itself: the way to the cell's site is added to every time
+        let startClosed = false;
         if (startCell >= 0) {
             const km = Math.hypot(grid.sites[startCell * 2] - start.x, grid.sites[startCell * 2 + 1] - start.y) * mesh.kmPerPx;
-            const pace = graph.water[startCell] ? speeds.boat : groundPace(graph, options, startCell);
-            const lead = km / pace;
-            for (let cell = 0; cell < reach.days.length; cell++) reach.days[cell] += lead;
+            const wet = graph.water[startCell] === 1;
+            const pace = wet ? speeds.boat : groundPace(graph, options, startCell);
+            const slowed = conditions ? (wet ? conditions.water : conditions.land)[startCell] : 1;
+            // A start snowbound or in ice goes nowhere this season
+            startClosed = !Number.isFinite(slowed);
+            const lead = startClosed ? Infinity : km === 0 ? 0 : (km / pace) * slowed;
+            for (let cell = 0; cell < reach.days.length; cell++) {
+                reach.days[cell] += lead;
+                home.days[cell] += lead;
+            }
         }
         const rings = dayRings(grid.delaunay.triangles, (cell) => grid.sites[cell * 2], (cell) => grid.sites[cell * 2 + 1], reach.days, T.MAX_DAYS, interval);
-        const blended = blendValues(reach.days, blendWeights(grid));
+        const weights = blendWeights(grid);
+        const blended = blendValues(reach.days, weights);
+        const blendedBack = blendValues(home.days, weights);
         const bands = new Uint8Array(blended.length);
         for (let cell = 0; cell < blended.length; cell++) bands[cell] = this.#band(blended[cell], interval);
-        const journey = { graph, reach, rings, blended, bands, interval, start, startCell, hasRoads: run.road.includes(1) || run.lane.includes(1) };
+        const journey = { graph, reach, home, rings, blended, blendedBack, bands, interval, start, startCell, season, startClosed, hasRoads: run.road.includes(1) || run.lane.includes(1) };
         journeys.set(app, { graph, key, modelRun: app.modelRun, journey });
         return journey;
     }
@@ -328,23 +395,32 @@ export class TravelView {
     // ------------------------------------------------------------------ the information bar
 
     /**
-     * The time from the start to the point under the pointer in the information bar (blended
-     * between the network's cells, as the bands are), and the way there drawn on the map from the
-     * start to the pointer; a dash where no journey reaches.
+     * The time from the start to the point under the pointer, and from there back to the start, in
+     * the information bar (blended between the network's cells, as the bands are); a dash where no
+     * journey reaches. With the way shown (see toggleWay), the way there is drawn on the map from
+     * the start to the pointer.
      */
     static readout(app, x, y) {
-        const element = app.root?.querySelector("[data-travel-readout]");
+        const there = app.root?.querySelector("[data-travel-readout]");
+        const backElement = app.root?.querySelector("[data-travel-back-readout]");
         const journey = this.journey(app);
-        element?.classList.toggle("fwmb-hidden", !journey);
+        there?.classList.toggle("fwmb-hidden", !journey);
+        backElement?.classList.toggle("fwmb-hidden", !journey);
         if (!journey) return;
         const display = x === null || y === null ? -1 : app.meshSession.cellAt(x, y);
         const { grid } = journey.graph;
         const cell = display >= 0 ? grid.of[display] : -1;
-        const blended = display >= 0 ? journey.blended[display] : Infinity;
-        const days = Number.isFinite(blended) ? blended : cell >= 0 ? journey.reach.days[cell] : Infinity;
-        if (element) element.querySelector("[data-travel-value]").textContent = Number.isFinite(days) ? this.duration(days) : NO_VALUE;
+        const timeOf = (blendedDays, cellDays) => {
+            const blended = display >= 0 ? blendedDays[display] : Infinity;
+            return Number.isFinite(blended) ? blended : cell >= 0 ? cellDays[cell] : Infinity;
+        };
+        const days = timeOf(journey.blended, journey.reach.days);
+        const backDays = timeOf(journey.blendedBack, journey.home.days);
+        const word = (value) => (Number.isFinite(value) ? this.duration(value) : NO_VALUE);
+        if (there) there.querySelector("[data-travel-value]").textContent = word(days);
+        if (backElement) backElement.querySelector("[data-travel-back-value]").textContent = word(backDays);
         let way = null;
-        if (Number.isFinite(days) && cell >= 0) {
+        if (this.wayShown(app) && Number.isFinite(days) && cell >= 0) {
             const route = wayTo(journey.graph, journey.reach, cell);
             const water = (at) => (journey.graph.water[at] ? "sea" : "road");
             const points = [journey.start.x, journey.start.y];
@@ -376,7 +452,7 @@ export class TravelView {
     /** What the legend shows, for ThematicView's signature (it is written again when this changes). */
     static legendSignature(app) {
         const journey = this.journey(app);
-        return journey ? `${this.setting(app).mode}:${journey.interval}` : null;
+        return journey ? `${this.setting(app).mode}:${journey.interval}:${journey.season}` : null;
     }
 
     /**
@@ -394,7 +470,9 @@ export class TravelView {
             item.append(swatch, make("span", "", String((at + 1) * interval)));
             body.append(item);
         });
-        const caption = make("div", "fwmb-ramp-unit", platform.i18n.format("FILRODENSWMB.UI.TravelLegendUnit", { mode: platform.i18n.localize(MODE_PHRASES[this.setting(app).mode]) }));
+        const mode = platform.i18n.localize(MODE_PHRASES[this.setting(app).mode]);
+        const season = SEASON_PHRASES[this.season(app)];
+        const caption = make("div", "fwmb-ramp-unit", season ? platform.i18n.format("FILRODENSWMB.UI.TravelLegendUnitSeason", { mode, season: platform.i18n.localize(season) }) : platform.i18n.format("FILRODENSWMB.UI.TravelLegendUnit", { mode }));
         const wrap = make("div", "");
         wrap.append(body, caption);
         return wrap;
@@ -405,6 +483,8 @@ export class TravelView {
     /** The panel's context. */
     static context(app) {
         const { mode, speeds, interval, start } = this.setting(app);
+        const season = this.season(app);
+        const conditioned = this.hasConditions(app);
         const unit = cleanUnit(app.uiState?.mapUnit);
         const auto = this.autoInterval(app);
         const ready = !!TravelNetwork.ready(app);
@@ -412,12 +492,17 @@ export class TravelView {
         return {
             ready,
             modes: T.MODES.map((id) => ({ id, label: MODE_LABELS[id], chosen: id === mode })),
+            // The seasons on a map that follows revision 2; an older map says how to bring them
+            seasons: conditioned ? T.SEASONS.map((id) => ({ id, label: SEASON_LABELS[id], chosen: id === season })) : null,
+            older: conditioned ? null : Generation.heldByParent(app) ? "FILRODENSWMB.UI.TravelOlderRegional" : "FILRODENSWMB.UI.TravelOlder",
+            startClosed: !!journey?.startClosed,
             speeds: Object.keys(T.SPEEDS).map((key) => ({ name: `${FIELD_PREFIX}${key}`, label: SPEED_LABELS[key], value: speeds[key], min: T.SPEED_RANGE.MIN, max: T.SPEED_RANGE.MAX, unit: platform.i18n.format("FILRODENSWMB.UI.TravelPerDay", { unit }) })),
             intervals: [
                 { value: AUTO, label: platform.i18n.format("FILRODENSWMB.UI.TravelIntervalAuto", { days: this.#days(auto) }), chosen: interval === null },
                 ...T.INTERVALS.map((value) => ({ value, label: this.#days(value), chosen: interval === value })),
             ],
             start: start ? { near: this.#nearest(app, start) } : null,
+            wayShown: this.wayShown(app),
             noRoads: ready && !!start && journey && !journey.hasRoads,
             canExport: !!journey,
         };
@@ -456,7 +541,9 @@ export class TravelView {
         if (!this.journey(app)) return name;
         const { mode, start } = this.setting(app);
         const near = this.#nearest(app, start);
-        const how = platform.i18n.localize(MODE_PHRASES[mode]);
+        const season = SEASON_PHRASES[this.season(app)];
+        const way = platform.i18n.localize(MODE_PHRASES[mode]);
+        const how = season ? platform.i18n.format("FILRODENSWMB.UI.TravelPhraseModeSeason", { mode: way, season: platform.i18n.localize(season) }) : way;
         return near ? platform.i18n.format("FILRODENSWMB.UI.TravelExportName", { name, mode: how, place: near }) : platform.i18n.format("FILRODENSWMB.UI.TravelExportNameNoPlace", { name, mode: how });
     }
 }

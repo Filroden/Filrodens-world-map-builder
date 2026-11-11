@@ -273,7 +273,7 @@ export class MapStateManager {
             historyAge: null,
             // The Travel tool's way of travel, speeds (km a day), band width (null for automatic) and
             // start (see TravelView)
-            travel: { mode: "foot", speeds: { ...FILRODENSWMB.TRAVEL_TIME.SPEEDS }, interval: null, start: null },
+            travel: { mode: "foot", season: "year", speeds: { ...FILRODENSWMB.TRAVEL_TIME.SPEEDS }, interval: null, start: null },
             // The map's unit (see MapUnit): the name every distance shown is labelled with
             mapUnit: FILRODENSWMB.MAP_UNIT.DEFAULT,
             cartographyScaleEnable: false,

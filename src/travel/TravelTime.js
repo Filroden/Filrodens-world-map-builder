@@ -16,7 +16,8 @@ import { MinHeap } from "../mesh/MinHeap.js";
  * edgeDays).
  *
  * Times run one way, from the start outward: going up a river is slower than coming down it, and
- * going aboard waits for passage where coming ashore does not.
+ * going aboard waits for passage where coming ashore does not. From generator revision 2, the
+ * conditions (see travelConditions) add the climb, the winds at sea and the season.
  */
 
 /**
@@ -116,6 +117,42 @@ export function groundPace(graph, { speeds, mode, cleared = null }, cell) {
 }
 
 /**
+ * The season's conditions at each travel cell (generator revision 2, see edgeDays): each cell's
+ * time multiplier over land and afloat, and whether its rivers are frozen. A cell's temperature is
+ * the map's (see TravelGraph.climateShape), warmer in summer and colder in winter by the climate's
+ * season swing (TRAVEL_TIME.SEASON_SWING, scaled by the latitude). Land below freezing is
+ * snowbound and closed (Infinity), and within SNOW_BAND above it slowed to SNOW_PACE; its rivers
+ * are frozen below freezing. Sea and lake below freezing are ice, closed; within COLD_SEA_BAND
+ * above it, up to COLD_SEA_SLOW slower, the most at freezing. A cell without a temperature (no
+ * pixels) is as on a mild day.
+ * @param {object} graph - See TravelGraph (temperature, latitude, water).
+ * @param {{season?: string, freezing?: number}} [options] - The season (TRAVEL_TIME.SEASONS) and the
+ *     map's freezing threshold (the map's sea ice and snow, see ProceduralEngine).
+ * @returns {{season: string, land: Float64Array, water: Float64Array, frozen: Uint8Array}}
+ */
+export function travelConditions(graph, { season = "year", freezing = FILRODENSWMB.CLIMATE.FREEZING_THRESHOLD } = {}) {
+    const T = FILRODENSWMB.TRAVEL_TIME;
+    const sign = season === "summer" ? 1 : season === "winter" ? -1 : 0;
+    const land = new Float64Array(graph.count).fill(1);
+    const water = new Float64Array(graph.count).fill(1);
+    const frozen = new Uint8Array(graph.count);
+    for (let cell = 0; cell < graph.count; cell++) {
+        const base = graph.temperature?.[cell];
+        if (!Number.isFinite(base)) continue;
+        const latitude = graph.latitude?.[cell] ?? 0;
+        const temperature = base + sign * T.SEASON_SWING * (Math.abs(latitude) / 90);
+        if (temperature < freezing) {
+            land[cell] = water[cell] = Infinity;
+            frozen[cell] = 1;
+            continue;
+        }
+        if (temperature < freezing + T.SNOW_BAND) land[cell] = 1 / T.SNOW_PACE;
+        if (temperature < freezing + T.COLD_SEA_BAND) water[cell] = 1 / (1 - T.COLD_SEA_SLOW * (1 - (temperature - freezing) / T.COLD_SEA_BAND));
+    }
+    return { season: T.SEASONS.includes(season) ? season : "year", land, water, frozen };
+}
+
+/**
  * Each edge's time in days, each way: `out` from its first cell (edgeA) to its second, `back` the
  * other way.
  *
@@ -135,12 +172,18 @@ export function groundPace(graph, { speeds, mode, cleared = null }, cell) {
  * @param {ArrayLike<number>} [options.cleared] - Each cell's share of land cleared for farming.
  * @param {number} [options.maxKm] - Edges longer than this are not travelled: the thin triangles
  *     along the map's edge join cells far apart, and a step along one would skip what lies between.
+ * @param {object|null} [options.conditions] - The lie of the land, the winds and the season (see
+ *     travelConditions), from generator revision 2; none gives the times of revision 1. A land step
+ *     then takes longer for the height it climbs (CLIMB_M; descent is free), snow slows it and a
+ *     snowbound cell closes it; a ship or boat goes faster with the prevailing wind and slower
+ *     against it, slower on cold seas and not at all through ice; a frozen river has no boats.
  * @returns {{out: Float64Array, back: Float64Array}}
  */
 export function edgeDays(graph, options) {
-    const { speeds, mode, road = null, lane = null, river = null, towns = null, maxKm = Infinity } = options;
-    const { edgeA, edgeB, edgeKm, edgeKind, water, reliefTerm } = graph;
-    const { TERRAIN, HARBOUR_DAYS, SHORE_DAYS } = FILRODENSWMB.TRAVEL_TIME;
+    const { speeds, mode, road = null, lane = null, river = null, towns = null, maxKm = Infinity, conditions = null } = options;
+    const { edgeA, edgeB, edgeKm, edgeKind, water, reliefTerm, heightM } = graph;
+    const T = FILRODENSWMB.TRAVEL_TIME;
+    const { TERRAIN, HARBOUR_DAYS, SHORE_DAYS } = T;
     const count = edgeA.length;
     const out = new Float64Array(count);
     const back = new Float64Array(count);
@@ -149,8 +192,24 @@ export function edgeDays(graph, options) {
     const pace = new Float64Array(graph.count);
     for (let cell = 0; cell < graph.count; cell++) pace[cell] = water[cell] ? 0 : groundPace(graph, options, cell);
     const slow = (cost) => Math.max(1, cost) ** TERRAIN;
-    const roadDays = (a, b, km) => (km * 0.5 * (slow(reliefTerm[a]) + slow(reliefTerm[b]))) / road1;
-    const groundDays = (a, b, km) => km * 0.5 * (1 / pace[a] + 1 / pace[b]);
+    // Each cell's time multiplier over land and afloat (1 without conditions)
+    const onLand = conditions ? (cell) => conditions.land[cell] : () => 1;
+    const afloat = conditions ? (cell) => conditions.water[cell] : () => 1;
+    const climbM = T.CLIMB_M[mode] ?? T.CLIMB_M.foot;
+    const climb = conditions ? (a, b) => Math.max(0, heightM[b] - heightM[a]) / climbM : () => 0;
+    const roadDays = (a, b, km) => (km * 0.5 * (slow(reliefTerm[a]) * onLand(a) + slow(reliefTerm[b]) * onLand(b))) / road1;
+    const groundDays = (a, b, km) => km * 0.5 * (onLand(a) / pace[a] + onLand(b) / pace[b]);
+    // A water step's speed factor from a to b with the wind, for a ship (on a sea route) or a boat
+    const windy = !!(conditions && graph.windX && graph.siteX);
+    const windFactor = (a, b, ship) => {
+        if (!windy) return 1;
+        const dx = graph.siteX[b] - graph.siteX[a];
+        const length = Math.hypot(dx, graph.siteY[b] - graph.siteY[a]);
+        if (!(length > 0)) return 1;
+        const along = (0.5 * (graph.windX[a] + graph.windX[b]) * dx) / length;
+        const gain = along >= 0 ? T.WIND.WITH * along : T.WIND.AGAINST * along;
+        return 1 + gain * (ship ? 1 : T.WIND.BOAT);
+    };
     for (let edge = 0; edge < count; edge++) {
         const a = edgeA[edge];
         const b = edgeB[edge];
@@ -163,35 +222,46 @@ export function edgeDays(graph, options) {
             continue;
         }
         switch (edgeKind[edge]) {
-            case EDGE.SEA:
-                forward = backward = km / (lane?.[edge] === 1 ? speeds.sea : boat);
+            case EDGE.SEA: {
+                const ship = lane?.[edge] === 1;
+                const days = (km / (ship ? speeds.sea : boat)) * 0.5 * (afloat(a) + afloat(b));
+                forward = days / windFactor(a, b, ship);
+                backward = days / windFactor(b, a, ship);
                 break;
+            }
             case EDGE.PORT: {
                 const land = water[a] ? b : a;
-                const ashore = built ? (km * 0.5 * slow(reliefTerm[land])) / road1 : (km * 0.5) / pace[land];
-                const afloat = (km * 0.5) / (lane?.[edge] === 1 ? speeds.sea : boat);
+                const wet = land === a ? b : a;
+                const ship = lane?.[edge] === 1;
+                const ashore = (built ? (km * 0.5 * slow(reliefTerm[land])) / road1 : (km * 0.5) / pace[land]) * onLand(land);
+                const aboard = ((km * 0.5) / (ship ? speeds.sea : boat)) * afloat(wet);
                 const wait = towns?.has(land) ? HARBOUR_DAYS : SHORE_DAYS;
                 // Going aboard is from the land cell to the water cell
-                forward = ashore + afloat + (land === a ? wait : 0);
-                backward = ashore + afloat + (land === b ? wait : 0);
+                forward = ashore + aboard / windFactor(a, b, ship) + (land === a ? wait : 0);
+                backward = ashore + aboard / windFactor(b, a, ship) + (land === b ? wait : 0);
                 break;
             }
             case EDGE.RIVER: {
                 const direction = riverDirection(graph, a, b);
                 const traded = river?.[edge] === 1;
-                const at = (speed) => km / (traded ? speed : Math.min(speed, boat));
+                // A frozen river carries no boats: only the way along its bank is left
+                const frozen = conditions ? conditions.frozen[a] === 1 || conditions.frozen[b] === 1 : false;
+                const at = (speed) => (frozen ? Infinity : km / (traded ? speed : Math.min(speed, boat)));
                 const down = at(speeds.riverDown);
                 const up = at(speeds.riverUp);
                 const level = at((speeds.riverDown + speeds.riverUp) / 2);
                 forward = direction > 0 ? down : direction < 0 ? up : level;
                 backward = direction > 0 ? up : direction < 0 ? down : level;
                 const overland = built ? roadDays(a, b, km) : groundDays(a, b, km);
-                forward = Math.min(forward, overland);
-                backward = Math.min(backward, overland);
+                forward = Math.min(forward, overland + climb(a, b));
+                backward = Math.min(backward, overland + climb(b, a));
                 break;
             }
-            default:
-                forward = backward = built ? roadDays(a, b, km) : groundDays(a, b, km);
+            default: {
+                const days = built ? roadDays(a, b, km) : groundDays(a, b, km);
+                forward = days + climb(a, b);
+                backward = days + climb(b, a);
+            }
         }
         out[edge] = forward;
         back[edge] = backward;
@@ -228,6 +298,37 @@ export function travelFrom(graph, { out, back }, start) {
         }
     }
     return { start, days, via };
+}
+
+/**
+ * The quickest time from every cell to a destination (Infinity where none gets there): the way
+ * back to the start, since times run one way (upstream, upwind and uphill differ from the way
+ * out). Each step is timed in the direction it is travelled, towards the destination.
+ * @returns {{target: number, days: Float64Array}}
+ */
+export function travelTo(graph, { out, back }, target) {
+    const days = new Float64Array(graph.count).fill(Infinity);
+    if (!(target >= 0 && target < graph.count)) return { target, days };
+    const heap = new MinHeap(1024);
+    days[target] = 0;
+    heap.push(0, target);
+    while (heap.size) {
+        const time = heap.peekPriority();
+        const cell = heap.pop();
+        if (time > days[cell]) continue;
+        for (let slot = graph.adjStart[cell]; slot < graph.adjStart[cell + 1]; slot++) {
+            const from = graph.adjCell[slot];
+            const edge = graph.adjEdge[slot];
+            // The step from the neighbour to this cell
+            const step = graph.edgeA[edge] === from ? out[edge] : back[edge];
+            const arrive = time + step;
+            if (arrive < days[from]) {
+                days[from] = arrive;
+                heap.push(arrive, from);
+            }
+        }
+    }
+    return { target, days };
 }
 
 /**

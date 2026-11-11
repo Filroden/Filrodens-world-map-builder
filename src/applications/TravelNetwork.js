@@ -41,7 +41,10 @@ export class TravelNetwork {
         const entry = { mesh, inputs, promise: null, value: null };
         const grid = gridFor(mesh);
         const makePayload = () => {
-            const payload = Generation.payload(app, undefined, { influences: false });
+            const state = app.uiState ?? {};
+            // The climate's latitudes and wind, for the seasons and winds (see TravelGraph.climateShape)
+            const travelClimate = { latTop: state.latTop, latBottom: state.latBottom, windDistance: state.windDistance };
+            const payload = { ...Generation.payload(app, undefined, { influences: false }), travelClimate };
             if (grid.coarse) return payload;
             // The travel cells in the model cells' place, with relief measured as on the generator's
             const kmPerPx = payload.kmPerPx;

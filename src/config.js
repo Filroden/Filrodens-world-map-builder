@@ -552,8 +552,9 @@ export const FILRODENSWMB = {
                 homeland: ["PlaceHomeland", "StopHomeland"],
                 // An age's event's place being picked on the map (see AgeEventRows)
                 eventPlace: ["PlaceEventPlace", "StopEventPlace"],
-                // The Travel tool: a click sets where the journey starts (see TravelView)
-                travel: ["SetTravelStart"],
+                // The Travel tool: a click sets where the journey starts, Shift+click shows or hides
+                // the way to the pointer (see TravelView)
+                travel: ["SetTravelStart", "ToggleTravelWay"],
                 terrain: ["PaintTerrain"],
                 biomes: ["PaintBiomes"],
                 spring: ["PlaceSpring", "MoveSpring", "DeleteSpring"],
@@ -1008,6 +1009,28 @@ export const FILRODENSWMB = {
         MAX_CELLS: 40000,
         // Edges longer than this many cell spacings are not travelled (see TravelTime.edgeDays)
         MAX_EDGE_SPACINGS: 2.5,
+        // From generator revision 2 (see GeneratorRevision.rules, travelCosts): the lie of the
+        // land, the winds and the seasons (see TravelTime.travelConditions).
+        // Climbing: the metres climbed that cost a day of travel, on top of the step's time
+        // (Naismith's hour per 600 m over a six-hour day; a wagon twice as slow). Descent is free.
+        CLIMB_M: Object.freeze({ foot: 3600, mount: 3600, wagon: 1800 }),
+        // Winds at sea, from the climate's prevailing winds (latitude bands, see
+        // ProceduralEngine.getMoistureAt): a ship's speed rises by WITH straight downwind and
+        // falls by AGAINST straight upwind (tacking), scaled by the band's strength; a small boat
+        // feels BOAT of that. Unchanged across the wind, and none when the climate has no wind.
+        WIND: Object.freeze({ WITH: 0.25, AGAINST: 0.4, BOAT: 0.5 }),
+        // The seasons the Travel tool offers: the map's temperatures as drawn, or warmer or
+        // colder by the climate's own season swing (SWING at the poles, none at the equator,
+        // as the Season slider at its ends). Land below freezing is snowbound and closed; within
+        // SNOW_BAND above it, travel goes at SNOW_PACE. A river below freezing has no boats. Sea
+        // or lake below freezing is ice, closed; within COLD_SEA_BAND above it, boats and ships
+        // are up to COLD_SEA_SLOW slower (storms), the most at freezing.
+        SEASONS: Object.freeze(["year", "summer", "winter"]),
+        SEASON_SWING: 0.35,
+        SNOW_BAND: 0.1,
+        SNOW_PACE: 0.5,
+        COLD_SEA_BAND: 0.25,
+        COLD_SEA_SLOW: 0.3,
     }),
     THEMATIC: Object.freeze({
         OPACITY: 0.7,
