@@ -70,6 +70,7 @@ export class RegionEditor {
             changeRank: (app, _region, ref) => RegionPanel.changeRank(app, ref.levelId, ref.id),
             delete: (app, _region, ref) => RegionPanel.deleteRegion(app, ref.levelId, ref.id),
             saveStyle: (app, region, ref, button) => RegionEditor.#saveStyle(app, region, button.dataset.styleType),
+            placeLabel: (app, region) => InspectorFields.placeLabel(app, region),
         },
     });
 

@@ -54,6 +54,7 @@ export class PinEditor {
             lock: (app, pin) => GeneratedEdits.toggleLock(app, pin),
             randomName: (app, pin) => RandomNames.press(app, "pin", pin),
             saveStyle: (app, pin, _ref, button) => PinEditor.#saveStyle(app, pin, button.dataset.styleType),
+            placeLabel: (app, pin) => InspectorFields.placeLabel(app, pin),
         },
     });
 

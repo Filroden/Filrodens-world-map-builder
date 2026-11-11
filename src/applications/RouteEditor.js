@@ -74,6 +74,7 @@ export class RouteEditor {
             repath: (app, route) => RouteEditor.#reshape(app, route, (session) => repathRoute(session, app.mapRoutes, route)),
             delete: (app, route) => RouteEditor.delete(app, route.id),
             saveStyle: (app, route, _ref, button) => RouteEditor.#saveStyle(app, route, button.dataset.styleType),
+            placeLabel: (app, route) => InspectorFields.placeLabel(app, route),
         },
     });
 

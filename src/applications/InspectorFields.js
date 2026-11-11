@@ -36,14 +36,39 @@ export class InspectorFields {
      * The label of a pin, route or region as the inspector shows it: its own fields over the
      * defaults new labels get (the bar's), with its rotation wrapped into the slider's range.
      */
+    /**
+     * Place automatically: an owned label the reader moved (its own `x`, `y`) goes back to the
+     * map's placement rules, beside its pin, along its route or inside its region and clear of
+     * other names where there is room (see LabelLayout), as one undo step. Its look, its turn
+     * included, stays. Returns whether it had a position of its own.
+     * @param {object} app
+     * @param {object} owner - The pin, route or region.
+     */
+    static placeLabel(app, owner) {
+        const label = owner?.label;
+        if (!label || (label.x === undefined && label.y === undefined)) return false;
+        MapStateManager.pushVectorState(app);
+        const { x: _x, y: _y, ...rest } = label;
+        owner.label = rest;
+        app._repaintVectors?.();
+        app.view?.render(["context", "editToolbar"]);
+        app.markDirty?.();
+        return true;
+    }
+
     static label(app, entity) {
         const label = MapDialogManager._withLabelDefaults(app, entity).label;
         return { ...label, visibility: label.visibility ?? "all" };
     }
 
-    /** The context the label fields partial (parts/label-fields.hbs) needs, besides the label. */
-    static labelChoices(app, label) {
+    /**
+     * The context the label fields partial (parts/label-fields.hbs) needs, besides the label.
+     * `owned`: a pin's, route's or region's label, which can be handed back to the map's own
+     * placement once moved (`moved`; see placeLabel). A standalone label's position is its own.
+     */
+    static labelChoices(app, label, { owned = true } = {}) {
         return {
+            moved: owned && (Number.isFinite(label.x) || Number.isFinite(label.y)),
             face: this.faceChoices(label.fontFamily),
             fontGroups: labelFontGroups(platform.fonts.list(), "FILRODENSWMB.UI.FontCategoryOther"),
             // A family the host lacks stays chosen (the label keeps it), shown as missing

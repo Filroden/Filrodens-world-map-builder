@@ -262,3 +262,34 @@ test("No fill on every region, then cleared: the regions get their colours from 
     assert.equal(shown, "#aa0000", "the colour box shows the first region's colour from before");
     assert.deepEqual(app.regionLevels[0].regions.map((region) => region.fillColor), ["#aa0000", "#aa0000"], "clearing No fill applies it to all, as one colour for the items chosen");
 });
+
+test("Place automatically: offered once any chosen label was moved, it hands every chosen label back to the map's placement, their looks kept, as one undo step", async () => {
+    const app = studio();
+    dialogue.drive = (form) => assert.equal(row(form, "label.placement"), null, "no label moved, no Position row");
+    await MassEdit.open(app, "route");
+
+    const again = studio();
+    again.mapRoutes[0].label = { ...again.mapRoutes[0].label, x: 50, y: 60, rotation: 20 };
+    let offered = null;
+    dialogue.drive = (form) => {
+        offered = row(form, "label.placement")?.textContent ?? null;
+        change(form, "label.placement", "auto");
+        change(form, "label.fontSize", "2");
+    };
+    assert.equal(await MassEdit.open(again, "route"), true);
+    assert.match(offered, /MassEditLabelPosition \{"count":"1"\}/);
+    const [one, two] = again.mapRoutes;
+    assert.ok(!("x" in one.label) && !("y" in one.label), "its own position gone");
+    assert.equal(one.label.rotation, 20, "its turn kept");
+    assert.deepEqual([one.label.fontSize, two.label.fontSize], [2, 2], "the other label changes still apply");
+    assert.equal(again.pinHistory.length, 1);
+    VectorHistory.step(again, true);
+    assert.deepEqual([again.mapRoutes[0].label.x, again.mapRoutes[0].label.y], [50, 60], "one undo step");
+
+    // Left as is, the moved label stays where it was put
+    const kept = studio();
+    kept.mapRoutes[0].label = { ...kept.mapRoutes[0].label, x: 50, y: 60 };
+    dialogue.drive = (form) => change(form, "label.fontSize", "2");
+    await MassEdit.open(kept, "route");
+    assert.deepEqual([kept.mapRoutes[0].label.x, kept.mapRoutes[0].label.y], [50, 60]);
+});

@@ -5,7 +5,9 @@
 
     Parameters:
       label: the label's fields (InspectorFields.label: its own over the defaults)
-      choices: InspectorFields.labelChoices: face, fontGroups, labelStyles, rotationRange, justifications
+      choices: InspectorFields.labelChoices: face, fontGroups, labelStyles, rotationRange,
+                justifications, and moved (an owned label the reader moved, offered Place
+                automatically; see InspectorFields.placeLabel)
       styleName: the label style it follows, or null for Custom
       sectionId, sectionTitle, closed: the section's id (its open state is remembered by it),
                 title key, and whether it starts closed
@@ -13,6 +15,12 @@
                 region's label can be hidden apart from its owner)
 --}}
 {{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id=sectionId title=sectionTitle styleBadge=styleName closed=closed}}
+{{#if choices.moved}}
+<p class="fwmb-hint">{{localize "FILRODENSWMB.UI.InspectorLabelMoved"}}</p>
+<div class="fwmb-btn-row">
+    <button type="button" class="fwmb-btn" data-inspector-action="placeLabel" data-tooltip="{{localize 'FILRODENSWMB.UI.InspectorLabelPlaceHint'}}"><i class="fwmb-icon fwmb-icon--undo" aria-hidden="true"></i>{{localize "FILRODENSWMB.UI.InspectorLabelPlace"}}</button>
+</div>
+{{/if}}
 {{> "modules/filrodens-world-map-builder/templates/parts/style-picker.hbs" name="labelQuickStyle" choices=choices.labelStyles type="Label"}}
 <div class="fwmb-form-group">
     <label class="fwmb-label" for="fwmb-inspector-label-font">{{localize "FILRODENSWMB.UI.InspectorFont"}}</label>

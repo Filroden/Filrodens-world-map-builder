@@ -75,6 +75,7 @@ export class LabelEditor {
             goToOwner: (app, object, ref) => LabelEditor.#goToOwner(app, object, ref),
             delete: (app, object) => MapDialogManager.deleteEntityById(app, "label", object.id),
             saveStyle: (app, object, ref) => LabelEditor.#saveStyle(app, object, ref),
+            placeLabel: (app, object, ref) => ref.type !== "custom" && InspectorFields.placeLabel(app, object),
         },
     });
 
@@ -89,7 +90,7 @@ export class LabelEditor {
             visibilities: RegionPanel.visibilityChoices(label.visibility),
             ownedVisibilities: standalone ? null : RegionPanel.visibilityChoices(label.visibility),
             label,
-            labelChoices: InspectorFields.labelChoices(app, label),
+            labelChoices: InspectorFields.labelChoices(app, label, { owned: !standalone }),
             labelStyleName: InspectorFields.styleName(app.uiState.customLabelStyles, label.quickStyle),
             palette: FILRODENSWMB.LABELS?.PRESETS || [],
         };

@@ -1120,3 +1120,27 @@ test("a random name is in the Name style its culture has now, not the one the ru
     app.uiState.cultures = [];
     assert.equal(suggested(), expect("English"), "a culture since deleted keeps the run's record");
 });
+
+test("a moved pin label offers Place automatically, in the pin's and the label's inspector: one undo step, its look kept; a standalone label never", async () => {
+    const { app } = await studio();
+    const pin = app.mapPins[0];
+    await PinEditor.open(app, "keep");
+    assert.equal(form(app).querySelector('[data-inspector-action="placeLabel"]'), null, "a label the map places offers nothing");
+    pin.label = { ...pin.label, x: 120, y: 80, rotation: 15 };
+    Inspector.refresh(app);
+    await settle();
+    assert.match(form(app).textContent, /InspectorLabelMoved/);
+    await press(app, "placeLabel");
+    assert.ok(!("x" in pin.label) && !("y" in pin.label), "its own position gone");
+    assert.equal(pin.label.rotation, 15, "its turn kept");
+    await undo(app);
+    const restored = () => app.mapPins.find((each) => each.id === "keep");
+    assert.deepEqual([restored().label.x, restored().label.y], [120, 80], "one undo step");
+
+    await LabelEditor.open(app, { type: "pin", id: "keep" });
+    await press(app, "placeLabel");
+    assert.ok(!("x" in restored().label), "from the label's own inspector too");
+
+    await LabelEditor.open(app, { type: "custom", id: "sea" });
+    assert.equal(form(app).querySelector('[data-inspector-action="placeLabel"]'), null, "a standalone label's position is its own");
+});
