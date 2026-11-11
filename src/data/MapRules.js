@@ -769,6 +769,8 @@ const MAP = obj({
     // A fingerprint of what the last fill-in read, as it left the map (see Infilling.inputs)
     infillInputs: obj({ places: key, routes: key, influences: key }, { nullable: true }),
     riverRoutes: bool,
+    // A regional map's inherited ports and river towns stand on its own shore and rivers (see ShoreRelay)
+    shoresPlaced: bool,
     terrainUpgradeDismissed: bool,
     springsBaked: bool,
     mapWidth: num(RANGE.SIZE),

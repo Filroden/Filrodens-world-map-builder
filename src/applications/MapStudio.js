@@ -25,6 +25,7 @@ import { getPinIconPickerList, getBuiltinPinIconList, getCustomPinIconList, getP
 import { RegionalExtractor } from "./RegionalExtractor.js";
 import { ParentRunRecovery } from "./ParentRunRecovery.js";
 import { RiverRelay } from "./RiverRelay.js";
+import { ShoreRelay } from "./ShoreRelay.js";
 import { RunCells } from "./RunCells.js";
 import { RunInputs } from "./RunInputs.js";
 import { Infilling } from "./Infilling.js";
@@ -590,6 +591,8 @@ export class MapStudio {
         this.infillInputs = null;
         // Whether a regional map's inherited river routes have been laid over its own rivers (see RiverRelay)
         this.riverRoutesLaid = false;
+        // Whether a regional map's inherited ports and river towns stand on its own shore (see ShoreRelay)
+        this.shoresPlaced = false;
         this.isDirty = false;
 
         MapStateManager.allocateBuffers(this);
@@ -4091,6 +4094,7 @@ export class MapStudio {
         this.infillPending = payload.infillPending === true;
         this.infillInputs = payload.infillInputs ?? null;
         this.riverRoutesLaid = payload.riverRoutes === true;
+        this.shoresPlaced = payload.shoresPlaced === true;
         this.uiState.terrainUpgradeDismissed = payload.terrainUpgradeDismissed === true;
         this.terrainUpgrade = null;
 
@@ -4626,6 +4630,7 @@ export class MapStudio {
             infillPending: this.infillPending === true,
             infillInputs: this.infillInputs ?? null,
             riverRoutes: this.riverRoutesLaid === true,
+            shoresPlaced: this.shoresPlaced === true,
             terrainUpgradeDismissed: this.uiState.terrainUpgradeDismissed === true,
             springsBaked: this.uiState.springsBaked,
             mapWidth: this.mapWidth,
@@ -5332,6 +5337,7 @@ export class MapStudio {
         this.infillPending = false;
         this.infillInputs = null;
         this.riverRoutesLaid = false;
+        this.shoresPlaced = false;
 
         // Reset biome colours to defaults so the DOM sync catches them
         this.customBiomeColors = {};
@@ -6156,6 +6162,13 @@ export class MapStudio {
                 this.riverRoutesLaid = true;
                 const { laid, removed } = RiverRelay.run(this);
                 if (laid + removed) this._repaintVectors();
+            }
+            // Its inherited ports onto its own coast, and river towns beside its own rivers, once
+            // (kept with its next save), before a fill-in reads them
+            if (ShoreRelay.needed(this)) {
+                this.shoresPlaced = true;
+                const { ports, rivers } = ShoreRelay.run(this);
+                if (ports + rivers) this._repaintVectors();
             }
             // Filled in now when asked for as it was cut; the map then has changes to save
             if (this.infillPending) {
