@@ -6914,8 +6914,8 @@ export class MapStudio {
             if (type === "custom") {
                 obj.visibility = this.#cycleVisibilityState(obj.visibility);
             } else {
-                // A custom river with no label yet has its name hidden: shown, it starts in the River label style
-                if (!obj.label && type === "river") obj.label = RiverLabels.newLabel(this, "none");
+                // A custom river with no label yet (drawn before rivers had labels) has its name hidden
+                if (!obj.label && type === "river") obj.label = { visibility: "none" };
                 if (!obj.label) obj.label = { visibility: "all" };
                 obj.label.visibility = this.#cycleVisibilityState(obj.label.visibility);
             }

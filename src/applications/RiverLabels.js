@@ -1,5 +1,6 @@
 import { FILRODENSWMB } from "../config.js";
 import { InspectorFields } from "./InspectorFields.js";
+import { platform } from "../platform/index.js";
 
 /**
  * A custom river's name on the map (a river guide drawn in Rivers and faults): its label, drawn
@@ -13,7 +14,7 @@ import { InspectorFields } from "./InspectorFields.js";
  *
  * **Shown or not:** a river drawn before rivers had labels has no `label`, and reads as hidden
  * (visibility "none"), so no map changes as it opens and labels made by hand for its rivers are
- * not doubled; a river drawn since starts shown, in the map's River label style when it has one.
+ * not doubled; a river drawn since starts shown, in the River label style (added when the map lacks it).
  * Where a custom river shows its name, Name natural features leaves that river to it (see
  * covers): the reader chooses between naming a river themselves and letting the map do it.
  */
@@ -37,16 +38,23 @@ export class RiverLabels {
     }
 
     /**
-     * The label a newly drawn river starts with: shown, in the map's River label style
-     * (FEATURE_NAMES.STYLES.river, which Name natural features adds) when the map has it.
+     * The label a newly drawn river starts with: shown, in the River label style
+     * (FEATURE_NAMES.STYLES.river), which is added from the defaults when the map lacks it (as Name
+     * natural features adds it; undone with the river). Only a river drawn now: an older river's
+     * label, shown later, keeps the look the reader gives it.
      * @param {object} app
-     * @param {string} [visibility]
      */
-    static newLabel(app, visibility = "all") {
-        const style = (app.uiState?.customLabelStyles ?? []).find((candidate) => candidate.id === FILRODENSWMB.FEATURE_NAMES.STYLES.river);
-        if (!style) return { visibility };
+    static newLabel(app) {
+        const styles = (app.uiState.customLabelStyles ??= []);
+        const id = FILRODENSWMB.FEATURE_NAMES.STYLES.river;
+        let style = styles.find((candidate) => candidate.id === id);
+        if (!style) {
+            const { nameKey, ...seed } = FILRODENSWMB.LABELS.DEFAULT_STYLES.find((candidate) => candidate.id === id);
+            style = { ...seed, name: platform.i18n.localize(nameKey) };
+            styles.push(style);
+        }
         const fields = Object.fromEntries(InspectorFields.LABEL_STYLE_FIELDS.map((name) => [name, name === "bold" ? style.bold !== false : name === "italic" ? style.italic === true : style[name]]));
-        return { visibility, quickStyle: style.id, ...fields };
+        return { visibility: "all", quickStyle: style.id, ...fields };
     }
 
     /**

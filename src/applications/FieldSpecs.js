@@ -140,7 +140,8 @@ export class FieldSpecs {
             style: { type: "Label", key: "unused", none: null, write: () => ({}) },
             perItem: ["riverName", "riverCorridor", "riverCutThrough", "labelRotation"],
             terrainFields: ["width"],
-            newLabel: (app) => RiverLabels.newLabel(app, "none"),
+            // A river drawn before rivers had labels has its name hidden until shown
+            newLabel: () => ({ visibility: "none" }),
             fields: [{ key: "width", store: "item", type: "select", label: "FILRODENSWMB.UI.RiverWidth", inspector: ["riverWidth"], options: () => RIVER_WIDTHS }, ...labelFields("label")],
             current: (app, river) => ({ ...river, width: river.width == null ? null : String(river.width), label: RiverLabels.label(app, river) }),
         }),

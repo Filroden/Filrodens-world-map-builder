@@ -20,13 +20,23 @@ test("a river drawn before rivers had labels reads as hidden; a label shown or h
     assert.equal(RiverLabels.label(app(), { ...old, label: {} }).visibility, "all", "a label without a visibility is shown, as every owned label");
 });
 
-test("a new river's label is shown, in the River label style when the map has it", () => {
-    assert.deepEqual(RiverLabels.newLabel(app()), { visibility: "all" });
-    const style = { id: FILRODENSWMB.FEATURE_NAMES.STYLES.river, name: "River", fontFamily: "EB Garamond", fontSize: 1.4, fillColor: "#335577", maxChars: 0, justify: "center", bold: false, italic: true };
-    const label = RiverLabels.newLabel(app({ uiState: { customLabelStyles: [style] } }));
-    assert.equal(label.quickStyle, style.id);
-    assert.deepEqual([label.fontFamily, label.fontSize, label.italic, label.bold], ["EB Garamond", 1.4, true, false]);
-    assert.equal(RiverLabels.newLabel(app(), "none").visibility, "none");
+test("a new river's label is shown in the River label style, which is added when the map lacks it", () => {
+    const id = FILRODENSWMB.FEATURE_NAMES.STYLES.river;
+    const bare = app();
+    const label = RiverLabels.newLabel(bare);
+    assert.equal(label.visibility, "all");
+    assert.equal(label.quickStyle, id);
+    const added = bare.uiState.customLabelStyles.filter((style) => style.id === id);
+    assert.equal(added.length, 1, "the River style added from the defaults");
+    const seed = FILRODENSWMB.LABELS.DEFAULT_STYLES.find((style) => style.id === id);
+    assert.deepEqual([label.fontFamily, label.fontSize, label.italic], [seed.fontFamily, seed.fontSize, seed.italic]);
+    RiverLabels.newLabel(bare);
+    assert.equal(bare.uiState.customLabelStyles.length, 1, "added once");
+
+    // The map's own River style, as the reader changed it, is the one used
+    const own = { id, name: "River", fontFamily: "EB Garamond", fontSize: 1.4, fillColor: "#335577", maxChars: 0, justify: "center", bold: false, italic: true };
+    const styled = RiverLabels.newLabel(app({ uiState: { customLabelStyles: [own] } }));
+    assert.deepEqual([styled.quickStyle, styled.fontFamily, styled.fontSize, styled.bold], [id, "EB Garamond", 1.4, false]);
 });
 
 test("the name follows the traced river near the guide, and the guide where none is near", () => {
