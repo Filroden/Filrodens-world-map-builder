@@ -2,20 +2,20 @@
 
 # Video script: tutorial 8, Places and labels
 
-**Goal:** Keep a generated place, add a place of your own, change a pin style, name a sea, and place a name that had no room.
+**Goal:** Keep a generated place, add a place of your own, change a pin style, name the seas, mountains, forests and rivers, and place a name that had no room.
 
-**Opening narration:** In this tutorial we're going to work with the map's places and names: we'll lock a generated city so it is kept, add a castle of our own, name a sea, and move a name the map had no room for.
+**Opening narration:** In this tutorial we're going to work with the map's places and names: we'll lock a generated city so it is kept, add a castle of our own, name the seas, mountains and forests, and move a name the map had no room for.
 
 ## 1. Find a place
 
-**Narration:** Search the pins for Golenduos, and focus the map on it. The Generated section shows what the run recorded: a city of about twenty-seven thousand people, nearly all Hillfolk.
+**Narration:** Search the pins for Kineley, and focus the map on it. The Generated section shows what the run recorded: a city of about twenty-one thousand people, nearly all Valefolk.
 
 **On screen:**
 
 - Click Routes and pins on the rail.
-- Set Search by name to Golenduos.
-- Click Golenduos.
-- Point at Golenduos's row.
+- Set Search by name to Kineley.
+- Click Kineley.
+- Point at Kineley's row.
 - Click Focus view.
 - Click Generated.
 
@@ -72,21 +72,19 @@
 
 **Matches the wiki's image:** `08-places-and-labels-castles.png`
 
-## 5. Name a sea
+## 5. Name the natural features
 
-**Narration:** Open Labels, choose Place and the Water style, and click the open sea. Call it The Morning Sea, and turn it to follow the channel.
+**Narration:** Open Labels and click Name natural features. It finds the seas, mountains, forests and largest rivers from the terrain, and names each in the language of the people living there.
 
 **On screen:**
 
 - Click Labels on the rail.
-- Choose Place on the bar.
-- Set Style to Water.
-- Zoom in on the sea.
-- Click the open water.
-- Set Text to The Morning Sea.
-- Set Rotation to -30.
+- Open the Natural features section.
+- Click Name natural features.
+- Wait for the map to update.
+- Zoom in on the east of the continent.
 
-**Camera:** the map from 1380, 600 to 1700, 1000
+**Camera:** the map from 1000, 250 to 1800, 1050
 
 **Hold:** 4 s after the action
 
@@ -94,10 +92,11 @@
 
 ## 6. Find the names with no room
 
-**Narration:** Filter the labels to those with no room. While you place labels, they show faintly where they would go, like the duchy name Golenduos here.
+**Narration:** Choose Place, and filter the labels to those with no room. While you place labels, they show faintly where they would go, like the steppe's name here.
 
 **On screen:**
 
+- Choose Place on the bar.
 - Set Kind of label to With no room.
 - Zoom in on the Red Hills.
 
@@ -109,11 +108,11 @@
 
 ## 7. Place it yourself
 
-**Narration:** Drag it a little north, above the names of the city and the castle. A name you've placed yourself stays where you put it and other names will move to make space.
+**Narration:** Drag it up into the open hills. A name you've placed yourself stays where you put it, and other names will move to make space.
 
 **On screen:**
 
-- Drag Golenduos north.
+- Drag Kvines Steppe north-west.
 
 **Camera:** the map from 1000, 300 to 1440, 760
 
@@ -143,7 +142,6 @@
 **On screen:**
 
 - Choose Select on the bar.
-- Click Close on the inspector.
 - Click Save map.
 
 **Camera:** the whole studio

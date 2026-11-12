@@ -3,8 +3,8 @@
 // and the map controls' view filters decide what an export shows. Then a new map traced over a
 // sketch with the reference image, the usual way to bring in an existing map.
 
-/** The west of the Red Hills on the regional map: Redwatch and two ruined towns, Winetonton and Wargton. */
-const WEST_HILLS = [300, 420, 760, 780];
+/** The west of the regional map: Redwatch and three ruined towns, Nostoles, Rothet and Chawbuton. */
+const WEST_HILLS = [20, 560, 520, 880];
 
 /** The sketch map (samples/tutorial/ashgrove-sketch.png) and the new map's size, the same as the sketch's. */
 const SKETCH = "samples/tutorial/ashgrove-sketch.png";
@@ -53,7 +53,7 @@ export default {
         {
             id: "search",
             title: "Search the lists",
-            instruction: "With **The Red Hills** open, click **Routes and pins** on the rail. The **Pins** list holds every place on the map, nearly eight hundred after the fill-in. Type `ford` in its **Search by name** field: the list keeps the pins whose names contain it, and says how many match.",
+            instruction: "With **The Red Hills** open, click **Routes and pins** on the rail. The **Pins** list holds every place on the map, nearly nine hundred after the fill-in. Type `ford` in its **Search by name** field: the list keeps the pins whose names contain it, and says how many match.",
             action: [
                 { do: "tool", tool: "infrastructure", label: "Routes and pins" },
                 { do: "set", field: PIN_SEARCH, value: "ford", label: "Search by name" },
@@ -77,7 +77,7 @@ export default {
         {
             id: "mass-edit",
             title: "Change them all at once",
-            instruction: "Click **Select items for mass edit** in the Pins section's title (the pencil). A tick box appears on each row: click **Select all**, which ticks every pin the list shows, then **Mass edit (13)**. The dialogue shows the pins' fields, each with the value they share or **Mixed**. Set **Visibility** to **GM only**: the ruins are secret until your players find them.",
+            instruction: "Click **Select items for mass edit** in the Pins section's title (the pencil). A tick box appears on each row: click **Select all**, which ticks every pin the list shows, then **Mass edit (8)**. The dialogue shows the pins' fields, each with the value they share or **Mixed**. Set **Visibility** to **GM only**: the ruins are secret until your players find them.",
             action: [
                 { do: "click", target: '[data-action="toggleMassEditMode"][data-type="pin"]', label: "Select items for mass edit" },
                 { do: "click", target: '[data-action="massEditSelectAll"][data-type="pin"]', label: "Select all" },
@@ -87,27 +87,27 @@ export default {
             ],
             settle: false,
             screenshot: { name: "mass-edit", region: "dialog", pad: 8 },
-            caption: "Mass edit for the thirteen ruined towns, with Visibility changed to GM only.",
+            caption: "Mass edit for the eight ruined towns, with Visibility changed to GM only.",
             note: "Only the fields you change are written; the rest stay as each pin has them. **Delete** beside **Mass edit** deletes the ticked items instead, after asking.",
             narration: "Now we will select items for mass edit. So select all, and open Mass edit. Set the visibility to GM only.",
         },
         {
             id: "mass-done",
             title: "Confirm",
-            instruction: "Click **Confirm**. The thirteen ruined towns are GM only, in one step of undo.",
+            instruction: "Click **Confirm**. The eight ruined towns are GM only, in one step of undo.",
             action: [
                 { do: "dialog", button: "ok", label: "Confirm" },
                 { do: "expect", check: (studio) => studio.mapPins.filter((pin) => pin.generated?.tier === "ruinedTown").every((pin) => pin.visibility === "gm") || "the ruined towns are not all GM only", within: 30000 },
             ],
-            narration: "Confirm, and all thirteen pins that were filtered will change at once.",
+            narration: "Confirm, and all eight pins that were filtered will change at once.",
         },
         {
             id: "views",
             title: "Visibility and the views",
-            instruction: "Everything on the map (pins, routes, regions, labels and decorations) is visible to **Everyone**, **GM only**, or **Hidden**. The first three buttons of the map controls, **Player view**, **GM view** and **Hidden**, choose which of them the map shows; at first the first two are on. Zoom in on the west of the Red Hills, where Redwatch stands with two of the ruins, Winetonton and Wargton, marked in red.",
-            action: [{ do: "frame", rect: WEST_HILLS, label: "Zoom in on the west of the Red Hills." }],
+            instruction: "Everything on the map (pins, routes, regions, labels and decorations) is visible to **Everyone**, **GM only**, or **Hidden**. The first three buttons of the map controls, **Player view**, **GM view** and **Hidden**, choose which of them the map shows; at first the first two are on. Zoom in on the west of the map, where Redwatch stands in the hills with three of the ruins, Nostoles, Rothet and Chawbuton, marked in red.",
+            action: [{ do: "frame", rect: WEST_HILLS, label: "Zoom in on the west of the map." }],
             screenshot: { name: "gm-view", region: { map: WEST_HILLS }, mapOnly: true },
-            caption: "Player view and GM view on: Redwatch, and the ruined towns Winetonton and Wargton.",
+            caption: "Player view and GM view on: Redwatch, and the ruined towns Nostoles, Rothet and Chawbuton.",
             narration: "Everything on the map can either be visible to everyone, to the GM only, or hidden from everyone. The first three buttons of the map controls choose which you see. Here, with the GM view on, the ruins show.",
             pause: 3,
         },
@@ -288,6 +288,6 @@ export default {
 
     whatYouSee: "Two saved maps besides Tutorial world: The Red Hills, with its ruined towns GM only and Redwatch hidden, and The Isle of Ashgrove, traced from the sketch, with the seed 51745D, a smoother coast and its four towns.",
     foundry: "Everything on this page is the same in Foundry, apart from where the sketch comes from: in Foundry, **Image source** opens Foundry's file picker, so upload the image to your world's data first.",
-    onYourOwn: `Use the filters and **Select all** whenever you want to change a kind of thing everywhere, and think about styles too: a change to a pin, route or label style reaches every item that follows it. Decide early what your players should not see, and set it GM only as you go; check with **GM view** off before you export. To recreate a map you already have, make the new map the same shape as the image, trace the coasts as land masks, and lower the image's **Opacity** to check the terrain against it. See [[Map Making Tools]] (mass edit), [[Map Canvas]] (view filters), [[Export]] and [[Reference image]].`,
+    onYourOwn: `Use the filters and **Select all** whenever you want to change a kind of thing everywhere, and think about styles too: a change to a pin, route or label style reaches every item that follows it. Decide early what your players should not see, and set it GM only as you go; check with **GM view** off before you export. To recreate a map you already have, make the new map the same shape as the image, trace the coasts as land masks, and lower the image's **Opacity** to check the terrain against it. When you have places of your own in mind, place their pins before you generate: a pin in a settlement style (a capital, city, port or castle, like Redwatch on page 8) is built as that settlement when the map is generated again, with the towns and roads round it, and realms, duchies and counties you paint in the Political set keep exactly their land. See [[Map Making Tools]] (mass edit), [[Map Canvas]] (view filters), [[Export]], [[Reference image]] and [[Generate]] (your own pins, regions and routes).`,
     related: ["Map Making Tools", "Map Canvas", "Export", "Reference image"],
 };

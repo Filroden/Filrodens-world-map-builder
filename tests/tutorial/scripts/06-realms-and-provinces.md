@@ -23,12 +23,12 @@
 
 ## 2. Find the island realms
 
-**Narration:** The big island in the east is split between two realms. Choose Dudge, and Focus view zooms the map to it.
+**Narration:** The big island in the east is split between two realms. Choose Shershoveria, and Focus view zooms the map to it.
 
 **On screen:**
 
-- Click Dudge.
-- Point at Dudge's row.
+- Click Shershoveria.
+- Point at Shershoveria's row.
 - Click Focus view.
 
 **Camera:** the whole studio
@@ -39,15 +39,15 @@
 
 ## 3. Merge the realms
 
-**Narration:** Unite the island: merge Stansteria into Dudge.
+**Narration:** Unite the island: merge Chister into Shershoveria.
 
 **On screen:**
 
-- Point at Stansteria's row.
-- Click ⋮ on Stansteria.
+- Point at Chister's row.
+- Click ⋮ on Chister.
 - Click Merge into.
 - The dialogue opens.
-- Set Merge into to Dudge.
+- Set Merge into to Shershoveria.
 
 **Camera:** the dialog
 

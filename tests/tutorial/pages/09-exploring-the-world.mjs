@@ -1,16 +1,16 @@
 // Tutorial page 9: exploring the world. Reads the run's thematic layers (population, culture and
 // trade), steps back to the world's first age in History with the culture layer on, and times a
-// journey from Kansmarda to Dudgeton with Travel.
+// journey from Pickermouth to Shershover with Travel.
 
-/** Golenduos and the land round it, where the population is read. */
+/** Kineley and the land round it, where the population is read. */
 const MOSTADRA_LAND = [1250, 625];
 
 /** The Red Hills, where the culture is read. */
 const HILLS_LAND = [1150, 500];
 
-/** The journey's start and end: the capitals Kansmarda and Dudgeton. */
+/** The journey's start and end: the capitals Pickermouth and Shershover, Islemark's. */
 const KANSMARDA = [1222, 673];
-const NEWCESTED = [1471, 1006];
+const NEWCESTED = [1631, 1091];
 
 /** The east of the continent and Islemark, for the trade close-up. */
 const EAST = [1000, 300, 1700, 1100];
@@ -37,7 +37,7 @@ export default {
         {
             id: "population",
             title: "Show the population",
-            instruction: "In the map controls at the foot of the map, open the **Regions** menu and untick **Fills**, so the realms' colours don't tint what comes next. Then open the **Thematic layers** menu and choose **Population**. The land is coloured by how many people live on it, from the empty wilds (palest) to the crowded farmland round the cities (darkest red). Point at the land near Golenduos: the information bar reads the population there, and the legend marks it on its scale.",
+            instruction: "In the map controls at the foot of the map, open the **Regions** menu and untick **Fills**, so the realms' colours don't tint what comes next. Then open the **Thematic layers** menu and choose **Population**. The land is coloured by how many people live on it, from the empty wilds (palest) to the crowded farmland round the cities (darkest red). Point at the land near Kineley: the information bar reads the population there, and the legend marks it on its scale.",
             action: [
                 { do: "click", target: mapButton("Regions"), label: "Regions in the map controls" },
                 { do: "click", target: FILLS, label: "Fills" },
@@ -45,11 +45,11 @@ export default {
                 { do: "click", target: mapButton("Thematic layers"), label: "Thematic layers in the map controls" },
                 { do: "click", target: thematic("population"), label: "Population" },
                 CLOSE_MENU,
-                { do: "hover", at: MOSTADRA_LAND, label: "Point at the land near Golenduos." },
+                { do: "hover", at: MOSTADRA_LAND, label: "Point at the land near Kineley." },
             ],
             screenshot: { name: "population", region: "studio", pointer: MOSTADRA_LAND },
-            caption: "Population, with the information bar and the legend reading the land near Golenduos.",
-            note: "**Capacity** shows how many people the land could feed, on the same scale, so where Capacity is darker than Population there is room for more. **Cleared land** and **Danger** show the farmland and the toll of raiding and strife. **Opacity**, at the foot of the menu, sets how strongly a layer covers the map.",
+            caption: "Population, with the information bar and the legend reading the land near Kineley.",
+            note: "**Capacity** shows how many people the land could feed, on the same scale, so where Capacity is darker than Population there is room for more. **Cleared land** and **Danger** show the farmland and the toll of raiding and strife. **Opacity**, at the foot of the menu, sets how strongly a layer covers the map. The legend says the run is out of date: the road and sea lane you drew on page 7 and the castle you placed on page 8 are things Generate builds round, so generating again would take them in. The tutorial keeps the run it has.",
             narration: "Turn off the region fills, and show the Population layer. The darker the red, the more people live there. The information bar and the legend show the value under your mouse pointer.",
             pause: 4,
         },
@@ -104,29 +104,30 @@ export default {
         {
             id: "present",
             title: "Back to the present",
-            instruction: "Click **Age 2: the present** in the **Ages** list, and compare: the invading Hillfolk now hold the north, the west and the hills. Scroll the panel down to **What changed**, which lists, since the age before, the realms that fell and rose, the places founded and lost, and each people's share of the land: the Hillfolk from none of it to 64%.",
+            instruction: "Click **Age 2: the present** in the **Ages** list, and compare: the invading Hillfolk now hold the north, the west and the hills. Scroll the panel down to **What changed**, which lists, since the age before, the realms that fell and rose, the places founded and lost, and each people's share of the land: the Hillfolk from none of it to 57%.",
             action: [{ do: "click", target: '[data-action="chooseHistoryAge"][data-age="2"]', label: "Age 2: the present" }],
             screenshot: { name: "what-changed", region: { union: ["map", { selector: 'details.fwmb-section:has(summary:has-text("What changed"))' }] } },
             caption: "The present, with what changed since Age 1.",
-            note: "**Export image** (**Export to PNG** before version 4.2.0) at the foot of the panel saves the map of the age shown, named with the age, so a set of images can tell your world's story.",
+            note: "**Export image** at the foot of the panel saves the map of the age shown, named with the age, so a set of images can tell your world's story.",
             narration: "Choose the present age and compare it. The Hillfolk invaded and now hold most of the land. What changed lists the realms that fell and rose, and how each people's share of the land grew or shrank.",
             pause: 4,
         },
         {
             id: "travel",
             title: "Time a journey",
-            instruction: "Click **Travel** in the **Explore** stage of the rail; the first time, it takes a moment to work out the map's travel network. Choose **By wagon** under **Way of travel**, then click **Kansmarda** on the map to start the journey there. The land is coloured by the days it takes to reach, in bands of ten days, and a numbered line marks the edge of each band. Point at **Dudgeton** on Islemark: the way there is drawn on the map, by road to the coast and then by ship, and the information bar gives the time: a little over 33 days. A world map is large, and a wagon is slow.",
+            instruction: "Click **Travel** in the **Explore** stage of the rail; the first time, it takes a moment to work out the map's travel network. Choose **By wagon** under **Way of travel**, then click **Pickermouth** on the map to start the journey there. The land is coloured by the days it takes to reach, in bands of ten days, and a numbered line marks the edge of each band. Shift+Click the map to show the way to the pointer, and point at **Shershover** on Islemark: the way there is drawn on the map, by road to the coast and then by ship, and the information bar gives the time there and back: about 46 days there and 45 back, the winds making the difference at sea. A world map is large, and a wagon is slow.",
             action: [
                 { do: "tool", tool: "travel", label: "Travel" },
                 { do: "click", target: '[data-action="chooseTravelMode"][data-mode="wagon"]', label: "By wagon" },
-                { do: "mapClick", at: KANSMARDA, label: "Click Kansmarda to start the journey." },
+                { do: "mapClick", at: KANSMARDA, label: "Click Pickermouth to start the journey." },
                 { do: "expect", check: (studio) => !!studio.uiState.travel?.start || "no journey start", within: 60000 },
-                { do: "hover", at: NEWCESTED, label: "Point at Dudgeton." },
+                { do: "mapClick", at: NEWCESTED, modifiers: ["Shift"], label: "Shift+Click the map to show the way to the pointer." },
+                { do: "hover", at: NEWCESTED, label: "Point at Shershover." },
             ],
             screenshot: { name: "journey", region: "studio", pointer: NEWCESTED },
-            caption: "By wagon from Kansmarda: the day bands, and the way to Dudgeton.",
-            note: "Try **On foot**: a wagon is quick on the roads and slow off them, so its bands stretch along the roads, while a walker's spread more evenly. While Travel is open, its day bands take the colour layer's place, and **Opacity** in the Thematic layers menu sets how strongly they cover the map.",
-            narration: "Open Travel, choose By wagon, and click Kansmarda to start. The bands show the days to reach every part of the land. Point at Dudgeton, and the way is drawn: by road to the coast, and then by ship.",
+            caption: "By wagon from Pickermouth: the day bands, and the way to Shershover.",
+            note: "Try **On foot**: a wagon is quick on the roads and slow off them, so its bands stretch along the roads, while a walker's spread more evenly. **Season** chooses all year, summer or winter: in winter the high passes close and the bands stop short of the mountains. While Travel is open, its day bands take the colour layer's place, and **Opacity** in the Thematic layers menu sets how strongly they cover the map.",
+            narration: "Open Travel, choose By wagon, and click Pickermouth to start. The bands show the days to reach every part of the land. Shift-click to show the way, point at Shershover, and it's drawn: by road to the coast, and then by ship. The information bar gives the time there, and back.",
             pause: 5,
         },
         {
@@ -147,7 +148,7 @@ export default {
         },
     ],
 
-    whatYouSee: "The map as it was at the end of page 8, with the region fills on and no thematic layer. The Travel tool opens on the journey from Kansmarda by wagon.",
+    whatYouSee: "The map as it was at the end of page 8, with the region fills on and no thematic layer. The Travel tool opens on the journey from Pickermouth by wagon.",
     foundry: "Everything on this page is the same in Foundry. A thematic layer that is on when the map is exported to a scene is drawn into the scene's image.",
     onYourOwn: `The thematic layers come from the last run, so generate again after big changes to the land (the Generate panel says when the map is out of date). For a world with history, give the run several ages and a culture event, then step through them in History with the Culture layer on, and export each age for your players. Use Travel to set the pace of a campaign: a 10-day band on a world map shows how long a realm takes to cross, a 1-day band on a regional map a day's march from a town. A road you draw counts at once, so Travel also shows what a new road would change. See [[Map Canvas]] (thematic layers), [[History]] and [[Travel]].`,
     related: ["Map Canvas", "History", "Travel", "Cultures"],

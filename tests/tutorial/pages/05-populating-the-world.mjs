@@ -7,15 +7,18 @@
 const HILLFOLK_HOME = [950, 330];
 const VALEFOLK_HOME = [850, 1050];
 
-/** Adds a culture through the Cultures section's naming row, and sets its name style, colour, height band and homeland. */
-function culture({ name, nameStyle, colour, band, upToTop, homeland }) {
+/** The biomes each culture is at home in: the Hillfolk the cool uplands, the Valefolk the warmer lowlands. */
+const HILLFOLK_BIOMES = ["Temperate rainforest", "Taiga", "Tundra", "Moorland"];
+const VALEFOLK_BIOMES = ["Grassland", "Deciduous forest", "Savanna", "Tropical rainforest"];
+
+/** Adds a culture through the Cultures section's naming row, and sets its name style, colour, biomes and homeland. */
+function culture({ name, nameStyle, colour, biomes, homeland }) {
     return [
         { do: "click", target: '[data-action="addCulture"]', label: "+ Culture" },
         { do: "set", field: "[data-culture-naming]", value: name, commit: "Enter", label: "the new culture's name" },
         { do: "set", field: 'dialog[open] select[name="cultureNameBase"]', value: nameStyle, label: "Name style" },
         { do: "set", field: 'dialog[open] input[name="cultureColor"]', value: colour, label: "Colour" },
-        { do: "click", target: `dialog[open] [data-band-zone]:text-is("${band}")`, label: band },
-        ...(upToTop ? [{ do: "slide", handle: 'dialog[open] [role="slider"][aria-label="Height, to"]', to: 1, label: "Drag Height's right-hand handle to the end." }] : []),
+        ...biomes.map((biome) => ({ do: "set", field: `dialog[open] label.fwmb-culture-biome:has(span:text-is("${biome}")) input[name="habitatBiome"]`, value: true, label: biome })),
         { do: "click", target: 'dialog[open] [data-inspector-action="addHomeland"]', label: "Add homeland" },
         { do: "mapClick", at: homeland, label: `Click the map to place ${name}'s homeland.` },
     ];
@@ -48,29 +51,29 @@ export default {
 
 - **Name style:** **Nordic**, the language their places are named in.
 - **Colour:** \`#5b7fa6\`.
-- **Habitat**, **Height:** click **Upland**, then drag the track's right-hand handle to the end: they suit the uplands and everything above.
+- **Habitat**, **Climate:** leave it at **Biomes** and tick **Temperate rainforest**, **Taiga**, **Tundra** and **Moorland** (the biome you made on page 3): the cool, wet uplands. The culture is at home wherever the climate is like that of these biomes.
 - **Homelands:** click **Add homeland**, then click the uplands in the north of the continent, south-east of the snow-capped peaks. The culture spreads from there.`,
-            action: culture({ name: "Hillfolk", nameStyle: "Nordic", colour: "#5b7fa6", band: "Upland", upToTop: true, homeland: HILLFOLK_HOME }),
+            action: culture({ name: "Hillfolk", nameStyle: "Nordic", colour: "#5b7fa6", biomes: HILLFOLK_BIOMES, homeland: HILLFOLK_HOME }),
             screenshot: { name: "hillfolk", region: "studio" },
             caption: "The Hillfolk in the culture inspector, with their homeland marked on the map.",
-            narration: "This world has two cultures. Add a culture called Hillfolk with these settings: Nordic names, a slate-blue colour, the uplands and above, and place a homeland in the northern uplands.",
+            narration: "This world has two cultures. Add a culture called Hillfolk with these settings: Nordic names, a slate-blue colour, and the biomes of the cool uplands, including the Moorland we made earlier. Then place a homeland in the northern uplands.",
             pause: 4,
         },
         {
             id: "valefolk",
             title: "The Valefolk",
-            instruction: "Add a second culture the same way: `Valefolk`, **Name style** **English**, **Colour** `#c9a227`, **Height** **Lowland**, and a homeland in the forests of the south of the continent. Then close the inspector.",
+            instruction: "Add a second culture the same way: `Valefolk`, **Name style** **English**, **Colour** `#c9a227`, the biomes **Grassland**, **Deciduous forest**, **Savanna** and **Tropical rainforest** (the warmer lowlands), and a homeland in the forests of the south of the continent. Then close the inspector.",
             action: [
-                ...culture({ name: "Valefolk", nameStyle: "English", colour: "#c9a227", band: "Lowland", upToTop: false, homeland: VALEFOLK_HOME }),
+                ...culture({ name: "Valefolk", nameStyle: "English", colour: "#c9a227", biomes: VALEFOLK_BIOMES, homeland: VALEFOLK_HOME }),
                 { do: "click", target: "dialog.fwmb-inspector[open] .fwmb-overlay-close", label: "Close on the inspector" },
                 { do: "expect", check: (studio) => (studio.uiState.cultures ?? []).map((each) => each.name).join(", ") === "Hillfolk, Valefolk" || `the cultures are ${(studio.uiState.cultures ?? []).map((each) => each.name).join(", ")}` },
             ],
-            narration: "Add a second culture, the Valefolk with these settings: English names, a golden colour, the lowlands, and a homeland in the southern forests.",
+            narration: "Add a second culture, the Valefolk with these settings: English names, a golden colour, the biomes of the warmer lowlands, and a homeland in the southern forests.",
         },
         {
             id: "ages",
             title: "Two ages",
-            instruction: "A run can pass through several ages, so the map has a history. In **Ages**, click **+ Age**: the map now has **Age 1** and **Age 2: the present**, and the present opens in the inspector. In its **Events** section, click **+ Event** and make it an **Invasion** by the **Hillfolk**: in the present age the Hillfolk come down from the hills and take land from the Valefolk. Then click **Age 1** in the list and set its **Era** to **Early medieval** and its **Strife** to **Peaceful**.",
+            instruction: "A run can pass through several ages, so the map has a history. In **Ages**, click **+ Age**: the map now has **Age 1** and **Age 2: the present**, and the present opens in the inspector. In its **Events** section, click **+ Event** and make it an **Invasion** by the **Hillfolk**: in the present age the Hillfolk come down from the hills and take land from the Valefolk. Then click **Age 1** in the list and set its **Era** to **Early medieval** and its **Strife** to **Peaceful**, and close the inspector.",
             action: [
                 { do: "click", target: '[data-action="addAge"]', label: "+ Age" },
                 { do: "click", target: 'dialog.fwmb-inspector [data-inspector-action="addEvent"]', label: "+ Event in the present's inspector" },
@@ -79,6 +82,7 @@ export default {
                 { do: "click", target: '.fwmb-age-row:first-child', label: "Age 1" },
                 { do: "set", field: 'dialog.fwmb-inspector select[name="ageEra"]', value: "earlyMedieval", valueLabel: "Early medieval", label: "Age 1's Era" },
                 { do: "set", field: 'dialog.fwmb-inspector select[name="ageStrife"]', value: "peaceful", valueLabel: "Peaceful", label: "Age 1's Strife" },
+                { do: "click", target: "dialog.fwmb-inspector[open] .fwmb-overlay-close", label: "Close on the inspector" },
             ],
             screenshot: { name: "ages", region: { selector: '[data-region="context"] details[data-section="generateAges"]' }, pad: 8 },
             caption: "Two ages: a peaceful early medieval age, then the present, with the Hillfolk invading.",
@@ -91,6 +95,7 @@ export default {
             title: "Generate",
             instruction: "Click **Generate** at the top of the panel. The map is covered while the run works through its stages, age by age; it takes a few seconds to a minute, depending on your computer. When it finishes, the map has its realms, towns, castles and routes, all named.",
             action: [
+                { do: "camera", view: "fit" },
                 { do: "click", target: '[data-action="generateWorld"]', label: "Generate" },
                 { do: "settle" },
                 { do: "expect", check: (studio) => (studio.modelRun && studio.layerSets.some((set) => set.name === "Political")) || "the run made no Political set", within: 600000 },
@@ -116,7 +121,7 @@ export default {
         {
             id: "results",
             title: "Read the results",
-            instruction: "Scroll to the foot of the panel. **Results** counts what the run left on the map (realms, duchies, counties, places of each kind, routes, ruins and old roads), its population, and each culture's share of it. The Hillfolk's invasion has given them more than half the people.",
+            instruction: "Scroll to the foot of the panel. **Results** counts what the run left on the map (realms, duchies, counties, places of each kind, routes, ruins and old roads), its population, and each culture's share of it. The Hillfolk's invasion has given them a third of the people.",
             action: { do: "openSection", section: "generateResults", label: "Results" },
             screenshot: { name: "results", region: { selector: '[data-region="context"] details[data-section="generateResults"]' }, pad: 8 },
             caption: "The run's results.",

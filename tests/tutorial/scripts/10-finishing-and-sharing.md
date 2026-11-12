@@ -4,7 +4,7 @@
 
 **Goal:** Give the map its finishing touches, export it as an image, and keep a backup of your maps.
 
-**Opening narration:** In this tutorial we're going to finish the map with a scale bar and a border, set its grid, export it as an image, and back it up.
+**Opening narration:** In this tutorial we're going to finish the map with a scale bar, a border, a compass rose and a title, set its grid, export it as an image, and back it up.
 
 ## 1. Add a scale bar and a border
 
@@ -25,7 +25,29 @@
 
 **Matches the wiki's image:** `10-finishing-and-sharing-scale-bar.png`
 
-## 2. Set the grid
+## 2. Add a compass rose and a title
+
+**Narration:** Add a compass rose from Add decoration, and then a cartouche, which holds the map's title. The module draws both, and the names on the map move to keep clear of them.
+
+**On screen:**
+
+- Click Add decoration.
+- Click Compass rose.
+- Wait for the map to update.
+- Click Close on the inspector.
+- Click Add decoration.
+- Click Cartouche.
+- Wait for the map to update.
+- Click Close on the inspector.
+- Reset view.
+
+**Camera:** the map from 0, 0 to 2000, 1600
+
+**Hold:** 4 s after the action
+
+**Matches the wiki's image:** `10-finishing-and-sharing-decorations.png`
+
+## 3. Set the grid
 
 **Narration:** Set the grid pattern to hexagonal. A scene exported to Foundry gets the same grid, lined up with the map.
 
@@ -41,7 +63,7 @@
 
 **Matches the wiki's image:** `10-finishing-and-sharing-grid.png`
 
-## 3. Choose what to export
+## 4. Choose what to export
 
 **Narration:** Hide the grid and the contour lines for a clean map. What the map controls show on screen is what an export shows.
 
@@ -57,15 +79,16 @@
 
 **Matches the wiki's image:** `10-finishing-and-sharing-clean.png`
 
-## 4. Export a PNG
+## 5. Export an image
 
-**Narration:** Open Export and click Export to PNG. The dialogue recommends a scale where the smallest names can be read.
+**Narration:** Open Export and click Export image. The dialogue recommends a scale where the smallest names can be read. Choose PNG.
 
 **On screen:**
 
 - Click Export on the rail.
-- Click Export to PNG.
+- Click Export image.
 - The dialogue opens.
+- Set Image format and quality to PNG.
 
 **Camera:** the dialog
 
@@ -73,7 +96,7 @@
 
 **Matches the wiki's image:** `10-finishing-and-sharing-png.png`
 
-## 5. Save the image
+## 6. Save the image
 
 **Narration:** Click Confirm and, depending on your browser, you'll either be prompted where to save the image or it will be saved in your downloads.
 
@@ -85,7 +108,7 @@
 
 **Hold:** 2 s after the action
 
-## 6. Save and back up
+## 7. Save and back up
 
 **Narration:** Save the map, then back up all your maps in one file from the Maps tool. Next, we're going to make a regional map.
 
@@ -102,4 +125,4 @@
 
 ---
 
-6 steps; at least 17 s of holds, plus the actions themselves.
+7 steps; at least 21 s of holds, plus the actions themselves.

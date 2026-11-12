@@ -54,7 +54,7 @@ function startFrom(page, pages) {
  * maps and video are kept from the version they were made with, so each matches the maps a reader
  * downloads, and the steps say where a name in them has since changed. Empty when they are current.
  */
-export const PICTURES_NOTE = "**Version 4.2.0:** the screenshots, the maps you can download and the video were made with version 4.1.0, so they don't show what 4.2.0 changed. The steps are the same; where a step names something 4.2.0 changed, it says so.";
+export const PICTURES_NOTE = "";
 
 /**
  * The wiki page.

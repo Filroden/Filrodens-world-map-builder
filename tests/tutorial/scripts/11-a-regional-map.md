@@ -63,7 +63,7 @@
 - Click Detail in the map controls.
 - Click Local.
 - Wait for the map to update.
-- Zoom in round Golenduos.
+- Zoom in round Kineley.
 
 **Camera:** the map from 600, 900 to 1200, 1400
 

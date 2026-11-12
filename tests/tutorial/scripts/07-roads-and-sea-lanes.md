@@ -72,7 +72,7 @@
 
 ## 5. Draw a sea lane
 
-**Narration:** Now we're going to add a sea lane. Set the transport to Sea and the style to Sea lane, and click the water off the coast, then off Islemark's capital. The lane keeps to the water. Name it The Islemark Crossing.
+**Narration:** Now we're going to add a sea lane. Set the transport to Sea and the style to Sea lane, and click the water off the coast, then off Islemark's west coast. The lane keeps to the water. Name it The Islemark Crossing.
 
 **On screen:**
 
@@ -87,7 +87,7 @@
 - Wait for the map to update.
 - Zoom in to look at the sea lane.
 
-**Camera:** the map from 1300, 700 to 1560, 1060
+**Camera:** the map from 1300, 700 to 1600, 1260
 
 **Hold:** 4 s after the action
 

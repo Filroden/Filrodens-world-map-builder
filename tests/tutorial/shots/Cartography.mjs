@@ -2,9 +2,8 @@
 // compass rose in the inspector, and a cartouche in the inspector.
 import { INSPECTOR, MAP } from "./_common.mjs";
 
-/** Add decoration's menu on the bar, and one of its items by kind. */
+/** Add decoration's menu on the bar. */
 const ADD_MENU = '[data-region="editToolbar"] .fwmb-bar-add > button';
-const addItem = (kind) => `[data-region="editToolbar"] [data-action="addDecoration"][data-kind="${kind}"]`;
 
 /** A design's thumbnail in the inspector, by its value. */
 const design = (name, value) => `${INSPECTOR} .fwmb-design-option:has(input[name="${name}"][value="${value}"])`;
@@ -18,16 +17,9 @@ export default [
         slug: "cartography-panel",
         start: MAP.finished,
         caption: "Cartography, with the scale bar, border and grid, a compass rose and a cartouche.",
+        // The tutorial's page 10 adds the compass rose and the cartouche, so the finished map has both
         action: [
             { do: "tool", tool: "cartography" },
-            { do: "click", target: ADD_MENU },
-            { do: "click", target: addItem("compass") },
-            { do: "settle" },
-            { do: "click", target: `${INSPECTOR} .fwmb-overlay-close` },
-            { do: "click", target: ADD_MENU },
-            { do: "click", target: addItem("cartouche") },
-            { do: "settle" },
-            { do: "click", target: `${INSPECTOR} .fwmb-overlay-close` },
             { do: "camera", view: "fit" },
         ],
         screenshot: { region: "studio" },

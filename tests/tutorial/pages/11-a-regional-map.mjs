@@ -2,7 +2,7 @@
 // four times the detail, filled in with villages and market towns, opens it, and steps the Detail
 // level down to Local to see what the fill-in added.
 
-/** The crop: the Red Hills and the King's Road, from Thatckerid to Kansmarda. */
+/** The crop: the Red Hills and the King's Road, from Castford to Pickermouth. */
 const CROP_FROM = [1040, 300];
 const CROP_TO = [1440, 740];
 
@@ -15,7 +15,7 @@ const REGION_NAME = "The Red Hills";
 /** The regional map's card in Maps. */
 const card = (name) => `.fwmb-map-card:has(> .fwmb-map-card-info:text-is("${name}"))`;
 
-/** A close-up on the regional map round Golenduos and the King's Road (in the regional map's own pixels). */
+/** A close-up on the regional map round Kineley and the King's Road (in the regional map's own pixels). */
 const MOSTADRA_VIEW = [600, 900, 1200, 1400];
 
 export default {
@@ -33,7 +33,7 @@ Once made, a regional map is a map of its own: changing it doesn't change the wo
         {
             id: "crop",
             title: "Draw the crop",
-            instruction: "Click **New map** on the rail, open the panel's **Regional map** section and set **New resolution** to `1600` pixels wide. Choose **Crop** on the bar and drag on the map from north-west of Thatckerid to south-east of Kansmarda, round the Red Hills and the King's Road. When you let go, the crop is fitted to the map's grid at a whole zoom, here ×4: the new map shows the land four times as closely, and its height and latitudes follow from the crop. Tick **Fill in villages and market towns**.",
+            instruction: "Click **New map** on the rail, open the panel's **Regional map** section and set **New resolution** to `1600` pixels wide. Choose **Crop** on the bar and drag on the map from north-west of Castford to south-east of Pickermouth, round the Red Hills and the King's Road. When you let go, the crop is fitted to the map's grid at a whole zoom, here ×4: the new map shows the land four times as closely, and its height and latitudes follow from the crop. Tick **Fill in villages and market towns**.",
             action: [
                 { do: "tool", tool: "scene", label: "New map" },
                 { do: "openSection", section: "regionalMap", label: "Regional map" },
@@ -77,15 +77,15 @@ Once made, a regional map is a map of its own: changing it doesn't change the wo
         {
             id: "local",
             title: "See the villages",
-            instruction: "Open the **Detail** menu in the map controls and choose **Local**. The market towns the fill-in added are shown, and its villages of 1,000 people or more, joined to the roads by lanes; the smaller villages show at **Everything**. Zoom in round Golenduos and the King's Road to see them.",
+            instruction: "Open the **Detail** menu in the map controls and choose **Local**. The market towns the fill-in added are shown, and its villages of 1,000 people or more, joined to the roads by lanes; the smaller villages show at **Everything**. Zoom in round Kineley and the King's Road to see them.",
             action: [
                 { do: "click", target: '[data-layer-group="detail"] > .fwmb-map-btn', label: "Detail in the map controls" },
                 { do: "click", target: '[data-action="setDetailLevel"][data-detail-level="3"]', label: "Local" },
                 { do: "settle" },
-                { do: "frame", rect: MOSTADRA_VIEW, label: "Zoom in round Golenduos." },
+                { do: "frame", rect: MOSTADRA_VIEW, label: "Zoom in round Kineley." },
             ],
             screenshot: { name: "villages", region: { map: MOSTADRA_VIEW }, mapOnly: true },
-            caption: "Villages, market towns and lanes round Golenduos at the Local detail level.",
+            caption: "Villages, market towns and lanes round Kineley at the Local detail level.",
             note: "Each map keeps its own Detail level, so the world map is still at Province.",
             narration: "Set the Detail level to Local. The villages and market towns that were filled-in will appear, joined to the roads by lanes.",
             pause: 4,
@@ -93,7 +93,7 @@ Once made, a regional map is a map of its own: changing it doesn't change the wo
         {
             id: "fill-in",
             title: "Read the fill-in",
-            instruction: "Click **Generate** on the rail. On a regional map its **Fill in** section counts the market towns, villages and lanes the last fill-in added. **Fill in again** replaces them, keeping any you have edited or locked; what the map inherited from the world map is never touched. The new places share out the people the world map's run put here, so filling in never adds people.",
+            instruction: "Click **Generate** on the rail. On a regional map its **Fill in** section counts the market towns, villages and lanes the last fill-in added. **Fill in again** replaces them, keeping any you have edited or locked; what the map inherited from the world map is never touched. The new places share out the people the world map's run put here, so filling in never adds people, and none stands on or beside a settlement pin, such as your castle Redwatch. Generate itself is off on a regional map that holds its world's run, since a run made here, blind to the land beyond its edges, would not match the world map; **Clone as new** in **Maps** makes a copy of its own that can be generated.",
             action: [
                 { do: "tool", tool: "generate", label: "Generate" },
                 { do: "openSection", section: "generateInfill", label: "Fill in" },

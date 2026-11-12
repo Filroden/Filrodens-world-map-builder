@@ -8,7 +8,7 @@
 
 ## 1. Open Generate
 
-**Narration:** Open Generate, the first tool in the Populate group. Leave the seed empty, so the run uses the map's own seed, and keep the World settings as they are.
+**Narration:** Open Generate, the second tool in the Populate group. Leave the seed empty, so the run uses the map's own seed, and keep the World settings as they are.
 
 **On screen:**
 
@@ -22,7 +22,7 @@
 
 ## 2. The Hillfolk
 
-**Narration:** This world has two cultures. Add a culture called Hillfolk with these settings: Nordic names, a slate-blue colour, the uplands and above, and place a homeland in the northern uplands.
+**Narration:** This world has two cultures. Add a culture called Hillfolk with these settings: Nordic names, a slate-blue colour, and the biomes of the cool uplands, including the Moorland we made earlier. Then place a homeland in the northern uplands.
 
 **On screen:**
 
@@ -30,8 +30,10 @@
 - Set the new culture's name to Hillfolk.
 - Set Name style to Nordic.
 - Set Colour to #5b7fa6.
-- Click Upland.
-- Drag Height's right-hand handle to the end.
+- Set Temperate rainforest to true.
+- Set Taiga to true.
+- Set Tundra to true.
+- Set Moorland to true.
 - Click Add homeland.
 - Click the map to place Hillfolk's homeland.
 
@@ -43,7 +45,7 @@
 
 ## 3. The Valefolk
 
-**Narration:** Add a second culture, the Valefolk with these settings: English names, a golden colour, the lowlands, and a homeland in the southern forests.
+**Narration:** Add a second culture, the Valefolk with these settings: English names, a golden colour, the biomes of the warmer lowlands, and a homeland in the southern forests.
 
 **On screen:**
 
@@ -51,7 +53,10 @@
 - Set the new culture's name to Valefolk.
 - Set Name style to English.
 - Set Colour to #c9a227.
-- Click Lowland.
+- Set Grassland to true.
+- Set Deciduous forest to true.
+- Set Savanna to true.
+- Set Tropical rainforest to true.
 - Click Add homeland.
 - Click the map to place Valefolk's homeland.
 - Click Close on the inspector.
@@ -62,14 +67,18 @@
 
 ## 4. Two ages
 
-**Narration:** Now give the world a history. Add a second age. Make the first age early medieval and peaceful, and in the present, add an event where the Hillfolk invade.
+**Narration:** Now give the world a history. Add a second age, and in the present, add an event where the Hillfolk invade. Then make the first age early medieval and peaceful.
 
 **On screen:**
 
 - Click + Age.
+- Click + Event in the present's inspector.
+- Set the event to Invasion.
+- Set its culture to Hillfolk.
+- Click Age 1.
 - Set Age 1's Era to Early medieval.
 - Set Age 1's Strife to Peaceful.
-- Set the present's Event to Hillfolk invade.
+- Click Close on the inspector.
 
 **Camera:** a close-up of the part of the studio in the wiki's image
 
@@ -83,6 +92,7 @@
 
 **On screen:**
 
+- Reset view.
 - Click Generate.
 - Wait for the map to update.
 

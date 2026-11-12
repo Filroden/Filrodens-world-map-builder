@@ -55,7 +55,7 @@
 
 ## 4. Confirm
 
-**Narration:** Confirm, and all thirteen pins that were filtered will change at once.
+**Narration:** Confirm, and all eight pins that were filtered will change at once.
 
 **On screen:**
 
@@ -71,9 +71,9 @@
 
 **On screen:**
 
-- Zoom in on the west of the Red Hills.
+- Zoom in on the west of the map.
 
-**Camera:** the map from 300, 420 to 760, 780
+**Camera:** the map from 20, 560 to 520, 880
 
 **Hold:** 3 s after the action
 
@@ -87,7 +87,7 @@
 
 - Click GM view.
 
-**Camera:** the map from 300, 420 to 760, 780
+**Camera:** the map from 20, 560 to 520, 880
 
 **Hold:** 4 s after the action
 

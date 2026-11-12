@@ -366,6 +366,7 @@ export const ACTIONS = Object.freeze({
                     if (owner === "region") for (const each of studio.regionLevels) if (!level || each.name === level) for (const region of each.regions) if (region.name === name) ids.add(region.id);
                     if (owner === "route") for (const route of studio.mapRoutes) if (route.name === name) ids.add(route.id);
                     if (owner === "pin") for (const pin of studio.mapPins) if (pin.name === name) ids.add(pin.id);
+                    if (owner === "custom") for (const label of studio.mapLabels) if (label.name === name) ids.add(label.id);
                     const target = studio.canvasEngine.interactiveTargets.find((each) => each.entityType === "label" && each.parentType === owner && ids.has(each.entityId));
                     return target ? [target.x, target.y] : null;
                 },

@@ -1,5 +1,5 @@
-// Tutorial page 10: finishing and sharing. Adds the scale bar and a border, sets the map's grid,
-// exports a PNG at the recommended scale, and saves and backs up the map. Foundry's scene export
+// Tutorial page 10: finishing and sharing. Adds the scale bar and a border, a compass rose and a
+// cartouche, sets the map's grid, exports a PNG at the recommended scale, and saves and backs up the map. Foundry's scene export
 // is described rather than played, since the runner works the web studio.
 
 /** The map's bottom left corner, where the scale bar starts. */
@@ -12,14 +12,21 @@ const HILLS = [1000, 300, 1440, 760];
 const LAYER = (layer) => `.fwmb-map-btn[data-action="toggleLayer"][data-layer="${layer}"]`;
 const GRID = '.fwmb-map-btn[data-action="toggleGrid"]';
 
+/** Add decoration's menu on the bar, and one of its items by kind. */
+const ADD_MENU = '[data-region="editToolbar"] .fwmb-bar-add > button';
+const addItem = (kind) => `[data-region="editToolbar"] [data-action="addDecoration"][data-kind="${kind}"]`;
+
+/** The open inspector. */
+const INSPECTOR = "dialog.fwmb-inspector[open]";
+
 export default {
     number: 10,
     slug: "finishing-and-sharing",
     title: "Finishing and sharing",
     start: "09-exploring-the-world",
     goal: "Give the map its finishing touches, export it as an image, and keep a backup of your maps.",
-    intro: `The **Finish** stage of the rail has two tools. **Cartography** adds what is drawn over the map: a scale bar, a border, the grid and decorations such as a compass rose. **Export** turns the map into a PNG image, and in Foundry into a scene. An export shows the map as the map controls show it, so choosing what to include is part of exporting.`,
-    narration: "In this tutorial we're going to finish the map with a scale bar and a border, set its grid, export it as an image, and back it up.",
+    intro: `The **Finish** stage of the rail has two tools. **Cartography** adds what is drawn over the map: a scale bar, a border, the grid, a compass rose, a cartouche holding the map's title, and images of your own. **Export** turns the map into an image, and in Foundry into a scene. An export shows the map as the map controls show it, so choosing what to include is part of exporting.`,
+    narration: "In this tutorial we're going to finish the map with a scale bar, a border, a compass rose and a title, set its grid, export it as an image, and back it up.",
 
     steps: [
         {
@@ -37,8 +44,30 @@ export default {
             ],
             screenshot: { name: "scale-bar", region: { map: CORNER }, mapOnly: true },
             caption: "The scale bar and the ornate border in the map's bottom left corner.",
-            note: "Choose **Move** on the bar to drag the scale bar elsewhere. **Add decoration** adds an image of your own over the map, such as a compass rose or a title cartouche; while you hold one in Move mode, scroll to turn it and Shift+Scroll to resize it.",
+            note: "Choose **Move** on the bar to drag the scale bar elsewhere.",
             narration: "Open Cartography. Turn on the scale bar, which matches the world's own scale, and choose an ornate border.",
+            pause: 4,
+        },
+        {
+            id: "decorations",
+            title: "Add a compass rose and a title",
+            instruction: "Click **Add decoration** on the bar and choose **Compass rose**: the module draws one and opens it in the inspector, where its **Design**, points, colours and lettering can be changed. Close the inspector, then click **Add decoration** again and choose **Cartouche**: a panel holding the map's title, its name, `Tutorial world`, which it follows if you rename the map. Close the inspector and click **Reset view** to see both.",
+            action: [
+                { do: "click", target: ADD_MENU, label: "Add decoration" },
+                { do: "click", target: addItem("compass"), label: "Compass rose" },
+                { do: "settle" },
+                { do: "click", target: `${INSPECTOR} .fwmb-overlay-close`, label: "Close on the inspector" },
+                { do: "click", target: ADD_MENU, label: "Add decoration" },
+                { do: "click", target: addItem("cartouche"), label: "Cartouche" },
+                { do: "settle" },
+                { do: "click", target: `${INSPECTOR} .fwmb-overlay-close`, label: "Close on the inspector" },
+                { do: "expect", check: (studio) => ["compass", "cartouche"].every((kind) => (studio.mapDecorations ?? []).some((each) => each.kind === kind)) || "no compass rose or cartouche", within: 30000 },
+                { do: "camera", view: "fit" },
+            ],
+            screenshot: { name: "decorations", region: { map: [0, 0, 2000, 1600] }, mapOnly: true },
+            caption: "The map with its compass rose and its title in a cartouche.",
+            note: "Choose **Move** on the bar to drag a decoration elsewhere; while you hold one, scroll to turn it and Shift+Scroll to resize it. **Add decoration** also adds an image of your own. Names on the map keep clear of the decorations.",
+            narration: "Add a compass rose from Add decoration, and then a cartouche, which holds the map's title. The module draws both, and the names on the map move to keep clear of them.",
             pause: 4,
         },
         {
@@ -73,18 +102,19 @@ export default {
         },
         {
             id: "png",
-            title: "Export a PNG",
-            instruction: "Click **Export** on the rail, then **Export to PNG**. The dialogue offers the image's **Scale**, from the map's own size (1×) to four times it, each with the image's size in pixels. The scale chosen at first is the **recommended** one, the smallest at which the smallest names can be read, and the line below it says why.",
+            title: "Export an image",
+            instruction: "Click **Export** on the rail, then **Export image**. The dialogue offers the image's **Scale**, from the map's own size (1×) to four times it, each with the image's size in pixels. The scale chosen at first is the **recommended** one, the smallest at which the smallest names can be read, and the line below it says why. Set **Image format and quality** to **PNG**.",
             action: [
                 { do: "tool", tool: "export", label: "Export" },
-                { do: "click", target: '[data-region="context"] [data-action="exportPng"]', label: "Export to PNG" },
+                { do: "click", target: '[data-region="context"] [data-action="exportPng"]', label: "Export image" },
                 { do: "waitForDialog" },
+                { do: "set", field: 'dialog.fwmb-overlay-modal[open] select[name="exportFormat"]', value: "png", valueLabel: "PNG", label: "Image format and quality" },
             ],
             settle: false,
             screenshot: { name: "png", region: "dialog", pad: 8 },
-            caption: "The Export to PNG dialogue, with the recommended scale chosen.",
-            note: "**In version 4.2.0:** the button is **Export image**, and the dialogue also asks for **Image format and quality**: **PNG**, **WebP, lossless** or **WebP, 90% quality**, each with its estimated size (see [[Export]]).",
-            narration: "Open Export and click Export to PNG. The dialogue recommends a scale where the smallest names can be read.",
+            caption: "The Export image dialogue, with the recommended scale chosen.",
+            note: "**WebP, lossless** gives the same picture at about 60% of a PNG's size, and **WebP, 90% quality** about a fifth, with the line work intact; each format shows its estimated size (see [[Export]]).",
+            narration: "Open Export and click Export image. The dialogue recommends a scale where the smallest names can be read. Choose PNG.",
             pause: 3,
         },
         {
@@ -109,8 +139,8 @@ export default {
         },
     ],
 
-    whatYouSee: "The map with a scale bar in the bottom left corner, an ornate border, and a hexagonal grid that is set but hidden; a PNG of it and a backup of your maps in your downloads.",
-    foundry: `In Foundry, the Export tool also has **Export to scene**, which makes the map a playable scene. Its dialogue asks for the scene's name, the folder for its images and the scale (with the same recommended one), and whether to make journal pages and a GM overlay. The scene gets the map as its background, the map's grid (sized so Foundry's ruler measures true distances), a hidden tile with the GM-only items, and a journal entry with a page for each named place, route and region, among them Golenduos's description. Exporting again to the same name updates the scene and keeps the walls, lights and tokens you placed. See [[Export]].`,
-    onYourOwn: `Finish every map the same way: scale bar, border, grid, then the map controls for what goes in. Make two images from one map with the view filters in the map controls: **Player view** alone for your players, **GM view** too for yourself. Raise the **Symbol size** in the **Detail** menu if names are small in a large image. Back up after every session of work on the web, since your browser can clear its storage. See [[Cartography]], [[Export]] and [[Maps]].`,
+    whatYouSee: "The map with a scale bar in the bottom left corner, an ornate border, a compass rose and a cartouche with its title, and a hexagonal grid that is set but hidden; a PNG of it and a backup of your maps in your downloads.",
+    foundry: `In Foundry, the Export tool also has **Export to scene**, which makes the map a playable scene. Its dialogue asks for the scene's name, the folder for its images and the scale (with the same recommended one), and whether to make journal pages and a GM overlay. The scene gets the map as its background, the map's grid (sized so Foundry's ruler measures true distances), a hidden tile with the GM-only items, and a journal entry with a page for each named place, route and region, among them Kineley's description. Exporting again to the same name updates the scene and keeps the walls, lights and tokens you placed. See [[Export]].`,
+    onYourOwn: `Finish every map the same way: scale bar, border, compass rose and title, grid, then the map controls for what goes in. Make two images from one map with the view filters in the map controls: **Player view** alone for your players, **GM view** too for yourself. Raise the **Symbol size** in the **Detail** menu if names are small in a large image. Back up after every session of work on the web, since your browser can clear its storage. See [[Cartography]], [[Export]] and [[Maps]].`,
     related: ["Cartography", "Export", "Maps", "Map Canvas"],
 };
