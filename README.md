@@ -18,6 +18,8 @@ It builds a world from a seed: the land, its climate, rivers and biomes, and the
 
 In Foundry, maps are saved as journals in a compendium. On the web, they are saved in your browser, and a map can be exported as a JSON file and imported into either version. Because the terrain is procedural and your edits are kept as a history of strokes, a saved map stays very small.
 
+Please see the [Wiki](https://filroden.com/modules/filroden-s-world-map-builder/wiki/) for more details on how to use the module.
+
 ![The studio on a finished map](https://raw.githubusercontent.com/wiki/Filroden/Filrodens-world-map-builder/images/home/home-studio.png)
 
 ### Main features
@@ -35,12 +37,14 @@ The map builder makes a world in two parts: the land, worked out from a procedur
 
 #### The people
 
-- **A generator for the world's people:** **Generate** reads the land (how many people it can feed, how hard it is to cross, how easy it is to defend) and in one run places capitals, cities, large towns, towns, castles, fortified towns and ports, traces the trade between them as roads, river trade routes and sea lanes, and divides the land into realms, duchies and counties. Everything is named, in 43 name styles.
-- **Cultures:** give the map peoples of its own, each with a habitat, homelands and a language. They spread over the land that suits them, mix where they meet, and name their own places. A culture can arrive, or invade, in a later age.
-- **Ages and history:** a generate run can pass through up to eight ages of different eras and strife, each starting from the one before, and leave ruins, abandoned castles, old roads and former capitals behind. The **History** tool shows the map as it was in each age, what changed between them, and exports any age as an image.
-- **Villages and market towns:** on a regional map, **Fill in** adds the villages and market towns between the places it inherited, joined to the roads by lanes. They share out the people of the world's run, so a fill-in never adds people the world did not have, and each closer regional map can be filled in again, more finely.
+- **A generator for the world's people:** **Generate** reads the land (how many people it can feed, how hard it is to cross, how easy it is to defend) and in one run places capitals, cities, large towns, towns, castles, fortified towns and ports, traces the trade between them as roads, river trade routes and sea lanes, and divides the land into realms, duchies and counties. Everything is named, in 43 name styles, and each name stays put when other places come and go.
+- **Built round your own map:** place a capital, city, port or castle pin and the run builds that settlement there; paint a realm, duchy or county and it keeps exactly that land, filled in round and inside; draw a road, sea route or river and the trade follows it.
+- **Influences:** paint where the land should feed more or fewer people, or be safer or more dangerous (bandit country, a quiet heartland), and the next run follows the painting.
+- **Cultures:** give the map peoples of its own, each with a habitat, homelands and a language. A culture's habitat comes from the biomes it is at home in, or from climate zones you set, so a forest people settles the forests wherever they grow. Cultures spread over the land that suits them, mix where they meet, name their own places and rule their own realms. A culture can invade, arrive, migrate or colonise in a later age.
+- **Ages and history:** a generate run can pass through up to eight ages, from a dark age to an age of advancement, each with its own level of strife and with events (plagues, famines and disasters, civil wars, collapses and dynastic unions, trade booms and trade wars, some at a place you choose). Each age starts from the one before, and leaves ruins, abandoned castles, old roads and former capitals behind. The **History** tool shows the map as it was in each age, what changed between them, and exports any age as an image.
+- **Villages and market towns:** on a regional map, **Fill in** adds the villages and market towns between the places it inherited and the settlement pins you place, joined to the roads by lanes. They share out the people of the world's run, so a fill-in never adds people the world did not have, and each closer regional map can be filled in again, more finely. A regional map carries its world's settings, influences and history with it.
 - **Thematic layers:** colour the map by population, the land's capacity, cleared land, danger or culture, and draw the trade along its roads, rivers and sea lanes, to see why the run put things where it did.
-- **Travel times:** the **Travel** tool shows how long journeys take from any place, on foot, by wagon or by fast mount, with boats and ships on the rivers and sea routes, as bands of days across the map and the quickest way to the pointer.
+- **Travel times:** the **Travel** tool shows how long journeys take from any place, on foot, by wagon or by fast mount, with boats and ships on the rivers and sea routes, as bands of days across the map, the time there and back, and the quickest way to the pointer. Climbs are slower than descents, ships sail faster with the wind, and winter closes the high passes and frozen seas.
 - **Yours to change:** everything the generator makes is ordinary map content. Anything you edit or lock is kept when you generate again, and the inspector shows each place's population, cultures and history.
 
 #### Making the map
@@ -48,7 +52,10 @@ The map builder makes a world in two parts: the land, worked out from a procedur
 - **Regions painted on the map:** paint regions onto the map's cells with a brush, fill and eraser, in layers (a kingdom's duchies inside the kingdom, and their counties inside them) grouped into layer sets. Each region claims the sea along its own coast, and each layer has its own borders, opacity and territorial waters.
 - **Routes that find their way:** a route is a chain of waypoints, and the module finds the way between them over the terrain, so a road winds round the mountains and joins the roads already there, and a sea lane keeps to the water.
 - **Pins, labels and styles:** pins, routes, labels and region fills each have named styles that set the look of everything using them, and **Save as…** makes a style from anything you have tuned. 29 fonts come with the module, and names are placed so they don't cover each other, the pins, the decorations or the map's border.
-- **Names for everything:** **Name natural features** finds the map's oceans, seas, bays, lakes, mountains, hills, forests, deserts, plains and largest rivers from its terrain and names them in the language of the people living there, with each river's name following its course. A **Random name** button beside every name, and **Name all** for the whole map, name your own regions, places and routes the same way.
+- **Names for everything:**
+  - **Name natural features** finds the map's oceans, seas, bays, lakes, mountains, hills, forests, deserts, plains and largest rivers from its terrain and names them in the language of the people living there, with each river's name following its course, as the rivers you draw have their names along them too.
+  - A **Random name** button beside every name so you can change any name quickly.
+  - **Name all** for the whole map, which names your own regions, places, routes and rivers the same way.
 - **Detail level:** a world map can hold thousands of places, so the **Detail** menu shows as much as the map's scale suits, from capitals, cities and realms alone to every village and county, with a symbol size that grows on closer maps.
 - **Regional maps:** cut any part of a map into a new map at a higher resolution, with finer coastlines, terrain and biome borders, and the parent's rivers, features, regions, places and routes carried in. Because the land is procedural, you can keep cutting closer, from a world towards a single valley.
 - **The inspector and mass edit:** choose anything on the map, or its row in a list, and it opens beside the map. Changes apply at once, each is one step of undo, and mass edit changes many pins, routes, labels or regions together.
@@ -69,7 +76,7 @@ The map builder makes a world in two parts: the land, worked out from a procedur
 
 ### Example maps
 
-The map the [tutorial](https://github.com/Filroden/Filrodens-world-map-builder/wiki/Tutorial-01-A-new-world) builds, P0JBVA, and a regional map cut from it, each exported as a PNG at its own size. Their map files can be imported into the module.
+The map the [tutorial](https://filroden.com/modules/filroden-s-world-map-builder/wiki/tutorial-01-a-new-world/) builds, P0JBVA, and a regional map cut from it, each exported as a PNG at its own size. Their map files can be imported into the module.
 
 #### The tutorial's world map (2,000 × 1,600 pixels)
 
@@ -90,8 +97,6 @@ Map file: [11-a-regional-map.json](https://github.com/Filroden/Filrodens-world-m
 In Foundry, open the **Scenes** sidebar and click **Map builder** at its top (only a GM sees it). On the web, go to [fwmb.filroden.com](https://fwmb.filroden.com): nothing needs installing.
 
 The map builder works with a mouse and keyboard or with a touch screen. On a tablet, tap and drag with one finger, pan and pinch with two, and press and hold to finish a line. A few actions (Shift, Ctrl or Alt with a click) still need a keyboard. The wiki's Map Canvas page has the details.
-
-Please see the [Wiki](https://github.com/Filroden/Filrodens-world-map-builder/wiki) for more details on how to use the module.
 
 ## Third-party licences
 

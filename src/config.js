@@ -1168,8 +1168,8 @@ export const FILRODENSWMB = {
         LICENCE: "https://github.com/Filroden/Filrodens-world-map-builder/blob/main/LICENSE.md",
         SPONSOR: "https://github.com/sponsors/Filroden",
         CHANGELOG: "https://filroden.com/modules/filroden-s-world-map-builder/",
-        WIKI: "https://github.com/Filroden/Filrodens-world-map-builder/wiki",
-        TUTORIAL: "https://github.com/Filroden/Filrodens-world-map-builder/wiki/Tutorial-01-A-new-world",
+        WIKI: "https://filroden.com/modules/filroden-s-world-map-builder/wiki/",
+        TUTORIAL: "https://filroden.com/modules/filroden-s-world-map-builder/wiki/tutorial-01-a-new-world/",
         ISSUE: "https://github.com/Filroden/Filrodens-world-map-builder/issues/new",
         // The other host: the web version from Foundry, the Foundry module from the web
         WEB_VERSION: "https://fwmb.filroden.com",
