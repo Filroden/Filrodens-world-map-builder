@@ -4,7 +4,7 @@
 
 **Goal:** Read what the generator worked out about your world, see it as it was in an earlier age, and time a journey across it.
 
-**Opening narration:** In this tutorial we're going to explore the world the generator made: its people and trade, its history, and how long it takes to travel.
+**Opening narration:** Let's explore the world the generator made: its people and trade, its history, and how long it takes to travel.
 
 ## 1. Show the population
 

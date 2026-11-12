@@ -25,7 +25,7 @@ export default {
     intro: `The **Regions** tool shows the map's areas: kingdoms and their duchies, but also climate bands, trade zones or a campaign's explored land. Regions are painted onto the map's cells, so neighbouring regions always share their border exactly. They are organised in **layer sets** (one way of dividing the map), each holding **layers** (Realms, then Duchies below them, then Counties), each holding its **regions**.
 
 The run on page 5 made a set called **Political**. Anything you change in it is kept when you generate again.`,
-    narration: "In this tutorial we're going to make the generated realms our own, and paint a region of our own.",
+    narration: "The generator has made its realms. Now we'll make them our own, then paint a region by hand.",
 
     steps: [
         {

@@ -4,7 +4,7 @@
 
 **Goal:** Add and remove river sources, draw a river of your own, and open a rift valley with a tectonic feature, reshaping it by its points and with Undo.
 
-**Opening narration:** In this tutorial we're going to finish shaping the land: we'll add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.
+**Opening narration:** Time to finish shaping the land: we'll add a river where there was none, remove another, draw a river of our own, and open a rift valley across the continent.
 
 ## 1. Open Rivers and faults
 

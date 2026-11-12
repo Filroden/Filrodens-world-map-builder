@@ -31,7 +31,7 @@ export default {
     start: "08-places-and-labels",
     goal: "Read what the generator worked out about your world, see it as it was in an earlier age, and time a journey across it.",
     intro: `A run of **Generate** works out more than it places on the map: how many people live on every part of the land, which people they are, how much trade passes along each route, and what the world was like in each of its ages. The **thematic layers**, in the map controls, draw those figures over the map. The **History** and **Travel** tools, in the **Explore** stage of the rail, are for looking at a finished world: History shows it as it was in an earlier age, and Travel shows how long journeys take. None of them changes the map.`,
-    narration: "In this tutorial we're going to explore the world the generator made: its people and trade, its history, and how long it takes to travel.",
+    narration: "Let's explore the world the generator made: its people and trade, its history, and how long it takes to travel.",
 
     steps: [
         {

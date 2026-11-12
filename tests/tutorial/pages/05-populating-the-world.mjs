@@ -31,7 +31,7 @@ export default {
     start: "04-rivers-and-faults",
     goal: "Give the world two peoples and a history, and let Generate settle it: towns, castles, roads, sea lanes, realms, duchies and counties, all named.",
     intro: `With the land finished, the **Generate** tool works out where people would live on it and populates the whole map in one run. It reads the land you have shaped (the height and ruggedness of the ground, the climate, the biomes, the rivers and the coast), founds towns where the land can feed them, traces the trade between them, and divides the land into realms. Everything it makes is ordinary map content, which the next pages edit and add to by hand.`,
-    narration: "In this tutorial we're going to populate the world: give it two cultures, a short history, and one run of the generator.",
+    narration: "With the land finished, we can populate the world: two cultures, a short history, and one run of the generator.",
 
     steps: [
         {

@@ -28,7 +28,7 @@ export default {
     intro: `Places are **pins**: a point on the map with an icon, a name and a description. The run on page 5 placed nearly two thousand, from capitals to villages, each on a **pin style** (Capital, City, Town, Castle and so on) that sets its look and the **detail levels** at which it and its name are shown.
 
 Every name on the map is a **label**: the labels of pins, routes and regions follow their owner's name, and **standalone** labels name anything else, such as a sea or a mountain range. Names are placed so they don't cover each other; a name with no room is left out until you place it yourself.`,
-    narration: "In this tutorial we're going to work with the map's places and names: we'll lock a generated city so it is kept, add a castle of our own, name the seas, mountains and forests, and move a name the map had no room for.",
+    narration: "Now for the map's places and names: we'll lock a generated city so it's kept, add a castle of our own, name the seas, mountains and forests, and move a name the map had no room for.",
 
     steps: [
         {

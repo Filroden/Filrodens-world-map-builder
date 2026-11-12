@@ -4,7 +4,7 @@
 
 **Goal:** Make the generated realms your own, merging, renaming and recolouring them, and paint a region of your own in a set of its own.
 
-**Opening narration:** In this tutorial we're going to make the generated realms our own, and paint a region of our own.
+**Opening narration:** The generator has made its realms. Now we'll make them our own, then paint a region by hand.
 
 ## 1. Open Regions
 

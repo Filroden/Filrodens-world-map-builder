@@ -4,7 +4,7 @@
 
 **Goal:** Find and change many items at once, control what your players see, and trace a map of your own from an existing image.
 
-**Opening narration:** In this last tutorial we're going to look at finding and changing many places at once, keeping secrets from your players, and tracing a map from an existing image.
+**Opening narration:** Finally, some further tips: finding and changing many places at once, keeping secrets from your players, and tracing a map from an existing image.
 
 ## 1. Search the lists
 

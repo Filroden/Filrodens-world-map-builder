@@ -4,7 +4,7 @@
 
 **Goal:** Cut a regional map of the Red Hills from the world map, fill it in with villages and market towns, and read it closely.
 
-**Opening narration:** In this tutorial we're going to crop a regional map of the Red Hills from the world map, and fill it in with additional villages and market towns.
+**Opening narration:** Now we'll crop a regional map of the Red Hills from the world map, and fill it in with more villages and market towns.
 
 ## 1. Draw the crop
 

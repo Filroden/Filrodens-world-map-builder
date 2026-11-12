@@ -31,7 +31,7 @@ export default {
     start: "06-realms-and-provinces",
     goal: "Draw a road and a sea lane of your own by their waypoints, and reshape a route by moving a waypoint.",
     intro: `The **Routes and pins** tool places the lines and points of the map: **routes** (roads, sea lanes and the river trade the run made) and **pins** (places). A route is a chain of **waypoints**, and the module finds the way between each pair for you over the map's cells: a road keeps to land and winds round steep ground, a sea lane keeps to water.`,
-    narration: "In this tutorial we're going to draw routes of our own: a road through the Red Hills, and a sea lane to the island realm.",
+    narration: "Next we'll draw routes of our own: a road through the Red Hills, and a sea lane to the island realm.",
 
     steps: [
         {

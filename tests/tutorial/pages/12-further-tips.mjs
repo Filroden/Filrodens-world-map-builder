@@ -47,7 +47,7 @@ export default {
     start: "11-a-regional-map",
     goal: "Find and change many items at once, control what your players see, and trace a map of your own from an existing image.",
     intro: `This last page answers the questions asked most often. Its first part carries on with the regional map from page 11: finding items in the long lists, changing many at once, and deciding what your players see. Its second part starts a new map, traced over an image of an existing map with the **Reference image** tool.`,
-    narration: "In this last tutorial we're going to look at finding and changing many places at once, keeping secrets from your players, and tracing a map from an existing image.",
+    narration: "Finally, some further tips: finding and changing many places at once, keeping secrets from your players, and tracing a map from an existing image.",
 
     steps: [
         {

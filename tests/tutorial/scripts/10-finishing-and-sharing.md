@@ -4,7 +4,7 @@
 
 **Goal:** Give the map its finishing touches, export it as an image, and keep a backup of your maps.
 
-**Opening narration:** In this tutorial we're going to finish the map with a scale bar, a border, a compass rose and a title, set its grid, export it as an image, and back it up.
+**Opening narration:** To finish the map, we'll add a scale bar, a border, a compass rose and a title, set its grid, export it as an image, and back it up.
 
 ## 1. Add a scale bar and a border
 

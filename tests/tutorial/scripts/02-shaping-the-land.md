@@ -4,7 +4,7 @@
 
 **Goal:** Use the Terrain tool to set how the engine shapes the coast, the land and the sea, then sculpt the ground by hand with the terrain brushes.
 
-**Opening narration:** In this tutorial we're going to use the Terrain tool to give our Tutorial world its final shape: a gentler coastline, broad lowlands and wide shallow seas. And then we'll sculpt a ridge by hand.
+**Opening narration:** Now we'll use the Terrain tool to give our world its final shape: a gentler coastline, broad lowlands and wide shallow seas. Then we'll sculpt a ridge by hand.
 
 ## 1. Open Terrain
 

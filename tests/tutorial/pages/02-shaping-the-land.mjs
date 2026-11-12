@@ -37,7 +37,7 @@ export default {
     intro: `On a Guided map your land masks decide where the land is; the **Terrain** tool decides what it looks like. Its **Generation** settings shape the coast and the rise of the land and sea floor across the whole map, and its brushes let you sculpt the ground in one place.
 
 Each **Generation** setting rebuilds the whole map, which takes a few seconds at this size: wait for the map to update before changing the next one.`,
-    narration: "In this tutorial we're going to use the Terrain tool to give our Tutorial world its final shape: a gentler coastline, broad lowlands and wide shallow seas. And then we'll sculpt a ridge by hand.",
+    narration: "Now we'll use the Terrain tool to give our world its final shape: a gentler coastline, broad lowlands and wide shallow seas. Then we'll sculpt a ridge by hand.",
 
     steps: [
         {

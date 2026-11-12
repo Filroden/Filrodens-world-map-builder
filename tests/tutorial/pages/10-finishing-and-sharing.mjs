@@ -26,7 +26,7 @@ export default {
     start: "09-exploring-the-world",
     goal: "Give the map its finishing touches, export it as an image, and keep a backup of your maps.",
     intro: `The **Finish** stage of the rail has two tools. **Cartography** adds what is drawn over the map: a scale bar, a border, the grid, a compass rose, a cartouche holding the map's title, and images of your own. **Export** turns the map into an image, and in Foundry into a scene. An export shows the map as the map controls show it, so choosing what to include is part of exporting.`,
-    narration: "In this tutorial we're going to finish the map with a scale bar, a border, a compass rose and a title, set its grid, export it as an image, and back it up.",
+    narration: "To finish the map, we'll add a scale bar, a border, a compass rose and a title, set its grid, export it as an image, and back it up.",
 
     steps: [
         {

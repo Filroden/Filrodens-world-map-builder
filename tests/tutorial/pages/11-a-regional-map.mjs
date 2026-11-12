@@ -27,7 +27,7 @@ export default {
     intro: `A world map shows a realm in a few hundred pixels. A **regional map** is a new map cut from part of another, at a higher resolution: the coastlines, terrain and biome borders gain finer detail, and everything on the parent comes with it (the realms, places, routes and names, your own and the run's). It keeps a copy of the parent's run over its area, so it can be **filled in** with the villages and market towns that lie between the parent's towns, joined to its roads by lanes.
 
 Once made, a regional map is a map of its own: changing it doesn't change the world map, or the other way round.`,
-    narration: "In this tutorial we're going to crop a regional map of the Red Hills from the world map, and fill it in with additional villages and market towns.",
+    narration: "Now we'll crop a regional map of the Red Hills from the world map, and fill it in with more villages and market towns.",
 
     steps: [
         {

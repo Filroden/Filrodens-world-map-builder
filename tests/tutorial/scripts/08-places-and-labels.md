@@ -4,7 +4,7 @@
 
 **Goal:** Keep a generated place, add a place of your own, change a pin style, name the seas, mountains, forests and rivers, and place a name that had no room.
 
-**Opening narration:** In this tutorial we're going to work with the map's places and names: we'll lock a generated city so it is kept, add a castle of our own, name the seas, mountains and forests, and move a name the map had no room for.
+**Opening narration:** Now for the map's places and names: we'll lock a generated city so it's kept, add a castle of our own, name the seas, mountains and forests, and move a name the map had no room for.
 
 ## 1. Find a place
 

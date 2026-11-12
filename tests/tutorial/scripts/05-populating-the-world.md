@@ -4,7 +4,7 @@
 
 **Goal:** Give the world two peoples and a history, and let Generate settle it: towns, castles, roads, sea lanes, realms, duchies and counties, all named.
 
-**Opening narration:** In this tutorial we're going to populate the world: give it two cultures, a short history, and one run of the generator.
+**Opening narration:** With the land finished, we can populate the world: two cultures, a short history, and one run of the generator.
 
 ## 1. Open Generate
 
