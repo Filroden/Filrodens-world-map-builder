@@ -3,10 +3,10 @@
 // writes them to tutorial-full.chapters.txt); a new render with different timings means new times here.
 
 /** The video's address. */
-export const VIDEO_URL = "https://www.youtube.com/watch?v=SEpRTlme3Tg";
+export const VIDEO_URL = "https://www.youtube.com/watch?v=8b0JylzSSD0";
 
 /** Where each page's chapter starts, in seconds, by page number; the last entry is where the closing starts. */
-const STARTS = [90, 202, 325, 403, 497, 583, 660, 720, 818, 908, 963, 1019, 1166];
+const STARTS = [90, 205, 328, 401, 497, 587, 665, 724, 817, 909, 980, 1033, 1183];
 
 /**
  * A page's chapter: the link that starts the video there, and its length in whole minutes (at least one).
