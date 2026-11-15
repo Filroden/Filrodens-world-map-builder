@@ -3,7 +3,7 @@
     brush is in use), then the terrain's shading and water, which only redraw. The brush and its
     modes are on the bar above the map.
 --}}
-{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="terrainGeneration" title="FILRODENSWMB.UI.SectionGeneration" badge="FILRODENSWMB.UI.BadgeRebuildsMap" rebuilds=true}}
+{{#> "modules/filrodens-world-map-builder/templates/parts/section.hbs" id="terrainGeneration" title="FILRODENSWMB.UI.SectionLandforms" badge="FILRODENSWMB.UI.BadgeRebuildsMap" rebuilds=true}}
     <!-- 1. Global Settings (Visible in Standard and Flat modes) -->
     {{#unless (or (eq uiState.generationEngine "advanced") (eq uiState.generationEngine "guided"))}}
         {{> "modules/filrodens-world-map-builder/templates/parts/shared-range.hbs" name="seaLevel" label="FILRODENSWMB.UI.SeaLevel" value=uiState.seaLevel min=0 max=1 step=0.01}}

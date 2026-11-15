@@ -335,9 +335,9 @@ export class TerrainVersion {
 
     /**
      * The version number to show beside a map's engine name, on every engine ("Guided v2", "Flat
-     * v2", "Legacy generation v1"): the map's terrain version, the rules its terrain is made with.
+     * v2", "Legacy terrain v1"): the map's terrain version, the rules its terrain is made with.
      * A version changes how maps look with every engine (tectonic features and rivers apply to all
-     * of them), so every engine shows it, Legacy generation included.
+     * of them), so every engine shows it, Legacy terrain included.
      *
      * @param {object} state - A uiState object (reads terrainVersion).
      * @returns {number}

@@ -3944,6 +3944,11 @@
     grid-template-columns: auto 4.5rem auto;
 }
 
+/* Folded, a slider with a unit keeps its fourth column, or the unit wraps under the value */
+.fwmb .fwmb-edit-toolbar[data-fold="3"] .fwmb-bar-range:has(> .fwmb-unit) {
+    grid-template-columns: auto 4.5rem auto auto;
+}
+
 /* A menu row that is chosen (a mode in More, the tool in use in the rail's More) */
 .fwmb .fwmb-dropdown-menu button:is([aria-current="page"], [aria-checked="true"]) {
     background: var(--fwmb-bg-highlight);

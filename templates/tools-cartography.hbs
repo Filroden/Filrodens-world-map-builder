@@ -9,7 +9,7 @@
         {{localize "FILRODENSWMB.UI.CartographyScale"}}
     </label>
         
-    {{!-- The bar's unit is the map's (New map, Generation). Matching the world works out the value
+    {{!-- The bar's unit is the map's (New map, Map setup). Matching the world works out the value
          per tick, so the value field then shows it and cannot be typed in (see MapUnit.scaleBarTick) --}}
     <label class="fwmb-setting-row" data-tooltip="{{localize 'FILRODENSWMB.UI.ScaleMatchWorldHint'}}">
         <input type="checkbox" name="cartographyScaleMatchWorld" class="fwmb-checkbox" {{#if uiState.cartographyScaleMatchWorld}}checked{{/if}}>

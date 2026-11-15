@@ -40,9 +40,9 @@ export const FILRODENSWMB = {
     },
     DEFAULTS: {
         // The engine of a new map: Advanced (tectonics), which gives the most natural worlds.
-        // Legacy generation ("standard", the original noise engine) stays for maps made with it
-        // and for anyone who chooses it, but is never the default. A saved map with no engine
-        // recorded is a Legacy generation map, since that was the only engine then.
+        // Legacy terrain ("standard", the original noise engine) stays for maps made with it, and
+        // the engine list offers it only on those maps. A saved map with no engine recorded is a
+        // Legacy terrain map, since that was the only engine then.
         ENGINE: "advanced",
         SEED: "FILRODEN",
         SEA_LEVEL: 0.35,
